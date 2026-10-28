@@ -1,0 +1,17 @@
+---
+source: language-server/src/tests/action.rs
+expression: "\npub fn main() {\n  [1, 2, 3] |> wibble(wobble:, woo: _)\n}\n"
+---
+----- BEFORE ACTION
+
+pub fn main() {
+  [1, 2, 3] |> wibble(wobble:, woo: _)
+               ↑                      
+}
+
+
+----- AFTER ACTION
+
+pub fn main() {
+  wibble(wobble:, woo: [1, 2, 3])
+}

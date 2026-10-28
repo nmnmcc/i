@@ -1,0 +1,19 @@
+[package]
+name = "wleam-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Wasmtime embedding and versioned host ABI for Wleam"
+
+[dependencies]
+anyhow.workspace = true
+num-bigint.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+wasmparser.workspace = true
+getrandom = "0.3"
+wasmtime = { version = "=50.0.0", default-features = false, features = ["anyhow", "cranelift", "gc", "gc-drc", "runtime", "std", "backtrace", "parallel-compilation"] }
+
+[dev-dependencies]
+wat = "=1.262.0"

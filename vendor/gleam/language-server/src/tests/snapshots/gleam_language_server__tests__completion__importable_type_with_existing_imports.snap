@@ -1,0 +1,67 @@
+---
+source: language-server/src/tests/completion.rs
+expression: "\n//// Some module comments\n// Some other whitespace\n\nimport dep2\n\npub fn wibble(\n  _: String,\n) -> Nil {\n  Nil\n}\n"
+---
+
+//// Some module comments
+// Some other whitespace
+
+import dep2
+
+pub fn wibble(
+|  _: String,
+) -> Nil {
+  Nil
+}
+
+
+----- Completion content -----
+BitArray
+  kind:   Class
+  detail: Type
+  sort:   5_BitArray
+Bool
+  kind:   Class
+  detail: Type
+  sort:   5_Bool
+Float
+  kind:   Class
+  detail: Type
+  sort:   5_Float
+Int
+  kind:   Class
+  detail: Type
+  sort:   5_Int
+List
+  kind:   Class
+  detail: Type
+  sort:   5_List
+Nil
+  kind:   Class
+  detail: Type
+  sort:   5_Nil
+Result
+  kind:   Class
+  detail: Type
+  sort:   5_Result
+String
+  kind:   Class
+  detail: Type
+  sort:   5_String
+UtfCodepoint
+  kind:   Class
+  detail: Type
+  sort:   5_UtfCodepoint
+dep.Zoo
+  kind:   Class
+  detail: Type
+  sort:   6_dep.Zoo
+  edits:
+    [7:0-7:0]: "dep.Zoo"
+    [4:0-4:0]: "import dep\n"
+dep2.Zoo
+  kind:   Class
+  detail: Type
+  sort:   4_dep2.Zoo
+  edits:
+    [7:0-7:0]: "dep2.Zoo"

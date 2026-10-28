@@ -1,0 +1,22 @@
+---
+source: language-server/src/tests/action.rs
+expression: "\nimport wibble.{ThisShouldBeUnqualified}\n\npub fn main(arg: wibble.Wibble) {\n  todo\n}\n"
+---
+----- BEFORE ACTION
+
+import wibble.{ThisShouldBeUnqualified}
+
+pub fn main(arg: wibble.Wibble) {
+                        ↑        
+  todo
+}
+
+
+----- AFTER ACTION
+
+import wibble.{ThisShouldBeUnqualified}
+
+pub fn main(arg: wibble.Wibble) {
+  let ThisShouldBeUnqualified(label:) = arg
+  todo
+}

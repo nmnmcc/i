@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 The Gleam contributors
+
+fn count_down(from i) {
+  case i {
+    0 -> Nil
+    _ -> count_down(i - 1)
+  }
+}
+
+fn tail_recursive_accumulate_down(x, y) {
+  case x {
+    0 -> y
+    _ -> tail_recursive_accumulate_down(x - 1, [x, ..y])
+  }
+}
+
+fn function_shadowed_by_own_argument(function_shadowed_by_own_argument) {
+  function_shadowed_by_own_argument()
+}
+
+pub fn ten_million_recursions_doesnt_overflow_the_stack_test() -> Nil {
+  assert Nil == count_down(from: 10_000_000)
+  Nil
+}
+
+// https://github.com/gleam-lang/gleam/issues/1214
+// https://github.com/gleam-lang/gleam/issues/1380
+pub fn arguments_correctly_reassigned_test() -> Nil {
+  assert [1, 2, 3] == tail_recursive_accumulate_down(3, [])
+  Nil
+}
+
+// https://github.com/gleam-lang/gleam/issues/2400
+pub fn function_shadowed_by_own_argument_test() -> Nil {
+  assert 1 == function_shadowed_by_own_argument(fn() { 1 })
+  Nil
+}

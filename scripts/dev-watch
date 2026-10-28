@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "${WLEAM_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+exec watchexec \
+  --watch . \
+  --exts rs,gleam,toml,lock,snap \
+  --ignore target \
+  --ignore '/build/**' \
+  --ignore '**/build/wasm/**' \
+  --ignore '**/build/dev/**' \
+  --ignore '**/build/prod/**' \
+  --ignore '**/build/packages/**' \
+  --ignore .wleam \
+  --ignore '**/.wleam/**' \
+  --ignore .devenv \
+  --ignore .git \
+  --ignore node_modules \
+  --on-busy-update queue \
+  -- ./scripts/dev-test "$@"

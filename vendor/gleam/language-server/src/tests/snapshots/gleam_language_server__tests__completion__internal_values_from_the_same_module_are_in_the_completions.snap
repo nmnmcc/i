@@ -1,0 +1,61 @@
+---
+source: language-server/src/tests/completion.rs
+expression: "\n@external(wasm, \"rand\", \"uniform\")\n@internal pub fn random_float() -> Float\n@internal pub fn main() { 0 }\n@internal pub type Wibble { Wobble }\n@internal pub const wibble = 1\n"
+---
+|
+@external(wasm, "rand", "uniform")
+@internal pub fn random_float() -> Float
+@internal pub fn main() { 0 }
+@internal pub type Wibble { Wobble }
+@internal pub const wibble = 1
+
+
+----- Completion content -----
+Error
+  kind:   Constructor
+  detail: gleam
+  sort:   5_Error
+False
+  kind:   EnumMember
+  detail: gleam
+  sort:   5_False
+Nil
+  kind:   EnumMember
+  detail: gleam
+  sort:   5_Nil
+Ok
+  kind:   Constructor
+  detail: gleam
+  sort:   5_Ok
+True
+  kind:   EnumMember
+  detail: gleam
+  sort:   5_True
+Wobble
+  kind:   EnumMember
+  detail: Wibble
+  sort:   3_Wobble
+  desc:   app
+  edits:
+    [1:0-1:0]: "Wobble"
+main
+  kind:   Function
+  detail: fn() -> Int
+  sort:   3_main
+  desc:   app
+  edits:
+    [1:0-1:0]: "main"
+random_float
+  kind:   Function
+  detail: fn() -> Float
+  sort:   3_random_float
+  desc:   app
+  edits:
+    [1:0-1:0]: "random_float"
+wibble
+  kind:   Constant
+  detail: Int
+  sort:   3_wibble
+  desc:   app
+  edits:
+    [1:0-1:0]: "wibble"

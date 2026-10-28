@@ -1,0 +1,17 @@
+---
+source: language-server/src/tests/action.rs
+expression: "pub fn main() {\n  let c = [\"constant\", todo]\n}"
+---
+----- BEFORE ACTION
+pub fn main() {
+  let c = ["constant", todo]
+           ↑                
+}
+
+
+----- AFTER ACTION
+const string = "constant"
+
+pub fn main() {
+  let c = [string, todo]
+}

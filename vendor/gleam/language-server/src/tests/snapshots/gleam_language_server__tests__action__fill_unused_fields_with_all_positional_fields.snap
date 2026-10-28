@@ -1,0 +1,21 @@
+---
+source: language-server/src/tests/action.rs
+expression: "\npub type Wibble { Wibble(Int, String) }\n\npub fn main() {\n  let Wibble(..) = todo\n}"
+---
+----- BEFORE ACTION
+
+pub type Wibble { Wibble(Int, String) }
+
+pub fn main() {
+  let Wibble(..) = todo
+             ↑         
+}
+
+
+----- AFTER ACTION
+
+pub type Wibble { Wibble(Int, String) }
+
+pub fn main() {
+  let Wibble(int, string) = todo
+}

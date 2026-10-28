@@ -1,0 +1,21 @@
+---
+source: language-server/src/tests/action.rs
+expression: "\npub fn main() {\n  [1, 2, 3] |> wibble()\n}\n\nfn wibble(a) { todo }\n"
+---
+----- BEFORE ACTION
+
+pub fn main() {
+  [1, 2, 3] |> wibble()
+               ↑       
+}
+
+fn wibble(a) { todo }
+
+
+----- AFTER ACTION
+
+pub fn main() {
+  wibble([1, 2, 3])
+}
+
+fn wibble(a) { todo }

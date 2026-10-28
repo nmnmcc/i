@@ -1,0 +1,3 @@
+name = "failure_assert"
+version = "0.1.0"
+target = "wasm"

@@ -1,0 +1,14 @@
+---
+source: language-server/src/tests/completion.rs
+expression: import dep.
+---
+import dep.|
+
+
+----- Completion content -----
+Wibble
+  kind:   Class
+  detail: Type
+  sort:   4_Wibble
+  edits:
+    [0:11-0:11]: "{type Wibble}"

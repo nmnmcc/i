@@ -1,0 +1,21 @@
+---
+source: language-server/src/tests/action.rs
+expression: "import gleam/list\n\npub fn main() {\n  list.sample([4, 5, 6], 2)\n}"
+---
+----- BEFORE ACTION
+import gleam/list
+
+pub fn main() {
+  list.sample([4, 5, 6], 2)
+                         ↑ 
+}
+
+
+----- AFTER ACTION
+import gleam/list
+
+const int = 2
+
+pub fn main() {
+  list.sample([4, 5, 6], int)
+}

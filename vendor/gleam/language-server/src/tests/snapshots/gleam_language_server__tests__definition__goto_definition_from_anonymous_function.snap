@@ -1,0 +1,21 @@
+---
+source: language-server/src/tests/definition.rs
+expression: output
+---
+----- Jumping from `src/app.gleam`
+
+pub type Wibble
+
+pub fn main() {
+  fn(w: Wibble) { todo }
+         ↑              
+}
+
+----- Jumped to `src/app.gleam`
+
+pub type Wibble
+↑▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+
+pub fn main() {
+  fn(w: Wibble) { todo }
+}

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "${WLEAM_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+export CARGO_TARGET_DIR="${WLEAM_CARGO_TARGET_DIR:-$PWD/target/cargo}"
+cargo fmt --all -- --check
+cargo fmt --manifest-path vendor/gleam/Cargo.toml --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked "$@"
+cargo test --manifest-path vendor/gleam/Cargo.toml --workspace --locked
+cargo build --workspace --locked
+cargo build --release --locked -p wleam-runner
+python3 scripts/conformance.py \
+  --compiler "$CARGO_TARGET_DIR/debug/wleam" \
+  --runner "$CARGO_TARGET_DIR/release/wleam-runner" \
+  --reference-gleam "${WLEAM_REFERENCE_GLEAM:-$(command -v gleam)}"
+npm ci --ignore-scripts
+npm test
+npm run test:browser

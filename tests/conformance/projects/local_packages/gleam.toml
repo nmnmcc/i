@@ -1,0 +1,6 @@
+name = "local_packages"
+version = "0.1.0"
+target = "wasm"
+
+[dependencies]
+local_math = { path = "deps/local_math" }

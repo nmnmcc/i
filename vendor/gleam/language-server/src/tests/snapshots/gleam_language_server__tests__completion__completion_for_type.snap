@@ -1,0 +1,15 @@
+---
+source: language-server/src/tests/completion.rs
+expression: "pub fn new() -> wibble.Wibble {}"
+---
+pub fn new() -> wibble.|Wibble {}
+
+
+----- Completion content -----
+wibble.Wibble
+  kind:   Class
+  detail: Type
+  sort:   6_wibble.Wibble
+  edits:
+    [0:16-0:29]: "wibble.Wibble"
+    [0:0-0:0]: "import wibble\n\n"

@@ -1,0 +1,17 @@
+---
+source: language-server/src/tests/action.rs
+expression: "\npub fn main() {\n  let my_value = 10\n}\n"
+---
+----- BEFORE ACTION
+
+pub fn main() {
+  let my_value = 10
+  ▔▔▔▔▔▔▔▔▔▔▔▔▔↑   
+}
+
+
+----- AFTER ACTION
+
+pub fn main() {
+  let my_value: Int = 10
+}

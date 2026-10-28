@@ -1,0 +1,79 @@
+---
+source: compiler-core/src/parse/tests.rs
+expression: "import wibble.{type Wobble, Wobble, type Wabble}"
+---
+Parsed {
+    module: Module {
+        name: "",
+        documentation: [],
+        type_info: (),
+        definitions: [
+            TargetedDefinition {
+                definition: Import(
+                    Import {
+                        documentation: None,
+                        location: SrcSpan {
+                            start: 0,
+                            end: 48,
+                        },
+                        module_location: SrcSpan {
+                            start: 7,
+                            end: 13,
+                        },
+                        module: "wibble",
+                        as_name: None,
+                        unqualified_values: [
+                            UnqualifiedImport {
+                                location: SrcSpan {
+                                    start: 28,
+                                    end: 34,
+                                },
+                                name: "Wobble",
+                                name_position: 28,
+                                as_name: None,
+                            },
+                        ],
+                        unqualified_types: [
+                            UnqualifiedImport {
+                                location: SrcSpan {
+                                    start: 15,
+                                    end: 26,
+                                },
+                                name: "Wobble",
+                                name_position: 20,
+                                as_name: None,
+                            },
+                            UnqualifiedImport {
+                                location: SrcSpan {
+                                    start: 36,
+                                    end: 47,
+                                },
+                                name: "Wabble",
+                                name_position: 41,
+                                as_name: None,
+                            },
+                        ],
+                        package: (),
+                    },
+                ),
+                target: None,
+            },
+        ],
+        names: Names {
+            local_types: {},
+            imported_modules: {},
+            type_variables: {},
+            local_value_constructors: {},
+            reexport_aliases: {},
+        },
+        unused_definition_positions: {},
+    },
+    extra: ModuleExtra {
+        module_comments: [],
+        doc_comments: [],
+        comments: [],
+        empty_lines: [],
+        new_lines: [],
+        trailing_commas: [],
+    },
+}

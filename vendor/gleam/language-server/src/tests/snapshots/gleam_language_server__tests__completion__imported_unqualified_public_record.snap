@@ -1,0 +1,43 @@
+---
+source: language-server/src/tests/completion.rs
+expression: "\nimport dep.{Box}\n"
+---
+|
+import dep.{Box}
+
+
+----- Completion content -----
+Box
+  kind:   Constructor
+  detail: fn(Int) -> Box
+  sort:   4_Box
+  desc:   app
+  edits:
+    [1:0-1:0]: "Box"
+Error
+  kind:   Constructor
+  detail: gleam
+  sort:   5_Error
+False
+  kind:   EnumMember
+  detail: gleam
+  sort:   5_False
+Nil
+  kind:   EnumMember
+  detail: gleam
+  sort:   5_Nil
+Ok
+  kind:   Constructor
+  detail: gleam
+  sort:   5_Ok
+True
+  kind:   EnumMember
+  detail: gleam
+  sort:   5_True
+dep.Box
+  kind:   Constructor
+  detail: fn(Int) -> Box
+  sort:   4_dep.Box
+  desc:   app
+  edits:
+    [1:0-1:0]: "dep.Box"

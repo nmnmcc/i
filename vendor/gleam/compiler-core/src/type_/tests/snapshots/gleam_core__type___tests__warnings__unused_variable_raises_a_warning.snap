@@ -1,0 +1,23 @@
+---
+source: compiler-core/src/type_/tests/warnings.rs
+expression: "\npub fn main() {\n  let number = 1\n  number\n  1\n}\n"
+---
+----- SOURCE CODE
+
+pub fn main() {
+  let number = 1
+  number
+  1
+}
+
+
+----- WARNING
+warning: Unused value
+  ┌─ /src/warning/wrn.gleam:4:3
+  │
+4 │   number
+  │   ^^^^^^ This value is never used
+
+This expression computes a value without any side effects, but then the
+value isn't used at all. You might want to assign it to a variable, or
+delete the expression entirely if it's not needed.

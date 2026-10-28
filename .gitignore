@@ -1,0 +1,17 @@
+/target/
+/.devenv/
+/.direnv/
+/.env
+/node_modules/
+/playwright-report/
+/test-results/
+/build/
+/examples/**/build/
+/tests/**/build/
+/stdlib/build/
+/vendor/gleam/target/
+**/.wleam/
+*.profraw
+
+__pycache__/
+*.pyc

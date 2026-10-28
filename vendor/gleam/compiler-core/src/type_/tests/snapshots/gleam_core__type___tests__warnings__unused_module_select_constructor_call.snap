@@ -1,0 +1,26 @@
+---
+source: compiler-core/src/type_/tests/warnings.rs
+expression: "\nimport wibble\n\npub fn main() {\n  wibble.Wibble(1)\n  1\n}\n"
+---
+----- SOURCE CODE
+-- wibble.gleam
+pub type Wibble { Wibble(Int) }
+
+-- main.gleam
+
+import wibble
+
+pub fn main() {
+  wibble.Wibble(1)
+  1
+}
+
+
+----- WARNING
+warning: Unused literal
+  ┌─ /src/warning/wrn.gleam:5:3
+  │
+5 │   wibble.Wibble(1)
+  │   ^^^^^^^^^^^^^^^^ This value is never used
+
+Hint: You can safely remove it.

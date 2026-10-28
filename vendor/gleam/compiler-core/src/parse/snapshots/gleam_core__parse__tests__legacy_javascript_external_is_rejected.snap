@@ -1,0 +1,21 @@
+---
+source: compiler-core/src/parse/tests.rs
+expression: "\n@external(javascript, \"one\", \"two\")\n@external(javascript, \"three\", \"four\")\npub fn one(x: Int) -> Int {\n  todo\n}\n"
+---
+----- SOURCE CODE
+
+@external(javascript, "one", "two")
+@external(javascript, "three", "four")
+pub fn one(x: Int) -> Int {
+  todo
+}
+
+
+----- ERROR
+error: Syntax error
+  ┌─ /src/parse/error.gleam:2:11
+  │
+2 │ @external(javascript, "one", "two")
+  │           ^^^^^^^^^^ I don't recognise this target
+
+Wleam supports only the `wasm` target. Replace platform-specific declarations with a Wasm implementation.

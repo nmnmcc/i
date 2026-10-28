@@ -1,0 +1,11 @@
+---
+source: language-server/src/tests/action.rs
+expression: "pub fn main() { 1 }"
+---
+----- BEFORE ACTION
+pub fn main() { 1 }
+              ↑    
+
+
+----- AFTER ACTION
+pub fn main() -> Int { 1 }

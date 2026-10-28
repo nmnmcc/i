@@ -1,0 +1,44 @@
+name: Verify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conformance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      - name: Verify fixed Cargo toolchain and all hosts
+        run: nix run github:cachix/devenv/v2.4.0 -- test
+      - name: Build compiler with Blaze
+        run: nix run github:cachix/devenv/v2.4.0 -- tasks run dev:build
+      - name: Compare Cargo and Blaze compiler artifacts and behavior
+        run: |
+          nix run github:cachix/devenv/v2.4.0 -- shell -- \
+            python3 scripts/conformance.py \
+            --compiler target/cargo/debug/wleam \
+            --runner target/cargo/release/wleam-runner \
+            --compare-compiler target/debug/wleam \
+            --output target/conformance/blaze
+      - name: Retain conformance evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: conformance-${{ github.run_id }}
+          path: |
+            target/conformance
+            target/browser
+            test-results
+            playwright-report
+          retention-days: 14

@@ -1,0 +1,40 @@
+---
+source: language-server/src/tests/completion.rs
+expression: "\nimport dep.{}\n\npub fn main() {\n  0\n}"
+---
+
+import dep.{|}
+
+pub fn main() {
+  0
+}
+
+
+----- Completion content -----
+Wibble
+  kind:   Class
+  detail: Type
+  sort:   4_Wibble
+  edits:
+    [1:12-1:12]: "type Wibble"
+myfun
+  kind:   Function
+  detail: fn() -> Int
+  sort:   4_myfun
+  desc:   dep
+  edits:
+    [1:12-1:12]: "myfun"
+wabble
+  kind:   Constant
+  detail: String
+  sort:   4_wabble
+  desc:   dep
+  edits:
+    [1:12-1:12]: "wabble"
+wibble
+  kind:   Constant
+  detail: String
+  sort:   4_wibble
+  desc:   dep
+  edits:
+    [1:12-1:12]: "wibble"

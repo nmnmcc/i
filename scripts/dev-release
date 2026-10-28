@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "${WLEAM_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+export CARGO_TARGET_DIR="${WLEAM_CARGO_TARGET_DIR:-$PWD/target/cargo}"
+release_target="${CARGO_BUILD_TARGET:-}"
+read_target=false
+for argument in "$@"; do
+  if "$read_target"; then
+    release_target="$argument"
+    read_target=false
+  elif [[ "$argument" == --target ]]; then
+    read_target=true
+  elif [[ "$argument" == --target=* ]]; then
+    release_target="${argument#--target=}"
+  fi
+done
+cargo build --workspace --release --locked "$@"
+package_arguments=()
+if [[ -n "$release_target" ]]; then
+  package_arguments+=(--target "$release_target" --binaries "$CARGO_TARGET_DIR/$release_target/release")
+fi
+exec python3 "$PWD/scripts/dev-package" "${package_arguments[@]}"

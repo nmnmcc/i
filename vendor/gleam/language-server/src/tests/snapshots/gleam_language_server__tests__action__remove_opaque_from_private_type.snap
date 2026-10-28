@@ -1,0 +1,15 @@
+---
+source: language-server/src/tests/action.rs
+expression: "opaque type Wibble {\n  Wobble\n}\n"
+---
+----- BEFORE ACTION
+opaque type Wibble {
+            ↑       
+  Wobble
+}
+
+
+----- AFTER ACTION
+type Wibble {
+  Wobble
+}

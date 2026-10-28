@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 The Gleam contributors
+
+const const_int = 5
+
+const const_float = 1.0
+
+const const_string = "Gleam"
+
+const const_nil = Nil
+
+const const_ok = Ok(1)
+
+const const_list_empty = []
+
+const const_list_1 = [1]
+
+const const_list_2 = [1, 2]
+
+pub fn int_test() {
+  assert const_int == 5
+}
+
+pub fn float_test() {
+  assert const_float == 1.0
+}
+
+pub fn string_test() {
+  assert const_string == "Gleam"
+}
+
+pub fn nil_test() {
+  assert const_nil == Nil
+}
+
+pub fn ok_test() {
+  assert const_ok == Ok(1)
+}
+
+pub fn list_empty_test() {
+  assert const_list_empty == []
+}
+
+pub fn list_1_test() {
+  assert const_list_1 == [1]
+}
+
+pub fn list_2_test() {
+  assert const_list_2 == [1, 2]
+}
+
+const message = "hello"
+
+// https://github.com/gleam-lang/gleam/issues/6045
+pub fn constant_string_in_bit_array_segment_test() {
+  assert <<"hello">> == <<message:utf8>>
+  assert <<"hello":utf8>> == <<message:utf8>>
+}
+
+const message_2 = message
+
+const message_3 = message_2 <> "?"
+
+// https://github.com/gleam-lang/gleam/issues/6086
+pub fn constant_aliased_string_in_bit_arrays_test() {
+  assert <<"hello">> == <<message_2:utf8>>
+  assert <<"hello":utf8>> == <<message_2:utf8>>
+  assert "hello!" == message_2 <> "!"
+  assert "hello?!" == message_3 <> "!"
+  let subject = "hello!"
+  assert case subject {
+    wibble if wibble == message_2 <> "!" -> True
+    _ -> False
+  }
+}

@@ -1,0 +1,25 @@
+---
+source: compiler-core/src/type_/tests/warnings.rs
+expression: "\npub fn main() {\n    1\n    |> fn(n) { n + 1 }\n\n    Nil\n}\n"
+---
+----- SOURCE CODE
+
+pub fn main() {
+    1
+    |> fn(n) { n + 1 }
+
+    Nil
+}
+
+
+----- WARNING
+warning: Unused value
+  ┌─ /src/warning/wrn.gleam:3:5
+  │  
+3 │ ╭     1
+4 │ │     |> fn(n) { n + 1 }
+  │ ╰──────────────────────^ This value is never used
+
+This expression computes a value without any side effects, but then the
+value isn't used at all. You might want to assign it to a variable, or
+delete the expression entirely if it's not needed.

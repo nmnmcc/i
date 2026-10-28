@@ -1,0 +1,32 @@
+---
+source: compiler-core/src/config.rs
+assertion_line: 1355
+expression: output
+---
+--- GLEAM.TOML
+
+name = "my_project"
+version = "1.0.0"
+
+
+--- EXPORTED JSON
+
+{
+  "name": "my_project",
+  "version": "1.0.0",
+  "gleam": null,
+  "licences": [],
+  "description": "",
+  "documentation": {
+    "pages": []
+  },
+  "dependencies": {},
+  "dev_dependencies": {},
+  "repository": null,
+  "links": [],
+  "target": "wasm",
+  "wasm": {
+    "exports": []
+  },
+  "internal_modules": null
+}

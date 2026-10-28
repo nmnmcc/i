@@ -1,0 +1,19 @@
+---
+source: compiler-core/src/type_/tests/warnings.rs
+expression: "import gleam/one.{two} as three"
+---
+----- SOURCE CODE
+-- gleam/one.gleam
+pub fn two() { 1 }
+
+-- main.gleam
+import gleam/one.{two} as three
+
+----- WARNING
+warning: Unused imported module
+  ┌─ /src/warning/wrn.gleam:1:1
+  │
+1 │ import gleam/one.{two} as three
+  │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This imported module is never used
+
+Hint: You can safely remove it.

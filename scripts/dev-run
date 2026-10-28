@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "${WLEAM_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+export BLAZE_HOME="${BLAZE_HOME:-$PWD/.devenv/state/blaze}"
+runner="${WLEAM_CARGO_TARGET_DIR:-$PWD/target/cargo}/release/wleam-runner"
+if [[ -z "${WLEAM_RUNNER:-}" && -x "$runner" ]]; then
+  export WLEAM_RUNNER="$runner"
+fi
+unset CARGO_TARGET_DIR
+exec blaze run --bin wleam -- "$@"

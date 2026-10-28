@@ -1,0 +1,17 @@
+---
+source: language-server/src/tests/action.rs
+expression: "\npub fn main() {\n  1.0 >= 2.3\n}\n"
+---
+----- BEFORE ACTION
+
+pub fn main() {
+  1.0 >= 2.3
+  ↑         
+}
+
+
+----- AFTER ACTION
+
+pub fn main() {
+  1.0 >=. 2.3
+}

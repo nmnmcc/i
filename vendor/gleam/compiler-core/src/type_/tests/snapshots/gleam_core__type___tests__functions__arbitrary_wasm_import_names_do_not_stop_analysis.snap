@@ -1,0 +1,34 @@
+---
+source: compiler-core/src/type_/tests/functions.rs
+assertion_line: 240
+expression: "\n@external(wasm, \"somemodule\", \"() => 123\")\npub fn one() -> Nil {\n  Nil\n}\n\npub fn two() -> Nil {\n  \"\"\n}\n"
+---
+----- SOURCE CODE
+
+@external(wasm, "somemodule", "() => 123")
+pub fn one() -> Nil {
+  Nil
+}
+
+pub fn two() -> Nil {
+  ""
+}
+
+
+----- ERROR
+error: Type mismatch
+  ┌─ /src/one/two.gleam:8:3
+  │
+8 │   ""
+  │   ^^
+
+The type of this returned value doesn't match the return type
+annotation of this function.
+
+Expected type:
+
+    Nil
+
+Found type:
+
+    String

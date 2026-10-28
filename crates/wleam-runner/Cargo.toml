@@ -1,0 +1,22 @@
+[package]
+name = "wleam-runner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Isolated Wasmtime host for Wleam WebAssembly programs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+wleam-host.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+wat = "=1.262.0"
+
+[[bin]]
+name = "wleam-runner"
+path = "src/main.rs"

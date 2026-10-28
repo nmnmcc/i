@@ -1,0 +1,29 @@
+---
+source: language-server/src/tests/definition.rs
+expression: output
+---
+Jumping to type definition
+
+----- Jumping from `src/app.gleam`
+
+pub type Wibble {
+  Wibble
+}
+
+pub fn main() {
+  let x = Wibble
+  x
+  ↑
+}
+
+----- Jumped to `src/app.gleam`
+
+pub type Wibble {
+↑▔▔▔▔▔▔▔▔▔▔▔▔▔▔  
+  Wibble
+}
+
+pub fn main() {
+  let x = Wibble
+  x
+}

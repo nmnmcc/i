@@ -1,0 +1,17 @@
+name = "host_abi"
+version = "1.0.0"
+target = "wasm"
+
+[wasm]
+exports = [
+  "host_abi.echo_int",
+  "host_abi.echo_string",
+  "host_abi.echo_bits",
+  "host_abi.echo_ref",
+  "host_abi.echo_bool",
+  "host_abi.echo_float",
+  "host_abi.echo_nil",
+  "host_abi.reference_same",
+  "host_abi.unaligned_bits",
+  "host_abi.panic_now",
+]
