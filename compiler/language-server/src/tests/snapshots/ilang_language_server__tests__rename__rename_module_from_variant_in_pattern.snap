@@ -1,0 +1,35 @@
+---
+source: language-server/src/tests/rename.rs
+expression: "\nimport option\n\npub fn is_some(option) {\n  case option {\n    option.  Some(_) -> True\n    option  .None -> False\n  }\n}\n"
+---
+----- BEFORE RENAME
+-- option.i
+pub type Option(a) { Some(a) None }
+
+-- app.i
+
+import option
+
+pub fn is_some(option) {
+  case option {
+    option.  Some(_) -> True
+    ↑▔▔▔▔▔                  
+    option  .None -> False
+  }
+}
+
+
+----- AFTER RENAME
+-- option.i
+pub type Option(a) { Some(a) None }
+
+-- app.i
+
+import option as opt
+
+pub fn is_some(option) {
+  case option {
+    opt.  Some(_) -> True
+    opt  .None -> False
+  }
+}

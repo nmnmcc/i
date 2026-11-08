@@ -1,0 +1,21 @@
+---
+source: language-server/src/tests/action.rs
+expression: "\nimport i/io\n\npub fn main() {\n  i.println(\"Hello, world!\")\n}\n"
+---
+----- BEFORE ACTION
+
+import i/io
+
+pub fn main() {
+  i.println("Hello, world!")
+  ▔▔↑                       
+}
+
+
+----- AFTER ACTION
+
+import i/io
+
+pub fn main() {
+  io.println("Hello, world!")
+}

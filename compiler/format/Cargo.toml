@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2020 The Gleam contributors
+
+[package]
+name = "ilang-format"
+version = "0.1.0"
+authors = ["Louis Pilfold <louis@lpil.uk>"]
+edition = "2024"
+license = "Apache-2.0"
+
+[dependencies]
+ilang-core = { path = "../compiler-core" }
+pretty-arena = { path = "../pretty-arena" }
+src-span.workspace = true
+itertools.workspace = true
+vec1.workspace = true
+camino.workspace = true
+ecow.workspace = true
+pretty_assertions.workspace = true

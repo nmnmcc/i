@@ -39,7 +39,7 @@ the pinned nightly's linker wrappers so Devenv's response-file mode works.
 
 The pinned base also carries the small upstream fix
 [`7145b282`](https://github.com/indexable-inc/blaze/commit/7145b282f6c3adccee8f24b200cb0270eba477fc),
-recorded in `patches/wleam-blaze-upstream-static-path.patch`. It canonicalizes
+recorded in `patches/ilang-blaze-upstream-static-path.patch`. It canonicalizes
 standard-library/Cargo source paths in static symbol identities and increments
 the std cache format. Without it, a std archive made under another sysroot can
 make even a minimal Rust test fail to find `__RUST_STD_INTERNAL_VAL`. The
@@ -51,7 +51,7 @@ The upstream MIT license for this patch is retained in
 ```sh
 devenv tasks run dev:build
 devenv tasks run dev:test
-wleam-dev --help
+i-dev --help
 devenv tasks run dev:watch
 ```
 
@@ -60,12 +60,12 @@ The Wasmtime executor is built independently as part of full verification or a
 release. Pass package/test selectors directly when needed:
 
 ```sh
-./scripts/dev-test -p wleam-wasm
+./scripts/dev-test -p ilang-wasm
 ./scripts/dev-run build
 devenv tasks run tools:blaze-smoke
 ```
 
-For `wleam-dev run` and `wleam-dev test`, build the independent executor once
+For `i-dev run` and `i-dev test`, build the independent executor once
 with `devenv tasks run dev:runner`. The development launcher selects the
 release executor when available: Wasmtime's JIT is much slower when its Rust
 implementation is compiled in the debug profile.
@@ -77,7 +77,7 @@ the fixture and full command output under `.devenv/state/blaze-smoke-*`.
 Sources live outside `target`: Blaze deliberately treats files below a
 directory named `target` as immutable generated output.
 
-The watcher serializes test runs after Rust, Gleam, manifest, lockfile, or snapshot
+The watcher serializes test runs after Rust, i, manifest, lockfile, or snapshot
 changes. Tests start in fresh processes. Build output, Nix state, Git metadata,
 and node_modules are excluded. It does not apply live patches to a running
 compiler or language server.
@@ -121,13 +121,13 @@ useful development feedback; fixed-toolchain verification determines whether a
 change is ready. Differential checks compare the compiler's diagnostics, Wasm,
 and runtime results across both builds. Benchmark reports distinguish Blaze's
 Nix bootstrap and daemon cold start from repeated edits, and distinguish Rust
-developer iteration from compilation of Gleam programs by Wleam.
+developer iteration from compilation of i programs.
 
 ## Initial environment validation
 
 On 2026-10-29, the pinned x86_64 Linux environment completed its tool version
-check, the full `tools:blaze-smoke` task, the Wleam `dev:build` task, and
-`wleam-dev --help`. Package-selected Blaze tests also passed all 122 Rust unit
+check, the full `tools:blaze-smoke` task, the iLang `dev:build` task, and
+`i-dev --help`. Package-selected Blaze tests also passed all 122 Rust unit
 and integration tests across the four default workspace members, including
 cross-module LSP protocol tests. These are development smoke observations from
 a changing checkout with concurrent work, not the controlled performance results in
@@ -138,9 +138,9 @@ a changing checkout with concurrent work, not the controlled performance results
 | First Nix build of the pinned Blaze distribution | Not measured | No reliable elapsed-time record was retained. |
 | Nix build with the upstream cache-path backport | Not measured | Built successfully; its elapsed time was not independently recorded. |
 | Generated two-package Cargo/Blaze smoke task | 105 s | Latest Devenv task duration, including manifest-only feature invalidation, both toolchains, and edit/restart checks. |
-| First successful Wleam Blaze build | 54.85 s | Blaze-reported build duration after earlier failed attempts had populated caches. |
-| Subsequent `wleam-dev --help` | 17.03 s | Blaze-reported build portion while source changes were still occurring. |
-| Frozen-source Wleam build after daemon restart | 23.90 s | Full Devenv command; Blaze reported 23.67 s. Nix was already realized and the disk cache was populated. |
+| First successful iLang Blaze build | 54.85 s | Blaze-reported build duration after earlier failed attempts had populated caches. |
+| Subsequent `i-dev --help` | 17.03 s | Blaze-reported build portion while source changes were still occurring. |
+| Frozen-source iLang build after daemon restart | 23.90 s | Full Devenv command; Blaze reported 23.67 s. Nix was already realized and the disk cache was populated. |
 
 These observations do not establish empty-cache or repeated unchanged-build
 performance. Measure those separately against a frozen source snapshot, with

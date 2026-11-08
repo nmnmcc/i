@@ -1,0 +1,29 @@
+---
+source: language-server/src/tests/reference.rs
+expression: "\npub type Wibble { Wibble }\n\npub fn main() -> Wibble {\n  todo\n}\n"
+---
+-- mod.i
+
+import app.{type Wibble}
+                 ▔▔▔▔▔▔ 
+
+fn wobble() -> Wibble {
+               ▔▔▔▔▔▔  
+  todo
+}
+
+fn other(w: app.Wibble) {
+                ▔▔▔▔▔▔   
+  todo
+}
+
+
+-- app.i
+
+pub type Wibble { Wibble }
+         ↑▔▔▔▔▔           
+
+pub fn main() -> Wibble {
+                 ▔▔▔▔▔▔  
+  todo
+}

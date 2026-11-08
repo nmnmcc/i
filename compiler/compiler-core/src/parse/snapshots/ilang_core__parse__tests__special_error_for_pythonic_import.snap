@@ -1,0 +1,18 @@
+---
+source: compiler-core/src/parse/tests.rs
+expression: import i.io
+---
+----- SOURCE CODE
+import i.io
+
+----- ERROR
+error: Syntax error
+  ┌─ /src/parse/error.i:1:13
+  │
+1 │ import i.io
+  │             ^ I was expecting either `/` or `.{` here.
+
+Perhaps you meant one of:
+
+    import i/io
+    import i.{item}

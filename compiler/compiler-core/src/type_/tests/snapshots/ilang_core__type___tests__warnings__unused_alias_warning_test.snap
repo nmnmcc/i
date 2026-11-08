@@ -1,0 +1,36 @@
+---
+source: compiler-core/src/type_/tests/warnings.rs
+expression: "\n            import i/wibble.{one} as wobble\n            pub const one = one\n        "
+---
+----- SOURCE CODE
+-- i/wibble.i
+pub const one = 1
+
+-- main.i
+
+            import i/wibble.{one} as wobble
+            pub const one = one
+        
+
+----- WARNING
+warning: Unused imported module alias
+  ┌─ /src/warning/wrn.i:2:39
+  │
+2 │             import i/wibble.{one} as wobble
+  │                                       ^^^^^^^^^ This alias is never used
+
+Hint: You can safely remove it.
+
+    import i/wibble as _
+
+
+warning: Shadowed Import
+  ┌─ /src/warning/wrn.i:3:13
+  │
+3 │             pub const one = one
+  │             ^^^^^^^^^^^^^ `one` is defined here
+
+Definition of one shadows an imported value.
+The imported value could not be used in this module anyway.
+
+Hint: Either rename the definition or remove the import.

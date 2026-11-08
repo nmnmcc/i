@@ -23,7 +23,7 @@ import conformance as suite
 
 def verify_module_only() -> int:
     """CLI runner hook that reports artifact identity, never test execution."""
-    expected = os.environ.get("WLEAM_ARTIFACT_EXPECTED_SHA256", "")
+    expected = os.environ.get("ILANG_ARTIFACT_EXPECTED_SHA256", "")
     if not re.fullmatch(r"[0-9a-f]{64}", expected):
         raise suite.Failure("artifact verifier requires its expected SHA-256")
     path = Path(sys.argv[1]).resolve()
@@ -134,7 +134,7 @@ def main() -> int:
                     names = suite.corpus_test_names(corpus, project)
                     if len(names) != corpus["expected_tests"]:
                         raise suite.Failure("corpus inventory changed")
-                    env = dict(os.environ, WLEAM_ARTIFACT_EXPECTED_SHA256=golden[corpus["name"]]["wasm_sha256"])
+                    env = dict(os.environ, ILANG_ARTIFACT_EXPECTED_SHA256=golden[corpus["name"]]["wasm_sha256"])
                     command = [compiler, "--project", str(project), "--no-cache", "--json", "test", "--runner", str(Path(__file__).resolve())]
                     result = suite.invoke(command, record, args.timeout, env=env)
                     suite.require_success(result)

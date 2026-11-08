@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-const port = Number(process.env.WLEAM_BROWSER_PORT ?? 4179);
+const port = Number(process.env.ILANG_BROWSER_PORT ?? 4179);
 
 export default defineConfig({
   testDir: "./tests/browser",

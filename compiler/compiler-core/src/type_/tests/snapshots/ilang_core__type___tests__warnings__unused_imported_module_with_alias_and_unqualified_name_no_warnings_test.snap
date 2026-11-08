@@ -1,0 +1,22 @@
+---
+source: compiler-core/src/type_/tests/warnings.rs
+expression: "import i/one.{two} as three\npub fn wibble() { two() }"
+---
+----- SOURCE CODE
+-- i/one.i
+pub fn two() { 1 }
+
+-- main.i
+import i/one.{two} as three
+pub fn wibble() { two() }
+
+----- WARNING
+warning: Unused imported module alias
+  ┌─ /src/warning/wrn.i:1:24
+  │
+1 │ import i/one.{two} as three
+  │                        ^^^^^^^^ This alias is never used
+
+Hint: You can safely remove it.
+
+    import i/one as _

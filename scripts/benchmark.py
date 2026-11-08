@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure Wleam development and language compilation in disposable workspaces."""
+"""Measure iLang development and language compilation in disposable workspaces."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ import time
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
-IGNORED = {".git", ".devenv", ".direnv", "target", "build", "node_modules", "playwright-report", "test-results", ".wleam", ".benchmark-blaze", "__pycache__"}
+IGNORED = {".git", ".devenv", ".direnv", "target", "build", "node_modules", "playwright-report", "test-results", ".ilang", ".benchmark-blaze", "__pycache__"}
 
 
 class BenchmarkFailure(RuntimeError):
@@ -55,7 +55,7 @@ def ignored_names(_directory: str, names: list[str]) -> set[str]:
     # `build` is also a real Rust source module in the imported frontend. Only
     # discard package build outputs, not every directory with that name.
     directory = Path(_directory)
-    if "build" in ignored and not any((directory / manifest).is_file() for manifest in ("Cargo.toml", "gleam.toml")):
+    if "build" in ignored and not any((directory / manifest).is_file() for manifest in ("Cargo.toml", "i.toml")):
         ignored.remove("build")
     return ignored
 
@@ -126,7 +126,7 @@ def host_info() -> dict:
 
 
 def add_rust_probe(workspace: Path) -> tuple[Path, Path]:
-    main = workspace / "crates/wleam-cli/src/main.rs"
+    main = workspace / "crates/ilang-cli/src/main.rs"
     if not main.is_file() or main.is_symlink() or not main.resolve().is_relative_to(workspace.resolve()):
         raise BenchmarkFailure(f"expected a regular CLI entry point inside the snapshot: {main}")
     text = main.read_text()
@@ -136,11 +136,11 @@ def add_rust_probe(workspace: Path) -> tuple[Path, Path]:
     opening = text.find("{", match.end())
     if opening < 0 or opening - match.end() > 1000:
         raise BenchmarkFailure("cannot safely instrument the CLI main function")
-    probe = main.parent / "wleam_benchmark_probe.rs"
-    types = main.parent / "wleam_benchmark_probe_types.rs"
+    probe = main.parent / "ilang_benchmark_probe.rs"
+    types = main.parent / "ilang_benchmark_probe_types.rs"
     if probe.exists() or types.exists():
         raise BenchmarkFailure("benchmark probe names already occur in the source; refusing to overwrite them")
-    main.write_text(text[: opening + 1] + "\n    wleam_benchmark_probe::verify();\n" + text[opening + 1 :] + "\nmod wleam_benchmark_probe;\nmod wleam_benchmark_probe_types;\n")
+    main.write_text(text[: opening + 1] + "\n    ilang_benchmark_probe::verify();\n" + text[opening + 1 :] + "\nmod ilang_benchmark_probe;\nmod ilang_benchmark_probe_types;\n")
     write_rust_probe(probe, 0)
     write_rust_types(types, 0)
     return probe, types
@@ -149,15 +149,15 @@ def add_rust_probe(workspace: Path) -> tuple[Path, Path]:
 def write_rust_probe(path: Path, revision: int) -> None:
     path.write_text(
         "#[inline(never)]\npub fn touch() -> u64 {\n"
-        f"    let probe = std::hint::black_box(super::wleam_benchmark_probe_types::Probe::new({revision}));\n"
+        f"    let probe = std::hint::black_box(super::ilang_benchmark_probe_types::Probe::new({revision}));\n"
         "    std::hint::black_box(probe.value)\n}\n"
         "\npub fn verify() {\n"
         "    let actual = touch();\n"
-        "    if let Ok(expected) = std::env::var(\"WLEAM_BENCHMARK_EXPECTED_REVISION\") {\n"
+        "    if let Ok(expected) = std::env::var(\"ILANG_BENCHMARK_EXPECTED_REVISION\") {\n"
         "        assert_eq!(actual, expected.parse::<u64>().expect(\"benchmark revision\"), \"stale function body\");\n"
         "    }\n"
-        "    if let Ok(expected) = std::env::var(\"WLEAM_BENCHMARK_EXPECTED_LAYOUT\") {\n"
-        "        assert_eq!(super::wleam_benchmark_probe_types::layout_size(), expected.parse::<usize>().expect(\"benchmark layout\"), \"stale type layout\");\n"
+        "    if let Ok(expected) = std::env::var(\"ILANG_BENCHMARK_EXPECTED_LAYOUT\") {\n"
+        "        assert_eq!(super::ilang_benchmark_probe_types::layout_size(), expected.parse::<usize>().expect(\"benchmark layout\"), \"stale type layout\");\n"
         "    }\n}\n"
         "\n#[cfg(test)]\n#[test]\nfn benchmark_probe_runs() { verify(); }\n"
     )
@@ -176,26 +176,26 @@ def write_rust_types(path: Path, revision: int) -> None:
 def make_gleam_fixture(project: Path, modules: int, function_revision: int = 0, type_revision: int = 0) -> None:
     (project / "src").mkdir(parents=True, exist_ok=True)
     (project / "test").mkdir(exist_ok=True)
-    (project / "gleam.toml").write_text('name = "benchmark"\nversion = "0.1.0"\ntarget = "wasm"\n')
+    (project / "i.toml").write_text('name = "benchmark"\nversion = "0.1.0"\ntarget = "wasm"\n')
     for index in range(modules):
         if index + 1 < modules:
             body = f"import bench_module_{index + 1}\n\npub fn apply(input: bench_types.Input) -> Int {{\n  bench_module_{index + 1}.apply(input) + 1\n}}\n"
         else:
             body = f"\npub fn apply(input: bench_types.Input) -> Int {{\n  input.value + {function_revision}\n}}\n"
-        (project / "src" / f"bench_module_{index}.gleam").write_text("import bench_types\n" + body)
+        (project / "src" / f"bench_module_{index}.i").write_text("import bench_types\n" + body)
     update_gleam_type(project, modules, function_revision, type_revision)
 
 
 def update_gleam_type(project: Path, modules: int, function_revision: int, revision: int) -> None:
     fields = "value: Int" + (f", generation_{revision}: Int" if revision else "")
     args = "value: 1" + (f", generation_{revision}: {revision}" if revision else "")
-    (project / "src/bench_types.gleam").write_text(f"pub type Input {{\n  Input({fields})\n}}\n")
-    (project / "src/benchmark.gleam").write_text(
+    (project / "src/bench_types.i").write_text(f"pub type Input {{\n  Input({fields})\n}}\n")
+    (project / "src/benchmark.i").write_text(
         "import bench_module_0\nimport bench_types\n\npub fn main() {\n"
         f"  echo bench_module_0.apply(bench_types.Input({args}))\n"
         "  Nil\n}\n"
     )
-    (project / "test/benchmark_test.gleam").write_text(
+    (project / "test/benchmark_test.i").write_text(
         "import bench_module_0\nimport bench_types\n\npub fn arithmetic_test() {\n"
         f"  let assert {modules + function_revision} = bench_module_0.apply(bench_types.Input({args}))\n"
         "  Nil\n}\n"
@@ -203,7 +203,7 @@ def update_gleam_type(project: Path, modules: int, function_revision: int, revis
 
 
 def edit_gleam_function(project: Path, modules: int, revision: int) -> None:
-    (project / "src" / f"bench_module_{modules - 1}.gleam").write_text(
+    (project / "src" / f"bench_module_{modules - 1}.i").write_text(
         "import bench_types\n\npub fn apply(input: bench_types.Input) -> Int {\n"
         f"  input.value + {revision}\n}}\n"
     )
@@ -213,7 +213,7 @@ class MemorySampler:
     """Sample the RSS sum of processes carrying this isolated engine's marker."""
 
     def __init__(self, marker: str):
-        self.marker = ("WLEAM_BENCHMARK_SESSION=" + marker).encode()
+        self.marker = ("ILANG_BENCHMARK_SESSION=" + marker).encode()
         self.pids: set[int] = set()
         self.last_discovery = 0.0
         self.peak: int | None = None
@@ -285,7 +285,7 @@ class Harness:
         out_path, err_path = self.logs / f"{label}.stdout", self.logs / f"{label}.stderr"
         resource_path = self.logs / f"{label}.maxrss"
         measured_argv = ([self.args.gnu_time, "-f", "%M", "-o", str(resource_path), "--", *argv] if self.args.gnu_time else argv)
-        memory = MemorySampler(env["WLEAM_BENCHMARK_SESSION"])
+        memory = MemorySampler(env["ILANG_BENCHMARK_SESSION"])
         memory.sample(discover=True)
         done = threading.Event()
         waited: dict = {}
@@ -380,30 +380,30 @@ class Harness:
             snapshot(reference, workspace)
             probe, types = add_rust_probe(workspace)
             env = os.environ.copy()
-            env.update(WLEAM_ROOT=str(workspace), WLEAM_BENCHMARK_SESSION=str(uuid.uuid4()), WLEAM_BENCHMARK_EXPECTED_REVISION="0", WLEAM_BENCHMARK_EXPECTED_LAYOUT="8")
-            if (workspace / "stdlib/gleam.toml").is_file():
-                env["WLEAM_STDLIB"] = str(workspace / "stdlib")
+            env.update(ILANG_ROOT=str(workspace), ILANG_BENCHMARK_SESSION=str(uuid.uuid4()), ILANG_BENCHMARK_EXPECTED_REVISION="0", ILANG_BENCHMARK_EXPECTED_LAYOUT="8")
+            if (workspace / "stdlib/i.toml").is_file():
+                env["ILANG_STDLIB"] = str(workspace / "stdlib")
             else:
-                env.pop("WLEAM_STDLIB", None)
+                env.pop("ILANG_STDLIB", None)
             for variable in ("CARGO", "RUSTC", "RUSTDOC", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER", "RUSTUP_TOOLCHAIN"):
                 env.pop(variable, None)
             if engine == "cargo":
                 executable = cargo
                 env["PATH"] = str(Path(cargo).parent) + os.pathsep + env.get("PATH", "")
                 env["CARGO_TARGET_DIR"] = str(workspace / "target/cargo")
-                binary = workspace / "target/cargo/debug/wleam"
-                build = [executable, "build", "--locked", "--bin", "wleam"]
+                binary = workspace / "target/cargo/debug/i"
+                build = [executable, "build", "--locked", "--bin", "i"]
                 tests = [executable, "test", "--locked"]
             else:
                 executable = resolve_executable(self.args.blaze)
                 env.pop("CARGO_TARGET_DIR", None)
                 env["BLAZE_HOME"] = str(workspace / ".benchmark-blaze")
                 env["RA_JIT_CACHE"] = str(workspace / ".benchmark-blaze/cache")
-                binary = workspace / "target/debug/wleam"
+                binary = workspace / "target/debug/i"
                 env.pop("BLAZE_TESTS", None)
                 env.pop("RA_JIT_TESTS", None)
                 self.blaze_sessions.append((executable, workspace, env))
-                build = [executable, "build", "--bin", "wleam"]
+                build = [executable, "build", "--bin", "i"]
                 tests = [executable, "test"]
             self.report["tools"][engine] = run_info([executable, "--version"], env)
             if engine == "blaze":
@@ -417,19 +417,19 @@ class Harness:
                 self.validate_rust_binary(binary, workspace, env)
             for iteration in range(self.args.rounds):
                 write_rust_probe(probe, iteration + 1)
-                env["WLEAM_BENCHMARK_EXPECTED_REVISION"] = str(iteration + 1)
+                env["ILANG_BENCHMARK_EXPECTED_REVISION"] = str(iteration + 1)
                 self.measure("rust", engine, "function-edit-build", iteration, build, workspace, env)
                 self.validate_rust_binary(binary, workspace, env)
             for iteration in range(self.args.rounds):
                 write_rust_types(types, iteration + 1)
-                env["WLEAM_BENCHMARK_EXPECTED_LAYOUT"] = str((iteration + 2) * 8)
+                env["ILANG_BENCHMARK_EXPECTED_LAYOUT"] = str((iteration + 2) * 8)
                 self.measure("rust", engine, "type-edit-build", iteration, build, workspace, env)
                 self.validate_rust_binary(binary, workspace, env)
             self.measure("rust", engine, "first-test", 0, tests, workspace, env)
             self.validate_rust_tests(engine)
             for iteration in range(self.args.rounds):
                 write_rust_probe(probe, self.args.rounds + iteration + 1)
-                env["WLEAM_BENCHMARK_EXPECTED_REVISION"] = str(self.args.rounds + iteration + 1)
+                env["ILANG_BENCHMARK_EXPECTED_REVISION"] = str(self.args.rounds + iteration + 1)
                 self.measure("rust", engine, "function-edit-test", iteration, tests, workspace, env)
                 self.validate_rust_tests(engine)
 
@@ -440,7 +440,7 @@ class Harness:
         summaries = re.findall(r"test result: (?:ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out;", output)
         fields = ("passed", "failed", "ignored", "measured", "filtered")
         totals = {field: sum(int(summary[index]) for summary in summaries) for index, field in enumerate(fields)}
-        probe_ran = bool(re.search(r"(?m)^test wleam_benchmark_probe::benchmark_probe_runs \.\.\. ok\s*$", output))
+        probe_ran = bool(re.search(r"(?m)^test ilang_benchmark_probe::benchmark_probe_runs \.\.\. ok\s*$", output))
         expected = self.report.setdefault("rust_test_expected_passed", totals["passed"])
         self.report.setdefault("rust_test_oracle_engine", engine)
         validation = {
@@ -462,7 +462,7 @@ class Harness:
             validation = {"success": False, "argv": argv, "error": str(error)}
         else:
             validation = {"success": result.returncode == 0, "argv": argv, "returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
-        validation.update(expected_revision=env["WLEAM_BENCHMARK_EXPECTED_REVISION"], expected_layout_bytes=env["WLEAM_BENCHMARK_EXPECTED_LAYOUT"])
+        validation.update(expected_revision=env["ILANG_BENCHMARK_EXPECTED_REVISION"], expected_layout_bytes=env["ILANG_BENCHMARK_EXPECTED_LAYOUT"])
         self.report["runs"][-1]["validation"] = validation
         self.save()
         if not validation["success"]:
@@ -473,17 +473,17 @@ class Harness:
         original_runner = resolve_executable(self.args.runner)
         binaries = directory / "bin"
         binaries.mkdir()
-        compiler, runner = str(binaries / "wleam"), str(binaries / "wleam-runner")
+        compiler, runner = str(binaries / "i"), str(binaries / "ilang-runner")
         shutil.copy2(original_compiler, compiler)
         shutil.copy2(original_runner, runner)
-        stdlib_source = (self.args.stdlib or Path(os.environ.get("WLEAM_STDLIB", str(self.args.source / "stdlib")))).resolve()
-        if not (stdlib_source / "gleam.toml").is_file():
+        stdlib_source = (self.args.stdlib or Path(os.environ.get("ILANG_STDLIB", str(self.args.source / "stdlib")))).resolve()
+        if not (stdlib_source / "i.toml").is_file():
             raise BenchmarkFailure(f"standard library not found at {stdlib_source}; use --stdlib to select the matching sources")
         stdlib = directory / "stdlib"
         snapshot(stdlib_source, stdlib)
         env = os.environ.copy()
-        env.update(WLEAM_BENCHMARK_SESSION=str(uuid.uuid4()), WLEAM_RUNNER=runner, WLEAM_STDLIB=str(stdlib))
-        self.report["tools"]["wleam"] = run_info([compiler, "--version"], env)
+        env.update(ILANG_BENCHMARK_SESSION=str(uuid.uuid4()), ILANG_RUNNER=runner, ILANG_STDLIB=str(stdlib))
+        self.report["tools"]["i"] = run_info([compiler, "--version"], env)
         self.report["input_compiler"] = original_compiler
         self.report["input_runner"] = original_runner
         self.report["input_stdlib"] = str(stdlib_source)
@@ -494,31 +494,31 @@ class Harness:
             project = directory / f"gleam-{command}"
             make_gleam_fixture(project, self.args.modules)
             argv = [compiler, "--project", str(project), command]
-            self.measure("gleam", "wleam", f"cold-{command}", 0, argv, project, env)
+            self.measure("gleam", "i", f"cold-{command}", 0, argv, project, env)
             if command == "build":
                 self.validate_gleam_binary(runner, project, env, self.args.modules)
             for iteration in range(self.args.rounds):
-                self.measure("gleam", "wleam", f"no-change-{command}", iteration, argv, project, env)
+                self.measure("gleam", "i", f"no-change-{command}", iteration, argv, project, env)
                 if command == "build":
                     self.validate_gleam_binary(runner, project, env, self.args.modules)
             for iteration in range(self.args.rounds):
                 edit_gleam_function(project, self.args.modules, iteration + 1)
-                self.measure("gleam", "wleam", f"function-edit-{command}", iteration, argv, project, env)
+                self.measure("gleam", "i", f"function-edit-{command}", iteration, argv, project, env)
                 if command == "build":
                     self.validate_gleam_binary(runner, project, env, self.args.modules + iteration + 1)
             for iteration in range(self.args.rounds):
                 update_gleam_type(project, self.args.modules, self.args.rounds, iteration + 1)
-                self.measure("gleam", "wleam", f"type-edit-{command}", iteration, argv, project, env)
+                self.measure("gleam", "i", f"type-edit-{command}", iteration, argv, project, env)
                 if command == "build":
                     self.validate_gleam_binary(runner, project, env, self.args.modules + self.args.rounds)
         tests = [compiler, "--project", str(project), "test", "--json"]
-        self.measure("gleam", "wleam", "first-test", 0, tests, project, env)
+        self.measure("gleam", "i", "first-test", 0, tests, project, env)
         self.validate_gleam_tests()
         for iteration in range(self.args.rounds):
             revision = self.args.rounds + iteration + 1
             edit_gleam_function(project, self.args.modules, revision)
             update_gleam_type(project, self.args.modules, revision, self.args.rounds)
-            self.measure("gleam", "wleam", "function-edit-test", iteration, tests, project, env)
+            self.measure("gleam", "i", "function-edit-test", iteration, tests, project, env)
             self.validate_gleam_tests()
 
     def validate_gleam_tests(self) -> None:
@@ -578,13 +578,13 @@ def positive(value: str) -> int:
 def arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("suite", choices=("rust", "gleam", "all"))
-    parser.add_argument("--source", type=Path, default=ROOT, help="Wleam checkout to snapshot for Rust benchmarks")
+    parser.add_argument("--source", type=Path, default=ROOT, help="iLang checkout to snapshot for Rust benchmarks")
     parser.add_argument("--engines", choices=("cargo", "blaze"), nargs="+", default=["cargo", "blaze"])
     parser.add_argument("--cargo", default="cargo")
     parser.add_argument("--blaze", default="blaze")
-    parser.add_argument("--compiler", help="prebuilt Wleam binary for language compilation benchmarks")
-    parser.add_argument("--runner", help="prebuilt wleam-runner binary for language test cycles")
-    parser.add_argument("--stdlib", type=Path, help="matching standard library to snapshot (default: WLEAM_STDLIB or SOURCE/stdlib)")
+    parser.add_argument("--compiler", help="prebuilt iLang binary for language compilation benchmarks")
+    parser.add_argument("--runner", help="prebuilt ilang-runner binary for language test cycles")
+    parser.add_argument("--stdlib", type=Path, help="matching standard library to snapshot (default: ILANG_STDLIB or SOURCE/stdlib)")
     parser.add_argument("--rounds", type=positive, default=5, help="samples for each warm/edit scenario; cold scenarios run once")
     parser.add_argument("--modules", type=positive, default=32, help="module count in the generated Gleam dependency chain")
     parser.add_argument("--timeout", type=positive, default=1800, help="per-command deadline in seconds")
@@ -595,7 +595,7 @@ def arguments() -> argparse.Namespace:
     args = parser.parse_args()
     args.source, args.output = args.source.resolve(), args.output.resolve()
     if args.suite in ("gleam", "all") and (not args.compiler or not args.runner):
-        parser.error("gleam/all require explicit --compiler and --runner paths")
+        parser.error("i/all require explicit --compiler and --runner paths")
     if not hasattr(os, "wait4"):
         parser.error("this harness requires Unix wait4 resource accounting")
     if args.work_parent:
@@ -616,7 +616,7 @@ def arguments() -> argparse.Namespace:
 def main() -> int:
     args = arguments()
     started = datetime.now(timezone.utc).isoformat()
-    work = Path(tempfile.mkdtemp(prefix="wleam-benchmark-", dir=args.work_parent))
+    work = Path(tempfile.mkdtemp(prefix="ilang-benchmark-", dir=args.work_parent))
     report = {
         "schema_version": 1, "started_utc": started, "success": False,
         "host": host_info(),

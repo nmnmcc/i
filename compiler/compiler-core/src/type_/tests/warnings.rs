@@ -1,0 +1,5286 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2022 The Gleam contributors
+
+use super::*;
+use crate::{
+    assert_module_syntax_error, assert_no_warnings, assert_no_warnings_with_i_version,
+    assert_warning, assert_warnings_with_i_version,
+};
+
+// Target capability tests must prove that analysis succeeds, not merely that
+// an error prevented the old target-specific warning from being emitted.
+fn assert_valid_without_warnings(source: &str) {
+    let warnings = VectorWarningEmitterIO::default();
+    let _ = compile_module(
+        "test_module",
+        source,
+        Some(Rc::new(warnings.clone())),
+        vec![],
+    )
+    .expect("Wasm source should type check");
+    assert_eq!(warnings.take(), vec![]);
+}
+
+#[test]
+fn unknown_label() {
+    // https://github.com/gleam-lang/gleam/issues/1098
+    // calling function with unused labelled argument should not emit warnings
+    assert_no_warnings!(
+        r#"fn greet(name name: String, title _title: String) { name }
+           pub fn main() { greet(name: "Sam", title: "Mr") }"#,
+    );
+}
+
+#[test]
+fn todo_warning_test() {
+    assert_warning!("pub fn main() { 1 == todo }");
+}
+
+// https://github.com/gleam-lang/gleam/issues/4164
+#[test]
+fn todo_uses_the_appropriate_type_name() {
+    assert_warning!(
+        "
+pub fn curry(_f: fn(a, b) -> c) -> fn(a) -> fn(b) -> c {
+  fn(_a: a) {
+    todo
+  }
+}"
+    );
+}
+
+#[test]
+fn todo_uses_the_appropriate_type_name_2() {
+    assert_warning!(
+        (
+            "wibble",
+            "
+            pub type Wibble
+            pub fn consume(wibble: Wibble) -> Nil { todo }
+        "
+        ),
+        "
+import wibble
+pub fn main() {
+  wibble.consume(todo)
+}"
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/1669
+#[test]
+fn todo_warning_correct_location() {
+    assert_warning!(
+        "pub fn main() {
+        todo
+      }"
+    );
+}
+
+#[test]
+fn todo_with_known_type() {
+    assert_warning!(
+        "pub fn main() -> String {
+  todo
+}"
+    );
+}
+
+#[test]
+fn empty_func_warning_test() {
+    assert_warning!(
+        "pub fn main() { wibble() }
+pub fn wibble() { }
+"
+    );
+}
+
+#[test]
+fn warning_variable_never_used_test() {
+    assert_warning!(
+        "
+pub fn wibble() { Ok(5) }
+pub fn main() { let five = wibble() }"
+    );
+}
+
+#[test]
+fn warning_private_function_never_used() {
+    assert_warning!("fn main() { 5 }");
+}
+
+#[test]
+fn warning_many_at_same_time() {
+    assert_warning!(
+        "
+fn main() { let five = 5 }"
+    );
+}
+
+#[test]
+fn result_discard_warning_test() {
+    // Implicitly discarded Results emit warnings
+    assert_warning!(
+        "
+pub fn wibble() { Ok(5) }
+pub fn main() {
+  wibble()
+  5
+}"
+    );
+}
+
+#[test]
+fn result_discard_warning_test2() {
+    // Explicitly discarded Results do not emit warnings
+    assert_no_warnings!(
+        "
+pub fn wibble() { Ok(5) }
+pub fn main() { let _ = wibble() 5 }",
+    );
+}
+
+#[test]
+fn unused_int() {
+    assert_warning!("pub fn main() { 1 2 }");
+}
+
+#[test]
+fn unused_float() {
+    assert_warning!("pub fn main() { 1.0 2 }");
+}
+
+#[test]
+fn unused_string() {
+    assert_warning!(
+        "
+    pub fn main() {
+        \"1\"
+                2
+    }"
+    );
+}
+
+#[test]
+fn unused_bit_array() {
+    assert_warning!(
+        "
+    pub fn main() {
+        <<3>>
+				2
+    }"
+    );
+}
+
+#[test]
+fn unused_tuple() {
+    assert_warning!(
+        "
+    pub fn main() {
+        #(1.0, \"Hello world\")
+				2
+    }"
+    );
+}
+
+#[test]
+fn unused_list() {
+    assert_warning!(
+        "
+    pub fn main() {
+        [1, 2, 3]
+				2
+    }"
+    );
+}
+
+#[test]
+fn record_update_warnings_test() {
+    // Some fields are given in a record update do not emit warnings
+    assert_no_warnings!(
+        "
+        pub type Person {
+            Person(name: String, age: Int)
+        }
+        pub fn update_person() {
+            let past = Person(\"Quinn\", 27)
+            let present = Person(..past, name: \"Santi\")
+            present
+        }",
+    );
+}
+
+#[test]
+fn record_update_warnings_test2() {
+    // No fields are given in a record update emit warnings
+    assert_warning!(
+        "
+        pub type Person {
+            Person(name: String, age: Int)
+        }
+        pub fn update_person() {
+            let past = Person(\"Quinn\", 27)
+            let present = Person(..past)
+            present
+        }"
+    );
+}
+
+#[test]
+fn record_update_warnings_test3() {
+    // All fields given in a record update emits warnings
+    assert_warning!(
+        "
+        pub type Person {
+            Person(name: String, age: Int)
+        }
+        pub fn update_person() {
+            let past = Person(\"Quinn\", 27)
+            let present = Person(..past, name: \"Quinn\", age: 28)
+            present
+        }"
+    );
+}
+
+#[test]
+fn unused_private_type_warnings_test() {
+    // External type
+    assert_warning!("type X");
+}
+
+#[test]
+fn unused_private_type_warnings_test2() {
+    assert_no_warnings!("pub type Y");
+}
+
+#[test]
+fn unused_private_type_warnings_test3() {
+    // Type alias
+    assert_warning!("type X = Int");
+}
+
+#[test]
+fn unused_private_type_warnings_test4() {
+    assert_no_warnings!("pub type Y = Int");
+}
+
+#[test]
+fn unused_private_type_warnings_test5() {
+    assert_no_warnings!("type Y = Int pub fn run(x: Y) { x }");
+}
+
+#[test]
+fn unused_private_type_warnings_test6() {
+    // Custom type
+    assert_warning!("type X { X }");
+}
+
+#[test]
+fn unused_private_type_warnings_test7() {
+    assert_no_warnings!("pub type X { X }");
+}
+
+#[test]
+fn unused_private_type_warnings_test8() {
+    assert_no_warnings!(
+        "
+type X { X }
+
+pub fn a() {
+  let b = X
+  case b {
+    X -> 1
+  }
+}"
+    );
+}
+
+#[test]
+fn unused_private_fn_warnings_test() {
+    assert_warning!("fn a() { 1 }");
+}
+
+#[test]
+fn used_private_fn_warnings_test() {
+    assert_no_warnings!("pub fn a() { 1 }");
+}
+
+#[test]
+fn used_private_fn_warnings_test2() {
+    assert_no_warnings!("fn a() { 1 } pub fn b() { a }");
+}
+
+#[test]
+fn unused_private_const_warnings_test() {
+    assert_warning!("const a = 1");
+}
+
+#[test]
+fn used_private_const_warnings_test() {
+    assert_no_warnings!("pub const a = 1");
+}
+
+#[test]
+fn used_private_const_warnings_test2() {
+    assert_no_warnings!("const a = 1 pub fn b() { a }");
+}
+
+#[test]
+fn unused_variable_warnings_test() {
+    // function argument
+    assert_warning!("pub fn a(b) { 1 }");
+}
+
+#[test]
+fn used_variable_warnings_test() {
+    assert_no_warnings!("pub fn a(b) { b }");
+}
+
+#[test]
+fn unused_variable_warnings_test2() {
+    // Simple let
+    assert_warning!("pub fn a() { let b = 1 5 }");
+}
+
+#[test]
+fn used_variable_warnings_test2() {
+    assert_no_warnings!("pub fn a() { let b = 1 b }");
+}
+
+#[test]
+fn unused_variable_shadowing_test() {
+    assert_warning!("pub fn a() { let b = 1 let b = 2 b }");
+}
+
+#[test]
+fn used_variable_shadowing_test() {
+    assert_no_warnings!("pub fn a() { let b = 1 let b = b + 1 b }");
+}
+
+#[test]
+fn unused_destructure() {
+    // Destructure
+    assert_warning!("pub fn a(b) { case b { #(c, _) -> 5 } }");
+}
+
+#[test]
+fn used_destructure() {
+    assert_no_warnings!("pub fn a(b) { case b { #(c, _) -> c } }");
+}
+
+#[test]
+fn unused_imported_module_warnings_test() {
+    assert_warning!(
+        ("i/wibble", "pub fn wobble() { 1 }"),
+        "import i/wibble"
+    );
+}
+
+#[test]
+fn unused_imported_module_with_alias_warnings_test() {
+    assert_warning!(
+        ("i/wibble", "pub fn wobble() { 1 }"),
+        "import i/wibble as wobble"
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/2326
+#[test]
+fn unused_imported_module_with_alias_and_unqualified_name_warnings_test() {
+    assert_warning!(
+        ("thepackage", "i/one", "pub fn two() { 1 }"),
+        "import i/one.{two} as three"
+    );
+}
+
+#[test]
+fn unused_imported_module_with_alias_and_unqualified_name_no_warnings_test() {
+    assert_warning!(
+        ("package", "i/one", "pub fn two() { 1 }"),
+        "import i/one.{two} as three\npub fn wibble() { two() }"
+    );
+}
+
+#[test]
+fn unused_imported_module_no_warning_on_used_function_test() {
+    assert_no_warnings!(
+        ("thepackage", "i/wibble", "pub fn wobble() { 1 }"),
+        "import i/wibble pub fn wibble() { wibble.wobble() }",
+    );
+}
+
+#[test]
+fn unused_imported_module_no_warning_on_used_type_test() {
+    assert_no_warnings!(
+        ("thepackage", "i/wibble", "pub type Wibble = Int"),
+        "import i/wibble pub fn wibble(a: wibble.Wibble) { a }",
+    );
+}
+
+#[test]
+fn unused_imported_module_no_warning_on_used_unqualified_function_test() {
+    assert_no_warnings!(
+        ("thepackage", "i/wibble", "pub fn wobble() { 1 }"),
+        "import i/wibble.{wobble} pub fn wibble() { wobble() }",
+    );
+}
+
+#[test]
+fn unused_imported_module_no_warning_on_used_unqualified_type_test() {
+    assert_no_warnings!(
+        ("thepackage", "i/wibble", "pub type Wibble = Int"),
+        "import i/wibble.{type Wibble} pub fn wibble(a: Wibble) { a }",
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/3313
+#[test]
+fn imported_module_with_alias_no_warning_when_only_used_in_case_test() {
+    assert_no_warnings!(
+        (
+            "thepackage",
+            "i/wibble",
+            "pub type Wibble { Wibble(Int) }"
+        ),
+        "import i/wibble as f\npub fn wibble(a) { case a { f.Wibble(int) -> { int } }  }",
+    );
+}
+
+#[test]
+fn module_access_registers_import_usage() {
+    assert_no_warnings!(
+        ("thepackage", "i/bibble", "pub const bobble = 1"),
+        "import i/bibble pub fn main() { bibble.bobble }",
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/978
+#[test]
+fn bit_pattern_var_use() {
+    assert_no_warnings!(
+        "
+pub fn main(x) {
+  let assert <<name_size:8, name:bytes-size(name_size)>> = x
+  name
+}",
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/989
+#[test]
+fn alternative_case_clause_pattern_variable_usage() {
+    assert_no_warnings!(
+        "
+pub fn main(s) {
+  case s {
+    [a] | [a, _] -> a
+    _ -> 0
+  }
+}"
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/1742
+#[test]
+fn imported_function_referenced_in_constant() {
+    assert_no_warnings!(
+        ("thepackage", "one", "pub fn two() { 2 }"),
+        "
+import one
+
+pub const make_two = one.two
+"
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/1742
+#[test]
+fn imported_constructor_referenced_in_constant() {
+    assert_no_warnings!(
+        ("thepackage", "one", "pub type Two { Two(Int) }"),
+        "
+import one
+
+pub const make_two = one.Two
+"
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/2050
+#[test]
+fn double_unary_int_literal() {
+    assert_warning!("pub fn main() { let _ = --7 }");
+}
+
+#[test]
+fn even_number_of_multiple_int_negations_raise_a_single_warning() {
+    assert_warning!("pub fn main() { let _ = ----7 }");
+}
+
+#[test]
+fn odd_number_of_multiple_int_negations_raise_a_single_warning_that_highlights_the_unnecessary_ones()
+ {
+    assert_warning!("pub fn main() { let _ = -----7 }");
+}
+
+#[test]
+fn even_number_of_multiple_bool_negations_raise_a_single_warning() {
+    assert_warning!("pub fn main() { let _ = !!!!True }");
+}
+
+#[test]
+fn odd_number_of_multiple_bool_negations_raise_a_single_warning_that_highlights_the_unnecessary_ones()
+ {
+    assert_warning!("pub fn main() { let _ = !!!!!False }");
+}
+
+// https://github.com/gleam-lang/gleam/issues/2050
+#[test]
+fn double_unary_int_variable() {
+    assert_warning!(
+        r#"
+        pub fn main() {
+            let x = 7
+            let _ = --x
+        }
+        "#
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/2050
+#[test]
+fn double_unary_bool_literal() {
+    assert_warning!("pub fn main() { let _ = !!True }");
+}
+
+// https://github.com/gleam-lang/gleam/issues/2050
+#[test]
+fn double_unary_bool_variable() {
+    assert_warning!(
+        r#"
+        pub fn main() {
+            let x = True
+            let _ = !!x
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/2067
+#[test]
+fn prefer_list_is_empty_over_list_length_eq_0() {
+    assert_warning!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = list.length(a_list) == 0
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/2067
+#[test]
+fn prefer_list_is_empty_over_list_length_eq_negative_0() {
+    assert_warning!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = list.length(a_list) == -0
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/2067
+#[test]
+fn prefer_list_is_empty_over_0_eq_list_length() {
+    assert_warning!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = 0 == list.length(a_list)
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/2067
+#[test]
+fn prefer_list_is_empty_over_negative_0_eq_list_length() {
+    assert_warning!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = -0 == list.length(a_list)
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/2067
+#[test]
+fn prefer_list_is_empty_over_list_length_not_eq_0() {
+    assert_warning!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = list.length(a_list) != 0
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/2067
+#[test]
+fn prefer_list_is_empty_over_0_not_eq_list_length() {
+    assert_warning!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = 0 != list.length(a_list)
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/2067
+#[test]
+fn prefer_list_is_empty_over_list_length_lt_eq_0() {
+    assert_warning!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = list.length(a_list) <= 0
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/2067
+#[test]
+fn prefer_list_is_empty_over_list_length_lt_1() {
+    assert_warning!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = list.length(a_list) < 1
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/4861
+#[test]
+fn prefer_list_is_empty_over_list_length_gt_negative_0() {
+    assert_warning!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = list.length(a_list) > 0
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/4861
+#[test]
+fn prefer_list_is_empty_over_negative_0_lt_list_length() {
+    assert_warning!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = 0 < list.length(a_list)
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/4861
+#[test]
+fn prefer_list_is_empty_over_list_length_gt_0() {
+    assert_warning!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = list.length(a_list) > 0
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/4861
+#[test]
+fn prefer_list_is_empty_over_0_lt_list_length() {
+    assert_warning!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = 0 < list.length(a_list)
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/2067
+#[test]
+fn allow_list_length_eq_1() {
+    assert_no_warnings!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = list.length(a_list) == 1
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/2067
+#[test]
+fn allow_1_eq_list_length() {
+    assert_no_warnings!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = 1 == list.length(a_list)
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/2067
+#[test]
+fn allow_list_length_eq_3() {
+    assert_no_warnings!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = list.length(a_list) == 3
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/2067
+#[test]
+fn allow_1_lt_list_length() {
+    assert_no_warnings!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = 1 < list.length(a_list)
+        }
+        "#
+    );
+}
+
+/// https://github.com/gleam-lang/gleam/issues/2067
+#[test]
+fn allow_list_length_gt_1() {
+    assert_no_warnings!(
+        (
+            "i_stdlib",
+            "i/list",
+            "pub fn length(_list: List(a)) -> Int { 0 }"
+        ),
+        r#"
+        import i/list
+
+        pub fn main() {
+            let a_list = []
+            let _ = list.length(a_list) > 1
+        }
+        "#
+    );
+}
+
+#[test]
+fn unused_external_function_arguments() {
+    // https://github.com/gleam-lang/gleam/issues/2259
+    assert_no_warnings!(
+        r#"
+@external(wasm, "go", "go")
+pub fn go(a: item_a) -> Nil
+"#,
+    );
+}
+
+#[test]
+fn importing_non_direct_dep_package() {
+    // Warn if an imported module is from a package that is not a direct dependency
+    assert_warning!(
+        // Magic string package name that the test setup will detect to not
+        // register this package as a dep.
+        ("non-dependency-package", "some_module", "pub const x = 1"),
+        r#"
+import some_module
+pub const x = some_module.x
+        "#
+    );
+}
+
+#[test]
+fn deprecated_constant() {
+    assert_warning!(
+        r#"
+@deprecated("Don't use this!")
+pub const a = Nil
+
+pub fn b() {
+  a
+}
+"#
+    );
+}
+
+#[test]
+fn deprecated_imported_constant() {
+    assert_warning!(
+        (
+            "package",
+            "module",
+            r#"@deprecated("Don't use this!") pub const a = Nil"#
+        ),
+        r#"
+import module
+
+pub fn a() {
+  module.a
+}
+"#
+    );
+}
+
+#[test]
+fn deprecated_imported_unqualified_constant() {
+    assert_warning!(
+        (
+            "package",
+            "module",
+            r#"@deprecated("Don't use this!") pub const a = Nil"#
+        ),
+        r#"
+import module.{a}
+
+pub fn b() {
+  a
+}
+"#
+    );
+}
+
+#[test]
+fn deprecated_function() {
+    assert_warning!(
+        r#"
+@deprecated("Don't use this!")
+pub fn a() {
+  Nil
+}
+
+pub fn b() {
+  a
+}
+        "#
+    );
+}
+
+#[test]
+fn deprecated_imported_function() {
+    assert_warning!(
+        (
+            "package",
+            "module",
+            r#"@deprecated("Don't use this!") pub fn a() { Nil }"#
+        ),
+        r#"
+import module
+
+pub fn a() {
+  module.a
+}
+"#
+    );
+}
+
+#[test]
+fn deprecated_imported_call_function() {
+    assert_warning!(
+        (
+            "package",
+            "module",
+            r#"@deprecated("Don't use this!") pub fn a() { Nil }"#
+        ),
+        r#"
+import module
+
+pub fn a() {
+  module.a()
+}
+"#
+    );
+}
+
+#[test]
+fn deprecated_imported_unqualified_function() {
+    assert_warning!(
+        (
+            "package",
+            "module",
+            r#"@deprecated("Don't use this!") pub fn a() { Nil }"#
+        ),
+        r#"
+import module.{a}
+
+pub fn b() {
+  a
+}
+"#
+    );
+}
+
+#[test]
+fn deprecated_type_used_in_alias() {
+    assert_warning!(
+        r#"
+@deprecated("Don't use this!")
+pub type Cat {
+    Cat(name: String)
+}
+
+pub type Dog = Cat
+        "#
+    );
+}
+
+#[test]
+fn deprecated_type_used_as_arg() {
+    assert_warning!(
+        r#"
+@deprecated("Don't use this!")
+pub type Cat {
+    Cat(name: String)
+}
+
+pub fn cat_name(cat: Cat) {
+  cat.name
+}
+        "#
+    );
+}
+
+#[test]
+fn deprecated_type_used_as_case_clause() {
+    assert_warning!(
+        r#"
+@deprecated("The type Animal has been deprecated.")
+pub type Animal {
+    Cat
+    Dog
+}
+
+pub fn sound(animal) -> String {
+  case animal {
+    Dog -> "Woof"
+    Cat -> "Meow"
+  }
+}
+
+pub fn main(){
+    let cat = Cat
+    sound(cat)
+}
+        "#
+    );
+}
+
+#[test]
+fn const_bytes_option() {
+    assert_no_warnings!("pub const x = <<<<>>:bits>>");
+}
+
+#[test]
+fn unused_module_wuth_alias_warning_test() {
+    assert_warning!(
+        ("i/wibble", "pub const one = 1"),
+        "import i/wibble as wobble"
+    );
+}
+
+#[test]
+fn unused_alias_warning_test() {
+    assert_warning!(
+        ("i/wibble", "pub const one = 1"),
+        r#"
+            import i/wibble.{one} as wobble
+            pub const one = one
+        "#,
+    );
+}
+
+#[test]
+fn used_type_with_import_alias_no_warning_test() {
+    assert_no_warnings!(
+        ("i", "i/wibble", "pub const one = 1"),
+        "import i/wibble as _wobble"
+    );
+}
+
+#[test]
+fn discarded_module_no_warnings_test() {
+    assert_no_warnings!(
+        ("i", "wibble", "pub const one = 1"),
+        "import wibble as _wobble"
+    );
+}
+
+#[test]
+fn unused_alias_for_duplicate_module_no_warning_for_alias_test() {
+    assert_warning!(
+        ("a/wibble", "pub const one = 1"),
+        ("b/wibble", "pub const two = 2"),
+        r#"
+            import a/wibble
+            import b/wibble as wobble
+            pub const one = wibble.one
+        "#,
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/5975
+#[test]
+fn imported_module_usage_not_confused_with_another_module_name() {
+    assert_no_warnings!(
+        ("thepackage", "wibble/wobble", "pub const one = 1"),
+        ("thepackage", "wobble", "pub const two = 2"),
+        r#"
+            import wibble/wobble
+            import wobble as my_wobble
+            pub const one = wobble.one
+            pub const two = my_wobble.two
+        "#
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/5975
+#[test]
+fn imported_module_type_usage_not_confused_with_another_module_name() {
+    assert_no_warnings!(
+        ("thepackage", "wibble/wobble", "pub type One = Int"),
+        ("thepackage", "wobble", "pub type Two = Int"),
+        r#"
+            import wibble/wobble
+            import wobble as my_wobble
+            pub fn one(value: wobble.One) -> wobble.One { value }
+            pub fn two(value: my_wobble.Two) -> my_wobble.Two { value }
+        "#
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/5975
+#[test]
+fn unused_module_alias_not_confused_with_another_module_name() {
+    assert_warning!(
+        ("thepackage", "wibble/wobble", "pub const one = 1"),
+        ("thepackage", "wobble", "pub const two = 2"),
+        r#"
+            import wibble/wobble
+            import wobble as my_wobble
+            pub const one = wobble.one
+        "#
+    );
+}
+
+#[test]
+fn unused_module_not_marked_as_used_by_discard_aliased_import_with_same_name() {
+    assert_warning!(
+        ("thepackage", "wibble/wobble", "pub const one = 1"),
+        ("thepackage", "wobble", "pub const two = 2"),
+        r#"
+            import wibble/wobble
+            import wobble.{two} as _wobble
+            pub fn main() { two }
+        "#
+    );
+}
+
+#[test]
+fn result_in_case_discarded() {
+    assert_warning!(
+        "
+pub fn main(x) {
+  case x {
+    _ -> Error(Nil)
+  }
+  Nil
+}"
+    );
+}
+
+#[test]
+fn pattern_matching_on_literal_tuple() {
+    assert_warning!(
+        "pub fn main() {
+        case #(1, 2) {
+            _ -> Nil
+        }
+      }"
+    );
+}
+
+#[test]
+fn pattern_matching_on_multiple_literal_tuples() {
+    assert_warning!(
+        "pub fn main() {
+        let wibble = 1
+        case #(1, 2), #(wibble, wibble) {
+            _, _ -> Nil
+        }
+      }"
+    );
+}
+
+#[test]
+fn pattern_matching_on_tuples_doesnt_raise_a_warning() {
+    assert_no_warnings!(
+        "pub fn main() {
+        let wibble = #(1, 2)
+        // This doesn't raise a warning since `wibble` is not a literal tuple.
+        case wibble {
+            _ -> Nil
+        }
+      }"
+    );
+}
+
+#[test]
+fn pattern_matching_on_literal_empty_tuple() {
+    assert_warning!(
+        "pub fn main() {
+        case #() {
+            _ -> Nil
+        }
+      }"
+    );
+}
+
+#[test]
+fn pattern_matching_on_literal_list() {
+    assert_warning!(
+        "pub fn main() {
+        case [1, 2] {
+            _ -> Nil
+        }
+      }"
+    );
+}
+
+#[test]
+fn pattern_matching_on_literal_list_with_tail() {
+    assert_warning!(
+        "pub fn main() {
+        case [1, 2, ..[]] {
+            _ -> Nil
+        }
+      }"
+    );
+}
+
+#[test]
+fn pattern_matching_on_literal_empty_list() {
+    assert_warning!(
+        "pub fn main() {
+        case [] {
+            _ -> Nil
+        }
+      }"
+    );
+}
+
+#[test]
+fn pattern_matching_on_literal_empty_bit_array() {
+    assert_warning!(
+        "pub fn main() {
+        case <<>> {
+            _ -> Nil
+        }
+      }"
+    );
+}
+
+#[test]
+fn pattern_matching_on_literal_record() {
+    assert_warning!(
+        "
+pub type Wibble { Wibble(Int) }
+pub fn main() {
+  let n = 1
+  case Wibble(n) {
+    _ -> Nil
+  }
+}"
+    );
+}
+
+#[test]
+fn pattern_matching_on_literal_record_with_no_args() {
+    assert_warning!(
+        "
+pub type Wibble { Wibble }
+pub fn main() {
+  case Wibble {
+    _ -> Nil
+  }
+}"
+    );
+}
+
+#[test]
+fn pattern_matching_on_literal_int() {
+    assert_warning!(
+        "
+pub type Wibble { Wibble }
+pub fn main() {
+  case 1 {
+    _ -> Nil
+  }
+}"
+    );
+}
+
+#[test]
+fn pattern_matching_on_literal_float() {
+    assert_warning!(
+        "
+pub type Wibble { Wibble }
+pub fn main() {
+  case 1.0 {
+    _ -> Nil
+  }
+}"
+    );
+}
+
+#[test]
+fn pattern_matching_on_literal_string() {
+    assert_warning!(
+        "
+pub type Wibble { Wibble }
+pub fn main() {
+  case \"hello\" {
+    _ -> Nil
+  }
+}"
+    );
+}
+
+#[test]
+fn opaque_external_type_raises_a_warning() {
+    assert_warning!("pub opaque type External");
+}
+
+#[test]
+fn unused_binary_operation_raises_a_warning() {
+    assert_warning!(
+        r#"
+pub fn main() {
+  let string = "a" <> "b" "c" <> "d"
+  string
+}
+"#
+    );
+}
+
+#[test]
+fn unused_record_access_raises_a_warning() {
+    assert_warning!(
+        r#"
+pub type Thing {
+  Thing(value: Int)
+}
+
+pub fn main() {
+  let thing = Thing(1)
+  thing.value
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_record_constructor_raises_a_warning() {
+    assert_warning!(
+        r#"
+pub type Thing {
+  Thing(value: Int)
+}
+
+pub fn main() {
+  Thing(1)
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_record_update_raises_a_warning() {
+    assert_warning!(
+        r#"
+pub type Thing {
+  Thing(value: Int, other: Int)
+}
+
+pub fn main() {
+  let thing = Thing(1, 2)
+  Thing(..thing, value: 1)
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_variable_raises_a_warning() {
+    assert_warning!(
+        r#"
+pub fn main() {
+  let number = 1
+  number
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_function_literal_raises_a_warning() {
+    assert_warning!(
+        r#"
+pub fn main() {
+  fn(n) { n + 1 }
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_tuple_index_raises_a_warning() {
+    assert_warning!(
+        r#"
+pub fn main() {
+  #(1, 2).0
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_bool_negation_raises_a_warning() {
+    assert_warning!(
+        r#"
+pub fn main() {
+  !True
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_int_negation_raises_a_warning() {
+    assert_warning!(
+        r#"
+pub fn main() {
+  -1
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_pipeline_ending_with_variant_raises_a_warning() {
+    assert_warning!(
+        r#"
+pub type Wibble(a) { Wibble(a) }
+pub fn wibble(a) { a }
+
+pub fn main() {
+  1 |> wibble |> Wibble
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_pipeline_ending_with_variant_raises_a_warning_2() {
+    assert_warning!(
+        ("wibble", "pub type Wibble { Wibble(Int) }"),
+        r#"
+import wibble
+
+pub fn wobble(a) { a }
+
+pub fn main() {
+  1 |> wobble |> wibble.Wibble
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_pipeline_not_ending_with_variant_raises_no_warnings() {
+    assert_no_warnings!(
+        r#"
+pub type Wibble(a) { Wibble(a) }
+pub fn wibble(a) { echo a }
+
+pub fn main() {
+  1 |> wibble |> wibble
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_module_select_constructor() {
+    assert_warning!(
+        ("wibble", "pub type Wibble { Wibble(Int) }"),
+        r#"
+import wibble
+
+pub fn main() {
+  wibble.Wibble
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_module_select_constructor_call() {
+    assert_warning!(
+        ("wibble", "pub type Wibble { Wibble(Int) }"),
+        r#"
+import wibble
+
+pub fn main() {
+  wibble.Wibble(1)
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_module_select_function() {
+    assert_warning!(
+        ("wibble", "pub fn println(a) { Nil }"),
+        r#"
+import wibble
+
+pub fn main() {
+  wibble.println
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_module_select_const() {
+    assert_warning!(
+        ("wibble", "pub const a = 1"),
+        r#"
+import wibble
+
+pub fn main() {
+  wibble.a
+  1
+}
+"#
+    );
+}
+
+#[test]
+fn module_used_by_unused_function_is_not_marked_as_unused() {
+    assert_warning!(
+        ("wibble", "pub const a = 1"),
+        "import wibble
+fn wobble() {
+  wibble.a
+}
+"
+    );
+}
+
+#[test]
+fn aliased_module_used_by_unused_function_is_not_marked_as_unused() {
+    assert_warning!(
+        ("wibble", "pub const a = 1"),
+        "import wibble as woo
+fn wobble() {
+  woo.a
+}
+"
+    );
+}
+
+#[test]
+fn calling_function_from_other_module_is_not_marked_unused() {
+    assert_no_warnings!(
+        ("wibble", "wibble", "pub fn println(a) { panic }"),
+        r#"
+import wibble
+
+pub fn main() {
+  wibble.println("hello!")
+  1
+}
+"#
+    );
+}
+
+/*
+
+TODO: These tests are commented out until we figure out a better way to deal
+      with reexports of internal types and reintroduce the warning.
+      As things stand it would break both Lustre and Mist.
+      You can see the thread starting around here for more context:
+      https://discord.com/channels/768594524158427167/768594524158427170/1227250677734969386
+
+#[test]
+fn internal_type_in_public_function_return() {
+    assert_warning!(
+        "
+@internal
+pub type Wibble {
+  Wibble
+}
+
+pub fn wibble() -> Wibble { Wibble }
+"
+    );
+}
+
+#[test]
+fn type_from_internal_module_in_public_function_return() {
+    assert_warning!(
+        ("thepackage/internal", "pub type Wibble { Wibble }"),
+        "
+import thepackage/internal.{type Wibble, Wibble}
+
+pub fn wibble() -> Wibble {
+  Wibble
+}"
+    );
+}
+
+#[test]
+fn internal_type_in_public_function_argument() {
+    assert_warning!(
+        "
+@internal
+pub type Wibble {
+  Wibble
+}
+
+pub fn wibble(_wibble: Wibble) -> Int { 1 }
+"
+    );
+}
+
+#[test]
+fn type_from_internal_module_in_public_function_argument() {
+    assert_warning!(
+        ("thepackage/internal", "pub type Wibble { Wibble }"),
+        "
+import thepackage/internal.{type Wibble}
+
+pub fn wibble(_wibble: Wibble) -> Int {
+  1
+}
+"
+    );
+}
+
+#[test]
+fn internal_type_in_public_constructor() {
+    assert_warning!(
+        "
+@internal
+pub type Wibble {
+  Wibble
+}
+
+pub type Wobble {
+    Wobble(Wibble)
+}
+"
+    );
+}
+
+#[test]
+fn type_from_internal_module_in_public_constructor() {
+    assert_warning!(
+        ("thepackage/internal", "pub type Wibble { Wibble }"),
+        "
+import thepackage/internal.{type Wibble}
+
+pub type Wobble {
+  Wobble(Wibble)
+}"
+    );
+}
+
+#[test]
+fn type_from_internal_module_dependency_in_public_constructor() {
+    assert_warning!(
+        ("dep", "dep/internal", "pub type Wibble { Wibble }"),
+        "
+import dep/internal.{type Wibble}
+
+pub type Wobble {
+  Wobble(Wibble)
+}"
+    );
+}
+
+*/
+
+#[test]
+fn redundant_let_assert() {
+    assert_warning!(
+        "
+pub fn main() {
+  let assert wibble = [1, 2, 3]
+  wibble
+}
+"
+    );
+}
+
+#[test]
+fn redundant_let_assert_on_custom_type() {
+    assert_warning!(
+        "
+pub type Wibble {
+    Wibble(Int, Bool)
+}
+
+pub fn main() {
+  let assert Wibble(_, bool) = Wibble(1, True)
+  bool
+}
+"
+    );
+}
+
+#[test]
+fn panic_used_as_function() {
+    assert_warning!(
+        "pub fn main() {
+          panic()
+        }"
+    );
+}
+
+#[test]
+fn panic_used_as_function_2() {
+    assert_warning!(
+        "pub fn main() {
+          panic(1)
+        }"
+    );
+}
+
+#[test]
+fn panic_used_as_function_3() {
+    assert_warning!(
+        "pub fn main() {
+          panic(1, Nil)
+        }"
+    );
+}
+
+#[test]
+fn todo_used_as_function() {
+    assert_warning!(
+        "pub fn main() {
+          todo()
+        }"
+    );
+}
+
+#[test]
+fn todo_used_as_function_2() {
+    assert_warning!(
+        "pub fn main() {
+          todo(1)
+        }"
+    );
+}
+
+#[test]
+fn todo_used_as_function_3() {
+    assert_warning!(
+        "pub fn main() {
+          todo(1, Nil)
+        }"
+    );
+}
+
+#[test]
+fn unreachable_warning_1() {
+    assert_warning!(
+        "pub fn main() {
+          panic
+          1
+        }"
+    );
+}
+
+#[test]
+fn unreachable_warning_2() {
+    assert_warning!(
+        "pub fn main() {
+          let _ = panic
+          1
+        }"
+    );
+}
+
+#[test]
+fn unreachable_warning_if_all_branches_panic() {
+    assert_warning!(
+        "pub fn main() {
+          let n = 1
+          case n {
+            0 -> panic
+            _ -> panic
+          }
+          1
+        }"
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/5683
+#[test]
+fn unreachable_use_statement_after_panic() {
+    assert_warning!(
+        "
+pub fn main() {
+  panic
+  use <- wibble
+  1
+}
+
+fn wibble(f) { f() }
+"
+    );
+}
+
+#[test]
+fn unreachable_use_fn_statement_after_panic() {
+    assert_warning!(
+        "
+pub fn main() -> Nil {
+  panic
+  use <- fn(_) { Nil }
+  1
+}
+"
+    );
+}
+
+#[test]
+fn unreachable_warning_if_all_branches_panic_2() {
+    assert_warning!(
+        "pub fn main() {
+          let n = 1
+          case n {
+            0 -> {
+              panic
+              2
+            }
+            _ -> panic
+          }
+          1
+        }"
+    );
+}
+
+#[test]
+fn no_unreachable_warning_if_at_least_a_branch_is_reachable() {
+    assert_no_warnings!(
+        "pub fn main() {
+          let n = 1
+          case n {
+            0 -> panic
+            _ -> 1
+          }
+          1
+        }"
+    );
+}
+
+#[test]
+fn unreachable_warning_doesnt_escape_out_of_a_block_if_panic_is_not_last() {
+    assert_warning!(
+        "pub fn main() {
+          let n = {
+            panic
+            1
+          }
+          n
+        }"
+    );
+}
+
+#[test]
+fn unreachable_warning_on_following_expression_if_panic_is_last_in_a_block() {
+    assert_warning!(
+        "pub fn main() {
+          let _ = {
+            panic
+          }
+          1
+        }"
+    );
+}
+
+#[test]
+fn unreachable_function_argument_if_panic_is_argument() {
+    assert_warning!(
+        "
+        pub fn wibble(_, _) { 1 }
+        pub fn main() {
+          wibble(panic, 1)
+        }"
+    );
+}
+
+#[test]
+fn unreachable_function_call_if_panic_is_last_argument_1() {
+    assert_warning!(
+        "
+        pub fn wibble(_, _) { 1 }
+        pub fn main() {
+          wibble(1, panic)
+          1
+        }"
+    );
+}
+
+#[test]
+fn unreachable_function_call_if_panic_is_last_argument_2() {
+    assert_warning!(
+        "
+        pub fn wibble(_, _) { 1 }
+        pub fn main() {
+          wibble(1, panic)
+        }"
+    );
+}
+
+#[test]
+fn no_unreachable_warning_if_panic_comes_last_in_function_body() {
+    assert_no_warnings!(
+        "
+        pub fn wibble() { panic }
+        pub fn main() { panic }"
+    );
+}
+
+#[test]
+fn unreachable_code_for_panic_as_first_pipeline_item() {
+    assert_warning!(
+        "
+        pub fn wibble(_) { 1 }
+        pub fn main() {
+            panic |> wibble
+        }
+        "
+    );
+}
+
+#[test]
+fn panic_used_as_function_inside_pipeline() {
+    assert_warning!(
+        "
+        pub fn wibble(_) { 1 }
+        pub fn main() {
+            1 |> panic |> wibble
+        }
+        "
+    );
+}
+
+#[test]
+fn unreachable_warning_for_panic_as_last_item_of_pipe_on_next_expression() {
+    assert_warning!(
+        r#"
+        pub fn wibble(_) { 1 }
+        pub fn main() {
+            1 |> wibble |> panic
+            "unreachable"
+        }
+        "#
+    );
+}
+
+#[test]
+fn doesnt_warn_twice_for_unreachable_code_if_has_already_warned_in_a_block_1() {
+    assert_warning!(
+        r#"
+        pub fn wibble(_) { 1 }
+        pub fn main() {
+            panic
+            let _ = "unreachable" // warning here
+            panic
+            "no warning here!"
+        }
+        "#
+    );
+}
+
+#[test]
+fn doesnt_warn_twice_for_unreachable_code_if_has_already_warned_in_a_block_2() {
+    assert_warning!(
+        r#"
+        pub fn main() {
+            let _ = {
+              panic
+              1 // warning here
+            }
+            "no warning here!"
+        }
+        "#
+    );
+}
+
+#[test]
+fn unreachable_use_after_panic_1() {
+    assert_warning!(
+        r#"
+        pub fn wibble(_) { 1 }
+        pub fn main() {
+            panic
+            use <- wibble
+            1
+        }
+        "#
+    );
+}
+
+#[test]
+fn unreachable_use_after_panic_2() {
+    assert_warning!(
+        ("package", "module", r#"pub fn wibble(_) { 1 }"#),
+        r#"
+        import module
+        pub fn a() {
+            panic
+            use <- module.wibble
+            1
+        }
+        "#
+    );
+}
+
+#[test]
+fn unreachable_code_after_case_subject_panics_1() {
+    assert_warning!(
+        r#"
+        pub fn main(a, b) {
+            case a, panic, b {
+                _, _, _ -> "no warning here!"
+            }
+        }
+        "#
+    );
+}
+
+#[test]
+fn unreachable_code_after_case_subject_panics_2() {
+    assert_warning!(
+        r#"
+        pub fn main(a, b) {
+            case a, b, panic {
+                _, _, _ -> "no warning here!"
+            }
+            "warning here!"
+        }
+        "#
+    );
+}
+
+#[test]
+fn unreachable_code_analysis_treats_anonymous_functions_independently_1() {
+    assert_no_warnings!(
+        r#"
+        pub fn main() {
+            let _ = fn() {
+              panic
+            }
+            "no warning here!"
+        }
+        "#
+    );
+}
+
+#[test]
+fn unreachable_code_analysis_treats_anonymous_functions_independently_2() {
+    assert_warning!(
+        r#"
+        pub fn main() {
+            let _ = fn() {
+              panic
+              "warning here!"
+            }
+            panic
+            "warning here!"
+        }
+        "#
+    );
+}
+
+#[test]
+fn unreachable_code_analysis_treats_anonymous_functions_independently_3() {
+    assert_warning!(
+        r#"
+        pub fn main() {
+            panic
+            let _ = "warning here!"
+            let _ = fn() {
+              panic
+              "warning here!"
+            }
+        }
+        "#
+    );
+}
+
+#[test]
+fn no_warnings_for_matches_used_like_ifs() {
+    assert_no_warnings!(
+        r#"
+    pub fn main() {
+        case True {
+          _ if True -> 1
+          _ -> 2
+        }
+    }
+        "#
+    );
+}
+
+#[test]
+fn no_warnings_for_matches_used_like_ifs_2() {
+    assert_no_warnings!(
+        r#"
+    pub fn main() {
+        case 1 {
+          _ if True -> 1
+          _ -> 2
+        }
+    }
+        "#
+    );
+}
+
+#[test]
+fn warnings_for_matches_on_literal_values_that_are_not_like_an_if_1() {
+    assert_warning!(
+        r#"
+    pub fn main() {
+        case True {
+          _ -> 1
+        }
+    }
+        "#
+    );
+}
+
+#[test]
+fn warnings_for_matches_on_literal_values_that_are_not_like_an_if_2() {
+    assert_warning!(
+        r#"
+    pub fn main() {
+        case True {
+          True -> 1
+        }
+    }
+        "#
+    );
+}
+
+#[test]
+fn redundant_function_capture_in_pipe_1() {
+    assert_warning!(
+        "
+  pub fn wibble(_, _) { 1 }
+
+  pub fn main() {
+    1 |> wibble(_, 2) |> wibble(2)
+  }
+"
+    );
+}
+
+#[test]
+fn redundant_function_capture_in_pipe_2() {
+    assert_warning!(
+        "
+  pub fn wobble(_) { 1 }
+
+  pub fn main() {
+    1 |> wobble(_) |> wobble
+  }
+"
+    );
+}
+
+#[test]
+fn redundant_function_capture_in_pipe_3() {
+    assert_warning!(
+        "
+  pub fn wobble(_) { 1 }
+
+  pub fn main() {
+    1 |> wobble |> wobble(_)
+  }
+"
+    );
+}
+
+#[test]
+fn redundant_function_capture_in_pipe_4() {
+    assert_warning!(
+        "
+  pub fn wibble(_, _) { 1 }
+
+  pub fn main() {
+    1 |> wibble(2) |> wibble(_, 2)
+  }
+"
+    );
+}
+
+#[test]
+fn redundant_function_capture_in_pipe_5() {
+    assert_no_warnings!(
+        "
+  pub fn wibble(_, _) { 1 }
+
+  pub fn main() {
+    1 |> wibble(2, _)
+  }
+"
+    );
+}
+
+#[test]
+fn deprecated_list_append_syntax() {
+    assert_warning!(
+        r#"
+    pub fn main() {
+      let letters = ["b", "c"]
+      ["a"..letters]
+    }
+        "#
+    );
+}
+
+#[test]
+fn deprecated_list_pattern_syntax() {
+    assert_warning!(
+        r#"
+    pub fn main() {
+      let letters = ["b", "c"]
+      case letters {
+        ["a"..rest] -> rest
+        _ -> []
+      }
+    }
+        "#
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/3383
+#[test]
+fn deprecated_list_pattern_syntax_1() {
+    assert_warning!(
+        r#"
+    pub fn main() {
+      let letters = ["b", "c"]
+      case letters {
+        [] -> []
+        [..] -> []
+      }
+    }
+        "#
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/6088
+#[test]
+fn deprecated_list_spread_variable_pattern_syntax() {
+    assert_warning!(
+        r#"
+pub fn main() {
+  let letters = ["b", "c"]
+  case letters {
+    [] -> []
+    [..x] -> x
+  }
+}
+"#
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/3473
+#[test]
+fn deprecated_record_pattern_syntax() {
+    assert_warning!(
+        r#"
+pub type Wibble {
+  Wibble(one: Int, two: Int)
+}
+
+pub fn main() {
+  let wibble = Wibble(one: 1, two: 2)
+  case wibble {
+    Wibble(one: one ..) -> one
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn deprecated_record_pattern_syntax_with_no_labels() {
+    assert_warning!(
+        r#"
+pub type Wibble {
+  Wibble(one: Int, two: Int)
+}
+
+pub fn main() {
+  let wibble = Wibble(one: 1, two: 2)
+  case wibble {
+    Wibble(one ..) -> one
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn deprecated_record_pattern_syntax_with_label_shorthand() {
+    assert_warning!(
+        r#"
+pub type Wibble {
+  Wibble(one: Int, two: Int)
+}
+
+pub fn main() {
+  let wibble = Wibble(one: 1, two: 2)
+  case wibble {
+    Wibble(one: ..) -> one
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn deprecated_record_pattern_syntax_has_no_warning_if_everything_is_discarded() {
+    assert_no_warnings!(
+        r#"
+pub type Wibble {
+  Wibble(one: Int, two: Int)
+}
+
+pub fn main() {
+  let wibble = Wibble(one: 1, two: 2)
+  case wibble {
+    Wibble(..) -> 1
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn deprecated_record_pattern_syntax_has_no_warning_if_there_is_a_comma_before_spread() {
+    assert_no_warnings!(
+        r#"
+pub type Wibble {
+  Wibble(one: Int, two: Int)
+}
+
+pub fn main() {
+  let wibble = Wibble(one: 1, two: 2)
+  case wibble {
+    Wibble(one: one, ..) -> one
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn unused_label_shorthand_pattern_arg() {
+    assert_warning!(
+        r#"
+pub type Wibble { Wibble(arg1: Int, arg2: Bool ) }
+
+pub fn main() {
+  let Wibble(arg1:, arg2:) = Wibble(1, True)
+  arg1
+}
+"#
+    );
+}
+
+#[test]
+fn unused_label_shorthand_pattern_arg_shadowing() {
+    assert_warning!(
+        r#"
+pub type Wibble { Wibble(arg1: Int, arg2: Bool ) }
+
+pub fn main() {
+  let Wibble(arg1:, arg2:) = Wibble(1, True)
+  let arg1 = False
+  arg1
+}
+"#
+    );
+}
+
+#[test]
+fn internal_annotation_on_constant_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+@internal
+pub const wibble = 1
+",
+    );
+}
+
+#[test]
+fn internal_annotation_on_type_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+@internal
+pub type Wibble
+",
+    );
+}
+
+#[test]
+fn internal_annotation_on_function_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+@internal
+pub fn wibble() { Nil }
+",
+    );
+}
+
+#[test]
+fn nested_tuple_access_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main() {
+  let tuple = #(1, #(1, 1))
+  tuple.1.0
+}
+",
+    );
+}
+
+#[test]
+fn wasm_external_module_names_do_not_require_javascript_features() {
+    assert_no_warnings_with_i_version!(
+        Range::higher_than(Version::new(1, 0, 0)),
+        "
+@external(wasm, \"module@module\", \"func\")
+pub fn main() -> Nil { Nil }
+",
+    );
+}
+
+#[test]
+fn int_plus_in_guards_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main() {
+  case Nil {
+    _ if 1 + 1 == 2 -> Nil
+    _ -> Nil
+  }
+}
+",
+    );
+}
+
+#[test]
+fn float_plus_in_guards_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main() {
+  case Nil {
+    _ if 1.0 +. 1.0 == 2.0 -> Nil
+    _ -> Nil
+  }
+}
+",
+    );
+}
+
+#[test]
+fn int_minus_in_guards_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main() {
+  case Nil {
+    _ if 1 - 1 == 0 -> Nil
+    _ -> Nil
+  }
+}
+",
+    );
+}
+
+#[test]
+fn float_minus_in_guards_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main() {
+  case Nil {
+    _ if 1.0 -. 1.0 == 0.0 -> Nil
+    _ -> Nil
+  }
+}
+",
+    );
+}
+
+#[test]
+fn int_multiplication_in_guards_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main() {
+  case Nil {
+  _ if 1 * 1 == 0 -> Nil
+  _ -> Nil
+  }
+}
+",
+    );
+}
+
+#[test]
+fn float_multiplication_in_guards_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main() {
+  case Nil {
+  _ if 1.0 *. 1.0 == 0.0 -> Nil
+  _ -> Nil
+  }
+}
+",
+    );
+}
+
+#[test]
+fn int_divide_in_guards_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main() {
+  case Nil {
+  _ if 1 / 1 == 0 -> Nil
+  _ -> Nil
+  }
+}
+",
+    );
+}
+
+#[test]
+fn float_divide_in_guards_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main() {
+  case Nil {
+  _ if 1.0 /. 1.0 == 0.0 -> Nil
+  _ -> Nil
+  }
+}
+",
+    );
+}
+
+#[test]
+fn int_remainder_in_guards_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main() {
+  case Nil {
+  _ if 1 % 1 == 0 -> Nil
+  _ -> Nil
+  }
+}
+",
+    );
+}
+
+#[test]
+fn label_shorthand_in_constand_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub type Wibble { Wibble(wibble: Int) }
+
+pub const wibble = 1
+pub const wobble = Wibble(wibble:)
+",
+    );
+}
+
+#[test]
+fn label_shorthand_in_call_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub type Wibble { Wibble(wibble: Int) }
+
+pub fn main() {
+  let wibble = 1
+  Wibble(wibble:)
+}
+",
+    );
+}
+
+#[test]
+fn label_shorthand_in_pattern_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub type Wibble { Wibble(wibble: Int) }
+
+pub fn main(wibble) {
+  case wibble {
+    Wibble(wibble:) -> wibble
+  }
+}
+",
+    );
+}
+
+#[test]
+fn constant_string_concatenation_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "pub const string = \"wibble\" <> \"wobble\""
+    );
+}
+
+#[test]
+fn missing_utf_8_option_in_bit_array_segment_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main() {
+  <<\"hello\">>
+}
+",
+    );
+}
+
+#[test]
+fn missing_utf_8_option_in_bit_array_constant_segment_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "pub const bits = <<\"hello\">>"
+    );
+}
+
+#[test]
+fn missing_utf_8_option_in_bit_array_pattern_segment_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main(a) {
+  case a {
+    <<\"hello\">> -> Nil
+    _ -> Nil
+  }
+}
+",
+    );
+}
+
+#[test]
+fn missing_float_option_in_bit_array_segment_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main() {
+  <<1.2>>
+}
+",
+    );
+}
+
+#[test]
+fn missing_float_option_in_bit_array_constant_segment_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "pub const bits = <<1.2>>"
+    );
+}
+
+#[test]
+fn missing_float_option_in_bit_array_pattern_segment_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main(a) {
+  case a {
+    <<1.2>> -> Nil
+    _ -> Nil
+  }
+}
+",
+    );
+}
+
+#[test]
+fn record_update_variant_inference_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub type Wibble {
+  Wibble(a: Int, b: Int)
+  Wobble(a: Int, c: Int)
+}
+
+pub fn main(wibble) {
+  case wibble {
+    Wibble(..) -> Wibble(..wibble, b: 10)
+    Wobble(..) -> panic
+  }
+}
+",
+    );
+}
+
+#[test]
+fn record_access_variant_inference_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub type Wibble {
+  Wibble(a: Int, b: Int)
+  Wobble(a: Int, c: Int)
+}
+
+pub fn main(wibble) {
+  case wibble {
+    Wibble(..) -> wibble.b
+    Wobble(..) -> wibble.c
+  }
+}
+",
+    );
+}
+
+#[test]
+fn let_assert_with_message_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        r#"
+pub fn main() {
+  let assert Ok(10) = Ok(20) as "This will crash..."
+}
+"#,
+    );
+}
+
+#[test]
+fn bool_assert_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn go(x) {
+  assert x == 2
+}
+",
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_decimal() {
+    assert_valid_without_warnings(
+        r#"
+pub fn go() {
+  [
+    9_007_199_254_740_990,
+    9_007_199_254_740_991,
+    9_007_199_254_740_992,
+    -9_007_199_254_740_990,
+    -9_007_199_254_740_991,
+    -9_007_199_254_740_992,
+    340_282_366_920_938_463_463_374_607_431_768_211_457,
+    -340_282_366_920_938_463_463_374_607_431_768_211_457,
+  ]
+}
+"#,
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_binary() {
+    assert_valid_without_warnings(
+        r#"
+pub fn go() {
+  [
+    0b11111111111111111111111111111111111111111111111111110,
+    0b11111111111111111111111111111111111111111111111111111,
+    0b100000000000000000000000000000000000000000000000000000,
+  ]
+}
+"#,
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_octal() {
+    assert_valid_without_warnings(
+        r#"
+pub fn go() {
+  [
+    0o377777777777777776,
+    0o377777777777777777,
+    0o400000000000000000,
+  ]
+}
+"#,
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_hex() {
+    assert_valid_without_warnings(
+        r#"
+pub fn go() {
+  [
+    0x1FFFFFFFFFFFFE,
+    0x1FFFFFFFFFFFFF,
+    0x20000000000000,
+    0x100000000000000000000000000000001,
+    -0x100000000000000000000000000000001,
+  ]
+}
+"#,
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_in_tuple() {
+    assert_valid_without_warnings(
+        r#"
+pub fn go() {
+  #(9_007_199_254_740_992)
+}
+"#,
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_segment_in_bit_array() {
+    assert_valid_without_warnings(
+        r#"
+pub fn go() {
+  <<9_007_199_254_740_992:64>>
+}
+"#,
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_segment_size_in_bit_array() {
+    assert_valid_without_warnings(
+        r#"
+pub fn go() {
+  [
+    <<0:9_007_199_254_740_992>>,
+    <<0:size(9_007_199_254_740_992)>>,
+  ]
+}
+"#,
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_in_const() {
+    assert_valid_without_warnings(r#"pub const i = 9_007_199_254_740_992"#);
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_in_const_tuple() {
+    assert_valid_without_warnings(r#"pub const i = #(9_007_199_254_740_992)"#);
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_segment_in_const_bit_array() {
+    assert_valid_without_warnings(
+        r#"
+pub const i = <<9_007_199_254_740_992:64>>
+"#,
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_segment_size_in_const_bit_array() {
+    assert_valid_without_warnings(
+        r#"
+pub const ints = [
+  <<0:9_007_199_254_740_992>>,
+  <<0:size(9_007_199_254_740_992)>>,
+]
+"#,
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_in_pattern() {
+    assert_valid_without_warnings(
+        r#"
+pub fn go() {
+  let assert <<9_007_199_254_740_992:64>> = <<>>
+}
+"#,
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_segment_size_in_pattern() {
+    assert_valid_without_warnings(
+        r#"
+pub fn go() {
+  let assert <<0:9_007_199_254_740_992>> = <<>>
+}
+"#,
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_with_external_implementation() {
+    assert_valid_without_warnings(
+        r#"
+@external(wasm, "./test.mjs", "go")
+pub fn go() -> Int {
+  9_007_199_254_740_992
+}
+"#,
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_segment_in_pattern_with_external_implementation() {
+    assert_valid_without_warnings(
+        r#"
+@external(wasm, "./test.mjs", "go")
+pub fn go(b: BitArray) -> BitArray {
+  let assert <<0xFFF0000000000000:64>> = b
+}
+"#,
+    );
+}
+
+#[test]
+fn wasm_arbitrary_precision_int_with_external_function_call() {
+    assert_valid_without_warnings(
+        r#"
+pub fn main() {
+  helper() + 9_007_199_254_740_992
+}
+
+@external(wasm, "a", "b")
+fn helper() -> Int
+"#,
+    );
+}
+
+#[test]
+fn incomplete_code_block_raises_warning() {
+    assert_warning!(
+        r#"
+pub fn main() {
+    {}
+}
+"#
+    );
+}
+
+#[test]
+fn rejected_legacy_target_shorthand_erlang() {
+    assert_module_syntax_error!(
+        "
+@target(erl)
+pub fn wibble() { panic }
+"
+    );
+}
+
+#[test]
+fn rejected_legacy_target_shorthand_javascript() {
+    assert_module_syntax_error!(
+        "
+@target(js)
+pub fn wibble() { panic }
+"
+    );
+}
+
+#[test]
+fn unused_block_wrapping_pure_expressions() {
+    assert_warning!(
+        r#"
+pub fn main() {
+  {
+    True
+    1
+  }
+  Nil
+}
+"#
+    );
+}
+
+#[test]
+fn unused_block_wrapping_pure_expression() {
+    assert_warning!(
+        r#"
+pub fn main() {
+  { 1 }
+  Nil
+}
+"#
+    );
+}
+
+#[test]
+fn unused_block_wrapping_impure_expressions_is_not_reported_as_pure() {
+    assert_no_warnings!(
+        r#"
+pub fn main() {
+  {
+    wibble()
+    1
+  }
+  Nil
+}
+
+fn wibble() { panic }
+"#
+    );
+}
+
+#[test]
+fn unused_case_expression() {
+    assert_warning!(
+        r#"
+pub fn main() {
+    let a = 1
+    case a {
+        1 -> a
+        _ -> 12
+    }
+    Nil
+}
+"#
+    );
+}
+
+#[test]
+fn impure_case_expression_is_not_marked_as_unused() {
+    assert_no_warnings!(
+        r#"
+pub fn main() {
+    let a = 1
+    case a {
+        1 -> wibble()
+        _ -> 12
+    }
+    Nil
+}
+
+fn wibble() { panic }
+"#
+    );
+}
+
+#[test]
+fn impure_case_expression_is_not_marked_as_unused_2() {
+    assert_no_warnings!(
+        r#"
+pub fn main() {
+    let a = 1
+    case wibble() {
+        1 -> a
+        _ -> 12
+    }
+    Nil
+}
+
+fn wibble() { panic }
+"#
+    );
+}
+
+#[test]
+fn unused_fn_function_call() {
+    assert_warning!(
+        r#"
+pub fn main() {
+    fn(a) { a + 1 }(1)
+    Nil
+}
+"#
+    );
+}
+
+#[test]
+fn impure_fn_function_call_not_mark_as_unused() {
+    assert_no_warnings!(
+        r#"
+pub fn main() {
+    fn(_) { panic }(1)
+    Nil
+}
+"#
+    );
+}
+
+#[test]
+fn unused_pipeline_ending_with_pure_fn() {
+    assert_warning!(
+        r#"
+pub fn main() {
+    1
+    |> fn(n) { n + 1 }
+
+    Nil
+}
+"#
+    );
+}
+
+#[test]
+fn unused_pipeline_ending_with_impure_fn() {
+    assert_no_warnings!(
+        r#"
+pub fn main() {
+    1
+    |> fn(_) { panic }
+
+    Nil
+}
+"#
+    );
+}
+
+#[test]
+fn pipeline_with_regular_function_call_is_never_marked_unused() {
+    assert_no_warnings!(
+        r#"
+pub fn main() {
+    1 |> wibble
+
+    Nil
+}
+
+fn wibble(n) { echo n }
+"#
+    );
+}
+
+#[test]
+fn use_with_pure_fn_expression_is_marked_as_unused() {
+    assert_warning!(
+        r#"
+pub fn main() {
+    {
+        use _ <- fn(a) { a }
+        1
+    }
+
+    Nil
+}
+"#
+    );
+}
+
+#[test]
+fn use_statement_calling_regular_function_is_never_marked_unused() {
+    assert_no_warnings!(
+        r#"
+pub fn main() {
+    {
+        use _ <- each([1, 2, 3])
+        1
+    }
+
+    Nil
+}
+
+fn each(list, _fun) { echo list }
+"#
+    );
+}
+
+#[test]
+// https://github.com/gleam-lang/gleam/issues/3425
+fn unused_variable_assignment_pattern() {
+    assert_warning!(
+        "
+type Wibble {
+  Wibble(a: Int, b: Int)
+}
+
+pub fn main() {
+  let Wibble(a:, ..) as w = Wibble(1, 2)
+  a
+}
+"
+    );
+}
+
+#[test]
+fn unused_variable_string_prefix_pattern() {
+    assert_warning!(
+        r#"
+pub fn main() {
+  let assert "hello" as hello <> rest = "hello, world"
+  rest
+}
+"#
+    );
+}
+
+#[test]
+fn unused_variable_string_prefix_pattern2() {
+    assert_warning!(
+        r#"
+pub fn main() {
+  let assert "hello" as hello <> rest = "hello, world"
+  hello
+}
+"#
+    );
+}
+
+#[test]
+fn echo_followed_by_panic() {
+    assert_warning!(
+        "
+pub fn main() {
+  echo panic
+}
+"
+    );
+}
+
+#[test]
+fn echo_followed_by_panicking_expression() {
+    assert_warning!(
+        "
+pub fn main(a) {
+  echo case a {
+    1 -> panic
+    _ -> [1, panic]
+  }
+}
+"
+    );
+}
+
+#[test]
+fn assert_on_inferred_variant() {
+    assert_warning!(
+        "
+type Wibble {
+  Wibble(w: Int)
+  Wobble(w: String)
+}
+
+pub fn main() {
+  let assert Wobble(w) = Wibble(10)
+  w
+}
+"
+    );
+}
+
+#[test]
+fn bit_array_truncated_segment() {
+    assert_warning!(
+        "
+pub fn main() {
+  <<12:size(1)>>
+}
+"
+    );
+}
+
+#[test]
+fn unused_pure_function() {
+    assert_warning!(
+        "
+fn add(a, b) { a + b }
+
+pub fn main() {
+  add(1, 2)
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn bit_array_truncated_segment_in_bytes() {
+    assert_warning!(
+        "
+pub fn main() {
+  <<258:size(8)>>
+}
+"
+    );
+}
+#[test]
+
+fn unused_pure_function_that_calls_other_pure_function() {
+    assert_warning!(
+        "
+fn sub(a, b) { add(a, -b) }
+
+fn add(a, b) { a + b }
+
+pub fn main() {
+  sub(1, 2)
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn bit_array_truncated_segment_in_bytes_2() {
+    assert_warning!(
+        "
+pub fn main() {
+  <<65_537:size(2)-unit(8)>>
+}
+"
+    );
+}
+
+#[test]
+fn bit_array_truncated_segment_in_range() {
+    assert_no_warnings!(
+        "
+pub fn main() {
+  <<255>>
+}
+"
+    );
+}
+
+#[test]
+fn function_is_impure_if_external() {
+    assert_no_warnings!(
+        r#"
+@external(wasm, "maths", "add")
+fn add(a: Int, b: Int) -> Int
+
+pub fn main() {
+  add(1, 2)
+  Nil
+}
+"#
+    );
+}
+
+#[test]
+fn bit_array_truncated_segment_in_range_2() {
+    assert_no_warnings!(
+        "
+pub fn main() {
+  <<0>>
+}
+"
+    );
+}
+
+#[test]
+fn function_is_impure_if_uses_echo() {
+    assert_no_warnings!(
+        r#"
+fn add(a: Int, b: Int) -> Int {
+  echo a + b
+}
+
+pub fn main() {
+  add(1, 2)
+  Nil
+}
+"#
+    );
+}
+
+#[test]
+fn bit_array_negative_truncated_segment() {
+    assert_warning!(
+        "
+pub fn main() {
+  // -5 in 2's complement is 1111...111011
+  // so if we truncate it to its first 3 bits we
+  // get 011, which is positive 3!
+  <<-5:size(3)>>
+}
+"
+    );
+}
+
+#[test]
+fn bit_array_negative_truncated_segment_2() {
+    assert_warning!(
+        "
+pub fn main() {
+  <<-200:size(8)>>
+}
+"
+    );
+}
+
+#[test]
+fn bit_array_negative_truncated_segment_in_range() {
+    assert_no_warnings!(
+        "
+pub fn main() {
+  <<-128>>
+}
+"
+    );
+}
+
+#[test]
+fn function_is_impure_if_uses_panic() {
+    assert_no_warnings!(
+        r#"
+fn add(a: Int, b: Int) -> Int {
+  case a + b {
+    0 -> panic as "Cannot add to zero"
+    x -> x
+  }
+}
+
+pub fn main() {
+  add(1, 2)
+  Nil
+}
+"#
+    );
+}
+
+#[test]
+fn function_is_impure_if_uses_todo() {
+    // We have to use `assert_warning` here instead of `assert_no_warnings`, because
+    // `todo` will always emit a warning. However, that should be the only warning;
+    // there should not be an unused function warning.
+    assert_warning!(
+        r#"
+fn add(a: Int, b: Int) -> Int {
+  case a + b {
+    0 -> todo as "Handle zero"
+    x -> x
+  }
+}
+
+pub fn main() {
+  add(1, 2)
+  Nil
+}
+"#
+    );
+}
+
+#[test]
+fn function_is_impure_if_uses_let_assert() {
+    assert_no_warnings!(
+        r#"
+fn assert_ok(x: Result(a, b)) -> a {
+  let assert Ok(x) = x
+  x
+}
+
+pub fn main() {
+  assert_ok(Ok(10))
+  Nil
+}
+"#
+    );
+}
+
+#[test]
+fn function_is_impure_if_uses_assert() {
+    assert_no_warnings!(
+        r#"
+fn assert_equal(a, b) {
+  assert a == b
+}
+
+pub fn main() {
+  assert_equal(1, 2)
+  Nil
+}
+"#
+    );
+}
+
+#[test]
+fn function_is_impure_if_call_impure_function() {
+    assert_no_warnings!(
+        r#"
+@external(wasm, "erlang", "something")
+fn impure() -> Nil
+
+fn add(a: Int, b: Int) -> Int {
+  impure()
+  a + b
+}
+
+pub fn main() {
+  add(1, 2)
+  Nil
+}
+"#
+    );
+}
+
+#[test]
+fn pure_pipeline_raises_warning() {
+    assert_warning!(
+        "
+fn add(a, b) { a + b }
+
+pub fn main() {
+  1 |> add(2)
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn pure_pipeline_with_many_steps_raises_warning() {
+    assert_warning!(
+        "
+fn add(a, b) { a + b }
+
+pub fn main() {
+  1 |> add(2) |> add(3) |> add(4)
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn pipeline_with_echo_is_impure() {
+    assert_no_warnings!(
+        "
+fn add(a, b) { a + b }
+
+pub fn main() {
+  1 |> add(2) |> echo |> add(3)
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn pipeline_with_impure_function_raises_no_warnings() {
+    assert_no_warnings!(
+        "
+fn add(a, b) { echo a + b }
+
+pub fn main() {
+  1 |> add(2)
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn wasm_external_with_pure_body_is_impure() {
+    assert_valid_without_warnings(
+        r#"
+@external(wasm, "maths", "add")
+fn add(a: Int, b: Int) -> Int { a + b }
+
+pub fn main() {
+  add(1, 2)
+  Nil
+}
+"#,
+    );
+}
+
+#[test]
+fn pure_function_without_external_has_unused_result_warning() {
+    assert_warning!(
+        r#"
+fn add(a: Int, b: Int) -> Int { a + b }
+
+pub fn main() {
+  add(1, 2)
+  Nil
+}
+"#
+    );
+}
+
+#[test]
+fn pure_standard_library_function() {
+    assert_warning!(
+        (
+            "i_stdlib",
+            "i/dict",
+            r#"
+pub type Dict(key, value)
+
+@external(wasm, "map", "new")
+pub fn new() -> Dict(a, b)
+
+@external(wasm, "map", "insert")
+pub fn insert(dict: Dict(key, value), key: key, value: value) -> Dict(key, value)
+"#
+        ),
+        "
+import i/dict
+
+pub fn main() {
+  dict.insert(dict.new(), 1, 2)
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn impure_standard_library_function() {
+    assert_no_warnings!(
+        (
+            "i_stdlib",
+            "i/io",
+            r#"
+@external(wasm, "io", "print")
+pub fn println(message: String) -> Nil
+"#
+        ),
+        r#"
+import i/io
+
+pub fn main() {
+  io.println("Hello, world!")
+  Nil
+}
+"#
+    );
+}
+
+#[test]
+fn trusted_pure_standard_library_function_that_panics_is_impure() {
+    assert_no_warnings!(
+        (
+            "i_stdlib",
+            "i/int",
+            r#"
+pub fn add(_a, _b) {
+  panic
+}
+"#
+        ),
+        "
+import i/int
+pub fn main() {
+  int.add(1, 2)
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn higher_order_function_is_not_marked_as_pure() {
+    assert_no_warnings!(
+        (
+            "i/list",
+            r#"
+pub fn each(list, f) {
+  case list {
+    [] -> Nil
+    [first, ..rest] -> {
+      f(first)
+      each(rest, f)
+    }
+  }
+}
+"#
+        ),
+        "
+import i/list
+pub fn main() {
+  list.each([1, 2, 3, 4], fn(x) { echo x })
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn stdlib_list_each_is_not_marked_as_pure() {
+    assert_no_warnings!(
+        (
+            "i",
+            "i/list",
+            r#"
+pub fn each(list, f) {
+  case list {
+    [] -> Nil
+    [first, ..rest] -> {
+      f(first)
+      each(rest, f)
+    }
+  }
+}
+"#
+        ),
+        "
+import i/list
+pub fn main() {
+  list.each([1, 2, 3, 4], fn(x) { echo x })
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn dict_each_function_is_not_marked_as_pure() {
+    assert_no_warnings!(
+        (
+            "i_stdlib",
+            "i/dict",
+            r#"
+pub type Dict(key, value)
+
+@external(wasm, "maps", "new")
+pub fn new() -> Dict(k, v)
+
+pub fn each(dict: Dict(k, v), fun: fn(k, v) -> a) -> Nil {
+  fold(dict, Nil, fn(nil, k, v) {
+    fun(k, v)
+    nil
+  })
+}
+
+@external(wasm, "../dict.mjs", "fold")
+pub fn fold(
+  over dict: Dict(k, v),
+  from initial: acc,
+  with fun: fn(acc, k, v) -> acc,
+) -> acc {
+  let fun = fn(key, value, acc) { fun(acc, key, value) }
+  do_fold(fun, initial, dict)
+}
+
+@external(wasm, "maps", "fold")
+fn do_fold(fun: fn(k, v, acc) -> acc, initial: acc, dict: Dict(k, v)) -> acc
+"#
+        ),
+        "
+import i/dict
+pub fn main() {
+  dict.each(dict.new(), fn(_, _) { echo 1 })
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn dict_fold_function_is_not_marked_as_pure() {
+    assert_no_warnings!(
+        (
+            "i_stdlib",
+            "i/dict",
+            r#"
+pub type Dict(key, value)
+
+@external(wasm, "maps", "new")
+pub fn new() -> Dict(k, v)
+
+@external(wasm, "../dict.mjs", "fold")
+pub fn fold(
+  over dict: Dict(k, v),
+  from initial: acc,
+  with fun: fn(acc, k, v) -> acc,
+) -> acc {
+  let fun = fn(key, value, acc) { fun(acc, key, value) }
+  do_fold(fun, initial, dict)
+}
+
+@external(wasm, "maps", "fold")
+fn do_fold(fun: fn(k, v, acc) -> acc, initial: acc, dict: Dict(k, v)) -> acc
+"#
+        ),
+        "
+import i/dict
+pub fn main() {
+  dict.fold(dict.new(), Nil, fn(_, _, _) { Nil })
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn calling_local_variable_not_marked_as_pure() {
+    assert_no_warnings!(
+        "
+pub fn main() {
+  let side_effects = fn() { panic }
+
+  side_effects()
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn constructing_anonymous_function_is_pure() {
+    assert_warning!(
+        r#"
+fn make_panic(message) {
+  fn() { panic as message }
+}
+
+pub fn main() {
+  make_panic("This is a crash")
+  Nil
+}
+"#
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/4504
+#[test]
+fn impure_stdlib_test_function() {
+    assert_no_warnings!(
+        (
+            "i_stdlib",
+            "i/should",
+            r#"
+@external(wasm, "gleam_test_ffi", "should_equal")
+pub fn equal(a: t, b: t) -> Nil
+"#
+        ),
+        "
+import i/should
+
+pub fn main() {
+  1 |> should.equal(1)
+}
+"
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/4505
+#[test]
+fn impure_function_using_a_pipe() {
+    assert_no_warnings!(
+        "
+fn impure(_x) {
+  panic
+}
+
+fn also_impure(x) {
+  x |> impure
+}
+
+pub fn main() {
+  also_impure(10)
+  Nil
+}
+"
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/4505
+#[test]
+fn impure_function_using_a_pipe_with_a_call() {
+    assert_no_warnings!(
+        "
+fn impure(_x, _y) {
+  panic
+}
+
+fn also_impure(x) {
+  x |> impure(1)
+}
+
+pub fn main() {
+  also_impure(10)
+  Nil
+}
+"
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/4505
+#[test]
+fn impure_function_using_a_pipe_into_anonymous_function() {
+    assert_no_warnings!(
+        "
+
+fn impure(x) {
+  x |> fn(_x) { panic }
+}
+
+pub fn main() {
+  impure(10)
+  Nil
+}
+"
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/4505
+#[test]
+fn impure_function_using_a_pipe_into_echo() {
+    assert_no_warnings!(
+        "
+
+fn impure(x) {
+  x |> echo
+}
+
+pub fn main() {
+  impure(10)
+  Nil
+}
+"
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/4505
+#[test]
+fn impure_function_using_a_pipe_into_result_of_call() {
+    assert_no_warnings!(
+        "
+fn make_panic() {
+  fn(_x) { panic }
+}
+
+fn impure(x) {
+  x |> make_panic()()
+}
+
+pub fn main() {
+  impure(10)
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn no_assert_warning_for_bit_array_with_variable() {
+    assert_no_warnings!(
+        r#"
+@external(wasm, "gleam@function", "identity")
+fn codepoint(value: Int) -> UtfCodepoint
+
+pub fn main() {
+  let codepoint = codepoint(32)
+  assert <<codepoint:utf8_codepoint>> == <<" ">>
+}
+"#
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/4637
+#[test]
+fn pattern_matching_on_32_float_plus_infinity_still_reachable() {
+    assert_no_warnings!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:32-float>> -> "Float"
+    <<0x7f800000:32>> -> "+Infinity"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn no_assert_warning_for_tuple_with_variable() {
+    assert_no_warnings!(
+        r#"
+pub fn main() {
+  let x = 3
+  assert #(1, 2, x) == #(1, 2, 3)
+}
+"#
+    );
+}
+
+#[test]
+fn pattern_matching_on_32_float_plus_infinity_still_reachable_2() {
+    assert_no_warnings!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:32-float>> -> "Float"
+    <<0x7f80:16, 0x0000:16>> -> "+Infinity"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn no_assert_warning_for_list_with_variable() {
+    assert_no_warnings!(
+        r#"
+pub fn main() {
+  let x = 3
+  assert [1, 2, x] == [1, 2, 3]
+}
+"#
+    );
+}
+
+#[test]
+fn pattern_matching_on_32_float_minus_infinity_still_reachable() {
+    assert_no_warnings!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:32-float>> -> "Float"
+    <<0xff800000:32>> -> "-Infinity"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn no_assert_warning_for_constructor_with_variable() {
+    assert_no_warnings!(
+        r#"
+type Box(t) {
+  Box(t)
+}
+
+pub fn main() {
+  let x = 42
+  assert Box(x) == Box(42)
+}
+"#
+    );
+}
+
+#[test]
+fn pattern_matching_on_32_float_minus_infinity_still_reachable_2() {
+    assert_no_warnings!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:32-float>> -> "Float"
+    <<0xff80:16, 0x0000:16>> -> "-Infinity"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn pattern_matching_on_32_float_nan_still_reachable() {
+    assert_no_warnings!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:32-float>> -> "Float"
+    <<0x7fc00000:32>> -> "NaN"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn pattern_matching_on_32_float_nan_still_reachable_2() {
+    assert_no_warnings!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:32-float>> -> "Float"
+    <<0x7fc0:16, 0x0000:16>> -> "NaN"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn pattern_matching_on_64_float_plus_infinity_still_reachable() {
+    assert_no_warnings!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:64-float>> -> "Float"
+    <<0x7ff0000000000000:64>> -> "+Infinity"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn pattern_matching_on_64_float_plus_infinity_still_reachable_2() {
+    assert_no_warnings!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:64-float>> -> "Float"
+    <<0x7ff00000:32, 0x00000000:32>> -> "+Infinity"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn pattern_matching_on_64_float_minus_infinity_still_reachable() {
+    assert_no_warnings!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:64-float>> -> "Float"
+    <<0xfff0000000000000:64>> -> "-Infinity"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn pattern_matching_on_64_float_minus_infinity_still_reachable_2() {
+    assert_no_warnings!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:64-float>> -> "Float"
+    <<0xfff00000:32, 0x00000000:32>> -> "-Infinity"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn pattern_matching_on_64_float_nan_still_reachable() {
+    assert_no_warnings!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:64-float>> -> "Float"
+    <<0x7ff8000000000000:64>> -> "NaN"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn pattern_matching_on_64_float_nan_still_reachable_2() {
+    assert_no_warnings!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:64-float>> -> "Float"
+    <<0x7ff80000:32, 0x00000000:32>> -> "NaN"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn pattern_matching_on_64_float_int_is_still_reachable() {
+    assert_no_warnings!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:64-float>> -> "Float"
+    <<_:64-int>> -> "Int"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn pattern_matching_on_64_float_float_is_unreachable() {
+    assert_warning!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<_:64-float>> -> "Float"
+    <<_:64-float>> -> "unreachable"
+    _ -> "Other"
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn import_module_twice() {
+    assert_warning!(
+        ("i/wibble", "pub fn wobble() { 1 }"),
+        "import i/wibble as a
+import i/wibble as b
+
+pub fn main() {
+  a.wobble() + b.wobble()
+}
+"
+    );
+}
+//https://github.com/gleam-lang/gleam/issues/4666
+#[test]
+fn shadow_imported_function() {
+    assert_warning!(
+        (
+            "thepackage",
+            "module",
+            r#"
+pub fn wibble() { Nil }
+"#
+        ),
+        r#"
+import module.{wibble}
+
+pub fn wibble() { Nil }
+"#
+    );
+}
+//https://github.com/gleam-lang/gleam/issues/4666
+#[test]
+fn shadow_imported_constant() {
+    assert_warning!(
+        (
+            "thepackage",
+            "module",
+            r#"
+pub const value = 1
+"#
+        ),
+        r#"
+import module.{value}
+
+pub const value = 1
+"#
+    );
+}
+
+#[test]
+fn int_literals_redundant_comparison() {
+    assert_warning!("pub fn main() { 1 == 1 }");
+}
+
+#[test]
+fn int_literals_redundant_comparison_2() {
+    assert_warning!("pub fn main() { 1 == 2 }");
+}
+
+#[test]
+fn int_literals_redundant_comparison_3() {
+    assert_warning!("pub fn main() { 1 != 1 }");
+}
+
+#[test]
+fn int_literals_redundant_comparison_4() {
+    assert_warning!("pub fn main() { 1 != 2 }");
+}
+
+#[test]
+fn int_literals_redundant_comparison_5() {
+    assert_warning!("pub fn main() { 1 > 2 }");
+}
+
+#[test]
+fn int_literals_redundant_comparison_6() {
+    assert_warning!("pub fn main() { 1 <= 2 }");
+}
+
+#[test]
+fn int_literals_redundant_comparison_7() {
+    assert_warning!("pub fn main() { 1 < 2 }");
+}
+
+#[test]
+fn int_literals_redundant_comparison_8() {
+    assert_warning!("pub fn main() { 1 >= 2 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison() {
+    assert_warning!("pub fn main() { 1.0 == 1.0 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison_2() {
+    assert_warning!("pub fn main() { 1.0 == 2.0 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison_3() {
+    assert_warning!("pub fn main() { 1.0 != 1.0 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison_4() {
+    assert_warning!("pub fn main() { 1.0 != 2.0 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison_5() {
+    assert_warning!("pub fn main() { 1.0 >. 2.0 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison_6() {
+    assert_warning!("pub fn main() { 1.0 <=. 2.0 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison_7() {
+    assert_warning!("pub fn main() { 1.0 <. 2.0 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison_8() {
+    assert_warning!("pub fn main() { 1.0 >=. 2.0 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison_different_repr() {
+    assert_warning!("pub fn main() { 1_0.0 == 10.0 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison_different_repr_2() {
+    assert_warning!("pub fn main() { 10.0 == 1.0e1 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison_precision_loss() {
+    assert_warning!("pub fn main() { 1.0e-500 == 1.0e-600 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison_infinity() {
+    assert_warning!("pub fn main() { 1.0e500 == 1.0e600 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison_signed_zero() {
+    assert_no_warnings!("pub fn main() { 0.0 == -0.0 }");
+}
+
+#[test]
+fn float_literals_redundant_comparison_omitted_zero() {
+    assert_warning!("pub fn main() { 10. == 10.0 }");
+}
+
+#[test]
+fn bool_literals_redundant_comparison() {
+    assert_warning!("pub fn main() { True == False }");
+}
+
+#[test]
+fn bool_literals_redundant_comparison_1() {
+    assert_warning!("pub fn main() { True != False }");
+}
+
+#[test]
+fn list_literals_redundant_comparison() {
+    assert_warning!("pub fn main(a, b) { [1] == [a, b(1)] }");
+}
+
+#[test]
+fn list_literals_redundant_comparison_2() {
+    assert_warning!("pub fn main(a, b) { [1] != [a, b(1)] }");
+}
+
+#[test]
+fn list_literals_redundant_comparison_3() {
+    assert_warning!("pub fn main() { [1] != [1] }");
+}
+
+#[test]
+fn list_literals_redundant_comparison_4() {
+    assert_warning!("pub fn main(a) { [1, ..[1, a]] == [1, ..[1, a]] }");
+}
+
+#[test]
+fn list_literals_redundant_comparison_5() {
+    assert_warning!("pub fn main(a) { [1, ..a] == [1, ..a] }");
+}
+
+#[test]
+fn list_literals_redundant_comparison_6() {
+    assert_no_warnings!("pub fn main(a) { [a(1)] == [a(1)] }");
+}
+
+#[test]
+fn list_literals_redundant_comparison_7() {
+    assert_warning!("pub fn main(a) { [a(1), 2] == [a(1), 3] }");
+}
+
+#[test]
+fn string_literals_redundant_comparison() {
+    assert_warning!("pub fn main() { \"wibble\" == \"wobble\" }");
+}
+
+#[test]
+fn string_literals_redundant_comparison_1() {
+    assert_warning!("pub fn main() { \"wibble\" != \"wobble\" }");
+}
+
+#[test]
+fn variables_redundant_comparison() {
+    assert_warning!("pub fn main(a) { a == a }");
+}
+
+#[test]
+fn variables_not_redundant_comparison() {
+    assert_no_warnings!("pub fn main(a, b) { a != b }");
+}
+
+#[test]
+fn constructor_functions_not_redundant_comparison() {
+    assert_no_warnings!(
+        "
+type Comparison {
+  Wobble(String)
+}
+
+pub fn main() {
+  Wobble == Wobble
+}
+"
+    );
+}
+
+#[test]
+fn record_select_redundant_comparison() {
+    assert_warning!(
+        "
+pub type Wibble {
+  Wibble(field: Int)
+}
+
+pub fn main(wibble: Wibble) { wibble.field == wibble.field }
+"
+    );
+}
+
+#[test]
+fn record_select_redundant_comparison_1() {
+    assert_warning!(
+        "
+pub type Wibble {
+  Wibble(field: Int)
+}
+
+pub fn main(wibble: Wibble) { wibble.field != wibble.field }
+"
+    );
+}
+
+#[test]
+fn record_select_not_redundant_comparison() {
+    assert_no_warnings!(
+        "
+pub type Wibble {
+  Wibble(field: Int)
+}
+
+pub fn main(wibble: Wibble, wobble: Wibble) { wibble.field == wobble.field }
+"
+    );
+}
+
+#[test]
+fn record_select_not_redundant_comparison_2() {
+    assert_no_warnings!(
+        "
+pub type Wibble {
+  Wibble(field: Int)
+}
+
+fn new() -> Wibble { Wibble(1) }
+
+pub fn main() {
+  new().field == new().field
+  // ^^ functions might have side effects so we can't
+  //    tell if this is redundant or not!
+}
+"
+    );
+}
+
+#[test]
+fn different_records_0_redundant_comparison() {
+    assert_warning!(
+        "
+pub type Either {
+  Left
+  Right
+}
+
+pub fn main() -> Bool {
+  Left == Right
+}
+"
+    );
+}
+
+#[test]
+fn different_records_1_redundant_comparison() {
+    assert_warning!(
+        "
+pub type Either {
+  Left(Int)
+  Right
+}
+
+pub fn main() -> Bool {
+  Left(1) == Right
+}
+"
+    );
+}
+
+#[test]
+fn different_records_2_redundant_comparison() {
+    assert_warning!(
+        "
+pub type Either {
+  Left(Int)
+  Right(Int)
+}
+
+pub fn main() -> Bool {
+  Left(1) == Right(1)
+}
+"
+    );
+}
+
+#[test]
+fn different_records_3_redundant_comparison() {
+    assert_warning!(
+        "
+pub type Either {
+  Left
+  Right(Int)
+}
+
+pub fn main() -> Bool {
+  Left == Right(1)
+}
+"
+    );
+}
+
+#[test]
+fn unused_discard_pattern() {
+    assert_warning!(
+        "pub fn main() {
+  let a = 10
+  let _ = case a {
+    _ as b -> b
+  }
+}
+"
+    );
+}
+
+#[test]
+fn discarded_argument_suggestion_is_not_given_for_different_functions() {
+    assert_no_warnings!(
+        "
+pub fn main(_x) { 1 }
+pub fn wibble() { x }
+"
+    );
+}
+
+#[test]
+fn empty_guard_clause() {
+    assert_warning!(
+        "
+pub fn main() {
+    let wibble = 10
+    case wibble {
+        10 if -> True
+        _ -> False
+    }
+
+}"
+    );
+}
+
+#[test]
+fn impossible_to_reach_int_segment() {
+    assert_warning!(
+        "
+pub fn main(x) {
+  case x {
+    <<9:size(2)>> -> True
+    _ -> False
+  }
+}"
+    );
+}
+
+#[test]
+fn impossible_to_reach_int_segment_2() {
+    assert_warning!(
+        "
+pub fn main(x) {
+  case x {
+    <<-9:unsigned>> -> True
+    _ -> False
+  }
+}"
+    );
+}
+
+#[test]
+fn impossible_to_reach_int_segment_3() {
+    assert_warning!(
+        "
+pub fn main(x) {
+  case x {
+    <<312>> -> True
+    _ -> False
+  }
+}"
+    );
+}
+
+#[test]
+fn impossible_to_reach_int_segment_4() {
+    assert_warning!(
+        "
+pub fn main(x) {
+  case x {
+    <<-1>> -> True
+    _ -> False
+  }
+}"
+    );
+}
+
+#[test]
+fn multiple_impossible_to_reach_int_segments() {
+    assert_warning!(
+        "
+pub fn main(x) {
+  case x {
+    <<1, -1, 2, -3>> -> True
+    _ -> False
+  }
+}"
+    );
+}
+
+#[test]
+fn assert_on_impossible_to_reach_int_segment() {
+    assert_warning!(
+        "
+pub fn main(x) {
+  let assert <<1, -1, 2, -3>> = x
+}"
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/4958
+#[test]
+fn unreachable_string_pattern_with_different_encodings() {
+    assert_warning!(
+        r#"
+pub fn wibble(bits) {
+  case bits {
+    <<"\u{0000}a\u{0000}b":utf8>> -> 1
+    // This is the same as the one above, it shouldn't be reachable
+    <<"ab":utf16>> -> 2
+    _ -> 3
+  }
+}"#
+    );
+}
+
+#[test]
+fn unreachable_int_pattern_with_string_of_same_value() {
+    assert_warning!(
+        r#"
+pub fn wibble(bits) {
+  case bits {
+    <<"a">> -> 1
+    <<97>> -> 2
+    _ -> 3
+  }
+}"#
+    );
+}
+
+#[test]
+fn unreachable_int_pattern_with_prefix_int() {
+    assert_warning!(
+        r#"
+pub fn wibble(bits) {
+  case bits {
+    <<0b1:1, _:1>> -> 1
+    <<0b11:2>> -> 2
+    _ -> 3
+  }
+}"#
+    );
+}
+
+#[test]
+fn reachable_pattern_after_unreachable_equal_pattern() {
+    assert_warning!(
+        r#"
+pub fn wibble(bits) {
+  case bits {
+    <<97:3>> -> 1
+    <<"a">> -> 2
+    _ -> 3
+  }
+}
+"#
+    );
+}
+
+#[test]
+fn unused_recursive_function_argument() {
+    assert_warning!(
+        "
+pub fn main(x: Int) {
+  main(x)
+}
+"
+    );
+}
+
+#[test]
+fn unused_recursive_function_argument_2() {
+    assert_warning!(
+        "
+pub fn main(x, times) {
+  case times {
+    0 -> main(x, 0)
+    _ -> main(x, times - 1)
+  }
+}
+"
+    );
+}
+
+#[test]
+fn unused_recursive_function_with_shadowing() {
+    assert_warning!(
+        "
+pub fn main(x: Int) {
+  let _useless = fn(x) { main(x) }
+  main(x)
+}
+"
+    );
+}
+
+#[test]
+fn unused_recursive_function_inside_anonymous_function() {
+    assert_warning!(
+        "
+pub fn main(x: Int) {
+  let _useless = fn(_) { main(x) }
+  Nil
+}
+"
+    );
+}
+
+#[test]
+fn unused_recursive_function_with_variable_shadowing() {
+    assert_no_warnings!(
+        "
+pub fn main(x: Int) {
+  let x = x * 2
+  main(x)
+}
+"
+    );
+}
+
+#[test]
+fn unused_recursive_function_passing_argument_in_a_different_position_counts_as_using_it() {
+    assert_no_warnings!(
+        "
+pub fn main(x: Int, y) {
+  case y {
+    0 -> main(1, x)
+    _ -> main(0, 0)
+  }
+}
+"
+    );
+}
+
+#[test]
+fn unused_recursive_function_with_shadowed_function() {
+    assert_no_warnings!(
+        "
+pub fn main(x: Int) {
+  let main = fn(x) { x }
+  main(x)
+}
+"
+    );
+}
+
+#[test]
+fn external_annotation_on_custom_type_requires_v0_1() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        r#"
+@external(wasm, "wibble", "wobble")
+pub type Wobble
+"#,
+    );
+}
+
+#[test]
+fn detached_doc_comment() {
+    assert_warning!(
+        "
+/// This comment is detached
+//
+
+/// This is actual documentation
+pub const pi = 3.14
+"
+    );
+}
+
+#[test]
+fn const_record_update_requires_v0_1_warning() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub type Wibble { Wibble(a: Int, b: Int) }
+const base = Wibble(1, 2)
+pub const wobble = Wibble(..base, b: 3)
+",
+    );
+}
+
+#[test]
+fn expression_in_expression_segment_size_requires_v0_1_warning() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main() {
+  <<1:size(3 * 8)>>
+}
+",
+    );
+}
+
+#[test]
+fn expression_in_pattern_segment_size_requires_v0_1_warning() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub fn main(x) {
+  case x {
+    <<_:size(3*8)>> -> 1
+    _ -> 2
+  }
+}",
+    );
+}
+
+#[test]
+fn constant_list_prepending_requires_v0_1_warning() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+pub const one = []
+pub const other = [1, 2, ..one]
+",
+    );
+}
+
+#[test]
+fn constant_list_prepending_in_guard_requires_v0_1_warning() {
+    assert_warnings_with_i_version!(
+        Range::higher_than(Version::new(0, 0, 1)),
+        "
+fn go(x) {
+  case x {
+    [1, ..] if [1, ..x] == x -> Nil
+    _ -> Nil
+  }
+}
+",
+    );
+}
+
+#[test]
+fn record_update_with_all_wrong_fields_produces_no_warnings_1() {
+    assert_no_warnings!(
+        "
+pub type Wibble {
+  Wibble(a: Int, b: Bool)
+}
+
+pub fn main() {
+  let original = Wibble(a: 1, b: True)
+  Wibble(..original, c: 2)
+}
+",
+    );
+}
+
+#[test]
+fn record_update_with_all_wrong_fields_produces_no_warnings_2() {
+    assert_no_warnings!(
+        "
+pub type Wibble {
+  Wibble(a: Int, b: Bool)
+}
+
+pub fn main() {
+  let original = Wibble(a: 1, b: True)
+  Wibble(..original, a: True)
+}
+",
+    );
+}
+
+#[test]
+fn record_update_with_wrong_types_but_all_fields_produces_warning() {
+    assert_warning!(
+        "
+pub type Wibble {
+  Wibble(a: Int, b: Bool)
+}
+
+pub fn main() {
+  let original = Wibble(a: 1, b: True)
+  Wibble(..original, a: True, b: 1)
+}
+"
+    );
+}
+
+#[test]
+fn bit_array_match_on_arbitrary_precision_int() {
+    assert_valid_without_warnings(
+        "
+pub fn go(x: BitArray) {
+    let assert <<number:123>> = x
+    number
+}
+",
+    );
+}
+
+#[test]
+fn bit_array_match_on_arbitrary_precision_int_1() {
+    assert_valid_without_warnings(
+        "
+pub fn go(x: BitArray) {
+  case x {
+    <<n:size(53)>> -> n
+    _ -> 1
+  }
+}
+",
+    );
+}
+
+#[test]
+fn bit_array_match_on_arbitrary_precision_int_with_unit() {
+    assert_valid_without_warnings(
+        "
+pub fn go(x: BitArray) {
+  case x {
+    <<n:2-unit(250)>> -> n
+    _ -> 1
+  }
+}
+",
+    );
+}
+
+#[test]
+fn bit_array_match_on_bytes_does_not_complain_about_int_size() {
+    assert_no_warnings!(
+        "
+pub fn go(x: BitArray) {
+  case x {
+    <<n:150-bytes>> -> n
+    _ -> <<>>
+  }
+}
+"
+    );
+}
+
+#[test]
+fn bit_array_match_in_wasm_external_body_does_not_complain_about_int_size() {
+    assert_no_warnings!(
+        r#"
+pub fn main() -> Nil {
+  echo wibble(<<1, 2, 3, 4, 5, 6, 7, 8>>)
+  Nil
+}
+
+@external(wasm, "./ffi.mjs", "wibble")
+fn wibble(bits: BitArray) -> Int {
+  let assert <<x:64>> = bits
+  x
+}
+"#
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/5599
+#[test]
+fn bit_array_size_constant() {
+    assert_no_warnings!(
+        r#"
+const some_size = 2
+
+pub fn run(data) {
+  case data {
+    <<x:bytes-size(some_size), _:bits>> -> x
+    _ -> data
+  }
+}
+        "#
+    );
+}
+
+#[test]
+fn constant_used_in_todo_message_counts_as_used() {
+    assert_no_warnings!(
+        "
+const wibble = 1
+pub const wobble = todo as wibble
+"
+    );
+}
+
+#[test]
+fn piping_into_call_which_returns_function() {
+    assert_warning!(
+        "
+pub fn main() {
+  1 |> wibble(2)
+}
+
+fn wibble(a) {
+  fn(b) { #(a, b) }
+}
+"
+    );
+}
+
+#[test]
+fn no_warning_when_extra_brackets_are_added_to_call_returning_function() {
+    assert_no_warnings!(
+        "
+pub fn main() {
+  1 |> wibble(2)()
+}
+
+fn wibble(a) {
+  fn(b) { #(a, b) }
+}
+"
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/3899
+#[test]
+fn deprecated_value_in_use_with_fn_literal_rhs_warns_once() {
+    assert_warning!(
+        r#"
+@deprecated("Don't use this!")
+pub fn wibble() {
+  Nil
+}
+
+pub fn main() {
+  use <- fn(f) { f() }
+  wibble()
+}
+"#
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/3899
+#[test]
+fn deprecated_value_in_nested_use_with_fn_literal_rhs_warns_once() {
+    assert_warning!(
+        r#"
+@deprecated("Don't use this!")
+pub fn wibble() {
+  Nil
+}
+
+pub fn main() {
+  use <- fn(f) { f() }
+  use <- fn(f) { f() }
+  wibble()
+}
+"#
+    );
+}
+
+// https://github.com/gleam-lang/gleam/issues/3899
+#[test]
+fn unreachable_code_in_use_with_fn_literal_rhs_warns_once() {
+    assert_warning!(
+        "
+pub fn wibble() {
+  Nil
+}
+
+pub fn main() {
+  use <- fn(f) { f() }
+  panic
+  wibble()
+}
+"
+    );
+}
+
+#[test]
+fn unreachable_empty_bit_array() {
+    // <<>> and <<"">> are equivalent.
+    assert_warning!(
+        r#"
+pub fn thingy(wibble) {
+  case wibble {
+    <<>> -> 1
+    <<"">> -> 2
+    _ -> 3
+  }
+}
+    "#
+    );
+}
+
+#[test]
+fn empty_string_in_bit_array_pattern_segment() {
+    assert_warning!(
+        r#"
+pub fn go(x) {
+  case x {
+    <<"">> -> True
+    _ -> False
+  }
+}
+"#
+    );
+}

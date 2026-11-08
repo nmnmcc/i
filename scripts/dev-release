@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "${WLEAM_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
-export CARGO_TARGET_DIR="${WLEAM_CARGO_TARGET_DIR:-$PWD/target/cargo}"
+cd "${ILANG_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+export CARGO_TARGET_DIR="${ILANG_CARGO_TARGET_DIR:-$PWD/target/cargo}"
 release_target="${CARGO_BUILD_TARGET:-}"
 read_target=false
 for argument in "$@"; do

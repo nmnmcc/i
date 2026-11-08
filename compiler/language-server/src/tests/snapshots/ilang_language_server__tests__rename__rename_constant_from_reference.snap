@@ -1,0 +1,41 @@
+---
+source: language-server/src/tests/rename.rs
+expression: "\npub const something = 10\n\npub fn main() {\n  something + { 4 * something }\n}\n"
+---
+----- BEFORE RENAME
+-- mod.i
+
+import app
+
+fn wibble() {
+  app.something
+}
+
+
+-- app.i
+
+pub const something = 10
+
+pub fn main() {
+  something + { 4 * something }
+  ↑▔▔▔▔▔▔▔▔                    
+}
+
+
+----- AFTER RENAME
+-- mod.i
+
+import app
+
+fn wibble() {
+  app.ten
+}
+
+
+-- app.i
+
+pub const ten = 10
+
+pub fn main() {
+  ten + { 4 * ten }
+}

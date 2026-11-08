@@ -27,9 +27,9 @@ jobs:
         run: |
           nix run github:cachix/devenv/v2.4.0 -- shell -- \
             python3 scripts/conformance.py \
-            --compiler target/cargo/debug/wleam \
-            --runner target/cargo/release/wleam-runner \
-            --compare-compiler target/debug/wleam \
+            --compiler target/cargo/debug/i \
+            --runner target/cargo/release/ilang-runner \
+            --compare-compiler target/debug/i \
             --output target/conformance/blaze
       - name: Retain conformance evidence
         if: always()

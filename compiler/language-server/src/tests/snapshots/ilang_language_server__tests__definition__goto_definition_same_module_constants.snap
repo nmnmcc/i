@@ -1,0 +1,21 @@
+---
+source: language-server/src/tests/definition.rs
+expression: output
+---
+----- Jumping from `src/app.i`
+
+const x = 1
+
+pub fn main() {
+  x
+  ↑
+}
+
+----- Jumped to `src/app.i`
+
+const x = 1
+↑▔▔▔▔▔▔    
+
+pub fn main() {
+  x
+}

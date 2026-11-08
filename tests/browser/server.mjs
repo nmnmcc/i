@@ -4,9 +4,9 @@ import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const manifestPath = resolve(process.env.WLEAM_BROWSER_MANIFEST ?? `${root}/target/conformance/browser.json`);
+const manifestPath = resolve(process.env.ILANG_BROWSER_MANIFEST ?? `${root}/target/conformance/browser.json`);
 const mime = { ".html": "text/html", ".mjs": "text/javascript", ".js": "text/javascript", ".json": "application/json", ".wasm": "application/wasm" };
-const port = Number(process.env.WLEAM_BROWSER_PORT ?? 4179);
+const port = Number(process.env.ILANG_BROWSER_PORT ?? 4179);
 
 async function manifest() {
   const entries = JSON.parse(await readFile(manifestPath, "utf8"));

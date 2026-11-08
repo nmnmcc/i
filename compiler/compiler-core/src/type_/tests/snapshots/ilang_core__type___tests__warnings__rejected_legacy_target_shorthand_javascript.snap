@@ -1,0 +1,18 @@
+---
+source: compiler-core/src/type_/tests/warnings.rs
+expression: "\n@target(js)\npub fn wibble() { panic }\n"
+---
+----- SOURCE CODE
+
+@target(js)
+pub fn wibble() { panic }
+
+
+----- ERROR
+error: Syntax error
+  ┌─ /src/one/two.i:2:9
+  │
+2 │ @target(js)
+  │         ^^ I don't recognise this target
+
+iLang supports only the `wasm` target. Replace platform-specific declarations with a Wasm implementation.

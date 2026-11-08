@@ -1,0 +1,21 @@
+---
+source: compiler-core/src/parse/tests.rs
+expression: "\n@external(wasm, \"one\", \"two\")\n@external(wasm, \"three\", \"four\")\npub fn one(x: Int) -> Int {\n  todo\n}\n"
+---
+----- SOURCE CODE
+
+@external(wasm, "one", "two")
+@external(wasm, "three", "four")
+pub fn one(x: Int) -> Int {
+  todo
+}
+
+
+----- ERROR
+error: Syntax error
+  ┌─ /src/parse/error.i:3:1
+  │
+3 │ @external(wasm, "three", "four")
+  │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Duplicate attribute
+
+This attribute has already been given.

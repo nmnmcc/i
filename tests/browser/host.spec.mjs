@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
 
 test("same ABI fixture supports GC, typed references and deep tail calls", async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { instantiate, supportsRequiredFeatures } = await import("/bindings/javascript/wleam.mjs");
+    const { instantiate, supportsRequiredFeatures } = await import("/bindings/javascript/ilang.mjs");
     const { fixtureAbi } = await import("/tests/browser/fixture-abi.mjs");
     const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { abi: fixtureAbi });
     return { supported: supportsRequiredFeatures(), initialized: guest.exports.initialized(), typedCall: guest.exports.feature_probe(), tails: guest.exports.tail_count(1_000_000, 0), sum: guest.exports.gc_sum(100_000) };
@@ -16,7 +16,7 @@ test("same ABI fixture supports GC, typed references and deep tail calls", async
 
 test("arbitrary precision values and UTF-8 survive copying and memory growth", async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { instantiate } = await import("/bindings/javascript/wleam.mjs");
+    const { instantiate } = await import("/bindings/javascript/ilang.mjs");
     const { fixtureAbi } = await import("/tests/browser/fixture-abi.mjs");
     const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { abi: fixtureAbi });
     const numbers = [0n, 1n, -1n, 1n << 30n, -(1n << 64n), (1n << 4096n) + 0x123456789abcdefn];
@@ -32,7 +32,7 @@ test("arbitrary precision values and UTF-8 survive copying and memory growth", a
 
 test("opaque references retain identity without inspecting guest GC objects", async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { instantiate } = await import("/bindings/javascript/wleam.mjs");
+    const { instantiate } = await import("/bindings/javascript/ilang.mjs");
     const { fixtureAbi } = await import("/tests/browser/fixture-abi.mjs");
     const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { abi: fixtureAbi });
     const reference = { value: 42 };
@@ -44,7 +44,7 @@ test("opaque references retain identity without inspecting guest GC objects", as
 
 test("custom imports use ordinary host values with explicit ownership", async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { instantiate } = await import("/bindings/javascript/wleam.mjs");
+    const { instantiate } = await import("/bindings/javascript/ilang.mjs");
     const { customAbi, identityImports } = await import("/tests/browser/fixture-abi.mjs");
     const guest = await instantiate("/tests/browser/fixtures/custom-imports.wasm", { abi: customAbi, imports: identityImports() });
     const integer = -(1n << 1024n) + 19n;
@@ -63,7 +63,7 @@ test("custom imports use ordinary host values with explicit ownership", async ({
 
 test("ABI frames reclaim guest temporaries after host failures and support nested calls", async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { instantiate } = await import("/bindings/javascript/wleam.mjs");
+    const { instantiate } = await import("/bindings/javascript/ilang.mjs");
     const { customAbi, identityImports } = await import("/tests/browser/fixture-abi.mjs");
     const failure = new Error("original host failure");
     const throwing = await instantiate("/tests/browser/fixtures/custom-imports.wasm", { abi: customAbi, imports: identityImports({ echo_string() { throw failure; } }) });
@@ -90,36 +90,36 @@ test("ABI frames reclaim guest temporaries after host failures and support neste
 
 test("panic reports source text, releases buffers and lets later tests run", async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { instantiate, runTests } = await import("/bindings/javascript/wleam.mjs");
+    const { instantiate, runTests } = await import("/bindings/javascript/ilang.mjs");
     const { fixtureAbi } = await import("/tests/browser/fixture-abi.mjs");
     const stdout = [];
     const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { abi: fixtureAbi, stdout: (text) => stdout.push(text) });
     guest.run();
     let panic;
-    try { guest.call("fail", ["module.gleam:7: panic detail"]); } catch (error) { panic = { name: error.name, message: error.message }; }
+    try { guest.call("fail", ["module.i:7: panic detail"]); } catch (error) { panic = { name: error.name, message: error.message }; }
     const tests = await runTests("/tests/browser/fixtures/host-abi.wasm", { abi: fixtureAbi });
     return { stdout, panic, allocations: guest.exports.live_allocations(), tests: tests.map(({ passed }) => passed) };
   });
-  expect(result).toEqual({ stdout: ["fixture main\n"], panic: { name: "WleamPanic", message: "module.gleam:7: panic detail" }, allocations: 0, tests: [true, false, true, true] });
+  expect(result).toEqual({ stdout: ["fixture main\n"], panic: { name: "iLangPanic", message: "module.i:7: panic detail" }, allocations: 0, tests: [true, false, true, true] });
 });
 
 test("random host callbacks support a memory-growing reentrant allocation", async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { instantiate } = await import("/bindings/javascript/wleam.mjs");
+    const { instantiate } = await import("/bindings/javascript/ilang.mjs");
     const { fixtureAbi } = await import("/tests/browser/fixture-abi.mjs");
     let guest;
     guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", {
       abi: fixtureAbi,
       random(bytes) {
-        const temporary = guest.exports.__wleam_alloc(131072);
-        guest.exports.__wleam_free(temporary, 131072);
+        const temporary = guest.exports.__ilang_alloc(131072);
+        guest.exports.__ilang_free(temporary, 131072);
         bytes.fill(0xa5);
       },
     });
-    const pointer = guest.exports.__wleam_alloc(8);
+    const pointer = guest.exports.__ilang_alloc(8);
     const status = guest.exports.fill_random(pointer, 8);
     const bytes = [...new Uint8Array(guest.exports.memory.buffer, pointer, 8)];
-    guest.exports.__wleam_free(pointer, 8);
+    guest.exports.__ilang_free(pointer, 8);
     return { status, bytes, allocations: guest.exports.live_allocations() };
   });
   expect(result).toEqual({ status: 0, bytes: Array(8).fill(0xa5), allocations: 0 });
@@ -127,7 +127,7 @@ test("random host callbacks support a memory-growing reentrant allocation", asyn
 
 test("malformed entry and test metadata cannot turn non-Nil functions into passing tests", async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { instantiate, runTests } = await import("/bindings/javascript/wleam.mjs");
+    const { instantiate, runTests } = await import("/bindings/javascript/ilang.mjs");
     const { fixtureAbi } = await import("/tests/browser/fixture-abi.mjs");
     let entryError;
     try { await instantiate("/tests/browser/fixtures/host-abi.wasm", { abi: { ...fixtureAbi, entry: "feature_probe" } }); } catch (error) { entryError = error.message; }
@@ -139,7 +139,7 @@ test("malformed entry and test metadata cannot turn non-Nil functions into passi
 
 test("Wasm linking rejects same-arity scalar mismatches instead of coercing floats", async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { instantiate } = await import("/bindings/javascript/wleam.mjs");
+    const { instantiate } = await import("/bindings/javascript/ilang.mjs");
     const { fixtureAbi, customAbi, identityImports } = await import("/tests/browser/fixture-abi.mjs");
     const errors = [];
     try {
@@ -150,5 +150,5 @@ test("Wasm linking rejects same-arity scalar mismatches instead of coercing floa
     } catch (error) { errors.push(error.name); }
     return errors;
   });
-  expect(result).toEqual(["WleamAbiError", "LinkError"]);
+  expect(result).toEqual(["iLangAbiError", "LinkError"]);
 });

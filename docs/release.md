@@ -2,7 +2,7 @@
 
 Run `devenv tasks run release` to build with Rust 1.99.1 and produce the archive
 and its SHA-256 sidecar in `target/release`. The archive name is
-`wleam-<version>-<Rust target triple>.tar.gz`.
+`ilang-<version>-<Rust target triple>.tar.gz`.
 
 To package artifacts that have already been built, use:
 
@@ -15,16 +15,16 @@ To package artifacts that have already been built, use:
 ./scripts/dev-package --nix-runtime
 ```
 
-The archive contains both `bin/wleam` and `bin/wleam-runner`, the JavaScript SDK
-under `share/wleam/javascript`, and the complete standard-library source under
-`share/wleam/stdlib`. The compiler locates this standard library relative to its
+The archive contains both `bin/i` and `bin/ilang-runner`, the JavaScript SDK
+under `share/ilang/javascript`, and the complete standard-library source under
+`share/ilang/stdlib`. The compiler locates this standard library relative to its
 executable, and `run`/`test` locate the sibling executor. Keep this directory
-layout when installing. `WLEAM_STDLIB` and `WLEAM_RUNNER` provide explicit
+layout when installing. `ILANG_STDLIB` and `ILANG_RUNNER` provide explicit
 overrides when a different layout is required.
 
-The package also contains documentation, Wleam/Gleam/stdlib/Unicode licenses,
+The package also contains documentation, iLang/Gleam/stdlib/Unicode licenses,
 upstream source records, dependency/toolchain lockfiles, and a
-`share/wleam/build/release.json` manifest. The manifest records the source commit,
+`share/ilang/build/release.json` manifest. The manifest records the source commit,
 target, packaging toolchain, ELF interpreter paths where applicable, and SHA-256
 hashes for every payload file.
 
@@ -34,10 +34,10 @@ Verify the archive against its sidecar, then extract it into a versioned
 directory and add its `bin` directory to `PATH`:
 
 ```sh
-sha256sum --check wleam-0.1.0-x86_64-unknown-linux-gnu.tar.gz.sha256
-tar -xzf wleam-0.1.0-x86_64-unknown-linux-gnu.tar.gz
-export PATH="$PWD/wleam-0.1.0-x86_64-unknown-linux-gnu/bin:$PATH"
-wleam --help
+sha256sum --check ilang-0.1.0-x86_64-unknown-linux-gnu.tar.gz.sha256
+tar -xzf ilang-0.1.0-x86_64-unknown-linux-gnu.tar.gz
+export PATH="$PWD/ilang-0.1.0-x86_64-unknown-linux-gnu/bin:$PATH"
+i --help
 ```
 
 These are native artifacts for the selected target. Packaging preserves their
@@ -52,7 +52,7 @@ the binaries' loader and runtime library search paths. It uses `nix-store` to
 export those paths and their dependencies; it does not bundle the Rust compiler
 merely because its path occurs in debug information. On the destination host,
 install Nix, verify the archive, and run `./runtime/restore` from the extracted
-package to import the closure before starting Wleam. Importing requires the
+package to import the closure before starting iLang. Importing requires the
 destination Nix store's usual authorization. The package records every exported
 store path in `runtime/paths.txt` and its build manifest. This mode does not
 support Mach-O/Windows artifacts or replace a host's kernel and Nix installation.

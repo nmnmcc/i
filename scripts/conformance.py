@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Wleam's language, upstream, host and compiler-engine conformance suites.
+"""Run iLang's language, upstream, host and compiler-engine conformance suites.
 
 No case is an expected failure: unsupported features, empty test reports, missing
 tools, compiler crashes and timeouts fail the suite. The small negative programs
@@ -51,7 +51,7 @@ def file_digest(path: Path) -> str:
 def source_fingerprint() -> str:
     """Identify compiler, runtime, standard library and executable test sources."""
     digest = hashlib.sha256()
-    roots = [ROOT / "crates", ROOT / "vendor" / "gleam", ROOT / "stdlib", ROOT / "tests"]
+    roots = [ROOT / "crates", ROOT / "compiler", ROOT / "stdlib", ROOT / "tests"]
     paths = {ROOT / "Cargo.toml", ROOT / "Cargo.lock", ROOT / "rust-toolchain.toml", Path(__file__).resolve()}
     for root in roots:
         for path in root.rglob("*"):
@@ -59,10 +59,10 @@ def source_fingerprint() -> str:
                 continue
             # Imported Rust code contains src/build; only package-root build
             # directories are generated outputs.
-            if any(parent.name == "build" and any((parent.parent / name).is_file() for name in ("Cargo.toml", "gleam.toml"))
+            if any(parent.name == "build" and any((parent.parent / name).is_file() for name in ("Cargo.toml", "i.toml"))
                    for parent in path.parents if parent.is_relative_to(root)):
                 continue
-            if path.suffix in {".rs", ".gleam", ".wat", ".mjs", ".json", ".py"} or path.name in {"Cargo.toml", "Cargo.lock", "gleam.toml"}:
+            if path.suffix in {".rs", ".i", ".wat", ".mjs", ".json", ".py"} or path.name in {"Cargo.toml", "Cargo.lock", "i.toml"}:
                 paths.add(path)
     for path in sorted(paths):
         digest.update(path.relative_to(ROOT).as_posix().encode())
@@ -131,7 +131,7 @@ def require_failure(event: dict, pattern: str) -> None:
 
 
 def package_name(project: Path) -> str:
-    with (project / "gleam.toml").open("rb") as stream:
+    with (project / "i.toml").open("rb") as stream:
         return tomllib.load(stream)["name"]
 
 
@@ -172,12 +172,29 @@ def check_upstream_sources() -> dict:
     return {"sources": manifest["sources"], "verified_files": len(manifest["files"])}
 
 
+def to_gleam_source(text: str) -> str:
+    """Translate i module references back to the names the Gleam oracle expects."""
+    text = re.sub(r"\bimport i/", "import gleam/", text)
+    text = re.sub(r"\bimport i\b(?![/\w])", "import gleam", text)
+    return re.sub(r"(?<![\w./-])i\.(?=[A-Z{])", "gleam.", text)
+
+
+def to_reference_layout(directory: Path) -> None:
+    """Translate an iLang project into the file layout the Gleam oracle reads."""
+    for path in sorted(directory.rglob("*.i")):
+        path.write_text(to_gleam_source(path.read_text()))
+        path.rename(path.with_suffix(".gleam"))
+    for path in sorted(directory.rglob("i.toml")):
+        path.rename(path.with_name("gleam.toml"))
+
+
 def reference_run(project: Path, record: dict, args: argparse.Namespace) -> dict:
     """Run the same pure source with upstream Gleam/Erlang, entirely local deps."""
-    with tempfile.TemporaryDirectory(prefix="wleam-reference-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="ilang-reference-") as temporary:
         copied = Path(temporary) / "project"
-        shutil.copytree(project, copied, ignore=shutil.ignore_patterns("build", ".wleam"))
+        shutil.copytree(project, copied, ignore=shutil.ignore_patterns("build", ".ilang"))
         original_stdlib = SUITE / "upstream" / "stdlib"
+        to_reference_layout(copied)
         for config in copied.rglob("gleam.toml"):
             with config.open("rb") as stream:
                 value = tomllib.load(stream)
@@ -226,14 +243,14 @@ def corpus_project(corpus: dict):
     if "project" in corpus:
         yield (SUITE / corpus["project"]).resolve()
         return
-    with tempfile.TemporaryDirectory(prefix="wleam-stdlib-tests-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="ilang-stdlib-tests-") as temporary:
         project = Path(temporary)
         (project / "src").mkdir()
         (project / "test").mkdir()
         name = corpus["name"]
-        (project / "gleam.toml").write_text(f'name = "{name}"\nversion = "0.1.0"\ntarget = "wasm"\n')
-        (project / "src" / f"{name}.gleam").write_text("pub fn main() { Nil }\n")
-        sources = sorted((SUITE / corpus["fixture_directory"]).glob("*.gleam"))
+        (project / "i.toml").write_text(f'name = "{name}"\nversion = "0.1.0"\ntarget = "wasm"\n')
+        (project / "src" / f"{name}.i").write_text("pub fn main() { Nil }\n")
+        sources = sorted((SUITE / corpus["fixture_directory"]).glob("*.i"))
         if not sources:
             raise Failure(f"no source files for corpus {name}")
         for source in sources:
@@ -251,7 +268,7 @@ def corpus_test_names(corpus: dict, project: Path) -> set[str]:
         return {f"{item['module']}.{item['function']}" for item in migration["active_tests"]}
     return {
         f"{path.relative_to(project / 'test').with_suffix('').as_posix()}.{name}"
-        for path in (project / "test").rglob("*.gleam")
+        for path in (project / "test").rglob("*.i")
         for name in re.findall(r"^pub fn (\w+_test)\s*\(\s*\)", path.read_text(), re.M)
     }
 
@@ -324,15 +341,15 @@ def run_corpus(corpus: dict, record: dict, args: argparse.Namespace) -> dict:
 
 
 def migration_checks(record: dict, args: argparse.Namespace) -> None:
-    sources = sorted((ROOT / "stdlib" / "test" / "migration").glob("*.gleam.invalid"))
+    sources = sorted((ROOT / "stdlib" / "test" / "migration").glob("*.i.invalid"))
     if len(sources) != 2:
         raise Failure("expected both legacy-platform migration diagnostic fixtures")
     for source in sources:
-        with tempfile.TemporaryDirectory(prefix="wleam-migration-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="ilang-migration-") as temporary:
             project = Path(temporary)
             (project / "src").mkdir()
-            (project / "gleam.toml").write_text('name = "migration"\nversion = "0.1.0"\ntarget = "wasm"\n')
-            shutil.copy2(source, project / "src" / "migration.gleam")
+            (project / "i.toml").write_text('name = "migration"\nversion = "0.1.0"\ntarget = "wasm"\n')
+            shutil.copy2(source, project / "src" / "migration.i")
             result = invoke(compiler_command(args.compiler, project, args.runner, "check"), record, args.timeout)
             require_failure(result, r"(?i)wasm|target|external")
 
@@ -361,9 +378,9 @@ def host_abi_check(record: dict, args: argparse.Namespace) -> dict:
     if args.host_probe:
         command = [executable(args.host_probe), str(destination)]
     else:
-        target_dir = os.environ.get("WLEAM_CARGO_TARGET_DIR", os.environ.get("CARGO_TARGET_DIR", str(ROOT / "target" / "cargo")))
+        target_dir = os.environ.get("ILANG_CARGO_TARGET_DIR", os.environ.get("CARGO_TARGET_DIR", str(ROOT / "target" / "cargo")))
         command = [executable(args.cargo), "run", "--release", "--locked", "--target-dir", target_dir,
-                   "-p", "wleam-host", "--example", "verify_compiler_abi", "--", str(destination)]
+                   "-p", "ilang-host", "--example", "verify_compiler_abi", "--", str(destination)]
     result = invoke(command, record, args.corpus_timeout)
     require_success(result)
     try:
@@ -379,8 +396,8 @@ def host_abi_check(record: dict, args: argparse.Namespace) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--compiler", required=True, help="Wleam executable under test")
-    parser.add_argument("--runner", default="wleam-runner", help="isolated Wasmtime runner")
+    parser.add_argument("--compiler", required=True, help="iLang executable under test")
+    parser.add_argument("--runner", default="ilang-runner", help="isolated Wasmtime runner")
     parser.add_argument("--wasm-tools", default="wasm-tools")
     parser.add_argument("--wasmtime", default="wasmtime")
     parser.add_argument("--cargo", default="cargo", help="pinned Cargo used to run the native ABI integration example")
@@ -483,7 +500,7 @@ def main() -> int:
         perform("migration_diagnostics", lambda record: migration_checks(record, args))
     if "runtime_values" in selected:
         perform("runtime_values", lambda record: require_success(invoke([
-            sys.executable, str(ROOT / "crates" / "wleam-wasm" / "tests" / "runtime_values.py"),
+            sys.executable, str(ROOT / "crates" / "ilang-wasm" / "tests" / "runtime_values.py"),
             "--wasm-tools", args.wasm_tools, "--wasmtime", args.wasmtime,
         ], record, args.timeout)))
     if "host_abi" in selected:

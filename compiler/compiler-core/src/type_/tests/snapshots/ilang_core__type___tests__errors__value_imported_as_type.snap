@@ -1,0 +1,21 @@
+---
+source: compiler-core/src/type_/tests/errors.rs
+expression: "import i/wibble.{type Wobble}"
+---
+----- SOURCE CODE
+-- i/wibble.i
+pub type Wibble {
+               Wobble
+             }
+
+-- main.i
+import i/wibble.{type Wobble}
+
+----- ERROR
+error: Unknown module type
+  ┌─ /src/one/two.i:1:22
+  │
+1 │ import i/wibble.{type Wobble}
+  │                      ^^^^^^^^^^^ Did you mean `Wobble`?
+
+`Wobble` is only a value, it cannot be imported as a type.

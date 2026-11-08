@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 
 // Native conformance produces the manifest and these exact Wasm binaries.
 // Missing inputs fail; host-only iteration is a separate named npm script.
-const manifestPath = resolve(process.env.WLEAM_BROWSER_MANIFEST ?? "target/conformance/browser.json");
+const manifestPath = resolve(process.env.ILANG_BROWSER_MANIFEST ?? "target/conformance/browser.json");
 let manifest;
 try {
   manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
@@ -20,7 +20,7 @@ for (const [index, fixture] of manifest.entries()) {
     test.setTimeout(10 * 60 * 1000);
     await page.goto("/tests/browser/harness.html");
     const result = await page.evaluate(async ({ index, names, hostAbi }) => {
-      const { instantiate, runTests } = await import("/bindings/javascript/wleam.mjs");
+      const { instantiate, runTests } = await import("/bindings/javascript/ilang.mjs");
       const stdout = [];
       const stderr = [];
       const options = { stdout: (text) => stdout.push(text), stderr: (text) => stderr.push(text) };

@@ -1,6 +1,6 @@
-import { instantiate, WleamPanic } from "../../bindings/javascript/wleam.mjs";
+import { instantiate, iLangPanic } from "../../bindings/javascript/ilang.mjs";
 
-// Shared by Node and browser verification of the real Gleam host_abi project.
+// Shared by Node and browser verification of the real i host_abi project.
 export async function verifyCompilerAbi(source, options = {}) {
   const check = (condition, message) => { if (!condition) throw new Error(message); };
   const expectedHostFailure = new Error("intentional host callback failure");
@@ -45,7 +45,7 @@ export async function verifyCompilerAbi(source, options = {}) {
   check(call("echo_string", "recovered after host failures") === "recovered after host failures", "Guest did not recover after a host exception");
   let panic;
   try { call("panic_now"); } catch (error) { panic = error; }
-  check(panic instanceof WleamPanic && panic.message.includes("host_abi intentional guest panic"), "Guest panic lost its message");
+  check(panic instanceof iLangPanic && panic.message.includes("host_abi intentional guest panic"), "Guest panic lost its message");
   check(call("echo_int", 42n) === 42n, "Guest did not recover after its panic");
   return { hostFailures: 100, guestPanic: panic.message };
 }

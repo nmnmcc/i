@@ -1,0 +1,27 @@
+---
+source: language-server/src/tests/definition.rs
+expression: output
+---
+----- Jumping from `src/app.i`
+
+pub type Rec {
+  Var1(Int)
+  Var2(Int, Int)
+}
+
+pub fn make_var() -> Rec {
+                     ↑    
+  Var1(1)
+}
+
+----- Jumped to `src/app.i`
+
+pub type Rec {
+↑▔▔▔▔▔▔▔▔▔▔▔  
+  Var1(Int)
+  Var2(Int, Int)
+}
+
+pub fn make_var() -> Rec {
+  Var1(1)
+}

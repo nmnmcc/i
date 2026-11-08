@@ -1,0 +1,22 @@
+---
+source: language-server/src/tests/action.rs
+expression: "import i/io\n\npub fn main() {\n  let c = #([1, 2, 3], [3, 2, 1])\n  io.debug(c)\n}"
+---
+----- BEFORE ACTION
+import i/io
+
+pub fn main() {
+  let c = #([1, 2, 3], [3, 2, 1])
+  ▔▔▔▔↑                          
+  io.debug(c)
+}
+
+
+----- AFTER ACTION
+import i/io
+
+const c = #([1, 2, 3], [3, 2, 1])
+
+pub fn main() {
+  io.debug(c)
+}

@@ -1,11 +1,11 @@
-# Wleam JavaScript host
+# iLang JavaScript host
 
-`wleam.mjs` is a self-contained ECMAScript module. It runs in modern browsers and
+`ilang.mjs` is a self-contained ECMAScript module. It runs in modern browsers and
 Node.js without npm runtime dependencies. The compiler can copy it beside its
-Wasm output; `wleam.d.ts` describes the same API for TypeScript consumers.
+Wasm output; `ilang.d.ts` describes the same API for TypeScript consumers.
 
 ```javascript
-import { instantiate } from "./wleam.mjs";
+import { instantiate } from "./ilang.mjs";
 
 const app = await instantiate(new URL("./app.wasm", import.meta.url), {
   stdout: (text) => document.body.append(text),
@@ -13,14 +13,14 @@ const app = await instantiate(new URL("./app.wasm", import.meta.url), {
 });
 app.run();
 
-// Explicit exported functions are described by the compiler's wleam.abi section.
+// Explicit exported functions are described by the compiler's ilang.abi section.
 const answer = app.call("app.calculate", [123456789012345678901234567890n]);
 ```
 
 The module must support WasmGC, typed function references, and tail calls.
 `supportsRequiredFeatures()` checks all three without a network request. Loading
 compiles the module, validates its ABI metadata, registers host functions,
-instantiates it, and invokes `__wleam_init` once. Calling `run()` invokes the ABI
+instantiates it, and invokes `__ilang_init` once. Calling `run()` invokes the ABI
 entry, defaulting to `_start`.
 
 The loader checks declared function signatures using Wasm's linker. Typed import
@@ -41,13 +41,13 @@ const app = await instantiate(wasmBytes, {
 });
 ```
 
-The compiler's `wleam.abi` custom section declares the parameter and result types.
+The compiler's `ilang.abi` custom section declares the parameter and result types.
 `rawImports` is available for low-level Wasm imports that the application manages
-itself. The `wleam:host/v1` namespace is supplied by this loader. Supplying `abi`
+itself. The `ilang:host/v1` namespace is supplied by this loader. Supplying `abi`
 explicitly is supported for independently produced modules without an embedded
 section; it cannot override compiler metadata.
 
-| Gleam boundary type | JavaScript value | Core Wasm representation |
+| i boundary type | JavaScript value | Core Wasm representation |
 | --- | --- | --- |
 | `Nil` | `undefined` or `null` | no values |
 | `Bool` | `boolean` | `i32` 0 or 1 |
@@ -69,7 +69,7 @@ copies, so guest memory growth cannot invalidate their arguments. Guest code own
 the newly allocated buffers returned by a custom host callback. These ownership
 rules also apply to non-null allocations of zero bytes.
 
-When the guest exports `__wleam_abi_mark` and `__wleam_abi_reset`, calls establish a
+When the guest exports `__ilang_abi_mark` and `__ilang_abi_reset`, calls establish a
 nested ABI allocation frame before lowering arguments. They copy results and
 release owned buffers, then restore the frame even after a trap. This also reclaims
 guest-created temporary import buffers whose normal cleanup was interrupted by a
@@ -104,7 +104,7 @@ Native compiler conformance produces `target/conformance/browser.json`, an array
 of `{ name, wasm, stdout, stderr?, tests? }` fixtures. Run `npm run test:browser:compiled` to execute
 those exact binaries in all three engines. `npm run test:browser` runs both suites
 and fails if the compiler manifest is missing or empty. Set
-`WLEAM_BROWSER_MANIFEST` to use a different manifest.
+`ILANG_BROWSER_MANIFEST` to use a different manifest.
 
 The `host_abi` conformance library additionally exercises the compiler's real
 foreign-function wrappers in all three browsers, including opaque equality,

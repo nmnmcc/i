@@ -1,0 +1,29 @@
+---
+source: language-server/src/tests/reference.rs
+expression: "\npub const wibble = 10\n\npub fn main() {\n  wibble\n}\n"
+---
+-- mod.i
+
+import app.{wibble}
+            ▔▔▔▔▔▔ 
+
+fn wobble() {
+  app.wibble
+      ▔▔▔▔▔▔
+}
+
+fn other() {
+  wibble
+  ▔▔▔▔▔▔
+}
+
+
+-- app.i
+
+pub const wibble = 10
+          ▔▔▔▔▔▔     
+
+pub fn main() {
+  wibble
+  ↑▔▔▔▔▔
+}

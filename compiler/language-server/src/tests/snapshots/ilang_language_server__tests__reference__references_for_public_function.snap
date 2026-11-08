@@ -1,0 +1,27 @@
+---
+source: language-server/src/tests/reference.rs
+expression: "\npub fn wibble() {\n  wibble()\n}\n"
+---
+-- mod.i
+
+import app.{wibble}
+            ▔▔▔▔▔▔ 
+
+fn wobble() {
+  app.wibble()
+      ▔▔▔▔▔▔  
+}
+
+fn other() {
+  wibble()
+  ▔▔▔▔▔▔  
+}
+
+
+-- app.i
+
+pub fn wibble() {
+       ▔▔▔▔▔▔    
+  wibble()
+  ↑▔▔▔▔▔  
+}

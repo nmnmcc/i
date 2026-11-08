@@ -1,0 +1,26 @@
+---
+source: language-server/src/tests/reference.rs
+expression: "\nimport mod.{wibble as wobble}\n\npub fn main() {\n  let value = mod.wibble\n  wobble + value\n}\n"
+---
+-- mod.i
+
+pub const wibble = 10
+          ▔▔▔▔▔▔     
+
+fn wobble() {
+  wibble
+  ▔▔▔▔▔▔
+}
+
+
+-- app.i
+
+import mod.{wibble as wobble}
+            ▔▔▔▔▔▔    ↑      
+
+pub fn main() {
+  let value = mod.wibble
+                  ▔▔▔▔▔▔
+  wobble + value
+  ▔▔▔▔▔▔        
+}

@@ -1,0 +1,13 @@
+---
+source: language-server/src/tests/hover.rs
+expression: "\nimport wibble/wobble.{type Wibble as Wobble, Wobble}\n"
+---
+
+import wibble/wobble.{type Wibble as Wobble, Wobble}
+                                             ↑▔▔▔▔▔ 
+
+
+----- Hover content (markdown) -----
+```i
+Wobble
+```

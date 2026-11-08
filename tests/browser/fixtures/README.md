@@ -1,7 +1,7 @@
 # Host ABI fixture
 
 `host-abi.wat` is an independent test fixture for the JavaScript and Rust host
-adapters. It is deliberately **not** a Wleam compiler conformance fixture.
+adapters. It is deliberately **not** an iLang compiler conformance fixture.
 
 Regenerate the checked-in binary with `bash scripts/build-abi-fixture.sh` from a
 Devenv shell containing wasm-tools 1.262.0. `WASM_TOOLS` can point at a specific
@@ -15,8 +15,8 @@ input and returned allocation, including failures. Individual frees update
 counters without reusing addresses; ABI frame resets restore the allocator's
 cursor. This is test infrastructure, not the production allocator.
 
-Both fixtures expose `__wleam_abi_mark() -> i32` and
-`__wleam_abi_reset(token: i32)`. Mark returns a nonzero token and pushes a GC
+Both fixtures expose `__ilang_abi_mark() -> i32` and
+`__ilang_abi_reset(token: i32)`. Mark returns a nonzero token and pushes a GC
 frame holding the allocator cursor, allocation count and byte count. Reset
 requires the most recent token and restores that snapshot. Out-of-order or
 repeated resets trap without changing state. Frames support nested host calls
@@ -32,7 +32,7 @@ to detect the required feature set without a network request.
 `echo_string`, `echo_int`, `echo_bits`, `echo_ref`, `echo_bool`, `echo_float`, and
 `echo_nil` from module `custom`, and exports same-named forwarding wrappers. The
 string, integer and bit-array imports return newly allocated buffers; host
-wrappers call `__wleam_alloc` reentrantly to create these buffers. The outer caller
+wrappers call `__ilang_alloc` reentrantly to create these buffers. The outer caller
 then frees both its original argument allocation and the returned allocation.
 This module exports the same allocator, initialization and allocation counters
 as `host-abi.wat`. Zero-byte allocations return nonzero pointers and must also be
@@ -46,7 +46,7 @@ so tests can verify the outer ABI frame reset reclaims the abandoned allocation
 while preserving the original exception.
 
 The module has no start section. Hosts instantiate it, attach exported memory,
-then call `__wleam_init` before invoking functions. Channels are supplied directly
+then call `__ilang_init` before invoking functions. Channels are supplied directly
 to `emit`, so the fixture does not impose an output-channel convention.
 
 | Export | Raw signature |
@@ -74,4 +74,4 @@ to `emit`, so the fixture does not impose an output-channel convention.
 
 Integer limbs are unsigned 32-bit words in little-endian order. Sign is -1, 0 or
 1. Bit-array buffers contain `ceil(bit_length / 8)` bytes. The fixture intentionally
-does not contain `wleam.abi` metadata, so tests supply explicit ABI descriptions.
+does not contain `ilang.abi` metadata, so tests supply explicit ABI descriptions.

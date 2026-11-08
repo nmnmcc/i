@@ -21,7 +21,7 @@
       "sha256": "2c29e0b5cf3a5961fe6839d27959e0cdb21dd158e74277a78b94b3620ec92f1e",
       "tests": [],
       "status": "active",
-      "active_path": "test/importable.gleam",
+      "active_path": "test/importable.i",
       "test_count": 0
     },
     {
@@ -36,9 +36,9 @@
         "guard_left_hand_side_test"
       ],
       "status": "active",
-      "active_path": "test/language/alternative_pattern.gleam",
+      "active_path": "test/language/alternative_pattern.i",
       "test_count": 6,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/anonymous_function_test.gleam",
@@ -50,9 +50,9 @@
         "call_tuple_access_test"
       ],
       "status": "active",
-      "active_path": "test/language/anonymous_function_test.gleam",
+      "active_path": "test/language/anonymous_function_test.i",
       "test_count": 4,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/assertion_test.gleam",
@@ -62,9 +62,9 @@
         "let_assert_ok_bind_test"
       ],
       "status": "active",
-      "active_path": "test/language/assertion_test.gleam",
+      "active_path": "test/language/assertion_test.i",
       "test_count": 2,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/bit_array_dynamic_size_test.gleam",
@@ -82,9 +82,9 @@
         "dynamic_size_6_test"
       ],
       "status": "active",
-      "active_path": "test/language/bit_array_dynamic_size_test.gleam",
+      "active_path": "test/language/bit_array_dynamic_size_test.i",
       "test_count": 10,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/bit_array_match_test.gleam",
@@ -123,9 +123,9 @@
         "bit_array_segment_assignment_proved_by_a_guarded_clause_test"
       ],
       "status": "active",
-      "active_path": "test/language/bit_array_match_test.gleam",
+      "active_path": "test/language/bit_array_match_test.i",
       "test_count": 31,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/bit_array_test.gleam",
@@ -169,9 +169,9 @@
       ],
       "platform_adaptation": "UTF-16/32 little-endian codepoint patterns now execute unconditionally on Wasm.",
       "status": "active",
-      "active_path": "test/language/bit_array_test.gleam",
+      "active_path": "test/language/bit_array_test.i",
       "test_count": 35,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/block_test.gleam",
@@ -180,9 +180,9 @@
         "block_scoping_test"
       ],
       "status": "active",
-      "active_path": "test/language/block_test.gleam",
+      "active_path": "test/language/block_test.i",
       "test_count": 1,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/bool_negation_test.gleam",
@@ -195,9 +195,9 @@
         "negation_correctly_parenthesised_test"
       ],
       "status": "active",
-      "active_path": "test/language/bool_negation_test.gleam",
+      "active_path": "test/language/bool_negation_test.i",
       "test_count": 5,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/build_files_test.gleam",
@@ -207,7 +207,7 @@
         "typescript_file_included_test"
       ],
       "status": "replaced-by-host-harness",
-      "reason": "These two target-exclusive definitions check copying a TypeScript file into removed Erlang/JavaScript output directories. The Wleam conformance harness validates the generated Core Wasm artifact header, ABI metadata and execution instead.",
+      "reason": "These two target-exclusive definitions check copying a TypeScript file into removed Erlang/JavaScript output directories. The iLang conformance harness validates the generated Core Wasm artifact header, ABI metadata and execution instead.",
       "replacement": "scripts/conformance.py artifact validation"
     },
     {
@@ -276,9 +276,9 @@
         "guard_binding_in_directly_matching_case_is_not_redeclared_test"
       ],
       "status": "active",
-      "active_path": "test/language/clause_guard_test.gleam",
+      "active_path": "test/language/clause_guard_test.i",
       "test_count": 60,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/constant_test.gleam",
@@ -296,9 +296,9 @@
         "constant_aliased_string_in_bit_arrays_test"
       ],
       "status": "active",
-      "active_path": "test/language/constant_test.gleam",
+      "active_path": "test/language/constant_test.i",
       "test_count": 10,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/directly_matching_case_subject_test.gleam",
@@ -314,9 +314,9 @@
         "pattern_shadowing_module_function_in_directly_matching_case_test"
       ],
       "status": "active",
-      "active_path": "test/language/directly_matching_case_subject_test.gleam",
+      "active_path": "test/language/directly_matching_case_subject_test.i",
       "test_count": 8,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/equality_test.gleam",
@@ -352,9 +352,9 @@
         "record_error_neq_2_test"
       ],
       "status": "active",
-      "active_path": "test/language/equality_test.gleam",
+      "active_path": "test/language/equality_test.i",
       "test_count": 28,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/float_test.gleam",
@@ -420,9 +420,9 @@
         "negative_float_test"
       ],
       "status": "active",
-      "active_path": "test/language/float_test.gleam",
+      "active_path": "test/language/float_test.i",
       "test_count": 58,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/imported_custom_type_test.gleam",
@@ -435,9 +435,9 @@
         "no_fields_unqualified_let_assignment_test"
       ],
       "status": "active",
-      "active_path": "test/language/imported_custom_type_test.gleam",
+      "active_path": "test/language/imported_custom_type_test.i",
       "test_count": 5,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/importing_test.gleam",
@@ -447,9 +447,9 @@
         "shadowed_module_test"
       ],
       "status": "active",
-      "active_path": "test/language/importing_test.gleam",
+      "active_path": "test/language/importing_test.i",
       "test_count": 2,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/int_negation_test.gleam",
@@ -464,9 +464,9 @@
         "negation_7_test"
       ],
       "status": "active",
-      "active_path": "test/language/int_negation_test.gleam",
+      "active_path": "test/language/int_negation_test.i",
       "test_count": 7,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/int_test.gleam",
@@ -506,9 +506,9 @@
         "negative_zero_same_as_positive_zero_test"
       ],
       "status": "active",
-      "active_path": "test/language/int_test.gleam",
+      "active_path": "test/language/int_test.i",
       "test_count": 32,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/list_prepend_test.gleam",
@@ -520,9 +520,9 @@
         "prepend_4_test"
       ],
       "status": "active",
-      "active_path": "test/language/list_prepend_test.gleam",
+      "active_path": "test/language/list_prepend_test.i",
       "test_count": 4,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/mixed_arg_match_test.gleam",
@@ -534,9 +534,9 @@
         "nested_custom_types_test"
       ],
       "status": "active",
-      "active_path": "test/language/mixed_arg_match_test.gleam",
+      "active_path": "test/language/mixed_arg_match_test.i",
       "test_count": 4,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/multiple_case_subject_test.gleam",
@@ -549,9 +549,9 @@
         "guard_test"
       ],
       "status": "active",
-      "active_path": "test/language/multiple_case_subject_test.gleam",
+      "active_path": "test/language/multiple_case_subject_test.i",
       "test_count": 5,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/non_utf8_string_bit_array_test.gleam",
@@ -573,9 +573,9 @@
         "utf32_codepoint_little_endian_test"
       ],
       "status": "active",
-      "active_path": "test/language/non_utf8_string_bit_array_test.gleam",
+      "active_path": "test/language/non_utf8_string_bit_array_test.i",
       "test_count": 14,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/pipe_test.gleam",
@@ -589,9 +589,9 @@
         "pipe_last_with_label_requires_false_capture_test"
       ],
       "status": "active",
-      "active_path": "test/language/pipe_test.gleam",
+      "active_path": "test/language/pipe_test.i",
       "test_count": 6,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/precedence_test.gleam",
@@ -610,9 +610,9 @@
         "precedence_11_test"
       ],
       "status": "active",
-      "active_path": "test/language/precedence_test.gleam",
+      "active_path": "test/language/precedence_test.i",
       "test_count": 11,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/prelude_test.gleam",
@@ -623,9 +623,9 @@
         "gleam_nil_test"
       ],
       "status": "active",
-      "active_path": "test/language/prelude_test.gleam",
+      "active_path": "test/language/prelude_test.i",
       "test_count": 3,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/record_access_test.gleam",
@@ -636,9 +636,9 @@
         "contextual_info_for_access_test"
       ],
       "status": "active",
-      "active_path": "test/language/record_access_test.gleam",
+      "active_path": "test/language/record_access_test.i",
       "test_count": 3,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/record_update_test.gleam",
@@ -650,9 +650,9 @@
         "unlabelled_field_in_record_update_test"
       ],
       "status": "active",
-      "active_path": "test/language/record_update_test.gleam",
+      "active_path": "test/language/record_update_test.i",
       "test_count": 4,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/record_with_field_named_constructor.gleam",
@@ -661,9 +661,9 @@
         "record_with_constructor_as_field_can_be_built_on_js_with_no_crash_test"
       ],
       "status": "active",
-      "active_path": "test/language/record_with_field_named_constructor.gleam",
+      "active_path": "test/language/record_with_field_named_constructor.i",
       "test_count": 1,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/remainder_test.gleam",
@@ -680,9 +680,9 @@
         "remainder_9_test"
       ],
       "status": "active",
-      "active_path": "test/language/remainder_test.gleam",
+      "active_path": "test/language/remainder_test.i",
       "test_count": 9,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/sized_bit_array_test.gleam",
@@ -715,9 +715,9 @@
         "pattern_negative_size_test"
       ],
       "status": "active",
-      "active_path": "test/language/sized_bit_array_test.gleam",
+      "active_path": "test/language/sized_bit_array_test.i",
       "test_count": 25,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/string_pattern_matching_test.gleam",
@@ -753,9 +753,9 @@
         "string_prefix_assignment_inside_a_nested_pattern_after_a_guard_test"
       ],
       "status": "active",
-      "active_path": "test/language/string_pattern_matching_test.gleam",
+      "active_path": "test/language/string_pattern_matching_test.i",
       "test_count": 28,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/string_test.gleam",
@@ -768,9 +768,9 @@
         "concat_block_multiple_test"
       ],
       "status": "active",
-      "active_path": "test/language/string_test.gleam",
+      "active_path": "test/language/string_test.i",
       "test_count": 5,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/tail_call_test.gleam",
@@ -781,9 +781,9 @@
         "function_shadowed_by_own_argument_test"
       ],
       "status": "active",
-      "active_path": "test/language/tail_call_test.gleam",
+      "active_path": "test/language/tail_call_test.i",
       "test_count": 3,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/tuple_access_test.gleam",
@@ -797,9 +797,9 @@
         "access_tuple_then_struct_then_tuple_test"
       ],
       "status": "active",
-      "active_path": "test/language/tuple_access_test.gleam",
+      "active_path": "test/language/tuple_access_test.i",
       "test_count": 6,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/unaligned_bit_array_expression_test.gleam",
@@ -818,9 +818,9 @@
         "unaligned_11_test"
       ],
       "status": "active",
-      "active_path": "test/language/unaligned_bit_array_expression_test.gleam",
+      "active_path": "test/language/unaligned_bit_array_expression_test.i",
       "test_count": 11,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/unaligned_bit_array_pattern_test.gleam",
@@ -862,9 +862,9 @@
         "unaligned_34_test"
       ],
       "status": "active",
-      "active_path": "test/language/unaligned_bit_array_pattern_test.gleam",
+      "active_path": "test/language/unaligned_bit_array_pattern_test.i",
       "test_count": 34,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language/utf_bit_array_string_segment_test.gleam",
@@ -882,23 +882,23 @@
         "variable_utf32_big_string_segment_test"
       ],
       "status": "active",
-      "active_path": "test/language/utf_bit_array_string_segment_test.gleam",
+      "active_path": "test/language/utf_bit_array_string_segment_test.i",
       "test_count": 10,
-      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for Wleam discovery; all original statements and assertions remain."
+      "return_adaptation": "Each test is explicitly annotated -> Nil and ends in Nil for iLang discovery; all original statements and assertions remain."
     },
     {
       "upstream_path": "test/language/test/language_test.gleam",
       "sha256": "cd12bae1f89cfe68aff7f4aa8e2f0f2527e9cd4e3d0277cb4288581671561988",
       "tests": [],
       "status": "test-runner-replaced",
-      "reason": "wleam test discovers and runs every public zero-argument *_test function. The former gleeunit.main entry contains no assertions."
+      "reason": "i test discovers and runs every public zero-argument *_test function. The former gleeunit.main entry contains no assertions."
     },
     {
       "upstream_path": "test/language/test/mod_with_numbers_0123456789.gleam",
       "sha256": "da6555e2fc9c6b53695cd013e2e13f29f4c5e006bc2f838d9f5a4e500dfe8552",
       "tests": [],
       "status": "active",
-      "active_path": "test/mod_with_numbers_0123456789.gleam",
+      "active_path": "test/mod_with_numbers_0123456789.i",
       "test_count": 0
     },
     {
@@ -906,7 +906,7 @@
       "sha256": "d6987319302ea87958887d95467388c846737378ab446bb9b37095964201fe18",
       "tests": [],
       "status": "active",
-      "active_path": "test/port.gleam",
+      "active_path": "test/port.i",
       "test_count": 0
     },
     {
@@ -914,7 +914,7 @@
       "sha256": "e3f71928c41915757cfd85651a108654219b333bf392742a749493e8031f4399",
       "tests": [],
       "status": "active",
-      "active_path": "test/record_update.gleam",
+      "active_path": "test/record_update.i",
       "test_count": 0
     },
     {
@@ -922,7 +922,7 @@
       "sha256": "3ca73c90c8cc39d866f1cace1664e95e0542c1d88c0cd738564d8d440ca2b474",
       "tests": [],
       "status": "active",
-      "active_path": "test/shadowed_module.gleam",
+      "active_path": "test/shadowed_module.i",
       "test_count": 0
     }
   ],

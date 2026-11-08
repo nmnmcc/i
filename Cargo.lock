@@ -793,97 +793,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc148d4ddd3930c52f9e5ae79b89805c6f07e9ff417e7b083e0348cea60a5aba"
 
 [[package]]
-name = "gleam-core"
-version = "1.19.2"
-dependencies = [
- "base16",
- "bimap",
- "bitcode",
- "bitvec",
- "camino",
- "clap",
- "codespan-reporting",
- "debug-ignore",
- "ecow",
- "gleam-version",
- "globset",
- "http",
- "id-arena",
- "imbl",
- "indexmap",
- "itertools 0.15.0",
- "num-bigint",
- "num-traits",
- "pathdiff",
- "petgraph",
- "pretty-arena",
- "pubgrub",
- "radix_trie",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "spdx",
- "src-span",
- "stacker",
- "strum",
- "termcolor",
- "thiserror",
- "toml",
- "tracing",
- "unicode-segmentation",
- "vec1",
- "xxhash-rust",
-]
-
-[[package]]
-name = "gleam-format"
-version = "1.19.2"
-dependencies = [
- "camino",
- "ecow",
- "gleam-core",
- "itertools 0.15.0",
- "pretty-arena",
- "pretty_assertions",
- "src-span",
- "vec1",
-]
-
-[[package]]
-name = "gleam-language-server"
-version = "1.19.2"
-dependencies = [
- "camino",
- "debug-ignore",
- "ecow",
- "gen-lsp-types",
- "gleam-core",
- "gleam-format",
- "gleam-version",
- "imbl",
- "itertools 0.15.0",
- "lsp-server",
- "num-bigint",
- "serde",
- "serde_json",
- "src-span",
- "strum",
- "toml",
- "tracing",
- "vec1",
-]
-
-[[package]]
-name = "gleam-version"
-version = "1.19.2"
-dependencies = [
- "pubgrub",
- "serde",
- "thiserror",
-]
-
-[[package]]
 name = "globset"
 version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1050,6 +959,197 @@ dependencies = [
 ]
 
 [[package]]
+name = "ilang-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "clap",
+ "ilang-core",
+ "ilang-format",
+ "ilang-frontend",
+ "ilang-lsp",
+ "ilang-wasm",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "ilang-core"
+version = "0.1.0"
+dependencies = [
+ "base16",
+ "bimap",
+ "bitcode",
+ "bitvec",
+ "camino",
+ "clap",
+ "codespan-reporting",
+ "debug-ignore",
+ "ecow",
+ "globset",
+ "http",
+ "id-arena",
+ "ilang-version",
+ "imbl",
+ "indexmap",
+ "itertools",
+ "num-bigint",
+ "num-traits",
+ "pathdiff",
+ "petgraph",
+ "pretty-arena",
+ "pubgrub",
+ "radix_trie",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "spdx",
+ "src-span",
+ "stacker",
+ "strum",
+ "termcolor",
+ "thiserror",
+ "toml",
+ "tracing",
+ "unicode-segmentation",
+ "vec1",
+ "xxhash-rust",
+]
+
+[[package]]
+name = "ilang-format"
+version = "0.1.0"
+dependencies = [
+ "camino",
+ "ecow",
+ "ilang-core",
+ "itertools",
+ "pretty-arena",
+ "pretty_assertions",
+ "src-span",
+ "vec1",
+]
+
+[[package]]
+name = "ilang-frontend"
+version = "0.1.0"
+dependencies = [
+ "bitcode",
+ "camino",
+ "ecow",
+ "ilang-core",
+ "ilang-format",
+ "imbl",
+ "serde",
+ "serde_json",
+ "sha2",
+ "src-span",
+ "tempfile",
+ "thiserror",
+ "toml",
+ "vec1",
+]
+
+[[package]]
+name = "ilang-host"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "getrandom 0.3.4",
+ "num-bigint",
+ "serde",
+ "serde_json",
+ "wasmparser 0.262.0",
+ "wasmtime",
+ "wat",
+]
+
+[[package]]
+name = "ilang-language-server"
+version = "0.1.0"
+dependencies = [
+ "camino",
+ "debug-ignore",
+ "ecow",
+ "gen-lsp-types",
+ "ilang-core",
+ "ilang-format",
+ "ilang-version",
+ "imbl",
+ "itertools",
+ "lsp-server",
+ "num-bigint",
+ "serde",
+ "serde_json",
+ "src-span",
+ "strum",
+ "toml",
+ "tracing",
+ "vec1",
+]
+
+[[package]]
+name = "ilang-lsp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "ilang-core",
+ "ilang-frontend",
+ "ilang-language-server",
+ "lsp-server",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "ilang-runner"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "ilang-host",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "wat",
+]
+
+[[package]]
+name = "ilang-version"
+version = "0.1.0"
+dependencies = [
+ "pubgrub",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "ilang-wasm"
+version = "0.1.0"
+dependencies = [
+ "bitcode",
+ "ecow",
+ "ilang-core",
+ "ilang-frontend",
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "serde_json",
+ "sha2",
+ "src-span",
+ "tempfile",
+ "thiserror",
+ "wasm-encoder 0.262.0",
+ "wasmparser 0.262.0",
+ "wat",
+]
+
+[[package]]
 name = "imbl"
 version = "7.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1094,15 +1194,6 @@ name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
 dependencies = [
  "either",
 ]
@@ -2113,7 +2204,7 @@ dependencies = [
  "cranelift-frontend",
  "cranelift-native",
  "gimli",
- "itertools 0.14.0",
+ "itertools",
  "log",
  "object 0.40.0",
  "pulley-interpreter",
@@ -2252,106 +2343,6 @@ name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
-
-[[package]]
-name = "wleam-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "camino",
- "clap",
- "gleam-core",
- "gleam-format",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "wleam-frontend",
- "wleam-lsp",
- "wleam-wasm",
-]
-
-[[package]]
-name = "wleam-frontend"
-version = "0.1.0"
-dependencies = [
- "bitcode",
- "camino",
- "ecow",
- "gleam-core",
- "gleam-format",
- "imbl",
- "serde",
- "serde_json",
- "sha2",
- "src-span",
- "tempfile",
- "thiserror",
- "toml",
- "vec1",
-]
-
-[[package]]
-name = "wleam-host"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "getrandom 0.3.4",
- "num-bigint",
- "serde",
- "serde_json",
- "wasmparser 0.262.0",
- "wasmtime",
- "wat",
-]
-
-[[package]]
-name = "wleam-lsp"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "camino",
- "gleam-core",
- "gleam-language-server",
- "lsp-server",
- "serde_json",
- "tempfile",
- "wleam-frontend",
-]
-
-[[package]]
-name = "wleam-runner"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "serde",
- "serde_json",
- "tempfile",
- "wat",
- "wleam-host",
-]
-
-[[package]]
-name = "wleam-wasm"
-version = "0.1.0"
-dependencies = [
- "bitcode",
- "ecow",
- "gleam-core",
- "num-bigint",
- "num-traits",
- "serde",
- "serde_json",
- "sha2",
- "src-span",
- "tempfile",
- "thiserror",
- "wasm-encoder 0.262.0",
- "wasmparser 0.262.0",
- "wat",
- "wleam-frontend",
-]
 
 [[package]]
 name = "writeable"

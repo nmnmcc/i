@@ -1,0 +1,33 @@
+---
+source: language-server/src/tests/rename.rs
+expression: "\npub type Wibble { Constructor }\n\npub fn main(w: Wibble) -> Wibble { todo }\n"
+---
+----- BEFORE RENAME
+-- mod.i
+
+import app.{type Wibble as Wobble}
+
+fn wibble() -> Wobble { todo }
+
+
+-- app.i
+
+pub type Wibble { Constructor }
+         ↑▔▔▔▔▔                
+
+pub fn main(w: Wibble) -> Wibble { todo }
+
+
+----- AFTER RENAME
+-- mod.i
+
+import app.{type SomeType as Wobble}
+
+fn wibble() -> Wobble { todo }
+
+
+-- app.i
+
+pub type SomeType { Constructor }
+
+pub fn main(w: SomeType) -> SomeType { todo }

@@ -1,0 +1,20 @@
+---
+source: language-server/src/tests/definition.rs
+expression: output
+---
+Jumping to type definition
+
+----- Jumping from `src/app.i`
+
+import wibble.{type Wibble}
+
+pub fn main() {
+  use_wibble(todo)
+             ↑    
+}
+
+pub fn use_wibble(wibble: Wibble) { todo }
+
+----- Jumped to `dep/src/wibble.i`
+pub type Wibble
+↑▔▔▔▔▔▔▔▔▔▔▔▔▔▔

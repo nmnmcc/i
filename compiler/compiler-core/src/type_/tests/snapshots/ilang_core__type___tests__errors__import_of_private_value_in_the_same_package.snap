@@ -1,0 +1,22 @@
+---
+source: compiler-core/src/type_/tests/errors.rs
+expression: "\nimport wibble.{wobble}\n"
+---
+----- SOURCE CODE
+-- wibble.i
+const wobble = 0
+
+-- main.i
+
+import wibble.{wobble}
+
+
+----- ERROR
+error: Use of private value
+  ┌─ /src/one/two.i:2:16
+  │
+2 │ import wibble.{wobble}
+  │                ^^^^^^
+
+`wibble` does define `wobble`, but it is private and cannot be accessed by
+other modules.

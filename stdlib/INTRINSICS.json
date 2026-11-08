@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "abi_version": 1,
-  "namespace": "wleam:runtime/v1",
-  "source_scope": "stdlib/src/gleam/**/*.gleam",
+  "namespace": "ilang:runtime/v1",
+  "source_scope": "stdlib/src/i/**/*.i",
   "calling_convention": {
     "kind": "internal-boxed-wasm-gc",
     "description": "Compiler-recognized runtime intrinsics linked into the generated Core Wasm module. These declarations do not use the public host foreign-function ABI and must not become host imports.",
@@ -21,11 +21,11 @@
       "Result": "Ordinary tagged Gleam constructors Ok(value) and Error(error), never a host status code.",
       "Dynamic": "The original boxed Gleam value with its runtime type tag preserved; dynamic_cast is an identity operation.",
       "Array": "Tagged dynamic array distinct from a linked List; dynamic_list accepts both and returns a linked List.",
-      "Dict": "The opaque persistent HAMT root from gleam/dict, identified by its type identity.",
+      "Dict": "The opaque persistent HAMT root from i/dict, identified by its type identity.",
       "UtfCodepoint": "Boxed Int representation; source-level validation remains the responsibility of the checked public API."
     },
     "ownership": "References are managed by Wasm GC; callers do not allocate or free linear-memory buffers for these intrinsic calls.",
-    "host_effects": "I/O and randomness may invoke the separately versioned wleam:host/v1 services internally. Public external functions use the host ABI adapters, not this boxed convention."
+    "host_effects": "I/O and randomness may invoke the separately versioned ilang:host/v1 services internally. Public external functions use the host ABI adapters, not this boxed convention."
   },
   "validation": {
     "declaration_count": 43,
@@ -52,11 +52,11 @@
         ]
       },
       "modules": [
-        "gleam/bit_array"
+        "i/bit_array"
       ],
       "declarations": [
         {
-          "module": "gleam/bit_array",
+          "module": "i/bit_array",
           "function": "bit_size",
           "visibility": "public",
           "signature": "pub fn bit_size(x: BitArray) -> Int",
@@ -64,7 +64,7 @@
             "BitArray"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/bit_array.gleam",
+          "source": "stdlib/src/i/bit_array.i",
           "line": 18
         }
       ]
@@ -81,11 +81,11 @@
         ]
       },
       "modules": [
-        "gleam/bit_array"
+        "i/bit_array"
       ],
       "declarations": [
         {
-          "module": "gleam/bit_array",
+          "module": "i/bit_array",
           "function": "unsafe_to_string",
           "visibility": "private",
           "signature": "fn unsafe_to_string(a: BitArray) -> String",
@@ -93,14 +93,14 @@
             "BitArray"
           ],
           "return_type": "String",
-          "source": "stdlib/src/gleam/bit_array.gleam",
+          "source": "stdlib/src/i/bit_array.i",
           "line": 110
         }
       ]
     },
     {
       "name": "dynamic_array",
-      "signature": "fn(List(gleam/dynamic.Dynamic)) -> gleam/dynamic.Dynamic",
+      "signature": "fn(List(i/dynamic.Dynamic)) -> i/dynamic.Dynamic",
       "wasm_signature": {
         "parameters": [
           "eqref"
@@ -110,11 +110,11 @@
         ]
       },
       "modules": [
-        "gleam/dynamic"
+        "i/dynamic"
       ],
       "declarations": [
         {
-          "module": "gleam/dynamic",
+          "module": "i/dynamic",
           "function": "array",
           "visibility": "public",
           "signature": "pub fn array(a: List(Dynamic)) -> Dynamic",
@@ -122,14 +122,14 @@
             "List(Dynamic)"
           ],
           "return_type": "Dynamic",
-          "source": "stdlib/src/gleam/dynamic.gleam",
+          "source": "stdlib/src/i/dynamic.i",
           "line": 73
         }
       ]
     },
     {
       "name": "dynamic_bit_array",
-      "signature": "fn(gleam/dynamic.Dynamic) -> Result(BitArray, BitArray)",
+      "signature": "fn(i/dynamic.Dynamic) -> Result(BitArray, BitArray)",
       "wasm_signature": {
         "parameters": [
           "eqref"
@@ -139,11 +139,11 @@
         ]
       },
       "modules": [
-        "gleam/dynamic/decode"
+        "i/dynamic/decode"
       ],
       "declarations": [
         {
-          "module": "gleam/dynamic/decode",
+          "module": "i/dynamic/decode",
           "function": "dynamic_bit_array",
           "visibility": "private",
           "signature": "fn dynamic_bit_array(data: Dynamic) -> Result(BitArray, BitArray)",
@@ -151,14 +151,14 @@
             "Dynamic"
           ],
           "return_type": "Result(BitArray, BitArray)",
-          "source": "stdlib/src/gleam/dynamic/decode.gleam",
+          "source": "stdlib/src/i/dynamic/decode.i",
           "line": 814
         }
       ]
     },
     {
       "name": "dynamic_cast",
-      "signature": "fn(t0) -> gleam/dynamic.Dynamic",
+      "signature": "fn(t0) -> i/dynamic.Dynamic",
       "wasm_signature": {
         "parameters": [
           "eqref"
@@ -168,12 +168,12 @@
         ]
       },
       "modules": [
-        "gleam/dynamic",
-        "gleam/dynamic/decode"
+        "i/dynamic",
+        "i/dynamic/decode"
       ],
       "declarations": [
         {
-          "module": "gleam/dynamic/decode",
+          "module": "i/dynamic/decode",
           "function": "cast",
           "visibility": "private",
           "signature": "fn cast(a: anything) -> Dynamic",
@@ -181,11 +181,11 @@
             "anything"
           ],
           "return_type": "Dynamic",
-          "source": "stdlib/src/gleam/dynamic/decode.gleam",
+          "source": "stdlib/src/i/dynamic/decode.i",
           "line": 1167
         },
         {
-          "module": "gleam/dynamic",
+          "module": "i/dynamic",
           "function": "cast",
           "visibility": "private",
           "signature": "fn cast(a: anything) -> Dynamic",
@@ -193,14 +193,14 @@
             "anything"
           ],
           "return_type": "Dynamic",
-          "source": "stdlib/src/gleam/dynamic.gleam",
+          "source": "stdlib/src/i/dynamic.i",
           "line": 93
         }
       ]
     },
     {
       "name": "dynamic_classify",
-      "signature": "fn(gleam/dynamic.Dynamic) -> String",
+      "signature": "fn(i/dynamic.Dynamic) -> String",
       "wasm_signature": {
         "parameters": [
           "eqref"
@@ -210,11 +210,11 @@
         ]
       },
       "modules": [
-        "gleam/dynamic"
+        "i/dynamic"
       ],
       "declarations": [
         {
-          "module": "gleam/dynamic",
+          "module": "i/dynamic",
           "function": "classify",
           "visibility": "public",
           "signature": "pub fn classify(data: Dynamic) -> String",
@@ -222,14 +222,14 @@
             "Dynamic"
           ],
           "return_type": "String",
-          "source": "stdlib/src/gleam/dynamic.gleam",
+          "source": "stdlib/src/i/dynamic.i",
           "line": 27
         }
       ]
     },
     {
       "name": "dynamic_dict",
-      "signature": "fn(gleam/dynamic.Dynamic) -> Result(gleam/dict.Dict(gleam/dynamic.Dynamic, gleam/dynamic.Dynamic), Nil)",
+      "signature": "fn(i/dynamic.Dynamic) -> Result(i/dict.Dict(i/dynamic.Dynamic, i/dynamic.Dynamic), Nil)",
       "wasm_signature": {
         "parameters": [
           "eqref"
@@ -239,11 +239,11 @@
         ]
       },
       "modules": [
-        "gleam/dynamic/decode"
+        "i/dynamic/decode"
       ],
       "declarations": [
         {
-          "module": "gleam/dynamic/decode",
+          "module": "i/dynamic/decode",
           "function": "decode_dict",
           "visibility": "private",
           "signature": "fn decode_dict(data: Dynamic) -> Result(Dict(Dynamic, Dynamic), Nil)",
@@ -251,14 +251,14 @@
             "Dynamic"
           ],
           "return_type": "Result(Dict(Dynamic, Dynamic), Nil)",
-          "source": "stdlib/src/gleam/dynamic/decode.gleam",
+          "source": "stdlib/src/i/dynamic/decode.i",
           "line": 922
         }
       ]
     },
     {
       "name": "dynamic_float",
-      "signature": "fn(gleam/dynamic.Dynamic) -> Result(Float, Float)",
+      "signature": "fn(i/dynamic.Dynamic) -> Result(Float, Float)",
       "wasm_signature": {
         "parameters": [
           "eqref"
@@ -268,11 +268,11 @@
         ]
       },
       "modules": [
-        "gleam/dynamic/decode"
+        "i/dynamic/decode"
       ],
       "declarations": [
         {
-          "module": "gleam/dynamic/decode",
+          "module": "i/dynamic/decode",
           "function": "dynamic_float",
           "visibility": "private",
           "signature": "fn dynamic_float(data: Dynamic) -> Result(Float, Float)",
@@ -280,14 +280,14 @@
             "Dynamic"
           ],
           "return_type": "Result(Float, Float)",
-          "source": "stdlib/src/gleam/dynamic/decode.gleam",
+          "source": "stdlib/src/i/dynamic/decode.i",
           "line": 781
         }
       ]
     },
     {
       "name": "dynamic_int",
-      "signature": "fn(gleam/dynamic.Dynamic) -> Result(Int, Int)",
+      "signature": "fn(i/dynamic.Dynamic) -> Result(Int, Int)",
       "wasm_signature": {
         "parameters": [
           "eqref"
@@ -297,11 +297,11 @@
         ]
       },
       "modules": [
-        "gleam/dynamic/decode"
+        "i/dynamic/decode"
       ],
       "declarations": [
         {
-          "module": "gleam/dynamic/decode",
+          "module": "i/dynamic/decode",
           "function": "dynamic_int",
           "visibility": "private",
           "signature": "fn dynamic_int(data: Dynamic) -> Result(Int, Int)",
@@ -309,14 +309,14 @@
             "Dynamic"
           ],
           "return_type": "Result(Int, Int)",
-          "source": "stdlib/src/gleam/dynamic/decode.gleam",
+          "source": "stdlib/src/i/dynamic/decode.i",
           "line": 756
         }
       ]
     },
     {
       "name": "dynamic_list",
-      "signature": "fn(gleam/dynamic.Dynamic) -> Result(List(gleam/dynamic.Dynamic), Nil)",
+      "signature": "fn(i/dynamic.Dynamic) -> Result(List(i/dynamic.Dynamic), Nil)",
       "wasm_signature": {
         "parameters": [
           "eqref"
@@ -326,11 +326,11 @@
         ]
       },
       "modules": [
-        "gleam/dynamic/decode"
+        "i/dynamic/decode"
       ],
       "declarations": [
         {
-          "module": "gleam/dynamic/decode",
+          "module": "i/dynamic/decode",
           "function": "dynamic_list",
           "visibility": "private",
           "signature": "fn dynamic_list(data: Dynamic) -> Result(List(Dynamic), Nil)",
@@ -338,14 +338,14 @@
             "Dynamic"
           ],
           "return_type": "Result(List(Dynamic), Nil)",
-          "source": "stdlib/src/gleam/dynamic/decode.gleam",
+          "source": "stdlib/src/i/dynamic/decode.i",
           "line": 840
         }
       ]
     },
     {
       "name": "dynamic_string",
-      "signature": "fn(gleam/dynamic.Dynamic) -> Result(String, String)",
+      "signature": "fn(i/dynamic.Dynamic) -> Result(String, String)",
       "wasm_signature": {
         "parameters": [
           "eqref"
@@ -355,11 +355,11 @@
         ]
       },
       "modules": [
-        "gleam/dynamic/decode"
+        "i/dynamic/decode"
       ],
       "declarations": [
         {
-          "module": "gleam/dynamic/decode",
+          "module": "i/dynamic/decode",
           "function": "dynamic_string",
           "visibility": "private",
           "signature": "fn dynamic_string(from data: Dynamic) -> Result(String, String)",
@@ -367,7 +367,7 @@
             "Dynamic"
           ],
           "return_type": "Result(String, String)",
-          "source": "stdlib/src/gleam/dynamic/decode.gleam",
+          "source": "stdlib/src/i/dynamic/decode.i",
           "line": 709
         }
       ]
@@ -384,11 +384,11 @@
         ]
       },
       "modules": [
-        "gleam/float"
+        "i/float"
       ],
       "declarations": [
         {
-          "module": "gleam/float",
+          "module": "i/float",
           "function": "ceiling",
           "visibility": "public",
           "signature": "pub fn ceiling(x: Float) -> Float",
@@ -396,7 +396,7 @@
             "Float"
           ],
           "return_type": "Float",
-          "source": "stdlib/src/gleam/float.gleam",
+          "source": "stdlib/src/i/float.i",
           "line": 185
         }
       ]
@@ -413,11 +413,11 @@
         ]
       },
       "modules": [
-        "gleam/float"
+        "i/float"
       ],
       "declarations": [
         {
-          "module": "gleam/float",
+          "module": "i/float",
           "function": "floor",
           "visibility": "public",
           "signature": "pub fn floor(x: Float) -> Float",
@@ -425,7 +425,7 @@
             "Float"
           ],
           "return_type": "Float",
-          "source": "stdlib/src/gleam/float.gleam",
+          "source": "stdlib/src/i/float.i",
           "line": 196
         }
       ]
@@ -442,12 +442,12 @@
         ]
       },
       "modules": [
-        "gleam/wleam_float_decimal",
-        "gleam/wleam_float_math"
+        "i/ilang_float_decimal",
+        "i/ilang_float_math"
       ],
       "declarations": [
         {
-          "module": "gleam/wleam_float_decimal",
+          "module": "i/ilang_float_decimal",
           "function": "from_bits",
           "visibility": "private",
           "signature": "fn from_bits(bits: Int) -> Float",
@@ -455,11 +455,11 @@
             "Int"
           ],
           "return_type": "Float",
-          "source": "stdlib/src/gleam/wleam_float_decimal.gleam",
+          "source": "stdlib/src/i/ilang_float_decimal.i",
           "line": 18
         },
         {
-          "module": "gleam/wleam_float_math",
+          "module": "i/ilang_float_math",
           "function": "from_bits",
           "visibility": "private",
           "signature": "fn from_bits(x: Int) -> Float",
@@ -467,7 +467,7 @@
             "Int"
           ],
           "return_type": "Float",
-          "source": "stdlib/src/gleam/wleam_float_math.gleam",
+          "source": "stdlib/src/i/ilang_float_math.i",
           "line": 41
         }
       ]
@@ -482,17 +482,17 @@
         ]
       },
       "modules": [
-        "gleam/float"
+        "i/float"
       ],
       "declarations": [
         {
-          "module": "gleam/float",
+          "module": "i/float",
           "function": "random",
           "visibility": "public",
           "signature": "pub fn random() -> Float",
           "parameter_types": [],
           "return_type": "Float",
-          "source": "stdlib/src/gleam/float.gleam",
+          "source": "stdlib/src/i/float.i",
           "line": 408
         }
       ]
@@ -509,11 +509,11 @@
         ]
       },
       "modules": [
-        "gleam/wleam_float_math"
+        "i/ilang_float_math"
       ],
       "declarations": [
         {
-          "module": "gleam/wleam_float_math",
+          "module": "i/ilang_float_math",
           "function": "square_root",
           "visibility": "private",
           "signature": "fn square_root(x: Float) -> Float",
@@ -521,7 +521,7 @@
             "Float"
           ],
           "return_type": "Float",
-          "source": "stdlib/src/gleam/wleam_float_math.gleam",
+          "source": "stdlib/src/i/ilang_float_math.i",
           "line": 50
         }
       ]
@@ -538,12 +538,12 @@
         ]
       },
       "modules": [
-        "gleam/wleam_float_decimal",
-        "gleam/wleam_float_math"
+        "i/ilang_float_decimal",
+        "i/ilang_float_math"
       ],
       "declarations": [
         {
-          "module": "gleam/wleam_float_decimal",
+          "module": "i/ilang_float_decimal",
           "function": "to_bits",
           "visibility": "private",
           "signature": "fn to_bits(value: Float) -> Int",
@@ -551,11 +551,11 @@
             "Float"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/wleam_float_decimal.gleam",
+          "source": "stdlib/src/i/ilang_float_decimal.i",
           "line": 15
         },
         {
-          "module": "gleam/wleam_float_math",
+          "module": "i/ilang_float_math",
           "function": "bits",
           "visibility": "private",
           "signature": "fn bits(x: Float) -> Int",
@@ -563,7 +563,7 @@
             "Float"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/wleam_float_math.gleam",
+          "source": "stdlib/src/i/ilang_float_math.i",
           "line": 38
         }
       ]
@@ -580,12 +580,12 @@
         ]
       },
       "modules": [
-        "gleam/float",
-        "gleam/wleam_float_math"
+        "i/float",
+        "i/ilang_float_math"
       ],
       "declarations": [
         {
-          "module": "gleam/float",
+          "module": "i/float",
           "function": "truncate",
           "visibility": "public",
           "signature": "pub fn truncate(x: Float) -> Int",
@@ -593,11 +593,11 @@
             "Float"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/float.gleam",
+          "source": "stdlib/src/i/float.i",
           "line": 234
         },
         {
-          "module": "gleam/wleam_float_math",
+          "module": "i/ilang_float_math",
           "function": "truncate",
           "visibility": "private",
           "signature": "fn truncate(x: Float) -> Int",
@@ -605,7 +605,7 @@
             "Float"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/wleam_float_math.gleam",
+          "source": "stdlib/src/i/ilang_float_math.i",
           "line": 44
         }
       ]
@@ -623,11 +623,11 @@
         ]
       },
       "modules": [
-        "gleam/int"
+        "i/int"
       ],
       "declarations": [
         {
-          "module": "gleam/int",
+          "module": "i/int",
           "function": "bitwise_and",
           "visibility": "public",
           "signature": "pub fn bitwise_and(x: Int, y: Int) -> Int",
@@ -636,7 +636,7 @@
             "Int"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/int.gleam",
+          "source": "stdlib/src/i/int.i",
           "line": 782
         }
       ]
@@ -653,11 +653,11 @@
         ]
       },
       "modules": [
-        "gleam/int"
+        "i/int"
       ],
       "declarations": [
         {
-          "module": "gleam/int",
+          "module": "i/int",
           "function": "bitwise_not",
           "visibility": "public",
           "signature": "pub fn bitwise_not(x: Int) -> Int",
@@ -665,7 +665,7 @@
             "Int"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/int.gleam",
+          "source": "stdlib/src/i/int.i",
           "line": 795
         }
       ]
@@ -683,11 +683,11 @@
         ]
       },
       "modules": [
-        "gleam/int"
+        "i/int"
       ],
       "declarations": [
         {
-          "module": "gleam/int",
+          "module": "i/int",
           "function": "bitwise_or",
           "visibility": "public",
           "signature": "pub fn bitwise_or(x: Int, y: Int) -> Int",
@@ -696,7 +696,7 @@
             "Int"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/int.gleam",
+          "source": "stdlib/src/i/int.i",
           "line": 808
         }
       ]
@@ -714,11 +714,11 @@
         ]
       },
       "modules": [
-        "gleam/int"
+        "i/int"
       ],
       "declarations": [
         {
-          "module": "gleam/int",
+          "module": "i/int",
           "function": "bitwise_shift_left",
           "visibility": "public",
           "signature": "pub fn bitwise_shift_left(x: Int, y: Int) -> Int",
@@ -727,7 +727,7 @@
             "Int"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/int.gleam",
+          "source": "stdlib/src/i/int.i",
           "line": 884
         }
       ]
@@ -745,11 +745,11 @@
         ]
       },
       "modules": [
-        "gleam/int"
+        "i/int"
       ],
       "declarations": [
         {
-          "module": "gleam/int",
+          "module": "i/int",
           "function": "bitwise_shift_right",
           "visibility": "public",
           "signature": "pub fn bitwise_shift_right(x: Int, y: Int) -> Int",
@@ -758,7 +758,7 @@
             "Int"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/int.gleam",
+          "source": "stdlib/src/i/int.i",
           "line": 915
         }
       ]
@@ -776,11 +776,11 @@
         ]
       },
       "modules": [
-        "gleam/int"
+        "i/int"
       ],
       "declarations": [
         {
-          "module": "gleam/int",
+          "module": "i/int",
           "function": "bitwise_exclusive_or",
           "visibility": "public",
           "signature": "pub fn bitwise_exclusive_or(x: Int, y: Int) -> Int",
@@ -789,7 +789,7 @@
             "Int"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/int.gleam",
+          "source": "stdlib/src/i/int.i",
           "line": 821
         }
       ]
@@ -806,13 +806,13 @@
         ]
       },
       "modules": [
-        "gleam/float",
-        "gleam/int",
-        "gleam/wleam_float_math"
+        "i/float",
+        "i/int",
+        "i/ilang_float_math"
       ],
       "declarations": [
         {
-          "module": "gleam/float",
+          "module": "i/float",
           "function": "do_to_float",
           "visibility": "private",
           "signature": "fn do_to_float(a: Int) -> Float",
@@ -820,11 +820,11 @@
             "Int"
           ],
           "return_type": "Float",
-          "source": "stdlib/src/gleam/float.gleam",
+          "source": "stdlib/src/i/float.i",
           "line": 265
         },
         {
-          "module": "gleam/int",
+          "module": "i/int",
           "function": "to_float",
           "visibility": "public",
           "signature": "pub fn to_float(x: Int) -> Float",
@@ -832,11 +832,11 @@
             "Int"
           ],
           "return_type": "Float",
-          "source": "stdlib/src/gleam/int.gleam",
+          "source": "stdlib/src/i/int.i",
           "line": 343
         },
         {
-          "module": "gleam/wleam_float_math",
+          "module": "i/ilang_float_math",
           "function": "to_float",
           "visibility": "private",
           "signature": "fn to_float(x: Int) -> Float",
@@ -844,7 +844,7 @@
             "Int"
           ],
           "return_type": "Float",
-          "source": "stdlib/src/gleam/wleam_float_math.gleam",
+          "source": "stdlib/src/i/ilang_float_math.i",
           "line": 47
         }
       ]
@@ -861,11 +861,11 @@
         ]
       },
       "modules": [
-        "gleam/io"
+        "i/io"
       ],
       "declarations": [
         {
-          "module": "gleam/io",
+          "module": "i/io",
           "function": "print",
           "visibility": "public",
           "signature": "pub fn print(string: String) -> Nil",
@@ -873,7 +873,7 @@
             "String"
           ],
           "return_type": "Nil",
-          "source": "stdlib/src/gleam/io.gleam",
+          "source": "stdlib/src/i/io.i",
           "line": 13
         }
       ]
@@ -890,11 +890,11 @@
         ]
       },
       "modules": [
-        "gleam/io"
+        "i/io"
       ],
       "declarations": [
         {
-          "module": "gleam/io",
+          "module": "i/io",
           "function": "print_error",
           "visibility": "public",
           "signature": "pub fn print_error(string: String) -> Nil",
@@ -902,7 +902,7 @@
             "String"
           ],
           "return_type": "Nil",
-          "source": "stdlib/src/gleam/io.gleam",
+          "source": "stdlib/src/i/io.i",
           "line": 27
         }
       ]
@@ -919,11 +919,11 @@
         ]
       },
       "modules": [
-        "gleam/wleam_string"
+        "i/ilang_string"
       ],
       "declarations": [
         {
-          "module": "gleam/wleam_string",
+          "module": "i/ilang_string",
           "function": "byte_size",
           "visibility": "public",
           "signature": "pub fn byte_size(string: String) -> Int",
@@ -931,7 +931,7 @@
             "String"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/wleam_string.gleam",
+          "source": "stdlib/src/i/ilang_string.i",
           "line": 7
         }
       ]
@@ -950,11 +950,11 @@
         ]
       },
       "modules": [
-        "gleam/wleam_string"
+        "i/ilang_string"
       ],
       "declarations": [
         {
-          "module": "gleam/wleam_string",
+          "module": "i/ilang_string",
           "function": "byte_slice",
           "visibility": "public",
           "signature": "pub fn byte_slice(string: String, index: Int, length: Int) -> String",
@@ -964,7 +964,7 @@
             "Int"
           ],
           "return_type": "String",
-          "source": "stdlib/src/gleam/wleam_string.gleam",
+          "source": "stdlib/src/i/ilang_string.i",
           "line": 10
         }
       ]
@@ -981,11 +981,11 @@
         ]
       },
       "modules": [
-        "gleam/string"
+        "i/string"
       ],
       "declarations": [
         {
-          "module": "gleam/string",
+          "module": "i/string",
           "function": "utf_codepoint_to_int",
           "visibility": "public",
           "signature": "pub fn utf_codepoint_to_int(cp: UtfCodepoint) -> Int",
@@ -993,7 +993,7 @@
             "UtfCodepoint"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/string.gleam",
+          "source": "stdlib/src/i/string.i",
           "line": 692
         }
       ]
@@ -1010,11 +1010,11 @@
         ]
       },
       "modules": [
-        "gleam/wleam_unicode"
+        "i/ilang_unicode"
       ],
       "declarations": [
         {
-          "module": "gleam/wleam_unicode",
+          "module": "i/ilang_unicode",
           "function": "codepoints",
           "visibility": "public",
           "signature": "pub fn codepoints(string: String) -> List(Int)",
@@ -1022,7 +1022,7 @@
             "String"
           ],
           "return_type": "List(Int)",
-          "source": "stdlib/src/gleam/wleam_unicode.gleam",
+          "source": "stdlib/src/i/ilang_unicode.i",
           "line": 10
         }
       ]
@@ -1039,11 +1039,11 @@
         ]
       },
       "modules": [
-        "gleam/wleam_string"
+        "i/ilang_string"
       ],
       "declarations": [
         {
-          "module": "gleam/wleam_string",
+          "module": "i/ilang_string",
           "function": "concat",
           "visibility": "public",
           "signature": "pub fn concat(strings: List(String)) -> String",
@@ -1051,7 +1051,7 @@
             "List(String)"
           ],
           "return_type": "String",
-          "source": "stdlib/src/gleam/wleam_string.gleam",
+          "source": "stdlib/src/i/ilang_string.i",
           "line": 13
         }
       ]
@@ -1068,11 +1068,11 @@
         ]
       },
       "modules": [
-        "gleam/wleam_unicode"
+        "i/ilang_unicode"
       ],
       "declarations": [
         {
-          "module": "gleam/wleam_unicode",
+          "module": "i/ilang_unicode",
           "function": "from_codepoints",
           "visibility": "public",
           "signature": "pub fn from_codepoints(codepoints: List(Int)) -> String",
@@ -1080,7 +1080,7 @@
             "List(Int)"
           ],
           "return_type": "String",
-          "source": "stdlib/src/gleam/wleam_unicode.gleam",
+          "source": "stdlib/src/i/ilang_unicode.i",
           "line": 13
         }
       ]
@@ -1097,11 +1097,11 @@
         ]
       },
       "modules": [
-        "gleam/string"
+        "i/string"
       ],
       "declarations": [
         {
-          "module": "gleam/string",
+          "module": "i/string",
           "function": "unsafe_int_to_utf_codepoint",
           "visibility": "private",
           "signature": "fn unsafe_int_to_utf_codepoint(a: Int) -> UtfCodepoint",
@@ -1109,7 +1109,7 @@
             "Int"
           ],
           "return_type": "UtfCodepoint",
-          "source": "stdlib/src/gleam/string.gleam",
+          "source": "stdlib/src/i/string.i",
           "line": 615
         }
       ]
@@ -1127,11 +1127,11 @@
         ]
       },
       "modules": [
-        "gleam/dict"
+        "i/dict"
       ],
       "declarations": [
         {
-          "module": "gleam/dict",
+          "module": "i/dict",
           "function": "compare_keys",
           "visibility": "private",
           "signature": "fn compare_keys(left: a, right: a) -> Int",
@@ -1140,7 +1140,7 @@
             "a"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/dict.gleam",
+          "source": "stdlib/src/i/dict.i",
           "line": 49
         }
       ]
@@ -1157,11 +1157,11 @@
         ]
       },
       "modules": [
-        "gleam/dict"
+        "i/dict"
       ],
       "declarations": [
         {
-          "module": "gleam/dict",
+          "module": "i/dict",
           "function": "hash",
           "visibility": "private",
           "signature": "fn hash(value: a) -> Int",
@@ -1169,7 +1169,7 @@
             "a"
           ],
           "return_type": "Int",
-          "source": "stdlib/src/gleam/dict.gleam",
+          "source": "stdlib/src/i/dict.i",
           "line": 44
         }
       ]
@@ -1186,11 +1186,11 @@
         ]
       },
       "modules": [
-        "gleam/string"
+        "i/string"
       ],
       "declarations": [
         {
-          "module": "gleam/string",
+          "module": "i/string",
           "function": "inspect_value",
           "visibility": "private",
           "signature": "fn inspect_value(term: anything) -> String",
@@ -1198,7 +1198,7 @@
             "anything"
           ],
           "return_type": "String",
-          "source": "stdlib/src/gleam/string.gleam",
+          "source": "stdlib/src/i/string.i",
           "line": 811
         }
       ]

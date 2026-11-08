@@ -1,16 +1,16 @@
 # Compiler-produced host ABI fixture
 
-Build this library using the real Wleam frontend and backend:
+Build this library using the real iLang frontend and backend:
 
 ```sh
-target/cargo/debug/wleam --project tests/conformance/projects/host_abi --no-cache build --lib
+target/cargo/debug/i --project tests/conformance/projects/host_abi --no-cache build --lib
 ```
 
 The result is `build/wasm/host_abi.wasm` inside this project, accompanied by its
 `.abi.json` descriptor. The native and browser harnesses load these exact bytes,
 require ABI version 1 and all declared exports and imports, and reject missing
 callbacks. This fixture has no application entry point or discoverable tests:
-its success is established by host assertions, never by an empty `wleam test`.
+its success is established by host assertions, never by an empty `i test`.
 
 Every `echo_*` export calls the corresponding import in the `custom` namespace.
 The harness counts callback invocations and checks their arguments and returned

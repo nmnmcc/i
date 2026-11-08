@@ -1,0 +1,26 @@
+---
+source: compiler-core/src/type_/tests.rs
+expression: "\nimport wibble\n\ntype Wibble {\n  Wibble(wibble.Wibble)\n}\n"
+---
+----- SOURCE CODE
+-- wibble.i
+type Wibble
+
+-- main.i
+
+import wibble
+
+type Wibble {
+  Wibble(wibble.Wibble)
+}
+
+
+----- ERROR
+error: Use of private type
+  ┌─ /src/one/two.i:5:10
+  │
+5 │   Wibble(wibble.Wibble)
+  │          ^^^^^^^^^^^^^
+
+`wibble` does define `Wibble`, but it is private and cannot be accessed by
+other modules.

@@ -1,0 +1,19 @@
+---
+source: compiler-core/src/type_/tests/functions.rs
+assertion_line: 29
+expression: "\n@external(wasm, \"\", \"\")\nfn main(wibble x: Int, y: Int) -> Int\n"
+---
+----- SOURCE CODE
+
+@external(wasm, "", "")
+fn main(wibble x: Int, y: Int) -> Int
+
+
+----- ERROR
+error: Unlabelled argument after labelled argument
+  ┌─ /src/one/two.i:3:24
+  │
+3 │ fn main(wibble x: Int, y: Int) -> Int
+  │                        ^^^^^^
+
+All unlabelled arguments must come before any labelled arguments.

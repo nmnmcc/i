@@ -9,8 +9,8 @@
 /examples/**/build/
 /tests/**/build/
 /stdlib/build/
-/vendor/gleam/target/
-**/.wleam/
+/compiler/target/
+**/.ilang/
 *.profraw
 
 __pycache__/

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package already-built native Wleam release artifacts deterministically."""
+"""Package already-built native iLang release artifacts deterministically."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ import tomllib
 
 
 ROOT = Path(__file__).resolve().parent.parent
-EXCLUDED_DIRECTORIES = {".git", ".wleam", "build", "target", "__pycache__"}
+EXCLUDED_DIRECTORIES = {".git", ".ilang", "build", "target", "__pycache__"}
 
 
 def command(*args: str) -> str:
@@ -74,7 +74,7 @@ def elf_runtime(binary: bytes) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binaries", type=Path, help="directory containing release wleam and wleam-runner")
+    parser.add_argument("--binaries", type=Path, help="directory containing release i and ilang-runner")
     parser.add_argument("--target", help="Rust target triple; defaults to rustc's host")
     parser.add_argument("--output", type=Path, default=ROOT / "target/release", help="archive output directory")
     parser.add_argument("--nix-runtime", action="store_true", help="include the ELF Nix runtime closure and an import script")
@@ -90,7 +90,7 @@ def main() -> None:
     if not 0 <= epoch <= 0xFFFFFFFF:
         raise ValueError("SOURCE_DATE_EPOCH must be an integer between 0 and 4294967295")
 
-    cargo_target = Path(os.environ.get("WLEAM_CARGO_TARGET_DIR", os.environ.get("CARGO_TARGET_DIR", ROOT / "target/cargo")))
+    cargo_target = Path(os.environ.get("ILANG_CARGO_TARGET_DIR", os.environ.get("CARGO_TARGET_DIR", ROOT / "target/cargo")))
     binaries = args.binaries or cargo_target / "release"
     suffix = ".exe" if "windows" in target else ""
     entries: dict[str, tuple[bytes, int]] = {}
@@ -115,17 +115,17 @@ def main() -> None:
             if path.is_file():
                 add_file(path, f"{destination}/{relative.as_posix()}")
 
-    for binary in ("wleam", "wleam-runner"):
+    for binary in ("i", "ilang-runner"):
         add_file(binaries / f"{binary}{suffix}", f"bin/{binary}{suffix}", executable=True)
     for name in ("LICENSE", "UPSTREAM.md", "README.md"):
         add_file(ROOT / name, name)
-    add_file(ROOT / "vendor/gleam/LICENCE", "licenses/gleam-LICENCE")
+    add_file(ROOT / "compiler/LICENCE", "licenses/gleam-LICENCE")
     add_tree(ROOT / "docs", "docs")
-    add_tree(ROOT / "stdlib", "share/wleam/stdlib")
-    for name in ("wleam.mjs", "wleam.d.ts", "README.md"):
-        add_file(ROOT / "bindings/javascript" / name, f"share/wleam/javascript/{name}")
+    add_tree(ROOT / "stdlib", "share/ilang/stdlib")
+    for name in ("ilang.mjs", "ilang.d.ts", "README.md"):
+        add_file(ROOT / "bindings/javascript" / name, f"share/ilang/javascript/{name}")
     for name in ("Cargo.lock", "rust-toolchain.toml", "devenv.lock"):
-        add_file(ROOT / name, f"share/wleam/build/{name}")
+        add_file(ROOT / name, f"share/ilang/build/{name}")
 
     runtimes = {name: runtime for name, (contents, _) in entries.items() if name.startswith("bin/") and (runtime := elf_runtime(contents))}
     runtime_paths = []
@@ -152,9 +152,9 @@ def main() -> None:
         "nix_runtime_paths": runtime_paths,
         "sha256": {name: hashlib.sha256(contents).hexdigest() for name, (contents, _) in sorted(entries.items())},
     }
-    entries["share/wleam/build/release.json"] = ((json.dumps(build, indent=2, sort_keys=True) + "\n").encode(), 0o644)
+    entries["share/ilang/build/release.json"] = ((json.dumps(build, indent=2, sort_keys=True) + "\n").encode(), 0o644)
 
-    name = f"wleam-{version}-{target}"
+    name = f"ilang-{version}-{target}"
     args.output.mkdir(parents=True, exist_ok=True)
     archive = args.output / f"{name}.tar.gz"
     with tempfile.NamedTemporaryFile(dir=args.output, suffix=".partial", delete=False) as output:

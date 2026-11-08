@@ -16,13 +16,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--keep", action="store_true", help="keep the successful fixture and logs")
     args = parser.parse_args()
-    root = Path(os.environ.get("WLEAM_ROOT", Path(__file__).resolve().parents[1]))
+    root = Path(os.environ.get("ILANG_ROOT", Path(__file__).resolve().parents[1]))
     # Blaze treats every source beneath a directory named `target` as immutable.
     # Keep fixture sources in project state so the edit checks exercise its watcher.
     state = root / ".devenv" / "state"
     state.mkdir(parents=True, exist_ok=True)
     workspace = Path(tempfile.mkdtemp(prefix="blaze-smoke-", dir=state))
-    blaze = os.environ.get("WLEAM_BLAZE", "blaze")
+    blaze = os.environ.get("ILANG_BLAZE", "blaze")
     cargo = shutil.which("cargo") or "cargo"
     base = os.environ.copy()
     cargo_env = dict(base, CARGO_TARGET_DIR=str(workspace / "target-cargo"))
@@ -100,8 +100,8 @@ def main():
         return snapshot + " forwarded\n"
 
     def blaze_round(label, expected):
-        command(label + " tests", [blaze, "test", "-p", "wleam-smoke-core"], blaze_env)
-        command(label + " output", [blaze, "run", "-q", "-p", "wleam-smoke-app", "--", "forwarded"], blaze_env, expected)
+        command(label + " tests", [blaze, "test", "-p", "ilang-smoke-core"], blaze_env)
+        command(label + " output", [blaze, "run", "-q", "-p", "ilang-smoke-app", "--", "forwarded"], blaze_env, expected)
 
     try:
         for executable, prefix in [("rustc", "rustc 1.99.1 "), (cargo, "cargo 1.99.1 ")]:
@@ -115,24 +115,24 @@ def main():
             (workspace / package / "src").mkdir(parents=True)
         (workspace / "Cargo.toml").write_text('[workspace]\nmembers = ["core", "app"]\nresolver = "3"\n')
         core_manifest = (
-            '[package]\nname = "wleam-smoke-core"\nversion = "0.1.0"\nedition = "2024"\n'
+            '[package]\nname = "ilang-smoke-core"\nversion = "0.1.0"\nedition = "2024"\n'
             '[dependencies]\nserde = { version = "=1.0.229", features = ["derive"] }\n'
             'serde_json = "=1.0.154"\n[dev-dependencies]\ninsta = "=1.49.0"\n'
         )
         (workspace / "core" / "Cargo.toml").write_text(core_manifest)
         (workspace / "app" / "Cargo.toml").write_text(
-            '[package]\nname = "wleam-smoke-app"\nversion = "0.1.0"\nedition = "2024"\n'
-            '[dependencies]\nwleam-smoke-core = { path = "../core" }\n'
+            '[package]\nname = "ilang-smoke-app"\nversion = "0.1.0"\nedition = "2024"\n'
+            '[dependencies]\nilang-smoke-core = { path = "../core" }\n'
         )
         (workspace / "app" / "src" / "main.rs").write_text(
-            'fn main() { println!("{} {}", wleam_smoke_core::render(), std::env::args().nth(1).unwrap_or_default()); }\n'
+            'fn main() { println!("{} {}", ilang_smoke_core::render(), std::env::args().nth(1).unwrap_or_default()); }\n'
         )
         generated(21)
         expected = library(21, 21)
         command("Cargo resolves the fixture lockfile", [cargo, "generate-lockfile"], cargo_env)
         command("Cargo baseline tests", [cargo, "test", "--locked", "--workspace"], cargo_env)
-        command("Cargo baseline output", [cargo, "run", "--locked", "-q", "-p", "wleam-smoke-app", "--", "forwarded"], cargo_env, expected)
-        command("Blaze selected-package build", [blaze, "build", "-p", "wleam-smoke-app"], blaze_env)
+        command("Cargo baseline output", [cargo, "run", "--locked", "-q", "-p", "ilang-smoke-app", "--", "forwarded"], cargo_env, expected)
+        command("Blaze selected-package build", [blaze, "build", "-p", "ilang-smoke-app"], blaze_env)
         blaze_round("Blaze baseline", expected)
         expected = library(22, 21)
         blaze_round("Function edit", expected)
@@ -147,14 +147,14 @@ def main():
         (workspace / "core" / "Cargo.toml").write_text(core_manifest + '\n[features]\ndefault = []\nextra = []\n')
         # Check the app before touching any Rust source: only the manifest changed.
         disabled = expected.replace('"ready":true', '"ready":false')
-        command("Manifest-only feature disable output", [blaze, "run", "-q", "-p", "wleam-smoke-app", "--", "forwarded"], blaze_env, disabled)
+        command("Manifest-only feature disable output", [blaze, "run", "-q", "-p", "ilang-smoke-app", "--", "forwarded"], blaze_env, disabled)
         # The render body stays identical; only its inline test expectation changes.
         expected = library(22, 22, layout=True, feature=True, feature_enabled=False)
-        command("Manifest feature disable tests", [blaze, "test", "-p", "wleam-smoke-core"], blaze_env)
+        command("Manifest feature disable tests", [blaze, "test", "-p", "ilang-smoke-core"], blaze_env)
         command("Stop fixture daemon", [blaze, "stop"], blaze_env)
         blaze_round("Daemon restart", expected)
         command("Cargo final tests", [cargo, "test", "--locked", "--workspace"], cargo_env)
-        command("Cargo final output equals Blaze", [cargo, "run", "--locked", "-q", "-p", "wleam-smoke-app", "--", "forwarded"], cargo_env, expected)
+        command("Cargo final output equals Blaze", [cargo, "run", "--locked", "-q", "-p", "ilang-smoke-app", "--", "forwarded"], cargo_env, expected)
         succeeded = True
         print("Blaze smoke passed: build scripts, derive macros, snapshots, edits, package selection, arguments and daemon restart.")
     finally:

@@ -1,0 +1,30 @@
+---
+source: compiler-core/src/type_/tests/errors.rs
+expression: "\nimport gleam\n\ntype Bool {\n  True\n  False\n}\n\nconst list_of_bools = [True, False, i.False]\n"
+---
+----- SOURCE CODE
+
+import i
+
+type Bool {
+  True
+  False
+}
+
+const list_of_bools = [True, False, i.False]
+
+
+----- ERROR
+error: Type mismatch
+  ┌─ /src/one/two.i:9:37
+  │
+9 │ const list_of_bools = [True, False, i.False]
+  │                                     ^^^^^^^^^^^
+
+Expected type:
+
+    Bool
+
+Found type:
+
+    i.Bool

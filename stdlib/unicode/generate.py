@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Wleam's Unicode 17 tables from the checked-in, hashed UCD files.
+"""Generate iLang's Unicode 17 tables from the checked-in, hashed UCD files.
 
 No network access is required. Run with --check in CI to verify that all source
 hashes match and that the checked-in Gleam files have been regenerated.
@@ -18,8 +18,8 @@ import subprocess
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 DATA = HERE / "data"
-TABLES = HERE.parent / "src/gleam/wleam_unicode_tables.gleam"
-TESTS = ROOT / "tests/stdlib/string_unicode_generated_test.gleam"
+TABLES = HERE.parent / "src/i/ilang_unicode_tables.i"
+TESTS = ROOT / "tests/stdlib/string_unicode_generated_test.i"
 
 GCB = {
     "Other": 0,
@@ -232,7 +232,7 @@ def literal(codepoints: list[int]) -> str:
 
 
 def generate_tests(mappings) -> str:
-    out = [HEADER, "import gleam/wleam_unicode as unicode", ""]
+    out = [HEADER, "import i/ilang_unicode as unicode", ""]
     cases = list(grapheme_cases())
     for offset in range(0, len(cases), 24):
         out.append(f"pub fn unicode_grapheme_break_{offset // 24:03d}_test() {{")

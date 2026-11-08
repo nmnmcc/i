@@ -1,0 +1,22 @@
+---
+source: language-server/src/tests/action.rs
+expression: "import i/io\n\npub fn main() {\n  let c = #(\"one\", \"two\", \"three\")\n  io.debug(c)\n}"
+---
+----- BEFORE ACTION
+import i/io
+
+pub fn main() {
+  let c = #("one", "two", "three")
+  ▔▔▔▔↑                           
+  io.debug(c)
+}
+
+
+----- AFTER ACTION
+import i/io
+
+const c = #("one", "two", "three")
+
+pub fn main() {
+  io.debug(c)
+}

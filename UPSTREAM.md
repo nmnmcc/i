@@ -1,13 +1,13 @@
 # Upstream sources
 
-Wleam derives its parser, type checker, formatter and language server from Gleam.
+The i programming language (iLang) started from Gleam. Its parser, type checker, formatter and language server derive from the Gleam compiler, and its standard library derives from gleam_stdlib. i is now developed independently and is not compatible with Gleam.
 
 | Source | Baseline | Commit | License |
 | --- | --- | --- | --- |
 | [Gleam](https://github.com/gleam-lang/gleam) | v1.19.2 | ed41eace2dd89054eb2d744c33925261d1eff32e | Apache-2.0 |
 | [gleam_stdlib](https://github.com/gleam-lang/stdlib) | v1.0.5 | 5b0642a77a38f984db5913548b84668652ca8b5c | Apache-2.0 |
 
-The vendored frontend is maintained as a Wasm-specific derivative. Original SPDX headers and copyright notices are retained. Wleam additions are Apache-2.0 licensed. The Rust and JavaScript hosting SDKs are part of Wleam; they do not replace the language's Wasm runtime.
+The vendored frontend is maintained as a Wasm-specific derivative. Original SPDX headers and copyright notices are retained. i additions are Apache-2.0 licensed. The Rust and JavaScript hosting SDKs are part of i; they do not replace the language's Wasm runtime.
 
 Unicode algorithms use the pinned Unicode 17.0.0 data and its retained license;
 the data inventory and regeneration instructions are in

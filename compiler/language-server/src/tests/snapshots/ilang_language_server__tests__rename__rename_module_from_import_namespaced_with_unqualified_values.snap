@@ -1,0 +1,19 @@
+---
+source: language-server/src/tests/rename.rs
+expression: "import   std /   option   .   {    Some, None }"
+---
+----- BEFORE RENAME
+-- std/option.i
+pub type Option(a) { Some(a) None }
+
+-- app.i
+import   std /   option   .   {    Some, None }
+                 ↑▔▔▔▔▔                        
+
+
+----- AFTER RENAME
+-- std/option.i
+pub type Option(a) { Some(a) None }
+
+-- app.i
+import   std /   option   .   {    Some, None } as opt

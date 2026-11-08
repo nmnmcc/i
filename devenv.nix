@@ -5,7 +5,7 @@ let
   # Backport upstream 7145b282: std/Cargo static symbols must not depend on the
   # absolute source path of the sysroot that originally populated the cache.
   blazeDist = blazePackages.dist.overrideAttrs (old: {
-    patches = (old.patches or []) ++ [ ./patches/wleam-blaze-upstream-static-path.patch ];
+    patches = (old.patches or []) ++ [ ./patches/ilang-blaze-upstream-static-path.patch ];
   });
   blazeBase = pkgs.replaceDependencies {
     drv = blazePackages.run;
@@ -34,7 +34,7 @@ let
   # Blaze reads rustup's manifests to answer rustc queries itself. rust-overlay
   # omits these files, and upstream's flake also omits the proc-macro WASI target.
   # Keep the correction in a separate immutable sysroot, scoped to Blaze alone.
-  blazeSysroot = pkgs.runCommand "wleam-blaze-sysroot-2026-10-27" {
+  blazeSysroot = pkgs.runCommand "ilang-blaze-sysroot-2026-10-27" {
     nativeBuildInputs = [ pkgs.makeWrapper ];
   } ''
     mkdir -p "$out/bin" "$out/lib/rustlib"
@@ -156,15 +156,15 @@ in
 
   env = {
     BLAZE_HOME = "${config.devenv.state}/blaze";
-    WLEAM_ROOT = root;
-    WLEAM_CARGO_TARGET_DIR = "${root}/target/cargo";
-    WLEAM_BLAZE = "${blaze}/bin/blaze";
-    WLEAM_BLAZE_BACKPORT = "7145b282f6c3adccee8f24b200cb0270eba477fc";
-    WLEAM_WASMTIME = "${wasmtime}/bin/wasmtime";
-    WLEAM_WASM_TOOLS = "${wasm-tools}/bin/wasm-tools";
-    WLEAM_REFERENCE_GLEAM = "${pkgs.gleam}/bin/gleam";
+    ILANG_ROOT = root;
+    ILANG_CARGO_TARGET_DIR = "${root}/target/cargo";
+    ILANG_BLAZE = "${blaze}/bin/blaze";
+    ILANG_BLAZE_BACKPORT = "7145b282f6c3adccee8f24b200cb0270eba477fc";
+    ILANG_WASMTIME = "${wasmtime}/bin/wasmtime";
+    ILANG_WASM_TOOLS = "${wasm-tools}/bin/wasm-tools";
+    ILANG_REFERENCE_GLEAM = "${pkgs.gleam}/bin/gleam";
     PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
-    WLEAM_PLAYWRIGHT_VERSION = pkgs.playwright-driver.version;
+    ILANG_PLAYWRIGHT_VERSION = pkgs.playwright-driver.version;
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
   } // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
     # WebKit's headless WPE backend still needs an EGL vendor on machines
@@ -172,7 +172,7 @@ in
     __EGL_VENDOR_LIBRARY_FILENAMES = "${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json";
   };
 
-  scripts.wleam-dev = {
+  scripts.i-dev = {
     description = "Run the development CLI with Blaze, forwarding all arguments";
     exec = ''
       exec "${root}/scripts/dev-run" "$@"

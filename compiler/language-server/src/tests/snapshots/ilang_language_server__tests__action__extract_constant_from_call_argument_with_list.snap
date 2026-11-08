@@ -1,0 +1,21 @@
+---
+source: language-server/src/tests/action.rs
+expression: "import i/io\n\npub fn main() {\n  io.debug([\"constant\", \"another constant\"])\n}"
+---
+----- BEFORE ACTION
+import i/io
+
+pub fn main() {
+  io.debug(["constant", "another constant"])
+           ↑                                
+}
+
+
+----- AFTER ACTION
+import i/io
+
+const strings = ["constant", "another constant"]
+
+pub fn main() {
+  io.debug(strings)
+}

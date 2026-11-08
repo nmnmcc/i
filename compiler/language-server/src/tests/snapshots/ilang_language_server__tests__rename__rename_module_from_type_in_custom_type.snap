@@ -1,0 +1,29 @@
+---
+source: language-server/src/tests/rename.rs
+expression: "\nimport option\n\ntype Value(a) {\n  Value(option.Option(a))\n}\n"
+---
+----- BEFORE RENAME
+-- option.i
+pub type Option(a) { Some(a) None }
+
+-- app.i
+
+import option
+
+type Value(a) {
+  Value(option.Option(a))
+        ↑▔▔▔▔▔           
+}
+
+
+----- AFTER RENAME
+-- option.i
+pub type Option(a) { Some(a) None }
+
+-- app.i
+
+import option as opt
+
+type Value(a) {
+  Value(opt.Option(a))
+}

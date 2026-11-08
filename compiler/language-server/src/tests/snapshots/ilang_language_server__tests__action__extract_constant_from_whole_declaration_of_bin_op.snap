@@ -1,0 +1,22 @@
+---
+source: language-server/src/tests/action.rs
+expression: "import i/io\n\npub fn main() {\n  let twelve = \"1\" <> \"2\"\n  io.print(twelve)\n}"
+---
+----- BEFORE ACTION
+import i/io
+
+pub fn main() {
+  let twelve = "1" <> "2"
+  ▔▔▔▔▔▔▔▔▔↑             
+  io.print(twelve)
+}
+
+
+----- AFTER ACTION
+import i/io
+
+const twelve = "1" <> "2"
+
+pub fn main() {
+  io.print(twelve)
+}

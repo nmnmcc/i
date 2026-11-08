@@ -1,6 +1,6 @@
 # Unicode data and algorithms
 
-Wleam's string functions use the Unicode **17.0.0** character database and the
+iLang's string functions use the Unicode **17.0.0** character database and the
 extended grapheme-cluster rules in **UAX #29 revision 47**. They use the same
 tables and Gleam implementation on every Wasm host.
 
@@ -20,13 +20,13 @@ The generator uses only Python's standard library and the pinned reference
 Gleam 1.19.2 formatter provided by the development environment. Set `GLEAM_BIN`
 or pass `--formatter /path/to/gleam` when the reference compiler is not on PATH.
 
-The generator writes `gleam/wleam_unicode_tables.gleam` and
-`tests/stdlib/string_unicode_generated_test.gleam`. Properties and case mappings
+The generator writes `i/ilang_unicode_tables.i` and
+`tests/stdlib/string_unicode_generated_test.i`. Properties and case mappings
 are compact constant bit arrays with shared binary-search routines. This keeps
 generated executable code small and lookup logarithmic, without thousands of
 generated decision-tree branches.
 
-`gleam/wleam_unicode.gleam` implements grapheme segmentation, including Indic
+`i/ilang_unicode.i` implements grapheme segmentation, including Indic
 conjuncts (GB9c), emoji ZWJ sequences (GB11), and paired regional indicators
 (GB12/GB13). Full default lowercase and uppercase mappings include one-to-many
 expansions and the context-sensitive final sigma. Locale-specific Turkish,
@@ -35,8 +35,8 @@ string API. No normalization is performed.
 
 Only UTF-8 decoding and encoding are runtime intrinsics:
 
-- `wleam:runtime/v1.string_codepoints`: `String -> List(Int)` of Unicode scalars.
-- `wleam:runtime/v1.string_from_codepoints`: `List(Int) -> String` of valid scalars.
+- `ilang:runtime/v1.string_codepoints`: `String -> List(Int)` of Unicode scalars.
+- `ilang:runtime/v1.string_from_codepoints`: `List(Int) -> String` of valid scalars.
 
 Generated conformance cases cover every boundary vector from the Unicode 17
 `GraphemeBreakTest.txt` and every nonidentity default full case mapping. The

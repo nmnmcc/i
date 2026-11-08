@@ -1,0 +1,23 @@
+---
+source: language-server/src/tests/definition.rs
+expression: output
+---
+----- Jumping from `src/app.i`
+
+@external(wasm, "wibble", "wobble")
+fn external_function() -> Nil
+
+fn main() {
+  external_function()
+         ↑           
+}
+
+----- Jumped to `src/app.i`
+
+@external(wasm, "wibble", "wobble")
+fn external_function() -> Nil
+↑▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔       
+
+fn main() {
+  external_function()
+}

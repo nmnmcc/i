@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "${WLEAM_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+cd "${ILANG_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
 exec watchexec \
   --watch . \
   --exts rs,gleam,toml,lock,snap \
@@ -10,8 +10,8 @@ exec watchexec \
   --ignore '**/build/dev/**' \
   --ignore '**/build/prod/**' \
   --ignore '**/build/packages/**' \
-  --ignore .wleam \
-  --ignore '**/.wleam/**' \
+  --ignore .ilang \
+  --ignore '**/.ilang/**' \
   --ignore .devenv \
   --ignore .git \
   --ignore node_modules \

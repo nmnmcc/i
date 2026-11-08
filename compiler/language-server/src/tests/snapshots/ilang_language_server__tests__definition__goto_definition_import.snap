@@ -1,0 +1,15 @@
+---
+source: language-server/src/tests/definition.rs
+expression: output
+---
+----- Jumping from `src/app.i`
+
+import example_module
+           ↑         
+fn main() {
+  example_module.my_num
+}
+
+----- Jumped to `src/example_module.i`
+pub const my_num = 1
+↑

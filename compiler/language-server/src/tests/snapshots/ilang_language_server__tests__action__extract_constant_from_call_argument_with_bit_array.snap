@@ -1,0 +1,21 @@
+---
+source: language-server/src/tests/action.rs
+expression: "import i/io\n\npub fn main() {\n  io.debug(<<3:size(8)>>)\n}"
+---
+----- BEFORE ACTION
+import i/io
+
+pub fn main() {
+  io.debug(<<3:size(8)>>)
+           ▔↑            
+}
+
+
+----- AFTER ACTION
+import i/io
+
+const bit_array = <<3:size(8)>>
+
+pub fn main() {
+  io.debug(bit_array)
+}

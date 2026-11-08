@@ -1,17 +1,17 @@
-# Measuring Wleam performance
+# Measuring iLang performance
 
 The benchmark harness keeps two measurements separate:
 
-- **Rust development:** rebuilding and testing the Wleam implementation with Cargo or Blaze after an edit.
-- **Gleam compilation:** checking, building and testing a Gleam project using an already-built Wleam executable.
+- **Rust development:** rebuilding and testing the iLang implementation with Cargo or Blaze after an edit.
+- **i compilation:** checking, building and testing an i project using an already-built iLang executable.
 
 No speedup is assumed. A successful report records actual samples; a failed or timed-out command stops the suite, preserves its logs, marks the report unsuccessful and returns a nonzero exit status.
 
 ## Measured baseline: 2026-10-29
 
-Blaze did not improve edit or full-test latency on this frozen Wleam workload. Unchanged-build times overlapped; the measured function and type edits took about 1.19 and 1.24 times Cargo's duration with Blaze. Both engines passed all rebuild checks and executed the same 124 tests in every test cycle, including the generated revision/layout probe.
+Blaze did not improve edit or full-test latency on this frozen iLang workload. Unchanged-build times overlapped; the measured function and type edits took about 1.19 and 1.24 times Cargo's duration with Blaze. Both engines passed all rebuild checks and executed the same 124 tests in every test cycle, including the generated revision/layout probe.
 
-Measurements ran on Linux 6.18.56, x86_64, an AMD EPYC-Genoa processor with 16 visible CPUs and 62.8 GiB visible memory. The final Rust run covered 28 commands between 19:15:04 and 19:25:50 UTC on October 28 (October 29 in Hong Kong); the release-language run followed at 19:26 UTC. Other Wleam validation jobs and their daemons had stopped. System and dependency-download caches remained populated.
+Measurements ran on Linux 6.18.56, x86_64, an AMD EPYC-Genoa processor with 16 visible CPUs and 62.8 GiB visible memory. The final Rust run covered 28 commands between 19:15:04 and 19:25:50 UTC on October 28 (October 29 in Hong Kong); the release-language run followed at 19:26 UTC. Other iLang validation jobs and their daemons had stopped. System and dependency-download caches remained populated.
 
 Cargo and rustc were 1.99.1. Blaze identified itself as `0.20261027.0 (5d4f78f)` and used `nightly-2026-10-27`, with the documented upstream cache-path backport `7145b282`. Each engine had a separate fresh project snapshot, target directory and, for Blaze, daemon/JIT cache. The source snapshot was identical before the same generated edits were applied.
 
@@ -28,9 +28,9 @@ Unchanged-build ranges were 0.119–0.131 seconds for Cargo and 0.124–0.128 se
 
 The benchmark exposed a nonexistent `rerun-if-changed` path in the frontend build script. After correction, unchanged Cargo builds stopped recompiling the frontend/LSP/CLI and the observed median fell from 1.884 to 0.123 seconds. The historical report is retained as `target/benchmarks/rust-before-watch-fix.json`; its later samples may overlap correction validation and are not used for the final comparison above.
 
-The release Wleam workload contains 32 linked computation modules, a shared record module, an application main and one arithmetic test. Each warm/edit scenario has five samples; cold check/build each have one. All 38 timed commands passed, as did 16 additional direct executions of built artifacts and all six named arithmetic-test executions.
+The release iLang workload contains 32 linked computation modules, a shared record module, an application main and one arithmetic test. Each warm/edit scenario has five samples; cold check/build each have one. All 38 timed commands passed, as did 16 additional direct executions of built artifacts and all six named arithmetic-test executions.
 
-| Gleam scenario | Check median, milliseconds | Build median, milliseconds |
+| i scenario | Check median, milliseconds | Build median, milliseconds |
 | --- | ---: | ---: |
 | Fresh project | 16.004 | 34.583 |
 | Unchanged source | 8.505 | 8.453 |
@@ -44,7 +44,7 @@ The first test cycle took 52.224 milliseconds; edited test cycles had a 49.965-m
 | Cargo | 1,043.0 | 3,495.0 |
 | Blaze | 1,747.8 | 21,314.7 |
 
-The sampled aggregate includes persistent Blaze workers and may count shared pages more than once; it is not physical-memory consumption. It cannot be compared directly with a single process's RSS. The primary language run's 38 commands all hit the Python launcher's inherited 29.742-MiB RSS floor, and their short lifetimes escaped `/proc` discovery. That value does not establish Wleam's peak memory.
+The sampled aggregate includes persistent Blaze workers and may count shared pages more than once; it is not physical-memory consumption. It cannot be compared directly with a single process's RSS. The primary language run's 38 commands all hit the Python launcher's inherited 29.742-MiB RSS floor, and their short lifetimes escaped `/proc` discovery. That value does not establish iLang's peak memory.
 
 A separate 38-command run used GNU Time 1.10 from `/nix/store/6vrl8gs1971k9p913mq5y041mpscvbss-time-1.10/bin/time` to measure the child's resource usage independently. It used identical compiler, runner and standard-library inputs and passed the same result checks. Maximum child process high-water RSS was **11.73 MiB for checking, 15.32 MiB for building and 24.65 MiB for test commands**. Test accounting includes the executor's child usage but is not a concurrent-process sum. The helper's startup cost is present only in this supplementary run's timings; the latency tables above use the original runs.
 
@@ -56,8 +56,8 @@ Raw samples, exact commands, validation evidence and logs are retained locally i
 
 ```text
 Rust benchmark source snapshot: 4533b14950b12ae1329be860df4a1c288bbdecec1aa6f0b8eb0ec4761f2b487c
-Release Wleam executable:       6a080f4e337f2c90a408f6d90738b17667da3adb5c53c3ed1a3b1532392ca8c0
-Release wleam-runner:           73689bc7779b2de0f46261f2de75c2c1f8f3b4f4fd346d11ee6ce4165b7a9356
+Release iLang executable:       6a080f4e337f2c90a408f6d90738b17667da3adb5c53c3ed1a3b1532392ca8c0
+Release ilang-runner:           73689bc7779b2de0f46261f2de75c2c1f8f3b4f4fd346d11ee6ce4165b7a9356
 Standard-library snapshot:     6551e0857ddcfc4497de8b579eaa08eed3f5432cca23a0843bde829f0d93e8dc
 ```
 
@@ -75,14 +75,14 @@ The harness freezes one source snapshot, then copies it into separate temporary 
 
 Each engine measures:
 
-1. One cold build of the `wleam` executable.
+1. One cold build of the `i` executable.
 2. Repeated builds with unchanged source.
 3. Builds after changing a reachable function body.
 4. Builds after changing the layout of a type shared by two modules.
 5. The first test build/run.
 6. Test cycles after further function-body edits.
 
-The edit probes are small generated modules called from the copied CLI entry point. They exercise the actual Wleam dependency graph and executable rebuild, while making edits repeatable and leaving the implementation's behavior intact. They are controlled compiler-edit probes, not a claim that every real compiler change costs the same amount. `black_box` keeps the changed values and layouts observable to the optimizer. After every build, an untimed executable check asserts that the function revision and type size match runtime expectations; the generated unit test makes the same assertions. A stale executable therefore fails validation instead of producing a misleading fast sample.
+The edit probes are small generated modules called from the copied CLI entry point. They exercise the actual iLang dependency graph and executable rebuild, while making edits repeatable and leaving the implementation's behavior intact. They are controlled compiler-edit probes, not a claim that every real compiler change costs the same amount. `black_box` keeps the changed values and layouts observable to the optimizer. After every build, an untimed executable check asserts that the function revision and type size match runtime expectations; the generated unit test makes the same assertions. A stale executable therefore fails validation instead of producing a misleading fast sample.
 
 Cargo uses `--locked` and `target/cargo`; Blaze uses its default target directory, a unique `BLAZE_HOME`, and a matching private `RA_JIT_CACHE`. The harness stops only its own Blaze daemon at the end. Dependency resolution and lockfile changes belong to Cargo. Blaze's nightly and the project's Rust version are captured separately in the report.
 
@@ -90,21 +90,21 @@ Every test sample must contain libtest summaries with a positive passed count, z
 
 To measure one engine, use `--engines cargo` or `--engines blaze`. This produces a single-engine report, not a Cargo/Blaze comparison. `--cargo` and `--blaze` select explicit executable paths when needed.
 
-## Gleam compilation measurements
+## i compilation measurements
 
 Use the same validated compiler and runner binaries throughout a comparison. For representative release timings, first run the release build, then:
 
 ```sh
 python3 scripts/benchmark.py gleam \
-  --compiler target/cargo/release/wleam \
-  --runner target/cargo/release/wleam-runner \
+  --compiler target/cargo/release/i \
+  --runner target/cargo/release/ilang-runner \
   --modules 32 --rounds 5 \
   --output target/benchmarks/gleam.json
 ```
 
-The harness snapshots the compiler and runner binaries and matching standard library before timing, so a concurrent development rebuild cannot change the executable used halfway through the run. Standard library selection is `--stdlib`, then `WLEAM_STDLIB`, then `SOURCE/stdlib`; its content digest is recorded together with both binary digests.
+The harness snapshots the compiler and runner binaries and matching standard library before timing, so a concurrent development rebuild cannot change the executable used halfway through the run. Standard library selection is `--stdlib`, then `ILANG_STDLIB`, then `SOURCE/stdlib`; its content digest is recorded together with both binary digests.
 
-It creates a disposable Gleam project with a module dependency chain and a shared public record. It measures cold checking and cold building in separate fresh projects; neither benefits from the other's frontend cache. For each operation it then measures unchanged source, a leaf function-body edit and a shared public type change. The type change updates the record constructor's caller as well, keeping the program valid.
+It creates a disposable i project with a module dependency chain and a shared public record. It measures cold checking and cold building in separate fresh projects; neither benefits from the other's frontend cache. For each operation it then measures unchanged source, a leaf function-body edit and a shared public type change. The type change updates the record constructor's caller as well, keeping the program valid.
 
 The final test cycles execute an assertion through the dependency chain. Function-edit test samples include updating the expected result. Runner JSON must report exactly the generated arithmetic test passing; a nonzero exit, missing test or empty success report fails validation.
 
@@ -119,7 +119,7 @@ After each build, an untimed runner invocation executes the artifact directly an
 The JSON report contains:
 
 - Schema version, UTC start/end times, platform, CPU identity/count and available host memory/load observations.
-- Input parameters, executable versions, the Rust source-tree digest and the measured Wleam binary digest.
+- Input parameters, executable versions, the Rust source-tree digest and the measured iLang binary digest.
 - Every command's arguments, working directory, duration, exit status and timeout flag.
 - Paths to unabridged stdout/stderr logs.
 - Per-scenario sample counts, median/minimum/maximum time and memory observations.
@@ -149,4 +149,4 @@ This audit is not a profile and does not establish that increasing the initial h
 
 The temporary parent (`--work-parent`, or the system temporary directory selected by `TMPDIR`) must be outside the source tree. For Blaze runs it must also have no directory component named `target`: the pinned Blaze source watcher treats such paths as immutable. Build output directories may still be named `target`. Reports must be outside the source tree or inside an ignored output directory such as `target/`. These checks prevent recursive snapshots, stale-source timings and mixing previous benchmark output into the measured source.
 
-Use `python3 scripts/benchmark.py --help` for all options. Measurements of Wleam should be published only after its correctness checks pass; the presence of a benchmark harness is not evidence that the compiler, Blaze integration or performance targets have passed.
+Use `python3 scripts/benchmark.py --help` for all options. Measurements of iLang should be published only after its correctness checks pass; the presence of a benchmark harness is not evidence that the compiler, Blaze integration or performance targets have passed.

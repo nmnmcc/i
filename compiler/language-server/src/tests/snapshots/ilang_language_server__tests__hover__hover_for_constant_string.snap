@@ -1,0 +1,13 @@
+---
+source: language-server/src/tests/hover.rs
+expression: "\nconst message = \"Hello!\"\n"
+---
+
+const message = "Hello!"
+                ▔▔▔▔▔▔↑▔
+
+
+----- Hover content (markdown) -----
+```i
+String
+```

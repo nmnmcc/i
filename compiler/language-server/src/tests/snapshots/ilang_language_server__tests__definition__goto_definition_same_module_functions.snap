@@ -1,0 +1,25 @@
+---
+source: language-server/src/tests/definition.rs
+expression: output
+---
+----- Jumping from `src/app.i`
+
+fn add_2(x) {
+  x + 2
+}
+
+pub fn main() {
+  add_2(1)
+  ↑       
+}
+
+----- Jumped to `src/app.i`
+
+fn add_2(x) {
+↑▔▔▔▔▔▔▔▔▔▔  
+  x + 2
+}
+
+pub fn main() {
+  add_2(1)
+}

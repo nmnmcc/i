@@ -1,0 +1,23 @@
+---
+source: language-server/src/tests/rename.rs
+expression: "\nimport i.{Error,}\n\npub fn main() -> Result(Int, Nil) {\n  Error(10)\n}\n"
+---
+----- BEFORE RENAME
+-- app.i
+
+import i.{Error,}
+
+pub fn main() -> Result(Int, Nil) {
+                 ↑▔▔▔▔▔            
+  Error(10)
+}
+
+
+----- AFTER RENAME
+-- app.i
+
+import i.{Error, type Result as OkOrError}
+
+pub fn main() -> OkOrError(Int, Nil) {
+  Error(10)
+}

@@ -1,0 +1,41 @@
+---
+source: language-server/src/tests/rename.rs
+expression: "\nimport mod\n\npub fn main() {\n  mod.something\n}\n"
+---
+----- BEFORE RENAME
+-- mod.i
+
+pub const something = 10
+
+fn wibble() {
+  something
+}
+
+
+-- app.i
+
+import mod
+
+pub fn main() {
+  mod.something
+      ↑▔▔▔▔▔▔▔▔
+}
+
+
+----- AFTER RENAME
+-- mod.i
+
+pub const ten = 10
+
+fn wibble() {
+  ten
+}
+
+
+-- app.i
+
+import mod
+
+pub fn main() {
+  mod.ten
+}

@@ -1,0 +1,21 @@
+---
+source: language-server/src/tests/action.rs
+expression: "import i/io\n\npub fn main() {\n  io.print(\"constant\")\n}"
+---
+----- BEFORE ACTION
+import i/io
+
+pub fn main() {
+  io.print("constant")
+           ↑          
+}
+
+
+----- AFTER ACTION
+import i/io
+
+const string = "constant"
+
+pub fn main() {
+  io.print(string)
+}

@@ -1,6 +1,10 @@
-# Wleam
+# The i Programming Language
 
-Wleam is a Rust implementation of Gleam targeting WebAssembly GC. It derives its frontend, formatter and language server from Gleam 1.19.2 and ports gleam_stdlib 1.0.5. The intended runtime contract is shared by browsers and Wasmtime: arbitrary-precision integers, UTF-8 strings, immutable GC-managed values, typed function references and tail calls.
+**i** is a programming language made for WebAssembly. The name stands for *Internet*: i compiles straight to WebAssembly GC, so the same program runs in every browser and in Wasmtime. A single small letter also says what the language aims to be: small, simple and easy to understand. When a longer name is clearer, call it **iLang**. The i is always lowercase.
+
+i programs live in `.i` files, and each project is described by an `i.toml` manifest. The command-line tool is just `i`.
+
+The runtime contract is shared by browsers and Wasmtime: arbitrary-precision integers, UTF-8 strings, immutable GC-managed values, typed function references and tail calls. i is written in Rust. Its frontend, formatter and language server started from Gleam 1.19.2, and its standard library started from i_stdlib 1.0.5. i is now developed as an independent language; see [upstream provenance](UPSTREAM.md).
 
 The repository includes a Devenv development environment and a pinned Blaze development build. Standard Cargo with the project's fixed Rust version remains the verification and release toolchain.
 
@@ -28,18 +32,18 @@ See [the development guide](docs/development.md) for exact tool versions, toolch
 ## Compile and run
 
 ```sh
-wleam-dev --project examples/hello check
-wleam-dev --project examples/hello build
+i-dev --project examples/hello check
+i-dev --project examples/hello build
 devenv tasks run dev:runner
-wleam-dev --project examples/hello run
+i-dev --project examples/hello run
 ```
 
-The `build` command writes a `.wasm` module, ABI metadata, and a standalone JavaScript hosting SDK in the project's `build/wasm` directory. An explicit `--out` path must end in `.wasm`. The Wasmtime-based runner is a separate executable; it can be found beside `wleam`, on `PATH`, through `WLEAM_RUNNER`, or with `--runner`. The development launcher automatically selects the optimized runner built by `dev:runner`.
+The `build` command writes a `.wasm` module, ABI metadata, and a standalone JavaScript hosting SDK in the project's `build/wasm` directory. An explicit `--out` path must end in `.wasm`. The Wasmtime-based runner is a separate executable; it can be found beside `i`, on `PATH`, through `ILANG_RUNNER`, or with `--runner`. The development launcher automatically selects the optimized runner built by `dev:runner`.
 
 ```sh
-wleam --project my-project test
-wleam --project my-project fmt --check
-wleam lsp
+i --project my-project test
+i --project my-project fmt --check
+i lsp
 ```
 
 Tests are public, zero-argument functions ending in `_test` and returning `Nil`, located in `test/`. Each runs in a fresh Wasm instance so a trap cannot stop the remaining tests.
@@ -51,7 +55,7 @@ and IR results when the public interface stays the same.
 
 ## Host a library
 
-Keep Gleam sources and `gleam.toml`, with `target = "wasm"` or no explicit target. Local dependencies use `{ path = "../package" }`. The bundled standard library is available without a registry download.
+Put `.i` sources in `src/` and `test/` next to an `i.toml`, with `target = "wasm"` or no explicit target. Local dependencies use `{ path = "../package" }`. The bundled standard library is available without a registry download.
 
 ```toml
 [wasm]
@@ -59,7 +63,7 @@ exports = ["calculator.add"]
 ```
 
 ```sh
-wleam --project calculator build --lib
+i --project calculator build --lib
 ```
 
 ```js

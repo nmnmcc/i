@@ -1,0 +1,29 @@
+---
+source: language-server/src/tests/rename.rs
+expression: "\nimport option\n\npub fn main() {\n  echo option     . None\n}\n"
+---
+----- BEFORE RENAME
+-- option.i
+pub type Option(a) { Some(a) None }
+
+-- app.i
+
+import option
+
+pub fn main() {
+  echo option     . None
+       ↑▔▔▔▔▔           
+}
+
+
+----- AFTER RENAME
+-- option.i
+pub type Option(a) { Some(a) None }
+
+-- app.i
+
+import option as opt
+
+pub fn main() {
+  echo opt     . None
+}

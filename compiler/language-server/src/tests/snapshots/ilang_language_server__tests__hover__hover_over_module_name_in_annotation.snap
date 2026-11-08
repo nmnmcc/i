@@ -1,0 +1,20 @@
+---
+source: language-server/src/tests/hover.rs
+expression: "\nimport wibble\n\npub fn main(w: wibble.Wibble) {\n  todo\n}\n"
+---
+
+import wibble
+
+pub fn main(w: wibble.Wibble) {
+               ↑▔▔▔▔▔          
+  todo
+}
+
+
+----- Hover content (markdown) -----
+```i
+wibble
+```
+ This is the wibble module.
+ Here is some documentation about it.
+ This module does stuff

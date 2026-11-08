@@ -4,9 +4,9 @@ Run from the pinned Devenv environment after building the compiler and runner:
 
 ```sh
 python3 scripts/conformance.py \
-  --compiler target/cargo/debug/wleam \
-  --runner target/cargo/release/wleam-runner \
-  --reference-gleam "$WLEAM_REFERENCE_GLEAM"
+  --compiler target/cargo/debug/i \
+  --runner target/cargo/release/ilang-runner \
+  --reference-gleam "$ILANG_REFERENCE_GLEAM"
 ```
 
 `scripts/dev-verify` runs this command before browser tests. The harness requires
@@ -33,9 +33,9 @@ functions returning `Nil`:
 The runner's JSON report must contain every expected qualified name exactly once,
 with every result passed and summary counts matching. The emitted ABI must list
 the same tests. Test filename suffixes do not determine discovery: upstream core
-tests include files such as `language/alternative_pattern.gleam`.
+tests include files such as `language/alternative_pattern.i`.
 
-`host_abi` builds an actual Wleam library with ten typed exports and seven host
+`host_abi` builds an actual iLang library with ten typed exports and seven host
 imports. Its companion descriptor must match `projects/host_abi/expected-abi.json`.
 The native Rust SDK example exercises the compiled module before it is staged
 for the identical browser assertions. This step uses pinned Cargo and a separate
@@ -44,7 +44,7 @@ for the identical browser assertions. This step uses pinned Cargo and a separate
 as successful host ABI coverage.
 
 `upstream/` preserves the original pinned sources, including their original
-platform support files. These are reference inputs, not Wleam production
+platform support files. These are reference inputs, not iLang production
 dependencies. `upstream-manifest.json` records SHA-256 checksums verified on every
 harness invocation. Migration inventories explain all platform-specific changes
 and preserve the original assertions. See [compatibility](../../docs/compatibility.md).
@@ -56,11 +56,11 @@ complete core oracle, use:
 
 ```sh
 python3 tests/conformance/projects/upstream_language/validate_reference.py \
-  --gleam "$WLEAM_REFERENCE_GLEAM" \
+  --gleam "$ILANG_REFERENCE_GLEAM" \
   --stdlib tests/conformance/upstream/stdlib
 ```
 
-Pass `--compare-compiler target/debug/wleam` to require both Cargo and Blaze
+Pass `--compare-compiler target/debug/i` to require both Cargo and Blaze
 compiler builds to produce identical Wasm bytes and execution results for the
 same programs and corpora. Source paths and build modes remain identical during
 the comparison. Both compilers use `--no-cache`, so neither can reuse the other
@@ -95,9 +95,9 @@ successful execution report can support a narrower follow-up:
 
 ```sh
 python3 scripts/conformance-verify-artifacts.py \
-  --compiler target/verification/wleam-cargo-final \
-  --compiler target/verification/wleam-blaze-final \
-  --runner target/verification/wleam-runner \
+  --compiler target/verification/ilang-cargo-final \
+  --compiler target/verification/ilang-blaze-final \
+  --runner target/verification/ilang-runner \
   --reference-report target/conformance/report.json
 ```
 

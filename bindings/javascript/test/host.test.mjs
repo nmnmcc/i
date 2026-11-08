@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { fixtureAbi, customAbi, identityImports } from "../../../tests/browser/fixture-abi.mjs";
-import { instantiate, integerFromLimbs, integerToLimbs, readAbi, runTests, supportsRequiredFeatures, WleamAbiError, WleamPanic } from "../wleam.mjs";
+import { instantiate, integerFromLimbs, integerToLimbs, readAbi, runTests, supportsRequiredFeatures, iLangAbiError, iLangPanic } from "../ilang.mjs";
 
 const fixture = await readFile(new URL("../../../tests/browser/fixtures/host-abi.wasm", import.meta.url));
 const customFixture = await readFile(new URL("../../../tests/browser/fixtures/custom-imports.wasm", import.meta.url));
@@ -25,10 +25,10 @@ test("integer marshalling preserves arbitrary precision and rejects noncanonical
     assert.equal(integerFromLimbs(sign, bytes), value);
   }
   assert.throws(() => integerToLimbs(9007199254740993), TypeError);
-  assert.throws(() => integerFromLimbs(2, new Uint8Array()), WleamAbiError);
-  assert.throws(() => integerFromLimbs(0, Uint8Array.of(1, 0, 0, 0)), WleamAbiError);
-  assert.throws(() => integerFromLimbs(1, Uint8Array.of(1)), WleamAbiError);
-  assert.throws(() => integerFromLimbs(-1, new Uint8Array(4)), WleamAbiError);
+  assert.throws(() => integerFromLimbs(2, new Uint8Array()), iLangAbiError);
+  assert.throws(() => integerFromLimbs(0, Uint8Array.of(1, 0, 0, 0)), iLangAbiError);
+  assert.throws(() => integerFromLimbs(1, Uint8Array.of(1)), iLangAbiError);
+  assert.throws(() => integerFromLimbs(-1, new Uint8Array(4)), iLangAbiError);
 });
 
 test("primitive round trips release inputs and copied results, including empty buffers", async () => {
@@ -72,11 +72,11 @@ test("host output is exact, random providers fill guest buffers and errors carry
   value.run();
   assert.deepEqual(output, ["fixture main\n"]);
   assert.deepEqual(errors, []);
-  const pointer = value.exports.__wleam_alloc(8);
+  const pointer = value.exports.__ilang_alloc(8);
   assert.equal(value.exports.fill_random(pointer, 8), 0);
   assert.deepEqual(new Uint8Array(value.exports.memory.buffer, pointer, 8), new Uint8Array(8).fill(0xab));
-  value.exports.__wleam_free(pointer, 8);
-  assert.throws(() => value.call("fail", ["source.gleam:7: panic detail"]), (error) => error instanceof WleamPanic && error.message === "source.gleam:7: panic detail");
+  value.exports.__ilang_free(pointer, 8);
+  assert.throws(() => value.call("fail", ["source.i:7: panic detail"]), (error) => error instanceof iLangPanic && error.message === "source.i:7: panic detail");
   assert.throws(() => value.call("trap_with_string", ["freed even when trapping"]), WebAssembly.RuntimeError);
   assert.throws(() => value.exports.emit(3, 0, 0), /channel 3/);
   assert.throws(() => value.exports.fill_random(0x7fffffff, 32), /outside linear memory/);
@@ -132,7 +132,7 @@ test("ABI frames reclaim guest temporaries after repeated host failures and nest
 test("test instances are isolated and one panic does not suppress later tests", async () => {
   const results = await runTests(fixture, { abi: fixtureAbi });
   assert.deepEqual(results.map(({ passed }) => passed), [true, false, true, true]);
-  assert.ok(results[1].error instanceof WleamPanic);
+  assert.ok(results[1].error instanceof iLangPanic);
 });
 
 test("GC and tail calls remain available through the adapter", async () => {
@@ -156,11 +156,11 @@ test("host reference identities remain stable within each instance", async () =>
 test("invalid ABI versions and signatures fail before instantiation", async () => {
   const module = await WebAssembly.compile(fixture);
   for (const malformed of [null, [], { version: 1, exports: [] }, { version: 1, imports: null }, { version: 1, tests: null }]) {
-    assert.throws(() => readAbi(module, malformed), WleamAbiError);
+    assert.throws(() => readAbi(module, malformed), iLangAbiError);
   }
   assert.throws(() => readAbi(module, { version: 2 }), /version 2/);
   assert.throws(() => readAbi(module, { version: 1, exports: { bad: { params: ["list"], result: "nil" } } }), /Unknown ABI type/);
-  assert.throws(() => readAbi(module, { version: 1, imports: { "wleam:host/v1": {} } }), /reserved/);
+  assert.throws(() => readAbi(module, { version: 1, imports: { "ilang:host/v1": {} } }), /reserved/);
   assert.equal(readAbi(module, { version: 1, entry: null }).entry, undefined);
 });
 

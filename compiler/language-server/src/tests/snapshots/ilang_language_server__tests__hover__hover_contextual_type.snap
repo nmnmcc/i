@@ -1,0 +1,14 @@
+---
+source: language-server/src/tests/hover.rs
+expression: "\nimport wibble/wobble\nconst value = wobble.Wobble\n"
+---
+
+import wibble/wobble
+const value = wobble.Wobble
+▔▔▔▔▔▔↑▔▔▔▔                
+
+
+----- Hover content (markdown) -----
+```i
+wobble.Wibble
+```

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate independent public-API tests from the pinned Unicode 17 oracle data.
 
-Expected values come from Unicode's test files, never the Wleam implementation.
+Expected values come from Unicode's test files, never the iLang implementation.
 This script requires only Python's standard library and performs no downloads.
 """
 
@@ -114,7 +114,7 @@ CONTEXT_CASES = [
 
 
 def grouped_tests(prefix: str, bodies: list[list[str]], chunk_size: int = 32) -> str:
-    parts = [HEADER, "import gleam/string\n\n"]
+    parts = [HEADER, "import i/string\n\n"]
     for chunk in range(0, len(bodies), chunk_size):
         parts.append(f"pub fn {prefix}_{chunk // chunk_size:04}_test() {{\n")
         for body in bodies[chunk : chunk + chunk_size]:
@@ -173,9 +173,9 @@ def generated_files() -> dict[Path, str]:
         },
     }
     return {
-        HERE / "test" / "grapheme_break_test.gleam": grouped_tests("grapheme_break", grapheme_bodies),
-        HERE / "test" / "casing_test.gleam": grouped_tests("casing", casing_bodies),
-        HERE / "test" / "contextual_casing_test.gleam": grouped_tests("contextual_casing", contextual_bodies),
+        HERE / "test" / "grapheme_break_test.i": grouped_tests("grapheme_break", grapheme_bodies),
+        HERE / "test" / "casing_test.i": grouped_tests("casing", casing_bodies),
+        HERE / "test" / "contextual_casing_test.i": grouped_tests("contextual_casing", contextual_bodies),
         HERE / "corpus.json": json.dumps(summary, indent=2, sort_keys=True) + "\n",
     }
 

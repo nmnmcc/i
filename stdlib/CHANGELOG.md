@@ -994,7 +994,7 @@ Happy Samhain! 🎃
 
 ## v0.1.1 - 2019-04-17
 
-- Included missing gleam.toml in hex package.
+- Included missing i.toml in hex package.
 
 ## v0.1.0 - 2019-04-15
 

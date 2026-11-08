@@ -1,0 +1,22 @@
+---
+source: language-server/src/tests/action.rs
+expression: "import i/io\n\npub fn main() {\n  let c = [3.1415, 0.33333333]\n  io.debug(c)\n}"
+---
+----- BEFORE ACTION
+import i/io
+
+pub fn main() {
+  let c = [3.1415, 0.33333333]
+  ▔▔▔▔↑                       
+  io.debug(c)
+}
+
+
+----- AFTER ACTION
+import i/io
+
+const c = [3.1415, 0.33333333]
+
+pub fn main() {
+  io.debug(c)
+}

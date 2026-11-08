@@ -7,10 +7,10 @@
     (struct (field i32) (field i32) (field i32) (field i32)
       (field (ref null $abi_frame))))
 
-  (import "wleam:host/v1" "write" (func $write (param i32 i32 i32)))
-  (import "wleam:host/v1" "random" (func $random (param i32 i32) (result i32)))
-  (import "wleam:host/v1" "panic" (func $panic (param i32 i32)))
-  (import "wleam:host/v1" "reference_id"
+  (import "ilang:host/v1" "write" (func $write (param i32 i32 i32)))
+  (import "ilang:host/v1" "random" (func $random (param i32 i32) (result i32)))
+  (import "ilang:host/v1" "panic" (func $panic (param i32 i32)))
+  (import "ilang:host/v1" "reference_id"
     (func $reference_id (param externref) (result i64)))
 
   (memory (export "memory") 1 256)
@@ -25,7 +25,7 @@
   (data (i32.const 128) "fixture main\0a")
   (data (i32.const 160) "fixture assertion failed")
 
-  (func (export "__wleam_init")
+  (func (export "__ilang_init")
     (global.set $ready (i32.const 1)))
   (func (export "initialized") (result i32) (global.get $ready))
   (func (export "live_allocations") (result i32) (global.get $live))
@@ -34,7 +34,7 @@
   (func (export "heap_end") (result i32) (global.get $next))
 
   ;; Frames are GC objects, so saving allocator state does not itself change it.
-  (func (export "__wleam_abi_mark") (result i32)
+  (func (export "__ilang_abi_mark") (result i32)
     (local $token i32)
     (local.set $token (global.get $next_token))
     (global.set $next_token (i32.add (local.get $token) (i32.const 1)))
@@ -47,7 +47,7 @@
     (global.set $frame_count (i32.add (global.get $frame_count) (i32.const 1)))
     (local.get $token))
 
-  (func (export "__wleam_abi_reset") (param $token i32)
+  (func (export "__ilang_abi_reset") (param $token i32)
     (local $frame (ref null $abi_frame))
     (local.set $frame (global.get $frames))
     ;; A null frame or a token other than the top token traps before mutation.
@@ -59,7 +59,7 @@
     (global.set $frames (struct.get $abi_frame 4 (local.get $frame)))
     (global.set $frame_count (i32.sub (global.get $frame_count) (i32.const 1))))
 
-  (func $alloc (export "__wleam_alloc") (param $len i32) (result i32)
+  (func $alloc (export "__ilang_alloc") (param $len i32) (result i32)
     (local $ptr i32) (local $end i32) (local $pages i32)
     (if (i32.lt_s (local.get $len) (i32.const 0)) (then unreachable))
     (local.set $ptr (global.get $next))
@@ -83,7 +83,7 @@
     (global.set $bytes (i32.add (global.get $bytes) (local.get $len)))
     (local.get $ptr))
 
-  (func (export "__wleam_free") (param $ptr i32) (param $len i32)
+  (func (export "__ilang_free") (param $ptr i32) (param $len i32)
     (if (i32.eqz (global.get $live)) (then unreachable))
     (if (i32.lt_s (local.get $len) (i32.const 0)) (then unreachable))
     (if (i32.lt_u (local.get $ptr) (i32.const 4096)) (then unreachable))
