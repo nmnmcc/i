@@ -67,7 +67,7 @@ A keyword may not be used as a name.
 ```
 =   :   ,   .   ..   ->   ?   !   |   |>   @
 (   )   [   ]   {   }   <<   >>
-+   -   *   /   %   <   <=   >   >=   ==   !=   &&   ||   <>
++   -   *   /   %   <   <=   >   >=   ==   !=   &&   ||   <>   &
 +.  -.  *.  /.      <.  <=.  >.  >=.
 ```
 
@@ -104,7 +104,7 @@ A break ends something. What it ends depends on the brackets it is directly insi
 - Directly inside `{ }` (a block, the clauses of a `case`, or the constructors of a type), and at the top level of a file, a break ends a statement, a clause, a constructor, or an item. Attributes are part of the item after them, so a break after an attribute does not end the item.
 - Directly inside `( )`, `[ ]`, or `<< >>`, a break is the same as a `,`. A `,` at the end of a line may be left out.
 
-With no break, as on one line, a statement or a clause is the longest expression that may be read from its start, and a `,` is needed between parts.
+With no break, as on one line, a statement or a clause is the longest expression that may be read from its start, and a `,` is needed between parts. So statements and clauses may share a line: `case b { True -> 1  False -> 0 }`.
 
 From this rule:
 
@@ -288,7 +288,8 @@ The parts are the location, the version, the git commit of the tag, and the **ha
 
 ```
 Type      = Union .
-Union     = Diff { "|" Diff } .
+Union     = Inter { "|" Inter } .
+Inter     = Diff { "&" Diff } .
 Diff      = Prim { "-" Prim } .
 Prim      = FnType | TupleType | NamedType | name | "_" | "{" Type "}" .
 FnType    = "(" [ ParamType { "," ParamType } [ "," ] ] ")" "->" Union [ "?" Union ] [ "!" Union ] .
@@ -298,7 +299,7 @@ NamedType = [ name "." ] UpName [ "(" Type { "," Type } ")" ] .
 ```
 
 - A `name` is a type variable. `_` is a hole that type inference fills in.
-- `A | B` is a union and `A - B` is a difference (§4.4). `-` is stronger than `|`.
+- `A | B` is a union, `A & B` is an intersection, and `A - B` is a difference (§4.4). `-` is stronger than `&`, and `&` is stronger than `|`.
 - `( … )` with `->` after it is a function type. Without `->`, it is a tuple type.
 - A parameter of a function type may have a label: `(in: String, each: String) -> String` (§4.6).
 - A function type goes as far to the right as it can: `(A) -> B | C` gives `B | C`. `{ }` puts a type in a group: `{ (A) -> B } | C`, `(a) -> { (b) -> c } ! E`.
@@ -354,24 +355,27 @@ Field       = [ name ":" ] Type .
 - Every type parameter must be used on the right, and every type variable on the right must be a parameter.
 - Custom types are **nominal**: two different definitions make two different types, even if they have the same form.
 
-### 4.4 Union and difference
+### 4.4 Union, intersection, and difference
 
 - The values of `A | B` are the values of `A` and the values of `B`. Order has no effect, `A | A` is `A`, and `A | Never` is `A`.
-- The **members** of a type are the types that make it up as a union, after the rules below are used. A type variable may be a member.
+- Members of a union with the same type constructor are put together into one. `T(A1, …) | T(B1, …)` is `T(C1, …)`, where for each parameter of `T` (§4.5 rules 6 and 7), `Ci` is `Ai | Bi` when the parameter goes in the same direction as the type, and `Ai & Bi` when it goes in the other direction. When the parameter does not change, `Ai` and `Bi` must be equal, and `Ci` is that type; if they cannot be equal, it is a compile error. Tuples of the same size count as one type constructor, and so do all function types, whose parameters go in the other direction and whose value, errors, and environment go in the same direction. A label is kept only where both have it. So `List(Int) | List(String)` is `List(Int | String)`.
+- The **members** of a type are the types that make it up as a union, after these rules are used. So no two members of a type have the same type constructor. A type variable may be a member.
+- The values of `A & B` are the values that are in both `A` and `B`. `{ A | B } & C` is `A & C | B & C`. When `T` and `U` are not type variables, `T & U` is `Never` when they have different type constructors; when they have the same one, it is that type constructor with each pair of arguments put together the other way round: `&` where the parameter goes in the same direction, `|` where it goes in the other direction, and equal where it does not change. `a & T`, with a type variable `a`, stays as it is.
+- Intersections come from inference. `(x) { x + 1  x }` has the type `(x: a & Int) -> a`: the value that comes in is given back, and it must be an `Int`.
 - `A - B` takes out of `A` every member whose type constructor is the type constructor of a member of `B`. These rules work it out:
   - `{ A | B } - C` is `A - C | B - C`, and `A - { B | C }` is `A - B - C`.
   - When `T` and `U` are not type variables: `T - U` is `Never` when they have the same type constructor, and `T` when they do not. Tuples of the same size count as one type constructor, and so do all function types.
   - When `T - U` is `Never`, `T <: U` must be true. This is a constraint for inference, like any other. When it cannot be true, it is a compile error: for example `List(Int | String) - List(String)`.
-  - `a - U` and `T - u`, with a type variable `a` or `u`, stay as they are until the variable is known.
+  - The right side of `-` may not have a type variable as a member. `a - U`, with a type variable `a`, stays as it is until `a` is known.
 - So `{ Int | String | Nil } - String` is `Int | Nil`, `A - A` is `Never`, and `{ Yield(a) | n } - Yield(a)` is `n - Yield(a)`.
-- Unions and differences may be used in every place where a type may be used: values, errors, and environments.
+- Unions, intersections, and differences may be used in every place where a type may be used: values, errors, and environments. In a written type, a union with two or more type variables as members may only be in an output place, and an intersection with a type variable only in an input place (§4.5 rule 6), because inference cannot choose between them in the other places.
 
 ### 4.5 Subtypes
 
 `A <: B` says that every value of `A` is a value of `B`. These are the rules:
 
 1. `Never <: A`, and `A <: A`.
-2. `A <: A | B`. `A | B <: C` when `A <: C` and `B <: C`.
+2. `A <: A | B`. `A | B <: C` when `A <: C` and `B <: C`. `A & B <: A`. `C <: A & B` when `C <: A` and `C <: B`.
 3. `A - B <: A`. `X <: A - B` when `X <: A` and `X` and `B` are **disjoint**: every member of `X` has a different type constructor from every member of `B`. A type variable as a member is never disjoint from anything.
 4. `(P1, …) -> R ? E ! N <: (Q1, …) -> S ? F ! M` when the numbers of parameters are the same, `Qi <: Pi` for every parameter, `R <: S`, `E <: F`, and `N <: M`. Labels have no effect.
 5. `(A1, …) <: (B1, …)` when the numbers of parts are the same and `Ai <: Bi` for every part.
@@ -398,7 +402,7 @@ Types are worked out by inference with subtypes (algebraic subtyping).
 
 - Type annotations may be left out everywhere for inference, but not on `@external` declarations. Some uses of a name need a known type, which may need an annotation (§4.8).
 - For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance. MLsub (Dolan and Mycroft, POPL 2017) and MLstruct (Parreaux and Chau, OOPSLA 2022) give ways to do this.
-- A type is made simpler before it is shown: equal parts are put together, and type variables that have no effect on the meaning are taken out. This never changes which programs are correct or what they do.
+- A type is made simpler before it is shown: equal parts are put together, and type variables that have no effect on the meaning are taken out. This never changes which programs are correct or what they do. A type scheme that is used as a known type (§4.8) is in this simpler form.
 - Annotations are used in inference, and the inferred type must agree with them. A type variable in an annotation may become a more exact type.
 - The **annotations of a binding** are the types written in its pattern and its value, also those in the parameters, `->` parts, and clause patterns in its value, but not those inside an inner binding. An inner binding is a binding statement in a block inside the value; a parameter or a clause pattern is not one. A type variable written in an annotation of a binding is one variable of that binding, and it is generalized with it. But when the same name is also written in an annotation of a binding that has this one inside it, it is the variable of that outer binding. So two local bindings next to each other that both write `a` have two different variables.
 - **A binding is generalized when its value is a direct value** (§6.10): the type variables of its type that are not in the types of names from outside it become general, so each use of the name may give them different types. A binding whose value is not a direct value is not generalized, because working out its value runs code, and that code may make a value for one type only (for example with `control.suspend`). This is the value restriction of ML, which is known to be safe. Functions are direct values, so every function binding is generalized.
@@ -415,21 +419,21 @@ Types are worked out by inference with subtypes (algebraic subtyping).
 1. **Subtypes.** If `e : A ? E ! N`, `A <: A'`, `E <: E'`, and `N <: N'`, then `e : A' ? E' ! N'`.
 2. **Literals** have the types of §6.3.
 3. **Names.** If `Γ(x) = ∀a1 … an. T`, then `x : T` with each `ai` changed to any type.
-4. **Functions.** Let the parameters be the patterns `q1 … qn`, and the environment parameters `x1 ! T1 … xk ! Tk`. Each `qi` is fitted to a type `Pi` in binding mode. If `Γ` with the names of the `qi` and `xi : Ti` gives `body : A ? F ! M`, then the function has the type `(P1, …, Pn) -> A ? F ! M | T1 | … | Tk | S`, with the labels of its parameters. `S` is `Assert` when some `qi` may fail for `Pi` (§7.3), and `Never` when not. Making the function needs nothing, so this rule may use any `E` and `N` for the function expression itself.
+4. **Functions.** Let the parameters be the patterns `q1 … qn`, and the environment parameters `x1 ! T1 … xk ! Tk`. Each `qi` is fitted to a type `Pi` (below). If `Γ` with the names of the `qi` and `xi : Ti` gives `body : A ? F ! M`, then the function has the type `(P1, …, Pn) -> A ? F ! M | T1 | … | Tk | S`, with the labels of its parameters. `S` is `Assert` when some `qi` may fail for `Pi` (§7.3), and `Never` when not. Making the function needs nothing, so this rule may use any `E` and `N` for the function expression itself.
 5. **Calls.** If `f : (P1, …, Pn) -> A ? E ! N` and every `ai : Pi`, then `f(a1, …, an) : A`. Arguments with labels are first put in the places of §6.6.
 6. **Tuples and lists.** If every `ei : Ti`, then `(e1, …, en) : (T1, …, Tn)`. If every `ei : T` and `r : List(T)`, then `[e1, …, en] : List(T)` and `[e1, …, en, ..r] : List(T)`.
 7. **Constructors** are functions from their field types to their type, with the field labels (§6.3). Fields and updates follow §6.7.
 8. **Operators** are not functions. Each has the types of §6.9. `a |> f(b)` has the type of `f(a, b)`.
 9. **Blocks.** `{ s1 … sn e }` has the type of `e`, with the names bound by `s1 … sn` (§6.10). For an environment statement `! T = e1` and the rest `r` of the block after it: if `e1 : T ? E ! N1` and `r : A ? E ! M`, then together they have `A ? E ! N1 | M - T`. So `e1` uses the environment from outside the statement.
-10. **Bindings.** For `p = e` with `e : A`: `p` is fitted to `A` in binding mode (below). If `p` may fail for `A` (§7.3), then `Assert <: N`.
-11. **case.** For `case e { … }` with `e : A`: let `P1 … Pn` be the pattern types of the clause patterns that are not catch-alls (each choice of `|` counts). If some clause pattern is a catch-all, then `A <: P1 | … | Pn | r - P1 - … - Pn`, where `r` is a new type variable. If not, then `A <: P1 | … | Pn`. The parts of each pattern are fitted to the parts of its pattern type in case mode (below), and a catch-all clause pattern is fitted to `A`. Every guard has the type `Bool`, and every clause expression has the type `R`. Then the `case` has the type `R`.
-12. **Narrowing.** Let a catch-all be at some place in a clause pattern, and let `B` be the type of the values at that place. A member `M` of `B` is taken out of the type of the catch-all when every value that the clause pattern matches with a value of `M` at that place is matched by an earlier clause without a guard. So in §9.3, `other` gets `HttpError`, because the clause before it takes every `Error` with a `ParseError` in it.
+10. **Bindings.** For `p = e` with `e : A`: `p` is fitted to `A` (below). If `p` may fail for `A` (§7.3), then `Assert <: N`.
+11. **case.** For `case e { … }` with `e : A`, the clause patterns (each choice of `|` counts) are looked at by **place**. The top place is the value of `e`. Below a pattern at a place, its parts are at places of their own: each field of a constructor `C`, each part of a tuple of n parts, and the parts and the rest of a list. Places below different constructors are different places. At each place, let `B` be the type of the values there (`A` at the top place, and else the part type of the pattern type above it), and let `P` be the union of the pattern types (below) of the patterns at that place that are not catch-alls. If some clause without a guard has a catch-all at that place or at a place above it, then `B <: P | r - P`, with a new type variable `r`: a value that no pattern takes may still come there. If not, then `B <: P`. A catch-all at a place gets the type of rule 12. Every guard has the type `Bool`, and every clause expression has the type `R`. Then the `case` has the type `R`. Coverage (§7.4) is checked with the types that inference finds.
+12. **Narrowing.** Let a catch-all be at some place in a clause pattern, and let `B` be the type of the values at that place. A type constructor `T` is **taken** at that place when every value that the clause pattern matches, with a value of `T` at that place, is matched by an earlier clause without a guard. The catch-all gets the type `B - H`, where `H` is the union of the taken type constructors, each with new type variables as its arguments. So in §9.3, `other` gets `HttpError`, because the clause before it takes every `Error` with a `ParseError` in it.
 13. **Fields and tuple parts.** For `v.f`, every constructor that may have made `v` (§6.7) must have a field with the label `f`. The type of `v.f` is the union of the types of these fields, with the type arguments put in. For `v.k`, every member of the known type of `v` (below) must be a tuple with more than k parts, and the type of `v.k` is the union of their parts k. If not, it is a compile error. In both cases, the type of `v` must be a subtype of its known type.
 14. **Generalization.** A binding whose value is a direct value is generalized (§4.7) after its value is typed. Other bindings, parameters, and clause patterns are not.
 
 A **catch-all** is a `name`, a discard, or `x = q` where `q` is a catch-all.
 
-To **fit** a pattern `q` to a type `B`: if `q` is a catch-all, its names get `B`. If not, let `Q` be the pattern type of `q`. In binding mode, `B <: Q`. In case mode, `B <: Q | r - Q` with a new type variable `r`, because a part that does not match only makes the clause not match. Then the parts of `q` are fitted, in the same mode, to the parts of `Q` given below. Fitting never adds `Assert`.
+To **fit** a pattern `q` to a type `B`, in a binding or a parameter: if `q` is a catch-all, its names get `B`. If not, `B <: Q`, where `Q` is the pattern type of `q`, and the parts of `q` are fitted to the parts of `Q` given below. Fitting never adds `Assert`. In a `case`, rules 11 and 12 take the place of fitting.
 
 The **pattern type** of a pattern that is not a catch-all, and its parts, are:
 
@@ -453,7 +457,7 @@ The **known type** `K(e)` of an expression is found from the parts of the expres
 - A name used inside the value of its own binding, and a top-level name of the same group, get their known types only from what is written, because their values are not yet known there: from `x: T` at the top of the binding's pattern when it is there, or else from what is written in the value, with `_` for the rest. So, as in TypeScript, a function that uses its own result in `.f`, `.k`, or a call by label needs a written `->` part. Every other name bound by a pattern gets its known type as below.
 - A known type may have `_` in it, for a part that is not known. A part that is `_` has no known type, but the rest of the type is still known. So the labels of a function are known even when its types are not.
 - A call `f(a1, …)`, also when written with `|>`, has a known type when `f` has a known function type, and every type variable of its result gets a type when its parameter types are matched with the known types of the arguments (below). Then it has the result type with those types put in. A constructor with arguments is a call.
-- To **match** a type `P` with a known type `K`: when `P` is a type variable, `K` is one of its types. When `P` is a named type, a tuple type, or a function type, and `K` has one member with the same type constructor, the parts are matched: the type arguments, the tuple parts, or the parameter and result types. When `P` is a union, each member of `P` that is not a type variable is matched with the member of `K` that has its type constructor, if there is one, and each type variable in `P` is matched with `K` less the type constructors of the other members of `P` (§4.4). A `_` in `K` matches nothing. When a type variable gets more than one type, it gets their union. So matching `(x: a | Nil)` with `User | Nil` gives `a` the type `User`.
+- To **match** a type `P` with a known type `K`: when `P` is a type variable, `K` is one of its types. When `P` is a named type, a tuple type, or a function type, and `K` has one member with the same type constructor, the parts are matched: the type arguments, the tuple parts, or the parameter and result types. When `P` is a union, each member of `P` that is not a type variable is matched with the member of `K` that has its type constructor, if there is one, and each type variable in `P` is matched with `K` less the type constructors of the other members of `P` (§4.4). A `_` in `K` matches nothing. Before matching, a difference in `K` is replaced by its members (§4.4), and an intersection `a & T` by `T`. When a type variable gets more than one type, it gets their union. So matching `(x: a | Nil)` with `User | Nil` gives `a` the type `User`.
 - **Expected types.** An expression may have an **expected type** from its place, as in TypeScript:
   - An argument of a call (also with `|>`) whose callee has a known function type has the type of its parameter there. Its type variables are put in when matching the parameter types with the known types of the other arguments fixes them. Function expressions that have a parameter with no written type are left out of this matching.
   - The value of a binding whose pattern has `x: T` at its top has `T`. The body of a function with a written `->` part has that type.
@@ -461,7 +465,7 @@ The **known type** `K(e)` of an expression is found from the parts of the expres
   - When a function expression has an expected type with one member, a function type with the same number of parameters, every parameter with no type written at its top is fitted to the matching parameter type, as for names in patterns below. This only gives known types. So `list.map(users, (u) { u.name })` is correct when `users` has a known type.
 - `v.f` and `v.k` have the field or part type of rule 13, when it has no type variable that is not put in.
 - A block has the known type of its last expression.
-- **Names in patterns**: when a pattern `q` is fitted to a value with a known type `B`: a catch-all gets `B`, less the members that rule 12 takes out. If `q` is not a catch-all, take the one member of `B` with the type constructor of `Q`; if there is not exactly one, the names of `q` get no known type. The parts of `q` then have the known part types of that member, with its type arguments put in. The name `x` of `x = q` gets that member. The name `x` of `x: T` gets `T`, whatever the value.
+- **Names in patterns**: when a pattern `q` is fitted to a value with a known type `B`: a catch-all gets `B`, less the members that rule 12 takes out. If `q` is not a catch-all, take the one member of `B` with the type constructor of `Q`; if there is not exactly one, the names of `q` get no known type. The parts of `q` then have the known part types of that member, with its type arguments put in. The name `x` of `x = q` gets that member. The name `x` of `x: T` gets `T`, whatever the value. So in `f: (x: Int) -> Int = (y) { … }`, `f` has the label `x`, from its annotation.
 
 So `(u) { u.name }` needs a type, `(u: User) { u.name }`, but with `opt: Option(User)`, `case opt { Some(u) -> u.name  None -> "" }` is correct.
 
@@ -542,7 +546,7 @@ The type of `[e1, …, en]` is `List(T)`, where every part has the type `T`. `T`
 
 ### 6.8 Functions
 
-`(p1, …, pn) -> A ? E ! N { body }` is a function value. It may use local names from outside. The `->` part may be left out; then the value type, errors, and environment are inferred. When the `->` part is written, it is the type of the function after its parameters, so a missing `?` or `!` in it means `Never` (§3), and `! N` must have the types of the environment parameters. The body is a block, and the value of the block is the value that the function gives back.
+`(p1, …, pn) -> A ? E ! N { body }` is a function value. It may use local names from outside. The `->` part may be left out; then the value type, errors, and environment are inferred. When the `->` part is written, it is the type of the function after its parameters, so a missing `?` or `!` in it means `Never` (§3), and `! N` must have the types of the environment parameters, and `Assert` when a parameter may fail (§4.8 rule 4). The body is a block, and the value of the block is the value that the function gives back.
 
 ### 6.9 Operators
 
@@ -636,7 +640,7 @@ Rest       = ".." [ name | discard ] .
   - A call of `C` may still give the fields with labels by position (§6.6), but a pattern takes them only by label. A call puts values in, where the order is clear; a pattern takes them out and names them, and the names are the labels. TypeScript does the same: `new User("bob", 3)` and `const { name, age } = user`.
 - The type after `:` goes as far to the right as it can, as every type does (§3). So `x: Int | String` tests for a union, and `f: (Int) -> Int = e` needs no brackets. In a `case` clause, `p: (Int, Int) -> e` is read as a function type, so a tuple type there is put in `{ }`, or a tuple pattern is used. A `|` after a type is part of the type, so a type test is written after the other choices: `True | _: Int`.
 
-`x: T` is one thing in every place where it may be written (in a bit array segment, `:` begins a format instead, §8.1). It matches the values of the type `T`, and `x` gets the type `T`. In a binding or a parameter, every value that comes there is in `T` (§4.8 rules 4 and 10), so `x: Int = e` and `(x: Int) { … }` are type annotations. In a `case`, `x: T` tests the value. Only type constructors are tested at run time, so in a `case`, `T` may not have a type variable as a member, and the type of the value may not have two members with the same type constructor as a member of `T`.
+`x: T` is one thing in every place where it may be written (in a bit array segment, `:` begins a format instead, §8.1). It matches the values of the type `T`, and `x` gets the type `T`. In a binding or a parameter, every value that comes there is in `T` (§4.8 rules 4 and 10), so `x: Int = e` and `(x: Int) { … }` are type annotations. In a `case`, `x: T` tests the value. Only type constructors are tested at run time, so in a `case`, `T` may not have a type variable as a member.
 
 ### 7.2 What patterns match
 
@@ -763,7 +767,7 @@ fixed = () {
 
 - `T` is written in the source, and must be one named type `T(…)`. It may have type variables as arguments, as in `State(s)`, but it may not be a type variable alone, a union, or `Never`.
 - The environment goes with every call: a called function gets the environment of the place of the call. An environment statement changes it for the calls in the rest of its block, also calls of functions that were made earlier. This is like the environment of Effect-TS: what a computation needs is given by the code that runs it. So the environment of a function is a set of parameters that are given without being written: its type `! N` says which services the caller must have, and a function made in one place and called in another gets its services from the place where it is called.
-- An environment may not have two forms of one type constructor: `State(Int) | State(String)` is a compile error. Two environment parameters of one function may not have the same type constructor. A later environment statement for the same type constructor takes the place of an earlier one.
+- Two forms of one type constructor in an environment are put together, as in every union (§4.4). So for a service type whose parameter does not change, as is usual for a record of functions, `State(Int) | State(String)` is a compile error. Two environment parameters of one function may not have the same type constructor. A later environment statement for the same type constructor takes the place of an earlier one.
 - A nominal type is the name of a service. To have two services of the same form, make two types.
 - A service is a normal value. It may be stored and given to functions, and code that has it may call its functions directly.
 - Type checking makes certain that every environment parameter gets its service. Getting it never fails at run time.
@@ -1080,12 +1084,16 @@ The rules below were chosen without a full discussion. Each one follows Gleam or
 17. There is no `echo`, no `todo`, and no `!` for "not", though Gleam has them. `!` always means the environment, a debug print is a host service, and `panic("todo")` does the work of `todo` (§6.9, §13).
 18. The program entry and tests are marked with `@main` and `@test`. Gleam finds them by their names, which would give names a special meaning (§10.2).
 19. The binary interface (Appendix B) and the module `i/core` (§13) are new. They are made for WasmGC, and Gleam and TypeScript have nothing to follow here.
+20. Members of a union with the same type constructor are put together, as MLsub needs for principal types. So `List(Int) | List(String)` is `List(Int | String)`, and a union never has two members with one type constructor (§4.4).
+21. Types have intersections `&`, because principal types need them where values come in, as in `(x: a & Int) -> a`. MLsub and TypeScript both have them (§3, §4.4).
+22. A `case` is typed by places, so a value that no pattern takes may only come where a catch-all can take it. Coverage is checked with the inferred types, and narrowing is a difference by the taken type constructors (§4.8 rules 11 and 12).
+23. Errors, unwinding, and `suspend` use Wasm exception handling, which Chrome, Firefox, Safari, and Wasmtime all have. Frames are saved only while a `suspend` goes out through them, so a normal call allocates nothing (Appendix B.1).
 
 ## Appendix B. The binary interface
 
 ### B.1 The module
 
-A compiled program is one Wasm module. It needs the Wasm features garbage collection, typed function references, and tail calls. It exports:
+A compiled program is one Wasm module. It needs the Wasm features garbage collection, typed function references, tail calls, and exception handling with `exnref`. Exceptions are used only inside the module: its tags are not exported, every export catches them, and an import must not throw one into the module. It exports:
 
 - `memory`: the linear memory used to pass buffers.
 - `ilang_alloc(size: i32) -> i32`: gives the address of a new buffer of `size` bytes in `memory`. For size 0 it may give 0.
