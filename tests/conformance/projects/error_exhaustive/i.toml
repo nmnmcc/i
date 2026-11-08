@@ -1,3 +1,0 @@
-name = "error_exhaustive"
-version = "0.1.0"
-target = "wasm"

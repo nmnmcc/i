@@ -1,9 +1,0 @@
----
-source: language-server/src/tests/completion.rs
-expression: "pub fn main() { wibble(p) }"
----
-pub fn main() { wibble(p|) }
-
-
------ After applying completion -----
-pub fn main() { wibble(panic) }

@@ -1,1 +1,0 @@
-pub fn answer() { 42 }

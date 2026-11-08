@@ -5,10 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test bindings/javascript/test/*.test.mjs",
-    "test:compiler:abi": "node bindings/javascript/test/compiler-abi.mjs",
     "test:browser": "playwright test",
-    "test:browser:host": "playwright test tests/browser/host.spec.mjs",
-    "test:browser:compiled": "playwright test tests/browser/compiler.spec.mjs"
+    "test:browser:host": "playwright test tests/browser/host.spec.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1"

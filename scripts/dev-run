@@ -2,9 +2,5 @@
 set -euo pipefail
 cd "${ILANG_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
 export BLAZE_HOME="${BLAZE_HOME:-$PWD/.devenv/state/blaze}"
-runner="${ILANG_CARGO_TARGET_DIR:-$PWD/target/cargo}/release/ilang-runner"
-if [[ -z "${ILANG_RUNNER:-}" && -x "$runner" ]]; then
-  export ILANG_RUNNER="$runner"
-fi
 unset CARGO_TARGET_DIR
 exec blaze run --bin i -- "$@"

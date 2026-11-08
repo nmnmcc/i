@@ -1,3 +1,0 @@
-name = "error_legacy_target"
-version = "0.1.0"
-target = "wasm"

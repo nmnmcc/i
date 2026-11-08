@@ -11,16 +11,4 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
-camino.workspace = true
 clap.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-sha2.workspace = true
-ilang-frontend.workspace = true
-ilang-wasm.workspace = true
-ilang-lsp.workspace = true
-ilang-core.workspace = true
-ilang-format.workspace = true
-
-[dev-dependencies]
-tempfile.workspace = true

@@ -1,8 +1,6 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-default-members = ["crates/ilang-cli", "crates/ilang-frontend", "crates/ilang-wasm", "crates/ilang-lsp"]
-exclude = ["compiler"]
 
 [workspace.package]
 version = "0.1.0"
@@ -27,13 +25,7 @@ insta = { version = "1", features = ["glob"] }
 tempfile = "3"
 wasm-encoder = "=0.262.0"
 wasmparser = "=0.262.0"
-ilang-core = { path = "compiler/compiler-core" }
-ilang-format = { path = "compiler/format" }
-ilang-language-server = { path = "compiler/language-server" }
-src-span = { path = "compiler/src-span" }
-ilang-frontend = { path = "crates/ilang-frontend" }
 ilang-wasm = { path = "crates/ilang-wasm" }
-ilang-lsp = { path = "crates/ilang-lsp" }
 ilang-host = { path = "crates/ilang-host" }
 
 [profile.dev]

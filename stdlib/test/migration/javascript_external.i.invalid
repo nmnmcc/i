@@ -1,2 +1,0 @@
-@external(javascript, "./host.mjs", "object")
-pub fn host_value() -> String

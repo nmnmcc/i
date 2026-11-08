@@ -74,7 +74,7 @@ def elf_runtime(binary: bytes) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binaries", type=Path, help="directory containing release i and ilang-runner")
+    parser.add_argument("--binaries", type=Path, help="directory containing the release i binary")
     parser.add_argument("--target", help="Rust target triple; defaults to rustc's host")
     parser.add_argument("--output", type=Path, default=ROOT / "target/release", help="archive output directory")
     parser.add_argument("--nix-runtime", action="store_true", help="include the ELF Nix runtime closure and an import script")
@@ -115,13 +115,12 @@ def main() -> None:
             if path.is_file():
                 add_file(path, f"{destination}/{relative.as_posix()}")
 
-    for binary in ("i", "ilang-runner"):
+    for binary in ("i",):
         add_file(binaries / f"{binary}{suffix}", f"bin/{binary}{suffix}", executable=True)
-    for name in ("LICENSE", "UPSTREAM.md", "README.md"):
+    for name in ("LICENSE", "README.md"):
         add_file(ROOT / name, name)
-    add_file(ROOT / "compiler/LICENCE", "licenses/gleam-LICENCE")
+    add_tree(ROOT / "licenses", "licenses")
     add_tree(ROOT / "docs", "docs")
-    add_tree(ROOT / "stdlib", "share/ilang/stdlib")
     for name in ("ilang.mjs", "ilang.d.ts", "README.md"):
         add_file(ROOT / "bindings/javascript" / name, f"share/ilang/javascript/{name}")
     for name in ("Cargo.lock", "rust-toolchain.toml", "devenv.lock"):

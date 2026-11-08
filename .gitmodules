@@ -1,0 +1,3 @@
+[submodule "crates/ilang-binaryen/binaryen"]
+	path = crates/ilang-binaryen/binaryen
+	url = https://github.com/WebAssembly/binaryen

@@ -1,9 +1,0 @@
----
-source: language-server/src/tests/completion.rs
-expression: "pub fn main() { t }"
----
-pub fn main() { t| }
-
-
------ After applying completion -----
-pub fn main() { todo }

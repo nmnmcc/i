@@ -1,2 +1,0 @@
-@external(erlang, "erlang", "self")
-pub fn host_value() -> String

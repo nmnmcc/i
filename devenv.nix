@@ -141,6 +141,8 @@ in
     blaze
     pkgs.git
     pkgs.stdenv.cc
+    # Builds the vendored Binaryen in crates/ilang-binaryen.
+    pkgs.cmake
     pkgs.pkg-config
     pkgs.watchexec
     wasmtime
@@ -150,8 +152,6 @@ in
     pkgs.hyperfine
     pkgs.time
     pkgs.playwright-driver.browsers
-    # Pinned Gleam 1.19.2 formatter for stdlib/unicode/generate.py.
-    pkgs.gleam
   ];
 
   env = {
@@ -186,10 +186,6 @@ in
     "dev:test" = {
       description = "Run Rust development tests with Blaze";
       exec = "${root}/scripts/dev-test";
-    };
-    "dev:runner" = {
-      description = "Build the independent Wasmtime executor with pinned Cargo";
-      exec = "${root}/scripts/dev-runner";
     };
     "dev:watch" = {
       description = "Run development tests serially after source changes";

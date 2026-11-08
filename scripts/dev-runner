@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-cd "${ILANG_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
-export CARGO_TARGET_DIR="${ILANG_CARGO_TARGET_DIR:-$PWD/target/cargo}"
-exec cargo build --release --locked -p ilang-runner "$@"

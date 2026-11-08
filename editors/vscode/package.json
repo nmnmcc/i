@@ -35,13 +35,6 @@
         "configuration": "./language-configuration.json"
       }
     ],
-    "grammars": [
-      {
-        "language": "i",
-        "scopeName": "source.i",
-        "path": "./syntaxes/i.tmLanguage.json"
-      }
-    ],
     "configuration": {
       "title": "i",
       "properties": {

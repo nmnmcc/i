@@ -1,6 +1,0 @@
-name = "i_stdlib"
-target = "wasm"
-version = "0.1.0"
-i = ">= 0.1.0"
-licences = ["Apache-2.0"]
-description = "The standard library for the i programming language"

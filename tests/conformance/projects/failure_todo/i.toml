@@ -1,3 +1,0 @@
-name = "failure_todo"
-version = "0.1.0"
-target = "wasm"

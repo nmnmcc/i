@@ -15,15 +15,12 @@ To package artifacts that have already been built, use:
 ./scripts/dev-package --nix-runtime
 ```
 
-The archive contains both `bin/i` and `bin/ilang-runner`, the JavaScript SDK
-under `share/ilang/javascript`, and the complete standard-library source under
-`share/ilang/stdlib`. The compiler locates this standard library relative to its
-executable, and `run`/`test` locate the sibling executor. Keep this directory
-layout when installing. `ILANG_STDLIB` and `ILANG_RUNNER` provide explicit
-overrides when a different layout is required.
+The archive contains `bin/i`, which has the compiler, Binaryen, the library
+modules and the Wasmtime host built in, and the JavaScript SDK under
+`share/ilang/javascript`.
 
-The package also contains documentation, iLang/Gleam/stdlib/Unicode licenses,
-upstream source records, dependency/toolchain lockfiles, and a
+The package also contains documentation, the licenses of i and of included
+third-party code (Gleam, Binaryen), dependency/toolchain lockfiles, and a
 `share/ilang/build/release.json` manifest. The manifest records the source commit,
 target, packaging toolchain, ELF interpreter paths where applicable, and SHA-256
 hashes for every payload file.

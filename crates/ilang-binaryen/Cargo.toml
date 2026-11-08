@@ -1,0 +1,19 @@
+[package]
+name = "ilang-binaryen"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Binaryen, built from source and linked as a library, for optimizing the Wasm that i produces"
+links = "binaryen"
+exclude = ["binaryen/test", "binaryen/third_party", "binaryen/.github"]
+
+[dependencies]
+thiserror.workspace = true
+
+[build-dependencies]
+cmake = "0.1"
+
+[dev-dependencies]
+wasmparser.workspace = true
+wat = "=1.262.0"
+wasmtime = { version = "=50.0.0", default-features = false, features = ["anyhow", "cranelift", "gc", "gc-drc", "runtime", "std"] }

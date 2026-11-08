@@ -55,20 +55,19 @@ i-dev --help
 devenv tasks run dev:watch
 ```
 
-The default Cargo workspace members select the compiler and language server.
-The Wasmtime executor is built independently as part of full verification or a
-release. Pass package/test selectors directly when needed:
+The workspace builds the `i` command, the code generator, the Wasmtime host,
+and Binaryen. Binaryen is a git submodule (`crates/ilang-binaryen/binaryen`)
+built from source with CMake and linked into `i` as a library, so users need
+nothing else installed. Fetch it once with
+`git submodule update --init crates/ilang-binaryen/binaryen`. Its first build
+takes a few minutes; later builds reuse it. Pass package/test selectors
+directly when needed:
 
 ```sh
 ./scripts/dev-test -p ilang-wasm
 ./scripts/dev-run build
 devenv tasks run tools:blaze-smoke
 ```
-
-For `i-dev run` and `i-dev test`, build the independent executor once
-with `devenv tasks run dev:runner`. The development launcher selects the
-release executor when available: Wasmtime's JIT is much slower when its Rust
-implementation is compiled in the debug profile.
 
 The toolchain smoke check uses a temporary workspace to compare Blaze and
 Rust 1.99.1 Cargo across build scripts, derive macros, snapshots, package
@@ -79,8 +78,7 @@ directory named `target` as immutable generated output.
 
 The watcher serializes test runs after Rust, i, manifest, lockfile, or snapshot
 changes. Tests start in fresh processes. Build output, Nix state, Git metadata,
-and node_modules are excluded. It does not apply live patches to a running
-compiler or language server.
+and node_modules are excluded.
 
 Blaze uses its default `target` directory. Its daemon state and toolchain cache
 are isolated under this project's `.devenv/state/blaze` via `BLAZE_HOME`:
@@ -108,9 +106,8 @@ devenv tasks run release
 ```
 
 Verification uses Rust 1.99.1 and `target/cargo`, independently of Blaze output.
-It checks formatting and Clippy, runs the root and `compiler` workspace
-tests, builds the compiler and executor, runs the conformance fixtures, and
-executes the Node SDK and Chromium/Firefox/WebKit browser tests. The browser
+It checks formatting and Clippy, runs the workspace tests, builds the
+workspace, and executes the Node SDK and Chromium/Firefox/WebKit browser tests. The browser
 binaries come from Nix; npm does not download a second browser bundle. Release artifacts are built
 with Cargo in `target/cargo/release`, then packaged with checksums under
 `target/release`. See [release packaging](release.md) for archive contents and
@@ -122,28 +119,3 @@ change is ready. Differential checks compare the compiler's diagnostics, Wasm,
 and runtime results across both builds. Benchmark reports distinguish Blaze's
 Nix bootstrap and daemon cold start from repeated edits, and distinguish Rust
 developer iteration from compilation of i programs.
-
-## Initial environment validation
-
-On 2026-10-29, the pinned x86_64 Linux environment completed its tool version
-check, the full `tools:blaze-smoke` task, the iLang `dev:build` task, and
-`i-dev --help`. Package-selected Blaze tests also passed all 122 Rust unit
-and integration tests across the four default workspace members, including
-cross-module LSP protocol tests. These are development smoke observations from
-a changing checkout with concurrent work, not the controlled performance results in
-[the benchmark guide](performance.md).
-
-| Stage | Observed duration | Measurement scope |
-| --- | --- | --- |
-| First Nix build of the pinned Blaze distribution | Not measured | No reliable elapsed-time record was retained. |
-| Nix build with the upstream cache-path backport | Not measured | Built successfully; its elapsed time was not independently recorded. |
-| Generated two-package Cargo/Blaze smoke task | 105 s | Latest Devenv task duration, including manifest-only feature invalidation, both toolchains, and edit/restart checks. |
-| First successful iLang Blaze build | 54.85 s | Blaze-reported build duration after earlier failed attempts had populated caches. |
-| Subsequent `i-dev --help` | 17.03 s | Blaze-reported build portion while source changes were still occurring. |
-| Frozen-source iLang build after daemon restart | 23.90 s | Full Devenv command; Blaze reported 23.67 s. Nix was already realized and the disk cache was populated. |
-
-These observations do not establish empty-cache or repeated unchanged-build
-performance. Measure those separately against a frozen source snapshot, with
-the Nix bootstrap outside the timed project build. The frozen-source build's
-command, scope, artifact hash, and elapsed time were saved for this run in
-`target/verification/environment-final-blaze.json`.

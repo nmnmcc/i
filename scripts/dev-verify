@@ -2,16 +2,11 @@
 set -euo pipefail
 cd "${ILANG_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
 export CARGO_TARGET_DIR="${ILANG_CARGO_TARGET_DIR:-$PWD/target/cargo}"
+git submodule update --init crates/ilang-binaryen/binaryen
 cargo fmt --all -- --check
-cargo fmt --manifest-path compiler/Cargo.toml --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked "$@"
-cargo test --manifest-path compiler/Cargo.toml --workspace --locked
 cargo build --workspace --locked
-cargo build --release --locked -p ilang-runner
-python3 scripts/conformance.py \
-  --compiler "$CARGO_TARGET_DIR/debug/i" \
-  --runner "$CARGO_TARGET_DIR/release/ilang-runner"
 npm ci --ignore-scripts
 npm test
 npm run test:browser

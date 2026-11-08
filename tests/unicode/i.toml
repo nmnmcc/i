@@ -1,6 +1,0 @@
-name = "unicode_conformance"
-version = "0.1.0"
-target = "wasm"
-
-[dependencies]
-i_stdlib = { path = "../../stdlib" }
