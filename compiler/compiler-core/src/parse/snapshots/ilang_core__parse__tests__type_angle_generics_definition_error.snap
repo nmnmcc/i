@@ -20,5 +20,3 @@ error: Syntax error
 Type parameters use lowercase names and are surrounded by parentheses.
 
     type Either(a, b) {
-
-See: https://tour.gleam.run/data-types/generic-custom-types/

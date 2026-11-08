@@ -13,4 +13,3 @@ error: Invalid bit array segment
   │                     ^^^^^^^ This is an extra unit specifier
 
 Hint: A BitArray segment can have at most 1 unit.
-See: https://tour.gleam.run/data-types/bit-arrays/

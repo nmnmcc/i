@@ -5,7 +5,7 @@ expression: "\n/// Wibble's documentation\npub type Wibble(a, b) {\n  Wibble\n  
 {
   "name": "my_package",
   "version": "11.10.9-1.wibble+build",
-  "ilang-version-constraint": "1.0.0",
+  "i-version-constraint": "1.0.0",
   "modules": {
     "my/module": {
       "documentation": [],

@@ -2,7 +2,7 @@
 ////
 //// ## Division by zero
 ////
-//// In Erlang division by zero results in a crash, however Gleam does not have
+//// In Erlang division by zero results in a crash, however i does not have
 //// partial functions and operators in core so instead division by zero returns
 //// zero, a behaviour taken from Pony, Coq, and Lean.
 ////

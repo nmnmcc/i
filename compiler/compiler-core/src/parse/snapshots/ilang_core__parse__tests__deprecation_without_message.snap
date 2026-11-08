@@ -16,5 +16,3 @@ error: Syntax error
   │
 2 │ @deprecated()
   │ ^^^^^^^^^^^ A deprecation attribute must have a string message.
-
-See: https://tour.gleam.run/functions/deprecations/

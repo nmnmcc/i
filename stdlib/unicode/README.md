@@ -2,7 +2,7 @@
 
 iLang's string functions use the Unicode **17.0.0** character database and the
 extended grapheme-cluster rules in **UAX #29 revision 47**. They use the same
-tables and Gleam implementation on every Wasm host.
+tables and i implementation on every Wasm host.
 
 `manifest.json` records the exact upstream URLs and SHA-256 hashes of every
 vendored source. The Unicode data license is in `LICENSE.txt`. The generator
@@ -13,7 +13,6 @@ From the repository root:
 ```sh
 python3 stdlib/unicode/generate.py
 python3 stdlib/unicode/generate.py --check
-python3 stdlib/unicode/test_reference.py
 ```
 
 The generator uses only Python's standard library and the pinned reference
@@ -43,8 +42,5 @@ Generated conformance cases cover every boundary vector from the Unicode 17
 additional handwritten tests cover contextual sigma, empty strings, whitespace
 classification, scalar preservation, and expansion ordering.
 
-`test_reference.py` runs these exact Gleam algorithms and assertions with the
-pinned reference compiler on Erlang, using only an UTF-8 decode/encode shim.
-This checks source-level conformance independently of the Wasm backend. The
-production Wasm conformance tests additionally check Wasm code generation and
-its scalar conversion intrinsics.
+The production Wasm conformance tests run these algorithms and assertions,
+including Wasm code generation and its scalar conversion intrinsics.

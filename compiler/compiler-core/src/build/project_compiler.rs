@@ -295,10 +295,7 @@ where
         result
     }
 
-    fn compile_i_dep_package(
-        &mut self,
-        package: &ManifestPackage,
-    ) -> Result<Vec<Module>, Error> {
+    fn compile_i_dep_package(&mut self, package: &ManifestPackage) -> Result<Vec<Module>, Error> {
         // TODO: Test
         let package_root = match &package.source {
             // If the path is relative it is relative to the root of the

@@ -6,7 +6,7 @@ Run the migrated suite with the iLang CLI:
 i --project stdlib test
 ```
 
-The source is `i_stdlib` v1.0.5, commit
+The source is `gleam_stdlib` v1.0.5, commit
 `5b0642a77a38f984db5913548b84668652ca8b5c`. Original files are retained
 byte-for-byte in `reference/` with `.reference` appended to their names, so the
 compiler does not accidentally analyse a legacy platform fixture.

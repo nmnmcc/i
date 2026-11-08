@@ -1,16 +1,16 @@
 ---
 source: compiler-core/src/type_/tests/errors.rs
-expression: "!\"Hello Gleam\""
+expression: "!\"Hello i\""
 ---
 ----- SOURCE CODE
-!"Hello Gleam"
+!"Hello i"
 
 ----- ERROR
 error: Type mismatch
   ┌─ /src/one/two.i:1:2
   │
-1 │ !"Hello Gleam"
-  │  ^^^^^^^^^^^^^
+1 │ !"Hello i"
+  │  ^^^^^^^^^
 
 Expected type:
 

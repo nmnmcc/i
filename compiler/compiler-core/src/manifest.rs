@@ -427,8 +427,8 @@ packages = [
   { name = "awsome_local1", version = "1.2.3", build_tools = ["i"], requirements = [], source = "local", path = "../path/to/package" },
   { name = "awsome_local2", version = "1.2.3", build_tools = ["i"], requirements = [], source = "git", repo = "https://github.com/gleam-lang/gleam.git", commit = "bd9fe02f72250e6a136967917bcb1bdccaffa3c8" },
   { name = "awsome_local3", version = "1.2.3", build_tools = ["i"], requirements = [], source = "git", repo = "https://github.com/gleam-lang/gleam.git", commit = "bd9fe02f72250e6a136967917bcb1bdccaffa3c8", path = "packages/sub" },
-  { name = "i_stdlib", version = "0.17.1", build_tools = ["i"], requirements = [], source = "hex", outer_checksum = "0116" },
   { name = "gleeunit", version = "0.4.0", build_tools = ["i"], requirements = ["i_stdlib"], source = "hex", outer_checksum = "032E" },
+  { name = "i_stdlib", version = "0.17.1", build_tools = ["i"], requirements = [], source = "hex", outer_checksum = "0116" },
   { name = "zzz", version = "0.4.0", build_tools = ["mix"], requirements = [], source = "hex", outer_checksum = "0316" },
 ]
 
@@ -437,8 +437,8 @@ aaa = { version = "> 0.0.0" }
 awsome_local1 = { path = "../path/to/package" }
 awsome_local2 = { git = "https://github.com/gleam-lang/gleam.git", ref = "bd9fe02f" }
 awsome_local3 = { git = "https://github.com/gleam-lang/gleam.git", ref = "bd9fe02f", path = "packages/sub" }
-i_stdlib = { version = "~> 0.17" }
 gleeunit = { version = "~> 0.1" }
+i_stdlib = { version = "~> 0.17" }
 zzz = { version = "> 0.0.0" }
 "#
         );
@@ -582,8 +582,8 @@ packages = [
   { name = "aaa", version = "0.4.0", build_tools = ["rebar3", "make"], requirements = ["i_stdlib", "zzz"], otp_app = "aaa_app", source = "hex", outer_checksum = "0316" },
   { name = "awsome_local1", version = "1.2.3", build_tools = ["i"], requirements = [], source = "local", path = "../path/to/package" },
   { name = "awsome_local2", version = "1.2.3", build_tools = ["i"], requirements = [], source = "git", repo = "https://github.com/gleam-lang/gleam.git", commit = "bd9fe02f72250e6a136967917bcb1bdccaffa3c8" },
-  { name = "i_stdlib", version = "0.17.1", build_tools = ["i"], requirements = [], source = "hex", outer_checksum = "0116" },
   { name = "gleeunit", version = "0.4.0", build_tools = ["i"], requirements = ["i_stdlib"], source = "hex", outer_checksum = "032E" },
+  { name = "i_stdlib", version = "0.17.1", build_tools = ["i"], requirements = [], source = "hex", outer_checksum = "0116" },
   { name = "zzz", version = "0.4.0", build_tools = ["mix"], requirements = [], source = "hex", outer_checksum = "0316" },
 ]
 
@@ -591,8 +591,8 @@ packages = [
 aaa = { version = "> 0.0.0" }
 awsome_local1 = { path = "../path/to/package" }
 awsome_local2 = { git = "https://github.com/gleam-lang/gleam.git", ref = "main" }
-i_stdlib = { version = "~> 0.17" }
 gleeunit = { version = "~> 0.1" }
+i_stdlib = { version = "~> 0.17" }
 zzz = { version = "> 0.0.0" }
 "#
         );

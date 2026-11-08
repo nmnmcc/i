@@ -2880,8 +2880,7 @@ pub fn main() {
 
     assert_code_action!(
         "Import `i/io`",
-        TestProject::for_source(src)
-            .add_hex_module("i/io", "pub fn println(message: String) {}"),
+        TestProject::for_source(src).add_hex_module("i/io", "pub fn println(message: String) {}"),
         find_position_of("io").select_until(find_position_of("."))
     );
 }
@@ -2924,8 +2923,7 @@ pub fn main() {
 
     assert_code_action!(
         "Did you mean `io`",
-        TestProject::for_source(src)
-            .add_hex_module("i/io", "pub fn println(message: String) {}"),
+        TestProject::for_source(src).add_hex_module("i/io", "pub fn println(message: String) {}"),
         find_position_of("i.").select_until(find_position_of("println"))
     );
 }
@@ -6846,7 +6844,7 @@ pub fn main() {
   io.debug(c)
 }"#,
         find_position_of("l")
-            .nth_occurrence(2)
+            .nth_occurrence(1)
             .select_until(find_position_of("c"))
     );
 }
@@ -6877,7 +6875,7 @@ pub fn main() {
   bits
 }"#,
         find_position_of("l")
-            .nth_occurrence(2)
+            .nth_occurrence(1)
             .select_until(find_position_of("s").nth_occurrence(2))
     );
 }
@@ -6904,8 +6902,8 @@ pub fn main() {
   io.print(twelve)
 }"#,
         find_position_of("l")
-            .nth_occurrence(2)
-            .select_until(find_position_of("e").nth_occurrence(4))
+            .nth_occurrence(1)
+            .select_until(find_position_of("e").nth_occurrence(3))
     );
 }
 
@@ -6931,7 +6929,7 @@ pub fn main() {
   io.debug(c)
 }"#,
         find_position_of("l")
-            .nth_occurrence(2)
+            .nth_occurrence(1)
             .select_until(find_position_of("c"))
     );
 }
@@ -6958,7 +6956,7 @@ pub fn main() {
   io.debug(c)
 }"#,
         find_position_of("l")
-            .nth_occurrence(2)
+            .nth_occurrence(1)
             .select_until(find_position_of("c"))
     );
 }
@@ -6996,7 +6994,7 @@ pub fn main() {
   io.debug(c)
 }"#,
         find_position_of("l")
-            .nth_occurrence(2)
+            .nth_occurrence(1)
             .select_until(find_position_of("c"))
     );
 }
@@ -7023,7 +7021,7 @@ pub fn main() {
   io.debug(c)
 }"#,
         find_position_of("l")
-            .nth_occurrence(2)
+            .nth_occurrence(1)
             .select_until(find_position_of("c"))
     );
 }
@@ -7052,7 +7050,7 @@ pub fn main() {
   io.debug(c)
 }"#,
         find_position_of("l")
-            .nth_occurrence(2)
+            .nth_occurrence(1)
             .select_until(find_position_of("c"))
     );
 }
@@ -7662,7 +7660,7 @@ pub fn main() {
   c
 }"#,
         find_position_of("l")
-            .nth_occurrence(3)
+            .nth_occurrence(2)
             .select_until(find_position_of("c"))
     );
 }
@@ -9229,11 +9227,7 @@ pub type Person {
 
     assert_code_action!(
         GENERATE_TO_JSON_FUNCTION,
-        TestProject::for_source(src).add_package_module(
-            "gleam_json",
-            "i/json",
-            "pub type Json"
-        ),
+        TestProject::for_source(src).add_package_module("gleam_json", "i/json", "pub type Json"),
         find_position_of("type").to_selection()
     );
 }
@@ -9253,11 +9247,7 @@ pub fn main() {
 
     assert_no_code_actions!(
         GENERATE_TO_JSON_FUNCTION,
-        TestProject::for_source(src).add_package_module(
-            "gleam_json",
-            "i/json",
-            "pub type Json"
-        ),
+        TestProject::for_source(src).add_package_module("gleam_json", "i/json", "pub type Json"),
         find_position_of("type").select_until(find_position_of("todo"))
     );
 }
@@ -9332,11 +9322,7 @@ pub type Wibble {
 
     assert_code_action!(
         GENERATE_TO_JSON_FUNCTION,
-        TestProject::for_source(src).add_package_module(
-            "gleam_json",
-            "i/json",
-            "pub type Json"
-        ),
+        TestProject::for_source(src).add_package_module("gleam_json", "i/json", "pub type Json"),
         find_position_of("type W").to_selection()
     );
 }
@@ -9364,11 +9350,7 @@ pub type Wibble {
 
     assert_code_action!(
         GENERATE_TO_JSON_FUNCTION,
-        TestProject::for_source(src).add_package_module(
-            "gleam_json",
-            "i/json",
-            "pub type Json"
-        ),
+        TestProject::for_source(src).add_package_module("gleam_json", "i/json", "pub type Json"),
         find_position_of("type W").to_selection()
     );
 }
@@ -9383,11 +9365,7 @@ pub type Wibble {
 
     assert_code_action!(
         GENERATE_TO_JSON_FUNCTION,
-        TestProject::for_source(src).add_package_module(
-            "gleam_json",
-            "i/json",
-            "pub type Json"
-        ),
+        TestProject::for_source(src).add_package_module("gleam_json", "i/json", "pub type Json"),
         find_position_of("type W").to_selection()
     );
 }
@@ -9404,11 +9382,7 @@ pub type Wibble {
 
     assert_code_action!(
         GENERATE_TO_JSON_FUNCTION,
-        TestProject::for_source(src).add_package_module(
-            "gleam_json",
-            "i/json",
-            "pub type Json"
-        ),
+        TestProject::for_source(src).add_package_module("gleam_json", "i/json", "pub type Json"),
         find_position_of("type W").to_selection()
     );
 }
@@ -9424,11 +9398,7 @@ pub type Wibble {
 
     assert_code_action!(
         GENERATE_TO_JSON_FUNCTION,
-        TestProject::for_source(src).add_package_module(
-            "gleam_json",
-            "i/json",
-            "pub type Json"
-        ),
+        TestProject::for_source(src).add_package_module("gleam_json", "i/json", "pub type Json"),
         find_position_of("type W").to_selection()
     );
 }
@@ -9494,11 +9464,7 @@ pub type Wibble {
 
     assert_code_action!(
         GENERATE_TO_JSON_FUNCTION,
-        TestProject::for_source(src).add_package_module(
-            "gleam_json",
-            "i/json",
-            "pub type Json"
-        ),
+        TestProject::for_source(src).add_package_module("gleam_json", "i/json", "pub type Json"),
         find_position_of("type").to_selection()
     );
 }
@@ -9514,11 +9480,7 @@ pub type Wibble {
 
     assert_code_action!(
         GENERATE_TO_JSON_FUNCTION,
-        TestProject::for_source(src).add_package_module(
-            "gleam_json",
-            "i/json",
-            "pub type Json"
-        ),
+        TestProject::for_source(src).add_package_module("gleam_json", "i/json", "pub type Json"),
         find_position_of("type").to_selection()
     );
 }
@@ -9535,11 +9497,7 @@ pub type Wibble {
 
     assert_code_action!(
         GENERATE_TO_JSON_FUNCTION,
-        TestProject::for_source(src).add_package_module(
-            "gleam_json",
-            "i/json",
-            "pub type Json"
-        ),
+        TestProject::for_source(src).add_package_module("gleam_json", "i/json", "pub type Json"),
         find_position_of("type").to_selection()
     );
 }
@@ -9659,11 +9617,7 @@ pub type Wibble {
 
     assert_no_code_actions!(
         GENERATE_TO_JSON_FUNCTION,
-        TestProject::for_source(src).add_package_module(
-            "gleam_json",
-            "i/json",
-            "pub type Json"
-        ),
+        TestProject::for_source(src).add_package_module("gleam_json", "i/json", "pub type Json"),
         find_position_of("type").to_selection()
     );
 }
@@ -9783,10 +9737,8 @@ pub fn main() {
 "#;
     assert_no_code_actions!(
         INLINE_VARIABLE,
-        TestProject::for_source(src).add_module(
-            "i/io",
-            "pub fn println(value) {} pub fn debug(value) {}"
-        ),
+        TestProject::for_source(src)
+            .add_module("i/io", "pub fn println(value) {} pub fn debug(value) {}"),
         find_position_of("message =").to_selection()
     );
 }
@@ -14168,11 +14120,7 @@ pub type Wobble {
         GENERATE_DYNAMIC_DECODER,
         TestProject::for_source(src)
             .add_module("wibble", "pub type Wibble { Wibble }")
-            .add_package_module(
-                "i_stdlib",
-                "i/dynamic/decode",
-                "pub type Decoder(a)"
-            ),
+            .add_package_module("i_stdlib", "i/dynamic/decode", "pub type Decoder(a)"),
         find_position_of("pub type Wobble {").select_until(find_position_of("}").nth_occurrence(2))
     );
 }
@@ -14214,11 +14162,7 @@ pub type Wibble { Wibble(value: NestedWibble) }
 pub type NestedWibble { NestedWibble }
 "#
             )
-            .add_package_module(
-                "i_stdlib",
-                "i/dynamic/decode",
-                "pub type Decoder(a)"
-            ),
+            .add_package_module("i_stdlib", "i/dynamic/decode", "pub type Decoder(a)"),
         find_position_of("pub type Wobble {").select_until(find_position_of("}").nth_occurrence(2))
     );
 }
@@ -14250,11 +14194,7 @@ pub type Dict(key, value)
 pub fn new() -> Dict(k, v) { todo }
 "#
             )
-            .add_package_module(
-                "i_stdlib",
-                "i/dynamic/decode",
-                "pub type Decoder(a)"
-            ),
+            .add_package_module("i_stdlib", "i/dynamic/decode", "pub type Decoder(a)"),
         find_position_of("pub type Wobble {").select_until(find_position_of("}").nth_occurrence(2))
     );
 }
@@ -14273,11 +14213,7 @@ pub type Wobble {
         GENERATE_DYNAMIC_DECODER,
         TestProject::for_source(src)
             .add_hex_module("wibble", "pub type Wibble { Wibble }")
-            .add_package_module(
-                "i_stdlib",
-                "i/dynamic/decode",
-                "pub type Decoder(a)"
-            ),
+            .add_package_module("i_stdlib", "i/dynamic/decode", "pub type Decoder(a)"),
         find_position_of("pub type Wobble {").select_until(find_position_of("}").nth_occurrence(2))
     );
 }
@@ -14341,11 +14277,7 @@ pub type Wobble {
         GENERATE_DYNAMIC_DECODER,
         TestProject::for_source(src)
             .add_hex_module("wibble", "pub type Wibble { Wibble }")
-            .add_package_module(
-                "i_stdlib",
-                "i/dynamic/decode",
-                "pub type Decoder(a)"
-            ),
+            .add_package_module("i_stdlib", "i/dynamic/decode", "pub type Decoder(a)"),
         find_position_of("pub type Wobble {").select_until(find_position_of("}").nth_occurrence(2))
     );
 }

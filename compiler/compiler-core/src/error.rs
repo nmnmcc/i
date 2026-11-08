@@ -2569,7 +2569,7 @@ function and try again.",
         }
 
         TypeError::BitArraySegmentError { error, location } => {
-            let (label, mut extra) = match error {
+            let (label, extra) = match error {
                 bit_array::ErrorType::ConflictingTypeOptions { existing_type } => (
                     "This is an extra type specifier",
                     vec![format!(
@@ -3562,10 +3562,7 @@ with no constructors."
         TypeError::LowercaseBoolPattern { location } => Diagnostic {
             title: "Lowercase bool pattern".to_string(),
             text: "".into(),
-            hint: Some(
-                "In i bool literals are `True` and `False`."
-                    .into(),
-            ),
+            hint: Some("In i bool literals are `True` and `False`.".into()),
             level: Level::Error,
             location: Some(Location {
                 label: Label {

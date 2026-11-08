@@ -7,7 +7,7 @@ The i programming language (iLang) started from Gleam. Its parser, type checker,
 | [Gleam](https://github.com/gleam-lang/gleam) | v1.19.2 | ed41eace2dd89054eb2d744c33925261d1eff32e | Apache-2.0 |
 | [gleam_stdlib](https://github.com/gleam-lang/stdlib) | v1.0.5 | 5b0642a77a38f984db5913548b84668652ca8b5c | Apache-2.0 |
 
-The vendored frontend is maintained as a Wasm-specific derivative. Original SPDX headers and copyright notices are retained. i additions are Apache-2.0 licensed. The Rust and JavaScript hosting SDKs are part of i; they do not replace the language's Wasm runtime.
+The derived compiler lives in `compiler/` and the derived standard library in `stdlib/`; both are maintained as part of i. Modified files are renamed or reorganised (for example `gleam/*` modules became `i/*`, sources use `.i`, manifests use `i.toml`). Original SPDX headers and copyright notices are retained. i additions are Apache-2.0 licensed. The Rust and JavaScript hosting SDKs are part of i; they do not replace the language's Wasm runtime.
 
 Unicode algorithms use the pinned Unicode 17.0.0 data and its retained license;
 the data inventory and regeneration instructions are in

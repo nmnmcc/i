@@ -13,9 +13,9 @@ import i/wibble.{type Wobble}
 
 ----- ERROR
 error: Unknown module type
-  ┌─ /src/one/two.i:1:22
+  ┌─ /src/one/two.i:1:18
   │
 1 │ import i/wibble.{type Wobble}
-  │                      ^^^^^^^^^^^ Did you mean `Wobble`?
+  │                  ^^^^^^^^^^^ Did you mean `Wobble`?
 
 `Wobble` is only a value, it cannot be imported as a type.

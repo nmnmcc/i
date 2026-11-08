@@ -22,7 +22,7 @@ fn literal(text: &str) -> String {
 pub fn wat() -> String {
     let mut source = r#"
   ;; Quoting works on UTF-8 bytes. C0, DEL and the UTF-8 encoded C1 controls use
-  ;; Gleam escapes; all other valid UTF-8 is copied unchanged.
+  ;; i escapes; all other valid UTF-8 is copied unchanged.
   (func $inspect_quote (param $s eqref) (result eqref)
     (local $bytes (ref $bytes)) (local $n i32) (local $size i32)
     (local $ptr i32) (local $out i32) (local $i i32) (local $b i32)

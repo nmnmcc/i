@@ -13,4 +13,3 @@ error: Invalid bit array segment
   │                        ^^^^^^^ Size cannot be specified here
 
 Hint: utf32 segments have an automatic size.
-See: https://tour.gleam.run/data-types/bit-arrays/

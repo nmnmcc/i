@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Opaque host-owned reference. The compiler maps constructor-free types to
-/// externref; no Gleam record or collection is exported through this interface.
+/// externref; no i record or collection is exported through this interface.
 pub type HostReference
 
 @external(wasm, "custom", "echo_int")

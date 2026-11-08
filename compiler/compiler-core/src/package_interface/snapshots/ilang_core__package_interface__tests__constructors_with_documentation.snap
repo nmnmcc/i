@@ -5,7 +5,7 @@ expression: "\npub type Wibble {\n  /// This is the Wibble variant. It contains 
 {
   "name": "my_package",
   "version": "11.10.9-1.wibble+build",
-  "ilang-version-constraint": "1.0.0",
+  "i-version-constraint": "1.0.0",
   "modules": {
     "my/module": {
       "documentation": [],
@@ -26,7 +26,7 @@ expression: "\npub type Wibble {\n  /// This is the Wibble variant. It contains 
                     "kind": "named",
                     "name": "Int",
                     "package": "",
-                    "module": "gleam",
+                    "module": "i",
                     "parameters": []
                   }
                 }

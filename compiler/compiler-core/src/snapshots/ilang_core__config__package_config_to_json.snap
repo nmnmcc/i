@@ -1,6 +1,5 @@
 ---
 source: compiler-core/src/config.rs
-assertion_line: 1339
 expression: output
 ---
 --- GLEAM.TOML
@@ -34,7 +33,7 @@ exports = ["my_project.main", "my_project/math.add"]
 {
   "name": "my_project",
   "version": "1.0.0",
-  "gleam": ">= 0.30.0",
+  "i": ">= 0.30.0",
   "licences": [
     "Apache-2.0",
     "MIT"

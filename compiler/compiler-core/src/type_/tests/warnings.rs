@@ -370,10 +370,7 @@ fn used_destructure() {
 
 #[test]
 fn unused_imported_module_warnings_test() {
-    assert_warning!(
-        ("i/wibble", "pub fn wobble() { 1 }"),
-        "import i/wibble"
-    );
+    assert_warning!(("i/wibble", "pub fn wobble() { 1 }"), "import i/wibble");
 }
 
 #[test]
@@ -437,11 +434,7 @@ fn unused_imported_module_no_warning_on_used_unqualified_type_test() {
 #[test]
 fn imported_module_with_alias_no_warning_when_only_used_in_case_test() {
     assert_no_warnings!(
-        (
-            "thepackage",
-            "i/wibble",
-            "pub type Wibble { Wibble(Int) }"
-        ),
+        ("thepackage", "i/wibble", "pub type Wibble { Wibble(Int) }"),
         "import i/wibble as f\npub fn wibble(a) { case a { f.Wibble(int) -> { int } }  }",
     );
 }

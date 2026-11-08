@@ -26,5 +26,3 @@ A case expression can take multiple subjects separated by commas like this:
     case one_subject, another_subject {
       _, _ -> todo
     }
-
-See: https://tour.gleam.run/flow-control/multiple-subjects/

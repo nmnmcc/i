@@ -1,11 +1,11 @@
 ---
 source: language-server/src/tests/completion.rs
-expression: "//// Main package\n//// documentation!\n\nimport gleam\n\npub fn main() {\n  0\n}"
+expression: "//// Main package\n//// documentation!\n\nimport i\n\npub fn main() {\n  0\n}"
 ---
 //// Main package
 //// documentation!
 
-import gle|am
+import i|
 
 pub fn main() {
   0
@@ -16,4 +16,4 @@ pub fn main() {
 example_module
   kind:   Module
   edits:
-    [3:7-3:12]: "example_module"
+    [3:7-3:8]: "example_module"

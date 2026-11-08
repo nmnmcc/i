@@ -11,5 +11,3 @@ error: Invalid bit array segment
   │
 1 │ let assert <<1:size(-1)>> = <<>>
   │                ^^^^^^^^ A constant size must be a positive number
-
-See: https://tour.gleam.run/data-types/bit-arrays/

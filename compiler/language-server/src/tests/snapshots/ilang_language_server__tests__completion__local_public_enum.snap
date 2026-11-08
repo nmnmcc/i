@@ -12,11 +12,11 @@ pub type Direction {
 ----- Completion content -----
 Error
   kind:   Constructor
-  detail: gleam
+  detail: i
   sort:   5_Error
 False
   kind:   EnumMember
-  detail: gleam
+  detail: i
   sort:   5_False
 Left
   kind:   EnumMember
@@ -27,11 +27,11 @@ Left
     [1:0-1:0]: "Left"
 Nil
   kind:   EnumMember
-  detail: gleam
+  detail: i
   sort:   5_Nil
 Ok
   kind:   Constructor
-  detail: gleam
+  detail: i
   sort:   5_Ok
 Right
   kind:   EnumMember
@@ -42,5 +42,5 @@ Right
     [1:0-1:0]: "Right"
 True
   kind:   EnumMember
-  detail: gleam
+  detail: i
   sort:   5_True

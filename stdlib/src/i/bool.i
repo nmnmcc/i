@@ -206,7 +206,7 @@ pub fn to_string(bool: Bool) -> String {
 /// // ...
 /// ```
 ///
-/// In Gleam with a `use` expression:
+/// In i with a `use` expression:
 ///
 /// ```i
 /// use <- bool.guard(when: predicate, return: value)
@@ -214,7 +214,7 @@ pub fn to_string(bool: Bool) -> String {
 /// // ...
 /// ```
 ///
-/// Like everything in Gleam `use` is an expression, so it short circuits the
+/// Like everything in i `use` is an expression, so it short circuits the
 /// current block, not the entire function. As a result you can assign the value
 /// to a variable:
 ///

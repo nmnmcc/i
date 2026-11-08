@@ -4,7 +4,7 @@
 
 i programs live in `.i` files, and each project is described by an `i.toml` manifest. The command-line tool is just `i`.
 
-The runtime contract is shared by browsers and Wasmtime: arbitrary-precision integers, UTF-8 strings, immutable GC-managed values, typed function references and tail calls. i is written in Rust. Its frontend, formatter and language server started from Gleam 1.19.2, and its standard library started from i_stdlib 1.0.5. i is now developed as an independent language; see [upstream provenance](UPSTREAM.md).
+The runtime contract is shared by browsers and Wasmtime: arbitrary-precision integers, UTF-8 strings, immutable GC-managed values, typed function references and tail calls. i is written in Rust. Its frontend, formatter and language server started from Gleam 1.19.2, and its standard library started from gleam_stdlib 1.0.5. i is now developed as an independent language; see [upstream provenance](UPSTREAM.md).
 
 The repository includes a Devenv development environment and a pinned Blaze development build. Standard Cargo with the project's fixed Rust version remains the verification and release toolchain.
 
@@ -53,6 +53,10 @@ Use `build --json` to inspect cache counters, or `--no-cache` to recompute them.
 Changing a dependency's implementation preserves its callers' cached frontend
 and IR results when the public interface stays the same.
 
+## Editor support
+
+[`editors/vscode`](editors/vscode) is a VS Code extension for `.i` files: syntax highlighting, editing rules and the `i lsp` language server. See its README for installation.
+
 ## Host a library
 
 Put `.i` sources in `src/` and `test/` next to an `i.toml`, with `target = "wasm"` or no explicit target. Local dependencies use `{ path = "../package" }`. The bundled standard library is available without a registry download.
@@ -75,9 +79,13 @@ const result = program.call("calculator.add", [2n, 3n]);
 
 Foreign functions use `@external(wasm, "module", "function")`. The versioned ABI supports booleans, floats, arbitrary-precision integers, strings, bit arrays, `Nil` and opaque host references. Compound data and callbacks require explicit application-level encoding. Integer arithmetic executes inside Wasm; JavaScript `BigInt` is used for boundary conversion.
 
+## Language definition
+
+The language is defined in [docs/spec.md](docs/spec.md). The present compiler does not yet do everything in it.
+
 ## Compatibility and verification
 
-The target requires WasmGC, typed function references and tail calls. See [the compatibility inventory](docs/compatibility.md) and [performance methodology](docs/performance.md) for the executable coverage and measurement procedure. CI checks both Rust toolchains and runs the generated Wasm under Wasmtime and browser engines; performance numbers are recorded only after measurement.
+The target requires WasmGC, typed function references and tail calls. See the [conformance guide](tests/conformance/README.md) and [performance methodology](docs/performance.md) for the executable coverage and measurement procedure. CI checks both Rust toolchains and runs the generated Wasm under Wasmtime and browser engines; performance numbers are recorded only after measurement.
 
 This project preserves [upstream provenance](UPSTREAM.md) and is distributed under the [Apache-2.0 license](LICENSE).
 

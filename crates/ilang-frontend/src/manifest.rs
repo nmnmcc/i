@@ -245,8 +245,7 @@ impl Resolver {
         self.names.insert(name.clone(), root.clone());
         self.stack.push((name.clone(), root.clone()));
         let is_root = root == self.root;
-        if is_root && let Some(Requirement::Path { path }) = config.dependencies.get("i_stdlib")
-        {
+        if is_root && let Some(Requirement::Path { path }) = config.dependencies.get("i_stdlib") {
             self.stdlib = Some(canonical_directory(&root.join(path.as_std_path()))?);
         }
         if config.name != "i_stdlib" && !config.dependencies.contains_key("i_stdlib") {
@@ -371,7 +370,7 @@ fn read_config(path: &Path) -> Result<PackageConfig, Error> {
     let config: PackageConfig = value
         .try_into()
         .map_err(|error| Error::project(path, format!("Invalid package configuration: {error}")))?;
-    config.check_i_compatibility().map_err(Error::Gleam)?;
+    config.check_i_compatibility().map_err(Error::Core)?;
     Ok(config)
 }
 

@@ -6,7 +6,7 @@ import i/dict
 ///
 /// This module contains code for forming dynamic data, and the
 /// `i/dynamic/decode` module contains code for turning dynamic data back
-/// into Gleam data with known types. You will likely mostly use the other
+/// into i data with known types. You will likely mostly use the other
 /// module in your projects.
 ///
 /// Dynamic values retain the runtime type of the original WasmGC value.
@@ -83,7 +83,7 @@ pub fn properties(entries: List(#(Dynamic, Dynamic))) -> Dynamic {
 
 /// A dynamic value representing nothing.
 ///
-/// This is the Gleam `Nil` value with its static type erased.
+/// This is the i `Nil` value with its static type erased.
 ///
 pub fn nil() -> Dynamic {
   cast(Nil)

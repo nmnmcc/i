@@ -1,12 +1,11 @@
 ---
 source: compiler-core/src/package_interface/tests.rs
-assertion_line: 187
 expression: "\n//// Some package\n//// documentation!\n\npub fn main() { 1 }\n"
 ---
 {
   "name": "my_package",
   "version": "11.10.9-1.wibble+build",
-  "ilang-version-constraint": "1.0.0",
+  "i-version-constraint": "1.0.0",
   "modules": {
     "my/module": {
       "documentation": [
@@ -21,7 +20,7 @@ expression: "\n//// Some package\n//// documentation!\n\npub fn main() { 1 }\n"
           "documentation": null,
           "deprecation": null,
           "implementations": {
-            "gleam": true,
+            "pure": true,
             "can-run-on-wasm": true,
             "uses-wasm-externals": false
           },
@@ -30,7 +29,7 @@ expression: "\n//// Some package\n//// documentation!\n\npub fn main() { 1 }\n"
             "kind": "named",
             "name": "Int",
             "package": "",
-            "module": "gleam",
+            "module": "i",
             "parameters": []
           }
         }

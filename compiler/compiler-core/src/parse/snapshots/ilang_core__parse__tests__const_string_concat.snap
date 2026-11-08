@@ -33,7 +33,7 @@ Parsed {
                         type_: (),
                         deprecation: NotDeprecated,
                         implementations: Implementations {
-                            gleam: true,
+                            pure: true,
                             can_run_on_wasm: true,
                             uses_wasm_externals: false,
                         },
@@ -85,7 +85,7 @@ Parsed {
                         type_: (),
                         deprecation: NotDeprecated,
                         implementations: Implementations {
-                            gleam: true,
+                            pure: true,
                             can_run_on_wasm: true,
                             uses_wasm_externals: false,
                         },

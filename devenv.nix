@@ -150,8 +150,8 @@ in
     pkgs.hyperfine
     pkgs.time
     pkgs.playwright-driver.browsers
+    # Pinned Gleam 1.19.2 formatter for stdlib/unicode/generate.py.
     pkgs.gleam
-    pkgs.beamMinimalPackages.erlang
   ];
 
   env = {
@@ -162,7 +162,6 @@ in
     ILANG_BLAZE_BACKPORT = "7145b282f6c3adccee8f24b200cb0270eba477fc";
     ILANG_WASMTIME = "${wasmtime}/bin/wasmtime";
     ILANG_WASM_TOOLS = "${wasm-tools}/bin/wasm-tools";
-    ILANG_REFERENCE_GLEAM = "${pkgs.gleam}/bin/gleam";
     PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
     ILANG_PLAYWRIGHT_VERSION = pkgs.playwright-driver.version;
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";

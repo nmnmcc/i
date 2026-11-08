@@ -13,4 +13,4 @@ pub fn main() {
 dep
   kind:   Module
   edits:
-    [0:7-0:12]: "dep"
+    [0:7-0:8]: "dep"

@@ -1,12 +1,11 @@
 ---
 source: compiler-core/src/package_interface/tests.rs
-assertion_line: 318
 expression: "\npub fn fold(list: List(a), from acc: b, with f: fn(a, b) -> b) -> b {\n  todo\n}\n"
 ---
 {
   "name": "my_package",
   "version": "11.10.9-1.wibble+build",
-  "ilang-version-constraint": "1.0.0",
+  "i-version-constraint": "1.0.0",
   "modules": {
     "my/module": {
       "documentation": [],
@@ -18,7 +17,7 @@ expression: "\npub fn fold(list: List(a), from acc: b, with f: fn(a, b) -> b) ->
           "documentation": null,
           "deprecation": null,
           "implementations": {
-            "gleam": true,
+            "pure": true,
             "can-run-on-wasm": true,
             "uses-wasm-externals": false
           },
@@ -29,7 +28,7 @@ expression: "\npub fn fold(list: List(a), from acc: b, with f: fn(a, b) -> b) ->
                 "kind": "named",
                 "name": "List",
                 "package": "",
-                "module": "gleam",
+                "module": "i",
                 "parameters": [
                   {
                     "kind": "variable",

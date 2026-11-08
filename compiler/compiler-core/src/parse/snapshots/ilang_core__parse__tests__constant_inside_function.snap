@@ -17,7 +17,7 @@ error: Syntax error
 3 │   const x = 10
   │   ^^^^^ Constants are not allowed inside functions
 
-All variables are immutable in Gleam, so constants inside functions are not
+All variables are immutable in i, so constants inside functions are not
 necessary.
 
 Hint: Either move this into the global scope or use `let` binding instead.

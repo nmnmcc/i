@@ -13,4 +13,3 @@ error: Invalid bit array segment
   │             ^ Invalid float size
 
 Hint: floats have an exact size of 16/32/64 bits.
-See: https://tour.gleam.run/data-types/bit-arrays/

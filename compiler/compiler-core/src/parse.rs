@@ -4074,9 +4074,7 @@ where
             // invalid
             token => {
                 self.token0 = token;
-                self.next_token_unexpected(vec![
-                    "A valid bit array segment type".into(),
-                ])
+                self.next_token_unexpected(vec!["A valid bit array segment type".into()])
             }
         }
     }

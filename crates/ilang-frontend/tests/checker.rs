@@ -1,4 +1,4 @@
-//! End-to-end checking tests use real projects and the actual Gleam analyser.
+//! End-to-end checking tests use real projects and the actual i analyser.
 //! Cache assertions cover both reuse and invalidation of semantically relevant
 //! changes; comparing counters alone would miss accidentally stale typed trees.
 

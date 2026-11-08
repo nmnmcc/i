@@ -2,7 +2,7 @@
 source: language-server/src/tests/completion.rs
 expression: " import i\n\npub fn main() {\n  0\n}"
 ---
- i|mport gleam
+ i|mport i
 
 pub fn main() {
   0
@@ -13,4 +13,4 @@ pub fn main() {
 dep
   kind:   Module
   edits:
-    [0:7-0:13]: "dep"
+    [0:7-0:9]: "dep"

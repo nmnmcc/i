@@ -12,10 +12,10 @@ pub fn wibble() { two() }
 
 ----- WARNING
 warning: Unused imported module alias
-  ┌─ /src/warning/wrn.i:1:24
+  ┌─ /src/warning/wrn.i:1:20
   │
 1 │ import i/one.{two} as three
-  │                        ^^^^^^^^ This alias is never used
+  │                    ^^^^^^^^ This alias is never used
 
 Hint: You can safely remove it.
 

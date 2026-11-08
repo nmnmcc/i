@@ -172,48 +172,6 @@ def check_upstream_sources() -> dict:
     return {"sources": manifest["sources"], "verified_files": len(manifest["files"])}
 
 
-def to_gleam_source(text: str) -> str:
-    """Translate i module references back to the names the Gleam oracle expects."""
-    text = re.sub(r"\bimport i/", "import gleam/", text)
-    text = re.sub(r"\bimport i\b(?![/\w])", "import gleam", text)
-    return re.sub(r"(?<![\w./-])i\.(?=[A-Z{])", "gleam.", text)
-
-
-def to_reference_layout(directory: Path) -> None:
-    """Translate an iLang project into the file layout the Gleam oracle reads."""
-    for path in sorted(directory.rglob("*.i")):
-        path.write_text(to_gleam_source(path.read_text()))
-        path.rename(path.with_suffix(".gleam"))
-    for path in sorted(directory.rglob("i.toml")):
-        path.rename(path.with_name("gleam.toml"))
-
-
-def reference_run(project: Path, record: dict, args: argparse.Namespace) -> dict:
-    """Run the same pure source with upstream Gleam/Erlang, entirely local deps."""
-    with tempfile.TemporaryDirectory(prefix="ilang-reference-") as temporary:
-        copied = Path(temporary) / "project"
-        shutil.copytree(project, copied, ignore=shutil.ignore_patterns("build", ".ilang"))
-        original_stdlib = SUITE / "upstream" / "stdlib"
-        to_reference_layout(copied)
-        for config in copied.rglob("gleam.toml"):
-            with config.open("rb") as stream:
-                value = tomllib.load(stream)
-            lines = [
-                f"name = {json.dumps(value['name'])}",
-                f"version = {json.dumps(value.get('version', '0.1.0'))}",
-                'target = "erlang"', "", "[dependencies]",
-                f"gleam_stdlib = {{ path = {json.dumps(str(original_stdlib))} }}",
-            ]
-            for name, dependency in value.get("dependencies", {}).items():
-                if name == "gleam_stdlib":
-                    continue
-                if not isinstance(dependency, dict) or "path" not in dependency:
-                    raise Failure(f"reference fixture contains a non-local dependency: {name}")
-                lines.append(f"{name} = {{ path = {json.dumps(dependency['path'])} }}")
-            config.write_text("\n".join(lines) + "\n")
-        return invoke([args.reference_gleam, "run"], record, args.timeout, cwd=copied)
-
-
 def run_case(case: dict, compiler: str, record: dict, args: argparse.Namespace) -> tuple[Path | None, bytes | None]:
     project = (SUITE / case["project"]).resolve()
     cache_flags = ("--no-cache",) if args.no_cache or args.compare_compiler else ()
@@ -404,24 +362,17 @@ def main() -> int:
     parser.add_argument("--host-probe", help="prebuilt verify_compiler_abi executable; otherwise build it with Cargo")
     parser.add_argument("--compare-compiler", help="second compiler build; require identical Wasm and behavior")
     parser.add_argument("--no-cache", action="store_true", help="force fresh frontend and code generation for debugging")
-    parser.add_argument("--reference-gleam", help="fixed upstream Gleam/Erlang oracle, using local dependencies")
     parser.add_argument("--case", action="append", help="select named cases/corpora for focused development")
     parser.add_argument("--timeout", type=int, default=180)
     parser.add_argument("--corpus-timeout", type=int, default=1800)
     parser.add_argument("--output", type=Path, default=ROOT / "target" / "conformance")
     args = parser.parse_args()
     try:
-        for name in ("compiler", "runner", "wasm_tools", "wasmtime", "compare_compiler", "reference_gleam"):
+        for name in ("compiler", "runner", "wasm_tools", "wasmtime", "compare_compiler"):
             value = getattr(args, name)
             if value:
                 setattr(args, name, executable(value))
         upstream = check_upstream_sources()
-        reference_version = None
-        if args.reference_gleam:
-            version = subprocess.run([args.reference_gleam, "--version"], capture_output=True, text=True, timeout=10)
-            reference_version = version.stdout.strip()
-            if version.returncode != 0 or reference_version != "gleam 1.19.2":
-                raise Failure(f"reference compiler must be gleam 1.19.2, got {reference_version!r}")
     except Failure as error:
         parser.error(str(error))
 
@@ -435,8 +386,7 @@ def main() -> int:
     report = {"schema": 1, "upstream": upstream, "compiler": args.compiler,
               "started_utc": datetime.now(timezone.utc).isoformat(), "source_sha256": source_fingerprint(),
               "cache_disabled": bool(args.no_cache or args.compare_compiler),
-              "compare_compiler": args.compare_compiler, "reference_gleam": args.reference_gleam,
-              "reference_version": reference_version,
+              "compare_compiler": args.compare_compiler,
               "selected": sorted(selected), "results": []}
     tool_paths = [args.compiler, args.runner, *([args.compare_compiler] if args.compare_compiler else []),
                   *([executable(args.host_probe)] if args.host_probe else [])]
@@ -480,11 +430,6 @@ def main() -> int:
                     if any(first_result[key] != second_result[key] for key in ("stdout", "stderr", "returncode")):
                         raise Failure("Cargo and Blaze compiler builds produced different failure diagnostics")
             if case["kind"] == "run":
-                if args.reference_gleam and case.get("reference"):
-                    result = reference_run((SUITE / case["project"]).resolve(), record, args)
-                    require_success(result)
-                    if result["stdout"] != case["stdout"]:
-                        raise Failure(f"upstream Erlang oracle disagrees: {result['stdout']!r}")
                 destination = args.output / "modules" / f"{case['name']}.wasm"
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(path, destination)

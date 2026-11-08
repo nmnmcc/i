@@ -1,0 +1,24 @@
+---
+source: compiler-core/src/type_/tests/warnings.rs
+expression: "\n@internal\npub const wibble = 1\n"
+---
+----- SOURCE CODE
+
+@internal
+pub const wibble = 1
+
+
+----- WARNING
+warning: Incompatible i version range
+  ┌─ /src/warning/wrn.i:2:1
+  │
+2 │ @internal
+  │ ^^^^^^^^^ This requires an i version >= 0.1.0
+
+The `@internal` annotation was introduced in version v0.1.0. But the i
+version range specified in your `i.toml` would allow this code to run on an
+earlier version like v0.0.1, resulting in compilation errors!
+
+Hint: Remove the version constraint from your `i.toml` or update it to be:
+
+    i = ">= 0.1.0"

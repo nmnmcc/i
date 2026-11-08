@@ -1190,9 +1190,9 @@ import i
 
     // The import
     assert!(module.find_node(1).is_some());
-    assert!(module.find_node(12).is_some());
-    assert!(module.find_node(13).is_some());
-    assert!(module.find_node(14).is_none());
+    assert!(module.find_node(8).is_some());
+    assert!(module.find_node(9).is_some());
+    assert!(module.find_node(10).is_none());
 }
 
 #[test]

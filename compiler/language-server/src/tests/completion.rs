@@ -1224,7 +1224,7 @@ pub fn main() {
 
     assert_completion!(
         TestProject::for_source(code).add_test_module("my_tests", test),
-        Position::new(0, 10)
+        Position::new(0, 8)
     );
 }
 
@@ -1274,7 +1274,7 @@ pub fn dev_helper() {
 }
 ";
 
-    let position = Position::new(0, 12);
+    let position = Position::new(0, 8);
     let (mut engine, position_param) = TestProject::for_source(code)
         .add_test_module("my_test", code)
         .add_dev_module("my_dev_code", code)
@@ -1309,7 +1309,7 @@ pub fn main() { 1 }
 
     assert_completion!(
         TestProject::for_source(code).add_dep_module("dep", dep),
-        Position::new(0, 10)
+        Position::new(0, 8)
     );
 }
 
@@ -1324,7 +1324,7 @@ pub fn main() {
 
     assert_completion!(
         TestProject::for_source(code).add_hex_module("example_module", dep),
-        Position::new(0, 10)
+        Position::new(0, 8)
     );
 }
 
@@ -1341,7 +1341,7 @@ pub fn main() {
         TestProject::for_source(code)
             .add_hex_module("example_module", dep)
             .add_indirect_hex_module("indirect_module", ""),
-        Position::new(0, 10)
+        Position::new(0, 8)
     );
 }
 
@@ -1358,7 +1358,7 @@ pub fn main() {
         TestProject::for_source(code)
             .add_hex_module("example_module", dep)
             .add_dev_hex_module("indirect_module", ""),
-        Position::new(0, 10)
+        Position::new(0, 8)
     );
 }
 
@@ -1406,7 +1406,7 @@ pub fn main() {
 ";
     let dep = "";
 
-    let position = Position::new(0, 10);
+    let position = Position::new(0, 8);
     let (mut engine, position_param) = TestProject::for_source(code)
         .add_dev_module("my_dev_module", dev)
         .add_hex_module("example_module", dep)
@@ -1444,7 +1444,7 @@ pub fn main() { 1 }
 
     assert_completion!(
         TestProject::for_source(code).add_hex_module("example_module", dep),
-        Position::new(3, 10)
+        Position::new(3, 8)
     );
 }
 

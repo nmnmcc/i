@@ -13,8 +13,8 @@ pub fn main() {
 app
   kind:   Module
   edits:
-    [0:7-0:12]: "app"
+    [0:7-0:8]: "app"
 dev_helper
   kind:   Module
   edits:
-    [0:7-0:12]: "dev_helper"
+    [0:7-0:8]: "dev_helper"

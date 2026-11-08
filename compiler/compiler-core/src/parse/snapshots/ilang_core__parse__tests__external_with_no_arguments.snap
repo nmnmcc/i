@@ -15,5 +15,3 @@ error: Syntax error
   │
 2 │ @external
   │ ^^^^^^^^^ This attribute is incomplete
-
-Hint: See https://tour.gleam.run/advanced-features/externals/

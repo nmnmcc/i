@@ -23,5 +23,3 @@ When updating a record, the previous record comes before the fields to change
 
     let record = Record(field1:, field2:)
     let updated_record = Record(..record, field1: "new_value")
-
-See: https://tour.gleam.run/data-types/record-updates/

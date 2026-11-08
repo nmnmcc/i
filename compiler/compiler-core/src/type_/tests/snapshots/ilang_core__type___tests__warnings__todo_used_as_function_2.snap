@@ -31,4 +31,3 @@ argument.
 
 Hint: if you want to display an error message you should write
 `todo as "my error message"`
-See: https://tour.gleam.run/advanced-features/todo/

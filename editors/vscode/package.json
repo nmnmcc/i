@@ -1,0 +1,83 @@
+{
+  "name": "ilang",
+  "displayName": "i",
+  "description": "Syntax highlighting and language server support for the i programming language (iLang).",
+  "version": "0.1.0",
+  "publisher": "ilang",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "i",
+    "ilang",
+    "wasm",
+    "language server"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "workspaceContains:**/i.toml"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "i",
+        "aliases": [
+          "i",
+          "iLang"
+        ],
+        "extensions": [
+          ".i"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "i",
+        "scopeName": "source.i",
+        "path": "./syntaxes/i.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "i",
+      "properties": {
+        "ilang.path": {
+          "type": "string",
+          "default": "i",
+          "scope": "machine-overridable",
+          "markdownDescription": "Path to the `i` compiler executable. The extension runs `<path> lsp` to start the language server."
+        },
+        "ilang.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the i language server."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "ilang.restartServer",
+        "title": "Restart Language Server",
+        "category": "i"
+      }
+    ]
+  },
+  "scripts": {
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.2.1"
+  }
+}

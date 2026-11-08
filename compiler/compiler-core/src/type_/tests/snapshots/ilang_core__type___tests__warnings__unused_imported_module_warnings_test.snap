@@ -14,6 +14,6 @@ warning: Unused imported module
   ┌─ /src/warning/wrn.i:1:1
   │
 1 │ import i/wibble
-  │ ^^^^^^^^^^^^^^^^^^^ This imported module is never used
+  │ ^^^^^^^^^^^^^^^ This imported module is never used
 
 Hint: You can safely remove it.

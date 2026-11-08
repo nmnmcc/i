@@ -29,7 +29,7 @@ It has these accessible fields:
     .id
     .name
 
-Gleam is not object oriented, so if you are trying to call a method on this
+i is not object oriented, so if you are trying to call a method on this
 value you may want to use the function syntax instead.
 
     login(value)

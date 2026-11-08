@@ -1,6 +1,6 @@
-# iLang standard library
+# The i standard library
 
-This is the WasmGC port of [Gleam stdlib v1.0.5](https://github.com/gleam-lang/stdlib/releases/tag/v1.0.5), based on upstream commit `5b0642a77a38f984db5913548b84668652ca8b5c`. It retains the upstream public API and Apache-2.0 [licence](LICENCE). iLang bundles these sources and makes the `gleam/*` modules available to projects automatically.
+The i standard library started as a WasmGC port of [gleam_stdlib v1.0.5](https://github.com/gleam-lang/stdlib/releases/tag/v1.0.5), based on upstream commit `5b0642a77a38f984db5913548b84668652ca8b5c`. It is distributed under the Apache-2.0 [licence](LICENCE). i bundles these sources and makes the `i/*` modules available to projects automatically.
 
 ```i
 import i/io

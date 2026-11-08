@@ -1,0 +1,28 @@
+---
+source: compiler-core/src/type_/tests/warnings.rs
+expression: "\npub type Wibble { Wibble(wibble: Int) }\n\npub fn main() {\n  let wibble = 1\n  Wibble(wibble:)\n}\n"
+---
+----- SOURCE CODE
+
+pub type Wibble { Wibble(wibble: Int) }
+
+pub fn main() {
+  let wibble = 1
+  Wibble(wibble:)
+}
+
+
+----- WARNING
+warning: Incompatible i version range
+  ┌─ /src/warning/wrn.i:6:10
+  │
+6 │   Wibble(wibble:)
+  │          ^^^^^^^ This requires an i version >= 0.1.0
+
+The label shorthand syntax was introduced in version v0.1.0. But the i
+version range specified in your `i.toml` would allow this code to run on an
+earlier version like v0.0.1, resulting in compilation errors!
+
+Hint: Remove the version constraint from your `i.toml` or update it to be:
+
+    i = ">= 0.1.0"

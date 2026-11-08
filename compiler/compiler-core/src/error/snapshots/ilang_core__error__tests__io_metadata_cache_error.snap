@@ -12,4 +12,4 @@ The data in this file was not in the expected format, so it could
 not be understood by the compiler.
 
 This can happen if the data file was created with a different
-version of Gleam, or if the files have been corrupted in some way.
+version of i, or if the files have been corrupted in some way.

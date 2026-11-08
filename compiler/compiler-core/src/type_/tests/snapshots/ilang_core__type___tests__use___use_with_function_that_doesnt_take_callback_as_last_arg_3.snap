@@ -20,5 +20,3 @@ The function on the right hand side of `<-` has to take a callback function
 as its last argument. But the last argument of this function has type:
 
     Int
-
-See: https://tour.gleam.run/advanced-features/use/

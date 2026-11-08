@@ -7,10 +7,10 @@ import i.io
 
 ----- ERROR
 error: Syntax error
-  ┌─ /src/parse/error.i:1:13
+  ┌─ /src/parse/error.i:1:9
   │
 1 │ import i.io
-  │             ^ I was expecting either `/` or `.{` here.
+  │         ^ I was expecting either `/` or `.{` here.
 
 Perhaps you meant one of:
 

@@ -15,7 +15,7 @@ pub fn main() {
 ----- Completion content -----
 Nil
   kind:   EnumMember
-  detail: gleam
+  detail: i
   sort:   05_Nil
 main
   kind:   Function

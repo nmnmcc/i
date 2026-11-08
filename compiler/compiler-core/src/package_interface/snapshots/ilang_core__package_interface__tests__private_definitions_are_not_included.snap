@@ -5,7 +5,7 @@ expression: "\nconst float = 1.1\nfn main() {}\ntype Wibble\ntype Wob = Int\n"
 {
   "name": "my_package",
   "version": "11.10.9-1.wibble+build",
-  "ilang-version-constraint": "1.0.0",
+  "i-version-constraint": "1.0.0",
   "modules": {
     "my/module": {
       "documentation": [],

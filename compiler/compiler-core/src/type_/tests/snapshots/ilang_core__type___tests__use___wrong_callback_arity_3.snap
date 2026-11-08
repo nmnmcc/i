@@ -20,5 +20,3 @@ error: Incorrect arity
 
 This function takes a callback that expects 1 argument. But 2 were provided
 on the left hand side of `<-`.
-
-See: https://tour.gleam.run/advanced-features/use/

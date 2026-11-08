@@ -5,8 +5,7 @@ Run from the pinned Devenv environment after building the compiler and runner:
 ```sh
 python3 scripts/conformance.py \
   --compiler target/cargo/debug/i \
-  --runner target/cargo/release/ilang-runner \
-  --reference-gleam "$ILANG_REFERENCE_GLEAM"
+  --runner target/cargo/release/ilang-runner
 ```
 
 `scripts/dev-verify` runs this command before browser tests. The harness requires
@@ -47,18 +46,11 @@ as successful host ABI coverage.
 platform support files. These are reference inputs, not iLang production
 dependencies. `upstream-manifest.json` records SHA-256 checksums verified on every
 harness invocation. Migration inventories explain all platform-specific changes
-and preserve the original assertions. See [compatibility](../../docs/compatibility.md).
+and preserve the original assertions.
 
-With `--reference-gleam`, the ten standalone programs also run on fixed
-Gleam/Erlang in temporary projects. The oracle uses only the preserved local
-stdlib and local path dependencies; it does not fetch Hex packages. For the
-complete core oracle, use:
-
-```sh
-python3 tests/conformance/projects/upstream_language/validate_reference.py \
-  --gleam "$ILANG_REFERENCE_GLEAM" \
-  --stdlib tests/conformance/upstream/stdlib
-```
+i no longer runs these programs on Gleam/Erlang for comparison. i is developed
+independently and its syntax diverges from Gleam, so the expected outputs in
+`cases.json` and the test corpora are the reference.
 
 Pass `--compare-compiler target/debug/i` to require both Cargo and Blaze
 compiler builds to produce identical Wasm bytes and execution results for the

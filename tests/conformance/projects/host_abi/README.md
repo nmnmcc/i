@@ -19,7 +19,7 @@ negative zero, booleans, Nil, Unicode and NUL strings, memory growth, nine-bit
 arrays, and nullable opaque references. Repeated calls must preserve reference
 identity and must recover after a callback throws.
 
-`reference_same` compares two independently lifted opaque references in Gleam.
+`reference_same` compares two independently lifted opaque references in i.
 `unaligned_bits` returns a nine-bit slice starting at a three-bit internal offset;
 the host must observe bytes `[255, 128]`, bit length `9`, and zero padding.
 `panic_now` deliberately raises `host_abi intentional guest panic`; the harness

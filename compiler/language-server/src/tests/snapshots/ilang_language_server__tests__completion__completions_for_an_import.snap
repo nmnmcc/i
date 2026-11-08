@@ -10,7 +10,7 @@ pub fn main() {
 
 
 ----- Completion content -----
-gleam
+i
   kind:   Module
   edits:
-    [0:7-0:10]: "gleam"
+    [0:7-0:10]: "i"

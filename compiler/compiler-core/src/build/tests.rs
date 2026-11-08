@@ -99,10 +99,7 @@ fn local_dependencies_can_import_the_implicit_standard_library() {
 
     let io = InMemoryFileSystem::new();
     for (path, contents) in [
-        (
-            "/stdlib/i.toml",
-            "name = \"i_stdlib\"\nversion = \"1.0.5\"",
-        ),
+        ("/stdlib/i.toml", "name = \"i_stdlib\"\nversion = \"1.0.5\""),
         ("/stdlib/src/i/example.i", "pub fn identity(x) { x }"),
         ("/dep/i.toml", "name = \"local_dep\"\nversion = \"1.0.0\""),
         (

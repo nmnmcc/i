@@ -28,7 +28,7 @@ pub enum Error {
     #[error("{path}: {message}")]
     Project { path: PathBuf, message: String },
     #[error("{}", .0.pretty_string())]
-    Gleam(#[from] ilang_core::Error),
+    Core(#[from] ilang_core::Error),
 }
 
 impl Error {

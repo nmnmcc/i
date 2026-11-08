@@ -41,7 +41,7 @@ pub fn main() {
             line: 2,
             character: 1
         }),
-        18
+        14
     );
 }
 

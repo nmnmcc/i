@@ -48,7 +48,7 @@ Parsed {
                         documentation: None,
                         external_wasm: None,
                         implementations: Implementations {
-                            gleam: true,
+                            pure: true,
                             can_run_on_wasm: true,
                             uses_wasm_externals: false,
                         },

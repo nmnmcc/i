@@ -20,8 +20,8 @@ warning: Duplicate import
   ┌─ /src/warning/wrn.i:2:1
   │
 1 │ import i/wibble as a
-  │ ------------------------ First imported here
+  │ -------------------- First imported here
 2 │ import i/wibble as b
-  │ ^^^^^^^^^^^^^^^^^^^^^^^^ Reimported here
+  │ ^^^^^^^^^^^^^^^^^^^^ Reimported here
 
 The i/wibble module has been imported twice.

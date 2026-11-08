@@ -14,11 +14,11 @@ pub fn main() -> Bool {
 ----- Completion content -----
 False
   kind:   EnumMember
-  detail: gleam
+  detail: i
   sort:   05_False
 True
   kind:   EnumMember
-  detail: gleam
+  detail: i
   sort:   05_True
 main
   kind:   Function

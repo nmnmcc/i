@@ -9,11 +9,11 @@ import dep.{Left}
 ----- Completion content -----
 Error
   kind:   Constructor
-  detail: gleam
+  detail: i
   sort:   5_Error
 False
   kind:   EnumMember
-  detail: gleam
+  detail: i
   sort:   5_False
 Left
   kind:   EnumMember
@@ -24,15 +24,15 @@ Left
     [1:0-1:0]: "Left"
 Nil
   kind:   EnumMember
-  detail: gleam
+  detail: i
   sort:   5_Nil
 Ok
   kind:   Constructor
-  detail: gleam
+  detail: i
   sort:   5_Ok
 True
   kind:   EnumMember
-  detail: gleam
+  detail: i
   sort:   5_True
 dep.Left
   kind:   EnumMember

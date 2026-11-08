@@ -1,12 +1,11 @@
 ---
 source: compiler-core/src/package_interface/tests.rs
-assertion_line: 246
 expression: "\npub const float = 1.1\npub const string = \"\"\npub const int = 1\npub const bool = True\n"
 ---
 {
   "name": "my_package",
   "version": "11.10.9-1.wibble+build",
-  "ilang-version-constraint": "1.0.0",
+  "i-version-constraint": "1.0.0",
   "modules": {
     "my/module": {
       "documentation": [],
@@ -17,7 +16,7 @@ expression: "\npub const float = 1.1\npub const string = \"\"\npub const int = 1
           "documentation": null,
           "deprecation": null,
           "implementations": {
-            "gleam": true,
+            "pure": true,
             "can-run-on-wasm": true,
             "uses-wasm-externals": false
           },
@@ -25,7 +24,7 @@ expression: "\npub const float = 1.1\npub const string = \"\"\npub const int = 1
             "kind": "named",
             "name": "Bool",
             "package": "",
-            "module": "gleam",
+            "module": "i",
             "parameters": []
           }
         },
@@ -33,7 +32,7 @@ expression: "\npub const float = 1.1\npub const string = \"\"\npub const int = 1
           "documentation": null,
           "deprecation": null,
           "implementations": {
-            "gleam": true,
+            "pure": true,
             "can-run-on-wasm": true,
             "uses-wasm-externals": false
           },
@@ -41,7 +40,7 @@ expression: "\npub const float = 1.1\npub const string = \"\"\npub const int = 1
             "kind": "named",
             "name": "Float",
             "package": "",
-            "module": "gleam",
+            "module": "i",
             "parameters": []
           }
         },
@@ -49,7 +48,7 @@ expression: "\npub const float = 1.1\npub const string = \"\"\npub const int = 1
           "documentation": null,
           "deprecation": null,
           "implementations": {
-            "gleam": true,
+            "pure": true,
             "can-run-on-wasm": true,
             "uses-wasm-externals": false
           },
@@ -57,7 +56,7 @@ expression: "\npub const float = 1.1\npub const string = \"\"\npub const int = 1
             "kind": "named",
             "name": "Int",
             "package": "",
-            "module": "gleam",
+            "module": "i",
             "parameters": []
           }
         },
@@ -65,7 +64,7 @@ expression: "\npub const float = 1.1\npub const string = \"\"\npub const int = 1
           "documentation": null,
           "deprecation": null,
           "implementations": {
-            "gleam": true,
+            "pure": true,
             "can-run-on-wasm": true,
             "uses-wasm-externals": false
           },
@@ -73,7 +72,7 @@ expression: "\npub const float = 1.1\npub const string = \"\"\npub const int = 1
             "kind": "named",
             "name": "String",
             "package": "",
-            "module": "gleam",
+            "module": "i",
             "parameters": []
           }
         }

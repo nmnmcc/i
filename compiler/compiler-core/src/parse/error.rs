@@ -895,9 +895,7 @@ impl LexicalError {
         match &self.error {
             LexicalErrorType::BadStringEscape => (
                 "I don't understand this escape code",
-                vec![
-                    "Hint: Add another backslash before it.".into(),
-                ],
+                vec!["Hint: Add another backslash before it.".into()],
             ),
             LexicalErrorType::DigitOutOfRadix => {
                 ("This digit is too big for the specified radix", vec![])
@@ -955,9 +953,7 @@ impl LexicalError {
             }
             LexicalErrorType::InvalidTripleEqual => (
                 "Did you mean `==`?",
-                vec![
-                    "i uses `==` to check for equality between two values.".into(),
-                ],
+                vec!["i uses `==` to check for equality between two values.".into()],
             ),
             LexicalErrorType::MergeConflictIndicator => (
                 "Merge conflict marker found",

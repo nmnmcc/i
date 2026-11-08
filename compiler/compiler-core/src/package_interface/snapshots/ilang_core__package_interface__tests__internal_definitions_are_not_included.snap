@@ -5,7 +5,7 @@ expression: "\n@internal pub const float = 1.1\n@internal pub fn main() {}\n@int
 {
   "name": "my_package",
   "version": "11.10.9-1.wibble+build",
-  "ilang-version-constraint": "1.0.0",
+  "i-version-constraint": "1.0.0",
   "modules": {
     "my/module": {
       "documentation": [],

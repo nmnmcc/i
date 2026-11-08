@@ -13,6 +13,4 @@ error: Syntax error
 2 │         wobble = 42
   │                ^ There must be a 'let' to bind variable to value
 
-See: https://tour.gleam.run/basics/assignments/
-
 Hint: Use let for binding.

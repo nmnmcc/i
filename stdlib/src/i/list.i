@@ -1,5 +1,5 @@
 //// Lists are an ordered sequence of elements and are one of the most common
-//// data types in Gleam.
+//// data types in i.
 ////
 //// New elements can be added and removed from the front of a list in
 //// constant time, while adding and removing from the end requires traversing

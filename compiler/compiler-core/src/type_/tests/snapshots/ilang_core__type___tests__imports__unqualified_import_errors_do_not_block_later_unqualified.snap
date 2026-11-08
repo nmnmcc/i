@@ -11,12 +11,12 @@ pub fn main() -> Integer {
 
 ----- ERROR
 error: Unknown module value
-  ┌─ /src/one/two.i:1:15
+  ┌─ /src/one/two.i:1:11
   │
 1 │ import i.{Unknown, type Int as Integer}
-  │               ^^^^^^^
+  │           ^^^^^^^
 
-The module `gleam` does not have a `Unknown` value.
+The module `i` does not have a `Unknown` value.
 
 error: Type mismatch
   ┌─ /src/one/two.i:4:3

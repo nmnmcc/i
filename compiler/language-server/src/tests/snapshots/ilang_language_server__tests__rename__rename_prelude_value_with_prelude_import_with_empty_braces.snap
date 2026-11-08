@@ -9,7 +9,7 @@ import i.{}
 
 pub fn main() {
   Ok(i.Error(10))
-  ↑▔                 
+  ↑▔             
 }
 
 

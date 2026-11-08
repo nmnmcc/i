@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from i_stdlib v1.0.5; persistent Wasm implementation.
+// Derived from gleam_stdlib v1.0.5; persistent Wasm implementation.
 
 import i/int
 import i/option.{type Option}
@@ -238,7 +238,7 @@ fn do_map_values(f: fn(k, v) -> a, dict: Dict(k, v)) -> Dict(k, a) {
 ///
 /// Dicts are not ordered so the keys are not returned in any specific order. Do
 /// not write code that relies on the order keys are returned by this function
-/// as it may change in later versions of Gleam or Erlang.
+/// as it may change in later versions of i or Erlang.
 ///
 /// ## Examples
 ///
@@ -254,7 +254,7 @@ pub fn keys(dict: Dict(k, v)) -> List(k) {
 ///
 /// Dicts are not ordered so the values are not returned in any specific order. Do
 /// not write code that relies on the order values are returned by this function
-/// as it may change in later versions of Gleam or Erlang.
+/// as it may change in later versions of i or Erlang.
 ///
 /// ## Examples
 ///
@@ -469,7 +469,7 @@ pub fn upsert(
 ///
 /// Dicts are not ordered so the values are not returned in any specific order. Do
 /// not write code that relies on the order entries are used by this function
-/// as it may change in later versions of Gleam or Erlang.
+/// as it may change in later versions of i or Erlang.
 ///
 /// ## Examples
 ///

@@ -13,11 +13,11 @@ pub fn main() -> Result(Int, Nil) {
 ----- Completion content -----
 Error
   kind:   Constructor
-  detail: gleam
+  detail: i
   sort:   05_Error
 Ok
   kind:   Constructor
-  detail: gleam
+  detail: i
   sort:   05_Ok
 main
   kind:   Function

@@ -1,4 +1,4 @@
-//// Strings are Gleam's text type, written in code using double quotes,
+//// Strings are i's text type, written in code using double quotes,
 //// `"like this"`.
 ////
 //// Two strings can be joined together using the concatenation operator: `<>`.
@@ -376,7 +376,7 @@ pub fn split_once(
 /// performance better.
 ///
 /// If you are joining together large string and want to avoid copying any data
-/// you may want to investigate using the [`string_tree`](../gleam/string_tree.html)
+/// you may want to investigate using the [`string_tree`](../i/string_tree.html)
 /// module.
 ///
 /// ## Examples
@@ -773,7 +773,7 @@ pub fn capitalise(string: String) -> String {
   }
 }
 
-/// Returns a `String` representation of a term in Gleam syntax.
+/// Returns a `String` representation of a term in i syntax.
 ///
 /// This may be occasionally useful for quick-and-dirty printing of values in
 /// scripts. For error reporting and other uses prefer constructing strings by
@@ -787,7 +787,7 @@ pub fn capitalise(string: String) -> String {
 /// This function works using runtime reflection, so the output may not be
 /// perfectly accurate for data structures where the runtime structure doesn't
 /// hold enough information to determine the original syntax. For example,
-/// tuples with an Erlang atom in the first position will be mistaken for Gleam
+/// tuples with an Erlang atom in the first position will be mistaken for i
 /// records.
 ///
 /// ## Security and safety

@@ -4,8 +4,8 @@ expression: error
 ---
 error: Failed to send LSP message
 
-An error occurred when the Gleam language server attempted to receive a
-message from the client:
+An error occurred when the i language server attempted to receive a message
+from the client:
 
     disconnected channel
 

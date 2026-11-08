@@ -17,5 +17,3 @@ would be in some other languages, instead they are written with lowercase
 names.
 
     fn example(argument: generic) -> generic
-
-See: https://tour.gleam.run/functions/generic-functions/

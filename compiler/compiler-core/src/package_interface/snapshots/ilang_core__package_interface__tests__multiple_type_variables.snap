@@ -1,12 +1,11 @@
 ---
 source: compiler-core/src/package_interface/tests.rs
-assertion_line: 291
 expression: "\npub type Box(a, b)\npub fn some_type_variables(a: a, b: b, c: Box(c, d)) -> Box(a, d) {}\n"
 ---
 {
   "name": "my_package",
   "version": "11.10.9-1.wibble+build",
-  "ilang-version-constraint": "1.0.0",
+  "i-version-constraint": "1.0.0",
   "modules": {
     "my/module": {
       "documentation": [],
@@ -25,7 +24,7 @@ expression: "\npub type Box(a, b)\npub fn some_type_variables(a: a, b: b, c: Box
           "documentation": null,
           "deprecation": null,
           "implementations": {
-            "gleam": true,
+            "pure": true,
             "can-run-on-wasm": true,
             "uses-wasm-externals": false
           },

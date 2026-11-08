@@ -29,7 +29,7 @@ expression: completions
                         },
                         end: Position {
                             line: 0,
-                            character: 12,
+                            character: 8,
                         },
                     },
                     new_text: "app",
@@ -68,7 +68,7 @@ expression: completions
                         },
                         end: Position {
                             line: 0,
-                            character: 12,
+                            character: 8,
                         },
                     },
                     new_text: "test_helper",

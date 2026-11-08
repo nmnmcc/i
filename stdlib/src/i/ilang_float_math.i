@@ -10,7 +10,7 @@
 //// granted, provided that this notice is preserved.
 ////
 //// Inputs are finite. Domain checks are performed by i/float. The
-//// explicit overflow paths preserve Gleam's finite-float semantics.
+//// explicit overflow paths preserve i's finite-float semantics.
 
 const word = 4_294_967_296
 

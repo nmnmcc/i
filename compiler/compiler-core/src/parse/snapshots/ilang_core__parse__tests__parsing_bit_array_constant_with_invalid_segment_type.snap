@@ -14,4 +14,3 @@ error: Syntax error
 
 Found a name, expected one of: 
 - A valid bit array segment type
-- See: https://tour.gleam.run/data-types/bit-arrays/

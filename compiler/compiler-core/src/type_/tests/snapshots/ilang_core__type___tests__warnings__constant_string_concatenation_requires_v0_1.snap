@@ -1,0 +1,21 @@
+---
+source: compiler-core/src/type_/tests/warnings.rs
+expression: "pub const string = \"wibble\" <> \"wobble\""
+---
+----- SOURCE CODE
+pub const string = "wibble" <> "wobble"
+
+----- WARNING
+warning: Incompatible i version range
+  ┌─ /src/warning/wrn.i:1:20
+  │
+1 │ pub const string = "wibble" <> "wobble"
+  │                    ^^^^^^^^^^^^^^^^^^^^ This requires an i version >= 0.1.0
+
+Constant strings concatenation was introduced in version v0.1.0. But the i
+version range specified in your `i.toml` would allow this code to run on an
+earlier version like v0.0.1, resulting in compilation errors!
+
+Hint: Remove the version constraint from your `i.toml` or update it to be:
+
+    i = ">= 0.1.0"

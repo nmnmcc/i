@@ -13,7 +13,7 @@ error: Syntax error
 2 │ wobble++
   │       ^^ Unknown operator
 
-Gleam is an immutable language and does not have any operators that
+i is an immutable language and does not have any operators that
 change the value of an existing variable. You might want to create a
 new variable with the same name as the previous one:
 

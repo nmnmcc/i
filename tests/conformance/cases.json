@@ -5,71 +5,61 @@
       "name": "arithmetic",
       "project": "projects/arithmetic",
       "kind": "run",
-      "stdout": "PASS:arithmetic\n",
-      "reference": true
+      "stdout": "PASS:arithmetic\n"
     },
     {
       "name": "bigint",
       "project": "projects/bigint",
       "kind": "run",
-      "stdout": "PASS:bigint\n",
-      "reference": true
+      "stdout": "PASS:bigint\n"
     },
     {
       "name": "functions",
       "project": "projects/functions",
       "kind": "run",
-      "stdout": "PASS:functions\n",
-      "reference": true
+      "stdout": "PASS:functions\n"
     },
     {
       "name": "patterns",
       "project": "projects/patterns",
       "kind": "run",
-      "stdout": "PASS:patterns\n",
-      "reference": true
+      "stdout": "PASS:patterns\n"
     },
     {
       "name": "records",
       "project": "projects/records",
       "kind": "run",
-      "stdout": "PASS:records\n",
-      "reference": true
+      "stdout": "PASS:records\n"
     },
     {
       "name": "recursion",
       "project": "projects/recursion",
       "kind": "run",
-      "stdout": "PASS:recursion\n",
-      "reference": true
+      "stdout": "PASS:recursion\n"
     },
     {
       "name": "bit_arrays",
       "project": "projects/bit_arrays",
       "kind": "run",
-      "stdout": "PASS:bit_arrays\n",
-      "reference": true
+      "stdout": "PASS:bit_arrays\n"
     },
     {
       "name": "unicode",
       "project": "projects/unicode",
       "kind": "run",
-      "stdout": "PASS:unicode\n",
-      "reference": true
+      "stdout": "PASS:unicode\n"
     },
     {
       "name": "collections",
       "project": "projects/collections",
       "kind": "run",
-      "stdout": "PASS:collections\n",
-      "reference": true
+      "stdout": "PASS:collections\n"
     },
     {
       "name": "local_packages",
       "project": "projects/local_packages",
       "kind": "run",
-      "stdout": "PASS:local_packages\n",
-      "reference": true
+      "stdout": "PASS:local_packages\n"
     },
     {
       "name": "failure_assert",

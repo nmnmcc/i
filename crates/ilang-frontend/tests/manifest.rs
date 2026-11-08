@@ -47,10 +47,7 @@ fn resolves_shared_local_dependencies_once_and_injects_stdlib() {
         .map(|package| package.name.as_str())
         .collect::<Vec<_>>();
     assert_eq!(names.iter().filter(|&&name| name == "common").count(), 1);
-    assert_eq!(
-        names.iter().filter(|&&name| name == "i_stdlib").count(),
-        1
-    );
+    assert_eq!(names.iter().filter(|&&name| name == "i_stdlib").count(), 1);
     assert_eq!(names.last(), Some(&"app"));
     assert_eq!(
         packages
@@ -60,13 +57,7 @@ fn resolves_shared_local_dependencies_once_and_injects_stdlib() {
             .root,
         common.canonicalize().unwrap()
     );
-    assert!(
-        packages
-            .last()
-            .unwrap()
-            .dependencies
-            .contains("i_stdlib")
-    );
+    assert!(packages.last().unwrap().dependencies.contains("i_stdlib"));
     assert!(packages.last().unwrap().is_root);
 }
 

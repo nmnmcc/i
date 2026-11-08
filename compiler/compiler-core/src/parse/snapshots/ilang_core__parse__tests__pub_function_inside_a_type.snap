@@ -20,5 +20,5 @@ Found the keyword `pub`, expected one of:
 - `}`
 - a record constructor
 
-Hint: Gleam is not an object oriented programming language so
+Hint: i is not an object oriented programming language so
 functions are declared separately from types.

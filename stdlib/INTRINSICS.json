@@ -9,7 +9,7 @@
     "parameters": "Each source parameter is one nullable Wasm eqref, in source order.",
     "results": "Each call returns one nullable Wasm eqref, including Nil-returning functions.",
     "polymorphism": "Generic values share the same representation. Canonical signatures rename generic variables by first occurrence; repeated variables retain the same identity.",
-    "type_names": "Unqualified names denote Gleam prelude types; non-prelude types are qualified in canonical signatures. Declarations retain their exact source signatures.",
+    "type_names": "Unqualified names denote i prelude types; non-prelude types are qualified in canonical signatures. Declarations retain their exact source signatures.",
     "values": {
       "Nil": "Null eqref.",
       "Int": "Signed i31 fast path or a GC object containing a sign and 32-bit limbs; values are never narrowed to host machine integers.",
@@ -18,8 +18,8 @@
       "BitArray": "GC object retaining bytes, bit offset and bit length.",
       "Bool": "Tagged GC object distinct from Int.",
       "List": "Tagged GC linked list; its empty value is distinct from Nil and an empty dynamic Array.",
-      "Result": "Ordinary tagged Gleam constructors Ok(value) and Error(error), never a host status code.",
-      "Dynamic": "The original boxed Gleam value with its runtime type tag preserved; dynamic_cast is an identity operation.",
+      "Result": "Ordinary tagged i constructors Ok(value) and Error(error), never a host status code.",
+      "Dynamic": "The original boxed i value with its runtime type tag preserved; dynamic_cast is an identity operation.",
       "Array": "Tagged dynamic array distinct from a linked List; dynamic_list accepts both and returns a linked List.",
       "Dict": "The opaque persistent HAMT root from i/dict, identified by its type identity.",
       "UtfCodepoint": "Boxed Int representation; source-level validation remains the responsibility of the checked public API."

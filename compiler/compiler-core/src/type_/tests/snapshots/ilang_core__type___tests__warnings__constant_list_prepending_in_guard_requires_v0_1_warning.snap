@@ -1,0 +1,36 @@
+---
+source: compiler-core/src/type_/tests/warnings.rs
+expression: "\nfn go(x) {\n  case x {\n    [1, ..] if [1, ..x] == x -> Nil\n    _ -> Nil\n  }\n}\n"
+---
+----- SOURCE CODE
+
+fn go(x) {
+  case x {
+    [1, ..] if [1, ..x] == x -> Nil
+    _ -> Nil
+  }
+}
+
+
+----- WARNING
+warning: Unused private function
+  ┌─ /src/warning/wrn.i:2:1
+  │
+2 │ fn go(x) {
+  │ ^^^^^^^^ This private function is never used
+
+Hint: You can safely remove it.
+
+warning: Incompatible i version range
+  ┌─ /src/warning/wrn.i:4:16
+  │
+4 │     [1, ..] if [1, ..x] == x -> Nil
+  │                ^^^^^^^^ This requires an i version >= 0.1.0
+
+Prepending to a constant list was introduced in version v0.1.0. But the i
+version range specified in your `i.toml` would allow this code to run on an
+earlier version like v0.0.1, resulting in compilation errors!
+
+Hint: Remove the version constraint from your `i.toml` or update it to be:
+
+    i = ">= 0.1.0"

@@ -1,5 +1,5 @@
 //! UTF-8 string primitives. Unicode segmentation and case mapping live in the
-//! bundled Gleam standard library; these helpers preserve scalar boundaries.
+//! bundled i standard library; these helpers preserve scalar boundaries.
 
 pub fn wat() -> String {
     r#"

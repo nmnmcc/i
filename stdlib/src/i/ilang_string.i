@@ -181,7 +181,7 @@ fn trim_codepoints(codepoints: List(Int)) -> List(Int) {
   }
 }
 
-// The nine whitespace scalars used by the Gleam 1.0.5 implementations.
+// The nine whitespace scalars used by the i 1.0.5 implementations.
 // Directional marks and nonbreaking spaces are deliberately retained.
 fn is_trim_whitespace(codepoint: Int) -> Bool {
   case codepoint {

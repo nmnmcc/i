@@ -173,7 +173,7 @@ def write_rust_types(path: Path, revision: int) -> None:
     )
 
 
-def make_gleam_fixture(project: Path, modules: int, function_revision: int = 0, type_revision: int = 0) -> None:
+def make_i_fixture(project: Path, modules: int, function_revision: int = 0, type_revision: int = 0) -> None:
     (project / "src").mkdir(parents=True, exist_ok=True)
     (project / "test").mkdir(exist_ok=True)
     (project / "i.toml").write_text('name = "benchmark"\nversion = "0.1.0"\ntarget = "wasm"\n')
@@ -183,10 +183,10 @@ def make_gleam_fixture(project: Path, modules: int, function_revision: int = 0, 
         else:
             body = f"\npub fn apply(input: bench_types.Input) -> Int {{\n  input.value + {function_revision}\n}}\n"
         (project / "src" / f"bench_module_{index}.i").write_text("import bench_types\n" + body)
-    update_gleam_type(project, modules, function_revision, type_revision)
+    update_i_type(project, modules, function_revision, type_revision)
 
 
-def update_gleam_type(project: Path, modules: int, function_revision: int, revision: int) -> None:
+def update_i_type(project: Path, modules: int, function_revision: int, revision: int) -> None:
     fields = "value: Int" + (f", generation_{revision}: Int" if revision else "")
     args = "value: 1" + (f", generation_{revision}: {revision}" if revision else "")
     (project / "src/bench_types.i").write_text(f"pub type Input {{\n  Input({fields})\n}}\n")
@@ -202,7 +202,7 @@ def update_gleam_type(project: Path, modules: int, function_revision: int, revis
     )
 
 
-def edit_gleam_function(project: Path, modules: int, revision: int) -> None:
+def edit_i_function(project: Path, modules: int, revision: int) -> None:
     (project / "src" / f"bench_module_{modules - 1}.i").write_text(
         "import bench_types\n\npub fn apply(input: bench_types.Input) -> Int {\n"
         f"  input.value + {revision}\n}}\n"
@@ -468,7 +468,7 @@ class Harness:
         if not validation["success"]:
             raise BenchmarkFailure(f"rebuilt {binary} failed its runtime revision/layout assertion: {validation}")
 
-    def gleam(self, directory: Path) -> None:
+    def language(self, directory: Path) -> None:
         original_compiler = resolve_executable(self.args.compiler)
         original_runner = resolve_executable(self.args.runner)
         binaries = directory / "bin"
@@ -491,37 +491,37 @@ class Harness:
         self.report["runner_sha256"] = file_digest(Path(runner))
         self.report["stdlib_sha256"] = tree_digest(stdlib)
         for command in ("check", "build"):
-            project = directory / f"gleam-{command}"
-            make_gleam_fixture(project, self.args.modules)
+            project = directory / f"i-{command}"
+            make_i_fixture(project, self.args.modules)
             argv = [compiler, "--project", str(project), command]
-            self.measure("gleam", "i", f"cold-{command}", 0, argv, project, env)
+            self.measure("i", "i", f"cold-{command}", 0, argv, project, env)
             if command == "build":
-                self.validate_gleam_binary(runner, project, env, self.args.modules)
+                self.validate_i_binary(runner, project, env, self.args.modules)
             for iteration in range(self.args.rounds):
-                self.measure("gleam", "i", f"no-change-{command}", iteration, argv, project, env)
+                self.measure("i", "i", f"no-change-{command}", iteration, argv, project, env)
                 if command == "build":
-                    self.validate_gleam_binary(runner, project, env, self.args.modules)
+                    self.validate_i_binary(runner, project, env, self.args.modules)
             for iteration in range(self.args.rounds):
-                edit_gleam_function(project, self.args.modules, iteration + 1)
-                self.measure("gleam", "i", f"function-edit-{command}", iteration, argv, project, env)
+                edit_i_function(project, self.args.modules, iteration + 1)
+                self.measure("i", "i", f"function-edit-{command}", iteration, argv, project, env)
                 if command == "build":
-                    self.validate_gleam_binary(runner, project, env, self.args.modules + iteration + 1)
+                    self.validate_i_binary(runner, project, env, self.args.modules + iteration + 1)
             for iteration in range(self.args.rounds):
-                update_gleam_type(project, self.args.modules, self.args.rounds, iteration + 1)
-                self.measure("gleam", "i", f"type-edit-{command}", iteration, argv, project, env)
+                update_i_type(project, self.args.modules, self.args.rounds, iteration + 1)
+                self.measure("i", "i", f"type-edit-{command}", iteration, argv, project, env)
                 if command == "build":
-                    self.validate_gleam_binary(runner, project, env, self.args.modules + self.args.rounds)
+                    self.validate_i_binary(runner, project, env, self.args.modules + self.args.rounds)
         tests = [compiler, "--project", str(project), "test", "--json"]
-        self.measure("gleam", "i", "first-test", 0, tests, project, env)
-        self.validate_gleam_tests()
+        self.measure("i", "i", "first-test", 0, tests, project, env)
+        self.validate_i_tests()
         for iteration in range(self.args.rounds):
             revision = self.args.rounds + iteration + 1
-            edit_gleam_function(project, self.args.modules, revision)
-            update_gleam_type(project, self.args.modules, revision, self.args.rounds)
-            self.measure("gleam", "i", "function-edit-test", iteration, tests, project, env)
-            self.validate_gleam_tests()
+            edit_i_function(project, self.args.modules, revision)
+            update_i_type(project, self.args.modules, revision, self.args.rounds)
+            self.measure("i", "i", "function-edit-test", iteration, tests, project, env)
+            self.validate_i_tests()
 
-    def validate_gleam_tests(self) -> None:
+    def validate_i_tests(self) -> None:
         run = self.report["runs"][-1]
         validation = {"success": False}
         try:
@@ -536,7 +536,7 @@ class Harness:
         if not validation["success"]:
             raise BenchmarkFailure(f"Gleam runner did not execute its expected arithmetic test: {validation}")
 
-    def validate_gleam_binary(self, runner: str, project: Path, env: dict[str, str], expected: int) -> None:
+    def validate_i_binary(self, runner: str, project: Path, env: dict[str, str], expected: int) -> None:
         # Run the artifact directly, without another compiler invocation that
         # could hide an incorrect cached build. Echo makes the leaf revision
         # observable without changing its caller during function-edit samples.
@@ -577,7 +577,7 @@ def positive(value: str) -> int:
 
 def arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("suite", choices=("rust", "gleam", "all"))
+    parser.add_argument("suite", choices=("rust", "i", "all"))
     parser.add_argument("--source", type=Path, default=ROOT, help="iLang checkout to snapshot for Rust benchmarks")
     parser.add_argument("--engines", choices=("cargo", "blaze"), nargs="+", default=["cargo", "blaze"])
     parser.add_argument("--cargo", default="cargo")
@@ -594,7 +594,7 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--keep-workdir", action="store_true", help="keep disposable snapshots for inspecting the measured inputs")
     args = parser.parse_args()
     args.source, args.output = args.source.resolve(), args.output.resolve()
-    if args.suite in ("gleam", "all") and (not args.compiler or not args.runner):
+    if args.suite in ("i", "all") and (not args.compiler or not args.runner):
         parser.error("i/all require explicit --compiler and --runner paths")
     if not hasattr(os, "wait4"):
         parser.error("this harness requires Unix wait4 resource accounting")
@@ -639,8 +639,8 @@ def main() -> int:
             report["measurement_notes"]["external_rss"] = "external_command_peak_rss_bytes comes from GNU Time's child wait4 accounting in KiB, avoiding the Python launcher's inherited RSS floor. It is a process high-water mark, not aggregate or daemon memory. Timings in this supplementary run include helper startup overhead."
         if args.suite in ("rust", "all"):
             harness.rust(work)
-        if args.suite in ("gleam", "all"):
-            harness.gleam(work)
+        if args.suite in ("i", "all"):
+            harness.language(work)
         report["success"] = True
     except (BenchmarkFailure, KeyboardInterrupt, OSError) as error:
         report["error"] = str(error) or "interrupted"

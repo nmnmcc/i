@@ -29,4 +29,4 @@ error: Duplicate import
   │         ^^^^^^^^^^ Reimported here
 
 `two` has been imported multiple times.
-Names in a Gleam module must be unique so one will need to be renamed.
+Names in an i module must be unique so one will need to be renamed.

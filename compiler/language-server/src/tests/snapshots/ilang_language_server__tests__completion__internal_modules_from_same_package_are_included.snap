@@ -13,4 +13,4 @@ pub fn main() {
 app/internal
   kind:   Module
   edits:
-    [0:7-0:12]: "app/internal"
+    [0:7-0:8]: "app/internal"

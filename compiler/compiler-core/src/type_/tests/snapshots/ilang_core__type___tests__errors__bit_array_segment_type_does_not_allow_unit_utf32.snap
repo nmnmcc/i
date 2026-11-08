@@ -13,4 +13,3 @@ error: Invalid bit array segment
   │                        ^^^^^^^ Unit cannot be specified here
 
 Hint: utf32 segments are sized based on their value and cannot have a unit.
-See: https://tour.gleam.run/data-types/bit-arrays/

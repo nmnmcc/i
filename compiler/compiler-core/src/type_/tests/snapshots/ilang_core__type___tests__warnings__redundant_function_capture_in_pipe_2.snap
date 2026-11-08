@@ -20,5 +20,3 @@ warning: Redundant function capture
 
 This function capture is redundant since the value is already piped as the
 first argument of this call.
-
-See: https://tour.gleam.run/functions/pipelines/

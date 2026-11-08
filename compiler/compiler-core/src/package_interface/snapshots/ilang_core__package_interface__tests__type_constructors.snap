@@ -5,7 +5,7 @@ expression: "\npub type Box(a, b) {\n  Box(b, Int)\n  OtherBox(message: String, 
 {
   "name": "my_package",
   "version": "11.10.9-1.wibble+build",
-  "ilang-version-constraint": "1.0.0",
+  "i-version-constraint": "1.0.0",
   "modules": {
     "my/module": {
       "documentation": [],
@@ -33,7 +33,7 @@ expression: "\npub type Box(a, b) {\n  Box(b, Int)\n  OtherBox(message: String, 
                     "kind": "named",
                     "name": "Int",
                     "package": "",
-                    "module": "gleam",
+                    "module": "i",
                     "parameters": []
                   }
                 }
@@ -50,7 +50,7 @@ expression: "\npub type Box(a, b) {\n  Box(b, Int)\n  OtherBox(message: String, 
                     "kind": "named",
                     "name": "String",
                     "package": "",
-                    "module": "gleam",
+                    "module": "i",
                     "parameters": []
                   }
                 },

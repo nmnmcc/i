@@ -21,7 +21,7 @@ warning: Transitive dependency imported
 
 The module `some_module` is being imported, but `non-dependency-package`,
 the package it belongs to, is not a direct dependency of your package.
-In a future version of Gleam this may become a compile error.
+In a future version of i this may become a compile error.
 
 Run this command to add it to your dependencies:
 

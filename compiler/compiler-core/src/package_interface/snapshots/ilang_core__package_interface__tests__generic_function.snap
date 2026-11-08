@@ -1,12 +1,11 @@
 ---
 source: compiler-core/src/package_interface/tests.rs
-assertion_line: 258
 expression: "\npub type Wob(a) { Wob }\n@deprecated(\"deprecation message\")\npub fn main() { Wob }\n"
 ---
 {
   "name": "my_package",
   "version": "11.10.9-1.wibble+build",
-  "ilang-version-constraint": "1.0.0",
+  "i-version-constraint": "1.0.0",
   "modules": {
     "my/module": {
       "documentation": [],
@@ -34,7 +33,7 @@ expression: "\npub type Wob(a) { Wob }\n@deprecated(\"deprecation message\")\npu
             "message": "deprecation message"
           },
           "implementations": {
-            "gleam": true,
+            "pure": true,
             "can-run-on-wasm": true,
             "uses-wasm-externals": false
           },

@@ -112,7 +112,7 @@
 //// ## Indexing objects
 ////
 //// The [`at`](#at) decoder can be used to decode a value that is nested within
-//// key-value containers such as Gleam dicts, Erlang maps, or JavaScript objects.
+//// key-value containers such as i dicts, Erlang maps, or JavaScript objects.
 ////
 //// ```i
 //// // Data:
@@ -125,7 +125,7 @@
 //// ## Indexing arrays
 ////
 //// If you use ints as keys then the [`at`](#at) decoder can be used to index into
-//// array-like containers such as Gleam or Erlang tuples, or JavaScript arrays.
+//// array-like containers such as i or Erlang tuples, or JavaScript arrays.
 ////
 //// ```i
 //// // Data:
@@ -310,7 +310,7 @@ pub opaque type Decoder(t) {
 ///
 /// This function will index into dictionaries with any key type, and if the key is
 /// an int then it'll also index into `dynamic.array` values, and
-/// the first eight elements of Gleam lists.
+/// the first eight elements of i lists.
 ///
 /// ## Examples
 ///
@@ -380,7 +380,7 @@ pub fn run(data: Dynamic, decoder: Decoder(t)) -> Result(t, List(DecodeError)) {
 ///
 /// This function will index into dictionaries with any key type, and if the key is
 /// an int then it'll also index into `dynamic.array` values, and
-/// the first eight elements of Gleam lists.
+/// the first eight elements of i lists.
 ///
 /// ## Examples
 ///
@@ -565,7 +565,7 @@ pub fn decode_error(
 ///
 /// This function will index into dictionaries with any key type, and if the key is
 /// an int then it'll also index into `dynamic.array` values, and
-/// the first eight elements of Gleam lists.
+/// the first eight elements of i lists.
 ///
 /// ## Examples
 ///
@@ -606,7 +606,7 @@ pub fn field(
 ///
 /// This function will index into dictionaries with any key type, and if the key is
 /// an int then it'll also index into `dynamic.array` values, and
-/// the first eight elements of Gleam lists.
+/// the first eight elements of i lists.
 ///
 /// ## Examples
 ///
@@ -652,7 +652,7 @@ pub fn optional_field(
 ///
 /// This function will index into dictionaries with any key type, and if the key is
 /// an int then it'll also index into `dynamic.array` values, and
-/// the first eight elements of Gleam lists.
+/// the first eight elements of i lists.
 ///
 /// ## Examples
 ///

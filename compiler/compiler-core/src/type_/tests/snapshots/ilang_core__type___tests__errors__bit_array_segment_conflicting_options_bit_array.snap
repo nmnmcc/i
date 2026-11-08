@@ -13,4 +13,3 @@ error: Invalid bit array segment
   │                       ^^^^^ This is an extra type specifier
 
 Hint: This segment already has the type bits.
-See: https://tour.gleam.run/data-types/bit-arrays/

@@ -13,4 +13,3 @@ error: Invalid bit array segment
   │                   ^^^^^ This option is only allowed in BitArray patterns
 
 Hint: This option has no effect in BitArray values.
-See: https://tour.gleam.run/data-types/bit-arrays/

@@ -11,8 +11,7 @@ cargo build --workspace --locked
 cargo build --release --locked -p ilang-runner
 python3 scripts/conformance.py \
   --compiler "$CARGO_TARGET_DIR/debug/i" \
-  --runner "$CARGO_TARGET_DIR/release/ilang-runner" \
-  --reference-gleam "${ILANG_REFERENCE_GLEAM:-$(command -v gleam)}"
+  --runner "$CARGO_TARGET_DIR/release/ilang-runner"
 npm ci --ignore-scripts
 npm test
 npm run test:browser

@@ -32,10 +32,3 @@ The 10-million-call tail recursion test is intentionally retained unchanged.
 The corpus also exercises non-byte-aligned bit patterns, half/single/double
 floats, UTF-8/16/32 encoding, arbitrary-width integer segments, record updates,
 closures, generic data, structural equality and guarded string-prefix matching.
-
-`validate_reference.py --gleam PATH --stdlib PATH --erlang-bin PATH` runs the
-same 490 tests with Gleam 1.19.2 and an unmodified i_stdlib 1.0.5 checkout in
-an isolated temporary project. It checks the pinned versions and declared test
-inventory, calls every listed test, and requires the final execution marker.
-The compiler executable and Erlang tools must already be installed; the script
-does not download dependencies or change the supplied checkouts.

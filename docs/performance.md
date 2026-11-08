@@ -95,11 +95,11 @@ To measure one engine, use `--engines cargo` or `--engines blaze`. This produces
 Use the same validated compiler and runner binaries throughout a comparison. For representative release timings, first run the release build, then:
 
 ```sh
-python3 scripts/benchmark.py gleam \
+python3 scripts/benchmark.py i \
   --compiler target/cargo/release/i \
   --runner target/cargo/release/ilang-runner \
   --modules 32 --rounds 5 \
-  --output target/benchmarks/gleam.json
+  --output target/benchmarks/i.json
 ```
 
 The harness snapshots the compiler and runner binaries and matching standard library before timing, so a concurrent development rebuild cannot change the executable used halfway through the run. Standard library selection is `--stdlib`, then `ILANG_STDLIB`, then `SOURCE/stdlib`; its content digest is recorded together with both binary digests.

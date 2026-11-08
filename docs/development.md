@@ -108,7 +108,7 @@ devenv tasks run release
 ```
 
 Verification uses Rust 1.99.1 and `target/cargo`, independently of Blaze output.
-It checks formatting and Clippy, runs the root and vendored frontend workspace
+It checks formatting and Clippy, runs the root and `compiler` workspace
 tests, builds the compiler and executor, runs the conformance fixtures, and
 executes the Node SDK and Chromium/Firefox/WebKit browser tests. The browser
 binaries come from Nix; npm does not download a second browser bundle. Release artifacts are built

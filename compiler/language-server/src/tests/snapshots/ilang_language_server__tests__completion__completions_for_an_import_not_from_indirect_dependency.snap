@@ -2,7 +2,7 @@
 source: language-server/src/tests/completion.rs
 expression: "import i\n\npub fn main() {\n  0\n}"
 ---
-import gle|am
+import i|
 
 pub fn main() {
   0
@@ -13,4 +13,4 @@ pub fn main() {
 example_module
   kind:   Module
   edits:
-    [0:7-0:12]: "example_module"
+    [0:7-0:8]: "example_module"

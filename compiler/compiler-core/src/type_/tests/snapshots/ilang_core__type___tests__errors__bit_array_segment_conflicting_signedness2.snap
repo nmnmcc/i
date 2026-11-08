@@ -13,4 +13,3 @@ error: Invalid bit array segment
   │                           ^^^^^^ This is an extra signedness specifier
 
 Hint: This segment already has a signedness of unsigned.
-See: https://tour.gleam.run/data-types/bit-arrays/
