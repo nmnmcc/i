@@ -999,3 +999,148 @@ fn publish_sees_what_the_host_must_give() {
         "{out}"
     );
 }
+
+#[test]
+fn publish_tells_apart_types_that_are_shown_alike() {
+    let w = World::new();
+    // Two packages, both named `util`, each with a module `u` and a type
+    // `T`; `pa` and `pb` each use one of them as `util`.
+    let util = |ty: &str| format!("export (T(..))\n\nT {{ T({ty}) }}\n");
+    let (u1, u2) = (util("Int"), util("String"));
+    w.repo(
+        "u1",
+        &[(
+            "1.0.0",
+            &[("i.toml", "name = \"util\"\n"), ("src/u.i", &u1)],
+        )],
+    );
+    w.repo(
+        "u2",
+        &[(
+            "1.0.0",
+            &[("i.toml", "name = \"util\"\n"), ("src/u.i", &u2)],
+        )],
+    );
+    let get = "import (util/u)\nexport (get)\n\nget = (x: u.T) { x }\n";
+    for (name, dep) in [("pa", "u1"), ("pb", "u2")] {
+        let toml =
+            format!("name = \"{name}\"\n\n[dependencies]\nutil = \"example.com/{dep}@1.0.0\"\n");
+        w.repo(name, &[("1.0.0", &[("i.toml", &toml), ("src/m.i", get)])]);
+    }
+    let dir = w.project(
+        "lib",
+        &[
+            (
+                "i.toml",
+                "name = \"lib\"\n\n[dependencies]\npa = \"example.com/pa@1.0.0\"\npb = \"example.com/pb@1.0.0\"\n",
+            ),
+            (".gitignore", "/build/\n"),
+            ("src/m.i", "import (pa/m)\nexport (h)\n\nh = m.get\n"),
+        ],
+    );
+    let project = dir.display().to_string();
+    w.ok(&["check", "--project", &project]);
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "first");
+    w.ok(&["publish", "1.0.0", "--project", &project]);
+
+    // `h` is shown alike, but it is another type.
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[("src/m.i", "import (pb/m)\nexport (h)\n\nh = m.get\n")],
+        "1.0.1",
+    );
+    assert!(!ok, "{out}");
+    assert!(
+        out.contains("changed value m.h: (x: example.com/u1@1:u.T) -> example.com/u1@1:u.T"),
+        "{out}"
+    );
+    assert!(
+        out.contains("to value m.h: (x: example.com/u2@1:u.T) -> example.com/u2@1:u.T"),
+        "{out}"
+    );
+    assert!(out.contains("a new major version"), "{out}");
+}
+
+#[test]
+fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
+    let w = World::new();
+    let api = "export (f)\n\n@external(\"env\", \"now\")\nnow: () -> Int\n\n@host(\"pub:io/v1\")\nIo { Io(print: (text: String) -> Nil) }\n\nf = () { now() }\n";
+    let dir = w.project(
+        "pub",
+        &[
+            ("i.toml", "name = \"pub\"\n"),
+            (".gitignore", "/build/\n"),
+            ("src/api.i", api),
+        ],
+    );
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "first");
+    let project = dir.display().to_string();
+    w.ok(&["publish", "1.0.0", "--project", &project]);
+
+    // Other names for them in the package are no change.
+    let renamed = api
+        .replace("now", "clock")
+        .replace("\"clock\")", "\"now\")")
+        .replace("Io", "Out");
+    let (ok, out) = try_publish(&w, &dir, &[("src/api.i", &renamed)], "1.0.1");
+    assert!(ok, "{out}");
+    assert!(
+        out.contains("the public interface is the same as in v1.0.0"),
+        "{out}"
+    );
+
+    // Another import of the external function that `f` uses.
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[("src/api.i", &api.replace("\"now\")", "\"now2\")"))],
+        "1.0.2",
+    );
+    assert!(!ok, "{out}");
+    assert!(
+        out.contains("removed external \"env\" \"now\": () -> Int"),
+        "{out}"
+    );
+    assert!(
+        out.contains("added external \"env\" \"now2\": () -> Int"),
+        "{out}"
+    );
+    assert!(out.contains("a new major version"), "{out}");
+
+    // Another type of it.
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[(
+            "src/api.i",
+            &api.replace("now: () -> Int", "now: (n: Int) -> Int")
+                .replace("now()", "now(1)"),
+        )],
+        "1.0.2",
+    );
+    assert!(!ok, "{out}");
+    assert!(
+        out.contains("changed external \"env\" \"now\": () -> Int"),
+        "{out}"
+    );
+
+    // Another label of a function of a host service.
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[("src/api.i", &api.replace("print:", "show:"))],
+        "1.0.2",
+    );
+    assert!(!ok, "{out}");
+    assert!(
+        out.contains("changed host \"pub:io/v1\": (print: (text: String) -> Nil)"),
+        "{out}"
+    );
+    assert!(
+        out.contains("to host \"pub:io/v1\": (show: (text: String) -> Nil)"),
+        "{out}"
+    );
+}
