@@ -430,6 +430,67 @@ fn types_of_parameters_that_share_a_type_variable() {
 }
 
 #[test]
+fn local_types_use_the_names_of_the_scheme() {
+    let f = Fixture::new(&[(
+        "src/main.i",
+        "k = (f, x) {\n  y = f(x)\n  y\n}\n\
+         compose = (f, g) {\n  (x) { g(f(x)) }\n}\n\
+         pairup = (a, b) { (b, a) }\n\
+         twice = (f) {\n  (z) { f(f(z)) }\n}\n\
+         both = (f, x) {\n  w = (q) { (q, x) }\n  (f(x), w)\n}\n",
+    )]);
+    assert!(!f.checked.diags.iter().any(|d| d.is_error()));
+    // The value of `f` is `y`, and the value of `k`.
+    assert_eq!(
+        f.hover("app/main", "k = ", 0),
+        "k: (f: (a) -> b ? e ! n, x: a) -> b ? e ! n"
+    );
+    assert_eq!(f.hover("app/main", "y = ", 0), "y: b");
+    assert_eq!(f.hover("app/main", "y\n}", 0), "y: b");
+    assert_eq!(
+        f.hover("app/main", "f, x) {\n  y", 0),
+        "f: (a) -> b ? e ! n"
+    );
+    // The second parameter of `compose` is named as in its scheme.
+    let compose = f.hover("app/main", "compose", 0);
+    assert_eq!(
+        compose,
+        "compose: (f: (a) -> b ? e ! n, g: (b) -> c ? e2 ! n2) -> \
+         (x: a) -> c ? e | e2 ! n | n2"
+    );
+    assert_eq!(f.hover("app/main", "f, g", 0), "f: (a) -> b ? e ! n");
+    assert_eq!(f.hover("app/main", "g) {", 0), "g: (b) -> c ? e2 ! n2");
+    assert_eq!(f.hover("app/main", "x) { g", 0), "x: a");
+    assert_eq!(f.hover("app/main", "g(f(x))", 0), "g: (b) -> c ? e2 ! n2");
+    // The names of the parameters are not the names of their types.
+    assert_eq!(
+        f.hover("app/main", "pairup", 0),
+        "pairup: (a: a, b: b) -> (b, a)"
+    );
+    assert_eq!(f.hover("app/main", "a, b)", 0), "a: a");
+    assert_eq!(f.hover("app/main", "b) {", 0), "b: b");
+    assert_eq!(f.hover("app/main", "b, a)", 0), "b: b");
+    assert_eq!(
+        f.hover("app/main", "twice", 0),
+        "twice: (f: (a | b) -> b & c ? e ! n) -> (z: a) -> c ? e ! n"
+    );
+    assert_eq!(f.hover("app/main", "z) {", 0), "z: a");
+    assert_eq!(
+        f.hover("app/main", "f(f(z))", 0),
+        "f: (a | b) -> b & c ? e ! n"
+    );
+    // `w` is generalized in the block: its own variable is not one of the
+    // scheme, and has a name that is not used there.
+    assert_eq!(
+        f.hover("app/main", "both = ", 0),
+        "both: (f: (a) -> b ? e ! n, x: a) -> (b, (q: c) -> (c, a)) ? e ! n"
+    );
+    assert_eq!(f.hover("app/main", "w = ", 0), "w: (q: d) -> (d, a)");
+    assert_eq!(f.hover("app/main", "q) {", 0), "q: d");
+    assert_eq!(f.hover("app/main", "x) {\n  w", 0), "x: a");
+}
+
+#[test]
 fn completions_of_the_name_being_bound() {
     let f = Fixture::new(&[(
         "src/main.i",

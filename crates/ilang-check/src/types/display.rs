@@ -35,13 +35,16 @@ pub(crate) fn scheme(s: &Solver, t: &Ty, opts: Opts) -> Result<String, ()> {
 
 /// The shown type of `t`, simplified together with the types in `context`:
 /// a variable that `t` shares with them is kept, as it is in the type
-/// scheme that they are part of, and only `t` is shown.
+/// scheme that they are part of, and only `t` is shown. The variables are
+/// named over the whole, in the order of `context` and then `t`, so a
+/// variable that `t` shares with them has the name it has there, and the
+/// others have names that are not used there.
 pub(crate) fn scheme_in(s: &Solver, t: &Ty, context: &[Ty], opts: Opts) -> Result<String, ()> {
     let mut parts = context.to_vec();
     parts.push(t.clone());
-    let whole = Ty::Con(super::Head::Tuple(parts.len() as u32), parts);
+    let whole = Ty::tuple(parts);
     match simplify_with(s, &whole, None, opts)? {
-        Ty::Con(_, mut parts) => Ok(Namer::new(s).show(&parts.pop().ok_or(())?)),
+        whole @ Ty::Con(..) => Namer::new(s).show_last(&whole),
         _ => Err(()),
     }
 }
@@ -914,6 +917,21 @@ impl<'s> Namer<'s> {
     }
 
     fn show(mut self, t: &Ty) -> String {
+        let t = self.name(t);
+        self.render(&t)
+    }
+
+    /// The last part of the tuple `whole`, with its variables named as in
+    /// the whole.
+    fn show_last(mut self, whole: &Ty) -> Result<String, ()> {
+        match self.name(whole) {
+            Ty::Con(_, parts) => Ok(self.render(parts.last().ok_or(())?)),
+            _ => Err(()),
+        }
+    }
+
+    /// `t` as it is shown, with a name for each of its variables.
+    fn name(&mut self, t: &Ty) -> Ty {
         // `Top` is a variable that has no effect: each gets its own name.
         let mut next = u32::MAX;
         let t = tops(&holes(&both(t)), &mut next);
@@ -935,11 +953,14 @@ impl<'s> Namer<'s> {
             let n = self.fresh(*role);
             self.names.insert(*v, n);
         }
-        let names = self.names;
+        t
+    }
+
+    fn render(&self, t: &Ty) -> String {
         render(
-            &t,
+            t,
             0,
-            &mut |v| names.get(&v).cloned().unwrap_or_else(|| "_".into()),
+            &mut |v| self.names.get(&v).cloned().unwrap_or_else(|| "_".into()),
             &self.s.type_names,
         )
     }
