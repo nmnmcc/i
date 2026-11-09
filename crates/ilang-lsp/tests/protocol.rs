@@ -637,3 +637,38 @@ fn quick_changes_are_checked_once() {
     assert!(!c.has_diagnostics(&main));
     c.shutdown();
 }
+
+/// Hover on a local name names its type variables as the type scheme of
+/// the top-level binding that it is in does.
+#[test]
+fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
+    let text = "k = (f, x) {\n  y = f(x)\n  y\n}\n\
+                \n\
+                compose = (f, g) {\n  (x) { g(f(x)) }\n}\n\
+                \n\
+                pairup = (a, b) { (b, a) }\n";
+    let dir = tempfile::tempdir().unwrap();
+    package(dir.path(), &[("src/main.i", text)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut c = Client::start();
+    c.open(&main, text);
+    assert_eq!(c.diagnostics(&main), vec![]);
+    let mut hover = |needle: &str| {
+        let (l, ch) = find(text, needle, 0);
+        let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch));
+        let value = h["contents"]["value"].as_str().unwrap();
+        value
+            .trim_start_matches("```i\n")
+            .trim_end_matches("\n```")
+            .to_string()
+    };
+    assert_eq!(hover("k ="), "k: (f: (a) -> b ? e ! n, x: a) -> b ? e ! n");
+    assert_eq!(hover("y ="), "y: b");
+    assert_eq!(hover("f, x"), "f: (a) -> b ? e ! n");
+    assert_eq!(hover("g) {"), "g: (b) -> c ? e2 ! n2");
+    assert_eq!(hover("f, g"), "f: (a) -> b ? e ! n");
+    assert_eq!(hover("x) { g"), "x: a");
+    assert_eq!(hover("b) {"), "b: b");
+    assert_eq!(hover("a, b"), "a: a");
+    c.shutdown();
+}
