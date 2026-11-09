@@ -37,15 +37,30 @@ jobs:
         with:
           submodules: ${{ matrix.part != 'js' }}
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          # Take paths that were built here before, such as the Rust toolchain
+          # of rust-overlay, from the cache instead of building them again.
+          extra-conf: |
+            always-allow-substitutes = true
+      # Keeps the Nix store paths built in CI in the GitHub Actions cache. Only
+      # the Actions cache is used, not FlakeHub, and the daemon is pinned.
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       # devenv 2.4.0, prebuilt in the binary cache of nixpkgs.
       - name: Install devenv
-        run: nix profile install nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         if: matrix.part != 'js'
         with:
           key: ${{ matrix.part }}
           # Run rustc and cargo of the Devenv shell, not those of the runner.
           cmd-format: devenv shell -- {0}
+          # The objects of Binaryen's C++ (see CMAKE_CXX_COMPILER_LAUNCHER in
+          # devenv.nix).
+          cache-directories: ~/.cache/ccache
           # Only main writes the cache, so that it stays small; every branch reads it.
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Verify ${{ matrix.part }}
