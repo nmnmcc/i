@@ -13,11 +13,13 @@
 use anyhow::{Context, Result, anyhow, bail};
 use clap::Subcommand;
 use ilang_check::hir::{self, DefKind, TypeBody, TypeKind, TypeRef};
+use ilang_check::identity::{PackageIdentity, type_identity};
+use ilang_check::types::ShownType;
 use ilang_package::git::Git;
 use ilang_package::manifest::{self, DependencySource, Version, parse_location, parse_version};
 use ilang_package::{Diagnostic, LoadOptions, ModuleKind, PackageGraph, PackageId, is_name};
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use toml_edit::{DocumentMut, InlineTable, Item, TableLike, Value};
@@ -289,8 +291,15 @@ impl PackageFile {
 
     /// Sets the dependency `name` in its table to `value`, keeping the
     /// comments around an entry that was there: the key, with the comments
-    /// above it, stays, and the value keeps its trailing comment.
+    /// above it, stays, and the value keeps its trailing comment. An entry
+    /// written as its own table is changed by [`set_table`].
     fn set(&mut self, dev: bool, name: &str, mut value: Value) -> Result<()> {
+        if let Some(Item::Table(parent)) = self.doc.get_mut(TABLES[dev as usize])
+            && matches!(parent.get(name), Some(Item::Table(_)))
+        {
+            set_table(parent, name, value);
+            return Ok(());
+        }
         let table = self.table(dev)?;
         match table.get_mut(name) {
             Some(old) => {
@@ -329,6 +338,66 @@ impl PackageFile {
             Some(bytes) => std::fs::write(&lock, bytes),
             None => std::fs::remove_file(&lock),
         };
+    }
+}
+
+/// Sets the dependency `name` of `parent`, written as its own table
+/// `[dependencies.name]`, to `value`, keeping its comments. A path stays
+/// that table, with its header and the comments of its entries. A location
+/// is a string, so it becomes an entry `name = "…"`: when `parent` has no
+/// header of its own, it takes the header's place and its comments;
+/// otherwise the comments above the header go above the entry.
+fn set_table(parent: &mut toml_edit::Table, name: &str, mut value: Value) {
+    let Some(Item::Table(old)) = parent.get_mut(name) else {
+        return;
+    };
+    if let Value::InlineTable(new) = value {
+        let gone: Vec<String> = old
+            .iter()
+            .map(|(k, _)| k.to_string())
+            .filter(|k| !new.contains_key(k))
+            .collect();
+        for k in gone {
+            old.remove(&k);
+        }
+        for (k, mut v) in new {
+            match old.get(&k).and_then(Item::as_value) {
+                Some(o) => *v.decor_mut() = o.decor().clone(),
+                None => v.decor_mut().clear(),
+            }
+            old.insert(&k, Item::Value(v));
+        }
+        return;
+    }
+    let decor = old.decor().clone();
+    let position = old.position();
+    // The key keeps its place in `parent`, but not the format it had in
+    // the header.
+    if parent.is_implicit() {
+        parent.set_implicit(false);
+        *parent.decor_mut() = decor;
+        parent.set_position(position);
+        parent.insert(name, Item::Value(value));
+        if let Some(mut key) = parent.key_mut(name) {
+            key.leaf_decor_mut().clear();
+        }
+        return;
+    }
+    let text = |raw: Option<&toml_edit::RawString>| {
+        raw.and_then(|r| r.as_str()).unwrap_or_default().to_string()
+    };
+    let comments = text(decor.prefix());
+    let comments = comments.trim_start_matches(['\n', '\r', ' ', '\t']);
+    let after = text(decor.suffix());
+    if after.trim_start().starts_with('#') {
+        value.decor_mut().set_suffix(after);
+    }
+    parent.insert(name, Item::Value(value));
+    if let Some(mut key) = parent.key_mut(name) {
+        key.leaf_decor_mut().clear();
+        if !comments.is_empty() {
+            key.leaf_decor_mut().set_prefix(comments);
+        }
     }
 }
 
@@ -930,12 +999,12 @@ fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interfac
 
 /// One part of the public interface: how it is shown, and its canonical
 /// form, which is what is compared. In the canonical form each custom type
-/// is named by what it is, whatever the module that uses it calls it: its
-/// package (this package; the library `i`; `location@major` for a package
-/// with a location, so that a new major version of a dependency is another
-/// type (§2.7); `path dir` for a path dependency), its module in that
-/// package, and its name. Type variables are named by the order they first
-/// come in.
+/// is named by what it is (`ilang_check::identity`), whatever the module
+/// that uses it calls it: its package (this package; the library `i`;
+/// `location@major` for a package with a location, so that a new major
+/// version of a dependency is another type (§2.7); `path dir` for a path
+/// dependency), its module in that package, and its name. Type variables
+/// are named by the order they first come in.
 #[derive(Clone, Debug)]
 struct Entry {
     shown: String,
@@ -946,10 +1015,15 @@ struct Entry {
 /// exported value its type, with the import of an external declaration
 /// (§10.1); for each exported type its parameters and host namespace (or
 /// its alias); and for each type exported with its constructors, and each
-/// host service type (§9.7), the constructors with their fields. The keys
-/// are `value m.x`, `type m.T`, and `constructors m.T`, where `m` is the
-/// module path without the package name, which only the package itself
-/// uses (§2.6).
+/// exported host service type (§9.7), the constructors with their fields.
+/// The keys are `value m.x`, `type m.T`, and `constructors m.T`, where `m`
+/// is the module path without the package name, which only the package
+/// itself uses (§2.6).
+///
+/// What the host must give is part of it too, exported or not, since an
+/// exported function may use it: each external function (§10.1), as
+/// `external "module" "function"` with its type, and each host service
+/// (§9.7), as `host "namespace"` with the fields of its constructor.
 type Interface = BTreeMap<String, Entry>;
 
 /// The interface of the package in `dir`, checked without its tests. The
@@ -975,47 +1049,77 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
     if diags.iter().any(Diagnostic::is_error) {
         return Ok(Err(problems(&graph, &diags)));
     }
-    let names = TypeNames::new(&graph, program, root);
+    let canonical_names = canonical_names(&graph, program);
     let mut out = Interface::new();
+    // What the host must give, by its key: how each declaration of it is
+    // shown, and its canonical forms.
+    let mut host: BTreeMap<String, (BTreeSet<String>, BTreeSet<String>)> = BTreeMap::new();
     for (i, m) in program.modules.iter().enumerate() {
         if m.package != root || m.kind != ModuleKind::Src {
             continue;
         }
         let module = hir::ModuleId(i as u32);
-        let shown_names = names.shown(module);
-        let local = names.local(module);
+        let shown_names = ilang_check::types::type_names(program, module);
         let path = inner_path(&m.path);
         for (index, d) in m.defs.iter().enumerate() {
-            if !d.exported {
-                continue;
-            }
             let id = hir::DefId {
                 module,
                 index: index as u32,
             };
             let ty = typed.schemes.get(&id).map_or("_", String::as_str);
+            let canonical = typed
+                .scheme_types
+                .get(&id)
+                .map_or_else(|| "_".to_string(), |t| canonical_type(t, &canonical_names));
             // The host gives an external function by its module and name.
             let import = match &d.kind {
                 DefKind::External {
                     module, function, ..
-                } => format!("@external(\"{module}\", \"{function}\") "),
+                } => {
+                    let (shown, canon) = host
+                        .entry(format!("external \"{module}\" \"{function}\""))
+                        .or_default();
+                    shown.insert(ty.to_string());
+                    canon.insert(canonical.clone());
+                    format!("@external(\"{module}\", \"{function}\") ")
+                }
                 DefKind::Binding { .. } => String::new(),
             };
+            if !d.exported {
+                continue;
+            }
             out.insert(
                 format!("value {path}.{}", d.name),
                 Entry {
                     shown: format!("{import}{ty}"),
-                    canonical: format!("{import}{}", canonical_scheme(ty, &local)),
+                    canonical: format!("{import}{canonical}"),
                 },
             );
         }
         for &t in &m.types {
             let def = program.ty(t);
+            let shown = TypeShow::new(program, def, &shown_names, false);
+            let canonical = TypeShow::new(program, def, &canonical_names, true);
+            // The host gives the functions of a host service by their
+            // labels (§9.7), so they are part of the interface even when
+            // the type or its constructor is not exported.
+            if let (Some(h), TypeBody::Custom(ctors)) = (&def.host, &def.body) {
+                let fields = |s: &TypeShow| -> String {
+                    let ctors: Vec<String> = ctors.iter().map(|c| s.fields(c)).collect();
+                    let all = ctors.join(" | ");
+                    if h.is_async {
+                        format!("async {all}")
+                    } else {
+                        all
+                    }
+                };
+                let (s, c) = host.entry(format!("host \"{}\"", h.namespace)).or_default();
+                s.insert(fields(&shown));
+                c.insert(fields(&canonical));
+            }
             if !def.exported {
                 continue;
             }
-            let shown = TypeShow::new(program, def, &shown_names, false);
-            let canonical = TypeShow::new(program, def, &names.canonical, true);
             out.insert(
                 format!("type {path}.{}", def.name),
                 Entry {
@@ -1023,9 +1127,6 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                     canonical: canonical.head(),
                 },
             );
-            // The host gives the functions of a host service by their
-            // labels (§9.7), so they are part of the interface even when
-            // the constructor is not exported.
             if (def.constructors_exported || def.host.is_some())
                 && let TypeBody::Custom(ctors) = &def.body
             {
@@ -1043,6 +1144,16 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
             }
         }
     }
+    for (key, (shown, canonical)) in host {
+        let join = |set: BTreeSet<String>| set.into_iter().collect::<Vec<_>>().join("; ");
+        out.insert(
+            key,
+            Entry {
+                shown: join(shown),
+                canonical: join(canonical),
+            },
+        );
+    }
     Ok(Ok(out))
 }
 
@@ -1051,127 +1162,52 @@ fn inner_path(path: &str) -> &str {
     path.split_once('/').map_or(path, |(_, p)| p)
 }
 
-/// The names of the custom types of a program, by `TypeId`.
-struct TypeNames<'a> {
-    program: &'a hir::Program,
-    /// The canonical name of each type (see [`Entry`]).
-    canonical: Vec<String>,
+/// The canonical name of each custom type of a program, by `TypeId` (see
+/// [`Entry`]): `m.Name` for a type of this package, and else its package,
+/// `:`, and `m.Name`.
+fn canonical_names(graph: &PackageGraph, program: &hir::Program) -> Vec<String> {
+    let root_dir = graph
+        .root
+        .and_then(|r| graph.packages[r].dir.clone())
+        .unwrap_or_default();
+    (0..program.types.len())
+        .map(|i| {
+            let t = type_identity(graph, program, hir::TypeId(i as u32));
+            let inner = format!("{}.{}", t.module, t.name);
+            match t.package {
+                PackageIdentity::Root => inner,
+                PackageIdentity::Library => format!("i:{inner}"),
+                PackageIdentity::Location { location, major } => {
+                    format!("{location}@{major}:{inner}")
+                }
+                PackageIdentity::Path(dir) => {
+                    format!("path {}:{inner}", relative(&root_dir, &dir))
+                }
+                PackageIdentity::Named(name) => format!("package {name}:{inner}"),
+            }
+        })
+        .collect()
 }
 
-impl<'a> TypeNames<'a> {
-    fn new(graph: &PackageGraph, program: &'a hir::Program, root: PackageId) -> Self {
-        let root_dir = graph.packages[root].dir.clone().unwrap_or_default();
-        let package = |id: PackageId| -> String {
-            let p = &graph.packages[id];
-            match (&p.location, &p.dir) {
-                _ if id == graph.library => "i".to_string(),
-                (Some(l), _) => format!("{}@{}", l.location, l.version.major),
-                (None, Some(dir)) => format!("path {}", relative(&root_dir, dir)),
-                (None, None) => format!("package {}", p.name),
-            }
-        };
-        let canonical = program
-            .types
-            .iter()
-            .map(|t| {
-                let m = program.module(t.module);
-                let inner = inner_path(&m.path);
-                if m.package == root {
-                    format!("{inner}.{}", t.name)
-                } else {
-                    format!("{}:{inner}.{}", package(m.package), t.name)
-                }
-            })
-            .collect();
-        TypeNames { program, canonical }
-    }
-
-    /// The name of each type in the module `m`, as the types of its values
-    /// are shown: the name alone for a type of the module, of the prelude,
-    /// or put in by an import (§2.3); `alias.Name` for a type of an
-    /// imported module; else `module/path.Name`.
-    fn shown(&self, m: hir::ModuleId) -> Vec<String> {
-        let p = self.program;
-        let here = p.module(m);
-        p.types
-            .iter()
-            .enumerate()
-            .map(|(i, t)| {
-                let id = hir::TypeId(i as u32);
-                if t.module == m || Some(t.module) == p.prelude || here.imported_types.contains(&id)
-                {
-                    t.name.clone()
-                } else if let Some((alias, _)) = here.import_names.iter().find(|x| x.1 == t.module)
-                {
-                    format!("{alias}.{}", t.name)
-                } else {
-                    format!("{}.{}", p.module(t.module).path, t.name)
-                }
-            })
-            .collect()
-    }
-
-    /// The canonical name of each name that a type is shown by in the
-    /// module `m`. When two types are shown alike, the name is the one that
-    /// the module means by it: its own type, then a type put in by an
-    /// import, then one of the prelude.
-    fn local(&self, m: hir::ModuleId) -> HashMap<String, String> {
-        let p = self.program;
-        let here = p.module(m);
-        let mut out: HashMap<String, (u8, String)> = HashMap::new();
-        for (i, shown) in self.shown(m).into_iter().enumerate() {
-            let id = hir::TypeId(i as u32);
-            let t = p.ty(id);
-            let rank = if t.module == m {
-                3
-            } else if here.imported_types.contains(&id) {
-                2
-            } else if Some(t.module) == p.prelude {
-                1
-            } else {
-                0
-            };
-            if out.get(&shown).is_none_or(|(r, _)| *r < rank) {
-                out.insert(shown, (rank, self.canonical[i].clone()));
-            }
-        }
-        out.into_iter().map(|(k, (_, v))| (k, v)).collect()
-    }
-}
-
-/// The canonical form of a type shown in the syntax of §3 (§4.7) in a
-/// module whose names of types are `names` (from [`TypeNames::local`]):
-/// each name of a custom type is put as its canonical name, and each type
-/// variable as `'0`, `'1`, … in the order they first come in. Labels and
-/// the names of the built-in types stay.
-fn canonical_scheme(text: &str, names: &HashMap<String, String>) -> String {
-    let is_word = |c: char| c.is_alphanumeric() || matches!(c, '_' | '.' | '/');
-    let mut out = String::new();
-    let mut vars: Vec<&str> = Vec::new();
-    let mut rest = text;
-    while let Some(c) = rest.chars().next() {
-        if !is_word(c) {
-            out.push(c);
-            rest = &rest[c.len_utf8()..];
-            continue;
-        }
-        let end = rest.find(|c| !is_word(c)).unwrap_or(rest.len());
-        let (word, after) = rest.split_at(end);
-        rest = after;
-        if word == "_" || after.trim_start().starts_with(':') {
-            // A part with no effect, or a label.
-            out.push_str(word);
-        } else if word.contains('.') || word.starts_with(char::is_uppercase) {
-            out.push_str(names.get(word).map_or(word, String::as_str));
-        } else {
-            let i = vars.iter().position(|v| *v == word).unwrap_or_else(|| {
-                vars.push(word);
+/// The canonical form of a shown type (§4.7): each custom type is put as
+/// its canonical name, and each type variable as `'0`, `'1`, … in the
+/// order they first come in. Labels and the names of the built-in types
+/// stay.
+fn canonical_type(t: &ShownType, names: &[String]) -> String {
+    let mut vars: Vec<String> = Vec::new();
+    t.text_with(
+        &mut |r| match r {
+            TypeRef::Builtin(b) => b.name().to_string(),
+            TypeRef::Custom(id) => names[id.0 as usize].clone(),
+        },
+        &mut |v| {
+            let i = vars.iter().position(|x| x == v).unwrap_or_else(|| {
+                vars.push(v.to_string());
                 vars.len() - 1
             });
-            out.push_str(&format!("'{i}"));
-        }
-    }
-    out
+            format!("'{i}")
+        },
+    )
 }
 
 /// Shows the parts of a type definition. The parameters are named by their
@@ -1254,6 +1290,11 @@ impl<'a> TypeShow<'a> {
         if c.fields.is_empty() {
             return c.name.clone();
         }
+        format!("{}{}", c.name, self.fields(c))
+    }
+
+    /// `(label: Type, Type)`: the fields of a constructor.
+    fn fields(&self, c: &hir::CtorDef) -> String {
         let fields: Vec<String> = c
             .fields
             .iter()
@@ -1262,7 +1303,7 @@ impl<'a> TypeShow<'a> {
                 None => self.ty(&f.ty, 0),
             })
             .collect();
-        format!("{}({})", c.name, fields.join(", "))
+        format!("({})", fields.join(", "))
     }
 
     /// A written type in the syntax of §3. `prec` is 1 inside a union, 2

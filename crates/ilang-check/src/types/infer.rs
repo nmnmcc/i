@@ -208,8 +208,11 @@ impl<'a> Checker<'a> {
                 };
                 // A type with itself inside it has been reported by the
                 // occurs check, and is not shown.
-                if let Ok(text) = display::scheme(&self.s, &scheme.ty, opts) {
-                    typed.schemes.insert(id, text);
+                if let Ok(shown) = display::scheme(&self.s, &scheme.ty, opts) {
+                    typed.schemes.insert(id, shown.text(&self.s.type_names));
+                    if d.exported || opts.written {
+                        typed.scheme_types.insert(id, shown);
+                    }
                 }
                 self.exported_type(d, &scheme.ty.clone(), opts);
             }

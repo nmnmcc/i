@@ -9,8 +9,7 @@
 //! not removed for being on one side only.
 
 use super::solve::Solver;
-use super::{FnTy, Head, Ty, V, Variance};
-use crate::hir::TypeRef;
+use super::{FnTy, Head, ShownFn, ShownType, Ty, V, Variance};
 // Fast hashing for the small keys of coalescing (docs/performance.md).
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
@@ -28,7 +27,7 @@ pub(crate) struct Opts {
 
 /// The shown type scheme of `t`. `Err` when the type has itself inside it
 /// through a type variable (§4.7).
-pub(crate) fn scheme(s: &Solver, t: &Ty, opts: Opts) -> Result<String, ()> {
+pub(crate) fn scheme(s: &Solver, t: &Ty, opts: Opts) -> Result<ShownType, ()> {
     let t = simplify_with(s, t, None, opts)?;
     Ok(Namer::new(s).show(&t))
 }
@@ -41,7 +40,9 @@ pub(crate) fn scheme_in(s: &Solver, t: &Ty, context: &[Ty], opts: Opts) -> Resul
     parts.push(t.clone());
     let whole = Ty::Con(super::Head::Tuple(parts.len() as u32), parts);
     match simplify_with(s, &whole, None, opts)? {
-        Ty::Con(_, mut parts) => Ok(Namer::new(s).show(&parts.pop().ok_or(())?)),
+        Ty::Con(_, mut parts) => Ok(Namer::new(s)
+            .show(&parts.pop().ok_or(())?)
+            .text(&s.type_names)),
         _ => Err(()),
     }
 }
@@ -98,7 +99,7 @@ fn rigid(s: &Solver, keep: Option<u32>, v: V) -> bool {
 
 /// A type as it is in the solver, for messages: variables are `_`.
 pub(crate) fn show(s: &Solver, t: &Ty) -> String {
-    render(&both(t), 0, &mut |_| "_".to_string(), &s.type_names)
+    render(&both(t), &mut |_| "_".to_string(), &s.type_names)
 }
 
 /// The variables that are equal because they are in a cycle of bounds that
@@ -913,7 +914,7 @@ impl<'s> Namer<'s> {
         }
     }
 
-    fn show(mut self, t: &Ty) -> String {
+    fn show(mut self, t: &Ty) -> ShownType {
         // `Top` is a variable that has no effect: each gets its own name.
         let mut next = u32::MAX;
         let t = tops(&holes(&both(t)), &mut next);
@@ -936,12 +937,9 @@ impl<'s> Namer<'s> {
             self.names.insert(*v, n);
         }
         let names = self.names;
-        render(
-            &t,
-            0,
-            &mut |v| names.get(&v).cloned().unwrap_or_else(|| "_".into()),
-            &self.s.type_names,
-        )
+        tree(&t, &mut |v| {
+            names.get(&v).cloned().unwrap_or_else(|| "_".into())
+        })
     }
 
     fn fresh(&mut self, role: Role) -> String {
@@ -1027,84 +1025,50 @@ fn roles(t: &Ty, role: Role, out: &mut Vec<(V, Role)>) {
     }
 }
 
-/// The text of a type (§3). `prec` is what the place allows: 0 any type, 1
-/// no union, 2 no intersection, 3 no difference and no function type.
-fn render(t: &Ty, prec: u8, name: &mut dyn FnMut(V) -> String, tn: &[String]) -> String {
-    let wrap = |s: String, need: u8| if prec > need { format!("{{ {s} }}") } else { s };
+/// The tree of a shown type: `Both` is its side that is shown, `Top` is
+/// `_`, and each variable has the name that `name` gives it.
+fn tree(t: &Ty, name: &mut dyn FnMut(V) -> String) -> ShownType {
+    let all = |xs: &[Ty], name: &mut dyn FnMut(V) -> String| -> Vec<ShownType> {
+        xs.iter().map(|x| tree(x, name)).collect()
+    };
     match t {
-        Ty::Var(v) => name(*v),
-        Ty::Never => "Never".into(),
-        Ty::Top => "_".into(),
-        Ty::Con(Head::Named(r), args) => {
-            let base = type_name(*r, tn);
-            if args.is_empty() {
-                base
-            } else {
-                let args: Vec<String> = args.iter().map(|a| render(a, 0, name, tn)).collect();
-                format!("{base}({})", args.join(", "))
-            }
-        }
-        Ty::Con(_, parts) => {
-            let parts: Vec<String> = parts.iter().map(|a| render(a, 0, name, tn)).collect();
-            format!("({})", parts.join(", "))
-        }
+        Ty::Var(v) => ShownType::Var(name(*v)),
+        Ty::Never => ShownType::Never,
+        Ty::Top => ShownType::Hole,
+        Ty::Con(Head::Named(r), args) => ShownType::Named(*r, all(args, name)),
+        Ty::Con(_, parts) => ShownType::Tuple(all(parts, name)),
         Ty::Fn(f) => {
-            let params: Vec<String> = f
+            let params = f
                 .params
                 .iter()
-                .map(|(l, p)| match l {
-                    Some(l) => format!("{l}: {}", render(p, 0, name, tn)),
-                    None => render(p, 0, name, tn),
-                })
+                .map(|(l, p)| (l.clone(), tree(p, name)))
                 .collect();
-            let has_err = f.err != Ty::Never;
-            let has_env = f.env != Ty::Never;
-            let part = |x: &Ty, followed: bool, name: &mut dyn FnMut(V) -> String| {
-                let s = render(x, 0, name, tn);
-                if followed && matches!(x, Ty::Fn(_)) {
-                    format!("{{ {s} }}")
-                } else {
-                    s
-                }
-            };
-            let mut s = format!(
-                "({}) -> {}",
-                params.join(", "),
-                part(&f.ret, has_err || has_env, name)
-            );
-            if has_err {
-                s.push_str(&format!(" ? {}", part(&f.err, has_env, name)));
-            }
-            if has_env {
-                s.push_str(&format!(" ! {}", part(&f.env, false, name)));
-            }
-            wrap(s, 0)
+            let ret = tree(&f.ret, name);
+            let err = (f.err != Ty::Never).then(|| tree(&f.err, name));
+            let env = (f.env != Ty::Never).then(|| tree(&f.env, name));
+            ShownType::Fn(Box::new(ShownFn {
+                params,
+                ret,
+                err,
+                env,
+            }))
         }
-        Ty::Union(ms) => {
-            let ms: Vec<String> = ms.iter().map(|m| render(m, 1, name, tn)).collect();
-            wrap(ms.join(" | "), 0)
-        }
-        Ty::Inter(ms) => {
-            let ms: Vec<String> = ms.iter().map(|m| render(m, 2, name, tn)).collect();
-            wrap(ms.join(" & "), 1)
-        }
-        Ty::Diff(a, h) => {
-            // Only the type constructors of `H` matter (§4.4).
-            let mut s = render(a, 2, name, tn);
-            for m in h {
-                s.push_str(" - ");
-                s.push_str(&render(m, 3, name, tn));
-            }
-            wrap(s, 2)
-        }
+        Ty::Union(ms) => ShownType::Union(all(ms, name)),
+        Ty::Inter(ms) => ShownType::Inter(all(ms, name)),
+        Ty::Diff(a, h) => ShownType::Diff(Box::new(tree(a, name)), all(h, name)),
         Ty::Both(a, b) => {
             if **a == Ty::Never {
-                render(b, prec, name, tn)
+                tree(b, name)
             } else {
-                render(a, prec, name, tn)
+                tree(a, name)
             }
         }
     }
+}
+
+/// The text of a type (§3), with the names of the custom types `tn`.
+fn render(t: &Ty, name: &mut dyn FnMut(V) -> String, tn: &[String]) -> String {
+    tree(t, name).text(tn)
 }
 
 /// `t` with the variables of `H` in each difference that are nowhere else
@@ -1158,16 +1122,6 @@ fn hide(t: &Ty, outside: &HashSet<V>, in_h: bool) -> Ty {
         ),
         Ty::Both(a, b) => Ty::Both(Box::new(go(a)), Box::new(go(b))),
         t => t.clone(),
-    }
-}
-
-fn type_name(r: TypeRef, types: &[String]) -> String {
-    match r {
-        TypeRef::Builtin(b) => b.name().to_string(),
-        TypeRef::Custom(id) => types
-            .get(id.0 as usize)
-            .cloned()
-            .unwrap_or_else(|| format!("T{}", id.0)),
     }
 }
 
@@ -1260,7 +1214,6 @@ pub(crate) fn show_known(s: &Solver, t: &Ty) -> String {
     let mut next = 0u8;
     render(
         t,
-        0,
         &mut |v| {
             names
                 .entry(v)

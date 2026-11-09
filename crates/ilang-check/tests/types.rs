@@ -4,6 +4,9 @@
 //! compared with `<case>.out` or `<case>/expected.out`. `library.out` has
 //! the types of the library modules. `UPDATE=1` writes the files.
 
+use ilang_check::hir::{DefId, DefKind, ModuleId, Program, TypeRef};
+use ilang_check::identity::{PackageIdentity, TypeIdentity, type_identity};
+use ilang_check::types::{ShownType, Typed};
 use ilang_package::{Diagnostic, PackageGraph};
 use ilang_syntax::span::LineIndex;
 use std::fs;
@@ -13,6 +16,7 @@ fn output(graph: &PackageGraph, short: bool, library: bool) -> String {
     let checked = ilang_check::check(graph);
     let mut out = String::new();
     if let (Some(program), Some(types)) = (&checked.program, &checked.types) {
+        same_as_text(program, types);
         for (i, m) in program.modules.iter().enumerate() {
             let wanted = if library {
                 m.package == graph.library
@@ -38,6 +42,32 @@ fn output(graph: &PackageGraph, short: bool, library: bool) -> String {
         out.push('\n');
     }
     out
+}
+
+/// Each tree of `scheme_types` is written as the text of `schemes`, and
+/// there is one for each exported name and each declaration that has a
+/// shown type.
+fn same_as_text(program: &Program, types: &Typed) {
+    for (i, m) in program.modules.iter().enumerate() {
+        let module = ModuleId(i as u32);
+        let names = ilang_check::types::type_names(program, module);
+        for (index, d) in m.defs.iter().enumerate() {
+            let id = DefId {
+                module,
+                index: index as u32,
+            };
+            let wanted = d.exported || matches!(d.kind, DefKind::External { .. });
+            match (types.schemes.get(&id), types.scheme_types.get(&id)) {
+                (Some(text), Some(tree)) => {
+                    assert!(wanted, "{}.{} has a tree", m.path, d.name);
+                    assert_eq!(&tree.text(&names), text, "{}.{}", m.path, d.name);
+                }
+                (Some(_), None) => assert!(!wanted, "{}.{} has no tree", m.path, d.name),
+                (None, Some(_)) => panic!("{}.{} has a tree but no text", m.path, d.name),
+                (None, None) => {}
+            }
+        }
+    }
 }
 
 fn render(graph: &PackageGraph, d: &Diagnostic, short: bool) -> String {
@@ -154,4 +184,115 @@ fn many_uses_of_a_parameter() {
         "{out}"
     );
     assert!(elapsed.as_secs() < 30, "{elapsed:?}");
+}
+
+/// The tree of a type scheme names each custom type by its `TypeId`, whose
+/// identity is its package, its module, and its name, though two modules
+/// show it alike.
+#[test]
+fn scheme_types_know_each_type_by_what_it_is() {
+    let tmp = tempfile::tempdir().unwrap();
+    let write = |path: &str, text: &str| {
+        let p = tmp.path().join(path);
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(p, text).unwrap();
+    };
+    write("dep/i.toml", "name = \"dep\"\n");
+    write("dep/src/u.i", "export (T(..))\nT { T(String) }\n");
+    write(
+        "app/i.toml",
+        "name = \"app\"\n[dependencies]\ndep = { path = \"../dep\" }\n",
+    );
+    write("app/src/geo/u.i", "export (T(..))\nT { T(Int) }\n");
+    write(
+        "app/src/main.i",
+        "import (app/geo/u, d = dep/u)\n\
+         export (f, g, ext)\n\
+         @external(\"env\", \"now\")\n\
+         now: () -> Int\n\
+         @external(\"env\", \"ext\")\n\
+         ext: (n: Int) -> Int\n\
+         f = (x: u.T, y: d.T, z: a) -> a { z }\n\
+         g = (o: Result(u.T, Int)) { o }\n\
+         hidden = (x: u.T) { x }\n",
+    );
+    let (graph, diags) = ilang_package::load(&tmp.path().join("app"));
+    assert!(diags.is_empty(), "{diags:?}");
+    let checked = ilang_check::check(&graph);
+    assert!(checked.diags.is_empty(), "{:?}", checked.diags);
+    let (program, types) = (checked.program.unwrap(), checked.types.unwrap());
+    let main = program
+        .modules
+        .iter()
+        .position(|m| m.path == "app/main")
+        .unwrap();
+    let def = |name: &str| {
+        let m = program.module(ModuleId(main as u32));
+        let index = m.defs.iter().position(|d| d.name == name).unwrap();
+        DefId {
+            module: ModuleId(main as u32),
+            index: index as u32,
+        }
+    };
+    let custom = |t: &ShownType| match t {
+        ShownType::Named(TypeRef::Custom(id), _) => type_identity(&graph, &program, *id),
+        other => panic!("not a custom type: {other:?}"),
+    };
+    let int = |t: &ShownType| matches!(t, ShownType::Named(TypeRef::Builtin(b), a) if b.name() == "Int" && a.is_empty());
+
+    // `f`: both `T`s are named `T` in no module, but they are two types.
+    let ShownType::Fn(f) = &types.scheme_types[&def("f")] else {
+        panic!("f is not a function");
+    };
+    let labels: Vec<_> = f.params.iter().map(|p| p.0.as_deref()).collect();
+    assert_eq!(labels, [Some("x"), Some("y"), Some("z")]);
+    assert_eq!(
+        custom(&f.params[0].1),
+        TypeIdentity {
+            package: PackageIdentity::Root,
+            module: "geo/u".into(),
+            name: "T".into(),
+        }
+    );
+    let dep = graph.packages[graph.packages[graph.root.unwrap()].dependencies[0]
+        .1
+        .unwrap()]
+    .dir
+    .clone()
+    .unwrap();
+    assert_eq!(
+        custom(&f.params[1].1),
+        TypeIdentity {
+            package: PackageIdentity::Path(dep),
+            module: "u".into(),
+            name: "T".into(),
+        }
+    );
+    assert_eq!(f.params[2].1, ShownType::Var("a".into()));
+    assert_eq!(f.ret, ShownType::Var("a".into()));
+    assert_eq!((&f.err, &f.env), (&None, &None));
+
+    // `g`: a type of the library.
+    let ShownType::Fn(g) = &types.scheme_types[&def("g")] else {
+        panic!("g is not a function");
+    };
+    let ShownType::Named(_, args) = &g.params[0].1 else {
+        panic!("{:?}", g.params[0].1);
+    };
+    assert_eq!(custom(&g.params[0].1).package, PackageIdentity::Library);
+    assert_eq!(custom(&g.params[0].1).name, "Result");
+    assert_eq!(custom(&args[0]).module, "geo/u");
+
+    // Declarations are there whether exported or not; other names that
+    // are not exported are not.
+    let ShownType::Fn(now) = &types.scheme_types[&def("now")] else {
+        panic!("now is not a function");
+    };
+    assert!(now.params.is_empty() && int(&now.ret));
+    let ShownType::Fn(e) = &types.scheme_types[&def("ext")] else {
+        panic!("ext is not a function");
+    };
+    assert!(int(&e.params[0].1) && int(&e.ret));
+    assert!(!types.scheme_types.contains_key(&def("hidden")));
+    assert!(types.schemes.contains_key(&def("hidden")));
 }
