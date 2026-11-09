@@ -165,6 +165,10 @@ in
     PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
     ILANG_PLAYWRIGHT_VERSION = pkgs.playwright-driver.version;
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+    # The browsers come from Nix with their libraries. Playwright's check of
+    # the host looks for libraries of the system (on Ubuntu, with
+    # `ldconfig -p`), which these browsers do not use.
+    PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "1";
   } // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
     # WebKit's headless WPE backend still needs an EGL vendor on machines
     # without /run/opengl-driver. Mesa supplies software rendering here.
