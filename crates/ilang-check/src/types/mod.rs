@@ -16,13 +16,17 @@
 //!   is written, in the order of inference.
 //! - `display.rs`: coalescing, simplification, and the text of a type in
 //!   the syntax of §3.
+//! - `shown.rs`: a shown type as a tree ([`ShownType`]), and its text.
 
 mod coverage;
 mod display;
 mod infer;
 mod known;
 mod pattern;
+mod shown;
 mod solve;
+
+pub use shown::{ShownFn, ShownType};
 
 use crate::hir::{BindingRef, CtorRef, DefId, ModuleId, Program, TypeRef};
 use ilang_package::{Diagnostic, Sources};
@@ -145,6 +149,13 @@ pub struct Typed {
     /// The type scheme of each top-level name, simplified and shown in the
     /// syntax of §3 (§4.7).
     pub schemes: HashMap<DefId, String>,
+    /// The type scheme of each exported top-level name and of each
+    /// declaration (§10.1), whether exported or not: the type of
+    /// `schemes`, simplified and named in the same way, as a tree whose
+    /// named types are known by their `TypeRef`, not by the names that
+    /// a module gives them. `schemes[d]` is
+    /// `scheme_types[d].text(&type_names(program, d.module))`.
+    pub scheme_types: HashMap<DefId, ShownType>,
     /// §7.5: each use of a name that is known to be made by a constructor,
     /// by the span of the `Name` expression.
     pub known_ctors: HashMap<(ModuleId, Span), CtorRef>,
@@ -334,6 +345,14 @@ impl Typed {
             })
             .collect()
     }
+}
+
+/// The name of each custom type, by `TypeId`, as the types of the names of
+/// the module `module` are shown in [`Typed::schemes`]: the name alone for
+/// a type of the module, of the prelude, or put in by an import (§2.3);
+/// `alias.Name` for a type of an imported module; else `module/path.Name`.
+pub fn type_names(program: &Program, module: ModuleId) -> Vec<String> {
+    infer::type_names(program, module)
 }
 
 /// Infers the type of every binding of the program, and reports the type

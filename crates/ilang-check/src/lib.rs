@@ -5,6 +5,7 @@
 //! The only authority is `docs/spec.md`; section numbers refer to it.
 
 pub mod hir;
+pub mod identity;
 pub mod order;
 pub mod query;
 pub mod resolve;
