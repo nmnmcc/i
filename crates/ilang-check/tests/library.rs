@@ -1,5 +1,5 @@
-//! The six library modules and the prelude parse and resolve with no
-//! problems, and they have the names and labels of the spec tables.
+//! The library modules and the prelude parse and resolve with no problems,
+//! and they have the names and labels of the spec tables.
 
 mod common;
 
@@ -21,9 +21,63 @@ fn library_resolves_cleanly() {
             "i/resource",
             "i/assertion",
             "i/core",
-            "i/io"
+            "i/io",
+            "i/task",
+            "i/clock",
+            "i/random",
+            "i/fs",
+            "i/process",
+            "i/net",
+            "i/stdio"
         ]
     );
+}
+
+/// Every registered module path has its own source in the package `i`,
+/// with the text of the list.
+#[test]
+fn library_modules_have_sources() {
+    let (graph, _, _) = common::check_files(&[]);
+    let package = &graph.packages[graph.library];
+    let registered = std::iter::once(ilang_package::library::PRELUDE)
+        .chain(ilang_package::library::MODULES.iter().copied());
+    let mut count = 0;
+    for (path, text) in registered {
+        let module = package
+            .modules
+            .iter()
+            .find(|m| m.path == path)
+            .unwrap_or_else(|| panic!("{path} has no module"));
+        assert_eq!(graph.sources.get(module.source).text, text, "{path}");
+        count += 1;
+    }
+    assert_eq!(package.modules.len(), count);
+}
+
+/// The reserved modules parse with no problems, and hold only a module
+/// documentation comment: no imports, no exports and no items.
+#[test]
+fn reserved_modules_are_placeholders() {
+    for path in [
+        "i/task",
+        "i/clock",
+        "i/random",
+        "i/fs",
+        "i/process",
+        "i/net",
+        "i/stdio",
+    ] {
+        let (_, text) = ilang_package::library::MODULES
+            .iter()
+            .find(|(p, _)| *p == path)
+            .unwrap_or_else(|| panic!("{path} is not registered"));
+        let (module, diags) = ilang_syntax::parse_module(text);
+        assert!(diags.is_empty(), "{path}: {diags:#?}");
+        assert!(!module.doc.is_empty(), "{path}");
+        assert!(module.imports.is_empty(), "{path}");
+        assert!(module.exports.is_empty(), "{path}");
+        assert!(module.items.is_empty(), "{path}");
+    }
 }
 
 /// The exported names of each library module, as in §9.3–§9.6 and §13.
@@ -72,6 +126,13 @@ fn library_names() {
         ),
         ("i/prelude", &["panic", "assert"]),
         ("i/io", &[]),
+        ("i/task", &[]),
+        ("i/clock", &[]),
+        ("i/random", &[]),
+        ("i/fs", &[]),
+        ("i/process", &[]),
+        ("i/net", &[]),
+        ("i/stdio", &[]),
     ];
     for (path, names) in expect {
         let m = program.module(common::module(&program, path));
