@@ -102,8 +102,8 @@ fn cycles(s: &Solver, t: &Ty, keep: Option<u32>) -> HashMap<V, V> {
     let mut found: Vec<V> = Vec::new();
     let mut todo: Vec<V> = Vec::new();
     let add = |v: V, number: &mut HashMap<V, usize>, found: &mut Vec<V>, todo: &mut Vec<V>| {
-        if !number.contains_key(&v) {
-            number.insert(v, found.len());
+        if let std::collections::hash_map::Entry::Vacant(e) = number.entry(v) {
+            e.insert(found.len());
             found.push(v);
             todo.push(v);
         }
