@@ -1,111 +1,88 @@
-;; Host-binding fixture. Imported host functions allocate copied result buffers
-;; through __ilang_alloc; the outer caller owns both input and result allocations.
+;; Host-binding fixture without ilang.abi metadata: tests give the metadata.
+;; The externals of module custom echo their argument, and the service
+;; custom:fallible/v1 gives every kind of error. Each export forwards to one
+;; import. Result buffers of an import belong to the module, which gives them
+;; on to the host as the results of the export (B.3).
 (module
-  (type $abi_frame
-    (struct (field i32) (field i32) (field i32) (field i32)
-      (field (ref null $abi_frame))))
-  (import "custom" "echo_string"
-    (func $echo_string (param i32 i32) (result i32 i32)))
-  (import "custom" "echo_int"
-    (func $echo_int (param i32 i32 i32) (result i32 i32 i32)))
-  (import "custom" "echo_bits"
-    (func $echo_bits (param i32 i32) (result i32 i32)))
-  (import "custom" "echo_ref"
-    (func $echo_ref (param externref) (result externref)))
-  (import "custom" "echo_bool"
-    (func $echo_bool (param i32) (result i32)))
-  (import "custom" "echo_float"
-    (func $echo_float (param f64) (result f64)))
+  (import "custom" "echo_string" (func $echo_string (param i32 i32) (result i32 i32)))
+  (import "custom" "echo_int" (func $echo_int (param i32 i32 i32) (result i32 i32 i32)))
+  (import "custom" "echo_bits" (func $echo_bits (param i32 i32) (result i32 i32)))
+  (import "custom" "echo_ref" (func $echo_ref (param externref) (result externref)))
+  (import "custom" "echo_bool" (func $echo_bool (param i32) (result i32)))
+  (import "custom" "echo_float" (func $echo_float (param f64) (result f64)))
   (import "custom" "echo_nil" (func $echo_nil))
+  ;; (selector: Float) -> String ? Nil | Bool | Int | Float | String | BitArray
+  (import "custom:fallible/v1" "fallible"
+    (func $fallible (param f64) (result i32 i32 i32 i32 i32 i32 i32 f64 i32 i32 i32 i32)))
 
   (memory (export "memory") 1 256)
   (global $next (mut i32) (i32.const 4096))
   (global $live (mut i32) (i32.const 0))
   (global $bytes (mut i32) (i32.const 0))
-  (global $frames (mut (ref null $abi_frame)) (ref.null $abi_frame))
-  (global $frame_count (mut i32) (i32.const 0))
-  (global $next_token (mut i32) (i32.const 1))
   (global $ready (mut i32) (i32.const 0))
 
-  (func (export "__ilang_init")
-    (global.set $ready (i32.const 1)))
+  (func (export "ilang_start") (global.set $ready (i32.const 1)))
   (func (export "initialized") (result i32) (global.get $ready))
   (func (export "live_allocations") (result i32) (global.get $live))
   (func (export "live_bytes") (result i32) (global.get $bytes))
-  (func (export "active_frames") (result i32) (global.get $frame_count))
-  (func (export "heap_end") (result i32) (global.get $next))
 
-  (func (export "__ilang_abi_mark") (result i32)
-    (local $token i32)
-    (local.set $token (global.get $next_token))
-    (global.set $next_token (i32.add (local.get $token) (i32.const 1)))
-    (if (i32.eqz (global.get $next_token))
-      (then (global.set $next_token (i32.const 1))))
-    (global.set $frames
-      (struct.new $abi_frame
-        (local.get $token) (global.get $next) (global.get $live)
-        (global.get $bytes) (global.get $frames)))
-    (global.set $frame_count (i32.add (global.get $frame_count) (i32.const 1)))
-    (local.get $token))
-
-  (func (export "__ilang_abi_reset") (param $token i32)
-    (local $frame (ref null $abi_frame))
-    (local.set $frame (global.get $frames))
-    (if (i32.ne (local.get $token) (struct.get $abi_frame 0 (local.get $frame)))
-      (then unreachable))
-    (global.set $next (struct.get $abi_frame 1 (local.get $frame)))
-    (global.set $live (struct.get $abi_frame 2 (local.get $frame)))
-    (global.set $bytes (struct.get $abi_frame 3 (local.get $frame)))
-    (global.set $frames (struct.get $abi_frame 4 (local.get $frame)))
-    (global.set $frame_count (i32.sub (global.get $frame_count) (i32.const 1))))
-
-  (func $alloc (export "__ilang_alloc") (param $len i32) (result i32)
+  (func $alloc (export "ilang_alloc") (param $len i32) (result i32)
     (local $ptr i32) (local $end i32) (local $pages i32)
+    (if (i32.eqz (local.get $len)) (then (return (i32.const 0))))
     (if (i32.lt_s (local.get $len) (i32.const 0)) (then unreachable))
     (local.set $ptr (global.get $next))
     (local.set $end
-      (i32.and
-        (i32.add (i32.add (local.get $ptr) (local.get $len)) (i32.const 8))
-        (i32.const -8)))
+      (i32.and (i32.add (i32.add (local.get $ptr) (local.get $len)) (i32.const 7)) (i32.const -8)))
     (if (i32.lt_u (local.get $end) (local.get $ptr)) (then unreachable))
-    (local.set $pages
-      (i32.shr_u (i32.add (local.get $end) (i32.const 65535)) (i32.const 16)))
+    (local.set $pages (i32.shr_u (i32.add (local.get $end) (i32.const 65535)) (i32.const 16)))
     (if (i32.gt_u (local.get $pages) (memory.size))
       (then
-        (if
-          (i32.eq
-            (memory.grow (i32.sub (local.get $pages) (memory.size)))
-            (i32.const -1))
+        (if (i32.eq (memory.grow (i32.sub (local.get $pages) (memory.size))) (i32.const -1))
           (then unreachable))))
     (global.set $next (local.get $end))
     (global.set $live (i32.add (global.get $live) (i32.const 1)))
     (global.set $bytes (i32.add (global.get $bytes) (local.get $len)))
     (local.get $ptr))
 
-  (func $free (export "__ilang_free") (param $ptr i32) (param $len i32)
+  (func $free (export "ilang_free") (param $ptr i32) (param $len i32)
     (if (i32.eqz (global.get $live)) (then unreachable))
-    (if (i32.lt_s (local.get $len) (i32.const 0)) (then unreachable))
     (if (i32.lt_u (local.get $ptr) (i32.const 4096)) (then unreachable))
     (global.set $live (i32.sub (global.get $live) (i32.const 1)))
     (global.set $bytes (i32.sub (global.get $bytes) (local.get $len))))
 
+  ;; The module makes and frees the parameter buffers of an import.
+  (func $copy (param $ptr i32) (param $len i32) (result i32)
+    (local $out i32)
+    (local.set $out (call $alloc (local.get $len)))
+    (memory.copy (local.get $out) (local.get $ptr) (local.get $len))
+    (local.get $out))
+  (func $release (param $ptr i32) (param $len i32)
+    (if (local.get $ptr) (then (call $free (local.get $ptr) (local.get $len)))))
+
   (func (export "echo_string") (param $ptr i32) (param $len i32) (result i32 i32)
-    (call $echo_string (local.get $ptr) (local.get $len)))
-  (func (export "leaking_throw") (param $ptr i32) (param $len i32) (result i32 i32)
-    (local $temporary i32) (local $output_ptr i32) (local $output_len i32)
-    (local.set $temporary (call $alloc (i32.const 16)))
-    (call $echo_string (local.get $ptr) (local.get $len))
-    (local.set $output_len)
-    (local.set $output_ptr)
-    ;; A host exception skips this guest cleanup; an ABI reset must reclaim it.
-    (call $free (local.get $temporary) (i32.const 16))
-    (local.get $output_ptr)
-    (local.get $output_len))
+    (local $own i32) (local $a i32) (local $b i32)
+    (local.set $own (call $copy (local.get $ptr) (local.get $len)))
+    (call $echo_string (local.get $own) (local.get $len))
+    (local.set $b) (local.set $a)
+    (call $release (local.get $own) (local.get $len))
+    (local.get $a) (local.get $b))
   (func (export "echo_int")
     (param $sign i32) (param $ptr i32) (param $count i32) (result i32 i32 i32)
-    (call $echo_int (local.get $sign) (local.get $ptr) (local.get $count)))
+    (local $own i32) (local $a i32) (local $b i32) (local $c i32)
+    (local.set $own (call $copy (local.get $ptr) (i32.shl (local.get $count) (i32.const 2))))
+    (call $echo_int (local.get $sign) (local.get $own) (local.get $count))
+    (local.set $c) (local.set $b) (local.set $a)
+    (call $release (local.get $own) (i32.shl (local.get $count) (i32.const 2)))
+    (local.get $a) (local.get $b) (local.get $c))
   (func (export "echo_bits") (param $ptr i32) (param $bits i32) (result i32 i32)
-    (call $echo_bits (local.get $ptr) (local.get $bits)))
+    (local $own i32) (local $size i32) (local $a i32) (local $b i32)
+    (local.set $size (i32.wrap_i64 (i64.shr_u
+      (i64.add (i64.extend_i32_u (local.get $bits)) (i64.const 7)) (i64.const 3))))
+    (local.set $own (call $copy (local.get $ptr) (local.get $size)))
+    (call $echo_bits (local.get $own) (local.get $bits))
+    (local.set $b) (local.set $a)
+    (call $release (local.get $own) (local.get $size))
+    (local.get $a) (local.get $b))
   (func (export "echo_ref") (param $value externref) (result externref)
     (call $echo_ref (local.get $value)))
   (func (export "echo_bool") (param $value i32) (result i32)
@@ -113,4 +90,7 @@
   (func (export "echo_float") (param $value f64) (result f64)
     (call $echo_float (local.get $value)))
   (func (export "echo_nil") (call $echo_nil))
+  (func (export "fallible") (param $selector f64)
+    (result i32 i32 i32 i32 i32 i32 i32 f64 i32 i32 i32 i32)
+    (call $fallible (local.get $selector)))
 )

@@ -32,7 +32,8 @@ pub fn wat() -> String {
   (if (i32.eqz (local.get $sign)) (then (return (f64.const 0))))
   (local.set $a (call $int_limbs (local.get $value)))
   (local.set $n (array.len (local.get $a)))
-  (if (i32.gt_u (local.get $n) (i32.const 32)) (then unreachable))
+  ;; 32 limbs hold every finite binary64 integer; more is not finite (§13 to_float).
+  (if (i32.gt_u (local.get $n) (i32.const 32)) (then (call $stop_float) unreachable))
   (local.set $bits
     (i32.sub
       (i32.mul (local.get $n) (i32.const 32))
@@ -75,7 +76,7 @@ pub fn wat() -> String {
           (i64.extend_i32_u (i32.add (local.get $shift) (i32.const 1023)))
           (i64.const 52)))))
   (if (f64.gt (local.get $number) (f64.const 0x1.fffffffffffffp+1023))
-    (then unreachable))
+    (then (call $stop_float) unreachable))
   (if (result f64) (i32.lt_s (local.get $sign) (i32.const 0))
     (then (f64.neg (local.get $number)))
     (else (local.get $number))))
@@ -148,23 +149,14 @@ pub fn wat() -> String {
       (i32.wrap_i64 (local.get $bits))
       (i32.wrap_i64 (i64.shr_u (local.get $bits) (i64.const 32))))))
 
+;; The float with the lowest 64 bits of the number in two's complement
+;; (spec §13). $float_new stops when they are not a finite float.
 (func $float_from_bits (param $value eqref) (result eqref)
-  (local $a (ref $limbs)) (local $n i32) (local $bits i64)
-  (if (i32.lt_s (call $int_sign (local.get $value)) (i32.const 0))
-    (then unreachable))
-  (local.set $a (call $int_limbs (local.get $value)))
-  (local.set $n (array.len (local.get $a)))
-  (if (i32.gt_u (local.get $n) (i32.const 2)) (then unreachable))
-  (if (i32.gt_u (local.get $n) (i32.const 0))
-    (then
-      (local.set $bits (i64.extend_i32_u (array.get $limbs (local.get $a) (i32.const 0))))))
-  (if (i32.eq (local.get $n) (i32.const 2))
-    (then
-      (local.set $bits
-        (i64.or (local.get $bits)
-          (i64.shl (i64.extend_i32_u (array.get $limbs (local.get $a) (i32.const 1)))
-            (i64.const 32))))))
-  (call $float_new (f64.reinterpret_i64 (local.get $bits))))
+  (local $a (ref $limbs))
+  (local.set $a (call $int_twos (local.get $value) (i32.const 2)))
+  (call $float_new (f64.reinterpret_i64
+    (i64.or (i64.extend_i32_u (array.get $limbs (local.get $a) (i32.const 0)))
+      (i64.shl (i64.extend_i32_u (array.get $limbs (local.get $a) (i32.const 1))) (i64.const 32))))))
 
 (func $int_to_string (param $value eqref) (result eqref)
   (call $int_to_base_string (local.get $value) (ref.i31 (i32.const 10))))

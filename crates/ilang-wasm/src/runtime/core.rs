@@ -1,0 +1,130 @@
+//! Float operators and the functions of `i/core` (spec §11.3, §13).
+//!
+//! Every function here takes and gives `eqref` values, so the code generator
+//! can call them directly or wrap them as function values.
+
+pub fn wat() -> String {
+    WAT.to_owned()
+}
+
+const WAT: &str = r#"
+;; Float operators. $float_new stops when a result is not finite.
+(func $float_add (param $a eqref) (param $b eqref) (result eqref)
+  (call $float_new (f64.add (call $float_get (local.get $a)) (call $float_get (local.get $b)))))
+(func $float_sub (param $a eqref) (param $b eqref) (result eqref)
+  (call $float_new (f64.sub (call $float_get (local.get $a)) (call $float_get (local.get $b)))))
+(func $float_mul (param $a eqref) (param $b eqref) (result eqref)
+  (call $float_new (f64.mul (call $float_get (local.get $a)) (call $float_get (local.get $b)))))
+;; a /. 0.0 is 0.0, also for -0.0 (spec §11.3).
+(func $float_div (param $a eqref) (param $b eqref) (result eqref)
+  (if (result eqref) (f64.eq (call $float_get (local.get $b)) (f64.const 0))
+    (then (call $float_new (f64.const 0)))
+    (else (call $float_new (f64.div (call $float_get (local.get $a)) (call $float_get (local.get $b)))))))
+(func $float_neg (param $a eqref) (result eqref)
+  (call $float_new (f64.neg (call $float_get (local.get $a)))))
+
+;; Ok and Error: constructors 0 and 1 of the type Result (type id 0).
+(func $result_ok (param $v eqref) (result eqref)
+  (call $record (i32.const 0) (i64.const 0) (array.new_fixed $values 1 (local.get $v))))
+(func $result_error (param $v eqref) (result eqref)
+  (call $record (i32.const 1) (i64.const 0) (array.new_fixed $values 1 (local.get $v))))
+
+(func $core_not (param $v eqref) (result eqref)
+  (call $bool_new (i32.eqz (call $bool_get (local.get $v)))))
+(func $core_to_float (param $v eqref) (result eqref)
+  (call $int_to_float (local.get $v)))
+(func $core_truncate (param $v eqref) (result eqref)
+  (call $float_truncate (local.get $v)))
+(func $core_floor (param $v eqref) (result eqref)
+  (call $float_new (f64.floor (call $float_get (local.get $v)))))
+(func $core_ceiling (param $v eqref) (result eqref)
+  (call $float_new (f64.ceil (call $float_get (local.get $v)))))
+;; The square root of a negative number is NaN, which stops.
+(func $core_sqrt (param $v eqref) (result eqref)
+  (call $float_new (f64.sqrt (call $float_get (local.get $v)))))
+(func $core_float_to_bits (param $v eqref) (result eqref)
+  (call $float_to_bits (local.get $v)))
+(func $core_float_from_bits (param $v eqref) (result eqref)
+  (call $float_from_bits (local.get $v)))
+(func $core_bit_and (param $a eqref) (param $b eqref) (result eqref)
+  (call $int_and (local.get $a) (local.get $b)))
+(func $core_bit_or (param $a eqref) (param $b eqref) (result eqref)
+  (call $int_or (local.get $a) (local.get $b)))
+(func $core_bit_xor (param $a eqref) (param $b eqref) (result eqref)
+  (call $int_xor (local.get $a) (local.get $b)))
+(func $core_bit_not (param $a eqref) (result eqref)
+  (call $int_not (local.get $a)))
+(func $core_shift_left (param $v eqref) (param $n eqref) (result eqref)
+  (call $int_shl (local.get $v) (local.get $n)))
+(func $core_shift_right (param $v eqref) (param $n eqref) (result eqref)
+  (call $int_shr (local.get $v) (local.get $n)))
+(func $core_concat (param $list eqref) (result eqref)
+  (call $string_concat (local.get $list)))
+(func $core_byte_size (param $s eqref) (result eqref)
+  (call $string_byte_size (local.get $s)))
+
+;; Error(Nil) when a byte is not in the string, or when the start or the end
+;; is inside a character. Any Int may come in, also negative and huge ones.
+(func $core_byte_slice (param $s eqref) (param $start eqref) (param $length eqref) (result eqref)
+  (local $b (ref $bytes)) (local $size i64) (local $from i64) (local $count i64)
+  (local.set $b (call $string_bytes (local.get $s)))
+  (local.set $size (i64.extend_i32_u (array.len (local.get $b))))
+  (if (i32.or (i32.lt_s (call $int_sign (local.get $start)) (i32.const 0))
+               (i32.lt_s (call $int_sign (local.get $length)) (i32.const 0)))
+    (then (return (call $result_error (ref.null eq)))))
+  (if (i32.or
+        (i32.gt_s (call $int_compare (local.get $start) (call $int_from_i64 (local.get $size))) (i32.const 0))
+        (i32.gt_s (call $int_compare (local.get $length) (call $int_from_i64 (local.get $size))) (i32.const 0)))
+    (then (return (call $result_error (ref.null eq)))))
+  (local.set $from (call $int_to_i64 (local.get $start)))
+  (local.set $count (call $int_to_i64 (local.get $length)))
+  (if (i64.gt_u (i64.add (local.get $from) (local.get $count)) (local.get $size))
+    (then (return (call $result_error (ref.null eq)))))
+  (if (i32.eqz (i32.and
+        (call $string_boundary (local.get $b) (i32.wrap_i64 (local.get $from)))
+        (call $string_boundary (local.get $b) (i32.wrap_i64 (i64.add (local.get $from) (local.get $count))))))
+    (then (return (call $result_error (ref.null eq)))))
+  (call $result_ok (call $string_slice_bytes (local.get $s)
+    (i32.wrap_i64 (local.get $from)) (i32.wrap_i64 (local.get $count)))))
+
+(func $core_codepoints (param $s eqref) (result eqref)
+  (call $string_codepoints (local.get $s)))
+(func $core_from_codepoints (param $list eqref) (result eqref)
+  (call $string_from_codepoints (local.get $list)))
+(func $core_codepoint_to_int (param $c eqref) (result eqref)
+  (call $int_from_i64 (i64.extend_i32_u (call $codepoint_get (local.get $c)))))
+;; Error(Nil) unless the number is a Unicode scalar value.
+(func $core_int_to_codepoint (param $n eqref) (result eqref)
+  (local $value i32)
+  (if (i32.eqz (ref.test (ref i31) (local.get $n))) (then (return (call $result_error (ref.null eq)))))
+  (local.set $value (i31.get_s (ref.cast (ref i31) (local.get $n))))
+  (if (i32.or (i32.or (i32.lt_s (local.get $value) (i32.const 0))
+                      (i32.gt_s (local.get $value) (i32.const 1114111)))
+              (i32.and (i32.ge_s (local.get $value) (i32.const 55296))
+                       (i32.le_s (local.get $value) (i32.const 57343))))
+    (then (return (call $result_error (ref.null eq)))))
+  (call $result_ok (call $codepoint_new (local.get $value))))
+(func $core_bit_size (param $b eqref) (result eqref)
+  (call $bits_size (local.get $b)))
+;; Error(Nil) unless the bits are whole bytes of correct UTF-8.
+(func $core_bit_array_to_string (param $value eqref) (result eqref)
+  (local $length i64) (local $data (ref $bytes)) (local $count i32) (local $index i32)
+  (local.set $length (call $bits_len64 (local.get $value)))
+  (if (i64.ne (i64.and (local.get $length) (i64.const 7)) (i64.const 0))
+    (then (return (call $result_error (ref.null eq)))))
+  (local.set $count (i32.wrap_i64 (i64.shr_u (local.get $length) (i64.const 3))))
+  (local.set $data (array.new_default $bytes (local.get $count)))
+  (block $copied (loop $copy
+    (br_if $copied (i32.ge_u (local.get $index) (local.get $count)))
+    (array.set $bytes (local.get $data) (local.get $index)
+      (call $bits_byte (local.get $value) (i64.shl (i64.extend_i32_u (local.get $index)) (i64.const 3))))
+    (local.set $index (i32.add (local.get $index) (i32.const 1)))
+    (br $copy)))
+  (if (i32.eqz (call $utf8_valid (local.get $data)))
+    (then (return (call $result_error (ref.null eq)))))
+  (call $result_ok (call $string_from_bytes (local.get $data))))
+(func $core_inspect (param $v eqref) (result eqref)
+  (call $inspect (local.get $v)))
+(func $core_hash (param $v eqref) (result eqref)
+  (call $value_hash (local.get $v)))
+"#;

@@ -266,15 +266,13 @@ pub fn wat() -> String {
 }
 
 #[cfg(test)]
-use crate::runtime::bigint as test_bigint;
-
-#[cfg(test)]
 mod tests {
-    use super::{test_bigint, wat};
+    use crate::runtime::tests::Checks;
+    use num_bigint::BigInt;
 
-    // These are the fixed reference presentations from Gleam/Erlang's shortest
-    // formatter. Hexadecimal IEEE encodings also cover subnormal endpoints and
-    // the two neighbors around 1 without depending on Rust literal rounding.
+    // Fixed presentations, with hexadecimal IEEE encodings for subnormal
+    // endpoints and the neighbours of 1, and each side of every limit of the
+    // long form in spec §11.8.
     const CASES: &[(u64, &str)] = &[
         (0x0000_0000_0000_0000, "0.0"),
         (0x8000_0000_0000_0000, "-0.0"),
@@ -297,117 +295,234 @@ mod tests {
         (0x4415_af1d_78b5_8c40, "1.0e20"),
     ];
 
-    fn fixture() -> Vec<u8> {
-        let mut source = String::from(
-            r#"(module
-(type $bytes (array (mut i8)))
-(type $values (array (mut eqref)))
-(type $limbs (array (mut i32)))
-(type $call (func (param eqref eqref) (result eqref)))
-(type $obj (struct (field i32) (field i32) (field i64) (field f64)
-  (field (ref null $bytes)) (field (ref null $values))
-  (field (ref null $limbs)) (field (ref null $call))))
-(func $string_from_bytes (param $bytes (ref $bytes)) (result eqref)
-  (struct.new $obj (i32.const 3) (i32.const 0) (i64.const 0) (f64.const 0)
-    (local.get $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
-(func $float_new (param $value f64) (result eqref)
-  (struct.new $obj (i32.const 2) (i32.const 0) (i64.const 0) (local.get $value)
-    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
-(func $float_get (param $value eqref) (result f64)
-  (struct.get $obj 3 (ref.cast (ref $obj) (local.get $value))))
-"#,
-        );
-        source.push_str(&test_bigint::wat());
-        source.push_str(&wat());
-        source.push_str(
-            r#"
-(func $matches (param $bits i64) (param $expected (ref $bytes)) (result i32)
-  (local $actual (ref $bytes)) (local $i i32)
-  (local.set $actual
-    (ref.as_non_null (struct.get $obj 4
-      (ref.cast (ref $obj) (call $f64_to_string (f64.reinterpret_i64 (local.get $bits)))))))
-  (if (i32.ne (array.len (local.get $actual)) (array.len (local.get $expected)))
-    (then (return (i32.const 0))))
-  (block $done (loop $bytes
-    (br_if $done (i32.ge_u (local.get $i) (array.len (local.get $actual))))
-    (if (i32.ne (array.get_u $bytes (local.get $actual) (local.get $i))
-                (array.get_u $bytes (local.get $expected) (local.get $i)))
-      (then (return (i32.const 0))))
-    (local.set $i (i32.add (local.get $i) (i32.const 1)))
-    (br $bytes)))
-  (i32.const 1))
-(func (export "verify") (result i32)
-"#,
-        );
-        for (index, (bits, expected)) in CASES.iter().enumerate() {
-            source.push_str(&format!(
-                "(if (i32.eqz (call $matches (i64.const {bits}) (array.new_fixed $bytes {}",
-                expected.len()
-            ));
-            for byte in expected.bytes() {
-                source.push_str(&format!(" (i32.const {byte})"));
-            }
-            source.push_str(&format!("))) (then (return (i32.const {}))))\n", index + 1));
+    const DECIMAL_CASES: &[(f64, &str)] = &[
+        (123.0, "123.0"),
+        (12.67, "12.67"),
+        (0.0123, "0.0123"),
+        (3.0e26, "3.0e26"),
+        (1.0e-7, "1.0e-7"),
+        (0.0001, "0.0001"),
+        (0.00001, "1.0e-5"),
+        (0.0015, "0.0015"),
+        (0.00015, "1.5e-4"),
+        (-0.00123, "-0.00123"),
+        (0.000123, "1.23e-4"),
+        (120.0, "120.0"),
+        (1200.0, "1.2e3"),
+        (1230.0, "1230.0"),
+        (12300.0, "1.23e4"),
+        (12345.0, "12345.0"),
+        (123456.0, "123456.0"),
+        (1.0e10, "1.0e10"),
+        (12345678901.0, "12345678901.0"),
+        (123456789010.0, "123456789010.0"),
+        (1234567890100.0, "1234567890100.0"),
+        (12345678901000.0, "1.2345678901e13"),
+        (123400000000.0, "1.234e11"),
+        (10000000000.5, "10000000000.5"),
+        (2251799813685248.5, "2251799813685248.5"),
+        (9007199254740994.0, "9.007199254740994e15"),
+        (1.5e300, "1.5e300"),
+        (5.0, "5.0"),
+        (-2.5e-3, "-0.0025"),
+        (0.3, "0.3"),
+        (2.0 / 3.0, "0.6666666666666666"),
+        (100.5, "100.5"),
+    ];
+
+    /// |digits × 10^t − value|, scaled by a positive factor that is the same
+    /// for every candidate of one value.
+    fn distance(digits: &BigInt, t: i32, value: f64) -> BigInt {
+        let bits = value.abs().to_bits();
+        let exponent = ((bits >> 52) & 0x7ff) as i32;
+        let fraction = bits & ((1 << 52) - 1);
+        let (mantissa, q) = if exponent == 0 {
+            (fraction, -1074)
+        } else {
+            (fraction | (1 << 52), exponent - 1075)
+        };
+        // Multiply both by 2^-q (when q < 0) and 10^-t (when t < 0).
+        let mut candidate = digits.clone();
+        let mut exact = BigInt::from(mantissa);
+        if t >= 0 {
+            candidate *= BigInt::from(10).pow(t as u32);
+        } else {
+            exact *= BigInt::from(10).pow((-t) as u32);
         }
-        source.push_str(
-            r#"(i32.const 0))
-(func (export "positive_infinity")
-  (drop (call $f64_to_string (f64.const inf))))
-(func (export "negative_infinity")
-  (drop (call $f64_to_string (f64.const -inf))))
-(func (export "nan")
-  (drop (call $f64_to_string (f64.const nan))))
-)"#,
+        if q >= 0 {
+            exact <<= q as usize;
+        } else {
+            candidate <<= (-q) as usize;
+        }
+        let difference = candidate - exact;
+        if difference.sign() == num_bigint::Sign::Minus {
+            -difference
+        } else {
+            difference
+        }
+    }
+
+    /// The shortest digits that read back as `value`; of those, the nearest,
+    /// and of two equally near, the one with an even last digit.
+    fn shortest(value: f64) -> (String, i32) {
+        let scientific = format!("{:e}", value.abs());
+        let (mantissa, exponent) = scientific.split_once('e').unwrap();
+        let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
+        let digits = digits.trim_end_matches('0').to_owned();
+        let n = digits.len() as i32;
+        let k = exponent.parse::<i32>().unwrap() + 1;
+        let t = k - n;
+        let found: BigInt = digits.parse().unwrap();
+        let mut best: Option<(BigInt, BigInt)> = None;
+        for candidate in [&found - 1, found.clone(), &found + 1] {
+            let text = candidate.to_string();
+            if text.len() != digits.len() || text.ends_with('0') {
+                continue;
+            }
+            if format!("{text}e{t}").parse::<f64>().unwrap() != value.abs() {
+                continue;
+            }
+            let far = distance(&candidate, t, value);
+            let better = match &best {
+                None => true,
+                Some((_, best_far)) => {
+                    far < *best_far
+                        || (far == *best_far && text.ends_with(['0', '2', '4', '6', '8']))
+                }
+            };
+            if better {
+                best = Some((candidate, far));
+            }
+        }
+        (best.unwrap().0.to_string(), k)
+    }
+
+    /// The text form of spec §11.8, written independently of the runtime.
+    fn reference(value: f64) -> String {
+        if value == 0.0 {
+            return if value.is_sign_negative() {
+                "-0.0"
+            } else {
+                "0.0"
+            }
+            .into();
+        }
+        let (digits, k) = shortest(value);
+        let digits = digits.as_str();
+        let n = digits.len() as i32;
+        let p = k - n;
+        let lower = if n == 1 { -4 } else { -2 - n };
+        let upper = if n == 1 || k >= 11 { 2 } else { 1 };
+        let long = p >= lower && p <= upper && !(p >= 0 && value.abs() >= 2_f64.powi(53));
+        let mut out = String::from(if value < 0.0 { "-" } else { "" });
+        if long {
+            if k <= 0 {
+                out.push_str("0.");
+                out.push_str(&"0".repeat((-k) as usize));
+                out.push_str(digits);
+            } else if k >= n {
+                out.push_str(digits);
+                out.push_str(&"0".repeat((k - n) as usize));
+                out.push_str(".0");
+            } else {
+                out.push_str(&digits[..k as usize]);
+                out.push('.');
+                out.push_str(&digits[k as usize..]);
+            }
+        } else {
+            out.push_str(&digits[..1]);
+            out.push('.');
+            out.push_str(if n == 1 { "0" } else { &digits[1..] });
+            out.push('e');
+            out.push_str(&(k - 1).to_string());
+        }
+        out
+    }
+
+    fn check(checks: &mut Checks, value: f64, expected: &str) {
+        checks.string(
+            format!("{value:e} ({:#x}) is {expected}", value.to_bits()),
+            &format!(
+                "(call $f64_to_string (f64.reinterpret_i64 (i64.const {})))",
+                value.to_bits() as i64
+            ),
+            expected,
         );
-        wat::parse_str(&source).expect("float formatting fixture must assemble")
     }
 
     #[test]
-    fn shortest_formatter_is_valid_wasm_gc() {
-        wasmparser::Validator::new()
-            .validate_all(&fixture())
-            .expect("float formatting fixture must validate");
+    fn reference_follows_the_examples_of_the_specification() {
+        for (bits, expected) in CASES {
+            assert_eq!(reference(f64::from_bits(*bits)), *expected);
+        }
+        for (value, expected) in DECIMAL_CASES {
+            assert_eq!(reference(*value), *expected);
+        }
+        // 2^-25 is exactly halfway between two 17-digit candidates.
+        assert_eq!(reference(2_f64.powi(-25)), "2.9802322387695312e-8");
+    }
+
+    #[test]
+    fn shortest_formatter_matches_fixed_values() {
+        let mut checks = Checks::default();
+        for (bits, expected) in CASES {
+            check(&mut checks, f64::from_bits(*bits), expected);
+        }
+        for (value, expected) in DECIMAL_CASES {
+            check(&mut checks, *value, expected);
+            match expected.strip_prefix('-') {
+                Some(positive) => check(&mut checks, -*value, positive),
+                None => check(&mut checks, -*value, &format!("-{expected}")),
+            }
+        }
+        checks.run();
+    }
+
+    #[test]
+    fn shortest_formatter_matches_the_reference_on_many_floats() {
+        let mut checks = Checks::default();
+        let mut values = Vec::new();
+        for exponent in -325..=308 {
+            values.push(format!("1e{exponent}").parse::<f64>().unwrap());
+            values.push(format!("1.5e{exponent}").parse::<f64>().unwrap());
+            values.push(
+                format!("9.999999999999999e{exponent}")
+                    .parse::<f64>()
+                    .unwrap(),
+            );
+        }
+        for exponent in -1074..=1023 {
+            let power = 2_f64.powi(exponent);
+            values.extend([power, power.next_up(), power.next_down()]);
+        }
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        for _ in 0..3000 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            values.push(f64::from_bits(state));
+        }
+        for value in values {
+            if value.is_finite() {
+                check(&mut checks, value, &reference(value));
+            }
+        }
+        checks.run();
     }
 
     #[test]
     fn formatter_rejects_non_finite_values() {
-        let file = tempfile::NamedTempFile::new().expect("create wasm fixture");
-        std::fs::write(file.path(), fixture()).expect("write wasm fixture");
-        let wasmtime = std::env::var_os("ILANG_WASMTIME").unwrap_or_else(|| "wasmtime".into());
-        for export in ["positive_infinity", "negative_infinity", "nan"] {
-            let output = std::process::Command::new(&wasmtime)
-                .args(["run", "--invoke", export])
-                .arg(file.path())
-                .output()
-                .expect("Wasmtime is required; run this test in the Devenv shell");
-            assert!(!output.status.success(), "{export} must trap");
-            assert!(
-                String::from_utf8_lossy(&output.stderr).contains("unreachable"),
-                "{export} failed for a reason other than the non-finite guard: {}",
-                String::from_utf8_lossy(&output.stderr)
+        for value in ["inf", "-inf", "nan"] {
+            let source = format!(
+                "(module {} {} {} (func (export \"format\") (result i32) \
+                 (drop (call $f64_to_string (f64.const {value}))) (i32.const 0)))",
+                crate::runtime::TYPES,
+                crate::runtime::tests::STUB_HOST,
+                crate::runtime::wat()
             );
+            let result =
+                std::panic::catch_unwind(|| crate::runtime::tests::run_export(&source, "format"));
+            assert!(result.is_err(), "{value} must trap");
         }
-    }
-
-    #[test]
-    fn shortest_formatter_matches_reference_values() {
-        let file = tempfile::NamedTempFile::new().expect("create wasm fixture");
-        std::fs::write(file.path(), fixture()).expect("write wasm fixture");
-        let wasmtime = std::env::var_os("ILANG_WASMTIME").unwrap_or_else(|| "wasmtime".into());
-        let output = std::process::Command::new(wasmtime)
-            .args(["run", "--invoke", "verify"])
-            .arg(file.path())
-            .output()
-            .expect("Wasmtime is required; run this test in the Devenv shell");
-        assert!(
-            output.status.success(),
-            "Wasmtime failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        assert_eq!(
-            String::from_utf8_lossy(&output.stdout).trim(),
-            "0",
-            "formatter returned the one-based index of a mismatching reference case"
-        );
     }
 }

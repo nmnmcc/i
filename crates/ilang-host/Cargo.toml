@@ -12,7 +12,6 @@ num-bigint.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 wasmparser.workspace = true
-getrandom = "0.3"
 wasmtime = { version = "=50.0.0", default-features = false, features = ["anyhow", "cranelift", "gc", "gc-drc", "runtime", "std", "backtrace", "parallel-compilation"] }
 
 [dev-dependencies]

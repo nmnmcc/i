@@ -17,6 +17,7 @@ const PREFIX: &str = r#"(module
   (field i32) (field i32) (field i64) (field f64)
   (field (ref null $bytes)) (field (ref null $values))
   (field (ref null $limbs)) (field (ref null $call))))
+(func $stop_float unreachable)
 (func $float_get (param $x eqref) (result f64)
   (struct.get $obj 3 (ref.cast (ref $obj) (local.get $x))))
 (func $float_new (param $x f64) (result eqref)
@@ -284,10 +285,10 @@ fn conversions_trap_for_nonfinite_float_and_out_of_range_bit_patterns() {
             format!("(drop (call $float_from_bits {}))", integer(-1)),
         ),
         (
-            "wide_bits",
+            "infinite_bits",
             format!(
                 "(drop (call $float_from_bits {}))",
-                integer(BigInt::one() << 64)
+                integer((BigInt::one() << 64) + 0x7ff0_0000_0000_0000_u64)
             ),
         ),
     ] {

@@ -5,6 +5,8 @@
  (type $call (func (param eqref eqref) (result eqref)))
  (type $obj (struct (field i32) (field i32) (field i64) (field f64) (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs)) (field (ref null $call))))
  (memory (export "memory") 1)
+ ;; The runtime stops here for a conversion that is not finite.
+ (func $stop_float unreachable)
  (func $float_new (param $x f64) (result eqref) (struct.new $obj (i32.const 2) (i32.const 0) (i64.const 0) (local.get $x) (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
  (func $float_get (param $v eqref) (result f64) (struct.get $obj 3 (ref.cast (ref $obj) (local.get $v))))
  (func $get_int (param $ptr i32) (param $n i32) (param $sign i32) (result eqref)

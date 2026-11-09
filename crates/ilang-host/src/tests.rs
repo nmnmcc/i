@@ -1,156 +1,415 @@
 use super::*;
+use std::sync::Mutex;
 
 const FIXTURE: &[u8] = include_bytes!("../../../tests/browser/fixtures/host-abi.wasm");
 const CUSTOM: &[u8] = include_bytes!("../../../tests/browser/fixtures/custom-imports.wasm");
 
-fn signature(kind: AbiType) -> Signature {
-    Signature {
-        params: if kind == AbiType::Nil {
-            vec![]
-        } else {
-            vec![kind]
-        },
-        result: kind,
-    }
+type Log = Arc<Mutex<Vec<String>>>;
+
+/// The host functions of host-abi.wasm. `print` writes to the log, `read`
+/// answers from a small table, `later` answers its argument, `hypot` works.
+fn imports(log: &Log) -> HostImports {
+    let mut imports = HostImports::default();
+    let printed = Arc::clone(log);
+    imports
+        .service("app:console/v1", "print", move |arguments| {
+            let [Value::String(text)] = arguments else {
+                bail!("print takes one String")
+            };
+            printed.lock().unwrap().push(text.clone());
+            Ok(Ok(Value::Nil))
+        })
+        .unwrap();
+    imports
+        .service("app:storage/v1", "read", |arguments| {
+            let [Value::String(key)] = arguments else {
+                bail!("read takes one String")
+            };
+            Ok(match key.as_str() {
+                "name" => Ok(Value::String("i".into())),
+                "fail" => bail!("the storage is gone"),
+                "int" => Err(Value::Int(BigInt::from(1))),
+                "wrong" => Ok(Value::Float(1.0)),
+                "nan" => Err(Value::Float(f64::NAN)),
+                _ => Err(Value::String(format!("no {key}"))),
+            })
+        })
+        .unwrap();
+    imports
+        .async_service("app:clock/v1", "later", |arguments| {
+            let value = arguments[0].clone();
+            async move {
+                match value {
+                    Value::Float(x) if x < 0.0 => Ok(Err(Value::String("negative".into()))),
+                    Value::Float(x) if x > 100.0 => bail!("the clock is broken"),
+                    value => Ok(Ok(value)),
+                }
+            }
+        })
+        .unwrap();
+    imports
+        .external("app:math/v1", "hypot", |arguments| {
+            let [Value::Float(a), Value::Float(b)] = arguments else {
+                bail!("hypot takes two Floats")
+            };
+            Ok(Value::Float(a.hypot(*b)))
+        })
+        .unwrap();
+    imports
 }
 
-fn fixture() -> Instance {
-    let mut abi = Abi::default();
-    for (name, kind) in [
-        ("string_roundtrip", AbiType::String),
-        ("int_roundtrip", AbiType::Int),
-        ("bit_array_roundtrip", AbiType::BitArray),
-        ("float_roundtrip", AbiType::Float),
-        ("bool_roundtrip", AbiType::Bool),
-        ("nil_roundtrip", AbiType::Nil),
-        ("opaque_roundtrip", AbiType::Externref),
-    ] {
-        abi.exports.insert(name.into(), signature(kind));
-    }
-    for name in ["trap_with_string", "fail"] {
-        abi.exports.insert(
-            name.into(),
-            Signature {
-                params: vec![AbiType::String],
-                result: AbiType::Nil,
-            },
-        );
-    }
-    Program::from_bytes(FIXTURE)
-        .unwrap()
-        .with_abi(abi)
-        .unwrap()
-        .instantiate(HostOptions::default())
-        .unwrap()
+fn program() -> Program {
+    Program::from_bytes(FIXTURE).unwrap()
 }
 
-fn allocations(instance: &mut Instance) -> i32 {
+fn fixture() -> (Instance, Log) {
+    let log = Log::default();
+    let instance = program()
+        .instantiate(HostOptions::new(imports(&log)))
+        .unwrap();
+    (instance, log)
+}
+
+fn raw(instance: &mut Instance, name: &str) -> i32 {
     instance
         .instance
-        .get_typed_func::<(), i32>(&mut instance.store, "live_allocations")
+        .get_typed_func::<(), i32>(&mut instance.store, name)
         .unwrap()
         .call(&mut instance.store, ())
         .unwrap()
 }
 
-#[test]
-fn strings_including_empty_unicode_and_embedded_nul_are_copied_and_freed() {
-    let mut instance = fixture();
-    for expected in ["", "Gleam 🦀 e\u{301}", "one\0two"] {
-        let Value::String(actual) = instance
-            .call("string_roundtrip", &[Value::String(expected.into())])
-            .unwrap()
-        else {
-            panic!("expected string")
-        };
-        assert_eq!(actual, expected);
-        assert_eq!(allocations(&mut instance), 0);
+fn allocations(instance: &mut Instance) -> i32 {
+    raw(instance, "live_allocations")
+}
+
+fn ok(outcome: Outcome) -> Value {
+    match outcome {
+        Outcome::Ok(value) => value,
+        other => panic!("expected a value, got {other:?}"),
+    }
+}
+
+fn stop(outcome: Outcome) -> Stop {
+    match outcome {
+        Outcome::Stop(stop) => stop,
+        other => panic!("expected a stop, got {other:?}"),
     }
 }
 
 #[test]
-fn arbitrary_precision_integers_roundtrip_without_host_arithmetic() {
-    let mut instance = fixture();
+fn metadata_is_read_from_the_custom_section() {
+    let abi = program().abi().clone();
+    assert_eq!(abi.version, 2);
+    assert_eq!(abi.entry, Some(EntryPoint::new("app/main.main")));
+    assert_eq!(abi.tests.len(), 6);
+    assert!(abi.tests[5].is_async);
+    assert_eq!(
+        abi.exports["choose"],
+        Signature::new([AbiType::Float], AbiType::String).with_errors([
+            AbiType::Nil,
+            AbiType::Bool,
+            AbiType::Int,
+            AbiType::Float,
+            AbiType::String,
+            AbiType::BitArray,
+        ])
+    );
+    assert!(abi.exports["app/async.later"].is_async);
+    assert!(abi.services["app:clock/v1"]["later"].is_async);
+    assert_eq!(
+        abi.externals["app:math/v1"]["hypot"],
+        Signature::new([AbiType::Float, AbiType::Float], AbiType::Float)
+    );
+    assert!(
+        Program::from_bytes(FIXTURE)
+            .unwrap()
+            .with_abi(Abi::default())
+            .is_err()
+    );
+}
+
+#[test]
+fn metadata_that_does_not_follow_b6_is_refused() {
+    let parse = |json: &str| Abi::from_json(json.as_bytes());
+    let empty =
+        r#"{"version":2,"entry":null,"tests":[],"exports":{},"services":{},"externals":{}}"#;
+    assert!(parse(empty).is_ok());
+    for json in [
+        r#"{"version":1,"entry":null,"tests":[],"exports":{},"services":{},"externals":{}}"#,
+        r#"{"version":2,"entry":null,"tests":[],"exports":{},"services":{}}"#,
+        r#"{"version":2,"tests":[],"exports":{},"services":{},"externals":{}}"#,
+        r#"{"version":2,"entry":null,"tests":[],"exports":{},"services":{},"externals":{},"imports":{}}"#,
+        r#"{"version":2,"entry":"main","tests":[],"exports":{},"services":{},"externals":{}}"#,
+        r#"{"version":2,"entry":null,"tests":[],"exports":{"f":{"params":[],"result":"nil","errors":["string","int"],"async":false}},"services":{},"externals":{}}"#,
+        r#"{"version":2,"entry":null,"tests":[],"exports":{"f":{"params":[],"result":"nil","errors":["int","int"],"async":false}},"services":{},"externals":{}}"#,
+        r#"{"version":2,"entry":null,"tests":[],"exports":{"f":{"params":[],"result":"nil","errors":["externref"],"async":false}},"services":{},"externals":{}}"#,
+        r#"{"version":2,"entry":null,"tests":[],"exports":{"f":{"params":["list"],"result":"nil","errors":[],"async":false}},"services":{},"externals":{}}"#,
+        r#"{"version":2,"entry":null,"tests":[],"exports":{"ilang_start":{"params":[],"result":"nil","errors":[],"async":false}},"services":{},"externals":{}}"#,
+        r#"{"version":2,"entry":{"name":"f","async":false},"tests":[],"exports":{"f":{"params":[],"result":"nil","errors":[],"async":false}},"services":{},"externals":{}}"#,
+        r#"{"version":2,"entry":null,"tests":[],"exports":{},"services":{"ilang:host/v1":{}},"externals":{}}"#,
+        r#"{"version":2,"entry":null,"tests":[],"exports":{},"services":{},"externals":{"m":{"f":{"params":[],"result":"nil","errors":["nil"]}}}}"#,
+        r#"{"version":2,"entry":null,"tests":[],"exports":{},"services":{"m":{"f":{"params":[],"result":"nil"}}},"externals":{"m":{"f":{"params":[],"result":"nil"}}}}"#,
+    ] {
+        assert!(parse(json).is_err(), "{json}");
+    }
+}
+
+#[test]
+fn start_runs_once_before_anything_and_may_call_imports() {
+    let (mut instance, log) = fixture();
+    assert_eq!(raw(&mut instance, "initialized"), 1);
+    assert_eq!(*log.lock().unwrap(), ["start\n"]);
+    assert_eq!(allocations(&mut instance), 0);
+}
+
+#[test]
+fn values_round_trip_and_every_buffer_is_freed() {
+    let (mut instance, _) = fixture();
+    for text in ["", "i 🦀 e\u{301}", "one\0two"] {
+        let value = ok(instance
+            .call("string_roundtrip", &[Value::String(text.into())])
+            .unwrap());
+        assert!(matches!(value, Value::String(actual) if actual == text));
+    }
     let huge = BigInt::from(1_u32) << 4096_u32;
-    for expected in [BigInt::from(0), BigInt::from(-1), huge.clone(), -huge] {
-        let Value::Int(actual) = instance
-            .call("int_roundtrip", &[Value::Int(expected.clone())])
-            .unwrap()
-        else {
-            panic!("expected int")
-        };
-        assert_eq!(actual, expected);
-        assert_eq!(allocations(&mut instance), 0);
+    for number in [BigInt::from(0), BigInt::from(-1), huge.clone(), -huge] {
+        let value = ok(instance
+            .call("int_roundtrip", &[Value::Int(number.clone())])
+            .unwrap());
+        assert!(matches!(value, Value::Int(actual) if actual == number));
     }
-}
-
-#[test]
-fn bit_array_preserves_non_byte_aligned_length_and_rejects_invalid_padding() {
-    let mut instance = fixture();
-    for expected in [
+    for bits in [
         BitArray::new(vec![], 0).unwrap(),
         BitArray::new(vec![0b1010_0000], 3).unwrap(),
         BitArray::new(vec![0xff, 0x80], 9).unwrap(),
     ] {
-        let Value::BitArray(actual) = instance
-            .call("bit_array_roundtrip", &[Value::BitArray(expected.clone())])
-            .unwrap()
-        else {
-            panic!("expected bits")
-        };
-        assert_eq!(actual, expected);
-        assert_eq!(allocations(&mut instance), 0);
+        let value = ok(instance
+            .call("bit_array_roundtrip", &[Value::BitArray(bits.clone())])
+            .unwrap());
+        assert!(matches!(value, Value::BitArray(actual) if actual == bits));
     }
+    let value = ok(instance
+        .call("float_roundtrip", &[Value::Float(-0.0)])
+        .unwrap());
+    assert!(matches!(value, Value::Float(x) if x.to_bits() == (-0.0_f64).to_bits()));
+    assert!(matches!(
+        ok(instance
+            .call("bool_roundtrip", &[Value::Bool(true)])
+            .unwrap()),
+        Value::Bool(true)
+    ));
+    assert!(matches!(
+        ok(instance.call("nil_roundtrip", &[]).unwrap()),
+        Value::Nil
+    ));
+    assert!(matches!(
+        ok(instance
+            .call("opaque_roundtrip", &[Value::NullExternref])
+            .unwrap()),
+        Value::NullExternref
+    ));
+    assert!(matches!(
+        ok(instance.call("exceptions", &[]).unwrap()),
+        Value::Float(42.0)
+    ));
+    assert_eq!(allocations(&mut instance), 0);
     assert!(BitArray::new(vec![0xff], 3).is_err());
     assert!(BitArray::new(vec![0], 9).is_err());
 }
 
 #[test]
-fn scalars_validate_language_semantics() {
-    let mut instance = fixture();
-    assert!(matches!(
-        instance
-            .call("bool_roundtrip", &[Value::Bool(true)])
-            .unwrap(),
-        Value::Bool(true)
-    ));
-    assert!(matches!(
-        instance.call("nil_roundtrip", &[]).unwrap(),
-        Value::Nil
-    ));
-    let Value::Float(value) = instance
-        .call("float_roundtrip", &[Value::Float(-0.0)])
+fn errors_use_the_tag_and_the_canonical_order() {
+    let (mut instance, _) = fixture();
+    let expected = [
+        "Ok(String(\"ok\"))",
+        "Err(Nil)",
+        "Err(Bool(true))",
+        "Err(Int(-7))",
+        "Err(Float(2.5))",
+        "Err(String(\"bad\"))",
+        "Err(BitArray(BitArray { bytes: [160], bit_length: 3 }))",
+    ];
+    for (selector, expected) in expected.iter().enumerate() {
+        let outcome = instance
+            .call("choose", &[Value::Float(selector as f64)])
+            .unwrap();
+        let text = match outcome {
+            Outcome::Ok(value) => format!("Ok({value:?})"),
+            Outcome::Err(GuestError(value)) => format!("Err({value:?})"),
+            Outcome::Stop(stop) => panic!("stopped: {stop}"),
+        };
+        assert_eq!(text, *expected);
+        assert_eq!(allocations(&mut instance), 0);
+    }
+    let error = instance.call("choose", &[Value::Float(7.0)]).unwrap_err();
+    assert!(format!("{error:#}").contains("error tag 7"), "{error:#}");
+    assert!(instance.unusable().is_some());
+}
+
+#[test]
+fn host_services_and_externals_use_the_same_encoding() {
+    let (mut instance, log) = fixture();
+    let value = ok(instance
+        .call("read_through", &[Value::String("name".into())])
+        .unwrap());
+    assert!(matches!(value, Value::String(text) if text == "i"));
+    let Outcome::Err(GuestError(Value::String(error))) = instance
+        .call("read_through", &[Value::String("other".into())])
         .unwrap()
     else {
-        panic!("expected float")
+        panic!("expected an error")
     };
-    assert_eq!(value.to_bits(), (-0.0_f64).to_bits());
-    assert!(
-        instance
-            .call("float_roundtrip", &[Value::Float(f64::INFINITY)])
-            .is_err()
-    );
-    assert!(
-        instance
-            .call("float_roundtrip", &[Value::Float(f64::NAN)])
-            .is_err()
-    );
+    assert_eq!(error, "no other");
+    let value = ok(instance
+        .call("hypot", &[Value::Float(3.0), Value::Float(4.0)])
+        .unwrap());
+    assert!(matches!(value, Value::Float(5.0)));
+    ok(instance
+        .call("print", &[Value::String("hello\n".into())])
+        .unwrap());
+    ok(instance
+        .call("print", &[Value::String(String::new())])
+        .unwrap());
+    assert_eq!(*log.lock().unwrap(), ["start\n", "hello\n", ""]);
+    assert_eq!(allocations(&mut instance), 0);
+}
+
+#[test]
+fn incorrect_host_values_stop_the_program() {
+    for key in ["int", "wrong", "nan"] {
+        let (mut instance, _) = fixture();
+        let stop = stop(
+            instance
+                .call("read_through", &[Value::String(key.into())])
+                .unwrap(),
+        );
+        assert_eq!(stop.message.as_deref(), Some(HOST_VALUE_REASON), "{key}");
+        assert!(instance.call("nil_roundtrip", &[]).is_err());
+    }
+    for (name, argument) in [
+        ("float_roundtrip", Value::Float(f64::NAN)),
+        ("float_roundtrip", Value::Float(f64::INFINITY)),
+        ("bool_roundtrip", Value::String("bad".into())),
+        (
+            "bit_array_roundtrip",
+            Value::BitArray(BitArray {
+                bytes: vec![1],
+                bit_length: 1,
+            }),
+        ),
+    ] {
+        let (mut instance, _) = fixture();
+        let stop = stop(instance.call(name, &[argument]).unwrap());
+        assert_eq!(stop.message.as_deref(), Some(HOST_VALUE_REASON));
+        assert!(instance.unusable().is_some());
+    }
+    let (mut instance, _) = fixture();
     assert!(instance.call("bool_roundtrip", &[]).is_err());
-    assert!(
+    assert!(instance.call("absent", &[]).is_err());
+    assert!(instance.unusable().is_none());
+}
+
+#[test]
+fn incorrect_guest_values_are_errors_of_the_module() {
+    for name in ["bad_bool", "bad_utf8", "bad_tag"] {
+        let (mut instance, _) = fixture();
+        assert!(instance.call(name, &[]).is_err(), "{name}");
+        assert!(instance.unusable().is_some());
+    }
+}
+
+#[test]
+fn a_stop_gives_its_message_and_the_instance_is_unusable() {
+    let (mut instance, _) = fixture();
+    let message = "panic: boom\napp/users:12:5";
+    let stop = stop(
         instance
-            .call("bool_roundtrip", &[Value::String("bad".into())])
-            .is_err()
+            .call("stop", &[Value::String(message.into())])
+            .unwrap(),
+    );
+    assert_eq!(stop.message.as_deref(), Some(message));
+    assert!(stop.trap.contains("unreachable"), "{}", stop.trap);
+    let refused = instance.call("nil_roundtrip", &[]).unwrap_err();
+    assert!(format!("{refused}").contains("make a new instance"));
+    assert!(instance.run("app/test.passing").is_err());
+}
+
+#[test]
+fn a_failing_host_function_traps_and_keeps_its_error() {
+    let (mut instance, _) = fixture();
+    let error = instance
+        .call("read_through", &[Value::String("fail".into())])
+        .unwrap_err();
+    assert_eq!(format!("{error}"), "the storage is gone");
+    assert!(instance.unusable().is_some());
+    let missing = program().instantiate(HostOptions::default()).err().unwrap();
+    assert!(format!("{missing:#}").contains("missing host function"));
+}
+
+#[test]
+fn entry_and_tests_run_by_name_each_test_in_a_new_instance() {
+    let log = Log::default();
+    let program = program();
+    let options = HostOptions::new(imports(&log));
+    assert!(matches!(
+        program.run_entry(options.clone()).unwrap(),
+        Outcome::Ok(Value::Nil)
+    ));
+    assert_eq!(*log.lock().unwrap(), ["start\n", "fixture main\n"]);
+    let reports = program.run_tests(&options);
+    let summary: Vec<_> = reports
+        .iter()
+        .map(|report| match &report.result {
+            TestResult::Passed => format!("{} passed", report.name),
+            TestResult::Stopped(stop) => format!("{} stopped: {stop}", report.name),
+            TestResult::Failed(error) => format!("{} failed: {error}", report.name),
+        })
+        .collect();
+    assert_eq!(
+        summary,
+        [
+            "app/test.passing passed".to_owned(),
+            "app/test.failing stopped: assertion failed: fixture\napp/test:3:5".to_owned(),
+            "app/test.trapping stopped: trap: wasm trap: wasm `unreachable` instruction executed"
+                .to_owned(),
+            "app/test.fresh passed".to_owned(),
+            "app/test.fresh passed".to_owned(),
+            "app/async_test.waits passed".to_owned(),
+        ]
     );
 }
 
 #[test]
-fn opaque_references_keep_identity_across_collection_and_support_null() {
-    let mut instance = fixture();
+fn async_exports_wait_for_host_functions() {
+    let (mut instance, _) = fixture();
+    let value = ok(block_on(instance.call_async("app/async.later", &[Value::Float(1.5)])).unwrap());
+    assert!(matches!(value, Value::Float(2.5)));
+    let outcome = block_on(instance.call_async("app/async.later", &[Value::Float(-1.0)])).unwrap();
+    assert!(matches!(outcome, Outcome::Err(GuestError(Value::String(text))) if text == "negative"));
+    assert_eq!(allocations(&mut instance), 0);
+    assert!(
+        instance
+            .call("app/async.later", &[Value::Float(1.0)])
+            .is_err()
+    );
+    assert!(
+        block_on(instance.call_async("hypot", &[Value::Float(1.0), Value::Float(1.0)])).is_err()
+    );
+    let error =
+        block_on(instance.call_async("app/async.later", &[Value::Float(500.0)])).unwrap_err();
+    assert_eq!(format!("{error}"), "the clock is broken");
+    assert!(instance.unusable().is_some());
+}
+
+#[test]
+fn references_keep_identity_across_collection_and_support_null() {
+    let (mut instance, _) = fixture();
     let reference = HostReference::new(String::from("owned by the embedder"));
     for _ in 0..10 {
-        let Value::Externref(returned) = instance
+        let Value::Externref(returned) = ok(instance
             .call("opaque_roundtrip", &[Value::Externref(reference.clone())])
-            .unwrap()
+            .unwrap())
         else {
             panic!("expected reference")
         };
@@ -161,12 +420,192 @@ fn opaque_references_keep_identity_across_collection_and_support_null() {
             "owned by the embedder"
         );
     }
-    assert!(matches!(
-        instance
-            .call("opaque_roundtrip", &[Value::NullExternref])
-            .unwrap(),
-        Value::NullExternref
-    ));
+    let other = HostReference::new(42);
+    for (a, b, same) in [
+        (
+            Value::Externref(reference.clone()),
+            Value::Externref(reference.clone()),
+            true,
+        ),
+        (
+            Value::Externref(reference.clone()),
+            Value::Externref(other.clone()),
+            false,
+        ),
+        (Value::NullExternref, Value::NullExternref, true),
+        (Value::NullExternref, Value::Externref(other), false),
+    ] {
+        assert!(matches!(
+            ok(instance.call("same_reference", &[a, b]).unwrap()),
+            Value::Bool(actual) if actual == same
+        ));
+    }
+}
+
+#[test]
+fn engine_features_include_gc_tail_calls_and_exceptions() {
+    let (mut instance, _) = fixture();
+    assert_eq!(raw(&mut instance, "feature_probe"), 42);
+    let tail = instance
+        .instance
+        .get_typed_func::<(i32, i32), i32>(&mut instance.store, "tail_count")
+        .unwrap()
+        .call(&mut instance.store, (1_000_000, 0))
+        .unwrap();
+    assert_eq!(tail, 1_000_000);
+    let probe = Program::from_bytes(include_bytes!(
+        "../../../tests/browser/fixtures/required-features.wasm"
+    ))
+    .unwrap();
+    let engine = &probe.engine;
+    let mut store = Store::new(engine, ());
+    let instance = Linker::new(engine)
+        .instantiate(&mut store, &probe.module)
+        .unwrap();
+    let answer = instance
+        .get_typed_func::<(), i32>(&mut store, "probe")
+        .unwrap()
+        .call(&mut store, ())
+        .unwrap();
+    assert_eq!(answer, 42);
+}
+
+fn custom_abi() -> Abi {
+    let unary = |kind: AbiType| Signature::new([kind], kind);
+    let mut abi = Abi::default();
+    let mut externals = BTreeMap::new();
+    for (name, kind) in [
+        ("echo_string", AbiType::String),
+        ("echo_int", AbiType::Int),
+        ("echo_bits", AbiType::BitArray),
+        ("echo_ref", AbiType::Externref),
+        ("echo_bool", AbiType::Bool),
+        ("echo_float", AbiType::Float),
+    ] {
+        abi.exports.insert(name.into(), unary(kind));
+        externals.insert(name.to_owned(), unary(kind));
+    }
+    abi.exports
+        .insert("echo_nil".into(), Signature::new([], AbiType::Nil));
+    externals.insert("echo_nil".into(), Signature::new([], AbiType::Nil));
+    abi.externals.insert("custom".into(), externals);
+    let fallible = Signature::new([AbiType::Float], AbiType::String).with_errors([
+        AbiType::Nil,
+        AbiType::Bool,
+        AbiType::Int,
+        AbiType::Float,
+        AbiType::String,
+        AbiType::BitArray,
+    ]);
+    abi.exports.insert("fallible".into(), fallible.clone());
+    abi.services.insert(
+        "custom:fallible/v1".into(),
+        BTreeMap::from([("fallible".to_owned(), fallible)]),
+    );
+    abi
+}
+
+fn custom() -> Instance {
+    let mut imports = HostImports::default();
+    for name in [
+        "echo_string",
+        "echo_int",
+        "echo_bits",
+        "echo_ref",
+        "echo_bool",
+        "echo_float",
+        "echo_nil",
+    ] {
+        imports
+            .external("custom", name, |arguments| {
+                Ok(arguments.first().cloned().unwrap_or(Value::Nil))
+            })
+            .unwrap();
+    }
+    imports
+        .service("custom:fallible/v1", "fallible", |arguments| {
+            let [Value::Float(selector)] = arguments else {
+                bail!("fallible takes a Float")
+            };
+            Ok(match *selector as i32 {
+                0 => Ok(Value::String("fine".into())),
+                1 => Err(Value::Nil),
+                2 => Err(Value::Bool(false)),
+                3 => Err(Value::Int(BigInt::from(1) << 100)),
+                4 => Err(Value::Float(-0.5)),
+                5 => Err(Value::String("oops".into())),
+                _ => Err(Value::BitArray(BitArray::new(vec![0xc0], 2).unwrap())),
+            })
+        })
+        .unwrap();
+    Program::from_bytes(CUSTOM)
+        .unwrap()
+        .with_abi(custom_abi())
+        .unwrap()
+        .instantiate(HostOptions::new(imports))
+        .unwrap()
+}
+
+#[test]
+fn externals_and_service_errors_round_trip_without_leaks() {
+    let mut instance = custom();
+    let huge: BigInt = (BigInt::from(1) << 1024) + 19;
+    for value in [
+        Value::String("host 👩🏽‍🚀 value".into()),
+        Value::String(String::new()),
+        Value::Int(-huge),
+        Value::Int(BigInt::from(0)),
+        Value::BitArray(BitArray::new(vec![0xc0], 2).unwrap()),
+        Value::Bool(true),
+        Value::Float(0.25),
+        Value::Nil,
+    ] {
+        let name = match value.abi_type() {
+            AbiType::String => "echo_string",
+            AbiType::Int => "echo_int",
+            AbiType::BitArray => "echo_bits",
+            AbiType::Bool => "echo_bool",
+            AbiType::Float => "echo_float",
+            _ => "echo_nil",
+        };
+        let arguments = if name == "echo_nil" {
+            vec![]
+        } else {
+            vec![value.clone()]
+        };
+        let returned = ok(instance.call(name, &arguments).unwrap());
+        assert_eq!(format!("{returned:?}"), format!("{value:?}"));
+        assert_eq!(allocations(&mut instance), 0);
+    }
+    let reference = HostReference::new(());
+    let Value::Externref(returned) = ok(instance
+        .call("echo_ref", &[Value::Externref(reference.clone())])
+        .unwrap())
+    else {
+        panic!("expected a reference")
+    };
+    assert!(returned.ptr_eq(&reference));
+    let expected = [
+        "Ok(String(\"fine\"))",
+        "Err(Nil)",
+        "Err(Bool(false))",
+        "Err(Int(1267650600228229401496703205376))",
+        "Err(Float(-0.5))",
+        "Err(String(\"oops\"))",
+        "Err(BitArray(BitArray { bytes: [192], bit_length: 2 }))",
+    ];
+    for (selector, expected) in expected.iter().enumerate() {
+        let text = match instance
+            .call("fallible", &[Value::Float(selector as f64)])
+            .unwrap()
+        {
+            Outcome::Ok(value) => format!("Ok({value:?})"),
+            Outcome::Err(GuestError(value)) => format!("Err({value:?})"),
+            Outcome::Stop(stop) => panic!("stopped: {stop}"),
+        };
+        assert_eq!(text, *expected);
+        assert_eq!(allocations(&mut instance), 0);
+    }
 }
 
 #[test]
@@ -174,6 +613,7 @@ fn identical_host_arcs_get_identical_ids_even_with_separate_externrefs() {
     let bytes = wat::parse_str(
         r#"(module
         (import "ilang:host/v1" "reference_id" (func $id (param externref) (result i64)))
+        (func (export "ilang_start"))
         (func (export "same") (param externref externref) (result i32)
             (i64.eq (call $id (local.get 0)) (call $id (local.get 1)))))"#,
     )
@@ -181,10 +621,7 @@ fn identical_host_arcs_get_identical_ids_even_with_separate_externrefs() {
     let mut abi = Abi::default();
     abi.exports.insert(
         "same".into(),
-        Signature {
-            params: vec![AbiType::Externref, AbiType::Externref],
-            result: AbiType::Bool,
-        },
+        Signature::new([AbiType::Externref, AbiType::Externref], AbiType::Bool),
     );
     let mut instance = Program::from_bytes(&bytes)
         .unwrap()
@@ -193,446 +630,37 @@ fn identical_host_arcs_get_identical_ids_even_with_separate_externrefs() {
         .instantiate(HostOptions::default())
         .unwrap();
     let reference = HostReference::new(42);
-    assert!(matches!(
-        instance
-            .call(
-                "same",
-                &[
-                    Value::Externref(reference.clone()),
-                    Value::Externref(reference)
-                ]
-            )
-            .unwrap(),
-        Value::Bool(true)
-    ));
-    assert!(matches!(
-        instance
-            .call(
-                "same",
-                &[
-                    Value::Externref(HostReference::new(42)),
-                    Value::Externref(HostReference::new(42))
-                ]
-            )
-            .unwrap(),
-        Value::Bool(false)
-    ));
-    assert!(matches!(
-        instance
-            .call("same", &[Value::NullExternref, Value::NullExternref])
-            .unwrap(),
-        Value::Bool(true)
-    ));
-}
-
-#[test]
-fn guest_retained_references_outlive_calls_and_are_released_after_collection() {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    struct Resource(Arc<AtomicUsize>);
-    impl Drop for Resource {
-        fn drop(&mut self) {
-            self.0.fetch_add(1, Ordering::SeqCst);
-        }
-    }
-
-    let bytes = wat::parse_str(
-        r#"(module
-        (import "ilang:host/v1" "reference_id" (func $id (param externref) (result i64)))
-        (global $retained (mut externref) (ref.null extern))
-        (func (export "retain") (param externref)
-            (drop (call $id (local.get 0)))
-            (global.set $retained (local.get 0)))
-        (func (export "release") (global.set $retained (ref.null extern))))"#,
-    )
-    .unwrap();
-    let mut abi = Abi::default();
-    abi.exports.insert(
-        "retain".into(),
-        Signature {
-            params: vec![AbiType::Externref],
-            result: AbiType::Nil,
-        },
-    );
-    let mut instance = Program::from_bytes(&bytes)
-        .unwrap()
-        .with_abi(abi)
-        .unwrap()
-        .instantiate(HostOptions::default())
-        .unwrap();
-    let drops = Arc::new(AtomicUsize::new(0));
-    instance
+    let value = ok(instance
         .call(
-            "retain",
-            &[Value::Externref(HostReference::new(Resource(
-                drops.clone(),
-            )))],
+            "same",
+            &[
+                Value::Externref(reference.clone()),
+                Value::Externref(reference.clone()),
+            ],
         )
-        .unwrap();
-    instance.collect_garbage().unwrap();
-    assert_eq!(drops.load(Ordering::SeqCst), 0);
-    instance.call_raw_empty("release").unwrap();
-    instance.collect_garbage().unwrap();
-    assert_eq!(drops.load(Ordering::SeqCst), 1);
+        .unwrap());
+    assert!(matches!(value, Value::Bool(true)));
 }
 
 #[test]
-fn trapping_exports_release_owned_argument_buffers() {
-    let mut instance = fixture();
-    let error = instance
-        .call(
-            "trap_with_string",
-            &[Value::String("error with allocated input".into())],
-        )
-        .unwrap_err();
-    assert!(format!("{error:#}").contains("executing trap_with_string"));
-    assert_eq!(allocations(&mut instance), 0);
-    let error = instance
-        .call(
-            "fail",
-            &[Value::String("fixture.i:12: assertion failed".into())],
-        )
-        .unwrap_err();
-    assert!(format!("{error:#}").contains("fixture.i:12: assertion failed"));
-    assert_eq!(allocations(&mut instance), 0);
-    instance.call_raw_empty("passing_test").unwrap();
-}
-
-#[test]
-fn shared_fixture_executes_gc_typed_function_references_and_deep_tail_calls() {
-    let mut instance = fixture();
-    let probe = instance
-        .instance
-        .get_typed_func::<(), i32>(&mut instance.store, "feature_probe")
-        .unwrap();
-    assert_eq!(probe.call(&mut instance.store, ()).unwrap(), 42);
-    let tail = instance
-        .instance
-        .get_typed_func::<(i32, i32), i32>(&mut instance.store, "tail_count")
-        .unwrap();
-    assert_eq!(
-        tail.call(&mut instance.store, (1_000_000, 7)).unwrap(),
-        1_000_007
-    );
-    let gc_sum = instance
-        .instance
-        .get_typed_func::<i32, i32>(&mut instance.store, "gc_sum")
-        .unwrap();
-    assert_eq!(
-        gc_sum.call(&mut instance.store, 10_000).unwrap(),
-        50_005_000
-    );
-    instance.collect_garbage().unwrap();
-}
-
-#[test]
-fn standard_output_is_exact_and_initialization_runs() {
-    let mut instance = fixture();
-    instance.call_raw_empty("passing_test").unwrap();
-    instance.call_raw_empty("main").unwrap();
-    assert_eq!(instance.output().stdout, "fixture main\n");
-    assert_eq!(instance.take_output().stdout, "fixture main\n");
-    assert!(instance.output().stdout.is_empty());
-}
-
-#[test]
-fn custom_imports_roundtrip_all_supported_types_and_free_buffers() {
-    let mut abi = Abi::default();
-    let mut imports = HostImports::default();
-    let types = [
-        ("echo_string", AbiType::String),
-        ("echo_int", AbiType::Int),
-        ("echo_bits", AbiType::BitArray),
-        ("echo_ref", AbiType::Externref),
-        ("echo_bool", AbiType::Bool),
-        ("echo_float", AbiType::Float),
-        ("echo_nil", AbiType::Nil),
-    ];
-    let mut signatures = BTreeMap::new();
-    for (name, kind) in types {
-        signatures.insert(name.into(), signature(kind));
-        abi.exports.insert(name.into(), signature(kind));
-        imports
-            .define("custom", name, |arguments| {
-                Ok(arguments.first().cloned().unwrap_or(Value::Nil))
-            })
-            .unwrap();
-    }
-    abi.imports.insert("custom".into(), signatures);
-    let program = Program::from_bytes(CUSTOM).unwrap().with_abi(abi).unwrap();
-    assert!(program.instantiate(HostOptions::default()).is_err());
-    let mut instance = program
-        .instantiate(HostOptions {
-            imports,
-            ..HostOptions::default()
-        })
-        .unwrap();
-    for value in ["", "host callback 🐉"] {
-        assert!(
-            matches!(instance.call("echo_string", &[Value::String(value.into())]).unwrap(), Value::String(actual) if actual == value)
-        );
-        assert_eq!(allocations(&mut instance), 0);
-    }
-    for value in [BigInt::from(0), -(BigInt::from(1) << 500_u32)] {
-        assert!(
-            matches!(instance.call("echo_int", &[Value::Int(value.clone())]).unwrap(), Value::Int(actual) if actual == value)
-        );
-        assert_eq!(allocations(&mut instance), 0);
-    }
-    let bits = BitArray::new(vec![0xa0], 3).unwrap();
-    assert!(
-        matches!(instance.call("echo_bits", &[Value::BitArray(bits.clone())]).unwrap(), Value::BitArray(actual) if actual == bits)
-    );
-    assert!(matches!(
-        instance.call("echo_nil", &[]).unwrap(),
-        Value::Nil
-    ));
-    let reference = HostReference::new("callback object");
-    assert!(
-        matches!(instance.call("echo_ref", &[Value::Externref(reference.clone())]).unwrap(), Value::Externref(actual) if actual.ptr_eq(&reference))
-    );
-    assert_eq!(allocations(&mut instance), 0);
-}
-
-#[test]
-fn shared_fixture_restores_allocation_frames_after_host_callback_errors() {
-    let mut abi = Abi::default();
-    let mut imports = HostImports::default();
-    let mut signatures = BTreeMap::new();
-    for (name, kind) in [
-        ("echo_string", AbiType::String),
-        ("echo_int", AbiType::Int),
-        ("echo_bits", AbiType::BitArray),
-        ("echo_ref", AbiType::Externref),
-        ("echo_bool", AbiType::Bool),
-        ("echo_float", AbiType::Float),
-        ("echo_nil", AbiType::Nil),
-    ] {
-        signatures.insert(name.into(), signature(kind));
-        imports
-            .define("custom", name, |_| bail!("custom host failure"))
-            .unwrap();
-    }
-    abi.imports.insert("custom".into(), signatures);
-    abi.exports
-        .insert("leaking_throw".into(), signature(AbiType::String));
-    let mut instance = Program::from_bytes(CUSTOM)
-        .unwrap()
-        .with_abi(abi)
-        .unwrap()
-        .instantiate(HostOptions {
-            imports,
-            ..HostOptions::default()
-        })
-        .unwrap();
-    let heap_end = instance
-        .instance
-        .get_typed_func::<(), i32>(&mut instance.store, "heap_end")
-        .unwrap();
-    let frames = instance
-        .instance
-        .get_typed_func::<(), i32>(&mut instance.store, "active_frames")
-        .unwrap();
-    let initial = heap_end.call(&mut instance.store, ()).unwrap();
-    for _ in 0..10 {
-        let error = instance
-            .call("leaking_throw", &[Value::String("owned input".into())])
-            .unwrap_err();
-        assert!(format!("{error:#}").contains("custom host failure"));
-        assert_eq!(allocations(&mut instance), 0);
-        assert_eq!(heap_end.call(&mut instance.store, ()).unwrap(), initial);
-        assert_eq!(frames.call(&mut instance.store, ()).unwrap(), 0);
-    }
-}
-
-#[test]
-fn malformed_metadata_reserved_modules_and_out_of_bounds_results_fail() {
-    let abi = Abi {
-        version: 2,
-        ..Abi::default()
-    };
-    assert!(Program::from_bytes(FIXTURE).unwrap().with_abi(abi).is_err());
-    let mut abi = Abi::default();
-    abi.imports.insert(HOST_MODULE.into(), BTreeMap::new());
-    assert!(Program::from_bytes(FIXTURE).unwrap().with_abi(abi).is_err());
-    let bytes = wat::parse_str(
+fn a_stop_in_ilang_start_is_reported_and_the_start_is_required() {
+    let stopping = wat::parse_str(
         r#"(module
+        (import "ilang:host/v1" "panic" (func $panic (param i32 i32)))
         (memory (export "memory") 1)
-        (func (export "bad") (result i32 i32) i32.const 65536 i32.const 10))"#,
+        (data (i32.const 0) "panic: early")
+        (func (export "ilang_start") (call $panic (i32.const 0) (i32.const 12)) unreachable))"#,
     )
     .unwrap();
-    let mut abi = Abi::default();
-    abi.exports.insert(
-        "bad".into(),
-        Signature {
-            params: vec![],
-            result: AbiType::String,
-        },
-    );
-    let mut instance = Program::from_bytes(&bytes)
-        .unwrap()
-        .with_abi(abi)
+    let program = Program::from_bytes(&stopping).unwrap();
+    let error = program.instantiate(HostOptions::default()).err().unwrap();
+    let stop = error.downcast_ref::<Stop>().unwrap();
+    assert_eq!(stop.message.as_deref(), Some("panic: early"));
+    let none = wat::parse_str("(module)").unwrap();
+    let error = Program::from_bytes(&none)
         .unwrap()
         .instantiate(HostOptions::default())
+        .err()
         .unwrap();
-    assert!(
-        instance
-            .call("bad", &[])
-            .unwrap_err()
-            .to_string()
-            .contains("outside guest memory")
-    );
-}
-
-#[test]
-fn embedded_abi_is_validated_and_cannot_be_overridden() {
-    fn append_abi(bytes: &mut Vec<u8>, json: &[u8]) {
-        fn leb(mut value: usize, out: &mut Vec<u8>) {
-            loop {
-                let byte = (value & 0x7f) as u8;
-                value >>= 7;
-                out.push(byte | if value != 0 { 0x80 } else { 0 });
-                if value == 0 {
-                    break;
-                }
-            }
-        }
-        let mut data = Vec::new();
-        leb("ilang.abi".len(), &mut data);
-        data.extend_from_slice(b"ilang.abi");
-        data.extend_from_slice(json);
-        bytes.push(0);
-        leb(data.len(), bytes);
-        bytes.extend(data);
-    }
-    let mut bytes = wat::parse_str("(module)").unwrap();
-    append_abi(&mut bytes, br#"{"version":1,"entry":null}"#);
-    let program = Program::from_bytes(&bytes).unwrap();
-    assert!(program.abi().entry.is_none());
-    assert!(program.with_abi(Abi::default()).is_err());
-    append_abi(&mut bytes, br#"{"version":1}"#);
-    assert!(
-        Abi::from_wasm(&bytes)
-            .unwrap_err()
-            .to_string()
-            .contains("duplicate")
-    );
-    let mut bytes = wat::parse_str("(module)").unwrap();
-    append_abi(&mut bytes, br#"{"version":999}"#);
-    assert!(
-        Abi::from_wasm(&bytes)
-            .unwrap_err()
-            .to_string()
-            .contains("unsupported")
-    );
-}
-
-#[test]
-fn bridge_frames_reclaim_guest_internal_allocations_when_host_imports_fail() {
-    let bytes = wat::parse_str(
-        r#"(module
-        (import "custom" "fail" (func $fail))
-        (memory (export "memory") 1)
-        (global $live (mut i32) (i32.const 0))
-        (func (export "__ilang_abi_mark") (result i32) (global.get $live))
-        (func (export "__ilang_abi_reset") (param i32) (global.set $live (local.get 0)))
-        (func $alloc (export "__ilang_alloc") (param i32) (result i32)
-            (global.set $live (i32.add (global.get $live) (i32.const 1)))
-            i32.const 8)
-        (func (export "__ilang_free") (param i32 i32)
-            (global.set $live (i32.sub (global.get $live) (i32.const 1))))
-        (func (export "bad") (drop (call $alloc (i32.const 12))) (call $fail))
-        (func (export "clean") (if (global.get $live) (then unreachable))))"#,
-    )
-    .unwrap();
-    let mut abi = Abi::default();
-    abi.imports.insert(
-        "custom".into(),
-        BTreeMap::from([("fail".into(), signature(AbiType::Nil))]),
-    );
-    abi.exports.insert("bad".into(), signature(AbiType::Nil));
-    let mut imports = HostImports::default();
-    imports
-        .define("custom", "fail", |_| bail!("intentional host failure"))
-        .unwrap();
-    let mut instance = Program::from_bytes(&bytes)
-        .unwrap()
-        .with_abi(abi)
-        .unwrap()
-        .instantiate(HostOptions {
-            imports,
-            ..HostOptions::default()
-        })
-        .unwrap();
-    for _ in 0..10 {
-        let error = instance.call("bad", &[]).unwrap_err();
-        assert!(format!("{error:#}").contains("intentional host failure"));
-        instance.call_raw_empty("clean").unwrap();
-        assert!(instance.call_raw_empty("bad").is_err());
-        instance.call_raw_empty("clean").unwrap();
-    }
-}
-
-#[test]
-fn incomplete_frame_exports_fail_and_reset_does_not_hide_primary_error() {
-    let bytes = wat::parse_str(
-        r#"(module
-        (func (export "__ilang_abi_mark") (result i32) i32.const 1)
-        (func (export "main")))"#,
-    )
-    .unwrap();
-    let mut instance = Program::from_bytes(&bytes)
-        .unwrap()
-        .instantiate(HostOptions::default())
-        .unwrap();
-    assert!(
-        instance
-            .call_raw_empty("main")
-            .unwrap_err()
-            .to_string()
-            .contains("both __ilang_abi_mark")
-    );
-    let bytes = wat::parse_str(
-        r#"(module
-        (func (export "__ilang_abi_mark") (result i32) i32.const 1)
-        (func (export "__ilang_abi_reset") (param i32) unreachable)
-        (func (export "bad") unreachable))"#,
-    )
-    .unwrap();
-    let mut instance = Program::from_bytes(&bytes)
-        .unwrap()
-        .instantiate(HostOptions::default())
-        .unwrap();
-    assert!(
-        instance
-            .call_raw_empty("bad")
-            .unwrap_err()
-            .to_string()
-            .contains("executing bad")
-    );
-}
-
-#[test]
-fn randomness_is_bounded_and_never_overwrites_adjacent_memory() {
-    let bytes = wat::parse_str(
-        r#"(module
-        (import "ilang:host/v1" "random" (func $random (param i32 i32) (result i32)))
-        (memory (export "memory") 1)
-        (func (export "randomness")
-            (i32.store (i32.const 4) (i32.const 1234))
-            (i32.store (i32.const 24) (i32.const 5678))
-            (if (call $random (i32.const 8) (i32.const 16)) (then unreachable))
-            (if (i32.ne (i32.load (i32.const 4)) (i32.const 1234)) (then unreachable))
-            (if (i32.ne (i32.load (i32.const 24)) (i32.const 5678)) (then unreachable)))
-        (func (export "bad_randomness")
-            (drop (call $random (i32.const 65535) (i32.const 2)))))"#,
-    )
-    .unwrap();
-    let mut instance = Program::from_bytes(&bytes)
-        .unwrap()
-        .instantiate(HostOptions::default())
-        .unwrap();
-    instance.call_raw_empty("randomness").unwrap();
-    let error = instance.call_raw_empty("bad_randomness").unwrap_err();
-    assert!(format!("{error:#}").contains("outside guest memory"));
+    assert!(format!("{error:#}").contains("ilang_start"));
 }

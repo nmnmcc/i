@@ -1,121 +1,145 @@
-# iLang Rust host
+# i Rust host
 
-`ilang-host` embeds Wasmtime 50 with the WasmGC, function-reference and tail-call
-features used by iLang. It is independent of the compiler and language server.
+`ilang-host` embeds Wasmtime 50 and runs i programs through the binary
+interface version 2 of `docs/spec.md` (Appendix B). It enables the Wasm
+features that i needs: garbage collection, typed function references, tail
+calls, and exception handling with `exnref`.
 
 ```rust,no_run
-use ilang_host::{HostOptions, Program, Value};
+use ilang_host::{HostImports, HostOptions, Outcome, Program, Value};
 
 fn main() -> anyhow::Result<()> {
     let wasm = std::fs::read("application.wasm")?;
     let program = Program::from_bytes(&wasm)?;
-    let mut instance = program.instantiate(HostOptions::default())?;
 
-    // An export declared by the module's ilang.abi custom section.
-    let answer = instance.call("greet", &[Value::String("friend".into())])?;
-    println!("{answer:?}");
+    // Host services (spec §9.7) and external functions (§10.1).
+    let mut imports = HostImports::default();
+    imports.service("app:console/v1", "print", |arguments| {
+        if let [Value::String(text)] = arguments {
+            print!("{text}");
+        }
+        Ok(Ok(Value::Nil))
+    })?;
 
-    // Run an application's entry point instead of a typed library export.
-    instance.call_raw_empty(program.abi().entry.as_deref().unwrap_or("_start"))?;
-    print!("{}", instance.take_output().stdout);
+    let mut instance = program.instantiate(HostOptions::new(imports))?;
+    match instance.call("app/math.add", &[Value::Int(1.into()), Value::Int(2.into())])? {
+        Outcome::Ok(value) => println!("{value:?}"),
+        Outcome::Err(error) => println!("error {:?}", error.0),
+        Outcome::Stop(stop) => println!("stopped:\n{stop}"),
+    }
     Ok(())
 }
 ```
 
-`HostOptions::default()` captures exact standard output and standard error.
-`HostOptions::stdio()` streams to the process's standard streams without retaining
-an unbounded copy. Custom output sinks can be combined with `capture_output`.
-Instantiation calls `__ilang_init` once if it exists. Reuse a `Program` to create
-independent instances; this avoids recompiling the module after a test traps.
-Functions compile in parallel with Cranelift's `Speed` optimization level.
-Build the embedding application in release mode for realistic loading times;
-a debug build leaves the JIT compiler's own code unoptimized. This SDK does not
-enable a persistent machine-code cache.
+## The module
 
-## Custom host functions
+`Program::from_bytes` compiles the module and reads its `ilang.abi` custom
+section (B.6): `entry`, `tests` (with `async`), `exports` (with `errors` and
+`async`), `services` and `externals`. Unknown fields, a version other than 2,
+errors that are not in the canonical order, and names of the interface used for
+exports are refused. `Program::with_abi` gives the metadata of a module without
+the section; it cannot replace a section.
 
-The guest describes imports in its `ilang.abi` custom section. Register matching
-Rust implementations before instantiation:
+`Program::instantiate` links the two runtime imports of `ilang:host/v1`
+(`panic` and `reference_id`, B.4) and every function in `services` and
+`externals`. A missing host function fails instantiation. Then it calls
+`ilang_start` once, before anything else (B.1). When the program stops in
+`ilang_start`, the error is a `Stop`.
+
+## Calls
+
+`Instance::call(name, arguments)` calls a host export with the encoding of B.2
+and gives an `Outcome`:
+
+- `Outcome::Ok(value)`;
+- `Outcome::Err(GuestError(value))` when the function gave an error of its
+  `? E`; the tag selects the member of `E` in the canonical order Nil, Bool, Int,
+  Float, String, BitArray;
+- `Outcome::Stop(Stop { message, trap })` when the program stopped. `message` is
+  the stop message given to `panic` (spec §11.7): the reason, then the source
+  positions. It is `None` when the module trapped without one.
+
+After a stop, or any other trap, the instance refuses every call (B.5); make a
+new one. `Err(…)` of the outer `Result` is a mistake of the caller (an unknown
+export, a wrong number of arguments), a failure of a host function, or a value
+from the module that is not correct (B.2). The last two also make the instance
+unusable.
+
+`Program::run_entry` runs the program entry in a new instance, and
+`Program::run_tests` runs every test of the metadata in a new instance (spec
+§10.2). `Instance::run(name)` runs one of them by name.
+
+| Type | Wasm values | Rust value |
+| --- | --- | --- |
+| `nil` | none | `Value::Nil` |
+| `bool` | `i32` 0 or 1 | `Value::Bool` |
+| `int` | sign, address, count (`i32`) | `Value::Int(BigInt)` |
+| `float` | finite `f64` | `Value::Float` |
+| `string` | address, UTF-8 length | `Value::String` |
+| `bit_array` | address, number of bits | `Value::BitArray` |
+| `externref` | `externref` | `Value::Externref` or `Value::NullExternref` |
+
+Buffers follow B.3. For an export, the host makes the parameter buffers with
+`ilang_alloc` and frees them with `ilang_free` after the call, and frees the
+result buffers after copying them. For an import, the module owns the parameter
+buffers and the host makes the result buffers with `ilang_alloc`. Empty buffers
+have the address 0 and are neither made nor freed.
+
+## Values that are not correct
+
+Values from the host are checked as B.2 requires. An argument of an export, or
+the answer of a host function, that is not a correct value of its type (a
+`Float` that is not finite, a `BitArray` whose bits after the end are not 0, a
+value of another type, or an error that is not a member of `E`) stops the
+program with `host: value is not correct`. A host function that returns `Err`
+traps the instance and its error is given back by the call.
+
+Values from the module are checked as well: a `Bool` that is not 0 or 1, a
+`String` that is not UTF-8, an `Int` with a wrong sign or a last part of 0, or a
+tag that is too big.
+
+## Host functions
 
 ```rust,no_run
-use anyhow::{bail, Result};
-use ilang_host::{HostImports, HostOptions, Program, Value};
-
-fn instantiate(wasm: &[u8]) -> Result<ilang_host::Instance> {
-    let mut imports = HostImports::default();
-    imports.define("application", "greet", |arguments| {
-        let [Value::String(name)] = arguments else {
-            bail!("greet expects one String");
-        };
-        Ok(Value::String(format!("Hello, {name}!")))
-    })?;
-
-    Program::from_bytes(wasm)?.instantiate(HostOptions {
-        imports,
-        ..HostOptions::default()
+# use ilang_host::{HostImports, Value, BigInt};
+# fn f(imports: &mut HostImports) -> anyhow::Result<()> {
+// read(key: String) -> String ? String
+imports.service("app:storage/v1", "read", |arguments| {
+    Ok(match arguments {
+        [Value::String(key)] if key == "name" => Ok(Value::String("i".into())),
+        _ => Err(Value::String("missing".into())),
     })
-}
+})?;
+// @external("app:math/v1", "sqrt")
+imports.external("app:math/v1", "sqrt", |arguments| match arguments {
+    [Value::Float(x)] => Ok(Value::Float(x.sqrt())),
+    _ => anyhow::bail!("sqrt takes a Float"),
+})?;
+# Ok(()) }
 ```
 
-The SDK copies incoming strings, integers and bit arrays before invoking the
-callback. Callbacks return owned Rust values; the SDK allocates and fills guest
-buffers for their results. It does not execute i arithmetic on behalf of the
-guest. `Program::with_abi` supplies descriptors for an independent Wasm module
-without an embedded descriptor; it cannot replace existing ABI metadata.
+## Async (B.4, B.5)
 
-## ABI version 1
+`HostImports::async_service` registers a function of an async host service. It
+starts the work and gives a future. `Instance::call_async` and
+`Instance::run_async` call an async export: while the status is 1, they await
+the future of the one host function that the module started, give its value to
+`ilang_resume:namespace:label`, and at status 0 read the results from
+`ilang_result:name`. `ilang_host::block_on` drives such a call without an
+executor.
 
-| Type | Flattened Wasm values | Rust value |
-| --- | --- | --- |
-| `nil` | no values | `Value::Nil` |
-| `bool` | `i32` containing 0 or 1 | `Value::Bool` |
-| `float` | finite `f64` | `Value::Float` |
-| `int` | sign, pointer, limb count (`i32`) | `Value::Int(BigInt)` |
-| `string` | pointer, UTF-8 byte length (`i32`) | `Value::String` |
-| `bit_array` | pointer, bit length (`i32`) | `Value::BitArray` |
-| `externref` | nullable `externref` | `Value::Externref` or `Value::NullExternref` |
-
-Integer sign is -1, 0 or 1. Limbs are unsigned little-endian 32-bit words, least
-significant first. Zero has sign 0 and no limbs; other values have no leading zero
-limb. Bit arrays are packed most-significant-bit first and unused low bits in the
-last byte are zero. Invalid UTF-8, nonfinite floats, malformed integers, invalid
-padding and out-of-bounds memory are rejected.
-
-The caller owns its argument buffers and frees them after the call, including
-when the call traps. The callee returns freshly allocated result buffers, whose
-ownership transfers to the caller. The receiving wrapper copies the results and
-frees them. A returned buffer must not alias an argument allocation. Allocation
-uses `__ilang_alloc(byte_length)` and release uses
-`__ilang_free(pointer, byte_length)`; memory is exported as `memory`.
-
-When the guest provides the optional pair `__ilang_abi_mark()` and
-`__ilang_abi_reset(mark)`, the SDK opens an allocation frame before every typed or
-raw zero-argument call. It copies results, releases known buffers and closes the
-frame even on a trap. This reclaims bridge buffers allocated inside a guest that
-calls a failing host function. Frame exports must appear as a pair; a cleanup
-failure never replaces an earlier execution error.
+## Host references
 
 `HostReference::new` stores an opaque `Send + Sync` Rust value in an `Arc`.
-Cloning the reference preserves its identity even when separate Wasm `externref`
-wrappers are created. References held by the guest remain rooted through
-Wasmtime's GC. `reference_id` uses weak registry entries and never extends the
-object's lifetime; null has identity 0. `collect_garbage` can request collection
-when testing resource lifetimes.
+`reference_id` gives the same number for clones of one reference, different
+numbers for different references, and 0 for null, so `==` in i compares host
+references by identity. References held by the module stay rooted through
+Wasmtime's GC.
 
-The reserved host namespace `ilang:host/v1` provides exact UTF-8 writes (channel 1
-for stdout, 2 for stderr), OS randomness, panic reporting and opaque reference
-identity. User import descriptors and implementations cannot override it.
-
-## Compiler integration verification
-
-The executable example takes the actual library artifact built from
-`tests/conformance/projects/host_abi` and fails if an ABI assertion fails:
+## Example
 
 ```sh
-cargo run --release --locked -p ilang-host --example verify_compiler_abi -- path/to/host_abi.wasm
+cargo run --release -p ilang-host --example run -- path/to/program.wasm
 ```
 
-It exercises compiler-generated import and export wrappers for every ABI type,
-4096-bit integers, large UTF-8 strings, nonaligned bit slices, opaque identity,
-host callback failures and guest panics. The instance must remain usable after
-each failure. A successful run prints a JSON assertion summary.
+runs the program entry and the tests of a module that needs no host functions.

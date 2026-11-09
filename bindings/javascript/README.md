@@ -1,90 +1,104 @@
-# iLang JavaScript host
+# i JavaScript host
 
-`ilang.mjs` is a self-contained ECMAScript module. It runs in modern browsers and
-Node.js without npm runtime dependencies. The compiler can copy it beside its
-Wasm output; `ilang.d.ts` describes the same API for TypeScript consumers.
+`ilang.mjs` is a self-contained ECMAScript module that runs i programs through
+the binary interface version 2 of `docs/spec.md` (Appendix B). It runs in modern
+browsers and Node.js without npm runtime dependencies. `ilang.d.ts` describes the
+same API for TypeScript.
 
 ```javascript
-import { instantiate } from "./ilang.mjs";
+import { instantiate, iLangError, iLangStop } from "./ilang.mjs";
 
 const app = await instantiate(new URL("./app.wasm", import.meta.url), {
-  stdout: (text) => document.body.append(text),
-  stderr: (text) => console.error(text),
-});
-app.run();
-
-// Explicit exported functions are described by the compiler's ilang.abi section.
-const answer = app.call("app.calculate", [123456789012345678901234567890n]);
-```
-
-The module must support WasmGC, typed function references, and tail calls.
-`supportsRequiredFeatures()` checks all three without a network request. Loading
-compiles the module, validates its ABI metadata, registers host functions,
-instantiates it, and invokes `__ilang_init` once. Calling `run()` invokes the ABI
-entry, defaulting to `_start`.
-
-The loader checks declared function signatures using Wasm's linker. Typed import
-proxies and export checks reject scalar type mismatches before JavaScript can
-silently coerce values, including when loading an already compiled
-`WebAssembly.Module`. Signature checks and immutable embedded metadata are cached
-per module when creating fresh test instances.
-
-Custom functions are synchronous and take ordinary JavaScript values:
-
-```javascript
-const app = await instantiate(wasmBytes, {
   imports: {
-    database: {
-      lookup: (key) => records.get(key),
+    // Host services (spec §9.7): the import module is the namespace.
+    "app:console/v1": { print: (text) => console.log(text) },
+    "app:storage/v1": {
+      read: (key) => {
+        if (!records.has(key)) throw new iLangError(`no ${key}`); // an error of `? String`
+        return records.get(key);
+      },
     },
+    // External functions (spec §10.1).
+    "app:math/v1": { hypot: (a, b) => Math.hypot(a, b) },
   },
 });
+app.run(); // the program entry
+
+try {
+  const sum = app.call("app/math.add", [1n, 2n]);
+} catch (error) {
+  if (error instanceof iLangError) console.log("error", error.value);
+  else if (error instanceof iLangStop) console.log(error.stopMessage);
+  else throw error;
+}
 ```
 
-The compiler's `ilang.abi` custom section declares the parameter and result types.
-`rawImports` is available for low-level Wasm imports that the application manages
-itself. The `ilang:host/v1` namespace is supplied by this loader. Supplying `abi`
-explicitly is supported for independently produced modules without an embedded
-section; it cannot override compiler metadata.
+The engine must support WasmGC, typed function references, tail calls and
+exception handling with `exnref`. `supportsRequiredFeatures()` checks all four
+with a tiny probe module, without a network request.
 
-| i boundary type | JavaScript value | Core Wasm representation |
+`instantiate` compiles the module, reads and checks its `ilang.abi` metadata
+(B.6), links `ilang:host/v1` (`panic` and `reference_id`, B.4) and every
+function in `services` and `externals`, and calls `ilang_start` once (B.1). The
+loader checks every declared signature with Wasm's linker, also for an already
+compiled `WebAssembly.Module`. `abi` gives the metadata of a module without the
+section; it cannot replace a section. `rawImports` adds other Wasm imports.
+
+## Calls and stops
+
+`call(name, args)` calls a host export (B.2). It gives the value, throws
+`iLangError` with `.value` when the function gives an error of its `? E`, and
+throws `iLangStop` when the program stops. `stopMessage` is the stop message of
+spec §11.7 (the reason, then the source positions), or `null` when the module
+trapped without one. After a stop, or any other trap, the instance refuses every
+call (B.5); make a new one. `unusable` says why.
+
+`run()` runs the program entry, and `runTests(source, options)` runs every test
+of the metadata in a new instance (spec §10.2), giving `{ name, passed, error? }`.
+
+| i type | JavaScript value | Wasm values |
 | --- | --- | --- |
-| `Nil` | `undefined` or `null` | no values |
+| `Nil` | `undefined` or `null` | none |
 | `Bool` | `boolean` | `i32` 0 or 1 |
+| `Int` | `bigint` | sign, address, count |
 | `Float` | finite `number` | `f64` |
-| `Int` | `bigint` | sign, pointer, unsigned 32-bit limb count |
-| `String` | well-formed `string` | UTF-8 pointer and byte length |
-| `BitArray` | `{ bytes: Uint8Array, bitLength: number }` | pointer and bit length |
-| opaque host type | a JavaScript reference | `externref` |
+| `String` | well-formed `string` | address, UTF-8 length |
+| `BitArray` | `{ bytes: Uint8Array, bitLength: number }` | address, number of bits |
+| custom type with no constructors | any JavaScript value | `externref` |
 
-Integer limbs use little-endian sign/magnitude encoding, with canonical zero
-represented by sign zero and no limbs. Bit arrays have exactly the byte length
-needed for their bits; unused low bits in the last byte are zero. Lists, records,
-and callbacks require an explicit application encoding at the boundary.
+When a function has errors, its results start with an `i32` tag: 0 for the
+value, i for the i-th member of `E` in the canonical order Nil, Bool, Int, Float,
+String, BitArray. A host service gives an error by throwing `iLangError(value)`;
+the type of the value selects the member.
 
-Each call copies its arguments into guest allocations. Returned buffers transfer
-ownership to the caller, which copies and frees them. All argument buffers are
-released even if the call traps or a host function throws. Host callbacks receive
-copies, so guest memory growth cannot invalidate their arguments. Guest code owns
-the newly allocated buffers returned by a custom host callback. These ownership
-rules also apply to non-null allocations of zero bytes.
+## Values that are not correct
 
-When the guest exports `__ilang_abi_mark` and `__ilang_abi_reset`, calls establish a
-nested ABI allocation frame before lowering arguments. They copy results and
-release owned buffers, then restore the frame even after a trap. This also reclaims
-guest-created temporary import buffers whose normal cleanup was interrupted by a
-host exception. Cleanup errors do not replace the original exception.
+An argument of `call` or an answer of a host function that is not a correct
+value of its type (a `Float` that is not finite, a string with a lone
+surrogate, a bit array with bits after the end, a value of another type, or an
+error that is not a member of `E`) stops the program with `host: value is not
+correct` (B.2). A wrong number of arguments or an unknown export is an
+`iLangAbiError` and leaves the instance usable. A value from the module that is
+not correct is an `iLangAbiError` too, and the instance becomes unusable. An
+exception from a host function goes through the module unchanged and also makes
+the instance unusable.
 
-The built-in host functions provide output, cryptographic randomness, panic
-messages, and per-instance identities for opaque references. The output callbacks
-receive the exact text written by the guest. Defaults use `console.log` and
-`console.error`, whose presentation can add line formatting. A custom `random`
-callback fills the supplied byte array synchronously. Language arithmetic and
-Unicode processing execute in the Wasm guest.
+## Buffers
 
-`runTests(source, options)` creates a fresh instance for every exported test and
-returns `{ name, passed, error? }` results. A trap or panic in one test does not
-prevent later tests from running.
+Buffers follow B.3. For an export, the loader makes the parameter buffers with
+`ilang_alloc` and frees them with `ilang_free` after the call, and frees the
+result buffers after copying them. For an import, the module owns the parameter
+buffers and the loader makes the result buffers. Empty buffers have the address
+0 and are neither made nor freed.
+
+## Async
+
+A function of an async host service (`@host("…", "async")`) gives a Promise.
+`callAsync(name, args)` calls an async export (B.5): while the status is 1, it
+awaits the Promise of the one host function that the module started, gives its
+value to `ilang_resume:namespace:label`, and at status 0 reads the results from
+`ilang_result:name`. While it waits, other calls are refused. `run()` and
+`runTests` also wait for async entry points.
 
 ## Verification
 
@@ -96,17 +110,7 @@ npm test
 npm run test:browser:host
 ```
 
-The browser suite uses the same checked-in ABI Wasm fixture in Chromium, Firefox,
-and WebKit. Regenerate those fixtures with `bash scripts/build-abi-fixture.sh`.
-They test the host contract, not the compiler's language implementation.
-
-Native compiler conformance produces `target/conformance/browser.json`, an array
-of `{ name, wasm, stdout, stderr?, tests? }` fixtures. Run `npm run test:browser:compiled` to execute
-those exact binaries in all three engines. `npm run test:browser` runs both suites
-and fails if the compiler manifest is missing or empty. Set
-`ILANG_BROWSER_MANIFEST` to use a different manifest.
-
-The `host_abi` conformance library additionally exercises the compiler's real
-foreign-function wrappers in all three browsers, including opaque equality,
-nonzero bit offsets and recovery after host exceptions. After building that
-project, `npm run test:compiler:abi` runs the same assertions in Node.js.
+The browser suite uses the same checked-in Wasm fixtures in Chromium, Firefox and
+WebKit. Regenerate them, and the feature probe in `ilang.mjs`, with
+`bash scripts/build-abi-fixture.sh`. They test the host contract, not the
+compiler.

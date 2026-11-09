@@ -23,16 +23,29 @@ const CORE: &str = r#"
 (func $value_tag (param $v eqref) (result i32)
   (if (ref.is_null (local.get $v)) (then (return (i32.const 0))))
   (if (ref.test (ref i31) (local.get $v)) (then (return (i32.const 8))))
-  (if (ref.test (ref $hostbox) (local.get $v)) (then (return (i32.const 10))))
+  (if (ref.test (ref $hostref) (local.get $v)) (then (return (i32.const 10))))
   (struct.get $obj 0 (ref.cast (ref $obj) (local.get $v))))
+;; A host reference keeps its reference_id, which never changes (spec B.4).
+(func $host_ref_new (param $r externref) (result eqref)
+  (struct.new $hostref (local.get $r) (call $host_reference_id (local.get $r))))
+(func $host_ref_get (param $v eqref) (result externref)
+  (struct.get $hostref 0 (ref.cast (ref $hostref) (local.get $v))))
+(func $host_id (param $v eqref) (result i64)
+  (struct.get $hostref 1 (ref.cast (ref $hostref) (local.get $v))))
+(func $codepoint_new (param $c i32) (result eqref)
+  (struct.new $obj (i32.const 13) (local.get $c) (i64.const 0) (f64.const 0)
+    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
+(func $codepoint_get (param $v eqref) (result i32)
+  (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))))
 (func $bool_new (param $v i32) (result eqref)
   (if (result eqref) (local.get $v)
     (then (global.get $value_true)) (else (global.get $value_false))))
 (func $bool_get (param $v eqref) (result i32)
   (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))))
 (func $float_new (param $v f64) (result eqref)
+  ;; NaN fails the comparison as well (spec §11.3).
   (if (i32.eqz (f64.le (f64.abs (local.get $v)) (f64.const 0x1.fffffffffffffp+1023)))
-    (then unreachable))
+    (then (call $stop_float) unreachable))
   (struct.new $obj (i32.const 2) (i32.const 0) (i64.const 0) (local.get $v)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
 (func $float_get (param $v eqref) (result f64)
@@ -88,6 +101,13 @@ const CORE: &str = r#"
 (func $value_eq (param $a eqref) (param $b eqref) (result i32)
   (if (ref.eq (local.get $a) (local.get $b)) (then (return (i32.const 1))))
   (i32.eqz (call $value_compare_i32 (local.get $a) (local.get $b))))
+;; `==` (spec §11.4).
+(func $equal (param $a eqref) (param $b eqref) (result i32)
+  (call $value_eq (local.get $a) (local.get $b)))
+;; Functions, boundaries and continuations are the same only as themselves.
+(func $value_identity_kind (param $kind i32) (result i32)
+  (i32.or (i32.eq (local.get $kind) (i32.const 7))
+    (i32.or (i32.eq (local.get $kind) (i32.const 11)) (i32.eq (local.get $kind) (i32.const 12)))))
 (func $compare_i32 (param $a i32) (param $b i32) (result i32)
   (i32.sub (i32.gt_s (local.get $a) (local.get $b)) (i32.lt_s (local.get $a) (local.get $b))))
 (func $compare_i64 (param $a i64) (param $b i64) (result i32)
@@ -115,6 +135,9 @@ const CORE: &str = r#"
       (if (i32.eq (local.get $ka) (i32.const 10)) (then
         (local.set $c (call $compare_i64 (call $host_id (local.get $a)) (call $host_id (local.get $b))))
         (br $compared)))
+      ;; Identity values that are not ref.eq are different. The order between
+      ;; them only has to be consistent within one comparison.
+      (if (call $value_identity_kind (local.get $ka)) (then (return (i32.const 1))))
       (local.set $oa (ref.cast (ref $obj) (local.get $a)))
       (local.set $ob (ref.cast (ref $obj) (local.get $b)))
       (if (i32.eq (local.get $ka) (i32.const 2)) (then
@@ -215,6 +238,8 @@ const CORE: &str = r#"
     (local.set $kind (call $value_tag (local.get $v)))
     (local.set $h (call $hash_mix (local.get $h) (local.get $kind)))
     (br_if $walk (i32.eqz (local.get $kind)))
+    ;; Identity values hash by their tag alone: equal values are one value.
+    (br_if $walk (call $value_identity_kind (local.get $kind)))
     (local.set $i (i32.const 0))
     (if (i32.eq (local.get $kind) (i32.const 8)) (then
       (local.set $h (call $hash_mix (local.get $h) (call $int_sign (local.get $v))))
@@ -276,31 +301,3 @@ const CORE: &str = r#"
 (func $value_hash (param $v eqref) (result eqref)
   (call $int_from_i64 (i64.extend_i32_u (call $value_hash_u32 (local.get $v)))))
 "#;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn generated_value_primitives_are_valid_wasm() {
-        let host = r#"
-          (type $hostbox (struct (field externref) (field i64)))
-          (memory 1)
-          (func $alloc (param i32) (result i32) (i32.const 0))
-          (func $free (param i32 i32))
-          (func $host_id (param $v eqref) (result i64)
-            (struct.get $hostbox 1 (ref.cast (ref $hostbox) (local.get $v))))
-          (func $host_equal (param $a eqref) (param $b eqref) (result i32)
-            (i64.eq (call $host_id (local.get $a)) (call $host_id (local.get $b))))
-        "#;
-        let source = format!(
-            "(module {} {host} {} {} {})",
-            crate::runtime::TYPES,
-            super::CORE,
-            crate::runtime::bigint::wat(),
-            super::strings::wat(),
-        );
-        let bytes = wat::parse_str(&source).expect("value primitive syntax");
-        wasmparser::Validator::new()
-            .validate_all(&bytes)
-            .expect("value primitive types");
-    }
-}

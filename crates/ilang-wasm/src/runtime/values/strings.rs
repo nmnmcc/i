@@ -157,13 +157,15 @@ pub fn wat() -> String {
   (array.copy $bytes $bytes (local.get $out) (i32.const 0) (local.get $b) (local.get $start) (local.get $len))
   (if (i32.eqz (call $utf8_valid (local.get $out))) (then unreachable))
   (call $string_from_bytes (local.get $out)))
-(func $string_byte_slice (param $s eqref) (param $start eqref) (param $len eqref) (result eqref)
-  (local $a i64) (local $n i64)
-  (local.set $a (call $int_to_i64 (local.get $start)))
-  (local.set $n (call $int_to_i64 (local.get $len)))
-  (if (i32.or (i64.gt_u (local.get $a) (i64.const 4294967295))
-               (i64.gt_u (local.get $n) (i64.const 4294967295))) (then unreachable))
-  (call $string_slice_bytes (local.get $s) (i32.wrap_i64 (local.get $a)) (i32.wrap_i64 (local.get $n))))
+(func $string_suffix (param $s eqref) (param $start i32) (result eqref)
+  (call $string_slice_bytes (local.get $s) (local.get $start)
+    (i32.sub (call $string_length_bytes (local.get $s)) (local.get $start))))
+;; Is `at` a character boundary of valid UTF-8 (the start, the end, or a byte
+;; that is not a continuation byte)?
+(func $string_boundary (param $b (ref $bytes)) (param $at i32) (result i32)
+  (if (i32.ge_u (local.get $at) (array.len (local.get $b)))
+    (then (return (i32.eq (local.get $at) (array.len (local.get $b))))))
+  (i32.ne (i32.and (array.get_u $bytes (local.get $b) (local.get $at)) (i32.const 192)) (i32.const 128)))
 
 (func $string_match_at (param $s (ref $bytes)) (param $needle (ref $bytes)) (param $at i32) (result i32)
   (local $i i32)
@@ -209,16 +211,9 @@ pub fn wat() -> String {
       (local.set $at (i32.sub (local.get $at) (i32.const 1))) (br $continuations)))
     (local.set $cp (call $utf8_decode (local.get $b) (local.get $at)))
     (if (i32.ne (i32.add (local.get $at) (call $utf8_width (local.get $cp))) (local.get $end)) (then unreachable))
-    (local.set $out (call $list_cons (call $int_from_i64 (i64.extend_i32_u (local.get $cp))) (local.get $out)))
+    (local.set $out (call $list_cons (call $codepoint_new (local.get $cp)) (local.get $out)))
     (local.set $end (local.get $at)) (br $more)))
   (local.get $out))
-(func $string_scalar_int (param $v eqref) (result i32)
-  (local $n i64) (local $cp i32)
-  (local.set $n (call $int_to_i64 (local.get $v)))
-  (if (i64.gt_u (local.get $n) (i64.const 1114111)) (then unreachable))
-  (local.set $cp (i32.wrap_i64 (local.get $n)))
-  (drop (call $utf8_width (local.get $cp)))
-  (local.get $cp))
 (func $string_from_codepoints (param $list eqref) (result eqref)
   (local $cursor eqref) (local $fields (ref null $values)) (local $n i64)
   (local $cp i32) (local $at i32) (local $out (ref $bytes))
@@ -226,7 +221,7 @@ pub fn wat() -> String {
   (block $counted (loop $count
     (local.set $fields (struct.get $obj 5 (ref.cast (ref $obj) (local.get $cursor))))
     (br_if $counted (ref.is_null (local.get $fields)))
-    (local.set $cp (call $string_scalar_int (array.get $values (local.get $fields) (i32.const 0))))
+    (local.set $cp (call $codepoint_get (array.get $values (local.get $fields) (i32.const 0))))
     (local.set $n (i64.add (local.get $n) (i64.extend_i32_u (call $utf8_width (local.get $cp)))))
     (if (i64.gt_u (local.get $n) (i64.const 4294967295)) (then unreachable))
     (local.set $cursor (array.get $values (local.get $fields) (i32.const 1))) (br $count)))
@@ -235,15 +230,10 @@ pub fn wat() -> String {
   (block $written (loop $write
     (local.set $fields (struct.get $obj 5 (ref.cast (ref $obj) (local.get $cursor))))
     (br_if $written (ref.is_null (local.get $fields)))
-    (local.set $cp (call $string_scalar_int (array.get $values (local.get $fields) (i32.const 0))))
+    (local.set $cp (call $codepoint_get (array.get $values (local.get $fields) (i32.const 0))))
     (local.set $at (call $utf8_write (local.get $out) (local.get $at) (local.get $cp)))
     (local.set $cursor (array.get $values (local.get $fields) (i32.const 1))) (br $write)))
   (call $string_from_bytes (local.get $out)))
-(func $string_int_to_codepoint (param $v eqref) (result eqref)
-  (struct.new $obj (i32.const 13) (call $string_scalar_int (local.get $v)) (i64.const 0) (f64.const 0)
-    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
-(func $string_codepoint_to_int (param $v eqref) (result eqref)
-  (call $int_from_i64 (i64.extend_i32_u (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))))))
 (func $string_concat (param $list eqref) (result eqref)
   (local $cursor eqref) (local $fields (ref null $values)) (local $n i64)
   (local $s (ref $bytes)) (local $at i32) (local $out (ref $bytes))
@@ -267,38 +257,4 @@ pub fn wat() -> String {
   (call $string_from_bytes (local.get $out)))
 "#
     .to_owned()
-}
-
-#[cfg(test)]
-mod tests {
-    const DEPENDENCIES: &str = r#"
-(type $bytes (array (mut i8)))
-(type $values (array (mut eqref)))
-(type $limbs (array (mut i32)))
-(type $call (func (param eqref eqref) (result eqref)))
-(type $obj (struct (field i32) (field i32) (field i64) (field f64)
-  (field (ref null $bytes)) (field (ref null $values))
-  (field (ref null $limbs)) (field (ref null $call))))
-(memory 1)
-(func $alloc (param i32) (result i32) (i32.const 0))
-(func $int_from_i64 (param i64) (result eqref) (ref.i31 (i32.wrap_i64 (local.get 0))))
-(func $int_to_i64 (param eqref) (result i64)
-  (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get 0)))))
-(func $list_nil (result eqref)
-  (struct.new $obj (i32.const 6) (i32.const 0) (i64.const 0) (f64.const 0)
-    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
-(func $list_cons (param eqref eqref) (result eqref)
-  (struct.new $obj (i32.const 6) (i32.const 0) (i64.const 0) (f64.const 0)
-    (ref.null $bytes) (array.new_fixed $values 2 (local.get 0) (local.get 1))
-    (ref.null $limbs) (ref.null $call)))
-"#;
-
-    #[test]
-    fn generated_utf8_runtime_is_valid_wasm() {
-        let module = format!("(module {DEPENDENCIES} {})", super::wat());
-        let bytes = wat::parse_str(module).expect("string runtime parses");
-        wasmparser::Validator::new()
-            .validate_all(&bytes)
-            .expect("string runtime validates");
-    }
 }

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Validate and execute the shared GC value primitives independently of lowering.
 
-Usage: python3 tests/runtime_values.py [--wasm-tools PATH] [--wasmtime PATH]
-The reference module contains production runtime bodies and test-only exports.
+Usage: python3 tests/runtime_values.py --types TYPES.wat --runtime RUNTIME.wat
+       [--wasm-tools PATH] [--wasmtime PATH]
+The Rust test runtime_values.rs writes the runtime's TYPES and wat() to the two
+files. The reference module adds stub host imports and test-only exports.
 """
 
 import argparse
@@ -27,17 +29,13 @@ def string(value):
 
 
 PRELUDE = """
-(type $hostbox (struct(field externref)(field i64)))
-(memory 1)
-(global $heap (mut i32) (i32.const 1024))
-(func $alloc (param $n i32)(result i32)(local $p i32)
-  (local.set $p(global.get $heap))
-  (global.set $heap(i32.add(local.get $p)(local.get $n))) (local.get $p))
-(func $free (param i32 i32))
-(func $host_id(param $v eqref)(result i64)
-  (struct.get $hostbox 1(ref.cast(ref $hostbox)(local.get $v))))
-(func $host_equal(param $a eqref)(param $b eqref)(result i32)
-  (i64.eq(call $host_id(local.get $a))(call $host_id(local.get $b))))
+(global $panic_address (mut i32) (i32.const 0))
+(global $panic_length (mut i32) (i32.const 0))
+;; The runtime traps with `unreachable` after the panic import returns.
+(func $host_panic (param $address i32) (param $length i32)
+  (global.set $panic_address (local.get $address))
+  (global.set $panic_length (local.get $length)))
+(func $host_reference_id (param externref) (result i64) (i64.const 1))
 (func $assert(param $v i32)(if(i32.eqz(local.get $v))(then unreachable)))
 """
 
@@ -81,9 +79,9 @@ TESTS = """
   (call $assert (call $value_eq(local.get $a)(local.get $b)))
   (call $assert (i32.eqz(call $value_compare_i32(local.get $a)(local.get $b))))
   (call $assert (i32.eq(call $value_hash_u32(local.get $a))(call $value_hash_u32(local.get $b))))
-  (local.set $a (struct.new $hostbox(ref.null extern)(i64.const 7)))
-  (local.set $b (struct.new $hostbox(ref.null extern)(i64.const 7)))
-  (local.set $c (struct.new $hostbox(ref.null extern)(i64.const 8)))
+  (local.set $a (struct.new $hostref(ref.null extern)(i64.const 7)))
+  (local.set $b (struct.new $hostref(ref.null extern)(i64.const 7)))
+  (local.set $c (struct.new $hostref(ref.null extern)(i64.const 8)))
   (call $assert (call $value_eq(local.get $a)(local.get $b)))
   (call $assert (i32.eqz(call $value_eq(local.get $a)(local.get $c))))
   (call $assert (i32.eq(call $value_compare_i32(local.get $a)(local.get $c))(i32.const -1)))
@@ -310,6 +308,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--wasm-tools", default="wasm-tools")
     parser.add_argument("--wasmtime", default="wasmtime")
+    parser.add_argument("--types", required=True)
+    parser.add_argument("--runtime", required=True)
     args = parser.parse_args()
     tests = TESTS
     for key, value in {
@@ -321,9 +321,8 @@ def main():
     }.items():
         tests = tests.replace("{{" + key + "}}", string(value))
     wat = "(module\n" + "\n".join([
-        raw(ROOT / "mod.rs"), PRELUDE,
-        raw(ROOT / "bigint.rs"), raw(ROOT / "values.rs"),
-        raw(ROOT / "values" / "strings.rs"), tests,
+        pathlib.Path(args.types).read_text(), PRELUDE,
+        pathlib.Path(args.runtime).read_text(), tests,
     ]) + ")"
     with tempfile.TemporaryDirectory(prefix="ilang-values-") as directory:
         execute(args, directory, "values", wat,

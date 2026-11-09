@@ -3,7 +3,8 @@
 //!
 //! Pattern code must use `bits_has`, `bits_float_finite`, or `bits_read_utf`
 //! before extracting a potentially invalid segment. Failed UTF decoding is a
-//! normal match failure, whereas invalid construction is a language panic.
+//! normal match failure, whereas invalid construction stops the program with
+//! one of the `bit array:` reasons of spec §11.7.
 
 pub fn wat() -> String {
     WAT.to_owned()
@@ -48,8 +49,8 @@ const WAT: &str = r#"
     (call $int_from_i64 (call $bits_len64 (local.get $value))))
 
   ;; A negative sentinel makes invalid dynamic pattern sizes ordinary match
-  ;; failures. Construction clamps negative sizes to zero, following Gleam,
-  ;; while rejecting excessive positive sizes rather than wrapping them.
+  ;; failures (spec §8.4). Construction uses $bits_length instead, which stops
+  ;; for a negative size. clamp_negative is kept for older callers.
   (func $bits_width (param $size eqref) (param $unit i64) (param $clamp_negative i32) (result i64)
     (local $limbs (ref null $limbs)) (local $count i32) (local $value i64)
     (if (i32.lt_s (call $int_sign (local.get $size)) (i32.const 0))
@@ -375,7 +376,37 @@ const WAT: &str = r#"
         (else (if (i64.eq (local.get $width) (i64.const 64))
           (then (local.set $raw (i64.reinterpret_f64 (local.get $number))))
           (else unreachable))))))
+    ;; Rounding to a smaller format may overflow to infinity (spec §8.3).
+    (if (i32.or
+          (i32.and (i64.eq (local.get $width) (i64.const 16))
+            (i64.eq (i64.and (local.get $raw) (i64.const 31744)) (i64.const 31744)))
+          (i32.and (i64.eq (local.get $width) (i64.const 32))
+            (i64.eq (i64.and (local.get $raw) (i64.const 2139095040)) (i64.const 2139095040))))
+      (then (call $stop_bits_float) unreachable))
     (call $bits_from_u64 (local.get $raw) (local.get $width) (local.get $little)))
+
+  ;; The length of a segment `u(n)`, `bits(n)` or `bytes(n)` in bits, for
+  ;; construction: n times unit. A negative n stops (spec §8.3); a length
+  ;; that no bit array can have traps as out of memory.
+  (func $bits_length (param $size eqref) (param $unit i64) (result i64)
+    (if (i32.lt_s (call $int_sign (local.get $size)) (i32.const 0))
+      (then (call $stop_bits_negative) unreachable))
+    (if (i32.gt_s (call $int_compare (local.get $size)
+          (call $int_from_i64 (i64.div_u (i64.const 34359738360) (local.get $unit)))) (i32.const 0))
+      (then unreachable))
+    (i64.mul (call $int_to_i64 (local.get $size)) (local.get $unit)))
+
+  ;; The first `length` bits of a `bits(n)` or `bytes(n)` segment value.
+  (func $bits_take (param $value eqref) (param $length i64) (result eqref)
+    (if (i64.lt_u (call $bits_len64 (local.get $value)) (local.get $length))
+      (then (call $stop_bits_short) unreachable))
+    (call $bits_slice (local.get $value) (i64.const 0) (local.get $length)))
+
+  ;; The value of a `bytes` segment, which must be whole bytes.
+  (func $bits_whole (param $value eqref) (result eqref)
+    (if (i64.ne (i64.and (call $bits_len64 (local.get $value)) (i64.const 7)) (i64.const 0))
+      (then (call $stop_bits_not_whole) unreachable))
+    (local.get $value))
 
   (func $bits_float_finite (param $value eqref) (param $start i64) (param $width i64)
       (param $little i32) (result i32)
@@ -457,8 +488,7 @@ const WAT: &str = r#"
     (local.get $count))
 
   (func $bits_codepoint_new (param $codepoint i32) (result eqref)
-    (struct.new $obj (i32.const 13) (local.get $codepoint) (i64.const 0) (f64.const 0)
-      (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
+    (call $codepoint_new (local.get $codepoint)))
 
   (func $bits_codepoint_get (param $value eqref) (result i32)
     (struct.get $obj 1 (ref.cast (ref $obj) (local.get $value))))
@@ -691,8 +721,7 @@ const WAT: &str = r#"
       (if (i32.eqz (local.get $size)) (then unreachable))
       (local.set $position (i64.add (local.get $position) (i64.mul (i64.extend_i32_u (local.get $size)) (i64.const 8))))
       (br $validate)))
-    (struct.new $obj (i32.const 3) (i32.const 0) (i64.extend_i32_u (local.get $count)) (f64.const 0)
-      (local.get $data) (ref.null $values) (ref.null $limbs) (ref.null $call)))
+    (call $string_from_bytes (ref.as_non_null (local.get $data))))
 
 "#;
 
@@ -705,11 +734,6 @@ mod tests {
     // These tests execute the emitted runtime with real arbitrary-precision
     // helpers. The executor is a development tool, not a compiler dependency.
     const FLOAT_HELPERS: &str = r#"
-      (func $float_new (param f64) (result eqref)
-        (struct.new $obj (i32.const 2) (i32.const 0) (i64.const 0) (local.get 0)
-          (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
-      (func $float_get (param eqref) (result f64)
-        (struct.get $obj 3 (ref.cast (ref $obj) (local.get 0))))
       (func $utf_check (param $bits eqref) (param $encoding i32) (param $little i32)
           (param $codepoint i32) (param $size i64) (result i32)
         (local $value eqref) (local $length i64) (local $success i32)
@@ -900,11 +924,11 @@ mod tests {
             let directory = tempfile::tempdir().unwrap();
             let path = directory.path().join("bitarrays.wasm");
             let source = format!(
-                "(module {} {FLOAT_HELPERS} {} {} \
+                "(module {} {} {FLOAT_HELPERS} {} \
                  (func (export \"check\") (result i32) {} (i32.const 0)))",
                 crate::runtime::TYPES,
-                crate::runtime::bigint::wat(),
-                super::wat(),
+                crate::runtime::tests::STUB_HOST,
+                crate::runtime::wat(),
                 self.conditions,
             );
             let module = wat::parse_str(&source).unwrap();
@@ -1020,6 +1044,10 @@ mod tests {
         ] {
             for little in [false, true] {
                 for width in [16, 32, 64] {
+                    // A half that is not finite stops instead (spec §8.3).
+                    if width == 16 && half & 0x7c00 == 0x7c00 {
+                        continue;
+                    }
                     let bytes = match (width, little) {
                         (16, false) => half.to_be_bytes().to_vec(),
                         (16, true) => half.to_le_bytes().to_vec(),

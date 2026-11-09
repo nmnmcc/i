@@ -1,4 +1,7 @@
-use super::literal;
+//! The text form of values (spec §11.8), run with the whole runtime.
+
+use crate::runtime::literal;
+use crate::runtime::tests::{Checks, STUB_HOST, run_export};
 
 fn integer(value: i64) -> String {
     format!("(call $int_from_i64 (i64.const {value}))")
@@ -12,11 +15,16 @@ fn fields(values: &[String]) -> String {
     )
 }
 
-fn record(ctor: i32, type_id: i64, values: &[String]) -> String {
+/// A value of the constructor `Pair`, the first one of the code generator.
+fn pair(values: &[String]) -> String {
     format!(
-        "(call $record (i32.const {ctor}) (i64.const {type_id}) {})",
+        "(call $record (i32.const 16) (i64.const 40) {})",
         fields(values)
     )
+}
+
+fn tuple(values: &[String]) -> String {
+    format!("(call $tuple {})", fields(values))
 }
 
 fn list(values: &[String]) -> String {
@@ -28,29 +36,21 @@ fn list(values: &[String]) -> String {
         })
 }
 
-fn object(tag: i32, aux: i32, extra: i64, fields: &str, bytes: &str) -> String {
+fn object(tag: i32, aux: i32, extra: i64, bytes: &str) -> String {
     format!(
         "(struct.new $obj (i32.const {tag}) (i32.const {aux}) (i64.const {extra}) \
-         (f64.const 0) {bytes} {fields} (ref.null $limbs) (ref.null $call))"
+         (f64.const 0) {bytes} (ref.null $values) (ref.null $limbs) (ref.null $call))"
     )
 }
 
+const INSTALL: &str = "(call $constructors_install (array.new_fixed $values 2 {{pair}} {{other}}))";
+
+fn install() -> String {
+    crate::runtime::with_literals(INSTALL.to_owned(), &[("pair", "Pair"), ("other", "Other")])
+}
+
 fn cases() -> Vec<(String, String)> {
-    let empty = "(ref.null $values)";
     let no_bytes = "(ref.null $bytes)";
-    let leaf = record(33, 200, &[integer(123), literal("a"), integer(1)]);
-    let collision = record(
-        34,
-        200,
-        &[
-            integer(456),
-            list(&[
-                format!("(call $tuple {})", fields(&[literal("b"), integer(2)])),
-                format!("(call $tuple {})", fields(&[literal("c"), integer(3)])),
-            ]),
-        ],
-    );
-    let branch = record(35, 200, &[integer(3), list(&[leaf.clone(), collision])]);
     let parameters = (0..300)
         .map(|i| {
             let letter = char::from(b'a' + (i % 26) as u8);
@@ -62,83 +62,121 @@ fn cases() -> Vec<(String, String)> {
         })
         .collect::<Vec<_>>()
         .join(", ");
-    vec![
+    let mut cases =
+        vec![
         (
             literal("🙂中\u{80}\u{7f}\n\r\t\u{c}\"\\"),
             "\"🙂中\\u{0080}\\u{007F}\\n\\r\\t\\f\\\"\\\\\"".into(),
         ),
+        (
+            literal("\u{0}\u{1}\u{8}\u{b}\u{1b}\u{1f} ~\u{9f}\u{a0}é\u{2028}"),
+            "\"\\u{0000}\\u{0001}\\u{0008}\\u{000B}\\u{001B}\\u{001F} ~\\u{009F}\u{a0}é\u{2028}\""
+                .into(),
+        ),
+        (literal(""), "\"\"".into()),
         (list(&[integer(11), integer(24)]), "[11, 24]".into()),
         (list(&[]), "[]".into()),
         (
-            format!(
-                "(call $tuple {})",
-                fields(&["(call $bool_new (i32.const 1))".into(), integer(-42)])
-            ),
-            "#(True, -42)".into(),
+            tuple(&["(call $bool_new (i32.const 1))".into(), integer(-42)]),
+            "(True, -42)".into(),
         ),
+        (tuple(&[]), "()".into()),
+        (tuple(&[tuple(&[integer(1)])]), "((1))".into()),
         ("(ref.null eq)".into(), "Nil".into()),
-        (record(32, 1, &[]), "Pair".into()),
         (
-            record(
-                32,
-                1,
-                &["(call $bool_new (i32.const 0))".into(), literal("name")],
-            ),
+            "(struct.new $obj (i32.const 5) (i32.const 16) (i64.const 40) (f64.const 0) \
+             (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call))"
+                .into(),
+            "Pair".into(),
+        ),
+        (pair(&[]), "Pair".into()),
+        (
+            pair(&["(call $bool_new (i32.const 0))".into(), literal("name")]),
             "Pair(False, \"name\")".into(),
         ),
         (
-            object(
-                9,
-                3,
-                10,
-                empty,
-                "(array.new_fixed $bytes 2 (i32.const 170) (i32.const 85))",
-            ),
-            "<<82, 2:size(2)>>".into(),
+            format!("(call $record (i32.const 17) (i64.const 41) {})", fields(&[integer(1)])),
+            "Other(1)".into(),
         ),
         (
-            object(9, 0, 0, empty, "(array.new_fixed $bytes 0)"),
+            format!("(call $record (i32.const 18) (i64.const 41) {})", fields(&[])),
+            "//wasm(unknown)".into(),
+        ),
+        (format!("(call $result_ok {})", integer(1)), "Ok(1)".into()),
+        (
+            "(call $result_error (ref.null eq))".into(),
+            "Error(Nil)".into(),
+        ),
+        (
+            format!("(call $record (i32.const 2) (i64.const 1) {})", fields(&[literal("m")])),
+            "AssertionFailure(\"m\")".into(),
+        ),
+        (
+            list(&[tuple(&[integer(1), literal("a")]), pair(&[list(&[])])]),
+            "[(1, \"a\"), Pair([])]".into(),
+        ),
+        (
+            object(9, 3, 10, "(array.new_fixed $bytes 2 (i32.const 170) (i32.const 85))"),
+            "<<82, 2:u2>>".into(),
+        ),
+        (
+            object(9, 0, 3, "(array.new_fixed $bytes 1 (i32.const 160))"),
+            "<<5:u3>>".into(),
+        ),
+        (
+            object(9, 0, 16, "(array.new_fixed $bytes 2 (i32.const 0) (i32.const 255))"),
+            "<<0, 255>>".into(),
+        ),
+        (
+            object(9, 0, 0, "(array.new_fixed $bytes 0)"),
             "<<>>".into(),
         ),
-        (object(7, 0, 0, empty, no_bytes), "//fn() { ... }".into()),
+        (object(7, 0, 0, no_bytes), "//fn() { ... }".into()),
+        (object(7, 0, 2, no_bytes), "//fn(a, b) { ... }".into()),
         (
-            object(7, 0, 2, empty, no_bytes),
-            "//fn(a, b) { ... }".into(),
-        ),
-        (
-            object(7, 0, 300, empty, no_bytes),
+            object(7, 0, 300, no_bytes),
             format!("//fn({parameters}) {{ ... }}"),
         ),
+        (object(11, 0, 0, no_bytes), "//boundary".into()),
+        (object(12, 0, 0, no_bytes), "//continuation".into()),
         (
-            record(32, 100, &[integer(0), record(36, 200, &[])]),
-            "dict.from_list([])".into(),
-        ),
-        (
-            record(32, 100, &[integer(1), leaf]),
-            "dict.from_list([#(\"a\", 1)])".into(),
-        ),
-        (
-            record(32, 100, &[integer(3), branch]),
-            "dict.from_list([#(\"a\", 1), #(\"b\", 2), #(\"c\", 3)])".into(),
-        ),
-        (
-            object(13, 0x1f642, 0, empty, no_bytes),
+            "(call $codepoint_new (i32.const 0x1f642))".into(),
             "//utfcodepoint(🙂)".into(),
+        ),
+        (
+            "(call $codepoint_new (i32.const 10))".into(),
+            "//utfcodepoint(\n)".into(),
         ),
         (
             format!("(call $int_shl {} {})", integer(1), integer(120)),
             (1_u128 << 120).to_string(),
         ),
+        (integer(-1_073_741_825), "-1073741825".into()),
         ("(call $float_new (f64.const -0))".into(), "-0.0".into()),
+        ("(call $float_new (f64.const 1e-7))".into(), "1.0e-7".into()),
         (
-            object(11, 0, 0, &fields(&[integer(55)]), no_bytes),
-            "55".into(),
-        ),
-        (
-            "(struct.new $hostbox (ref.null extern) (i64.const 1))".into(),
+            "(struct.new $hostref (ref.null extern) (i64.const 1))".into(),
             "//wasm(opaque)".into(),
         ),
-    ]
+    ];
+    cases.push((
+        tuple(&[object(7, 0, 1, no_bytes), object(11, 0, 0, no_bytes)]),
+        "(//fn(a) { ... }, //boundary)".into(),
+    ));
+    cases
+}
+
+#[test]
+fn all_value_presentations_match() {
+    let mut checks = Checks::default();
+    checks.check(
+        "install names",
+        format!("(block (result i32) {} (i32.const 1))", install()),
+    );
+    for (value, expected) in cases() {
+        checks.inspect(&value, &expected);
+    }
+    checks.run();
 }
 
 // Construct deeply nested aggregates in Wasm loops, then compare every output
@@ -185,101 +223,6 @@ fn deep_aggregate_fixtures() -> String {
     (local.set $i (i32.add (local.get $i) (i32.const 1)))
     (br $check_suffix)))
   (i32.const 0))
-"#,
-    );
-    let nested_value = "(local.get $value)".to_owned();
-    let first_field = record(32, 1, &[nested_value.clone(), integer(1)]);
-    let middle_field = record(32, 1, &[integer(1), nested_value.clone(), integer(1)]);
-    let list_head = format!("(call $list_cons {nested_value} (call $list_nil))");
-    let leaf = record(
-        33,
-        200,
-        &[integer(123), "(local.get $key)".to_owned(), nested_value],
-    );
-    let dict_value = record(32, 100, &[integer(1), leaf]);
-    for (name, value, prefix, suffix, key) in [
-        ("deep_first_field", first_field, "Pair(", ", 1)", None),
-        ("deep_middle_field", middle_field, "Pair(1, ", ", 1)", None),
-        ("deep_list_heads", list_head, "[", "]", None),
-        (
-            "deep_dict_values",
-            dict_value,
-            "dict.from_list([#(\"a\", ",
-            ")])",
-            Some(literal("a")),
-        ),
-    ] {
-        source.push_str(&format!(
-            "(func (export \"{name}\") (result i32)\n\
-               (local $i i32) (local $value eqref) (local $key eqref)\n\
-               (local.set $value (ref.i31 (i32.const 1)))\n"
-        ));
-        if let Some(key) = key {
-            source.push_str(&format!("(local.set $key {key})\n"));
-        }
-        source.push_str(&format!(
-            "(loop $build\n\
-               (local.set $value {value})\n\
-               (local.set $i (i32.add (local.get $i) (i32.const 1)))\n\
-               (br_if $build (i32.lt_u (local.get $i) (i32.const 10000))))\n\
-             (call $verify_deep_inspection (local.get $value) {} {} (i32.const 10000)))\n",
-            literal(prefix),
-            literal(suffix)
-        ));
-    }
-    source
-}
-
-fn fixture() -> Vec<u8> {
-    // Use production allocation, bigint, string, and value bodies together so
-    // tests catch interface and representation changes between runtime modules.
-    let mut source = format!(
-        "(module\n{}\n{}\n",
-        crate::runtime::TYPES,
-        crate::runtime::MEMORY
-    );
-    source.push_str(
-        r#"
-(type $hostbox (struct (field externref) (field i64)))
-(func $host_id (param $v eqref) (result i64)
-  (struct.get $hostbox 1 (ref.cast (ref $hostbox) (local.get $v))))
-(func $host_equal (param $a eqref) (param $b eqref) (result i32)
-  (i64.eq (call $host_id (local.get $a)) (call $host_id (local.get $b))))
-(global $written_ptr (mut i32) (i32.const 0))
-(global $written_len (mut i32) (i32.const 0))
-(global $written_channel (mut i32) (i32.const 0))
-(func $host_write (param i32 i32 i32)
-  (global.set $written_channel (local.get 0))
-  (global.set $written_ptr (local.get 1))
-  (global.set $written_len (local.get 2)))
-(func $type_is_dict (param i64) (result i32) (i64.eq (local.get 0) (i64.const 100)))
-"#,
-    );
-    source.push_str(&format!(
-        "(func $constructor_name (param i32) (result eqref) {})\n",
-        literal("Pair")
-    ));
-    source.push_str(&crate::runtime::bigint::wat());
-    source.push_str(crate::runtime::values::CORE);
-    source.push_str(&crate::runtime::values::strings::wat());
-    source.push_str(&super::wat());
-    source.push_str("(func (export \"verify\") (result i32)\n");
-    for (index, (value, expected)) in cases().iter().enumerate() {
-        source.push_str(&format!(
-            "(if (call $string_compare (call $inspect {value}) {}) \
-              (then (return (i32.const {}))))\n",
-            literal(expected),
-            index + 1
-        ));
-    }
-    source.push_str(r#"
-(drop (call $echo (ref.i31 (i32.const 42))))
-(if (i32.ne (global.get $written_channel) (i32.const 2)) (then (return (i32.const 100))))
-(if (i32.ne (global.get $written_len) (i32.const 3)) (then (return (i32.const 101))))
-(if (i32.ne (i32.load8_u (global.get $written_ptr)) (i32.const 52)) (then (return (i32.const 102))))
-(if (i32.ne (i32.load8_u offset=1 (global.get $written_ptr)) (i32.const 50)) (then (return (i32.const 103))))
-(if (i32.ne (i32.load8_u offset=2 (global.get $written_ptr)) (i32.const 10)) (then (return (i32.const 104))))
-(i32.const 0))
 (func (export "long_list") (result i32)
   (local $i i32) (local $list eqref) (local $out (ref $bytes))
   (local.set $list (call $list_nil))
@@ -287,7 +230,7 @@ fn fixture() -> Vec<u8> {
     (local.set $list (call $list_cons (ref.i31 (i32.const 1)) (local.get $list)))
     (local.set $i (i32.add (local.get $i) (i32.const 1)))
     (br_if $build (i32.lt_u (local.get $i) (i32.const 10000))))
-  (local.set $out (ref.as_non_null (struct.get $obj 4 (ref.cast (ref $obj) (call $inspect (local.get $list))))))
+  (local.set $out (call $string_bytes (call $inspect (local.get $list))))
   (if (i32.ne (array.len (local.get $out)) (i32.const 30000)) (then (return (i32.const 1))))
   (if (i32.ne (array.get_u $bytes (local.get $out) (i32.const 0)) (i32.const 91)) (then (return (i32.const 2))))
   (if (i32.ne (array.get_u $bytes (local.get $out) (i32.const 29999)) (i32.const 93)) (then (return (i32.const 3))))
@@ -297,22 +240,49 @@ fn fixture() -> Vec<u8> {
     (local.set $i (i32.add (local.get $i) (i32.const 3)))
     (br_if $check (i32.lt_u (local.get $i) (i32.const 30000))))
   (i32.const 0))
-"#);
-    source.push_str(&deep_aggregate_fixtures());
-    source.push(')');
-    wat::parse_str(source).expect("inspection fixture must assemble")
+"#,
+    );
+    let nested_value = "(local.get $value)".to_owned();
+    let first_field = pair(&[nested_value.clone(), integer(1)]);
+    let middle_field = pair(&[integer(1), nested_value.clone(), integer(1)]);
+    let tuple_field = tuple(&[nested_value.clone(), integer(1)]);
+    let list_head = format!("(call $list_cons {nested_value} (call $list_nil))");
+    for (name, value, prefix, suffix) in [
+        ("deep_first_field", first_field, "Pair(", ", 1)"),
+        ("deep_middle_field", middle_field, "Pair(1, ", ", 1)"),
+        ("deep_tuple_field", tuple_field, "(", ", 1)"),
+        ("deep_list_heads", list_head, "[", "]"),
+    ] {
+        source.push_str(&format!(
+            "(func (export \"{name}\") (result i32)\n\
+               (local $i i32) (local $value eqref)\n\
+               {}\n\
+               (local.set $value (ref.i31 (i32.const 1)))\n\
+               (loop $build\n\
+                 (local.set $value {value})\n\
+                 (local.set $i (i32.add (local.get $i) (i32.const 1)))\n\
+                 (br_if $build (i32.lt_u (local.get $i) (i32.const 10000))))\n\
+               (call $verify_deep_inspection (local.get $value) {} {} (i32.const 10000)))\n",
+            install(),
+            literal(prefix),
+            literal(suffix)
+        ));
+    }
+    source
 }
 
-#[test]
-fn inspection_runtime_is_valid_wasm_gc() {
-    wasmparser::Validator::new()
-        .validate_all(&fixture())
-        .expect("inspection fixture must validate");
-}
-
-#[test]
-fn all_value_presentations_match() {
-    execute("verify");
+fn execute(export: &str) {
+    let source = format!(
+        "(module {} {STUB_HOST} {} {})",
+        crate::runtime::TYPES,
+        crate::runtime::wat(),
+        deep_aggregate_fixtures()
+    );
+    assert_eq!(
+        run_export(&source, export),
+        0,
+        "{export}: inspection case failed"
+    );
 }
 
 #[test]
@@ -331,32 +301,11 @@ fn deep_middle_record_fields_preserve_pending_siblings() {
 }
 
 #[test]
-fn deep_list_heads_do_not_use_the_call_stack() {
-    execute("deep_list_heads");
+fn deep_tuple_fields_do_not_use_the_call_stack() {
+    execute("deep_tuple_field");
 }
 
 #[test]
-fn deep_dictionary_values_preserve_pending_dict_delimiters() {
-    execute("deep_dict_values");
-}
-
-fn execute(export: &str) {
-    let file = tempfile::NamedTempFile::new().expect("create wasm fixture");
-    std::fs::write(file.path(), fixture()).expect("write wasm fixture");
-    let wasmtime = std::env::var_os("ILANG_WASMTIME").unwrap_or_else(|| "wasmtime".into());
-    let output = std::process::Command::new(wasmtime)
-        .args(["run", "--invoke", export])
-        .arg(file.path())
-        .output()
-        .expect("Wasmtime is required; run this test in the Devenv shell");
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(
-        String::from_utf8_lossy(&output.stdout).trim(),
-        "0",
-        "{export}: inspection case failed"
-    );
+fn deep_list_heads_do_not_use_the_call_stack() {
+    execute("deep_list_heads");
 }
