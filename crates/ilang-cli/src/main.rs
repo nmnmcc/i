@@ -1,5 +1,7 @@
 //! The `i` command.
 
+mod commands;
+
 use clap::{Parser, Subcommand};
 use ilang_cli::{BuildOptions, build, level, run_test};
 use ilang_host::{Outcome, Program, TestResult};
@@ -69,6 +71,8 @@ enum Command {
         /// Only run the tests whose name has this text.
         filter: Option<String>,
     },
+    #[command(flatten)]
+    Package(commands::package::PackageCommand),
 }
 
 fn main() -> ExitCode {
@@ -97,6 +101,7 @@ fn main() -> ExitCode {
             opt,
             filter,
         } => cmd_test(&project, opt, offline, filter.as_deref()),
+        Command::Package(c) => commands::package::run(c),
     };
     match result {
         Ok(code) => code,
