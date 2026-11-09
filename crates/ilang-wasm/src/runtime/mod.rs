@@ -154,6 +154,9 @@
 //! | `codepoint_to_int`, `int_to_codepoint` | `$core_codepoint_to_int (c)`, `$core_int_to_codepoint (n) -> Result` |
 //! | `bit_size`, `bit_array_to_string` | `$core_bit_size (b)`, `$core_bit_array_to_string (b) -> Result` |
 //! | `inspect`, `hash` | `$core_inspect (v)`, `$core_hash (v)` (0 to 2^32 - 1) |
+//! | `to_upper`, `to_lower` | `$core_to_upper (s)`, `$core_to_lower (s)`: simple case mappings, tables in `case_tables.rs` |
+//! | `index_of` | `$core_index_of (s, find, from) -> Result`: Knuth–Morris–Pratt, linear time |
+//! | `bit_array_concat` | `$core_bit_array_concat (list)`: one copy |
 //!
 //! Bit arrays (spec §8). Construction:
 //!
@@ -199,7 +202,11 @@
 mod abi;
 mod bigint;
 mod bitarrays;
+mod bits_join;
+mod case_tables;
+mod casing;
 mod core;
+mod search;
 mod stops;
 mod values;
 
@@ -237,6 +244,9 @@ pub fn wat() -> &'static str {
             values::wat(),
             stops::wat(),
             core::wat(),
+            casing::wat(),
+            search::wat(),
+            bits_join::wat(),
             abi::wat(),
         ]
         .concat()
@@ -312,3 +322,5 @@ pub(crate) fn with_literals(mut source: String, texts: &[(&str, &str)]) -> Strin
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod text_tests;

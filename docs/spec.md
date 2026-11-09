@@ -6,7 +6,7 @@ This document is complete in itself. It defines:
 
 - the source language (§1 to §8);
 - effects, and the library modules `i/fail`, `i/control`, `i/resource`, and `i/assertion` (§9);
-- the library module `i/core`, which has the operations that cannot be written in i (§13);
+- the library module `i/core`, which has the operations that are not written in i (§13);
 - packages, versions, and the files `i.toml` and `i.lock` (§2.1, §2.6 to §2.8);
 - what programs do when they run, and the text form of values (§11);
 - the binary interface between a compiled module and its host (§10 and Appendix B).
@@ -1042,7 +1042,7 @@ These are normal functions and types. The modules `i/fail` (§9.3), `i/control` 
 
 ## 13. The module `i/core`
 
-These are normal functions: they are called, given, and compared like any other function. Only their bodies cannot be written in i, because they do things that the rest of the language cannot do, such as looking at how any value is made (`inspect`, `hash`). They have no errors and need no environment.
+These are normal functions: they are called, given, and compared like any other function. Only their bodies are not written in i. Most of them do things that the rest of the language cannot do, such as looking at how any value is made (`inspect`, `hash`). Some, such as `index_of` and `bit_array_concat`, could be written in i, but the runtime does them much faster. They have no errors and need no environment.
 
 | Function | Type | What it gives |
 |---|---|---|
@@ -1065,16 +1065,23 @@ These are normal functions: they are called, given, and compared like any other 
 | `from_codepoints` | `(List(UtfCodepoint)) -> String` | The string of these characters |
 | `codepoint_to_int` | `(UtfCodepoint) -> Int` | The number of the character |
 | `int_to_codepoint` | `(Int) -> Result(UtfCodepoint, Nil)` | The character with this number, or `Error(Nil)` when it is not a Unicode scalar value |
+| `to_upper` | `(String) -> String` | The string with each character changed to its simple uppercase mapping in Unicode 18.0.0 (UnicodeData.txt). This is one character for one character, and no language changes it. A character with no simple uppercase mapping, such as `ß`, stays the same. |
+| `to_lower` | `(String) -> String` | The string with each character changed to its simple lowercase mapping in Unicode 18.0.0, in the same way |
+| `index_of` | `(in: String, find: String, from: Int) -> Result(Int, Nil)` | The byte offset (counting from 0) of the first `find` in `in` that starts at `from` or after it. An empty `find` is at `from`. `Error(Nil)` when there is no such `find`, when `from` is less than 0 or greater than the byte size of `in`, or when `from` is inside a character. |
 | `bit_size` | `(BitArray) -> Int` | The number of bits |
 | `bit_array_to_string` | `(BitArray) -> Result(String, Nil)` | The string, when the bits are whole bytes of correct UTF-8; `Error(Nil)` when not |
+| `bit_array_concat` | `(List(BitArray)) -> BitArray` | The bit arrays one after the other. Their sizes may be any number of bits. |
 | `inspect` | `(a) -> String` | The text form of the value (§11.8) |
 | `hash` | `(a) -> Int` | A number from 0 to 2^32 − 1. Values that are the same (§11.4) give the same number. Which number is not fixed. |
 
 ## Appendix A. Choices
 
-This appendix lists the rules that were chosen without a full discussion, until they are confirmed. Each one says which rule of Gleam or TypeScript it follows, or why it does not.
+This appendix lists the rules that were chosen without a full discussion, until they are confirmed. Each one says which rule of Gleam or TypeScript it follows, or why it does not. The choices before these have all been confirmed.
 
 1. Major version 0 is a major version like the others: a newer `0.y.z` must be able to take the place of an older one, so `0.2.0` must work where `0.1.0` did. Semantic Versioning, which the packages of Gleam (Hex) and TypeScript (npm) follow, lets any `0.y` step break. It cannot here, because `0.1.0` and `0.2.0` are one package, and minimal version selection may give either one to code that asked for `0.1.0` (§2.7).
+2. `core.to_upper` and `core.to_lower` use only the simple case mappings of Unicode, one character for one character, with no language (§13). Gleam's `string.uppercase` and `string.lowercase` and TypeScript's `toUpperCase` and `toLowerCase` also use the special mappings, so `"ß"` becomes `"SS"` there; in i it stays `"ß"`, and the size of a string in characters does not change. The names are not Gleam's: they are those of `to_upper` and `to_lower` in the i standard library.
+3. `core.index_of` follows TypeScript's `indexOf(searchString, position)`, and an empty `find` is at `from` as in TypeScript. It counts UTF-8 bytes, not UTF-16 units. It gives `Error(Nil)` where TypeScript gives -1, as Gleam does for a value that is not there, and also when `from` is outside the string, where TypeScript moves `position` to the nearest end. Gleam has no such function (§13).
+4. `core.bit_array_concat` is Gleam's `bit_array.concat`, with the same type. Its name has `bit_array_` before it because `concat` in `i/core` joins strings, as Gleam's `string.concat` does. As on Gleam's Erlang target, the parts may be any number of bits (§13).
 
 ## Appendix B. The binary interface
 

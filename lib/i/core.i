@@ -1,11 +1,11 @@
-//// The operations that cannot be written in i (§13).
+//// The operations that are not written in i (§13).
 
 export (
   not, to_float, truncate, floor, ceiling, sqrt, float_to_bits,
   float_from_bits, bit_and, bit_or, bit_xor, bit_not, shift_left,
   shift_right, concat, byte_size, byte_slice, codepoints, from_codepoints,
-  codepoint_to_int, int_to_codepoint, bit_size, bit_array_to_string, inspect,
-  hash
+  codepoint_to_int, int_to_codepoint, to_upper, to_lower, index_of, bit_size,
+  bit_array_to_string, bit_array_concat, inspect, hash
 )
 
 /// `True` for `False`, and `False` for `True`.
@@ -92,6 +92,18 @@ codepoint_to_int: (UtfCodepoint) -> Int
 @external("ilang:core", "int_to_codepoint")
 int_to_codepoint: (Int) -> Result(UtfCodepoint, Nil)
 
+/// Each character by its simple uppercase mapping in Unicode.
+@external("ilang:core", "to_upper")
+to_upper: (String) -> String
+
+/// Each character by its simple lowercase mapping in Unicode.
+@external("ilang:core", "to_lower")
+to_lower: (String) -> String
+
+/// The byte offset of the first `find` at or after byte `from`.
+@external("ilang:core", "index_of")
+index_of: (in: String, find: String, from: Int) -> Result(Int, Nil)
+
 /// The number of bits.
 @external("ilang:core", "bit_size")
 bit_size: (BitArray) -> Int
@@ -99,6 +111,10 @@ bit_size: (BitArray) -> Int
 /// The string, when the bits are whole bytes of correct UTF-8.
 @external("ilang:core", "bit_array_to_string")
 bit_array_to_string: (BitArray) -> Result(String, Nil)
+
+/// The bit arrays one after the other.
+@external("ilang:core", "bit_array_concat")
+bit_array_concat: (List(BitArray)) -> BitArray
 
 /// The text form of the value (§11.8).
 @external("ilang:core", "inspect")
