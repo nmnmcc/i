@@ -577,6 +577,8 @@ The unary operators `-` (Int) and `-.` (Float) are stronger than all binary oper
 
 The statements of a block are done in order. The value of a block is the value of its last expression. The last statement may not be a binding or an environment statement. A block with only one expression puts it in a group: `{ a + b } * c`.
 
+An expression statement that is not the last, and whose working out can do nothing but make its value, gives a compile warning: its value is not used. These are literals, names, functions, and tuples, lists, constructor calls, `.f`, `.k`, `-`, and Int, Bool, String, and comparison operators made only of these. A call, `|>`, a `case`, a block, a bit array, and a Float operator, which may stop (§11.3), do not give the warning. So `assert 1 + 1 == 3`, which is the two statements `assert` and `1 + 1 == 3` (§1.7), gives two warnings.
+
 `p = e` is a binding. It works out `e` and matches it with the pattern `p`. The names in `p` may be used from the next statement.
 
 - The type of `e` must be a subtype of the pattern type of `p` (§4.8 rule 10). So `x: Int = e` says that `e` has the type `Int`, and `(a, b) = v` with `v: (Int, Int) | Nil` is a compile error; `case` is used for this.
@@ -1084,6 +1086,7 @@ This appendix lists the rules that were chosen without a full discussion, until 
 4. `core.bit_array_concat` is Gleam's `bit_array.concat`, with the same type. Its name has `bit_array_` before it because `concat` in `i/core` joins strings, as Gleam's `string.concat` does. As on Gleam's Erlang target, the parts may be any number of bits (§13).
 5. A `///` comment is the documentation of an item only when nothing but other comments and the item's attributes come between them. A `///` comment in other places, such as inside a function body, before `import`, or at the end of the file, documents nothing and is a normal comment. As in Gleam, it is not an error (§1.2).
 6. A `////` comment is the documentation of the module wherever it is in the file, also after `import` or between items. Gleam does the same. The lines of all such comments, in order, are the documentation (§1.2).
+7. A statement that is not the last and does nothing gives a warning, not an error (§6.10). Gleam also warns about an unused literal or pure value; TypeScript's `noUnusedExpressions` (in ESLint) is an error only when it is turned on. Calls are never warned about, also when their value is not `Nil`, as in Gleam, because a call may have an effect.
 
 ## Appendix B. The binary interface
 

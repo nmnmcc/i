@@ -86,13 +86,17 @@ annotated_call : Int
 55:19: error[E0520]: the two sides have the known types `(x: Int) -> String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
 56:16: error[E0520]: the two sides have the known types `(x: Int, y: _) -> Int ? _ ! _` and `Int`, which are disjoint, so the result would always be the same (§6.9)
 62:12: error[E0520]: the two sides have the known types `(n: Int) -> _ ? _ ! _` and `Int`, which are disjoint, so the result would always be the same (§6.9)
+62:12: warning[W0502]: this value is not used, and working it out does nothing
 65:29: error[E0520]: the two sides have the known types `(m: _) -> _ ? _ ! _` and `Int`, which are disjoint, so the result would always be the same (§6.9)
+65:29: warning[W0502]: this value is not used, and working it out does nothing
 68:28: error[E0520]: the two sides have the known types `(n: Int) -> _` and `Int`, which are disjoint, so the result would always be the same (§6.9)
+68:28: warning[W0502]: this value is not used, and working it out does nothing
 73:13: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
 75:18: error[E0520]: the two sides have the known types `Box(Int)` and `Int`, which are disjoint, so the result would always be the same (§6.9)
 84:32: error[E0520]: the two sides have the known types `User` and `Int`, which are disjoint, so the result would always be the same (§6.9)
 90:18: error[E0520]: the two sides have the known types `Int | String` and `Float`, which are disjoint, so the result would always be the same (§6.9)
 100:31: error[E0520]: the two sides have the known types `User` and `Int`, which are disjoint, so the result would always be the same (§6.9)
+101:13: warning[W0502]: this value is not used, and working it out does nothing
 102:19: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
 105:21: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
 106:36: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)

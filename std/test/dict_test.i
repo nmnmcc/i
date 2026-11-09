@@ -464,7 +464,6 @@ large_n_get_test = () {
 	m = list_to_map(l)
 	list.map(l, (i) { assert(dict.get(m, i) == Some(i)) })
 	Nil
-	Nil
 }
 
 @test
@@ -474,7 +473,6 @@ large_n_after_shrink_test = () {
 
 	m = grow_and_shrink_map(n, 0)
 	list.map(l, (i) { assert(dict.get(m, i) == None) })
-	Nil
 	Nil
 }
 

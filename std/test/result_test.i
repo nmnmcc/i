@@ -244,14 +244,12 @@ partition_tco_ok_test = () {
 	// TCO test
 	_ = list.repeat(Ok(1), 1_000_000) |> result.partition
 	Nil
-	Nil
 }
 
 @test
 partition_tco_error_test = () {
 	// TCO test
 	_ = list.repeat(Error("a"), 1_000_000) |> result.partition
-	Nil
 	Nil
 }
 

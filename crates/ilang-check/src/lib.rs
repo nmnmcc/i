@@ -94,6 +94,7 @@ pub mod code {
     pub const ENTRY_TYPE: &str = "E0521";
     pub const ENTRY_ENV: &str = "E0522";
     pub const NEVER_USED: &str = "W0501";
+    pub const VALUE_NOT_USED: &str = "W0502";
 }
 
 /// A parsed module of the graph.
