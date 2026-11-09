@@ -19,6 +19,14 @@ pub(crate) struct VarState {
     pub upper: Vec<Ty>,
     /// The name written in an annotation (§4.7), kept when it is shown.
     pub name: Option<String>,
+    /// Values may come to the variable from outside the constraints: it is
+    /// the type of a parameter, a written type variable, or the result of a
+    /// function that is not known. Its lower bounds are then not all its
+    /// values (§7.3, §7.4).
+    pub input: bool,
+    /// The variables that have this one as an upper bound: their values
+    /// come to it too, but they are not among its lower bounds.
+    pub from: Vec<V>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -30,6 +38,9 @@ pub(crate) enum FailKind {
     /// Two forms of a type constructor whose parameter does not change, with
     /// arguments that cannot be equal (§4.4).
     Invariant,
+    /// Two forms of one type constructor in an environment, with arguments
+    /// that cannot be equal (§9.2).
+    EnvForms,
     /// A value could go to more than one type variable of a union (§4.4).
     Ambiguous,
 }
@@ -73,7 +84,9 @@ pub(crate) struct Solver {
     /// The level of new variables: one more than the level of the binding
     /// whose value is being typed, for a binding that is generalized.
     pub level: u32,
-    cache: HashSet<(Ty, Ty)>,
+    /// The constraints with a variable that are already made, each with
+    /// whether it was made between environments.
+    cache: HashSet<(Ty, Ty, bool)>,
     pub variance: HashMap<TypeId, Vec<Variance>>,
     pub failures: Vec<Failure>,
     /// The names of the custom types, by `TypeId`, to show types.
@@ -96,14 +109,40 @@ impl Solver {
         Ty::Var(self.fresh_at(self.level))
     }
 
+    /// A new variable whose values may come from outside (`input`).
+    pub fn fresh_input(&mut self) -> Ty {
+        let v = self.fresh_at(self.level);
+        self.vars[v.0 as usize].input = true;
+        Ty::Var(v)
+    }
+
+    /// Marks the variables made since `start` as inputs.
+    pub fn mark_inputs(&mut self, start: usize) {
+        for v in &mut self.vars[start..] {
+            v.input = true;
+        }
+    }
+
     pub fn fresh_at(&mut self, level: u32) -> V {
         self.vars.push(VarState {
             level,
             lower: Vec::new(),
             upper: Vec::new(),
             name: None,
+            input: false,
+            from: Vec::new(),
         });
         V(self.vars.len() as u32 - 1)
+    }
+
+    /// Sets the upper bounds of a new variable.
+    fn set_upper(&mut self, v: V, upper: Vec<Ty>) {
+        for u in &upper {
+            if let Ty::Var(w) = u {
+                self.var_mut(*w).from.push(v);
+            }
+        }
+        self.var_mut(v).upper = upper;
     }
 
     fn var(&self, v: V) -> &VarState {
@@ -164,46 +203,61 @@ impl Solver {
 
     /// Makes `l <: r` true, or records why it cannot be.
     pub fn constrain(&mut self, l: &Ty, r: &Ty) {
+        self.constrain_in(l, r, false);
+    }
+
+    /// Makes `N` **in** `M` true for two environments (§4.5 rule 4): every
+    /// member of `N` is a type variable that is a subtype of `M`, or has a
+    /// member of `M` with the same type constructor and equal arguments,
+    /// whatever the variance of the parameters.
+    pub fn constrain_env(&mut self, l: &Ty, r: &Ty) {
+        self.constrain_in(l, r, true);
+    }
+
+    /// `l <: r`, or `l` in `r` when `env` (§4.5 rule 4). The mode goes
+    /// through the bounds of variables, but not into type arguments: those
+    /// are compared as normal types.
+    fn constrain_in(&mut self, l: &Ty, r: &Ty, env: bool) {
         if l == r || matches!(l, Ty::Never) || matches!(r, Ty::Top) {
             return;
         }
         if (matches!(l, Ty::Var(_)) || matches!(r, Ty::Var(_)))
-            && !self.cache.insert((l.clone(), r.clone()))
+            && !self.cache.insert((l.clone(), r.clone(), env))
         {
             return;
         }
         match (l, r) {
             (Ty::Union(ms), _) => {
                 for m in ms {
-                    self.constrain(m, r);
+                    self.constrain_in(m, r, env);
                 }
             }
             (_, Ty::Inter(ms)) => {
                 for m in ms {
-                    self.constrain(l, m);
+                    self.constrain_in(l, m, env);
                 }
             }
             (Ty::Var(v), _) if self.level_of(r) <= self.var(*v).level => {
-                self.add_bound(*v, r.clone(), false);
+                self.add_bound(*v, r.clone(), false, env);
                 for lb in self.var(*v).lower.clone() {
-                    self.constrain(&lb, r);
+                    self.constrain_in(&lb, r, env);
                 }
             }
             (_, Ty::Var(v)) if self.level_of(l) <= self.var(*v).level => {
-                self.add_bound(*v, l.clone(), true);
+                self.add_bound(*v, l.clone(), true, env);
                 for ub in self.var(*v).upper.clone() {
-                    self.constrain(l, &ub);
+                    self.constrain_in(l, &ub, env);
                 }
             }
             (Ty::Var(v), _) => {
                 let level = self.var(*v).level;
                 let r2 = self.extrude(r, Pol::Neg, level, &mut HashMap::new());
-                self.constrain(l, &r2);
+                self.constrain_in(l, &r2, env);
             }
             (_, Ty::Var(v)) => {
                 let level = self.var(*v).level;
                 let l2 = self.extrude(l, Pol::Pos, level, &mut HashMap::new());
-                self.constrain(&l2, r);
+                self.constrain_in(&l2, r, env);
             }
             (Ty::Inter(ms), _) => {
                 // `a & T <: R`: the members that are not type variables give
@@ -211,25 +265,33 @@ impl Solver {
                 let (vars, conc): (Vec<Ty>, Vec<Ty>) =
                     ms.iter().cloned().partition(|m| matches!(m, Ty::Var(_)));
                 if conc.is_empty() {
-                    self.constrain(&vars[0], r);
+                    self.constrain_in(&vars[0], r, env);
                 } else {
                     let c = self.inter(conc);
-                    self.constrain(&c, r);
+                    self.constrain_in(&c, r, env);
                 }
             }
-            (Ty::Diff(a, h), _) => self.diff_left(a, h, r),
+            (Ty::Diff(a, h), _) => self.diff_left(a, h, r, env),
             (Ty::Top, _) => self.fail(FailKind::Mismatch, l, r),
-            (Ty::Both(a, _), _) => self.constrain(&a.clone(), r),
-            (_, Ty::Both(_, b)) => self.constrain(l, &b.clone()),
-            (_, Ty::Union(ms)) => self.route(l, ms),
+            (Ty::Both(a, _), _) => self.constrain_in(&a.clone(), r, env),
+            (_, Ty::Both(_, b)) => self.constrain_in(l, &b.clone(), env),
+            (_, Ty::Union(ms)) => self.route(l, ms, env),
             (_, Ty::Diff(a, h)) => {
                 if h.iter().any(|m| m.head() == l.head()) {
                     self.fail(FailKind::Mismatch, l, r);
                 } else {
-                    self.constrain(l, a);
+                    self.constrain_in(l, a, env);
                 }
             }
             (Ty::Con(h1, a1), Ty::Con(h2, a2)) if h1 == h2 && a1.len() == a2.len() => {
+                if env {
+                    // §4.5 rule 4: service arguments are equal.
+                    for (x, y) in a1.iter().zip(a2) {
+                        self.constrain(x, y);
+                        self.constrain(y, x);
+                    }
+                    return;
+                }
                 let vs = self.variances(*h1, a1.len());
                 for ((x, y), v) in a1.iter().zip(a2).zip(vs) {
                     self.constrain_by(x, y, v);
@@ -245,7 +307,7 @@ impl Solver {
                 }
                 self.constrain(&f.ret, &g.ret);
                 self.constrain(&f.err, &g.err);
-                self.constrain(&f.env, &g.env);
+                self.constrain_env(&f.env, &g.env);
             }
             _ => self.fail(FailKind::Mismatch, l, r),
         }
@@ -265,68 +327,90 @@ impl Solver {
 
     /// Adds a bound to a variable. Two bounds of one variable with the same
     /// type constructor are one member (§4.4), so arguments that do not
-    /// change must be equal.
-    fn add_bound(&mut self, v: V, t: Ty, lower: bool) {
-        if let Ty::Fn(f) = &t {
-            // All function types are one head; their parameters must agree
-            // in number to be put together.
-            let bounds = if lower {
-                &self.var(v).lower
-            } else {
-                &self.var(v).upper
-            };
-            if let Some(other) = bounds
-                .iter()
-                .find(|b| matches!(b, Ty::Fn(g) if g.params.len() != f.params.len()))
-                .cloned()
-            {
-                self.fail(FailKind::Arity, &other, &t);
-            }
-        }
-        if let Ty::Con(h, args) = &t {
-            let bounds = if lower {
-                &self.var(v).lower
-            } else {
-                &self.var(v).upper
-            };
-            let same: Vec<Vec<Ty>> = bounds
-                .iter()
-                .filter_map(|b| match b {
-                    Ty::Con(h2, a2) if h2 == h && a2.len() == args.len() => Some(a2.clone()),
-                    _ => None,
-                })
-                .collect();
-            let vs = self.variances(*h, args.len());
-            for other in same {
-                for ((x, y), var) in args.iter().zip(&other).zip(&vs) {
-                    if *var == Variance::Inv {
-                        self.equal(x, y);
+    /// change must be equal; in an environment, all arguments must be equal
+    /// (§9.2). Two lower bounds that are put together by union also have
+    /// their parts put together, so that the environments of two function
+    /// types are checked in the same way.
+    fn add_bound(&mut self, v: V, t: Ty, lower: bool, env: bool) {
+        let level = self.var(v).level;
+        let bounds = if lower {
+            self.var(v).lower.clone()
+        } else {
+            self.var(v).upper.clone()
+        };
+        match &t {
+            Ty::Fn(f) => {
+                for b in &bounds {
+                    let Ty::Fn(g) = b else { continue };
+                    if g.params.len() != f.params.len() {
+                        // All function types are one head; their parameters
+                        // must agree in number to be put together.
+                        self.fail(FailKind::Arity, b, &t);
+                    } else if lower {
+                        self.join(&f.ret, &g.ret, level, false);
+                        self.join(&f.err, &g.err, level, false);
+                        self.join(&f.env, &g.env, level, true);
                     }
                 }
             }
+            Ty::Con(h, args) => {
+                let vs = self.variances(*h, args.len());
+                for b in &bounds {
+                    let Ty::Con(h2, other) = b else { continue };
+                    if h2 != h || other.len() != args.len() {
+                        continue;
+                    }
+                    for ((x, y), var) in args.iter().zip(other).zip(&vs) {
+                        if env {
+                            self.equal(x, y, FailKind::EnvForms);
+                        } else if *var == Variance::Inv {
+                            self.equal(x, y, FailKind::Invariant);
+                        } else if *var == Variance::Co && lower {
+                            self.join(x, y, level, false);
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
         let s = self.var_mut(v);
         let bounds = if lower { &mut s.lower } else { &mut s.upper };
         if !bounds.contains(&t) {
-            bounds.push(t);
+            bounds.push(t.clone());
+            if let (false, Ty::Var(w)) = (lower, &t) {
+                self.var_mut(*w).from.push(v);
+            }
         }
     }
 
-    /// `x` and `y` must be equal, as arguments that do not change.
-    fn equal(&mut self, x: &Ty, y: &Ty) {
+    /// Puts two types together by union in a new variable, only for the
+    /// checks of `add_bound`: the variable is used nowhere else.
+    fn join(&mut self, x: &Ty, y: &Ty, level: u32, env: bool) {
+        if x == y || !(needs_join(x) && needs_join(y)) {
+            return;
+        }
+        let w = Ty::Var(self.fresh_at(level));
+        self.constrain_in(x, &w, env);
+        self.constrain_in(y, &w, env);
+    }
+
+    /// `x` and `y` must be equal, as arguments that do not change, or as the
+    /// arguments of two forms of a service in an environment; `kind` says
+    /// which.
+    fn equal(&mut self, x: &Ty, y: &Ty, kind: FailKind) {
         let before = self.failures.len();
         self.constrain(x, y);
         self.constrain(y, x);
         if self.failures.len() > before {
             self.failures.truncate(before);
-            self.fail(FailKind::Invariant, x, y);
+            self.fail(kind, x, y);
         }
     }
 
     /// `l <: m1 | m2 | …` for an `l` with a type constructor: the member
     /// with the same type constructor, or else the one member that is a type
     /// variable (§4.4).
-    fn route(&mut self, l: &Ty, ms: &[Ty]) {
+    fn route(&mut self, l: &Ty, ms: &[Ty], env: bool) {
         let mut flat = Vec::new();
         flatten_union(ms, &mut flat);
         let h = l.head();
@@ -334,7 +418,7 @@ impl Solver {
             && let Some(m) = flat.iter().find(|m| m.head() == h)
         {
             let m = m.clone();
-            self.constrain(l, &m);
+            self.constrain_in(l, &m, env);
             return;
         }
         let vars: Vec<&Ty> = flat
@@ -344,7 +428,7 @@ impl Solver {
         match vars.len() {
             1 => {
                 let m = vars[0].clone();
-                self.constrain(l, &m);
+                self.constrain_in(l, &m, env);
             }
             0 => self.fail(FailKind::Mismatch, l, &Ty::Union(ms.to_vec())),
             _ => self.fail(FailKind::Ambiguous, l, &Ty::Union(ms.to_vec())),
@@ -354,25 +438,25 @@ impl Solver {
     /// `A - H <: R`, where `R` is not a variable. For a variable `a`, its
     /// values whose type constructor is in `H` go to `H`, and the rest go
     /// to `R`: `a <: H | R`, with the members of `H` first.
-    fn diff_left(&mut self, a: &Ty, h: &[Ty], r: &Ty) {
+    fn diff_left(&mut self, a: &Ty, h: &[Ty], r: &Ty, env: bool) {
         match a {
             Ty::Never => {}
             Ty::Union(ms) => {
                 for m in ms {
-                    self.diff_left(m, h, r);
+                    self.diff_left(m, h, r, env);
                 }
             }
             Ty::Con(..) | Ty::Fn(_) => match h.iter().find(|m| m.head() == a.head()) {
                 Some(m) => {
                     let m = m.clone();
-                    self.constrain(a, &m);
+                    self.constrain_in(a, &m, env);
                 }
-                None => self.constrain(a, r),
+                None => self.constrain_in(a, r, env),
             },
             _ => {
                 let mut ms = h.to_vec();
                 ms.push(r.clone());
-                self.constrain(a, &Ty::Union(ms));
+                self.constrain_in(a, &Ty::Union(ms), env);
             }
         }
     }
@@ -389,9 +473,11 @@ impl Solver {
                     return Ty::Var(*nv);
                 }
                 let nv = self.fresh_at(level);
+                self.vars[nv.0 as usize].input = self.var(*v).input;
                 cache.insert((*v, pol), nv);
                 if pol != Pol::Neg {
                     self.var_mut(*v).upper.push(Ty::Var(nv));
+                    self.var_mut(nv).from.push(*v);
                     let lower = self.var(*v).lower.clone();
                     let lower = lower
                         .iter()
@@ -407,7 +493,7 @@ impl Solver {
                         .filter(|b| **b != Ty::Var(nv))
                         .map(|b| self.extrude(b, Pol::Neg, level, cache))
                         .collect();
-                    self.var_mut(nv).upper = upper;
+                    self.set_upper(nv, upper);
                 }
                 Ty::Var(nv)
             }
@@ -431,9 +517,8 @@ impl Solver {
                 let (lower, upper) = (self.var(*v).lower.clone(), self.var(*v).upper.clone());
                 let lower = lower.iter().map(|b| self.freshen(b, above, map)).collect();
                 let upper = upper.iter().map(|b| self.freshen(b, above, map)).collect();
-                let s = self.var_mut(nv);
-                s.lower = lower;
-                s.upper = upper;
+                self.var_mut(nv).lower = lower;
+                self.set_upper(nv, upper);
                 Ty::Var(nv)
             }
             _ => self.map_children(t, Pol::Pos, &mut |s, x, _| s.freshen(x, above, map)),
@@ -489,6 +574,16 @@ impl Solver {
     /// direction by intersection, and arguments that do not change must be
     /// equal.
     pub fn union(&mut self, ms: Vec<Ty>) -> Ty {
+        self.union_in(ms, false)
+    }
+
+    /// The union of environments (§9.2): two forms of one type constructor
+    /// must have equal arguments, whatever their variance.
+    pub fn env_union(&mut self, ms: Vec<Ty>) -> Ty {
+        self.union_in(ms, true)
+    }
+
+    fn union_in(&mut self, ms: Vec<Ty>, env: bool) -> Ty {
         let mut flat = Vec::new();
         flatten_union(&ms, &mut flat);
         let mut out: Vec<Ty> = Vec::new();
@@ -505,7 +600,7 @@ impl Solver {
             {
                 Some(i) => {
                     let old = std::mem::replace(&mut out[i], Ty::Never);
-                    out[i] = self.merge(old, m, true);
+                    out[i] = self.merge(old, m, true, env);
                 }
                 None => out.push(m),
             }
@@ -521,6 +616,10 @@ impl Solver {
     /// `Never`; members with one are put together the other way round
     /// (§4.4). `a & T` with a type variable stays.
     pub fn inter(&mut self, ms: Vec<Ty>) -> Ty {
+        self.inter_in(ms, false)
+    }
+
+    fn inter_in(&mut self, ms: Vec<Ty>, env: bool) -> Ty {
         let mut flat = Vec::new();
         for m in ms {
             match m {
@@ -537,7 +636,7 @@ impl Solver {
                 Ty::Con(..) | Ty::Fn(_) => {
                     con = Some(match con.take() {
                         None => m,
-                        Some(c) if c.head() == m.head() => self.merge(c, m, false),
+                        Some(c) if c.head() == m.head() => self.merge(c, m, false, env),
                         Some(_) => return Ty::Never,
                     });
                 }
@@ -554,10 +653,17 @@ impl Solver {
     }
 
     /// Two members with one type constructor, as one: by union when `union`,
-    /// and by intersection when not.
-    fn merge(&mut self, a: Ty, b: Ty, union: bool) -> Ty {
+    /// and by intersection when not. In an environment (`env`), the
+    /// arguments must be equal (§9.2).
+    fn merge(&mut self, a: Ty, b: Ty, union: bool, env: bool) -> Ty {
         match (a, b) {
             (Ty::Con(h, xs), Ty::Con(_, ys)) if xs.len() == ys.len() => {
+                if env {
+                    for (x, y) in xs.iter().zip(&ys) {
+                        self.equal(x, y, FailKind::EnvForms);
+                    }
+                    return Ty::Con(h, xs);
+                }
                 let vs = self.variances(h, xs.len());
                 let args = xs
                     .into_iter()
@@ -579,11 +685,18 @@ impl Solver {
                         (label, self.merge_arg(p, q, Variance::Contra, union))
                     })
                     .collect();
+                // The environments of two function types are put together
+                // as environments (§4.4, §9.2).
+                let env = if union {
+                    self.union_in(vec![f.env, g.env], true)
+                } else {
+                    self.inter_in(vec![f.env, g.env], true)
+                };
                 Ty::Fn(Box::new(FnTy {
                     params,
                     ret: self.merge_arg(f.ret, g.ret, Variance::Co, union),
                     err: self.merge_arg(f.err, g.err, Variance::Co, union),
-                    env: self.merge_arg(f.env, g.env, Variance::Co, union),
+                    env,
                 }))
             }
             (a, b) => {
@@ -600,7 +713,7 @@ impl Solver {
             Variance::Contra if union => self.inter(vec![x, y]),
             Variance::Contra => self.union(vec![x, y]),
             Variance::Inv => {
-                self.equal(&x, &y);
+                self.equal(&x, &y, FailKind::Invariant);
                 x
             }
         }
@@ -609,6 +722,16 @@ impl Solver {
     /// `a - h1 - h2 - …` (§4.4). A member of `a` whose type constructor is
     /// in `h` is taken out, and it must be a subtype of that member of `h`.
     pub fn diff(&mut self, a: Ty, h: Vec<Ty>) -> Ty {
+        self.diff_in(a, h, false)
+    }
+
+    /// `M - T` for an environment `M` (§4.8 rule 9): the member of `M` that
+    /// is taken out must be equal to its member of `T` (§9.2).
+    pub fn env_diff(&mut self, a: Ty, h: Vec<Ty>) -> Ty {
+        self.diff_in(a, h, true)
+    }
+
+    fn diff_in(&mut self, a: Ty, h: Vec<Ty>, env: bool) -> Ty {
         let mut hs = Vec::new();
         flatten_union(&h, &mut hs);
         hs.retain(|m| !matches!(m, Ty::Never));
@@ -618,13 +741,20 @@ impl Solver {
         match a {
             Ty::Never => Ty::Never,
             Ty::Union(ms) => {
-                let parts = ms.into_iter().map(|m| self.diff(m, hs.clone())).collect();
-                self.union(parts)
+                let parts = ms
+                    .into_iter()
+                    .map(|m| self.diff_in(m, hs.clone(), env))
+                    .collect();
+                self.union_in(parts, env)
             }
             Ty::Con(..) | Ty::Fn(_) => match hs.iter().find(|m| m.head() == a.head()) {
                 Some(m) => {
                     let m = m.clone();
-                    self.constrain(&a, &m);
+                    if env {
+                        self.equal(&a, &m, FailKind::EnvForms);
+                    } else {
+                        self.constrain(&a, &m);
+                    }
                     Ty::Never
                 }
                 None => a,
@@ -639,6 +769,16 @@ impl Solver {
             }
             a => Ty::Diff(Box::new(a), hs),
         }
+    }
+}
+
+/// Whether two parts of bounds may hold function types, whose
+/// environments must be checked when the bounds are put together.
+fn needs_join(t: &Ty) -> bool {
+    match t {
+        Ty::Con(_, args) => !args.is_empty(),
+        Ty::Never | Ty::Top => false,
+        _ => true,
     }
 }
 

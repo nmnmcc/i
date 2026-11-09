@@ -1,8 +1,10 @@
 //! Patterns: pattern types, fitting (§4.8, after rule 14), "may fail"
-//! (§7.3), and `case` by places (rule 11).
+//! (§7.3), `case` by places (rule 11), narrowing (rule 12), coverage and
+//! clauses that are never used (§7.4), and known constructors (§7.5).
 
+use super::coverage::{self, Col, Ctor, Pat};
 use super::infer::{Checker, Scheme};
-use super::{Head, Ty};
+use super::{FnTy, Head, Ty};
 use crate::code;
 use crate::hir::*;
 use ilang_syntax::span::Span;
@@ -41,32 +43,9 @@ pub(crate) fn binders(p: &Pattern, out: &mut Vec<VarId>) {
     }
 }
 
-/// §7.3, by the form of the pattern: a catch-all, `x: T` (fitting makes
-/// the value a `T`), a tuple of parts that cannot fail, and a constructor
-/// of a type with one constructor whose parts cannot fail, cannot fail.
-/// Every other pattern may fail.
-///
-/// TODO(M3b): exact, with the type of the value: `1 | _: Int` and a
-/// literal for a type with one value cannot fail either.
-pub(crate) fn may_fail(p: &Program, q: &Pattern) -> bool {
-    match &q.kind {
-        PatternKind::Var(_)
-        | PatternKind::Discard
-        | PatternKind::Typed { .. }
-        | PatternKind::Error(_) => false,
-        PatternKind::Named { pattern, .. } => may_fail(p, pattern),
-        PatternKind::Tuple(ps) => ps.iter().any(|x| may_fail(p, x)),
-        PatternKind::Constructor { ctor, args, .. } => {
-            let one = matches!(&p.ty(ctor.ty).body, TypeBody::Custom(cs) if cs.len() == 1);
-            !one || args.iter().any(|x| may_fail(p, x))
-        }
-        _ => true,
-    }
-}
-
 /// The label of a part of a constructor pattern (§7.1): the last name in
 /// the chain of `=` at its top.
-fn part_label(p: &Pattern) -> Option<&str> {
+pub(crate) fn part_label(p: &Pattern) -> Option<&str> {
     match &p.kind {
         PatternKind::Var(b) => Some(&b.name),
         PatternKind::Typed {
@@ -89,6 +68,36 @@ struct Place {
     catch_here: bool,
     parent: Option<usize>,
     children: Vec<(Step, usize)>,
+    /// The type constructors of the patterns here that are not catch-alls:
+    /// the clause, whether it has no guard, the head, and its number of
+    /// arguments.
+    seen: Vec<(usize, bool, Head, usize)>,
+}
+
+/// A catch-all in a clause pattern, to be narrowed (rule 12).
+struct Catch<'p> {
+    pattern: &'p Pattern,
+    clause: usize,
+    choice: usize,
+    place: usize,
+}
+
+/// A `case` whose coverage (§7.4) is checked when the types of its group
+/// are found.
+pub(crate) struct PendingCase {
+    pub module: ModuleId,
+    pub subject: Ty,
+    pub span: Span,
+    /// Each clause: its choices, whether it has a guard, and its place.
+    pub clauses: Vec<(Pat, bool, Span)>,
+}
+
+/// What a clause pass needs while it visits patterns.
+struct Visit<'p> {
+    clause: usize,
+    choice: usize,
+    unguarded: bool,
+    catches: Vec<Catch<'p>>,
 }
 
 /// The step from a place to a place below it.
@@ -160,6 +169,7 @@ impl Checker<'_> {
             PatternKind::Named { binder, pattern } => {
                 let t = self.param(pattern);
                 self.bind(binder, t.clone(), false);
+                self.note_known(binder, pattern);
                 t
             }
             PatternKind::Typed { binder, ty } => {
@@ -298,22 +308,67 @@ impl Checker<'_> {
         out
     }
 
-    // ---- case (rule 11) ----
+    /// §7.3: `q` may fail for the type `t` of the value, when some value of
+    /// `t` does not match it. Only used after `q` is fitted to `t`.
+    pub fn may_fail(&mut self, q: &Pattern, t: &Ty) -> bool {
+        if catch_all(q) {
+            return false;
+        }
+        let pat = coverage::fit_pat(self.p, q);
+        self.useful(&[vec![pat]], &[Pat::Wild(None)], &[Col::of(t.clone())])
+            .is_some()
+    }
+
+    /// §7.5: `x = C(…)` makes `x` known to be made by `C`. With choices
+    /// that give `x` two constructors, it is not known.
+    fn note_known(&mut self, binder: &Binder, inner: &Pattern) {
+        let Some(c) = top_ctor(inner) else {
+            return;
+        };
+        if self.known_conflict.contains(&binder.var) {
+            return;
+        }
+        match self.known.get(&binder.var) {
+            Some(old) if *old != c => {
+                self.known.remove(&binder.var);
+                self.known_conflict.insert(binder.var);
+            }
+            _ => {
+                self.known.insert(binder.var, c);
+            }
+        }
+    }
+
+    // ---- case (rules 11 and 12) ----
 
     pub fn case(&mut self, subject: &Expr, clauses: &[Clause], span: Span) -> Ty {
         let a = self.infer(subject);
         let mut places = vec![Place {
-            ty: a,
+            ty: a.clone(),
             pats: Vec::new(),
             heads: Vec::new(),
             catch_here: false,
             parent: None,
             children: Vec::new(),
+            seen: Vec::new(),
         }];
-        for c in clauses {
-            for p in &c.patterns {
-                self.visit(p, 0, c.guard.is_none(), &mut places);
+        let mut rows: Vec<Vec<Pat>> = Vec::new();
+        let mut v = Visit {
+            clause: 0,
+            choice: 0,
+            unguarded: true,
+            catches: Vec::new(),
+        };
+        for (ci, c) in clauses.iter().enumerate() {
+            v.clause = ci;
+            v.unguarded = c.guard.is_none();
+            let mut choices = Vec::new();
+            for (j, p) in c.patterns.iter().enumerate() {
+                v.choice = j;
+                let (_, pat) = self.visit(p, 0, &mut v, &mut places);
+                choices.push(pat);
             }
+            rows.push(choices);
         }
         // `B <: P`, or `B <: P | r - P` when a clause without a guard has a
         // catch-all at the place or above it.
@@ -335,8 +390,31 @@ impl Checker<'_> {
             let b = places[i].ty.clone();
             self.sub(&b, &want, if i == 0 { subject.span } else { span });
         }
+        // Rule 12: each catch-all gets `B - H`.
+        for k in 0..v.catches.len() {
+            let c = &v.catches[k];
+            let (pattern, ci, choice, place) = (c.pattern, c.clause, c.choice, c.place);
+            let t = self.narrow(&rows, clauses, ci, choice, k as u32, &places[place]);
+            self.bind_catch_all(pattern, &t, true);
+        }
+        // §7.5: inside a clause `C(…)`, the name of the subject is known to
+        // be made by `C`.
+        let subject_var = match &subject.kind {
+            ExprKind::Name(ValueRef::Local(x)) => Some(*x),
+            ExprKind::Name(ValueRef::Def(d)) => match self.p.def(*d).kind {
+                DefKind::Binding { var, .. } => Some(var),
+                DefKind::External { .. } => None,
+            },
+            _ => None,
+        };
         let r = self.s.fresh();
         for c in clauses {
+            let known = subject_var.and_then(|x| {
+                let mut ctors = c.patterns.iter().map(top_ctor);
+                let first = ctors.next()??;
+                ctors.all(|o| o == Some(first)).then_some((x, first))
+            });
+            let before = known.map(|(x, ctor)| (x, self.known.insert(x, ctor)));
             if let Some(g) = &c.guard {
                 let t = self.infer(g);
                 let want = self.bool_ty();
@@ -344,8 +422,127 @@ impl Checker<'_> {
             }
             let t = self.infer(&c.body);
             self.sub(&t, &r, c.body.span);
+            if let Some((x, old)) = before {
+                match old {
+                    Some(o) => self.known.insert(x, o),
+                    None => self.known.remove(&x),
+                };
+            }
         }
+        let module = self.module;
+        self.cases.push(PendingCase {
+            module,
+            subject: a,
+            span: subject.span,
+            clauses: rows
+                .into_iter()
+                .zip(clauses)
+                .map(|(choices, c)| {
+                    let span = match (c.patterns.first(), c.patterns.last()) {
+                        (Some(f), Some(l)) => Span {
+                            start: f.span.start,
+                            end: l.span.end,
+                        },
+                        _ => c.span,
+                    };
+                    (Pat::Or(choices), c.guard.is_some(), span)
+                })
+                .collect(),
+        });
         r
+    }
+
+    /// Rule 12: the type of the catch-all `id` of choice `choice` of clause
+    /// `ci`, at `place`: `B - H`, with `H` the type constructors that the
+    /// earlier clauses without a guard take there. "Every value that the
+    /// clause pattern matches" is any value at the other places: the types
+    /// are not known yet, so the columns have no type.
+    fn narrow(
+        &mut self,
+        rows: &[Vec<Pat>],
+        clauses: &[Clause],
+        ci: usize,
+        choice: usize,
+        id: u32,
+        place: &Place,
+    ) -> Ty {
+        let earlier: Vec<Vec<Pat>> = (0..ci)
+            .filter(|i| clauses[*i].guard.is_none())
+            .map(|i| vec![Pat::Or(rows[i].clone())])
+            .collect();
+        // A choice whose values are all matched before: every type
+        // constructor is taken there.
+        if self
+            .useful(
+                &earlier,
+                std::slice::from_ref(&rows[ci][choice]),
+                &[Col::Any],
+            )
+            .is_none()
+        {
+            return Ty::Never;
+        }
+        let mut candidates: Vec<(Head, usize)> = Vec::new();
+        for (c, unguarded, h, n) in &place.seen {
+            if *c < ci && *unguarded && !candidates.iter().any(|x| x.0 == *h) {
+                candidates.push((*h, *n));
+            }
+        }
+        let mut taken = Vec::new();
+        for (h, n) in candidates {
+            let q = coverage::replace(&rows[ci][choice], id, &Pat::Head(h, n));
+            if self.useful(&earlier, &[q], &[Col::Any]).is_none() {
+                let args: Vec<Ty> = (0..n).map(|_| self.s.fresh()).collect();
+                taken.push(match h {
+                    Head::Fn => Ty::Fn(Box::new(FnTy {
+                        params: args.into_iter().map(|a| (None, a)).collect(),
+                        ret: self.s.fresh(),
+                        err: self.s.fresh(),
+                        env: self.s.fresh(),
+                    })),
+                    h => Ty::Con(h, args),
+                });
+            }
+        }
+        if taken.is_empty() {
+            return place.ty.clone();
+        }
+        let t = self.s.diff(place.ty.clone(), taken);
+        self.flush(place_span(clauses, ci), None);
+        t
+    }
+
+    /// Checks the coverage (§7.4) of a `case`, and warns about the clauses
+    /// that are never used, with the types that inference found.
+    pub fn check_case(&mut self, c: PendingCase) {
+        self.module = c.module;
+        let col = [Col::of(c.subject.clone())];
+        let mut rows: Vec<Vec<Pat>> = Vec::new();
+        for (pat, guarded, span) in &c.clauses {
+            if self
+                .useful(&rows, std::slice::from_ref(pat), &col)
+                .is_none()
+            {
+                self.warning(
+                    code::NEVER_USED,
+                    *span,
+                    "this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)",
+                );
+            }
+            if !guarded {
+                rows.push(vec![pat.clone()]);
+            }
+        }
+        if let Some(w) = self.useful(&rows, &[Pat::Wild(None)], &col) {
+            let text = self.show_pat(&w[0]);
+            self.error(
+                code::CASE_NOT_COVERED,
+                c.span,
+                format!(
+                    "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `{text}`"
+                ),
+            );
+        }
     }
 
     /// The place below `at` by `step`, with the type `ty` when it is new.
@@ -360,13 +557,15 @@ impl Checker<'_> {
             catch_here: false,
             parent: Some(at),
             children: Vec::new(),
+            seen: Vec::new(),
         });
         let i = places.len() - 1;
         places[at].children.push((step, i));
         i
     }
 
-    /// The arguments shared at a place by the patterns with one head.
+    /// The arguments shared at a place by the patterns with one head
+    /// (rule 11).
     fn shared(&mut self, places: &mut [Place], at: usize, h: Head, n: usize) -> Vec<Ty> {
         if let Some((_, args)) = places[at].heads.iter().find(|x| x.0 == h) {
             return args.clone();
@@ -376,29 +575,41 @@ impl Checker<'_> {
         args
     }
 
-    /// Puts a clause pattern at the place `at`, binds its names, and gives
-    /// back its pattern type.
-    fn visit(&mut self, q: &Pattern, at: usize, unguarded: bool, places: &mut Vec<Place>) -> Ty {
+    /// Puts a clause pattern at the place `at`, binds its names (but not
+    /// those of catch-alls, which wait for rule 12), and gives back its
+    /// pattern type and its pattern for `coverage`.
+    fn visit<'p>(
+        &mut self,
+        q: &'p Pattern,
+        at: usize,
+        v: &mut Visit<'p>,
+        places: &mut Vec<Place>,
+    ) -> (Ty, Pat) {
         if catch_all(q) {
-            // TODO(M3b): rule 12 narrows a catch-all to `B - H`.
-            let b = places[at].ty.clone();
-            self.bind_catch_all(q, &b, true);
-            if unguarded {
+            if v.unguarded {
                 places[at].catch_here = true;
             }
-            return b;
+            let id = v.catches.len() as u32;
+            v.catches.push(Catch {
+                pattern: q,
+                clause: v.clause,
+                choice: v.choice,
+                place: at,
+            });
+            return (places[at].ty.clone(), Pat::Wild(Some(id)));
         }
-        let t = match &q.kind {
-            PatternKind::Named { binder, pattern } => {
-                let t = self.visit(pattern, at, unguarded, places);
-                self.bind(binder, t.clone(), true);
-                return t;
-            }
+        if let PatternKind::Named { binder, pattern } = &q.kind {
+            let (t, pat) = self.visit(pattern, at, v, places);
+            self.bind(binder, t.clone(), true);
+            self.note_known(binder, pattern);
+            return (t, pat);
+        }
+        let (t, pat) = match &q.kind {
             PatternKind::Typed { binder, ty } => {
                 let t = self.conv(ty, &HashMap::new());
                 let mut members = Vec::new();
                 super::solve::flatten_union(std::slice::from_ref(&t), &mut members);
-                if members
+                let pat = if members
                     .iter()
                     .any(|m| m.head().is_none() && *m != Ty::Never)
                 {
@@ -407,17 +618,37 @@ impl Checker<'_> {
                         ty.span,
                         "in a `case`, `x: T` tests the type constructor, so `T` may not have a type variable as a member (§7.1)",
                     );
+                    Pat::Wild(None)
+                } else {
+                    Pat::Or(
+                        members
+                            .iter()
+                            .filter_map(|m| match m {
+                                Ty::Con(h, args) => Some(Pat::Head(*h, args.len())),
+                                Ty::Fn(f) => Some(Pat::Head(Head::Fn, f.params.len())),
+                                _ => None,
+                            })
+                            .collect(),
+                    )
+                };
+                if let Pat::Or(alts) = &pat {
+                    for a in alts {
+                        if let Pat::Head(h, n) = a {
+                            places[at].seen.push((v.clause, v.unguarded, *h, *n));
+                        }
+                    }
                 }
                 if let Some(b) = binder {
                     self.bind(b, t.clone(), true);
                 }
-                t
+                (t, pat)
             }
             PatternKind::Constructor { ctor, args, spread } => {
                 let h = Head::Named(TypeRef::Custom(ctor.ty));
                 let n = self.p.ty(ctor.ty).params.len();
                 let targs = self.shared(places, at, h, n);
                 let fields = self.ctor_fields(*ctor, &targs);
+                let mut parts = vec![Pat::Wild(None); fields.len()];
                 for (arg, i) in self.match_fields(q.span, &fields, args, *spread) {
                     let c = self.child(
                         places,
@@ -425,41 +656,76 @@ impl Checker<'_> {
                         Step::Field(*ctor, i as u32),
                         fields[i].1.clone(),
                     );
-                    self.visit(arg, c, unguarded, places);
+                    parts[i] = self.visit(arg, c, v, places).1;
                 }
-                Ty::named(TypeRef::Custom(ctor.ty), targs)
+                places[at].seen.push((v.clause, v.unguarded, h, n));
+                (
+                    Ty::named(TypeRef::Custom(ctor.ty), targs),
+                    Pat::Ctor(Ctor::Custom(*ctor), parts),
+                )
             }
             PatternKind::Tuple(ps) => {
                 let n = ps.len() as u32;
-                let parts = self.shared(places, at, Head::Tuple(n), ps.len());
+                let h = Head::Tuple(n);
+                let parts = self.shared(places, at, h, ps.len());
+                let mut pats = Vec::new();
                 for (i, x) in ps.iter().enumerate() {
                     let c = self.child(places, at, Step::Part(n, i as u32), parts[i].clone());
-                    self.visit(x, c, unguarded, places);
+                    pats.push(self.visit(x, c, v, places).1);
                 }
-                Ty::tuple(parts)
+                places[at].seen.push((v.clause, v.unguarded, h, ps.len()));
+                (Ty::tuple(parts), Pat::Ctor(Ctor::Tuple(n), pats))
             }
             PatternKind::List { items, rest } => {
                 let h = Head::Named(TypeRef::Builtin(BuiltinType::List));
                 let e = self.shared(places, at, h, 1).remove(0);
                 let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![e.clone()]);
+                let mut pats = Vec::new();
                 for (i, x) in items.iter().enumerate() {
                     let c = self.child(places, at, Step::Item(i as u32), e.clone());
-                    self.visit(x, c, unguarded, places);
+                    pats.push(self.visit(x, c, v, places).1);
                 }
                 if let Some(r) = rest {
                     let c = self.child(places, at, Step::Rest, list.clone());
                     if let Some(b) = r {
                         self.bind(b, list.clone(), true);
                     }
-                    if unguarded {
+                    if v.unguarded {
                         places[c].catch_here = true;
                     }
                 }
-                list
+                places[at].seen.push((v.clause, v.unguarded, h, 1));
+                (list, coverage::list(pats, rest.is_some()))
             }
-            _ => self.leaf(q, true),
+            _ => {
+                let t = self.leaf(q, true);
+                let pat = match coverage::literal(q) {
+                    Some(l) => {
+                        let c = Ctor::Lit(l);
+                        places[at].seen.push((v.clause, v.unguarded, c.head(), 0));
+                        Pat::Ctor(c, Vec::new())
+                    }
+                    None => Pat::Wild(None),
+                };
+                (t, pat)
+            }
         };
         places[at].pats.push(t.clone());
-        t
+        (t, pat)
     }
+}
+
+/// The constructor at the top of a pattern, through `x = …`.
+fn top_ctor(p: &Pattern) -> Option<CtorRef> {
+    match &p.kind {
+        PatternKind::Constructor { ctor, .. } => Some(*ctor),
+        PatternKind::Named { pattern, .. } => top_ctor(pattern),
+        _ => None,
+    }
+}
+
+/// The place of the patterns of a clause, for problems.
+fn place_span(clauses: &[Clause], ci: usize) -> Span {
+    let c = &clauses[ci];
+    c.patterns.first().map_or(c.span, |p| p.span)
 }

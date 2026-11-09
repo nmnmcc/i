@@ -4,7 +4,7 @@ user : () -> String ? Int
 elapsed : (start: Int) -> Int ! Clock
 fixed : () -> Int
 collect : (body: () -> Nil ! Yield(a) | n) -> List(a) ! n
-numbers : () -> List(Never)
+numbers : () -> List(Int)
 my_assert : (c: Bool) -> Nil ! Assert
 catch : (body: () -> a ? e ! n) -> Result(a, AssertionFailure) ? e ! n - Assert
 checked : () -> Result(Int, AssertionFailure)

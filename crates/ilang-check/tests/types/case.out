@@ -12,4 +12,6 @@ mixed : (b: Bool) -> Int | String
 named : (r: Result(a, b)) -> Result(a | Int, b)
 bad : (v: a) -> a
 first_one : (p: (a, b) | c - (_, b)) -> b | Int
+4:8: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
+52:8: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
 87:8: error[E0511]: in a `case`, `x: T` tests the type constructor, so `T` may not have a type variable as a member (§7.1)

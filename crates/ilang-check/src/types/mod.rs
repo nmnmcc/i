@@ -8,23 +8,26 @@
 //!   smart constructors that merge unions by type constructor (§4.4).
 //! - `infer.rs`: the typing rules for expressions, blocks, functions, and
 //!   bindings (§4.8 rules 1–10 and 14).
-//! - `pattern.rs`: patterns, fitting, and `case` by places (rule 11).
+//! - `pattern.rs`: patterns, fitting, `case` by places (rule 11),
+//!   narrowing (rule 12), and known constructors (§7.5).
+//! - `coverage.rs`: Maranget's usefulness algorithm, for "can not fail"
+//!   (§7.3), "taken" (rule 12), coverage and "never used" (§7.4).
 //! - `display.rs`: coalescing, simplification, and the text of a type in
 //!   the syntax of §3.
 //!
-//! TODO(M3b): narrowing (rule 12), the exact "may fail" of §7.3, coverage
-//! (§7.4), and known constructors (§7.5).
 //! TODO(M3d): known types and expected types (§4.8), fields and tuple parts
 //! (rule 13) on values with no written type, and the disjointness check of
 //! `==` (§6.9).
 
+mod coverage;
 mod display;
 mod infer;
 mod pattern;
 mod solve;
 
-use crate::hir::{DefId, ModuleId, Program, TypeRef};
+use crate::hir::{CtorRef, DefId, ModuleId, Program, TypeRef};
 use ilang_package::{Diagnostic, Sources};
+use ilang_syntax::span::Span;
 use std::collections::HashMap;
 
 /// A type variable of the solver.
@@ -130,6 +133,9 @@ pub struct Typed {
     /// The type scheme of each top-level name, simplified and shown in the
     /// syntax of §3 (§4.7).
     pub schemes: HashMap<DefId, String>,
+    /// §7.5: each use of a name that is known to be made by a constructor,
+    /// by the module and the place of the name.
+    pub known_ctors: HashMap<(ModuleId, Span), CtorRef>,
 }
 
 impl Typed {

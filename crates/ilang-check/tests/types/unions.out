@@ -7,6 +7,6 @@ tuples : List((Int | String, String | Int))
 sizes : List((Int, Int) | (Int, Int, Int))
 bad_diff : (x: Never) -> Never
 var_diff : (x: Int) -> Int
-6:8: error[E0503]: `Int` and `String` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4)
+6:8: error[E0515]: `Int` and `String` must be equal: an environment may not have two forms of one type constructor with different arguments (§9.2)
 20:16: error[E0501]: `Int` is not a subtype of `String`
 22:22: error[E0513]: the right side of `-` may only have members with a type constructor (§4.4)

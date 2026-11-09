@@ -1,0 +1,23 @@
+collect : (body: () -> Nil ! Yield(a) | n) -> List(a) ! n
+numbers : () -> List(Int)
+inferred : () -> List(String)
+run_never : (body: () -> Nil ! Yield(Never)) -> Int
+bad_never : () -> Int
+run_int : (body: () -> Nil ! Yield(Int)) -> Int
+good_int : () -> Int
+emit_int : () -> Nil ! Yield(Int)
+emit_string : () -> Nil ! Yield(String)
+both_yields : () -> Nil ! Yield(Int)
+next_int : () -> Int ! Source(Int)
+next_string : () -> String ! Source(String)
+both_sources : () -> String ! Source(Int)
+both_fns : List(() -> Nil ! Yield(Never))
+written : () -> Nil ! Yield(Int) | Source(Int)
+emit_any : () -> Nil ! Yield(Int | String)
+given_narrow : () -> Nil
+given_same : () -> Nil
+28:28: error[E0501]: `Int` is not a subtype of `Never` (the type at 28:18 needs it)
+37:15: error[E0515]: `Int` and `String` must be equal: an environment may not have two forms of one type constructor with different arguments (§9.2)
+43:16: error[E0515]: `Int` and `String` must be equal: an environment may not have two forms of one type constructor with different arguments (§9.2)
+48:32: error[E0515]: `Int` and `String` must be equal: an environment may not have two forms of one type constructor with different arguments (§9.2)
+56:3: error[E0515]: `Yield(Int | String)` and `Yield(Int)` must be equal: an environment may not have two forms of one type constructor with different arguments (§9.2)

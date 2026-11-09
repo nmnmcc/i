@@ -34,7 +34,7 @@ Clock { Clock(now: () -> Int) }
 now = (c ! Clock) { c.now() }
 top_env = now()
 top_err = fail.raise(1)
-(top_a, Ok(top_fail)) = (1, Ok(1))
+(top_a, [top_fail]) = (1, [1])
 // E0514: bit array formats.
 bits = <<1:u8, 2:u3, 3:i16be, 4.0:f64be, "a":utf8, 5:u(4)>>
 bad_bits = <<1:u16, 2:x8>>

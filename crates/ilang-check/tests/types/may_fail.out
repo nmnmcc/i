@@ -1,0 +1,23 @@
+pair : (t: (a, b)) -> a
+pair_written : (t: (Int, String)) -> String
+first : (r: Result(a, b)) -> a ! Assert
+annotated : () -> Int
+literal : (n: a & Int) -> a ! Assert
+single : (u: User) -> String
+only_ok : (r: Result(Int, Never)) -> Int
+nested : (p: (Result(Int, Never), Bool)) -> Int
+from_value : () -> Int
+list : (xs: List(a)) -> a ! Assert
+list_rest : (xs: List(a)) -> List(a)
+prefix : (s: String) -> String
+prefix_some : (s: String) -> String ! Assert
+named : (r: Result(a, b)) -> Result(a, b) ! Assert
+typed_part : (p: (Int, a)) -> a
+bits : (b: BitArray) -> Int ! Assert
+float : (f: a & Float) -> a ! Assert
+type_var : (x: a) -> a
+param_tuple : ((a, b)) -> a
+param_user : (User) -> String
+param_ctor : (Result(a, b)) -> a ! Assert
+param_literal : (Int) -> Int ! Assert
+param_list : (List(a)) -> Int ! Assert

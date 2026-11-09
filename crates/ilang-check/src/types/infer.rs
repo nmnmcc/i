@@ -16,7 +16,7 @@ use ilang_package::{Diagnostic, Sources};
 use ilang_syntax::ast::{BinOp, Ident, UnOp};
 use ilang_syntax::span::{LineIndex, Span};
 use num_traits::ToPrimitive;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// `∀ (variables deeper than level). ty`. A name that is not generalized
 /// has the level `u32::MAX`.
@@ -69,6 +69,16 @@ pub(crate) struct Checker<'a> {
     effects: Vec<Effects>,
     pub b: Builtins,
     alias_depth: u32,
+    /// §7.5: the names known to be made by a constructor, where they are
+    /// used now.
+    pub known: HashMap<VarId, CtorRef>,
+    /// Names bound by choices that give them different constructors.
+    pub known_conflict: HashSet<VarId>,
+    /// The uses of names known to be made by a constructor (§7.5).
+    known_uses: HashMap<(ModuleId, Span), CtorRef>,
+    /// The `case` expressions of the group being typed, whose coverage is
+    /// checked with the types that inference finds (§4.8 rule 11).
+    pub cases: Vec<super::pattern::PendingCase>,
 }
 
 impl<'a> Checker<'a> {
@@ -102,6 +112,10 @@ impl<'a> Checker<'a> {
             effects: Vec::new(),
             b,
             alias_depth: 0,
+            known: HashMap::new(),
+            known_conflict: HashSet::new(),
+            known_uses: HashMap::new(),
+            cases: Vec::new(),
         }
     }
 
@@ -134,7 +148,10 @@ impl<'a> Checker<'a> {
             self.group(group);
         }
         // The shown type schemes (§4.7).
-        let mut typed = Typed::default();
+        let mut typed = Typed {
+            known_ctors: std::mem::take(&mut self.known_uses),
+            ..Typed::default()
+        };
         for (mi, m) in p.modules.iter().enumerate() {
             self.module = ModuleId(mi as u32);
             for (di, d) in m.defs.iter().enumerate() {
@@ -178,7 +195,7 @@ impl<'a> Checker<'a> {
             self.effects.push(Effects::default());
             let a = self.infer(&binding.value);
             self.fit(&binding.pattern, &a);
-            if super::pattern::may_fail(p, &binding.pattern) {
+            if self.may_fail(&binding.pattern, &a) {
                 self.add_env(Ty::named(self.b.assert, Vec::new()));
             }
             let (err, env) = self.pop_effects(binding.span);
@@ -223,11 +240,16 @@ impl<'a> Checker<'a> {
             };
             self.defs.insert(d, scheme);
         }
+        // §7.4: coverage, with the types of the group.
+        for c in std::mem::take(&mut self.cases) {
+            self.check_case(c);
+        }
     }
 
     pub fn new_tyvars(&mut self, ids: &[TyVarId]) {
         for id in ids {
             let v = self.s.fresh_at(self.s.level);
+            self.s.vars[v.0 as usize].input = true;
             self.s.vars[v.0 as usize].name = self.p.ty_var_names.get(id.0 as usize).cloned();
             self.tyvars.insert(*id, Ty::Var(v));
         }
@@ -239,6 +261,12 @@ impl<'a> Checker<'a> {
         let source = self.p.module(self.module).source;
         self.diags
             .push(Diagnostic::error(code, Some(source), span, message));
+    }
+
+    pub fn warning(&mut self, code: &'static str, span: Span, message: impl Into<String>) {
+        let source = self.p.module(self.module).source;
+        self.diags
+            .push(Diagnostic::warning(code, Some(source), span, message));
     }
 
     fn occurs(&mut self, span: Span) {
@@ -293,6 +321,12 @@ impl<'a> Checker<'a> {
                     "`{l}` and `{r}` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4)"
                 ),
             ),
+            FailKind::EnvForms => (
+                code::ENV_FORMS,
+                format!(
+                    "`{l}` and `{r}` must be equal: an environment may not have two forms of one type constructor with different arguments (§9.2)"
+                ),
+            ),
             FailKind::Ambiguous => (
                 code::TYPE_AMBIGUOUS,
                 format!("a value of `{l}` could go to more than one type variable of `{r}` (§4.4)"),
@@ -308,6 +342,20 @@ impl<'a> Checker<'a> {
         let t = self.s.union(ms);
         self.flush(span, None);
         t
+    }
+
+    /// The union of environments (§9.2).
+    fn env_union(&mut self, ms: Vec<Ty>, span: Span) -> Ty {
+        let t = self.s.env_union(ms);
+        self.flush(span, None);
+        t
+    }
+
+    /// `N` in `M` for two environments (§4.5 rule 4), with problems reported
+    /// at `span`, and `other` the place of the written type.
+    fn sub_env(&mut self, l: &Ty, r: &Ty, span: Span, other: Option<Span>) {
+        self.s.constrain_env(l, r);
+        self.flush(span, other);
     }
 
     // ---- Effects ----
@@ -332,7 +380,7 @@ impl<'a> Checker<'a> {
     fn pop_effects(&mut self, span: Span) -> (Ty, Ty) {
         let e = self.effects.pop().unwrap_or_default();
         let err = self.union(e.err, span);
-        let env = self.union(e.env, span);
+        let env = self.env_union(e.env, span);
         (err, env)
     }
 
@@ -371,7 +419,7 @@ impl<'a> Checker<'a> {
                 if let Some(t) = local.get(tv).or_else(|| self.tyvars.get(tv)) {
                     return t.clone();
                 }
-                let v = self.s.fresh();
+                let v = self.s.fresh_input();
                 if let Ty::Var(x) = v {
                     self.s.vars[x.0 as usize].name =
                         self.p.ty_var_names.get(tv.0 as usize).cloned();
@@ -379,7 +427,7 @@ impl<'a> Checker<'a> {
                 self.tyvars.insert(*tv, v.clone());
                 v
             }
-            TypeKind::Hole | TypeKind::Error => self.s.fresh(),
+            TypeKind::Hole | TypeKind::Error => self.s.fresh_input(),
             TypeKind::Tuple(ts) => Ty::tuple(ts.iter().map(|a| self.conv(a, local)).collect()),
             TypeKind::Fn {
                 params,
@@ -593,14 +641,22 @@ impl<'a> Checker<'a> {
             ExprKind::Int(_) => self.prim(BuiltinType::Int),
             ExprKind::Float(_) => self.prim(BuiltinType::Float),
             ExprKind::String(_) => self.prim(BuiltinType::String),
-            ExprKind::Name(ValueRef::Local(v)) => match self.locals.get(v).cloned() {
-                Some(s) => self.instantiate(&s),
-                None => self.s.fresh(),
-            },
-            ExprKind::Name(ValueRef::Def(d)) => match self.defs.get(d).cloned() {
-                Some(s) => self.instantiate(&s),
-                None => self.s.fresh(),
-            },
+            ExprKind::Name(ValueRef::Local(v)) => {
+                self.note_use(*v, e.span);
+                match self.locals.get(v).cloned() {
+                    Some(s) => self.instantiate(&s),
+                    None => self.s.fresh_input(),
+                }
+            }
+            ExprKind::Name(ValueRef::Def(d)) => {
+                if let DefKind::Binding { var, .. } = self.p.def(*d).kind {
+                    self.note_use(var, e.span);
+                }
+                match self.defs.get(d).cloned() {
+                    Some(s) => self.instantiate(&s),
+                    None => self.s.fresh_input(),
+                }
+            }
             ExprKind::Name(ValueRef::Ctor(c)) => self.ctor_value(*c),
             ExprKind::Tuple(items) => Ty::tuple(items.iter().map(|x| self.infer(x)).collect()),
             ExprKind::List { items, rest } => {
@@ -650,7 +706,7 @@ impl<'a> Checker<'a> {
                 want
             }
             ExprKind::Binary { op, lhs, rhs } => self.binary(*op, lhs, rhs, e.span),
-            ExprKind::Error => self.s.fresh(),
+            ExprKind::Error => self.s.fresh_input(),
         }
     }
 
@@ -750,7 +806,13 @@ impl<'a> Checker<'a> {
                 self.s.fresh()
             }
             _ => {
-                let (r, e, n) = (self.s.fresh(), self.s.fresh(), self.s.fresh());
+                // The function may be a parameter: what it gives back may
+                // come from outside.
+                let (r, e, n) = (
+                    self.s.fresh_input(),
+                    self.s.fresh_input(),
+                    self.s.fresh_input(),
+                );
                 let want = Ty::Fn(Box::new(FnTy {
                     params: placed.into_iter().map(|(t, _)| (None, t)).collect(),
                     ret: r.clone(),
@@ -893,12 +955,58 @@ impl<'a> Checker<'a> {
         self.written.get(&var).map(|t| self.expand(t))
     }
 
-    /// Rule 13 for `v.f`, where `v` is a name with a written custom type.
+    /// §7.5: records a use of a name that is known to be made by a
+    /// constructor.
+    fn note_use(&mut self, v: VarId, span: Span) {
+        if let Some(c) = self.known.get(&v) {
+            self.known_uses.insert((self.module, span), *c);
+        }
+    }
+
+    /// The constructor that the name `e` is known to be made by (§7.5).
+    fn known_ctor(&self, e: &Expr) -> Option<CtorRef> {
+        let var = match &e.kind {
+            ExprKind::Name(ValueRef::Local(v)) => *v,
+            ExprKind::Name(ValueRef::Def(d)) => match self.p.def(*d).kind {
+                DefKind::Binding { var, .. } => var,
+                DefKind::External { .. } => return None,
+            },
+            _ => return None,
+        };
+        self.known.get(&var).copied()
+    }
+
+    /// Rule 13 for `v.f`, where `v` is a name with a written custom type,
+    /// or a name known to be made by a constructor (§6.7, §7.5).
     ///
-    /// TODO(M3d): every value with a known type (§4.8), and the constructor
-    /// that `v` is known to be made by (§7.5).
+    /// TODO(M3d): every value with a known type (§4.8).
     fn field(&mut self, target: &Expr, name: &Ident) -> Ty {
         let t = self.infer(target);
+        if let Some(c) = self.known_ctor(target) {
+            // §6.7: the one constructor that may have made `v`.
+            let targs = self.fresh_args(c.ty);
+            let fields = self.ctor_fields(c, &targs);
+            let Some((_, ft)) = fields
+                .into_iter()
+                .find(|f| f.0.as_deref() == Some(&name.name))
+            else {
+                let cname = match &self.p.ty(c.ty).body {
+                    TypeBody::Custom(cs) => cs[c.index as usize].name.clone(),
+                    TypeBody::Alias(_) => String::new(),
+                };
+                self.error(
+                    code::NO_FIELD,
+                    name.span,
+                    format!(
+                        "the constructor `{cname}`, which made this value (§7.5), has no field with the label `{}` (§4.8 rule 13)",
+                        name.name
+                    ),
+                );
+                return self.s.fresh();
+            };
+            self.sub(&t, &Ty::named(TypeRef::Custom(c.ty), targs), target.span);
+            return ft;
+        }
         let known = self.known_written(target);
         let Some(TypeKind::Named {
             ty: TypeRef::Custom(id),
@@ -1001,12 +1109,14 @@ impl<'a> Checker<'a> {
         let TypeBody::Custom(ctors) = &self.p.ty(ctor.ty).body else {
             return self.s.fresh();
         };
-        if ctors.len() != 1 {
-            // TODO(M3b, M3d): `base` known to be made by `C` (§7.5).
+        if ctors.len() != 1 && self.known_ctor(base) != Some(ctor) {
+            let cname = ctors[ctor.index as usize].name.clone();
             self.error(
-                code::NOT_SUPPORTED,
+                code::NOT_KNOWN_CTOR,
                 ctor_span,
-                "a record update of a type with more than one constructor needs the value to be known to be made by the constructor (§6.7), which is not supported yet",
+                format!(
+                    "`{cname}(..v, …)` needs `v` to be known to be made by `{cname}` (§6.7): its type has other constructors, so `v` must be a name matched with `{cname}(…)` (§7.5)"
+                ),
             );
         }
         let old = self.fresh_args(ctor.ty);
@@ -1145,7 +1255,7 @@ impl<'a> Checker<'a> {
                     let a = self.block(&stmts[i + 1..], *span);
                     let (err, env) = self.pop_effects(*span);
                     self.add_err(err);
-                    let rest = self.s.diff(env, vec![t]);
+                    let rest = self.s.env_diff(env, vec![t]);
                     self.flush(*span, None);
                     self.add_env(rest);
                     return a;
@@ -1165,8 +1275,11 @@ impl<'a> Checker<'a> {
         for p in &f.params {
             match p {
                 Param::Pattern { pattern, label } => {
+                    // The values of a parameter come from the calls.
+                    let start = self.s.vars.len();
                     let t = self.param(pattern);
-                    fails |= super::pattern::may_fail(self.p, pattern);
+                    self.s.mark_inputs(start);
+                    fails |= self.may_fail(pattern, &t);
                     params.push((label.clone(), t));
                 }
                 Param::Env { var, ty, .. } => {
@@ -1207,12 +1320,12 @@ impl<'a> Checker<'a> {
                 let nspan = written.env.as_ref().map_or(wspan, |t| t.span);
                 self.sub2(&a, &value, body_span, wspan);
                 self.sub2(&err, &rerr, f.body.span, espan);
-                self.sub2(&env, &renv, f.body.span, nspan);
+                self.sub_env(&env, &renv, f.body.span, Some(nspan));
                 for t in &env_tys {
-                    self.sub(t, &renv, nspan);
+                    self.sub_env(t, &renv, nspan, None);
                 }
                 if fails {
-                    self.sub(&assert, &renv, nspan);
+                    self.sub_env(&assert, &renv, nspan, None);
                 }
                 Ty::Fn(Box::new(FnTy {
                     params,
@@ -1227,7 +1340,7 @@ impl<'a> Checker<'a> {
                 if fails {
                     envs.push(assert);
                 }
-                let env = self.union(envs, f.span);
+                let env = self.env_union(envs, f.span);
                 Ty::Fn(Box::new(FnTy {
                     params,
                     ret: a,
@@ -1259,7 +1372,7 @@ impl<'a> Checker<'a> {
         }
         let a = self.infer(&b.value);
         self.fit(&b.pattern, &a);
-        if super::pattern::may_fail(self.p, &b.pattern) {
+        if self.may_fail(&b.pattern, &a) {
             self.add_env(Ty::named(self.b.assert, Vec::new()));
         }
         for (v, h) in holders {

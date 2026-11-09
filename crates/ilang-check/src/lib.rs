@@ -81,6 +81,10 @@ pub mod code {
     pub const NO_FIELD: &str = "E0512";
     pub const TYPE_DIFF_VAR: &str = "E0513";
     pub const BAD_FORMAT: &str = "E0514";
+    pub const ENV_FORMS: &str = "E0515";
+    pub const CASE_NOT_COVERED: &str = "E0516";
+    pub const NOT_KNOWN_CTOR: &str = "E0517";
+    pub const NEVER_USED: &str = "W0501";
 }
 
 /// A parsed module of the graph.

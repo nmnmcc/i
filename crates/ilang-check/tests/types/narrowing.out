@@ -1,0 +1,15 @@
+http_get : (url: String) -> String ? HttpError ! Http
+parse_user : (text: String) -> User ? ParseError
+default_user : User
+load : (id: String) -> User ? HttpError | ParseError ! Http
+safe : (id: String) -> User ? HttpError ! Http
+rest : (v: Int | String | Nil) -> String
+whole : (v: Result(Int, Int) | String) -> String
+nested : (r: Result(Int | String, Nil)) -> String
+pairs : (p: (Int | String, Bool)) -> String
+deep : (r: Result(Result(Int, String) | Nil, Nil)) -> String | Nil
+guarded : (v: Int | String) -> String | Int
+literal : (v: Int | String) -> String | Int
+partial : (v: Result(Int, String) | Nil) -> Nil | Result(Int, String)
+by_patterns : (p: (Bool, Int | String)) -> String | Int
+open : (v: a) -> Int | a - Int
