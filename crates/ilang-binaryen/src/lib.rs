@@ -18,9 +18,10 @@ use std::sync::Mutex;
 pub enum Level {
     /// Do not optimize: the module is given back as it is.
     O0,
-    /// Optimize for speed, as `wasm-opt -O2`.
+    /// Optimize for speed, as `wasm-opt -O2`, but with the inlining of
+    /// [`ALWAYS_INLINE`].
     O2,
-    /// Optimize more, as `wasm-opt -O3`.
+    /// Optimize more, as `wasm-opt -O3`, with the same inlining.
     O3,
 }
 
@@ -35,6 +36,15 @@ pub enum Error {
     #[error("Binaryen gave no output")]
     Write,
 }
+
+/// Functions of at most this many Binaryen expressions are always inlined
+/// (Binaryen's default is 2). The runtime and the generated code call many
+/// small functions, such as `$list_head` and the shadow stack ones, and
+/// Wasmtime inlines nothing, so each would stay a call with its spills of GC
+/// references. 20 makes list-heavy benchmarks about 25% faster and the
+/// optimization of `std`'s tests about 1 s slower; 40 gains little more and
+/// costs twice that (docs/performance.md).
+pub const ALWAYS_INLINE: u32 = 20;
 
 /// Binaryen keeps its optimization settings in global state, so every use of
 /// it is done while holding this lock.
@@ -98,6 +108,7 @@ pub fn optimize(wasm: &[u8], level: Level) -> Result<Vec<u8>, Error> {
         ffi::BinaryenSetClosedWorld(true);
         ffi::BinaryenSetTrapsNeverHappen(false);
         ffi::BinaryenSetDebugInfo(false);
+        ffi::BinaryenSetAlwaysInlineMaxSize(ALWAYS_INLINE);
         ffi::BinaryenModuleOptimize(module.0);
         if !ffi::BinaryenModuleValidate(module.0) {
             return Err(Error::Invalid);

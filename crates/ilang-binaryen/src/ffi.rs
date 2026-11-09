@@ -51,4 +51,5 @@ unsafe extern "C" {
     pub fn BinaryenSetClosedWorld(on: bool);
     pub fn BinaryenSetTrapsNeverHappen(on: bool);
     pub fn BinaryenSetDebugInfo(on: bool);
+    pub fn BinaryenSetAlwaysInlineMaxSize(size: u32);
 }
