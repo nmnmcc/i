@@ -392,3 +392,14 @@ fn symbols_of_a_module() {
         "id"
     );
 }
+
+#[test]
+fn types_in_a_program_with_errors() {
+    let f = Fixture::new(&[(
+        "src/main.i",
+        "f = (n: Int) {\n  m = n + 1\n  m\n}\ng = () { nope }\n",
+    )]);
+    assert!(f.checked.diags.iter().any(|d| d.is_error()));
+    assert_eq!(f.hover("app/main", "m = ", 0), "m: Int");
+    assert_eq!(f.hover("app/main", "f = ", 0), "f: (n: Int) -> Int");
+}

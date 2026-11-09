@@ -17,34 +17,39 @@ use ilang_syntax::ast;
 use ilang_syntax::span::Span;
 use std::collections::{HashMap, HashSet};
 
-/// [`crate::check`] for editors. The diagnostics are the same. The program
-/// is resolved even when a module has a syntax error, from the syntax tree
-/// that the parser recovered, so that names can still be found; its
-/// problems are then not reported. Types are kept for the local names
-/// (`Typed::locals`).
+/// [`crate::check`] for editors. The diagnostics are the same. But the
+/// program is resolved even when a module has a syntax error, from the
+/// syntax tree that the parser recovered, and its types are inferred even
+/// when it has errors, so that names and types can still be found; the
+/// problems found after the first errors are not reported. The types of
+/// the local names are kept (`Typed::locals`).
 pub fn check_for_queries(graph: &PackageGraph) -> Checked {
     let (parsed, mut diags) = parse(graph);
     let syntax_errors = diags.iter().any(Diagnostic::is_error);
     let (mut program, more) = resolve::resolve(graph, &parsed);
-    if syntax_errors {
+    let mut ordered = Vec::new();
+    order::order(&mut program, &mut ordered);
+    if !syntax_errors {
+        diags.extend(more);
+        diags.extend(ordered);
+    }
+    if diags.iter().any(Diagnostic::is_error) {
+        // Inference is only a best effort on a program with errors.
+        let types = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            types::check_keeping_locals(&program, &graph.sources).0
+        }))
+        .ok();
         return Checked {
             program: Some(program),
-            types: None,
+            types,
             diags,
         };
     }
+    let (typed, more) = types::check_keeping_locals(&program, &graph.sources);
     diags.extend(more);
-    order::order(&mut program, &mut diags);
-    let types = if diags.iter().any(Diagnostic::is_error) {
-        None
-    } else {
-        let (typed, more) = types::check_keeping_locals(&program, &graph.sources);
-        diags.extend(more);
-        Some(typed)
-    };
     Checked {
         program: Some(program),
-        types,
+        types: Some(typed),
         diags,
     }
 }
@@ -150,6 +155,11 @@ impl<'a> Query<'a> {
             .iter()
             .position(|m| m.source == source)
             .map(|i| ModuleId(i as u32))
+    }
+
+    /// The file of a module.
+    pub fn source_of(&self, m: ModuleId) -> SourceId {
+        self.program.module(m).source
     }
 
     fn text(&self, m: ModuleId) -> &'a str {
