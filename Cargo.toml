@@ -27,6 +27,7 @@ tempfile = "3"
 wasm-encoder = "=0.262.0"
 wasmparser = "=0.262.0"
 petgraph = "0.8"
+rustc-hash = "2"
 ilang-syntax = { path = "crates/ilang-syntax" }
 ilang-package = { path = "crates/ilang-package" }
 ilang-check = { path = "crates/ilang-check" }
@@ -40,7 +41,8 @@ debug = 1
 
 # Dependencies such as Wasmtime and Cranelift run i programs in tests, and are
 # many times slower without optimization; the compiler's own crates stay
-# quick to rebuild.
+# quick to rebuild. Optimizing those too (opt-level 1) was measured and does
+# not make the tests faster (docs/performance.md).
 [profile.dev.package."*"]
 opt-level = 2
 

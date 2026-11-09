@@ -20,6 +20,41 @@
 //! no message (spec §11.7). Every call into the module runs on a
 //! thread of its own with a native stack of [`THREAD_STACK`] bytes, so that
 //! the Wasm stack always fits in it, whatever thread calls the host.
+//!
+//! # Garbage collection
+//!
+//! Wasmtime 50 has three collectors (`wasmtime::Collector`):
+//!
+//! - **copying** (`gc-copying`): a Cheney semi-space collector. Compiled
+//!   code allocates inline with a bump pointer and needs no barriers; a
+//!   collection copies the live objects to the other half of the heap. It
+//!   collects cycles. Half the heap is unused at any time.
+//! - **deferred reference counting** (`gc-drc`): every allocation is a call
+//!   into the runtime, every load and store of a reference has a barrier,
+//!   and it never frees cycles (a closure that refers to itself is one).
+//! - **null** (`gc-null`): bump allocation that never frees; the program
+//!   traps when the heap (at most 4 GiB) is full. Only for measuring.
+//!
+//! The host uses the copying collector, with a GC heap that starts at
+//! [`GC_HEAP`] (256 MiB). On the benchmarks of `bench/` (lists of a million
+//! elements, docs/performance.md) it is as fast as the null collector,
+//! while DRC is 2 to 10 times slower (`list.sort` of 1M Ints: 59 s with
+//! DRC, 6.1 s copying, 5.8 s null).
+//!
+//! The heap size matters because of how Wasmtime 50 decides between
+//! collecting and growing: it grows the heap only when the live data after
+//! a collection fill more than half of it, and for the copying collector
+//! half the heap is all that can ever be live. So the heap grows only once
+//! a half is completely full of live data, and while the live data is
+//! close to that size, each collection frees little and the next one comes
+//! soon. With a heap that starts at 0 the benchmarks above took up to five
+//! times longer than with the null collector (merging two 1M lists: 6.7 s
+//! against 1.2 s); 64 MiB was not enough, 128 MiB thrashed on one of them,
+//! 256 MiB did not. The heap is only reserved: a program that makes little
+//! garbage uses little memory, and one that makes much uses at most
+//! the heap size until its live data needs more (the whole benchmark run
+//! peaked at 310 MB). `ILANG_GC` and `ILANG_GC_HEAP` (in MiB) choose another
+//! collector or size, to measure them.
 
 pub mod services;
 #[cfg(test)]
@@ -594,6 +629,9 @@ impl Program {
         // optimized machine code used for long-running guest programs.
         config.parallel_compilation(true);
         config.cranelift_opt_level(wasmtime::OptLevel::Speed);
+        let (collector, heap) = gc_settings()?;
+        config.collector(collector);
+        config.gc_heap_initial_size(heap);
         let engine = Engine::new(&config)?;
         let module = Module::new(&engine, bytes)
             .map_err(anyhow::Error::from)
@@ -1076,6 +1114,34 @@ enum Invoked {
 /// The most stack, in bytes, that Wasm code may use (see the module
 /// documentation).
 pub const WASM_STACK: usize = 32 << 20;
+
+/// The size, in bytes, that the GC heap of every instance starts with (see
+/// "Garbage collection" in the module docs). It is only reserved: memory is
+/// used as objects are made.
+pub const GC_HEAP: u64 = 256 << 20;
+
+/// The collector and the initial GC heap size: [`Collector::Copying`] and
+/// [`GC_HEAP`], unless the environment variables `ILANG_GC` (`copying`,
+/// `drc` or `null`) and `ILANG_GC_HEAP` (MiB) say otherwise, to measure them.
+///
+/// [`Collector::Copying`]: wasmtime::Collector::Copying
+fn gc_settings() -> Result<(wasmtime::Collector, u64)> {
+    use wasmtime::Collector;
+    let collector = match std::env::var("ILANG_GC").as_deref() {
+        Err(_) | Ok("" | "copying") => Collector::Copying,
+        Ok("drc") => Collector::DeferredReferenceCounting,
+        Ok("null") => Collector::Null,
+        Ok(other) => bail!("ILANG_GC must be copying, drc or null, not {other:?}"),
+    };
+    let heap = match std::env::var("ILANG_GC_HEAP") {
+        Err(_) => GC_HEAP,
+        Ok(mib) => match mib.parse::<u64>() {
+            Ok(mib) if mib <= 4096 => mib << 20,
+            _ => bail!("ILANG_GC_HEAP must be a number of MiB, at most 4096, not {mib:?}"),
+        },
+    };
+    Ok((collector, heap))
+}
 
 /// The native stack, in bytes, of the thread that runs Wasm code: the Wasm
 /// stack, and room for the host functions it calls.

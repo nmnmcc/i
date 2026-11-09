@@ -10,7 +10,10 @@
 
 use super::{FnTy, Head, Ty, V, Variance};
 use crate::hir::{BuiltinType, TypeId, TypeRef};
-use std::collections::{HashMap, HashSet};
+// The maps and sets of the solver hold small keys and are on the hot path:
+// a fast hash is much quicker than the default one (docs/performance.md).
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use std::collections::HashMap as StdHashMap;
 
 #[derive(Clone, Debug)]
 pub(crate) struct VarState {
@@ -95,21 +98,21 @@ pub(crate) struct Solver {
     reported: HashSet<V>,
     /// The pairs of bounds whose parts `add_bound` has put together.
     compared: HashSet<(Ty, Ty, bool, bool)>,
-    pub variance: HashMap<TypeId, Vec<Variance>>,
+    pub variance: StdHashMap<TypeId, Vec<Variance>>,
     pub failures: Vec<Failure>,
     /// The names of the custom types, by `TypeId`, to show types.
     pub type_names: Vec<String>,
 }
 
 impl Solver {
-    pub fn new(variance: HashMap<TypeId, Vec<Variance>>, type_names: Vec<String>) -> Solver {
+    pub fn new(variance: StdHashMap<TypeId, Vec<Variance>>, type_names: Vec<String>) -> Solver {
         Solver {
             vars: Vec::new(),
             level: 0,
-            cache: HashSet::new(),
-            compared: HashSet::new(),
+            cache: HashSet::default(),
+            compared: HashSet::default(),
             touched: Vec::new(),
-            reported: HashSet::new(),
+            reported: HashSet::default(),
             variance,
             failures: Vec::new(),
             type_names,
@@ -273,12 +276,12 @@ impl Solver {
             }
             (Ty::Var(v), _) => {
                 let level = self.var(*v).level;
-                let r2 = self.extrude(r, Pol::Neg, level, &mut HashMap::new());
+                let r2 = self.extrude(r, Pol::Neg, level, &mut HashMap::default());
                 self.constrain_in(l, &r2, env);
             }
             (_, Ty::Var(v)) => {
                 let level = self.var(*v).level;
-                let l2 = self.extrude(l, Pol::Pos, level, &mut HashMap::new());
+                let l2 = self.extrude(l, Pol::Pos, level, &mut HashMap::default());
                 self.constrain_in(&l2, r, env);
             }
             (Ty::Inter(ms), _) => {
@@ -386,7 +389,7 @@ impl Solver {
         let preds = self.reach(vec![v], !lower).0;
         let mut others = self.reach(preds, lower).1;
         if !lower {
-            let mut heads = HashSet::new();
+            let mut heads = HashSet::default();
             others.retain(|b| heads.insert(b.head()));
         }
         let new = match &t {
@@ -418,8 +421,8 @@ impl Solver {
     /// and the bounds of those variables that are not variables.
     fn reach(&self, starts: Vec<V>, lower: bool) -> (Vec<V>, Vec<Ty>) {
         let mut seen: Vec<V> = Vec::new();
-        let mut visited: HashSet<V> = HashSet::new();
-        let mut found: HashSet<&Ty> = HashSet::new();
+        let mut visited: HashSet<V> = HashSet::default();
+        let mut found: HashSet<&Ty> = HashSet::default();
         let mut stack = starts;
         let mut out = Vec::new();
         while let Some(x) = stack.pop() {
@@ -612,7 +615,7 @@ impl Solver {
 
     /// Instantiates a type scheme: copies the variables deeper than `above`
     /// to new variables at the current level, with their bounds.
-    pub fn freshen(&mut self, t: &Ty, above: u32, map: &mut HashMap<V, V>) -> Ty {
+    pub fn freshen(&mut self, t: &Ty, above: u32, map: &mut StdHashMap<V, V>) -> Ty {
         if self.level_of(t) <= above {
             return t.clone();
         }
@@ -945,13 +948,31 @@ impl Solver {
     /// come back to it through a type constructor. A cycle is reported
     /// once.
     pub fn occurs(&mut self, roots: Vec<V>) -> bool {
-        let mut done: HashSet<V> = HashSet::new();
+        // The search of `occurs_from` goes over the bounds reached from each
+        // root, so it costs the size of that graph for every root; a binding
+        // with many variables reaching a large graph would take time
+        // quadratic in it. `first_cycle` finds the same first root with one
+        // pass over the graph; the search then runs for that root only, so
+        // that the variables marked as reported are the same.
+        match self.first_cycle(&roots) {
+            Some(r) => {
+                let found = self.occurs_from(vec![r]);
+                debug_assert!(found, "the occurs check of a root disagrees");
+                found
+            }
+            None => false,
+        }
+    }
+
+    /// The search of the occurs check, one root at a time.
+    fn occurs_from(&mut self, roots: Vec<V>) -> bool {
+        let mut done: HashSet<V> = HashSet::default();
         for r in roots {
             if !done.insert(r) || self.reported.contains(&r) {
                 continue;
             }
             for pol in [true, false] {
-                let mut seen: HashSet<(V, bool, bool)> = HashSet::new();
+                let mut seen: HashSet<(V, bool, bool)> = HashSet::default();
                 let mut stack = vec![(r, pol, false)];
                 while let Some((v, p, con)) = stack.pop() {
                     if !seen.insert((v, p, con)) {
@@ -976,6 +997,208 @@ impl Solver {
         }
         false
     }
+
+    /// The first of `roots` (not yet reported) for which `occurs_from`
+    /// finds a cycle. The graph has a node for each variable and polarity,
+    /// and an edge for each variable in a bound, which is marked when it is
+    /// inside a type constructor. A root `r` has a cycle when a path with a
+    /// marked edge goes from `(r, p)` to `(r, q)`, for some `p` and `q`.
+    /// With the strongly connected components of the graph, that is: the
+    /// component of `(r, p)` has a marked edge inside it, or a path of
+    /// components with a marked edge goes from it to the component of
+    /// `(r, not p)`.
+    fn first_cycle(&self, roots: &[V]) -> Option<V> {
+        let mut order: Vec<V> = Vec::new();
+        let mut done: HashSet<V> = HashSet::default();
+        for r in roots {
+            if done.insert(*r) && !self.reported.contains(r) {
+                order.push(*r);
+            }
+        }
+        if order.is_empty() {
+            return None;
+        }
+        let g = Graph::build(self, &order);
+        // The component of each root and polarity, and of the other
+        // polarity, which a path with a marked edge must go to. The roots
+        // are done in groups, so that the sets of targets stay small.
+        let ends: Vec<[(usize, usize); 2]> = order
+            .iter()
+            .map(|r| {
+                let plus = g.comp[g.index[&(*r, true)]];
+                let minus = g.comp[g.index[&(*r, false)]];
+                [(plus, minus), (minus, plus)]
+            })
+            .collect();
+        for (chunk, roots) in ends.chunks(512).zip(order.chunks(512)) {
+            let targets: Vec<usize> = chunk.iter().flat_map(|e| [e[0].1, e[1].1]).collect();
+            let reach = g.marked_paths(&targets);
+            for (k, r) in roots.iter().enumerate() {
+                for (j, (a, _)) in chunk[k].iter().enumerate() {
+                    let t = 2 * k + j;
+                    if g.marked[*a] || reach[*a][t / 64] & (1 << (t % 64)) != 0 {
+                        return Some(*r);
+                    }
+                }
+            }
+        }
+        None
+    }
+}
+
+/// The graph of the occurs check, from some roots, with its strongly
+/// connected components (`Solver::first_cycle`).
+struct Graph {
+    /// The number of each node: a variable with a polarity.
+    index: HashMap<(V, bool), usize>,
+    /// The edges of each node, to other nodes, with their mark.
+    edges: Vec<Vec<(usize, bool)>>,
+    /// The component of each node.
+    comp: Vec<usize>,
+    /// Whether a component has a marked edge inside it.
+    marked: Vec<bool>,
+    /// The nodes of each component.
+    members: Vec<Vec<usize>>,
+}
+
+impl Graph {
+    fn build(s: &Solver, roots: &[V]) -> Graph {
+        let mut g = Graph {
+            index: HashMap::default(),
+            edges: Vec::new(),
+            comp: Vec::new(),
+            marked: Vec::new(),
+            members: Vec::new(),
+        };
+        // Tarjan's algorithm, without recursion. A node is added (with its
+        // edges) the first time it is reached.
+        let mut low: Vec<usize> = Vec::new();
+        let mut on_stack: Vec<bool> = Vec::new();
+        let mut stack: Vec<usize> = Vec::new();
+        let mut calls: Vec<(usize, usize)> = Vec::new();
+        let add = |g: &mut Graph, low: &mut Vec<usize>, on: &mut Vec<bool>, key: (V, bool)| {
+            if let Some(&n) = g.index.get(&key) {
+                return (n, false);
+            }
+            let n = g.edges.len();
+            g.index.insert(key, n);
+            g.edges.push(Vec::new());
+            g.comp.push(usize::MAX);
+            low.push(n);
+            on.push(false);
+            (n, true)
+        };
+        // The edges of a node as variables, until the search numbers them.
+        let mut pending: Vec<Vec<(V, bool, bool)>> = Vec::new();
+        let mut next_comp = 0;
+        for r in roots {
+            for pol in [true, false] {
+                let (start, new) = add(&mut g, &mut low, &mut on_stack, (*r, pol));
+                if !new {
+                    continue;
+                }
+                pending.push(edge_vars(s, (*r, pol)));
+                stack.push(start);
+                on_stack[start] = true;
+                calls.push((start, 0));
+                while let Some(&mut (n, ref mut i)) = calls.last_mut() {
+                    let at = *i;
+                    if at < pending[n].len() {
+                        *i += 1;
+                        let (u, q, c) = pending[n][at];
+                        let (m, new) = add(&mut g, &mut low, &mut on_stack, (u, q));
+                        g.edges[n].push((m, c));
+                        if new {
+                            pending.push(edge_vars(s, (u, q)));
+                            stack.push(m);
+                            on_stack[m] = true;
+                            calls.push((m, 0));
+                        } else if on_stack[m] {
+                            low[n] = low[n].min(low[m]);
+                        }
+                        continue;
+                    }
+                    calls.pop();
+                    if let Some(&(parent, _)) = calls.last() {
+                        low[parent] = low[parent].min(low[n]);
+                    }
+                    if low[n] == n {
+                        loop {
+                            let m = stack.pop().expect("the node is on the stack");
+                            on_stack[m] = false;
+                            g.comp[m] = next_comp;
+                            if m == n {
+                                break;
+                            }
+                        }
+                        next_comp += 1;
+                    }
+                }
+            }
+        }
+        g.marked = vec![false; next_comp];
+        g.members = vec![Vec::new(); next_comp];
+        for (n, es) in g.edges.iter().enumerate() {
+            g.members[g.comp[n]].push(n);
+            for &(m, c) in es {
+                if c && g.comp[n] == g.comp[m] {
+                    g.marked[g.comp[n]] = true;
+                }
+            }
+        }
+        g
+    }
+
+    /// For each component, the targets (indexes into `targets`, as bits)
+    /// that a path from it with a marked edge goes to. Components are
+    /// numbered in the order Tarjan's algorithm finishes them, so an edge
+    /// between two components goes to a lower number, and the components
+    /// can be done in order.
+    fn marked_paths(&self, targets: &[usize]) -> Vec<Vec<u64>> {
+        let words = targets.len().div_ceil(64);
+        let n = self.marked.len();
+        // `any`: the targets reached by any path; `con`: with a marked edge.
+        let mut any = vec![vec![0u64; words]; n];
+        let mut con = vec![vec![0u64; words]; n];
+        for (t, &c) in targets.iter().enumerate() {
+            any[c][t / 64] |= 1 << (t % 64);
+        }
+        for c in 0..n {
+            let mut a = std::mem::take(&mut any[c]);
+            let mut m = std::mem::take(&mut con[c]);
+            for &node in &self.members[c] {
+                for &(to, e) in &self.edges[node] {
+                    let d = self.comp[to];
+                    if d == c {
+                        continue;
+                    }
+                    for w in 0..words {
+                        a[w] |= any[d][w];
+                        m[w] |= con[d][w] | if e { any[d][w] } else { 0 };
+                    }
+                }
+            }
+            if self.marked[c] {
+                for w in 0..words {
+                    m[w] |= a[w];
+                }
+            }
+            any[c] = a;
+            con[c] = m;
+        }
+        con
+    }
+}
+
+/// The edges of a node of the occurs check graph, as variables.
+fn edge_vars(s: &Solver, (v, p): (V, bool)) -> Vec<(V, bool, bool)> {
+    let st = s.var(v);
+    let bounds = if p { &st.lower } else { &st.upper };
+    let mut out = Vec::new();
+    for b in bounds {
+        bound_vars(s, b, p, false, &mut out);
+    }
+    out
 }
 
 /// The variables in a bound at a place of polarity `pos`, each with its
