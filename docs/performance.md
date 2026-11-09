@@ -38,8 +38,8 @@ processor time is given.
 
 ## Results
 
-Release build, `--opt 2`, seconds. "Before" is the head of `new-compiler`
-(`f7b3964`); "after" has every change below.
+Release build, `--opt 2`, seconds. "Before" is commit `f7b3964`; "after"
+has every change below.
 
 | Benchmark | Before | After |
 |---|---|---|

@@ -248,8 +248,8 @@ replace = (in: String, each: String, with: String) -> String {
 /// slice stops at the end of the string. A negative length gives `""`.
 ///
 /// ```i
-/// string.slice("gleam", at_index: 1, length: 2)   // "le"
-/// string.slice("gleam", at_index: -3, length: 2)  // "ea"
+/// string.slice("hello", at_index: 1, length: 2)   // "el"
+/// string.slice("hello", at_index: -3, length: 2)  // "ll"
 /// ```
 slice = (string: String, at_index: Int, length: Int) -> String {
 	case length <= 0 {
@@ -312,7 +312,7 @@ pop_codepoint = (string: String) -> Option((String, String)) {
 /// there, the string is the same.
 ///
 /// ```i
-/// string.crop("The Lone Gleamer", before: "Lone")  // "Lone Gleamer"
+/// string.crop("The Lone Ranger", before: "Lone")  // "Lone Ranger"
 /// ```
 crop = (from: String, before: String) -> String {
 	case core.index_of(from, before, 0) {

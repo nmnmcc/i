@@ -29,5 +29,5 @@ named = inner: Hidden = Hidden
 (c: Hidden, d: Int) = (Hidden, 1)
 private: Hidden = Hidden
 
-// TODO(M3): an inferred type is checked by type inference.
+// An inferred type is checked by type inference (tests/types/qualified), not here.
 inferred = Hidden

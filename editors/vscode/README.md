@@ -31,7 +31,7 @@ Editor support for **the i programming language**, as defined in
   - the outline of a file (document symbols);
   - completion of the names in scope, of the members of a module after
     `m.`, and of the fields of a value after `v.`;
-  - formatting, in builds of `i` that have the formatter.
+  - formatting, with the formatter of `i fmt`.
 
 ## Requirements
 

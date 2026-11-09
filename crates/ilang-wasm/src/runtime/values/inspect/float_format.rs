@@ -160,7 +160,7 @@ pub fn wat() -> String {
       (local.set $n (i32.sub (local.get $n) (i32.const 1)))
       (br $trim)))
 
-  ;; The presentation follows Erlang's shortest format, including scientific
+  ;; The text form of a Float (spec §11.8): the shortest digits, in scientific
   ;; notation once integral decimal output would imply precision above 2^53.
   (local.set $decimal_exp (i32.sub (local.get $k) (local.get $n)))
   (local.set $lower

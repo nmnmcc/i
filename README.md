@@ -8,14 +8,19 @@ i programs live in `.i` files, and each package is described by an `i.toml` file
 
 The language is defined in one document, [docs/spec.md](docs/spec.md). It is complete in itself: the syntax, the types and their inference, effects (errors, services in the environment, and one-shot delimited control), packages and versions, run-time behavior, and the binary interface with the host.
 
-## Status
+## What is here
 
-The compiler is being rebuilt to follow the spec. The first version of i grew out of the Gleam compiler; the new compiler is written from the spec and is much smaller:
+The compiler follows the spec and is kept small:
 
-- a new syntax crate and type checker (algebraic subtyping with unions, errors and environments in function types);
-- a WasmGC code generator that keeps the existing runtime for big integers, bit arrays, strings and the text form of values;
-- [Binaryen](https://github.com/WebAssembly/binaryen), built from source and linked into `i` as a library, for optimization, so the compiler itself only has to be simple and correct;
-- a Wasmtime host and a JavaScript SDK for browsers.
+- `crates/ilang-syntax`: the lexer, parser and formatter;
+- `crates/ilang-check`: name resolution and the type checker (algebraic subtyping with unions, errors and environments in function types);
+- `crates/ilang-wasm`: the WasmGC code generator and its hand-written runtime;
+- `crates/ilang-binaryen`: [Binaryen](https://github.com/WebAssembly/binaryen), built from source and linked into `i` as a library, for optimization, so the compiler itself only has to be simple and correct;
+- `crates/ilang-package`: packages, versions and `i.lock`;
+- `crates/ilang-host` and `bindings/javascript`: the Wasmtime host and the JavaScript SDK for browsers;
+- `crates/ilang-lsp` and `editors/vscode`: the language server and the VS Code extension;
+- `crates/ilang-cli`: the `i` command;
+- `lib/i` and `std`: the library modules and the standard library.
 
 The spec suite in `tests/spec` runs every case unoptimized and optimized, and requires the same result.
 
@@ -124,4 +129,4 @@ Run the complete verification with `devenv test`, or one part of it with `./scri
 
 See [the development guide](docs/development.md) for the tools of the shell and the verification commands, and [release packages](docs/release.md) for the archive layout.
 
-i is distributed under the [Apache-2.0 license](LICENSE). The licenses of included third-party code are in [licenses](licenses).
+i is distributed under the [Apache-2.0 license](LICENSE). The lexer is adapted from the [Gleam](https://github.com/gleam-lang/gleam) compiler, and the standard library in `std` is ported from [Gleam's standard library](https://github.com/gleam-lang/stdlib), both under Apache-2.0. The licenses of included third-party code are in [licenses](licenses).

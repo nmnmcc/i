@@ -62,7 +62,7 @@ TESTS = """
   (local.set $a {{COLLISION_A}})
   (local.set $b {{COLLISION_B}})
   (call $assert (i32.eqz(call $value_eq(local.get $a)(local.get $b))))
-  (call $assert (i32.eq(call $value_hash_u32(local.get $a))(i32.const -1980314446)))
+  (call $assert (i32.eq(call $value_hash_u32(local.get $a))(i32.const 528531168)))
   (call $assert (i32.eq(call $value_hash_u32(local.get $a))(call $value_hash_u32(local.get $b))))
   (call $assert (i32.ne(call $value_compare_i32(local.get $a)(local.get $b))(i32.const 0)))
   (local.set $a (call $record(i32.const 32)(i64.const 40)(array.new_fixed $values 2(ref.i31(i32.const 4))(call $list_nil))))
@@ -316,8 +316,8 @@ def main():
         "STRING_A": "你好😀",
         "STRING_A_AGAIN": "你好😀",
         "STRING_B": "你好😁",
-        "COLLISION_A": "wleam-hamt-297688",
-        "COLLISION_B": "wleam-hamt-1541250",
+        "COLLISION_A": "ilang-hamt-63983",
+        "COLLISION_B": "ilang-hamt-429330",
     }.items():
         tests = tests.replace("{{" + key + "}}", string(value))
     wat = "(module\n" + "\n".join([

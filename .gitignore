@@ -5,13 +5,9 @@
 /.direnv/
 /.env
 /node_modules/
-/playwright-report/
-/test-results/
 /build/
 /examples/**/build/
 /tests/**/build/
-/stdlib/build/
-/compiler/target/
 **/.ilang/
 *.profraw
 

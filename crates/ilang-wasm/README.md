@@ -11,12 +11,11 @@ interface of Appendix B of the spec.
 - `src/ir.rs` is a small intermediate form in A-normal form, and documents the
   calling convention.
 - `src/lower.rs` lowers the resolved program and its types to it.
+- `src/control.rs` splits the functions that may suspend (§9.4).
 - `src/emit.rs` writes WAT text with the runtime, which is assembled, and adds
   the `ilang.abi` custom section.
 
 The code is simple and not optimized: `ilang-binaryen` optimizes it. The
-environment (§9.2), errors (§9.3), final functions (§9.5), and `Assert` (§9.6)
-are supported: `src/ir.rs` documents how. Control (§9.4), host services, and
-external functions are not supported yet; the code generator reports them with
-`E0701`. Until control comes, `assertion.catch` is an operation of the code
-generator, done with an exception, in place of its i source.
+environment (§9.2), errors (§9.3), control (§9.4), final functions (§9.5), and
+`Assert` (§9.6) are lowered as `src/ir.rs` documents; host services and
+external functions become imports (Appendix B).

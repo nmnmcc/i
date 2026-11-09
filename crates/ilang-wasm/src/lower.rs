@@ -2065,8 +2065,7 @@ impl<'a> Lowerer<'a> {
                 }
             } else {
                 // The choices are tried in order, each with the guard, as
-                // if each were a clause of its own (as in Gleam). The body
-                // is shared.
+                // if each were a clause of its own. The body is shared.
                 let matched = fx.label();
                 let mut mb = Vec::new();
                 for p in &c.patterns {

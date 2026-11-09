@@ -106,7 +106,7 @@ fn case_mapping_of_strings() {
     let mut checks = Checks::default();
     let cases = [
         ("", "", ""),
-        ("Gleam 123!", "GLEAM 123!", "gleam 123!"),
+        ("Hello 123!", "HELLO 123!", "hello 123!"),
         ("héllo", "HÉLLO", "héllo"),
         ("Ωμέγα", "ΩΜΈΓΑ", "ωμέγα"),
         ("Привет", "ПРИВЕТ", "привет"),

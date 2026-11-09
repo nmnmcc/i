@@ -23,7 +23,7 @@ arity_var = (f) { (f(1), f(1, 2)) }
 // E0504: a value that could go to two type variables.
 ambiguous = (x: a | b) { x }
 use_ambiguous = () { ambiguous(1) }
-// E0508: fields need a known type for now.
+// E0506: `.f` and `.k` need a known type (§4.8).
 field = (u) { u.name }
 part = (t) { t.0 }
 // E0512: a field that not every constructor has.

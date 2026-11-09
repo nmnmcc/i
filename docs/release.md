@@ -25,7 +25,7 @@ language server built in, and the JavaScript SDK under
 `ilang.path` setting names.
 
 The package also contains documentation, the licenses of i and of included
-third-party code (Gleam, Binaryen), dependency/toolchain lockfiles, and a
+third-party code (Gleam, Binaryen with parts of LLVM and FP16, Unicode data), dependency/toolchain lockfiles, and a
 `share/ilang/build/release.json` manifest. The manifest records the source commit,
 target, packaging toolchain, ELF interpreter paths where applicable, and SHA-256
 hashes for every payload file.
@@ -69,6 +69,6 @@ Identical payloads, metadata, and epoch produce identical archives. This is an
 archive reproducibility guarantee; it does not independently make native Rust
 builds reproducible.
 
-The packager fails if either binary or any required package input is missing.
+The packager fails if the `i` binary or any required package input is missing.
 It does not compile, run tests, or publish. Run the full verification workflow
 before distributing a release.
