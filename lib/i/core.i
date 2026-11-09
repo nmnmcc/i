@@ -1,4 +1,4 @@
-//// The operations that cannot be written in i (§13).
+//// The operations that are not written in i (§13).
 
 export (
   not, to_float, truncate, floor, ceiling, sqrt, float_to_bits,
