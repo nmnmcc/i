@@ -1144,3 +1144,44 @@ fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
         "{out}"
     );
 }
+
+#[test]
+fn add_over_a_dependency_written_as_a_table_keeps_its_comments() {
+    let w = World::new();
+    lib_repo(&w);
+    for name in ["util", "util2"] {
+        w.project(
+            name,
+            &[("i.toml", "name = \"util\"\n"), ("src/u.i", "x = 1\n")],
+        );
+    }
+    let toml = "name = \"app\"\n\n# the util\n[dependencies.lib]\npath = \"../util\" # p\n\n[wasm]\nexports = []\n";
+    let main = ("src/main.i", "export (x)\n\nx = 1\n");
+
+    // Another path: the table stays, with its comments.
+    let dir = w.project("app", &[("i.toml", toml), main]);
+    let project = dir.display().to_string();
+    let util2 = w.path().join("util2").display().to_string();
+    w.ok(&["add", "lib", "--path", &util2, "--project", &project]);
+    assert_eq!(
+        read(&dir.join("i.toml")),
+        toml.replace("../util\"", "../util2\"")
+    );
+
+    // A location: an entry, under the comments of the table.
+    w.ok(&["add", "lib", "example.com/lib@1.2.0", "--project", &project]);
+    assert_eq!(
+        read(&dir.join("i.toml")),
+        "name = \"app\"\n\n# the util\n[dependencies]\nlib = \"example.com/lib@1.2.0\"\n\n[wasm]\nexports = []\n"
+    );
+
+    // When `[dependencies]` has a header, the comments go above the entry.
+    let toml = "name = \"app\"\n\n[dependencies]\nother = \"example.com/lib@2.0.0\"\n\n# the util\n[dependencies.lib] # mine\npath = \"../util\"\n";
+    let dir = w.project("app2", &[("i.toml", toml), main]);
+    let project = dir.display().to_string();
+    w.ok(&["add", "lib", "example.com/lib@1.2.0", "--project", &project]);
+    assert_eq!(
+        read(&dir.join("i.toml")),
+        "name = \"app\"\n\n[dependencies]\nother = \"example.com/lib@2.0.0\"\n# the util\nlib = \"example.com/lib@1.2.0\" # mine\n"
+    );
+}

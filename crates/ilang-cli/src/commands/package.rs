@@ -291,8 +291,15 @@ impl PackageFile {
 
     /// Sets the dependency `name` in its table to `value`, keeping the
     /// comments around an entry that was there: the key, with the comments
-    /// above it, stays, and the value keeps its trailing comment.
+    /// above it, stays, and the value keeps its trailing comment. An entry
+    /// written as its own table is changed by [`set_table`].
     fn set(&mut self, dev: bool, name: &str, mut value: Value) -> Result<()> {
+        if let Some(Item::Table(parent)) = self.doc.get_mut(TABLES[dev as usize])
+            && matches!(parent.get(name), Some(Item::Table(_)))
+        {
+            set_table(parent, name, value);
+            return Ok(());
+        }
         let table = self.table(dev)?;
         match table.get_mut(name) {
             Some(old) => {
@@ -331,6 +338,66 @@ impl PackageFile {
             Some(bytes) => std::fs::write(&lock, bytes),
             None => std::fs::remove_file(&lock),
         };
+    }
+}
+
+/// Sets the dependency `name` of `parent`, written as its own table
+/// `[dependencies.name]`, to `value`, keeping its comments. A path stays
+/// that table, with its header and the comments of its entries. A location
+/// is a string, so it becomes an entry `name = "…"`: when `parent` has no
+/// header of its own, it takes the header's place and its comments;
+/// otherwise the comments above the header go above the entry.
+fn set_table(parent: &mut toml_edit::Table, name: &str, mut value: Value) {
+    let Some(Item::Table(old)) = parent.get_mut(name) else {
+        return;
+    };
+    if let Value::InlineTable(new) = value {
+        let gone: Vec<String> = old
+            .iter()
+            .map(|(k, _)| k.to_string())
+            .filter(|k| !new.contains_key(k))
+            .collect();
+        for k in gone {
+            old.remove(&k);
+        }
+        for (k, mut v) in new {
+            match old.get(&k).and_then(Item::as_value) {
+                Some(o) => *v.decor_mut() = o.decor().clone(),
+                None => v.decor_mut().clear(),
+            }
+            old.insert(&k, Item::Value(v));
+        }
+        return;
+    }
+    let decor = old.decor().clone();
+    let position = old.position();
+    // The key keeps its place in `parent`, but not the format it had in
+    // the header.
+    if parent.is_implicit() {
+        parent.set_implicit(false);
+        *parent.decor_mut() = decor;
+        parent.set_position(position);
+        parent.insert(name, Item::Value(value));
+        if let Some(mut key) = parent.key_mut(name) {
+            key.leaf_decor_mut().clear();
+        }
+        return;
+    }
+    let text = |raw: Option<&toml_edit::RawString>| {
+        raw.and_then(|r| r.as_str()).unwrap_or_default().to_string()
+    };
+    let comments = text(decor.prefix());
+    let comments = comments.trim_start_matches(['\n', '\r', ' ', '\t']);
+    let after = text(decor.suffix());
+    if after.trim_start().starts_with('#') {
+        value.decor_mut().set_suffix(after);
+    }
+    parent.insert(name, Item::Value(value));
+    if let Some(mut key) = parent.key_mut(name) {
+        key.leaf_decor_mut().clear();
+        if !comments.is_empty() {
+            key.leaf_decor_mut().set_prefix(comments);
+        }
     }
 }
 
