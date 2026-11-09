@@ -197,6 +197,9 @@ pub struct LocalTypes {
     s: std::sync::Mutex<solve::Solver>,
     types: HashMap<crate::hir::VarId, Ty>,
     known: HashMap<crate::hir::VarId, Ty>,
+    /// The constructors that may have made `v` in each `v.f`, by the span
+    /// of `v.f`.
+    fields: HashMap<(ModuleId, Span), Vec<CtorRef>>,
 }
 
 impl std::fmt::Debug for LocalTypes {
@@ -216,22 +219,53 @@ impl LocalTypes {
         module: ModuleId,
         v: crate::hir::VarId,
     ) -> Option<String> {
+        self.show_in(program, module, v, &[])
+    }
+
+    /// [`LocalTypes::show`], in the context of the names of the top-level
+    /// binding that the name is in: the type variables that the name
+    /// shares with them, as a parameter `f` of `(f, x) { f(x) }` shares the
+    /// type of `x`, keep their names, as in the type scheme of the binding.
+    pub fn show_in(
+        &self,
+        program: &Program,
+        module: ModuleId,
+        v: crate::hir::VarId,
+        context: &[crate::hir::VarId],
+    ) -> Option<String> {
         let t = self.types.get(&v)?;
+        let context: Vec<Ty> = context
+            .iter()
+            .filter(|c| **c != v)
+            .filter_map(|c| self.types.get(c).cloned())
+            .collect();
         let mut s = self.s.lock().unwrap_or_else(|e| e.into_inner());
         s.type_names = infer::type_names(program, module);
-        let side = |out: bool| {
+        let side = |out: bool, context: &[Ty]| {
             let (a, b) = if out {
                 (t.clone(), Ty::Top)
             } else {
                 (Ty::Top, t.clone())
             };
             let both = Ty::Both(Box::new(a), Box::new(b));
-            display::scheme(&s, &both, display::Opts::default()).ok()
+            display::scheme_in(&s, &both, context, display::Opts::default()).ok()
         };
-        match side(true) {
-            Some(s) if s != "Never" => Some(s),
-            _ => side(false),
+        // The side is chosen from the name alone: in the context, a
+        // parameter is also an input of the binding, so it would not be
+        // `Never` as an output.
+        let out = side(true, &[]);
+        let out_side = matches!(&out, Some(s) if s != "Never");
+        if context.is_empty() {
+            return if out_side { out } else { side(false, &[]) };
         }
+        side(out_side, &context).or_else(|| side(out_side, &[]))
+    }
+
+    /// The constructors that may have made the value before the dot of the
+    /// field access `v.f` with this span, from its known type (§4.8, §6.7),
+    /// whatever `v` is: the fields that may be written after the dot.
+    pub fn field_ctors(&self, module: ModuleId, span: Span) -> Option<&[CtorRef]> {
+        self.fields.get(&(module, span)).map(Vec::as_slice)
     }
 
     /// The named types that are members of the known type of a name (§4.8),
