@@ -419,6 +419,19 @@ impl Parser<'_> {
         } else {
             let bstart = self.start();
             let Some(pattern) = self.binding_head()? else {
+                // `name: Type` with no `=` is a declaration; the checker
+                // reports it when `@external` is missing (§2.5).
+                if matches!(self.kind(), T::Name(_)) && *self.nth(1) == T::Colon {
+                    let name = self.name()?;
+                    self.bump();
+                    let ty = self.ty()?;
+                    return Ok(Item {
+                        doc,
+                        attributes,
+                        kind: ItemKind::Declaration { name, ty },
+                        span: self.span_from(start),
+                    });
+                }
                 return self.error("an item: a type definition, or a binding `pattern = value`");
             };
             let value = self.expr()?;

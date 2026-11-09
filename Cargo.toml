@@ -25,6 +25,10 @@ insta = { version = "1", features = ["glob"] }
 tempfile = "3"
 wasm-encoder = "=0.262.0"
 wasmparser = "=0.262.0"
+petgraph = "0.8"
+ilang-syntax = { path = "crates/ilang-syntax" }
+ilang-package = { path = "crates/ilang-package" }
+ilang-check = { path = "crates/ilang-check" }
 ilang-wasm = { path = "crates/ilang-wasm" }
 ilang-host = { path = "crates/ilang-host" }
 

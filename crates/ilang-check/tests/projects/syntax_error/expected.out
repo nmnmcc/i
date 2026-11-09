@@ -1,0 +1,2 @@
+src/main.i:1:5: error[E0010]: `(` is not closed
+src/main.i:2:1: error[E0101]: expected an expression, found the end of the file

@@ -1,0 +1,2 @@
+src/main.i:1:9: error[E0211]: `app/helper` is a module under `test/`, which a module under `src/` may not import
+test/helper.i:3:5: error[E0205]: `main` is a module, not a value; use a member, as in `main.name`

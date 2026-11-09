@@ -1,0 +1,4 @@
+name = "app"
+
+[wasm]
+exports = ["app/math.add", "app/math.hidden", "app/math.nothing", "app/nomodule.f", "app/math.main"]

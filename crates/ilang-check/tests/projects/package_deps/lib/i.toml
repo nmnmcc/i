@@ -1,0 +1,4 @@
+name = "textlib"
+
+[dev-dependencies]
+nothere = { path = "nothere" }

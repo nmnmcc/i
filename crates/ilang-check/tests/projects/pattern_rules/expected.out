@@ -1,0 +1,14 @@
+src/main.i:1:5: error[E0217]: this pattern binds `a` more than once
+src/main.i:4:9: error[E0217]: this pattern binds `x` more than once
+src/main.i:5:11: error[E0217]: this pattern binds `z` more than once
+src/main.i:7:12: error[E0217]: this pattern binds `b` more than once
+src/main.i:11:14: error[E0218]: the parameters of this function bind `p` more than once
+src/main.i:11:14: error[E0219]: two parameters of this function have the label `p`
+src/main.i:12:18: error[E0219]: two parameters of this function have the label `l`
+src/main.i:12:22: error[E0218]: the parameters of this function bind `l` more than once
+src/main.i:13:20: error[E0218]: the parameters of this function bind `s` more than once
+src/main.i:14:18: error[E0218]: the parameters of this function bind `n` more than once
+src/main.i:18:14: error[E0220]: every choice of a clause binds the same names, but not all bind `b`
+src/main.i:19:13: error[E0220]: every choice of a clause binds the same names, but not all bind `x`, `y`
+src/main.i:21:28: error[E0220]: every choice of a clause binds the same names, but not all bind `k`
+src/main.i:27:5: error[E0201]: `Nope` is not defined

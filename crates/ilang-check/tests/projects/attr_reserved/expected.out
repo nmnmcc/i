@@ -1,0 +1,2 @@
+src/main.i:1:11: error[E0306]: names that start with `ilang:` are kept for the runtime
+src/main.i:4:7: error[E0306]: names that start with `ilang:` are kept for the runtime

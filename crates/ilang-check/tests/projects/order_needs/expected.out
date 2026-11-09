@@ -1,0 +1,6 @@
+src/main.i:1:1: error[E0401]: the value of `x` is needed to work out itself (§2.5); only names inside the function bodies of a direct value may refer back
+src/main.i:2:1: error[E0401]: the value of `y` is needed to work out itself (§2.5); only names inside the function bodies of a direct value may refer back
+src/main.i:4:1: error[E0401]: the value of `a` is needed to work out itself (§2.5); only names inside the function bodies of a direct value may refer back
+src/main.i:5:1: error[E0401]: the value of `b` is needed to work out itself (§2.5); only names inside the function bodies of a direct value may refer back
+src/main.i:9:1: error[E0401]: the value of `e` is needed to work out itself (§2.5); only names inside the function bodies of a direct value may refer back
+src/main.i:10:1: error[E0401]: the value of `g` is needed to work out itself (§2.5); only names inside the function bodies of a direct value may refer back

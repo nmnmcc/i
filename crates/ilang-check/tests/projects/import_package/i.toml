@@ -1,0 +1,4 @@
+name = "app"
+
+[dev-dependencies]
+check = { path = "check" }

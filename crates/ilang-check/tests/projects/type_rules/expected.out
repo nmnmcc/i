@@ -1,0 +1,18 @@
+src/main.i:1:5: error[E0221]: the type parameter `a` is not used
+src/main.i:2:13: error[E0222]: the type variable `a` is not a parameter of this type
+src/main.i:3:10: error[E0226]: the type parameter `a` is given more than once
+src/main.i:4:5: error[E0221]: the type parameter `a` is not used
+src/main.i:5:15: error[E0222]: the type variable `b` is not a parameter of this type
+src/main.i:7:1: error[E0223]: the alias `A` uses itself, directly or through other aliases
+src/main.i:8:1: error[E0223]: the alias `B` uses itself, directly or through other aliases
+src/main.i:9:1: error[E0223]: the alias `C` uses itself, directly or through other aliases
+src/main.i:13:17: error[E0224]: the type `List` has 1 type parameter, but 0 are given
+src/main.i:14:17: error[E0224]: the type `Int` has 0 type parameters, but 1 is given
+src/main.i:15:17: error[E0224]: the type `Result` has 2 type parameters, but 1 is given
+src/main.i:16:17: error[E0224]: the type `Box` has 1 type parameter, but 0 are given
+src/main.i:17:42: error[E0224]: the type `Continuation` has 4 type parameters, but 1 is given
+src/main.i:18:19: error[E0202]: the type `Nothing` is not defined
+src/main.i:25:24: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
+src/main.i:25:31: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
+src/main.i:27:5: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
+src/main.i:28:5: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)

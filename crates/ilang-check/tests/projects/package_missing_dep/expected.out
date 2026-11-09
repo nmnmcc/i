@@ -1,0 +1,2 @@
+i.toml:4:1: error[E0621]: there is no package directory `gone`
+i.toml:5:1: error[E0621]: there is no `i.toml` in `nofile`
