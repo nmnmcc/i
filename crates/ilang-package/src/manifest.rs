@@ -39,11 +39,30 @@ pub struct Location {
     pub version: Version,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+impl Location {
+    /// The location without the version: the repository, then `//` and the
+    /// directory when there is one. This is the location of `i.lock` (§2.8)
+    /// and of source positions (§11.7).
+    pub fn place(&self) -> String {
+        match &self.dir {
+            Some(d) => format!("{}//{d}", self.repository),
+            None => self.repository.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Version {
     pub major: u64,
     pub minor: u64,
     pub patch: u64,
+}
+
+/// `major.minor.patch`.
+impl std::fmt::Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
+    }
 }
 
 /// `"app/math.add"` in `[wasm] exports` (§2.6, §10.2).

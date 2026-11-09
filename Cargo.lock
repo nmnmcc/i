@@ -675,6 +675,7 @@ name = "ilang-package"
 version = "0.1.0"
 dependencies = [
  "ilang-syntax",
+ "sha2",
  "tempfile",
  "toml",
 ]

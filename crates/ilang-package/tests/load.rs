@@ -95,22 +95,3 @@ fn circles_and_missing() {
     assert!(graph.root.is_none());
     assert_eq!(diags[0].code, code::NO_PACKAGE);
 }
-
-#[test]
-fn location_not_supported() {
-    let dir = tempfile::tempdir().unwrap();
-    write(
-        dir.path(),
-        &[(
-            "i.toml",
-            "name = \"a\"\n[dependencies]\njson = \"github.com/alice/json@1.4.0\"\n",
-        )],
-    );
-    let (graph, diags) = load(dir.path());
-    assert_eq!(diags.len(), 1);
-    assert_eq!(diags[0].code, code::LOCATION_NOT_SUPPORTED);
-    let root = &graph.packages[graph.root.unwrap()];
-    assert_eq!(root.dependencies, [("json".to_string(), None)]);
-    let line = graph.sources.render(&diags[0]);
-    assert!(line.starts_with("i.toml:3:1: error[E0620]: "), "{line}");
-}

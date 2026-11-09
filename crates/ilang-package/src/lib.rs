@@ -1,14 +1,23 @@
 //! Packages (§2.1, §2.6): the package file, the modules of a package, the
 //! library package `i`, and the graph of packages that a program uses.
 //!
+//! Packages with a location are got with git (§2.7, [`git`]), their versions
+//! are chosen by minimal version selection ([`mvs`]), and they are checked
+//! against the lock file `i.lock` ([`lock`]).
+//!
 //! The only authority is `docs/spec.md`; section numbers refer to it.
 
+pub mod git;
 pub mod library;
+mod locations;
+pub mod lock;
 pub mod manifest;
 pub mod modules;
+pub mod mvs;
 
 use ilang_syntax::span::{LineIndex, Span};
-use manifest::{DependencySource, Manifest, WasmExport};
+use manifest::{DependencySource, Manifest, Version, WasmExport};
+use mvs::PackageKey;
 use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::path::{Component, Path, PathBuf};
@@ -25,12 +34,28 @@ pub mod code {
     pub const BAD_VERSION: &str = "E0608";
     pub const PATH_DEPENDENCY: &str = "E0609";
     pub const WASM_EXPORT: &str = "E0610";
-    pub const LOCATION_NOT_SUPPORTED: &str = "E0620";
+    // "E0620" was "getting packages by location is not supported yet".
     pub const NO_PACKAGE: &str = "E0621";
     pub const PACKAGE_CIRCLE: &str = "E0622";
     pub const MODULE_PATH_NAME: &str = "E0623";
     pub const MODULE_TWICE: &str = "E0624";
     pub const UNREADABLE: &str = "E0625";
+    /// `git` could not be run, or a repository could not be fetched.
+    pub const GIT: &str = "E0630";
+    /// A repository has no tag for a version that is reached (§2.7).
+    pub const NO_VERSION: &str = "E0631";
+    /// The commit or the hash of a version is not the one in `i.lock` (§2.8).
+    pub const LOCK_MISMATCH: &str = "E0632";
+    /// `i.lock` is not correct.
+    pub const LOCK_SYNTAX: &str = "E0633";
+    /// Offline, and something that is needed is not in the cache.
+    pub const OFFLINE: &str = "E0634";
+    /// The tree of a version has a path that cannot be a file.
+    pub const PACKAGE_FILES: &str = "E0635";
+    /// The cache could not be found or written.
+    pub const CACHE: &str = "E0636";
+    /// `i.lock` could not be written.
+    pub const LOCK_WRITE: &str = "E0637";
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -173,16 +198,56 @@ pub struct ModuleSource {
 #[derive(Clone, Debug)]
 pub struct Package {
     pub name: String,
-    /// The canonical directory. `None` for the library package `i`.
+    /// The canonical directory. `None` for the library package `i`. For a
+    /// package with a location, it is in the cache (see [`git`]).
     pub dir: Option<PathBuf>,
     pub manifest_source: Option<SourceId>,
     /// Dependency names and their packages. A package is `None` when it
     /// could not be loaded; the problem has been reported.
     pub dependencies: Vec<(String, Option<PackageId>)>,
-    /// Only for the compiled package (§2.6).
+    /// Only for the compiled package (§2.6). When its tests are not
+    /// compiled ([`LoadOptions::tests`]), the names are here, but their
+    /// packages are `None` and are not loaded.
     pub dev_dependencies: Vec<(String, Option<PackageId>)>,
     pub modules: Vec<ModuleSource>,
     pub wasm_exports: Vec<WasmExport>,
+    /// For a package got by location: its location and version (§2.7).
+    pub location: Option<PackageLocation>,
+}
+
+impl Package {
+    /// What comes before the module path in a source position (§11.7):
+    /// `location@major ` for a package with a location, and nothing
+    /// otherwise.
+    pub fn position_prefix(&self) -> String {
+        self.location
+            .as_ref()
+            .map_or_else(String::new, PackageLocation::position_prefix)
+    }
+}
+
+/// The version of a package with a location that a program uses.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PackageLocation {
+    /// The location, with its `//dir` (§2.6).
+    pub location: String,
+    pub version: Version,
+    /// The git commit of the tag (§2.8).
+    pub commit: String,
+    /// The hash of the files (§2.8).
+    pub hash: String,
+}
+
+impl PackageLocation {
+    /// The package (§2.7): the location and the major version.
+    pub fn key(&self) -> PackageKey {
+        PackageKey::new(self.location.clone(), self.version)
+    }
+
+    /// `location@major ` (§11.7), with the space.
+    pub fn position_prefix(&self) -> String {
+        format!("{}@{} ", self.location, self.version.major)
+    }
 }
 
 /// The packages of a program: the library package `i`, the compiled package,
@@ -196,9 +261,75 @@ pub struct PackageGraph {
     pub root: Option<PackageId>,
 }
 
-/// Loads the package in `root` and the packages it uses. Test modules and
-/// dev-dependencies are loaded only for that package (§2.1, §2.6).
+/// How packages are loaded.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LoadOptions {
+    /// The tests of the compiled package are compiled: its test modules and
+    /// its dev-dependencies are loaded, and its dev-dependencies take part
+    /// in minimal version selection (§2.6, §2.7).
+    pub tests: bool,
+    /// The network may not be used. Something that is not in the cache is
+    /// an error ([`code::OFFLINE`]).
+    pub offline: bool,
+    /// The cache directory (see [`git`]). When `None`, it is found from the
+    /// environment when it is needed, with [`git::cache_dir`].
+    pub cache: Option<PathBuf>,
+    /// Rewrites from a prefix of a repository to a prefix of a URL (see
+    /// [`git`]).
+    pub git_urls: Vec<(String, String)>,
+    /// `i.lock` is written when its lines change (§2.8).
+    pub write_lock: bool,
+}
+
+impl Default for LoadOptions {
+    /// With the tests, online, and writing `i.lock`.
+    fn default() -> LoadOptions {
+        LoadOptions {
+            tests: true,
+            offline: false,
+            cache: None,
+            git_urls: Vec::new(),
+            write_lock: true,
+        }
+    }
+}
+
+impl LoadOptions {
+    /// The defaults, with `ILANG_OFFLINE`, `ILANG_CACHE` (and the other
+    /// variables of [`git::cache_dir`]) and `ILANG_GIT_URLS` from the
+    /// environment.
+    pub fn from_env() -> LoadOptions {
+        LoadOptions::from_vars(|k| std::env::var_os(k))
+    }
+
+    /// As [`LoadOptions::from_env`], with the variables that `get` reads.
+    /// `ILANG_OFFLINE` is on when it is set, and not empty or `0`.
+    pub fn from_vars(get: impl Fn(&str) -> Option<std::ffi::OsString>) -> LoadOptions {
+        let offline = get("ILANG_OFFLINE").is_some_and(|v| !v.is_empty() && v != "0");
+        let urls = get("ILANG_GIT_URLS")
+            .map(|v| git::parse_url_map(&v.to_string_lossy()))
+            .unwrap_or_default();
+        LoadOptions {
+            offline,
+            cache: git::cache_dir(&get),
+            git_urls: urls,
+            ..LoadOptions::default()
+        }
+    }
+}
+
+/// Loads the package in `root` and the packages it uses, with its tests,
+/// and with the options from the environment ([`LoadOptions::from_env`]).
 pub fn load(root: &Path) -> (PackageGraph, Vec<Diagnostic>) {
+    load_with(root, &LoadOptions::from_env())
+}
+
+/// Loads the package in `root` and the packages it uses. Test modules and
+/// dev-dependencies are loaded only for that package, and only with
+/// [`LoadOptions::tests`] (§2.1, §2.6). Packages with a location are got
+/// with git, chosen by minimal version selection, and checked against
+/// `i.lock`, which is brought up to date (§2.7, §2.8).
+pub fn load_with(root: &Path, options: &LoadOptions) -> (PackageGraph, Vec<Diagnostic>) {
     let mut loader = Loader {
         graph: PackageGraph {
             sources: Sources::default(),
@@ -208,26 +339,83 @@ pub fn load(root: &Path) -> (PackageGraph, Vec<Diagnostic>) {
         },
         diags: Vec::new(),
         by_dir: HashMap::new(),
+        by_key: HashMap::new(),
         stack: Vec::new(),
         base: root.canonicalize().unwrap_or_else(|_| root.to_path_buf()),
+        tests: options.tests,
+        pending: Vec::new(),
+        located: None,
     };
     library::add(&mut loader.graph);
-    let root = loader.package(root, true, None);
-    loader.graph.root = root;
+    let root_id = loader.package(root, Kind::Root, None);
+    loader.graph.root = root_id;
+    if let Some(id) = root_id
+        && let Some(dir) = loader.graph.packages[id].dir.clone()
+    {
+        let located = locations::resolve(&mut loader, &dir, options);
+        loader.located = Some(located);
+        for p in std::mem::take(&mut loader.pending) {
+            let found = loader.located.as_ref().and_then(|l| l.get(&p.key)).cloned();
+            let id = found
+                .and_then(|l| loader.package(&l.dir, Kind::Location(l.location), Some(p.from)));
+            let list = &mut loader.graph.packages[p.package];
+            let list = if p.dev {
+                &mut list.dev_dependencies
+            } else {
+                &mut list.dependencies
+            };
+            list[p.index].1 = id;
+        }
+    }
     (loader.graph, loader.diags)
 }
 
-struct Loader {
-    graph: PackageGraph,
-    diags: Vec<Diagnostic>,
-    by_dir: HashMap<PathBuf, PackageId>,
-    stack: Vec<PathBuf>,
+/// A package with a location that a program uses, in the cache.
+#[derive(Clone, Debug)]
+pub(crate) struct Located {
+    pub(crate) location: PackageLocation,
+    pub(crate) dir: PathBuf,
+}
+
+/// A dependency by location of a package got by path, to be filled when
+/// the versions are chosen.
+struct Pending {
+    package: PackageId,
+    dev: bool,
+    index: usize,
+    key: PackageKey,
+    from: (SourceId, Span),
+}
+
+#[derive(Clone, Debug)]
+enum Kind {
+    Root,
+    Path,
+    Location(PackageLocation),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Node {
+    Dir(PathBuf),
+    Key(PackageKey),
+}
+
+pub(crate) struct Loader {
+    pub(crate) graph: PackageGraph,
+    pub(crate) diags: Vec<Diagnostic>,
+    pub(crate) by_dir: HashMap<PathBuf, PackageId>,
+    by_key: HashMap<PackageKey, PackageId>,
+    stack: Vec<Node>,
     /// Paths are shown relative to this directory.
     base: PathBuf,
+    tests: bool,
+    pending: Vec<Pending>,
+    /// The packages with a location, once they are chosen.
+    located: Option<HashMap<PackageKey, Located>>,
 }
 
 impl Loader {
-    fn display(&self, path: &Path) -> String {
+    pub(crate) fn display(&self, path: &Path) -> String {
         relative(&self.base, path)
     }
 
@@ -235,11 +423,15 @@ impl Loader {
     fn package(
         &mut self,
         dir: &Path,
-        is_root: bool,
+        kind: Kind,
         from: Option<(SourceId, Span)>,
     ) -> Option<PackageId> {
         let (from_source, from_span) =
             from.map_or((None, Span::default()), |(s, sp)| (Some(s), sp));
+        if let Kind::Location(loc) = &kind {
+            return self.location_package(dir, loc, from_source, from_span);
+        }
+        let is_root = matches!(kind, Kind::Root);
         let Ok(dir) = dir.canonicalize() else {
             let shown = self.display(dir);
             self.diags.push(Diagnostic::error(
@@ -250,7 +442,7 @@ impl Loader {
             ));
             return None;
         };
-        if self.stack.contains(&dir) {
+        if self.stack.contains(&Node::Dir(dir.clone())) {
             self.diags.push(Diagnostic::error(
                 code::PACKAGE_CIRCLE,
                 from_source,
@@ -297,25 +489,99 @@ impl Loader {
             dev_dependencies: Vec::new(),
             modules: Vec::new(),
             wasm_exports: manifest.wasm_exports.clone(),
+            location: None,
         });
         self.by_dir.insert(dir.clone(), id);
-        self.stack.push(dir.clone());
-        // Packages got by location are not loaded yet, so every package
-        // here is the compiled package or got by path.
-        for d in manifest.check_path_dependencies(false) {
+        self.stack.push(Node::Dir(dir.clone()));
+        let deps = self.dependencies(id, &manifest, false, &dir, source);
+        self.graph.packages[id].dependencies = deps;
+        if is_root {
+            let dev = if self.tests {
+                self.dependencies(id, &manifest, true, &dir, source)
+            } else {
+                manifest
+                    .dev_dependencies
+                    .iter()
+                    .map(|d| (d.name.clone(), None))
+                    .collect()
+            };
+            self.graph.packages[id].dev_dependencies = dev;
+        }
+        self.stack.pop();
+        let tests = is_root && self.tests;
+        let (modules, diags) = modules::collect(self, &manifest.name, &dir, tests, None);
+        self.graph.packages[id].modules = modules;
+        self.diags.extend(diags);
+        Some(id)
+    }
+
+    /// A package got by location, from its files in the cache.
+    fn location_package(
+        &mut self,
+        dir: &Path,
+        loc: &PackageLocation,
+        from_source: Option<SourceId>,
+        from_span: Span,
+    ) -> Option<PackageId> {
+        let key = loc.key();
+        if self.stack.contains(&Node::Key(key.clone())) {
+            self.diags.push(Diagnostic::error(
+                code::PACKAGE_CIRCLE,
+                from_source,
+                from_span,
+                format!(
+                    "this dependency leads back to `{}@{}`, so the packages are in a circle (§2.6)",
+                    loc.location, loc.version
+                ),
+            ));
+            return None;
+        }
+        if let Some(&id) = self.by_key.get(&key) {
+            return Some(id);
+        }
+        let shown = format!("{}@{}", loc.location, loc.version);
+        let dir = &dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
+        let Ok(text) = std::fs::read_to_string(dir.join("i.toml")) else {
+            self.diags.push(Diagnostic::error(
+                code::NO_PACKAGE,
+                from_source,
+                from_span,
+                format!("`{shown}` has no `i.toml`"),
+            ));
+            return None;
+        };
+        let source = self.graph.sources.add(format!("{shown}/i.toml"), text);
+        let text = &self.graph.sources.get(source).text;
+        let (manifest, diags) = manifest::parse_dependency_manifest(text);
+        self.diags.extend(diags.into_iter().map(|d| Diagnostic {
+            source: Some(source),
+            ..d
+        }));
+        let manifest = manifest?;
+        let id = self.graph.packages.len();
+        self.graph.packages.push(Package {
+            name: manifest.name.clone(),
+            dir: Some(dir.to_path_buf()),
+            manifest_source: Some(source),
+            dependencies: Vec::new(),
+            dev_dependencies: Vec::new(),
+            modules: Vec::new(),
+            wasm_exports: Vec::new(),
+            location: Some(loc.clone()),
+        });
+        self.by_key.insert(key.clone(), id);
+        // §2.6: a package got by location may not have path dependencies.
+        for d in manifest.check_path_dependencies(true) {
             self.diags.push(Diagnostic {
                 source: Some(source),
                 ..d
             });
         }
-        let deps = self.dependencies(&manifest, false, &dir, source);
+        self.stack.push(Node::Key(key));
+        let deps = self.dependencies(id, &manifest, false, dir, source);
         self.graph.packages[id].dependencies = deps;
-        if is_root {
-            let dev = self.dependencies(&manifest, true, &dir, source);
-            self.graph.packages[id].dev_dependencies = dev;
-        }
         self.stack.pop();
-        let (modules, diags) = modules::collect(self, &manifest.name, &dir, is_root);
+        let (modules, diags) = modules::collect(self, &manifest.name, dir, false, Some(&shown));
         self.graph.packages[id].modules = modules;
         self.diags.extend(diags);
         Some(id)
@@ -323,11 +589,13 @@ impl Loader {
 
     fn dependencies(
         &mut self,
+        package: PackageId,
         manifest: &Manifest,
         dev: bool,
         dir: &Path,
         source: SourceId,
     ) -> Vec<(String, Option<PackageId>)> {
+        let by_location = self.graph.packages[package].location.is_some();
         let list = if dev {
             &manifest.dev_dependencies
         } else {
@@ -336,20 +604,30 @@ impl Loader {
         let mut out = Vec::new();
         for d in list {
             let id = match &d.source {
-                DependencySource::Location(_) => {
-                    self.diags.push(Diagnostic::error(
-                        code::LOCATION_NOT_SUPPORTED,
-                        Some(source),
-                        d.span,
-                        format!(
-                            "`{}`: getting packages by location is not supported yet; use `{{ path = \"…\" }}`",
-                            d.name
-                        ),
-                    ));
-                    None
+                DependencySource::Location(loc) => {
+                    let key = PackageKey::new(loc.place(), loc.version);
+                    match &self.located {
+                        // The versions are chosen: a package got by location.
+                        Some(located) => located.get(&key).cloned().and_then(|l| {
+                            self.package(&l.dir, Kind::Location(l.location), Some((source, d.span)))
+                        }),
+                        // Filled when the versions are chosen.
+                        None => {
+                            self.pending.push(Pending {
+                                package,
+                                dev,
+                                index: out.len(),
+                                key,
+                                from: (source, d.span),
+                            });
+                            None
+                        }
+                    }
                 }
+                // Reported by `check_path_dependencies`.
+                DependencySource::Path(_) if by_location => None,
                 DependencySource::Path(p) => {
-                    self.package(&dir.join(p), false, Some((source, d.span)))
+                    self.package(&dir.join(p), Kind::Path, Some((source, d.span)))
                 }
             };
             out.push((d.name.clone(), id));
@@ -359,7 +637,7 @@ impl Loader {
 }
 
 /// The path of `to` relative to the directory `from`, with `/`.
-fn relative(from: &Path, to: &Path) -> String {
+pub(crate) fn relative(from: &Path, to: &Path) -> String {
     let a: Vec<Component> = from.components().collect();
     let b: Vec<Component> = to.components().collect();
     let common = a.iter().zip(&b).take_while(|(x, y)| x == y).count();

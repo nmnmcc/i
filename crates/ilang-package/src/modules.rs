@@ -6,12 +6,15 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Every `.i` file under `dir/src`, and under `dir/test` when `tests` is set,
-/// in the order of their paths.
+/// in the order of their paths. With `shown`, the files are shown as
+/// `shown/` and their path in `dir`; otherwise relative to the directory of
+/// the compiled package.
 pub(crate) fn collect(
     loader: &mut Loader,
     package: &str,
     dir: &Path,
     tests: bool,
+    shown: Option<&str>,
 ) -> (Vec<ModuleSource>, Vec<Diagnostic>) {
     let mut diags = Vec::new();
     let mut out: Vec<ModuleSource> = Vec::new();
@@ -27,7 +30,10 @@ pub(crate) fn collect(
         walk(&base, &mut files);
         files.sort();
         for file in files {
-            let display = loader.display(&file);
+            let display = match shown {
+                Some(s) => format!("{s}/{}", crate::relative(dir, &file)),
+                None => loader.display(&file),
+            };
             let text = match std::fs::read(&file).map(String::from_utf8) {
                 Ok(Ok(text)) => text,
                 _ => {

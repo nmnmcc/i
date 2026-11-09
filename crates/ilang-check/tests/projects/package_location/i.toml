@@ -1,4 +1,0 @@
-name = "app"
-
-[dependencies]
-json = "github.com/alice/json@1.4.0"
