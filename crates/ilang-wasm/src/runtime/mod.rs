@@ -8,12 +8,22 @@
 //! A program module is, in this order:
 //!
 //! 1. [`TYPES`];
-//! 2. [`HOST`], the only runtime imports (`ilang:host/v1` `panic` and
-//!    `reference_id`), then the imports of host services and external
-//!    functions (the text format puts every import before any definition);
-//! 3. [`wat()`], the runtime definitions (it also defines and exports
+//! 2. the runtime imports, then the imports of host services and external
+//!    functions (the text format puts every import before any definition).
+//!    The runtime imports are [`HOST`] (`ilang:host/v1` `panic` and
+//!    `reference_id`, spec B.4) on the target of the binary interface. On
+//!    the WASI target (B.7) they are [`WASI_HOST`]
+//!    (`wasi_snapshot_preview1` `fd_write` and `proc_exit`), and
+//!    [`WASI_REFERENCE_ID_IMPORT`] only when a type of an import or export
+//!    is a host reference;
+//! 3. on the WASI target only: [`WASI_RUNTIME`], which defines
+//!    `$host_panic` and the writes to file descriptors; [`WASI_REFERENCE_ID`]
+//!    when `reference_id` is not imported; the function that `print` of the
+//!    standard service calls; and the export `_start`, which calls
+//!    `ilang_start` and then the program entry;
+//! 4. [`wat()`], the runtime definitions (it also defines and exports
 //!    `memory`, `ilang_alloc` and `ilang_free`);
-//! 4. the generated code. It defines and exports `ilang_start`, the entry
+//! 5. the generated code. It defines and exports `ilang_start`, the entry
 //!    points and the host exports, and it adds the `ilang.abi` custom section.
 //!
 //! The runtime has no Wasm start function and no exception tags of its own.
@@ -232,7 +242,8 @@ pub const TYPES: &str = r#"
 (type $frames (array (mut i32)))
 "#;
 
-/// The runtime imports (spec B.4). Nothing else is imported from `ilang:host/v1`.
+/// The runtime imports (spec B.4) on the target of the binary interface.
+/// Nothing else is imported from `ilang:host/v1`.
 pub const HOST: &str = r#"
 (import "ilang:host/v1" "panic" (func $host_panic (param i32 i32)))
 (import "ilang:host/v1" "reference_id" (func $host_reference_id (param externref) (result i64)))
@@ -296,7 +307,10 @@ pub const WASI_RUNTIME: &str = r#"
 /// The first constructor id that the code generator may use.
 pub const FIRST_CONSTRUCTOR: u32 = 16;
 
-/// The runtime definitions. They need [`TYPES`] and [`HOST`] in the module.
+/// The runtime definitions. They need [`TYPES`] in the module, and the
+/// functions `$host_panic` and `$host_reference_id`: the imports of
+/// [`HOST`], or on the WASI target [`WASI_HOST`] with [`WASI_RUNTIME`] and
+/// [`WASI_REFERENCE_ID_IMPORT`] or [`WASI_REFERENCE_ID`].
 pub fn wat() -> &'static str {
     static RUNTIME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
     RUNTIME.get_or_init(|| {
