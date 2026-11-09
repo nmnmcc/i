@@ -672,3 +672,47 @@ fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
     assert_eq!(hover("a, b"), "a: a");
     c.shutdown();
 }
+
+/// Hover on a local name whose type variable is on one side only of the
+/// scheme of its binding, where it is shown as a name of its own, shows it
+/// with that name.
+#[test]
+fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
+    let text = "one = (x) {\n  y = x\n  1\n}\n\
+                \n\
+                drop2 = (x, g, h) {\n  y = (x, h)\n  g(1)\n}\n\
+                \n\
+                effonly = (f, x) {\n  r = f(x)\n  Nil\n}\n";
+    let dir = tempfile::tempdir().unwrap();
+    package(dir.path(), &[("src/main.i", text)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut c = Client::start();
+    c.open(&main, text);
+    assert_eq!(c.diagnostics(&main), vec![]);
+    let mut hover = |needle: &str| {
+        let (l, ch) = find(text, needle, 0);
+        let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch));
+        let value = h["contents"]["value"].as_str().unwrap();
+        value
+            .trim_start_matches("```i\n")
+            .trim_end_matches("\n```")
+            .to_string()
+    };
+    assert_eq!(hover("one"), "one: (x: a) -> Int");
+    assert_eq!(hover("x) {\n  y = x"), "x: a");
+    assert_eq!(hover("y = x"), "y: a");
+    assert_eq!(
+        hover("drop2"),
+        "drop2: (x: a, g: (Int) -> b ? e ! n, h: c) -> b ? e ! n"
+    );
+    assert_eq!(hover("x, g, h"), "x: a");
+    assert_eq!(hover("h) {"), "h: c");
+    assert_eq!(hover("y = (x, h)"), "y: (a, c)");
+    assert_eq!(
+        hover("effonly"),
+        "effonly: (f: (a) -> b ? e ! n, x: a) -> Nil ? e ! n"
+    );
+    assert_eq!(hover("f, x) {\n  r"), "f: (a) -> b ? e ! n");
+    assert_eq!(hover("r = "), "r: b");
+    c.shutdown();
+}

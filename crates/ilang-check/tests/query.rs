@@ -491,6 +491,55 @@ fn local_types_use_the_names_of_the_scheme() {
 }
 
 #[test]
+fn local_types_name_one_sided_variables_as_the_scheme() {
+    // A variable on one side only of the scheme has no effect, and is
+    // shown as a name of its own there: a local name of that type shows
+    // the same name.
+    let f = Fixture::new(&[(
+        "src/main.i",
+        "one = (x) {\n  y = x\n  1\n}\n\
+         drop = (x, g) {\n  y = x\n  g(1)\n}\n\
+         drop2 = (x, g, h) {\n  y = (x, h)\n  g(1)\n}\n\
+         effonly = (f, x) {\n  r = f(x)\n  Nil\n}\n",
+    )]);
+    assert!(!f.checked.diags.iter().any(|d| d.is_error()));
+    assert_eq!(f.hover("app/main", "one", 0), "one: (x: a) -> Int");
+    assert_eq!(f.hover("app/main", "x) {\n  y = x\n  1", 0), "x: a");
+    assert_eq!(f.hover("app/main", "y = x\n  1", 0), "y: a");
+    assert_eq!(f.hover("app/main", "x\n  1", 0), "x: a");
+    assert_eq!(
+        f.hover("app/main", "drop =", 0),
+        "drop: (x: a, g: (Int) -> b ? e ! n) -> b ? e ! n"
+    );
+    assert_eq!(f.hover("app/main", "x, g) {\n  y = x\n  g", 0), "x: a");
+    assert_eq!(f.hover("app/main", "y = x\n  g", 0), "y: a");
+    assert_eq!(
+        f.hover("app/main", "g) {\n  y = x", 0),
+        "g: (Int) -> b ? e ! n"
+    );
+    assert_eq!(
+        f.hover("app/main", "drop2", 0),
+        "drop2: (x: a, g: (Int) -> b ? e ! n, h: c) -> b ? e ! n"
+    );
+    assert_eq!(f.hover("app/main", "x, g, h", 0), "x: a");
+    assert_eq!(f.hover("app/main", "h) {", 0), "h: c");
+    assert_eq!(f.hover("app/main", "y = (x, h)", 0), "y: (a, c)");
+    assert_eq!(f.hover("app/main", "x, h)", 0), "x: a");
+    assert_eq!(f.hover("app/main", "h)\n", 0), "h: c");
+    assert_eq!(
+        f.hover("app/main", "effonly", 0),
+        "effonly: (f: (a) -> b ? e ! n, x: a) -> Nil ? e ! n"
+    );
+    assert_eq!(
+        f.hover("app/main", "f, x) {\n  r", 0),
+        "f: (a) -> b ? e ! n"
+    );
+    assert_eq!(f.hover("app/main", "x) {\n  r", 0), "x: a");
+    assert_eq!(f.hover("app/main", "f(x)\n  Nil", 0), "f: (a) -> b ? e ! n");
+    assert_eq!(f.hover("app/main", "r = ", 0), "r: b");
+}
+
+#[test]
 fn completions_of_the_name_being_bound() {
     let f = Fixture::new(&[(
         "src/main.i",
