@@ -32,7 +32,11 @@ i/core.codepoints : (String) -> List(UtfCodepoint)
 i/core.from_codepoints : (List(UtfCodepoint)) -> String
 i/core.codepoint_to_int : (UtfCodepoint) -> Int
 i/core.int_to_codepoint : (Int) -> Result(UtfCodepoint, Nil)
+i/core.to_upper : (String) -> String
+i/core.to_lower : (String) -> String
+i/core.index_of : (in: String, find: String, from: Int) -> Result(Int, Nil)
 i/core.bit_size : (BitArray) -> Int
 i/core.bit_array_to_string : (BitArray) -> Result(String, Nil)
+i/core.bit_array_concat : (List(BitArray)) -> BitArray
 i/core.inspect : (a) -> String
 i/core.hash : (a) -> Int
