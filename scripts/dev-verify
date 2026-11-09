@@ -8,9 +8,11 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked "$@"
 cargo build --workspace --locked
 cargo build --release --locked -p ilang-cli
+"$CARGO_TARGET_DIR/release/i" fmt --check lib std bench examples
 for level in 0 2; do
   "$CARGO_TARGET_DIR/release/i" test --project std --opt "$level"
   "$CARGO_TARGET_DIR/release/i" test --project examples/hello --opt "$level"
+  "$CARGO_TARGET_DIR/release/i" test --project bench --opt "$level"
 done
 ./scripts/wasi-smoke "$CARGO_TARGET_DIR/release/i"
 npm ci --ignore-scripts
