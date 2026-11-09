@@ -13,7 +13,9 @@ use crossbeam_channel::RecvTimeoutError;
 use ilang_check::Checked;
 use ilang_check::hir::ModuleId;
 use ilang_check::query::{self, CompletionKind, Query, SymbolKind};
-use ilang_package::{Diagnostic, LoadOptions, ModuleKind, PackageGraph, Severity, SourceId};
+use ilang_package::{
+    Diagnostic, LoadOptions, ModuleKind, ModuleSource, PackageGraph, Severity, SourceId,
+};
 use lsp_server::{Connection, ErrorCode, Message, Notification, Request, RequestId, Response};
 use lsp_types as lsp;
 use lsp_types::notification::Notification as _;
@@ -92,6 +94,10 @@ struct Analysis {
     load_diags: Vec<Diagnostic>,
     /// The file of each source, where there is one.
     paths: HashMap<SourceId, PathBuf>,
+    /// The `i.toml` files whose open document differs from the file. They
+    /// are loaded from the file, so their problems are not where they were
+    /// found in the document, and are not shown until it is saved.
+    unsaved_manifests: HashSet<SourceId>,
 }
 
 impl Analysis {
@@ -132,13 +138,37 @@ struct Server<'c> {
     published: HashMap<PathBuf, Vec<lsp::Uri>>,
     /// The packages that have been checked once.
     loaded: HashSet<PathBuf>,
-    /// Where the files of the library package `i` are written, when a
-    /// definition is there.
-    library_dir: PathBuf,
+    /// A new private directory, removed when the server stops, where the
+    /// files of the library package `i` are written when a definition is
+    /// there. Never a path that another user could know beforehand: they
+    /// could put a link there to a file of ours for us to write over.
+    library: Option<tempfile::TempDir>,
 }
 
+/// The canonical path of a file, also of one that is not on the disk (a
+/// new document), from the canonical path of its directory.
 fn normalize(path: &Path) -> PathBuf {
-    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+    if let Ok(p) = path.canonicalize() {
+        return p;
+    }
+    match (path.parent(), path.file_name()) {
+        (Some(dir), Some(name)) => normalize(dir).join(name),
+        _ => path.to_path_buf(),
+    }
+}
+
+/// A new directory that only this user may use.
+fn private_dir() -> Option<tempfile::TempDir> {
+    let dir = tempfile::Builder::new()
+        .prefix("ilang-lsp-library-")
+        .tempdir()
+        .ok()?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).ok()?;
+    }
+    Some(dir)
 }
 
 /// The directory of the nearest `i.toml` above a file.
@@ -159,9 +189,12 @@ impl<'c> Server<'c> {
             dirty: HashSet::new(),
             published: HashMap::new(),
             loaded: HashSet::new(),
-            library_dir: std::env::temp_dir()
-                .join(format!("ilang-lsp-{}-library", env!("CARGO_PKG_VERSION"))),
+            library: private_dir(),
         }
+    }
+
+    fn library_dir(&self) -> Option<&Path> {
+        self.library.as_ref().map(tempfile::TempDir::path)
     }
 
     fn main_loop(&mut self) -> anyhow::Result<()> {
@@ -346,10 +379,10 @@ impl<'c> Server<'c> {
         let (mut graph, load_diags) = ilang_package::load_with(root, &options);
         let mut paths = HashMap::new();
         for (id, p) in graph.packages.iter().enumerate() {
-            let dir = match &p.dir {
-                Some(dir) => dir.clone(),
-                None if id == graph.library => self.library_dir.clone(),
-                None => continue,
+            let dir = match (&p.dir, self.library_dir()) {
+                (Some(dir), _) => dir.clone(),
+                (None, Some(library)) if id == graph.library => library.to_path_buf(),
+                (None, _) => continue,
             };
             if let Some(s) = p.manifest_source {
                 paths.insert(s, dir.join("i.toml"));
@@ -365,13 +398,28 @@ impl<'c> Server<'c> {
                 paths.insert(m.source, path);
             }
         }
+        self.add_new_documents(&mut graph, &mut paths);
+        let manifests: HashSet<SourceId> = graph
+            .packages
+            .iter()
+            .filter_map(|p| p.manifest_source)
+            .collect();
+        let mut unsaved_manifests = HashSet::new();
         for (id, path) in &paths {
-            if let Some((p, text)) = patch
-                && p == path
-            {
+            let text = match patch {
+                Some((p, text)) if p == path => text,
+                _ => match self.docs.get(path) {
+                    Some(doc) => doc.text.as_str(),
+                    None => continue,
+                },
+            };
+            if graph.sources.get(*id).text == text {
+                continue;
+            }
+            if manifests.contains(id) {
+                unsaved_manifests.insert(*id);
+            } else {
                 graph.sources.set_text(*id, text.to_string());
-            } else if let Some(doc) = self.docs.get(path) {
-                graph.sources.set_text(*id, doc.text.clone());
             }
         }
         let checked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -393,6 +441,51 @@ impl<'c> Server<'c> {
             checked,
             load_diags,
             paths,
+            unsaved_manifests,
+        }
+    }
+
+    /// Adds the open documents under `src/` and `test/` of the package
+    /// that are not files yet as its modules (§2.1), with their text.
+    fn add_new_documents(&self, graph: &mut PackageGraph, paths: &mut HashMap<SourceId, PathBuf>) {
+        let Some(root) = graph.root else { return };
+        let Some(dir) = graph.packages[root].dir.clone() else {
+            return;
+        };
+        let mut new: Vec<(&PathBuf, &Doc)> = self
+            .docs
+            .iter()
+            .filter(|(p, _)| p.extension().is_some_and(|e| e == "i"))
+            .filter(|(p, _)| !paths.values().any(|q| q == *p))
+            .collect();
+        new.sort_by(|a, b| a.0.cmp(b.0));
+        for (path, doc) in new {
+            for (sub, kind) in [("src", ModuleKind::Src), ("test", ModuleKind::Test)] {
+                let Ok(rel) = path.strip_prefix(dir.join(sub)) else {
+                    continue;
+                };
+                let parts: Vec<String> = rel
+                    .with_extension("")
+                    .components()
+                    .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                    .collect();
+                if !parts.iter().all(|p| ilang_package::is_name(p)) {
+                    continue;
+                }
+                let package = &mut graph.packages[root];
+                let module = format!("{}/{}", package.name, parts.join("/"));
+                if package.modules.iter().any(|m| m.path == module) {
+                    continue;
+                }
+                let display = format!("{sub}/{}", parts.join("/")) + ".i";
+                let source = graph.sources.add(display, doc.text.clone());
+                graph.packages[root].modules.push(ModuleSource {
+                    path: module,
+                    source,
+                    kind,
+                });
+                paths.insert(source, path.clone());
+            }
         }
     }
 
@@ -413,7 +506,9 @@ impl<'c> Server<'c> {
             .collect();
         let mut seen = HashSet::new();
         for d in a.load_diags.iter().chain(&a.checked.diags) {
-            if d.source.is_some_and(|s| library_sources.contains(&s)) {
+            if d.source
+                .is_some_and(|s| library_sources.contains(&s) || a.unsaved_manifests.contains(&s))
+            {
                 continue;
             }
             let (path, range) = match d.source.and_then(|s| a.paths.get(&s).map(|p| (s, p))) {
@@ -561,7 +656,7 @@ impl<'c> Server<'c> {
         let loc = a.query()?.definition_at(place.module, place.offset)?;
         let path = a.paths.get(&loc.source)?;
         let text = &a.graph.sources.get(loc.source).text;
-        if path.starts_with(&self.library_dir) {
+        if self.library_dir().is_some_and(|l| path.starts_with(l)) {
             self.write_library(a);
         }
         Some(lsp::GotoDefinitionResponse::Scalar(lsp::Location {
@@ -666,14 +761,17 @@ impl<'c> Server<'c> {
 /// The name put after `v.` to check the text while completing.
 const PLACEHOLDER: &str = "x";
 
-/// `v.` just before `offset`, with no letters of a name after the dot.
+/// `v.` just before `offset`, with no letters of a name after the dot:
+/// after a name, or after the end of any other expression, as in `f(x).`
+/// or `{ t }.`.
 fn member_without_name(text: &str, offset: u32) -> bool {
     let b = text.as_bytes();
     let o = offset as usize;
     o > 1
         && o <= b.len()
         && b[o - 1] == b'.'
-        && (b[o - 2].is_ascii_alphanumeric() || b[o - 2] == b'_')
+        && (b[o - 2].is_ascii_alphanumeric()
+            || matches!(b[o - 2], b'_' | b')' | b']' | b'}' | b'"'))
 }
 
 fn params<P: serde::de::DeserializeOwned, R: serde::Serialize>(
