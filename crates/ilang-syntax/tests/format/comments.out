@@ -23,8 +23,7 @@ area = (shape) { // after the brace
 	yy = 22 // twenty-two
 
 	// after a blank line
-	zzz = x +
-		// in the middle of an operation
+	zzz = x + // in the middle of an operation
 		yy
 	call(
 		x // after the first argument
