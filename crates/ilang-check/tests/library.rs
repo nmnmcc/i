@@ -242,3 +242,56 @@ fn hello_example_checks() {
     assert!(diags.is_empty(), "{:#?}", graph.sources.render_all(&diags));
     assert!(checked.program.is_some() && checked.types.is_some());
 }
+
+const RESERVED: [&str; 7] = [
+    "i/task",
+    "i/clock",
+    "i/random",
+    "i/fs",
+    "i/process",
+    "i/net",
+    "i/stdio",
+];
+
+/// User code imports every reserved module with no problems.
+#[test]
+fn reserved_modules_import_cleanly() {
+    let imports: String = RESERVED.iter().map(|p| format!("  {p}\n")).collect();
+    let main = format!("import (\n{imports})\n\nx = 1\n");
+    let (graph, program, diags) = common::check_files(&[("src/main.i", &main)]);
+    let rendered = graph.sources.render_all(&diags);
+    assert!(rendered.is_empty(), "{rendered:#?}");
+    assert!(program.is_some());
+}
+
+/// A name imported from a reserved module, or used through its alias, is
+/// reported as missing from that module.
+#[test]
+fn reserved_modules_have_no_names() {
+    let imports: String = RESERVED
+        .iter()
+        .map(|p| format!("  (nothing) = {p}\n"))
+        .collect();
+    let main = format!("import (\n{imports})\n\nx = 1\n");
+    let (graph, _, diags) = common::check_files(&[("src/main.i", &main)]);
+    let rendered = graph.sources.render_all(&diags);
+    let want: Vec<String> = RESERVED
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            format!(
+                "src/main.i:{}:4: error[E0203]: `{p}` has no `nothing`",
+                i + 2
+            )
+        })
+        .collect();
+    assert_eq!(rendered, want);
+
+    let main = "import (\n  i/task\n)\n\nx = task.spawn\n";
+    let (graph, _, diags) = common::check_files(&[("src/main.i", main)]);
+    let rendered = graph.sources.render_all(&diags);
+    assert_eq!(
+        rendered,
+        ["src/main.i:5:10: error[E0203]: `i/task` has no `spawn`"]
+    );
+}

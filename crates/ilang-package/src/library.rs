@@ -11,7 +11,7 @@ pub const MODULES: &[(&str, &str)] = &[
     ("i/assertion", include_str!("../../../lib/i/assertion.i")),
     ("i/core", include_str!("../../../lib/i/core.i")),
     ("i/io", include_str!("../../../lib/i/io.i")),
-    // Reserved modules, each filled by a later track.
+    // Reserved modules. They are empty for now.
     ("i/task", include_str!("../../../lib/i/task.i")),
     ("i/clock", include_str!("../../../lib/i/clock.i")),
     ("i/random", include_str!("../../../lib/i/random.i")),
