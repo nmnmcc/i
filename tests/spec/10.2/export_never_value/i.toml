@@ -1,0 +1,9 @@
+# spec: 10.2, 10.3
+# expect: compile-error E0521
+
+# `Never` is not a type that the host can take, so a host export may not
+# give it.
+name = "spec"
+
+[wasm]
+exports = ["spec/m.f"]

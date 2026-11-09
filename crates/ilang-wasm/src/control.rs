@@ -12,10 +12,20 @@
 //!   statements, and they are made again from the environment of the place
 //!   of `resume` (§9.4 rule 3);
 //! - the **segment** is the rest of the function after the call: the rest
-//!   of its statement list, then the rest of each enclosing list, with the
-//!   enclosing blocks around them so that `Break` still leaves them. In a
-//!   segment, each later `Suspendable` is followed by a `Continue` to its own
-//!   segment, so every part of the code is in few segments.
+//!   of its statement list, then a [`Stmt::Join`] to the [`Join`] of the
+//!   `If` or `Block` around it, which is the rest of the function after that
+//!   statement, made in the same way.
+//!
+//! Each piece of code is copied into at most one segment or join, so the
+//! code grows linearly with the number of points:
+//!
+//! - in a segment or a join, a later `Suspendable` is followed by a
+//!   `Continue` to its own segment, and a later `If` or `Block` that has a
+//!   point is followed by a `Join` to its own join; nothing after them is
+//!   copied;
+//! - a `Break` to a block that is around the start of a segment or a join,
+//!   and so not in it, is a `Join` to the join of that block: the code after
+//!   it.
 //!
 //! A function may suspend also when it only makes a tail call to a closure
 //! or to a function that may suspend: its caller's frame is on the stack
@@ -45,24 +55,32 @@ pub fn split(p: &mut Program) {
         let f = &*f;
         let mut defs = HashMap::new();
         env_defs(&f.body, &mut defs);
-        let mut live = HashMap::new();
-        live_stmts(&f.body, BTreeSet::new(), &mut HashMap::new(), &mut live);
-        let mut paths = HashMap::new();
-        find(&f.body, &mut Vec::new(), &mut paths);
+        let mut found = Found {
+            first_join: p.joins.len() as JoinId,
+            ..Found::default()
+        };
+        find(&f.body, &mut Vec::new(), &mut found);
+        let mut live = Liveness {
+            join_of: &found.join_of,
+            points: HashMap::new(),
+            joins: HashMap::new(),
+        };
+        live.stmts(&f.body, BTreeSet::new(), &mut HashMap::new());
+        let cutter = Cutter {
+            join_of: &found.join_of,
+            label_join: &found.label_join,
+        };
         for point in first..next {
-            let path = &paths[&point];
+            let path = &found.points[&point];
             let (list, at) = *path.last().expect("a point is in its function");
-            let Stmt::Suspendable {
-                dst, value, site, ..
-            } = &list[at]
-            else {
+            let Stmt::Suspendable { dst, value, .. } = &list[at] else {
                 unreachable!()
             };
             let env = match value {
                 Value::Call { env, .. } | Value::OpEnv(_, _, env) => *env,
                 _ => Env::Param,
             };
-            let after = &live[&point];
+            let after = &live.points[&point];
             // Every environment that is used, and the ones it is made from.
             let mut needed: BTreeSet<Local> = after
                 .iter()
@@ -99,26 +117,50 @@ pub fn split(p: &mut Program) {
                 .collect();
             p.points.push(Point {
                 func: FuncId(i as u32),
-                site: *site,
                 env,
                 dst: *dst,
                 params,
                 envs,
-                segment: rest(path),
+                segment: cutter.segment(path),
                 locals: Vec::new(),
             });
         }
-        // The locals that each segment declares: those it mentions, and
-        // those that the later points it goes on with need.
+        for (k, path) in found.joins.iter().enumerate() {
+            let j = found.first_join + k as JoinId;
+            p.joins.push(Join {
+                func: FuncId(i as u32),
+                params: live.joins[&j].iter().copied().collect(),
+                segment: cutter.segment(path),
+                locals: Vec::new(),
+            });
+        }
+        // The paths into the body are not used any more.
+        let first_join = found.first_join as usize;
+        drop(live);
+        drop(found);
+        // The locals that each segment and join declares: those it
+        // mentions, and those that the later points and joins it goes on
+        // with need.
+        let needs = |p: &Program, s: &Stmt, set: &mut BTreeSet<Local>| match s {
+            Stmt::Suspendable { point: q, .. } | Stmt::Continue(q) => {
+                set.extend(p.points[*q as usize].params.iter().copied());
+                set.insert(p.points[*q as usize].dst);
+            }
+            Stmt::Join(j) => set.extend(p.joins[*j as usize].params.iter().copied()),
+            _ => {}
+        };
         for point in first..next {
             let pt = &p.points[point as usize];
             let mut set: BTreeSet<Local> = pt.params.iter().copied().collect();
             set.insert(pt.dst);
-            mentioned(&pt.segment, &mut set, &mut |q, set| {
-                set.extend(p.points[q as usize].params.iter().copied());
-                set.insert(p.points[q as usize].dst);
-            });
+            mentioned(&pt.segment, &mut set, &mut |s, set| needs(p, s, set));
             p.points[point as usize].locals = set.into_iter().collect();
+        }
+        for j in first_join..p.joins.len() {
+            let join = &p.joins[j];
+            let mut set: BTreeSet<Local> = join.params.iter().copied().collect();
+            mentioned(&join.segment, &mut set, &mut |s, set| needs(p, s, set));
+            p.joins[j].locals = set.into_iter().collect();
         }
     }
 }
@@ -128,7 +170,7 @@ pub fn split(p: &mut Program) {
 fn mentioned(
     stmts: &[Stmt],
     set: &mut BTreeSet<Local>,
-    point: &mut dyn FnMut(PointId, &mut BTreeSet<Local>),
+    goes_on: &mut dyn FnMut(&Stmt, &mut BTreeSet<Local>),
 ) {
     for s in stmts {
         let mut uses = Vec::new();
@@ -138,17 +180,12 @@ fn mentioned(
                 add(*dst);
                 value_uses(value, &mut add);
             }
-            Stmt::Suspendable {
-                dst,
-                value,
-                point: q,
-                ..
-            } => {
+            Stmt::Suspendable { dst, value, .. } => {
                 add(*dst);
                 value_uses(value, &mut add);
-                point(*q, set);
+                goes_on(s, set);
             }
-            Stmt::Continue(q) => point(*q, set),
+            Stmt::Continue(_) | Stmt::Join(_) => goes_on(s, set),
             Stmt::LetNum { dst, value, .. } => {
                 add(*dst);
                 num_value_uses(value, &mut add);
@@ -173,10 +210,10 @@ fn mentioned(
                 otherwise,
             } => {
                 cond_uses(cond, &mut add);
-                mentioned(then, set, point);
-                mentioned(otherwise, set, point);
+                mentioned(then, set, goes_on);
+                mentioned(otherwise, set, goes_on);
             }
-            Stmt::Block { body, .. } => mentioned(body, set, point),
+            Stmt::Block { body, .. } => mentioned(body, set, goes_on),
             Stmt::Break(_) | Stmt::Unreachable => {}
             Stmt::Return(a) | Stmt::SetGlobal(_, a) => atom_uses(a, &mut add),
             Stmt::TailCall {
@@ -311,209 +348,269 @@ fn env_defs(stmts: &[Stmt], out: &mut HashMap<Local, (Env, u32)>) {
 
 type Path<'a> = Vec<(&'a [Stmt], usize)>;
 
-/// For each point, the statement lists from the body to it, with the index
-/// in each.
-fn find<'a>(stmts: &'a [Stmt], path: &mut Path<'a>, out: &mut HashMap<PointId, Path<'a>>) {
+/// Where the points and the joins of a function are.
+#[derive(Default)]
+struct Found<'a> {
+    /// For each point, the statement lists from the body to it, with the
+    /// index in each.
+    points: HashMap<PointId, Path<'a>>,
+    /// The id of the first join of the function.
+    first_join: JoinId,
+    /// For each join, in order, the path to its `If` or `Block`.
+    joins: Vec<Path<'a>>,
+    /// The join of each `If` and `Block` that has a point, by its address.
+    join_of: HashMap<*const Stmt, JoinId>,
+    /// The join of each block that has a point, by its label.
+    label_join: HashMap<Label, JoinId>,
+}
+
+fn has_point(stmts: &[Stmt]) -> bool {
+    stmts.iter().any(|s| match s {
+        Stmt::Suspendable { .. } => true,
+        Stmt::If {
+            then, otherwise, ..
+        } => has_point(then) || has_point(otherwise),
+        Stmt::Block { body, .. } => has_point(body),
+        _ => false,
+    })
+}
+
+fn find<'a>(stmts: &'a [Stmt], path: &mut Path<'a>, out: &mut Found<'a>) {
     for (i, s) in stmts.iter().enumerate() {
         path.push((stmts, i));
         match s {
             Stmt::Suspendable { point, .. } => {
-                out.insert(*point, path.clone());
+                out.points.insert(*point, path.clone());
             }
             Stmt::If {
                 then, otherwise, ..
-            } => {
+            } if has_point(then) || has_point(otherwise) => {
+                out.join_of
+                    .insert(s, out.first_join + out.joins.len() as JoinId);
+                out.joins.push(path.clone());
                 find(then, path, out);
                 find(otherwise, path, out);
             }
-            Stmt::Block { body, .. } => find(body, path, out),
+            Stmt::Block { label, body } if has_point(body) => {
+                let j = out.first_join + out.joins.len() as JoinId;
+                out.join_of.insert(s, j);
+                out.label_join.insert(*label, j);
+                out.joins.push(path.clone());
+                find(body, path, out);
+            }
             _ => {}
         }
         path.pop();
     }
 }
 
-/// The segment of the point at the end of `path`: the rest of the function
-/// after it. The rest of an `If` branch goes on after the `If`; the rest of
-/// a block body is in the block, for its `Break`s.
-fn rest(path: &[(&[Stmt], usize)]) -> Vec<Stmt> {
-    let (list, at) = path[path.len() - 1];
-    let mut out = cut(&list[at + 1..]);
-    for &(list, at) in path[..path.len() - 1].iter().rev() {
-        match &list[at] {
-            Stmt::Block { label, .. } => {
-                out = vec![Stmt::Block {
-                    label: *label,
-                    body: out,
-                }];
-            }
-            // A branch that goes on with a segment does not end.
-            Stmt::If { .. } if matches!(out.last(), Some(Stmt::Continue(_))) => continue,
-            Stmt::If { .. } => {}
-            _ => unreachable!("only blocks and ifs have statements"),
-        }
-        out.extend(cut(&list[at + 1..]));
-    }
-    out
+/// Makes the segments of the points and the joins of a function.
+struct Cutter<'a> {
+    join_of: &'a HashMap<*const Stmt, JoinId>,
+    label_join: &'a HashMap<Label, JoinId>,
 }
 
-/// A copy of the statements in which each `Suspendable` goes on with the
-/// segment of its point, so that the code after it is not copied.
-fn cut(stmts: &[Stmt]) -> Vec<Stmt> {
-    let mut out = Vec::new();
-    for s in stmts {
-        match s {
-            Stmt::Suspendable { point, .. } => {
-                out.push(s.clone());
-                out.push(Stmt::Continue(*point));
+impl Cutter<'_> {
+    /// The code after the statement at the end of `path`: the rest of its
+    /// list, then the join of the `If` or `Block` around it, which is the
+    /// code after that statement.
+    fn segment(&self, path: &[(&[Stmt], usize)]) -> Vec<Stmt> {
+        let (list, at) = path[path.len() - 1];
+        let mut out = self.cut(&list[at + 1..], &mut Vec::new());
+        let ends = matches!(
+            out.last(),
+            Some(
+                Stmt::Return(_)
+                    | Stmt::TailCall { .. }
+                    | Stmt::Continue(_)
+                    | Stmt::Join(_)
+                    | Stmt::Break(_)
+                    | Stmt::Unreachable
+            )
+        );
+        if path.len() > 1 && !ends {
+            let (list, at) = path[path.len() - 2];
+            out.push(Stmt::Join(self.join_of[&(&list[at] as *const Stmt)]));
+        }
+        out
+    }
+
+    /// A copy of the statements up to the first point or statement with a
+    /// join, which goes on with its segment or its join. `blocks` has the
+    /// labels of the blocks of the copy around the statements; a `Break` to
+    /// another block goes on with the join of that block.
+    fn cut(&self, stmts: &[Stmt], blocks: &mut Vec<Label>) -> Vec<Stmt> {
+        let mut out = Vec::new();
+        for s in stmts {
+            match s {
+                Stmt::Suspendable { point, .. } => {
+                    out.push(s.clone());
+                    out.push(Stmt::Continue(*point));
+                    return out;
+                }
+                Stmt::If {
+                    cond,
+                    then,
+                    otherwise,
+                } => out.push(Stmt::If {
+                    cond: cond.clone(),
+                    then: self.cut(then, blocks),
+                    otherwise: self.cut(otherwise, blocks),
+                }),
+                Stmt::Block { label, body } => {
+                    blocks.push(*label);
+                    let body = self.cut(body, blocks);
+                    blocks.pop();
+                    out.push(Stmt::Block {
+                        label: *label,
+                        body,
+                    });
+                }
+                Stmt::Break(label) if !blocks.contains(label) => {
+                    out.push(Stmt::Join(self.label_join[label]));
+                    return out;
+                }
+                s => out.push(s.clone()),
+            }
+            if let Some(&j) = self.join_of.get(&(s as *const Stmt)) {
+                out.push(Stmt::Join(j));
                 return out;
             }
-            Stmt::If {
-                cond,
-                then,
-                otherwise,
-            } => out.push(Stmt::If {
-                cond: cond.clone(),
-                then: cut(then),
-                otherwise: cut(otherwise),
-            }),
-            Stmt::Block { label, body } => out.push(Stmt::Block {
-                label: *label,
-                body: cut(body),
-            }),
-            s => out.push(s.clone()),
         }
+        out
     }
-    out
 }
 
 // ---- Liveness ----
 
 type Live = BTreeSet<Local>;
 
-/// The locals that are used before they are set, from the start of
-/// `stmts`, when `after` is live at their end. `breaks` has what is live
-/// after each enclosing block. The live locals after each `Suspendable` go
-/// to `points`.
-fn live_stmts(
-    stmts: &[Stmt],
-    after: Live,
-    breaks: &mut HashMap<Label, Live>,
-    points: &mut HashMap<PointId, Live>,
-) -> Live {
-    let mut live = after;
-    for s in stmts.iter().rev() {
-        live = live_stmt(s, live, breaks, points);
-    }
-    live
+/// The live locals after each point and each statement with a join.
+struct Liveness<'a> {
+    join_of: &'a HashMap<*const Stmt, JoinId>,
+    points: HashMap<PointId, Live>,
+    joins: HashMap<JoinId, Live>,
 }
 
-fn live_stmt(
-    s: &Stmt,
-    mut live: Live,
-    breaks: &mut HashMap<Label, Live>,
-    points: &mut HashMap<PointId, Live>,
-) -> Live {
-    match s {
-        Stmt::Let { dst, value, .. } => {
-            live.remove(dst);
-            value_uses(value, &mut |l| {
-                live.insert(l);
-            });
+impl Liveness<'_> {
+    /// The locals that are used before they are set, from the start of
+    /// `stmts`, when `after` is live at their end. `breaks` has what is live
+    /// after each enclosing block.
+    fn stmts(&mut self, stmts: &[Stmt], after: Live, breaks: &mut HashMap<Label, Live>) -> Live {
+        let mut live = after;
+        for s in stmts.iter().rev() {
+            if let Some(&j) = self.join_of.get(&(s as *const Stmt)) {
+                self.joins.insert(j, live.clone());
+            }
+            live = self.stmt(s, live, breaks);
         }
-        Stmt::Suspendable {
-            dst, value, point, ..
-        } => {
-            points.insert(*point, live.clone());
-            live.remove(dst);
-            value_uses(value, &mut |l| {
-                live.insert(l);
-            });
-        }
-        Stmt::LetNum { dst, value, .. } => {
-            live.remove(dst);
-            num_value_uses(value, &mut |l| {
-                live.insert(l);
-            });
-        }
-        Stmt::ReadUtf {
-            codepoint,
-            width,
-            ok,
-            bits,
-            start,
-            ..
-        } => {
-            live.remove(codepoint);
-            live.remove(width);
-            live.remove(ok);
-            atom_uses(bits, &mut |l| {
-                live.insert(l);
-            });
-            num_uses(start, &mut |l| {
-                live.insert(l);
-            });
-        }
-        Stmt::If {
-            cond,
-            then,
-            otherwise,
-        } => {
-            let a = live_stmts(then, live.clone(), breaks, points);
-            let b = live_stmts(otherwise, live, breaks, points);
-            live = a;
-            live.extend(b);
-            cond_uses(cond, &mut |l| {
-                live.insert(l);
-            });
-        }
-        Stmt::Block { label, body } => {
-            let saved = breaks.insert(*label, live.clone());
-            live = live_stmts(body, live, breaks, points);
-            match saved {
-                Some(s) => breaks.insert(*label, s),
-                None => breaks.remove(label),
-            };
-        }
-        Stmt::Break(label) => live = breaks.get(label).cloned().unwrap_or_default(),
-        Stmt::Return(a) => {
-            live = Live::new();
-            atom_uses(a, &mut |l| {
-                live.insert(l);
-            });
-        }
-        Stmt::TailCall {
-            callee, args, env, ..
-        } => {
-            live = Live::new();
-            call_uses(callee, args, *env, &mut |l| {
-                live.insert(l);
-            });
-        }
-        Stmt::LetEnv {
-            dst, env, value, ..
-        } => {
-            live.remove(dst);
-            env_uses(*env, &mut |l| {
-                live.insert(l);
-            });
-            atom_uses(value, &mut |l| {
-                live.insert(l);
-            });
-        }
-        Stmt::Unreachable => live = Live::new(),
-        Stmt::SetCapture { closure, value, .. } => {
-            live.insert(*closure);
-            atom_uses(value, &mut |l| {
-                live.insert(l);
-            });
-        }
-        Stmt::SetGlobal(_, a) => atom_uses(a, &mut |l| {
-            live.insert(l);
-        }),
-        Stmt::Continue(_) => unreachable!("liveness is worked out before segments"),
+        live
     }
-    live
+
+    fn stmt(&mut self, s: &Stmt, mut live: Live, breaks: &mut HashMap<Label, Live>) -> Live {
+        match s {
+            Stmt::Let { dst, value, .. } => {
+                live.remove(dst);
+                value_uses(value, &mut |l| {
+                    live.insert(l);
+                });
+            }
+            Stmt::Suspendable {
+                dst, value, point, ..
+            } => {
+                self.points.insert(*point, live.clone());
+                live.remove(dst);
+                value_uses(value, &mut |l| {
+                    live.insert(l);
+                });
+            }
+            Stmt::LetNum { dst, value, .. } => {
+                live.remove(dst);
+                num_value_uses(value, &mut |l| {
+                    live.insert(l);
+                });
+            }
+            Stmt::ReadUtf {
+                codepoint,
+                width,
+                ok,
+                bits,
+                start,
+                ..
+            } => {
+                live.remove(codepoint);
+                live.remove(width);
+                live.remove(ok);
+                atom_uses(bits, &mut |l| {
+                    live.insert(l);
+                });
+                num_uses(start, &mut |l| {
+                    live.insert(l);
+                });
+            }
+            Stmt::If {
+                cond,
+                then,
+                otherwise,
+            } => {
+                let a = self.stmts(then, live.clone(), breaks);
+                let b = self.stmts(otherwise, live, breaks);
+                live = a;
+                live.extend(b);
+                cond_uses(cond, &mut |l| {
+                    live.insert(l);
+                });
+            }
+            Stmt::Block { label, body } => {
+                let saved = breaks.insert(*label, live.clone());
+                live = self.stmts(body, live, breaks);
+                match saved {
+                    Some(s) => breaks.insert(*label, s),
+                    None => breaks.remove(label),
+                };
+            }
+            Stmt::Break(label) => live = breaks.get(label).cloned().unwrap_or_default(),
+            Stmt::Return(a) => {
+                live = Live::new();
+                atom_uses(a, &mut |l| {
+                    live.insert(l);
+                });
+            }
+            Stmt::TailCall {
+                callee, args, env, ..
+            } => {
+                live = Live::new();
+                call_uses(callee, args, *env, &mut |l| {
+                    live.insert(l);
+                });
+            }
+            Stmt::LetEnv {
+                dst, env, value, ..
+            } => {
+                live.remove(dst);
+                env_uses(*env, &mut |l| {
+                    live.insert(l);
+                });
+                atom_uses(value, &mut |l| {
+                    live.insert(l);
+                });
+            }
+            Stmt::Unreachable => live = Live::new(),
+            Stmt::SetCapture { closure, value, .. } => {
+                live.insert(*closure);
+                atom_uses(value, &mut |l| {
+                    live.insert(l);
+                });
+            }
+            Stmt::SetGlobal(_, a) => atom_uses(a, &mut |l| {
+                live.insert(l);
+            }),
+            Stmt::Continue(_) | Stmt::Join(_) => {
+                unreachable!("liveness is worked out before segments")
+            }
+        }
+        live
+    }
 }
 
 fn atom_uses(a: &Atom, f: &mut dyn FnMut(Local)) {

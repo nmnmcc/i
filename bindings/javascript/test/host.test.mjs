@@ -183,6 +183,34 @@ test("a failing host function keeps its error and the instance is unusable", asy
   await assert.rejects(instantiate(customFixture, { abi: customAbi, imports: {} }), /Missing host function/);
 });
 
+test("an exception of a host function is not thrown into the module", async () => {
+  const failure = new Error("the host is gone");
+  for (const [name, args] of [["nil", []], ["float", [1.5]]]) {
+    const value = await custom({ [`echo_${name}`]: () => { throw failure; } });
+    // The handler of every exception around the import does not run: the
+    // module traps, and the caller gets the exception.
+    assert.throws(() => value.call(`guarded_${name}`, args), (error) => error === failure, name);
+    assert.match(value.unusable, /the host is gone/);
+    assert.throws(() => value.call("echo_nil"), /make a new instance/);
+    const fine = await custom();
+    assert.equal(fine.call(`guarded_${name}`, args), false);
+  }
+  // A value of another type, which the host cannot give to the module.
+  const wrong = await custom({ echo_float: () => "text" });
+  assert.throws(() => wrong.call("guarded_float", [1]), stopsWith(HOST_VALUE_REASON));
+  assert.ok(wrong.unusable);
+});
+
+test("answers of the right type are given to the module unchecked by default", async () => {
+  // The hand-written module gives the answer back as it is; a module built
+  // by the compiler checks it (compiled.test.mjs).
+  const value = await custom({ echo_float: () => NaN });
+  assert.ok(Number.isNaN(value.exports.echo_float(1)));
+  const checked = await instantiate(customFixture, { abi: customAbi, imports: customImports(iLangError, { echo_float: () => NaN }), checkReplies: true });
+  assert.throws(() => checked.call("guarded_float", [1]), stopsWith(HOST_VALUE_REASON));
+  assert.ok(checked.unusable);
+});
+
 test("tests run each in a new instance and a stop fails only its own test", async () => {
   const results = await runTests(fixture, { imports: hostImports(iLangError) });
   assert.deepEqual(results.map(({ name, passed }) => [name, passed]), [

@@ -32,6 +32,13 @@ export interface Options {
    */
   imports?: Record<string, Record<string, (...args: any[]) => unknown>>;
   rawImports?: WebAssembly.Imports;
+  /**
+   * Check the answers of host functions in the loader, and stop the program
+   * there, with no positions, when one is not correct. By default an answer
+   * of the right type is given to the module as it is, and the module checks
+   * it and stops with the positions of the call (B.2).
+   */
+  checkReplies?: boolean;
 }
 export interface Guest {
   readonly module: WebAssembly.Module;

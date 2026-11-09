@@ -995,7 +995,10 @@ impl<'a> Lowerer<'a> {
         };
         match self.import(module, function, host_abi(hf), ImportKind::External) {
             Ok(import) => {
-                let f = self.import_func(import);
+                // §11.4: each declaration is one value, so two declarations
+                // of one import have two functions, which call the same
+                // import.
+                let f = self.make_import_func(import);
                 self.external_funcs.insert(d, f);
                 Some(f)
             }
@@ -1050,6 +1053,13 @@ impl<'a> Lowerer<'a> {
         if let Some(&f) = self.import_funcs.get(&import) {
             return f;
         }
+        let f = self.make_import_func(import);
+        self.import_funcs.insert(import, f);
+        f
+    }
+
+    /// A new function that calls an import, as `import_func`.
+    fn make_import_func(&mut self, import: ImportId) -> FuncId {
         let x = self.out.imports[import as usize].clone();
         let n = x.abi.params.len() as u32;
         let args: Vec<Atom> = (0..n).map(Atom::Local).collect();
@@ -1111,7 +1121,6 @@ impl<'a> Lowerer<'a> {
             body,
             frame: true,
         });
-        self.import_funcs.insert(import, f);
         f
     }
 
@@ -2500,7 +2509,7 @@ impl<'a> Lowerer<'a> {
 /// has no values, so it is passed as nothing, like `Nil`.
 fn abi_type(t: HostType) -> AbiType {
     match t {
-        HostType::Nil | HostType::Never => AbiType::Nil,
+        HostType::Nil => AbiType::Nil,
         HostType::Bool => AbiType::Bool,
         HostType::Int => AbiType::Int,
         HostType::Float => AbiType::Float,

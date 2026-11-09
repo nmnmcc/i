@@ -51,8 +51,24 @@ test("the module traps when the host answers a function it does not wait for", a
   assert.throws(() => idle.exports["ilang_resume:app:clock/v1:later"](0, 1, 0, 0), WebAssembly.RuntimeError);
 });
 
-test("an answer of the host that is not correct stops the program", async () => {
+test("an answer of the host that is not correct stops the program in the module", async () => {
+  // By default the module checks the answer, and the stop has the position
+  // of the call (B.2, §11.7).
   const value = await guest([], { later: async () => NaN });
-  await assert.rejects(value.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof iLangStop && error.stopMessage === "host: value is not correct");
+  await assert.rejects(value.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof iLangStop && error.stopMessage === "host: value is not correct\napp/app:35:50");
   assert.ok(value.unusable);
+  const sync = await instantiate(compiled, { imports: { ...compiledImports(iLangError), "app:math/v1": { hypot: () => Infinity } } });
+  assert.throws(() => sync.call("app/app.distance", [3, 4]), (error) => error instanceof iLangStop && error.stopMessage === "host: value is not correct\napp/app:32:35");
+  // With `checkReplies`, the host stops the program, with no positions.
+  const checked = await instantiate(compiled, { imports: compiledImports(iLangError, [], { later: async () => NaN }), checkReplies: true });
+  await assert.rejects(checked.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof iLangStop && error.stopMessage === "host: value is not correct");
+  const checkedSync = await instantiate(compiled, { imports: { ...compiledImports(iLangError), "app:math/v1": { hypot: () => Infinity } }, checkReplies: true });
+  assert.throws(() => checkedSync.call("app/app.distance", [3, 4]), (error) => error instanceof iLangStop && error.stopMessage === "host: value is not correct");
+});
+
+test("an exception of a host function goes to the caller", async () => {
+  const failure = new Error("the storage is gone");
+  const value = await guest([], { read: () => { throw failure; } });
+  assert.throws(() => value.call("app/app.lookup", ["name"]), (error) => error === failure);
+  assert.match(value.unusable, /the storage is gone/);
 });

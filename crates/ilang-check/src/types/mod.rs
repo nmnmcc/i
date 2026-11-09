@@ -196,8 +196,6 @@ pub enum HostType {
     BitArray,
     /// A custom type with no constructors: an opaque reference.
     Opaque(crate::hir::TypeId),
-    /// `Never`: no value, so nothing is passed.
-    Never,
 }
 
 /// The types of a host export (B.2): its parameters, its value, and the

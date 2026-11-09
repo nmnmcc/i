@@ -82,17 +82,27 @@ unusable.
 Buffers follow B.3. For an export, the host makes the parameter buffers with
 `ilang_alloc` and frees them with `ilang_free` after the call, and frees the
 result buffers after copying them. For an import, the module owns the parameter
-buffers and the host makes the result buffers with `ilang_alloc`. Empty buffers
-have the address 0 and are neither made nor freed.
+buffers and the host makes the result buffers with `ilang_alloc`. The host gives
+empty buffers the address 0 and does not make or free them; the module frees
+every result buffer whose address is not 0, also an empty one.
 
 ## Values that are not correct
 
-Values from the host are checked as B.2 requires. An argument of an export, or
-the answer of a host function, that is not a correct value of its type (a
-`Float` that is not finite, a `BitArray` whose bits after the end are not 0, a
-value of another type, or an error that is not a member of `E`) stops the
-program with `host: value is not correct`. A host function that returns `Err`
-traps the instance and its error is given back by the call.
+Values from the host are checked as B.2 requires. An argument of an export that
+is not a correct value of its type (a `Float` that is not finite, a `BitArray`
+whose bits after the end are not 0, or a value of another type) stops the
+program with `host: value is not correct`.
+
+The answer of a host function that has the right type is given to the module as
+it is, also when it is not correct: the module checks it and stops with the
+positions of the call (B.2, §11.7). An answer of another type, or an error that
+is not a member of `E`, cannot be given to the module, so the host stops the
+program with `host: value is not correct` and no positions. With
+`HostOptions::check_replies`, the host checks the answers of the right type too,
+and stops the program for them in the same way.
+
+A host function that returns `Err` traps the instance, with no handler of the
+module run, and its error is given back by the call.
 
 Values from the module are checked as well: a `Bool` that is not 0 or 1, a
 `String` that is not UTF-8, an `Int` with a wrong sign or a last part of 0, or a

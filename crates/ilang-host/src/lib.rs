@@ -529,19 +529,22 @@ impl HostImports {
 #[derive(Clone, Default)]
 pub struct HostOptions {
     pub imports: HostImports,
-    /// Give the answers of host functions to the module when they have the
-    /// right types, without checking that they are correct (a `Float` that
-    /// is not finite, a `BitArray` with bits after the end): the module
-    /// checks them and stops, with the positions of the call (B.2, §11.7).
-    /// When off, the host stops the program itself, with no positions.
-    pub unchecked_replies: bool,
+    /// Check the answers of host functions in the host (B.2), and stop the
+    /// program there, with no positions, when one is not correct. Off by
+    /// default: an answer of the right type is given to the module as it
+    /// is, also when it is not correct (a `Float` that is not finite, a
+    /// `BitArray` with bits after the end), and the module checks it and
+    /// stops with the positions of the call (B.2, §11.7). An answer of
+    /// another type cannot be given to the module, so the host stops the
+    /// program for it in both cases.
+    pub check_replies: bool,
 }
 
 impl HostOptions {
     pub fn new(imports: HostImports) -> Self {
         Self {
             imports,
-            unchecked_replies: false,
+            check_replies: false,
         }
     }
 }
@@ -646,7 +649,7 @@ impl Program {
                         name,
                         signature,
                         function,
-                        !options.unchecked_replies,
+                        options.check_replies,
                     )?;
                 }
             }
@@ -673,7 +676,7 @@ impl Program {
             instance,
             abi: self.abi.clone(),
             unusable: None,
-            checked: !options.unchecked_replies,
+            checked: options.check_replies,
         };
         let start = instance
             .instance

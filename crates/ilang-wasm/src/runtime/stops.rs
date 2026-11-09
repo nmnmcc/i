@@ -84,6 +84,10 @@ const WAT: &str = r#"
   (if (i32.eqz (global.get $sp)) (then (return_call $shadow_enter (local.get $site))))
   (array.set $frames (global.get $shadow) (i32.sub (global.get $sp) (i32.const 1)) (local.get $site)))
 
+;; The slot of the innermost frame. Only called inside a frame.
+(func $shadow_top (result i32)
+  (array.get $frames (global.get $shadow) (i32.sub (global.get $sp) (i32.const 1))))
+
 (func $shadow_depth (result i32) (global.get $sp))
 
 (func $shadow_restore (param $depth i32) (global.set $sp (local.get $depth)))

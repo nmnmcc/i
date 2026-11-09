@@ -1,0 +1,9 @@
+# spec: B.5
+# expect: compile-error E0321
+
+# A function named two times in `[wasm].exports` would have two exports with
+# one name.
+name = "spec"
+
+[wasm]
+exports = ["spec/m.f", "spec/m.f"]

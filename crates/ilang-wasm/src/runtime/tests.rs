@@ -1135,6 +1135,23 @@ fn host_boundary_values_round_trip_and_reject_incorrect_values() {
             bits(&[0xff, 0xff], 1, 3)
         ),
     );
+    // B.3: the results of an import are freed also when they are empty, as
+    // a block of `ilang_alloc(0)`; the next one is the same block.
+    checks.define(
+        "(func $empty_results_are_freed (result i32)
+           (local $a i32) (local $ok i32)
+           (local.set $a (call $alloc (i32.const 0)))
+           (drop (call $abi_string_take (local.get $a) (i32.const 0)))
+           (local.set $ok (i32.eq (call $alloc (i32.const 0)) (local.get $a)))
+           (drop (call $abi_bits_take (local.get $a) (i32.const 0)))
+           (local.set $ok (i32.and (local.get $ok) (i32.eq (call $alloc (i32.const 0)) (local.get $a))))
+           (drop (call $abi_int_take (i32.const 0) (local.get $a) (i32.const 0)))
+           (local.set $ok (i32.and (local.get $ok) (i32.eq (call $alloc (i32.const 0)) (local.get $a))))
+           ;; The address 0 is not freed.
+           (drop (call $abi_string_take (i32.const 0) (i32.const 0)))
+           (i32.and (local.get $ok) (i32.ne (call $alloc (i32.const 0)) (i32.const 0))))",
+    );
+    checks.check("empty results are freed", "(call $empty_results_are_freed)");
     checks.check(
         "empty buffers are not allocated",
         "(block (result i32) (call $abi_string_out (call $string_from_bytes (array.new_fixed $bytes 0)))
@@ -1184,6 +1201,19 @@ fn host_boundary_values_round_trip_and_reject_incorrect_values() {
         (
             "string outside memory",
             "(drop (call $abi_string_in (i32.const -1) (i32.const 2)))",
+        ),
+        // An empty buffer must be inside memory too, for every type (B.2).
+        (
+            "empty string outside memory",
+            "(drop (call $abi_string_in (i32.const -1) (i32.const 0)))",
+        ),
+        (
+            "empty bit array outside memory",
+            "(drop (call $abi_bits_in (i32.const -1) (i32.const 0)))",
+        ),
+        (
+            "zero outside memory",
+            "(drop (call $abi_int_in (i32.const 0) (i32.const -1) (i32.const 0)))",
         ),
         (
             "bits after the end",

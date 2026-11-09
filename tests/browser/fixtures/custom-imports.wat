@@ -93,4 +93,16 @@
   (func (export "fallible") (param $selector f64)
     (result i32 i32 i32 i32 i32 i32 i32 f64 i32 i32 i32 i32)
     (call $fallible (local.get $selector)))
+  ;; Imports inside a handler of every exception: the host never throws into
+  ;; the module (B.1), so the handlers never run and these give 0.
+  (func (export "guarded_nil") (result i32)
+    (block $caught
+      (try_table (catch_all $caught) (call $echo_nil))
+      (return (i32.const 0)))
+    (i32.const 1))
+  (func (export "guarded_float") (param $value f64) (result i32)
+    (block $caught
+      (try_table (catch_all $caught) (drop (call $echo_float (local.get $value))))
+      (return (i32.const 0)))
+    (i32.const 1))
 )

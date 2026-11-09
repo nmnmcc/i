@@ -468,6 +468,9 @@ pub fn wat(p: &Program) -> String {
     for i in 0..p.points.len() {
         e.point(i as PointId);
     }
+    for i in 0..p.joins.len() {
+        e.join(i as JoinId);
+    }
     if let Some(start) = &p.start {
         e.code("$start", start);
     }
@@ -622,7 +625,10 @@ impl<'p> Emitter<'p> {
         let _ = writeln!(self.out, ";; {}", f.name.replace('\n', " "));
         self.header(name, f.arity, &f.locals);
         if f.frame {
-            self.out.push_str("(call $shadow_enter_call)\n");
+            // `$slot` keeps the slot of the frame for the frame records of
+            // its points.
+            self.out
+                .push_str(" (local $slot i32)\n(call $shadow_enter_call)\n");
         }
         let mut body = String::new();
         self.stmts(&mut body, &f.body, f.frame);
@@ -756,6 +762,13 @@ impl<'p> Emitter<'p> {
                 if let Some(site) = site {
                     let _ = writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
                 }
+                // The slot of the frame, which may be a tail site (§11.7),
+                // goes in the frame record. The inner frames are still on
+                // the shadow stack when the record is made, so it is read
+                // before the call.
+                if frame {
+                    out.push_str("(local.set $slot (call $shadow_top))\n");
+                }
                 let v = self.value(value);
                 let record = self.record(*point);
                 let _ = writeln!(
@@ -781,6 +794,15 @@ impl<'p> Emitter<'p> {
                     point.dst
                 );
             }
+            Stmt::Join(j) => {
+                let program: &'p Program = self.p;
+                let args: String = program.joins[*j as usize]
+                    .params
+                    .iter()
+                    .map(|l| format!(" (local.get $l{l})"))
+                    .collect();
+                let _ = writeln!(out, "(return_call $j{j} (local.get $env){args})");
+            }
         }
     }
 
@@ -794,8 +816,9 @@ impl<'p> Emitter<'p> {
     }
 
     /// The frame record of a point (§9.4): its re-entry function, the saved
-    /// locals, then the values of the environment statements it rebuilds.
-    /// Numbers are boxed.
+    /// locals, then the values of the environment statements it rebuilds,
+    /// then, for a function with a frame, the slot of its frame on the
+    /// shadow stack as an `i31`. Numbers are boxed.
     fn record(&self, p: PointId) -> String {
         let program: &'p Program = self.p;
         let point = &program.points[p as usize];
@@ -815,6 +838,9 @@ impl<'p> Emitter<'p> {
                 link.dst, link.service
             ));
         }
+        if self.func_of(point).frame {
+            items.push("(ref.i31 (local.get $slot))".into());
+        }
         let saved = if items.is_empty() {
             "(ref.null $values)".to_string()
         } else {
@@ -827,6 +853,71 @@ impl<'p> Emitter<'p> {
         format!("(struct.new $frame (ref.func $r{p}) {saved})")
     }
 
+    /// A function that goes on with the rest of the function `f`: a
+    /// segment of a point, with the value of its call `dst`, or a join.
+    fn rest_func(
+        &mut self,
+        name: &str,
+        f: &Func,
+        params: &[Local],
+        dst: Option<Local>,
+        locals: &[Local],
+        code: &[Stmt],
+    ) {
+        let ty = |l: Local| local_type(f.locals[l as usize]);
+        let _ = write!(
+            self.out,
+            ";; {} {}\n(func ${name} (param $env (ref null $env))",
+            f.name.replace('\n', " "),
+            match dst {
+                Some(_) => format!("after point {}", &name[1..]),
+                None => format!("join {}", &name[1..]),
+            }
+        );
+        for (j, &l) in params.iter().enumerate() {
+            let _ = write!(self.out, " (param $a{j} {})", ty(l));
+        }
+        if dst.is_some() {
+            self.out.push_str(" (param $res eqref)");
+        }
+        self.out
+            .push_str(" (result eqref)\n (local $clo (ref null $obj))");
+        if f.frame {
+            self.out.push_str(" (local $slot i32)");
+        }
+        for &l in locals {
+            let _ = write!(self.out, " (local $l{l} {})", ty(l));
+        }
+        self.out.push('\n');
+        for (j, &l) in params.iter().enumerate() {
+            let _ = writeln!(self.out, "(local.set $l{l} (local.get $a{j}))");
+        }
+        if let Some(dst) = dst {
+            let _ = writeln!(self.out, "(local.set $l{dst} (local.get $res))");
+        }
+        let mut body = String::new();
+        self.stmts(&mut body, code, f.frame);
+        self.out.push_str(&body);
+        self.out.push_str("(unreachable))\n");
+    }
+
+    /// The function `$j…` of a join (§9.4).
+    fn join(&mut self, j: JoinId) {
+        let program: &'p Program = self.p;
+        let join = &program.joins[j as usize];
+        let FuncKind::Code(f) = &program.funcs[join.func.0 as usize] else {
+            unreachable!("a join is in code")
+        };
+        self.rest_func(
+            &format!("j{j}"),
+            f,
+            &join.params,
+            None,
+            &join.locals,
+            &join.segment,
+        );
+    }
+
     /// The segment `$s…` and the re-entry function `$r…` of a point (§9.4).
     fn point(&mut self, p: PointId) {
         let program: &'p Program = self.p;
@@ -836,28 +927,14 @@ impl<'p> Emitter<'p> {
         let ty = |l: Local| local_type(locals[l as usize]);
         // The segment: the environment, the locals it needs, and the value
         // of the call.
-        let _ = write!(
-            self.out,
-            ";; {} after point {p}\n(func $s{p} (param $env (ref null $env))",
-            f.name.replace('\n', " ")
+        self.rest_func(
+            &format!("s{p}"),
+            f,
+            &point.params,
+            Some(point.dst),
+            &point.locals,
+            &point.segment,
         );
-        for (j, &l) in point.params.iter().enumerate() {
-            let _ = write!(self.out, " (param $a{j} {})", ty(l));
-        }
-        self.out
-            .push_str(" (param $res eqref) (result eqref)\n (local $clo (ref null $obj))");
-        for &l in &point.locals {
-            let _ = write!(self.out, " (local $l{l} {})", ty(l));
-        }
-        self.out.push('\n');
-        for (j, &l) in point.params.iter().enumerate() {
-            let _ = writeln!(self.out, "(local.set $l{l} (local.get $a{j}))");
-        }
-        let _ = writeln!(self.out, "(local.set $l{} (local.get $res))", point.dst);
-        let mut body = String::new();
-        self.stmts(&mut body, &point.segment, f.frame);
-        self.out.push_str(&body);
-        self.out.push_str("(unreachable))\n");
         // The re-entry: rebuild the frame, re-enter the inner frames in a
         // handler that adds this record again, and go on with the segment.
         let _ = write!(
@@ -899,9 +976,16 @@ impl<'p> Emitter<'p> {
                 saved.len() + k
             );
         }
+        // The slot of the frame as it was at the point: the site of the
+        // call, or the tail site of the tail call that called the function
+        // (§11.7).
         if f.frame {
-            let site = point.site.map_or(-1, site_code);
-            let _ = writeln!(self.out, "(call $shadow_enter (i32.const {site}))");
+            let _ = writeln!(
+                self.out,
+                "(call $shadow_enter (i31.get_s (ref.cast (ref i31) \
+                 (array.get $values (ref.as_non_null (local.get $saved)) (i32.const {})))))",
+                saved.len() + point.envs.len()
+            );
         }
         let args: String = point
             .params

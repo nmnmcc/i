@@ -2,7 +2,7 @@
 import (i/fail)
 
 export (
-  add, opaque, errors, never, bad_param, bad_value, generic, bad_errors,
+  add, opaque, errors, never, never_param, bad_param, bad_value, generic, bad_errors,
   twice_error, with_host, with_clock, number, Handle, Storage(..), Clock(..)
 )
 
@@ -23,7 +23,9 @@ errors = (x: Int) -> Nil ? Int | String {
     _ -> Nil
   }
 }
+// `Never` is not a type that the host can take (§10.3).
 never = (s: String) { panic(s) }
+never_param = (x: Never) -> Int { x + 1 }
 bad_param = (xs: List(Int)) { 1 }
 bad_value = () { (1, 2) }
 generic = (x) { x }

@@ -17,6 +17,8 @@ export const customAbi = {
     echo_float: unary("float"),
     echo_nil: { params: [], result: "nil" },
     fallible,
+    guarded_nil: { params: [], result: "bool" },
+    guarded_float: { params: ["float"], result: "bool" },
   },
   services: { "custom:fallible/v1": { fallible } },
   externals: {

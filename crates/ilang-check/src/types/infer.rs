@@ -462,7 +462,6 @@ impl<'a> Checker<'a> {
     /// take (§10.3, B.2).
     fn host_part(&self, t: &Ty) -> Option<HostType> {
         Some(match t {
-            Ty::Never => HostType::Never,
             Ty::Con(Head::Named(TypeRef::Builtin(b)), _) => match b {
                 BuiltinType::Int => HostType::Int,
                 BuiltinType::Float => HostType::Float,
@@ -485,11 +484,11 @@ impl<'a> Checker<'a> {
         })
     }
 
-    /// §10.3: a type that the host can take. `Never` has no values, so it
-    /// is one.
+    /// §10.3: a type that the host can take. `Never` is not one, as for
+    /// the functions of host services (§9.7) and external functions
+    /// (§10.1).
     fn host_type(&self, t: &Ty) -> bool {
         match t {
-            Ty::Never => true,
             Ty::Con(Head::Named(TypeRef::Builtin(b)), _) => host_builtin(*b),
             Ty::Con(Head::Named(r @ TypeRef::Custom(id)), _) => {
                 *r == self.b.nil

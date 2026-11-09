@@ -51,15 +51,20 @@
 //! handler around the call adds the frame record of the point. The point has
 //! a **segment**, a function with the rest of the function after the call,
 //! and a **re-entry** function that rebuilds the frame when the
-//! continuation is resumed: it puts the frame on the shadow stack, rebuilds
-//! the environment, re-enters the inner frames, and goes on with the
-//! segment. The normal path does not use the segment: the rest of the
-//! function stays where it is. See `control.rs` and `emit.rs`.
+//! continuation is resumed: it puts the frame on the shadow stack with the
+//! slot that the frame record keeps, rebuilds the environment, re-enters the
+//! inner frames, and goes on with the segment. A segment goes on with a
+//! [`Join`], the code after an `If` or a `Block` around the point, so that no
+//! code is in more than one segment. The normal path does not use segments:
+//! the rest of the function stays where it is. See `control.rs` and
+//! `emit.rs`.
 //!
 //! # The host boundary (§9.7, §10, Appendix B)
 //!
 //! Each [`Import`] has a function of the program that calls it, with the
-//! encoding of B.2 ([`Value::HostCall`]). An async entry point runs inside a
+//! encoding of B.2 ([`Value::HostCall`]); an import of external functions has
+//! one for each declaration, so that two declarations are two values
+//! (§11.4). An async entry point runs inside a
 //! root boundary; a function of an async host service starts its import
 //! ([`Value::HostStart`]), suspends to that boundary with `control.suspend`,
 //! and reads the answer when its `ilang_resume:…` export resumes it
@@ -94,6 +99,8 @@ pub fn site_code(s: Site) -> i64 {
 }
 /// An index in [`Program::points`].
 pub type PointId = u32;
+/// An index in [`Program::joins`].
+pub type JoinId = u32;
 /// An index in [`Program::imports`].
 pub type ImportId = u32;
 
@@ -474,6 +481,9 @@ pub enum Stmt {
     /// Goes on with the segment of a point, after its `Suspendable`: a tail
     /// call with the locals that the segment needs. Only in segments.
     Continue(PointId),
+    /// Goes on with a join: a tail call with the locals that it needs. Only
+    /// in segments and joins.
+    Join(JoinId),
 }
 
 /// A function of the program.
@@ -491,13 +501,11 @@ pub struct Func {
 
 /// A call that may suspend in a function that may suspend (§9.4), and how
 /// its frame is captured and rebuilt. Its segment and re-entry function have
-/// the locals of the function `func`.
+/// the locals of the function `func`. The frame record keeps the slot of the
+/// frame on the shadow stack, which the re-entry puts back (§11.7).
 #[derive(Clone, Debug)]
 pub struct Point {
     pub func: FuncId,
-    /// The site of the call, put on the shadow stack when the frame is
-    /// rebuilt (§11.7).
-    pub site: Option<Site>,
     /// The environment of the call, given to the inner frames when they are
     /// rebuilt.
     pub env: Env,
@@ -514,6 +522,22 @@ pub struct Point {
     /// The rest of the function after the call.
     pub segment: Vec<Stmt>,
     /// The locals of the function that the segment declares.
+    pub locals: Vec<Local>,
+}
+
+/// The code after an `If` or a `Block` that has a point in it, in a
+/// function that may suspend (§9.4): segments go on with it as a tail call,
+/// so that the code after it is in one place and not in every segment. It
+/// has the locals of the function `func`.
+#[derive(Clone, Debug)]
+pub struct Join {
+    pub func: FuncId,
+    /// The locals that are live after the statement: its parameters after
+    /// the environment.
+    pub params: Vec<Local>,
+    /// The rest of the function after the statement.
+    pub segment: Vec<Stmt>,
+    /// The locals of the function that the join declares.
     pub locals: Vec<Local>,
 }
 
@@ -650,6 +674,8 @@ pub struct Program {
     pub funcs: Vec<FuncKind>,
     /// The points of the calls that may suspend (§9.4).
     pub points: Vec<Point>,
+    /// The joins of the segments of the points (§9.4).
+    pub joins: Vec<Join>,
     /// The functions with one constant closure, used by `Atom::Func`.
     pub constants: Vec<FuncId>,
     /// The number of globals for top-level values.

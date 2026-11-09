@@ -120,3 +120,38 @@ fn library() {
         "library types differ (run with UPDATE=1 to bless)"
     );
 }
+
+/// A parameter used at many calls, each giving it an upper bound with one
+/// type constructor (`many_uses.i`), checks in a time that grows slowly
+/// with the number of calls: 200 calls took minutes when each two bounds
+/// were made equal.
+#[test]
+fn many_uses_of_a_parameter() {
+    let n = 200;
+    let mut source = String::from(
+        "import (i/control)\n\
+         s = (b, v) { control.suspend(b, (k) { control.resume(k, v) }) }\n\
+         f = (b, x) {\n  a0 = x\n",
+    );
+    for i in 1..=n {
+        let p = i - 1;
+        source.push_str(&format!(
+            "  a{i} = case a{p} % 3 {{ 0 -> s(b, a{p} + 1)  _ -> a{p} + 2 }}\n"
+        ));
+    }
+    source.push_str(&format!("  a{n}\n}}\n"));
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    fs::create_dir_all(dir.path().join("src")).unwrap();
+    fs::write(dir.path().join("src/main.i"), source).unwrap();
+    let (graph, diags) = ilang_package::load(dir.path());
+    assert!(diags.is_empty());
+    let start = std::time::Instant::now();
+    let out = output(&graph, true, false);
+    let elapsed = start.elapsed();
+    assert!(
+        out.contains("f : (b: Boundary(a, b, c), x: Int) -> Int\n") && !out.contains("error"),
+        "{out}"
+    );
+    assert!(elapsed.as_secs() < 30, "{elapsed:?}");
+}

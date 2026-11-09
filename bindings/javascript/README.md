@@ -73,23 +73,40 @@ the type of the value selects the member.
 
 ## Values that are not correct
 
-An argument of `call` or an answer of a host function that is not a correct
-value of its type (a `Float` that is not finite, a string with a lone
-surrogate, a bit array with bits after the end, a value of another type, or an
-error that is not a member of `E`) stops the program with `host: value is not
-correct` (B.2). A wrong number of arguments or an unknown export is an
-`iLangAbiError` and leaves the instance usable. A value from the module that is
-not correct is an `iLangAbiError` too, and the instance becomes unusable. An
-exception from a host function goes through the module unchanged and also makes
-the instance unusable.
+An argument of `call` that is not a correct value of its type (a `Float` that
+is not finite, a string with a lone surrogate, a bit array with bits after the
+end, or a value of another type) stops the program with `host: value is not
+correct` (B.2).
+
+The answer of a host function that has the right type is given to the module
+as it is, also when it is not correct: the module checks it, and stops with the
+positions of the call (B.2, §11.7). An answer of another type, or an error that
+is not a member of `E`, cannot be given to the module, so the loader stops the
+program with `host: value is not correct` and no positions. With the option
+`checkReplies: true`, the loader also checks the answers of the right type, and
+stops the program for them in the same way.
+
+A wrong number of arguments or an unknown export is an `iLangAbiError` and
+leaves the instance usable. A value from the module that is not correct is an
+`iLangAbiError` too, and the instance becomes unusable.
+
+## Exceptions of host functions
+
+Nothing is thrown into the module (B.1). Each import is a small Wasm function
+that calls the host function, then traps when the host function threw or its
+answer stops the program; a trap runs no handler of the module. The host
+function gives results of the right types first, which the module never uses.
+So when a host function throws, the call of the export throws that same
+exception, and the instance becomes unusable.
 
 ## Buffers
 
 Buffers follow B.3. For an export, the loader makes the parameter buffers with
 `ilang_alloc` and frees them with `ilang_free` after the call, and frees the
 result buffers after copying them. For an import, the module owns the parameter
-buffers and the loader makes the result buffers. Empty buffers have the address
-0 and are neither made nor freed.
+buffers and the loader makes the result buffers. The loader gives empty
+buffers the address 0 and does not make or free them; the module frees every
+result buffer whose address is not 0, also an empty one.
 
 ## Async
 

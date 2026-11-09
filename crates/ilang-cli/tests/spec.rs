@@ -15,9 +15,9 @@
 //! ```
 //!
 //! The host gives the services and external functions of
-//! `ilang_host::services::testing` under `test:` namespaces, and does not
-//! check their answers, so that the module stops for an answer that is not
-//! correct (B.2). With `output` lines, the texts that the `@main` gave to
+//! `ilang_host::services::testing` under `test:` namespaces, and, as by
+//! default, does not check their answers, so that the module stops for an
+//! answer that is not correct (B.2). With `output` lines, the texts that the `@main` gave to
 //! `test:io/v1` `print` and to the functions of `test:async/v1` are exactly
 //! those, in order.
 //!
@@ -206,10 +206,7 @@ fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
         Err(e) => return Err(e.to_string()),
     };
     let program = Program::from_bytes(&built.wasm).map_err(|e| format!("{e:#}"))?;
-    let options = |log: &Log| HostOptions {
-        imports: testing(log.clone()),
-        unchecked_replies: true,
-    };
+    let options = |log: &Log| HostOptions::new(testing(log.clone()));
     let log = Log::default();
     let main = match &program.abi().entry {
         None => None,

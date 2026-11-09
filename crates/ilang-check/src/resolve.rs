@@ -707,6 +707,22 @@ impl<'a> Resolver<'a> {
                 _ => out.deprecated = Some(args[0].to_string()),
             }
         }
+        // B.5: the program entry and a test have the export name `module
+        // path.function name`, so one function may not be both.
+        if out.main
+            && out.test
+            && Some(self.p.module(self.cur).package) == self.graph.root
+            && let Some(a) = item
+                .attributes
+                .iter()
+                .rfind(|a| matches!(a.name.name.as_str(), "main" | "test"))
+        {
+            self.error(
+                code::EXPORT_NAME_TWICE,
+                a.span,
+                "this function is the program entry and also a test, so their export names would be the same (B.5)",
+            );
+        }
         if let ast::ItemKind::Declaration { name, .. } = &item.kind
             && out.external.is_none()
             && !item.attributes.iter().any(|a| a.name.name == "external")
@@ -2526,6 +2542,7 @@ impl<'a> Resolver<'a> {
         let Some(source) = pkg.manifest_source else {
             return;
         };
+        let mut names = HashSet::new();
         for e in &pkg.wasm_exports {
             let (first, rest) = e.module.split_once('/').unwrap_or((&e.module, ""));
             let package = if first == pkg.name {
@@ -2581,6 +2598,17 @@ impl<'a> Resolver<'a> {
                         ),
                     ))
                 }
+            }
+            // B.5: a function named two times has two exports with one
+            // name.
+            if problem.is_none() && !names.insert((e.module.as_str(), e.function.as_str())) {
+                problem = Some((
+                    code::EXPORT_NAME_TWICE,
+                    format!(
+                        "`{}.{}` is named more than once in `[wasm].exports`, so their export names would be the same (B.5)",
+                        e.module, e.function
+                    ),
+                ));
             }
             match (problem, def) {
                 (Some((code, message)), _) => {

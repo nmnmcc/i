@@ -97,6 +97,42 @@ function typedFunction(fn, params, results, location) {
   }
 }
 
+// The import of a host function: a tiny Wasm function that calls the
+// JavaScript callback, then asks `broken` whether the callback failed, and
+// traps when it did. A JavaScript exception is never thrown into the module
+// (B.1): the callback catches everything, and a trap runs no handler of the
+// module. The callback gives results of the right types also when it fails.
+const guardModules = new Map();
+function guardedFunction(fn, broken, params, results, location) {
+  const key = `${params.join(",")}:${results.join(",")}`;
+  let module = guardModules.get(key);
+  if (!module) {
+    const section = (id, bytes) => [id, ...leb(bytes.length), ...bytes];
+    const body = [
+      0, // no locals
+      ...params.flatMap((_, index) => [0x20, ...leb(index)]), // local.get
+      0x10, 0, // call the callback
+      0x10, 1, // call broken
+      0x04, 0x40, 0x00, 0x0b, // if (then unreachable)
+      0x0b,
+    ];
+    module = new WebAssembly.Module(Uint8Array.from([
+      0, 97, 115, 109, 1, 0, 0, 0,
+      ...section(1, [2, 0x60, ...leb(params.length), ...params, ...leb(results.length), ...results, 0x60, 0, 1, 0x7f]),
+      ...section(2, [2, 1, 97, 1, 102, 0, 0, 1, 97, 1, 98, 0, 1]), // import a.f with type 0, a.b with type 1
+      ...section(3, [1, 0]),
+      ...section(7, [1, 1, 102, 0, 2]), // export f, the guard
+      ...section(10, [1, ...leb(body.length), ...body]),
+    ]));
+    guardModules.set(key, module);
+  }
+  try {
+    return new WebAssembly.Instance(module, { a: { f: fn, b: broken } }).exports.f;
+  } catch (cause) {
+    throw new iLangAbiError(`Wasm signature does not match ABI descriptor for ${location}`, { cause });
+  }
+}
+
 function validateFunction(module, exports, name, params, results) {
   expect(typeof exports[name] === "function", `Missing exported function ${name}`);
   let signatures = checkedSignatures.get(module);
@@ -252,6 +288,39 @@ function correctBits(value) {
   return !remainder || (bytes.at(-1) & ((1 << (8 - remainder)) - 1)) === 0;
 }
 
+/**
+ * Is this JavaScript value of the type, so that it can be given to the module
+ * as it is, also when it is not correct (B.2)? The module then checks it.
+ */
+function ofType(type, value) {
+  switch (type) {
+    case "nil": return value === undefined || value === null;
+    case "bool": return typeof value === "boolean";
+    case "int": return typeof value === "bigint";
+    case "float": return typeof value === "number";
+    case "string": return typeof value === "string";
+    case "bit_array": {
+      if (!value || !(value.bytes instanceof Uint8Array)) return false;
+      const { bytes, bitLength } = value;
+      return Number.isSafeInteger(bitLength) && bitLength >= 0 && bitLength <= 0xffffffff && bytes.length === Math.ceil(bitLength / 8);
+    }
+    case "externref": return true;
+    default: return false;
+  }
+}
+
+/** UTF-8, with a lone surrogate as its three bytes (WTF-8), which are not UTF-8. */
+function utf8(text) {
+  if (text.isWellFormed()) return encoder.encode(text);
+  const bytes = [];
+  for (const char of text) {
+    const code = char.codePointAt(0);
+    if (code >= 0xd800 && code <= 0xdfff) bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+    else bytes.push(...encoder.encode(char));
+  }
+  return Uint8Array.from(bytes);
+}
+
 /** Is this JavaScript value a correct value of the type (B.2)? */
 function correct(type, value) {
   switch (type) {
@@ -274,9 +343,6 @@ class GuestFault extends iLangAbiError {
   }
 }
 
-/** Thrown through the module when a host function gives a value that is not correct. */
-class HostValueStop extends Error {}
-
 class Bridge {
   instance;
   /** Set while an async export waits (B.5). */
@@ -284,8 +350,12 @@ class Bridge {
   /** Why the instance cannot be used any more. */
   unusable = null;
   stopMessage = null;
-  /** The error of a host function, thrown through the module. */
+  /** `{ error }` of a host function that threw, given to the caller after the module traps. */
   failure = null;
+  /** Set by a host function that failed or stopped the program: its guard traps. */
+  broken = false;
+  /** Check the answers of host functions in the host (`checkReplies`). */
+  checkReplies = false;
   pending = [];
 
   exports() {
@@ -353,11 +423,25 @@ class Bridge {
     }
   }
 
+  /**
+   * In a host function: the program cannot go on, because the host function
+   * threw (`failure` is `{ error }`) or its answer stops the program
+   * (`failure` is null). Gives results of the right types; the guard of the
+   * import then traps.
+   */
+  breakIn(signature, failure) {
+    if (failure) this.failure ??= failure;
+    else this.stopMessage ??= HOST_VALUE_REASON;
+    this.broken = true;
+    return signature.async ? [] : resultTypes(signature).map((wasm) => (wasm === 0x6f ? null : 0));
+  }
+
   trapped(error) {
     this.pending = [];
     if (this.failure) {
-      const failure = this.failure;
+      const { error: failure } = this.failure;
       this.failure = null;
+      this.stopMessage = null;
       this.unusable = String(failure?.message ?? failure);
       return failure;
     }
@@ -381,7 +465,7 @@ class Bridge {
         return [sign, this.allocate(bytes, owned), bytes.length / 4];
       }
       case "string": {
-        const bytes = encoder.encode(value);
+        const bytes = utf8(value);
         return [this.allocate(bytes, owned), bytes.length];
       }
       case "bit_array": return [this.allocate(value.bytes, owned), value.bitLength];
@@ -454,17 +538,22 @@ class Bridge {
   }
 
   /**
-   * The answer of a host function as results of B.2, or null when it is not
-   * a correct value. Successfully returned buffers belong to the module.
+   * The answer of a host function as results of B.2, or null when the host
+   * stops the program for it: when it is not of its type, or, with
+   * `checkReplies`, not a correct value. Without `checkReplies`, a value of
+   * the type that is not correct is given to the module, which checks it and
+   * stops with the positions of the call (B.2, §11.7). Successfully returned
+   * buffers belong to the module.
    */
   lowerReply(signature, reply) {
+    const fits = (type, value) => (this.checkReplies ? correct(type, value) : ofType(type, value));
     let tag = 0;
     let value = reply.value;
     if ("error" in reply) {
       value = reply.error;
-      tag = signature.errors.findIndex((type) => correct(type, value) && kindOf(value) === type) + 1;
+      tag = signature.errors.findIndex((type) => fits(type, value) && kindOf(value) === type) + 1;
       if (!tag) return null;
-    } else if (!correct(signature.result, value)) {
+    } else if (!fits(signature.result, value)) {
       return null;
     }
     const owned = [];
@@ -539,7 +628,10 @@ export async function instantiate(source, options = {}) {
   const module = await compile(source);
   const abi = readAbi(module, options.abi);
   const bridge = new Bridge();
+  bridge.checkReplies = options.checkReplies ?? false;
+  expect(typeof bridge.checkReplies === "boolean", "checkReplies must be a boolean");
   const imports = Object.create(null);
+  const broken = typedFunction(() => (bridge.broken ? 1 : 0), [], [0x7f], `${namespace} guard`);
   const objectIds = new WeakMap();
   const primitiveIds = new Map();
   let nextReferenceId = 1n;
@@ -548,17 +640,20 @@ export async function instantiate(source, options = {}) {
     imports[name] = { ...values };
   }
   imports[namespace] = {
-    reference_id: typedFunction((value) => {
+    reference_id: guardedFunction((value) => {
       if (value === null) return 0n;
       const identities = (typeof value === "object" || typeof value === "function") ? objectIds : primitiveIds;
       let id = identities.get(value);
       if (id === undefined) {
-        expect(nextReferenceId <= 0x7fffffffffffffffn, "Host reference identity space exhausted");
+        if (nextReferenceId > 0x7fffffffffffffffn) {
+          bridge.breakIn({ result: "nil", errors: [] }, { error: new iLangAbiError("Host reference identity space exhausted") });
+          return 0n;
+        }
         id = nextReferenceId++;
         identities.set(value, id);
       }
       return id;
-    }, [0x6f], [0x7e], `${namespace} reference_id`),
+    }, broken, [0x6f], [0x7e], `${namespace} reference_id`),
     // The module traps right after this call (B.4).
     panic: typedFunction((pointer, length) => {
       let message;
@@ -577,45 +672,31 @@ export async function instantiate(source, options = {}) {
         const fn = options.imports?.[moduleName]?.[name];
         expect(typeof fn === "function", `Missing host function ${moduleName} ${name}`);
         expect(!Object.hasOwn(imports[moduleName], name), `Host function ${moduleName} ${name} is registered twice`);
+        // Nothing is thrown into the module (B.1): an exception of the
+        // host function, or an answer that stops the program, is kept, and
+        // the guard of the import traps.
         const callback = (...raw) => {
-          let args;
+          if (bridge.broken) return importResult(bridge.breakIn(signature, null));
           try {
-            args = bridge.liftAll(signature.params, raw);
-          } catch (error) {
-            bridge.failure = error;
-            throw error;
-          }
-          if (signature.async) {
-            const work = Promise.resolve().then(() => fn(...args)).then((value) => ({ value }), (error) => {
-              if (error instanceof iLangError) return { error: error.value };
-              throw error;
-            });
-            work.catch(() => {});
-            bridge.pending.push({ namespace: moduleName, label: name, signature, work });
-            return undefined;
-          }
-          let answer;
-          try {
-            answer = kind === "service" ? reply(fn, args) : { value: fn(...args) };
+            const args = bridge.liftAll(signature.params, raw);
+            if (signature.async) {
+              const work = Promise.resolve().then(() => fn(...args)).then((value) => ({ value }), (error) => {
+                if (error instanceof iLangError) return { error: error.value };
+                throw error;
+              });
+              work.catch(() => {});
+              bridge.pending.push({ namespace: moduleName, label: name, signature, work });
+              return undefined;
+            }
+            const answer = kind === "service" ? reply(fn, args) : { value: fn(...args) };
             expect(!answer.value || typeof answer.value.then !== "function", `${moduleName} ${name} is not async; it must not give a Promise`);
+            const values = bridge.lowerReply(signature, answer);
+            return importResult(values ?? bridge.breakIn(signature, null));
           } catch (error) {
-            bridge.failure = error;
-            throw error;
+            return importResult(bridge.breakIn(signature, { error }));
           }
-          let values;
-          try {
-            values = bridge.lowerReply(signature, answer);
-          } catch (error) {
-            bridge.failure = error;
-            throw error;
-          }
-          if (!values) {
-            bridge.stopMessage ??= HOST_VALUE_REASON;
-            throw new HostValueStop(HOST_VALUE_REASON);
-          }
-          return importResult(values);
         };
-        imports[moduleName][name] = typedFunction(callback, paramTypes(signature), signature.async ? [] : resultTypes(signature), `${moduleName} ${name}`);
+        imports[moduleName][name] = guardedFunction(callback, broken, paramTypes(signature), signature.async ? [] : resultTypes(signature), `${moduleName} ${name}`);
       }
     }
   }

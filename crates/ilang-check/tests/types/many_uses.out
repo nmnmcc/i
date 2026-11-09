@@ -1,0 +1,7 @@
+s : (b: Boundary(a, b, c), v: d) -> d
+f : (b: Boundary(a, b, c), x: Int) -> Int
+main : () -> Int
+take_int : (b: Boundary(Int, Never, Never)) -> Nil
+take_string : (b: Boundary(String, Never, Never)) -> Nil
+g : (b: Boundary(Int, Never, Never)) -> Nil
+26:15: error[E0503]: `String` and `Int` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4) (the type at 26:3 needs it)

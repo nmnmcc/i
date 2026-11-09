@@ -1133,7 +1133,7 @@ A function `(P1, …, Pn) -> A ? E` is passed like this. Environment parameters 
 - **Results**, when `E` is `Never`: the values of `A`.
 - **Results**, when `E` has members: first an `i32` **tag**, then the values of `A`, then the values of each member of `E` in the **canonical order**: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`. Tag 0 means a normal value; tag i means an error of the i-th member. The values that are not used are 0, or null for an `externref`.
 
-When the host gives a value that is not correct (a `String` that is not UTF-8, an `Int` with a wrong sign or a last part of 0, a `BitArray` whose bits after the end are not 0, a `Float` that is not finite, a `Bool` that is not 0 or 1, a buffer that is not inside `memory`, or a tag that is too big), the program stops (§11.7).
+When the host gives a value that is not correct (a `String` that is not UTF-8, an `Int` with a wrong sign or a last part of 0, a `BitArray` whose bits after the end are not 0, a `Float` that is not finite, a `Bool` that is not 0 or 1, a buffer that is not inside `memory`, also an empty one, or a tag that is too big), the program stops (§11.7).
 
 ### B.3 Buffers
 

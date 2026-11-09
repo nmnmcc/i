@@ -147,3 +147,23 @@ test("Wasm linking rejects signatures that do not match the metadata", async ({ 
   }, `(${load})`);
   expect(result).toEqual(["iLangAbiError", "LinkError"]);
 });
+
+test("host functions never throw into the module, and the module checks their answers", async ({ page }) => {
+  const result = await page.evaluate(async (loader) => {
+    const { instantiate, customAbi, customImports, compiledImports, iLangError } = await eval(loader)();
+    const failure = new Error("the host is gone");
+    const guarded = {};
+    for (const [name, args] of [["nil", []], ["float", [1.5]]]) {
+      const custom = await instantiate("/tests/browser/fixtures/custom-imports.wasm", { abi: customAbi, imports: customImports(iLangError, { [`echo_${name}`]: () => { throw failure; } }) });
+      try { guarded[name] = custom.call(`guarded_${name}`, args); } catch (error) { guarded[name] = error === failure ? "thrown to the caller" : String(error); }
+    }
+    const compiled = await instantiate("/tests/browser/fixtures/compiled.wasm", { imports: { ...compiledImports(iLangError), "app:math/v1": { hypot: () => NaN } } });
+    let stop;
+    try { compiled.call("app/app.distance", [3, 4]); } catch (error) { stop = error.stopMessage; }
+    return { guarded, stop };
+  }, `(${load})`);
+  expect(result).toEqual({
+    guarded: { nil: "thrown to the caller", float: "thrown to the caller" },
+    stop: "host: value is not correct\napp/app:32:35",
+  });
+});

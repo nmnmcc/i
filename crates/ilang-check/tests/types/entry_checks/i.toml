@@ -6,6 +6,7 @@ exports = [
   "app/main.opaque",
   "app/main.errors",
   "app/main.never",
+  "app/main.never_param",
   "app/main.bad_param",
   "app/main.bad_value",
   "app/main.generic",

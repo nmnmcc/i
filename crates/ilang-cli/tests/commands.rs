@@ -720,3 +720,50 @@ fn located_packages() {
         assert!(err.contains("E0634"), "{command}: {err}");
     }
 }
+
+/// By default the host gives the answers of host functions to the module as
+/// they are, so an answer that is not correct stops the program with the
+/// positions of the call (B.2, §11.7). With `check_replies`, the host stops
+/// the program itself, with no positions.
+#[test]
+fn incorrect_host_answers_stop_in_the_module() {
+    let dir = package(&[
+        ("i.toml", "name = \"app\"\n"),
+        (
+            "src/main.i",
+            "@host(\"test:bad/v1\")\n\
+             Bad { Bad(nan: () -> Float) }\n\
+             \n\
+             half = (bad ! Bad) {\n  x = bad.nan()\n  x /. 2.0\n}\n\
+             \n\
+             @main\nmain = () {\n  half()\n  Nil\n}\n",
+        ),
+    ]);
+    let built = build(
+        dir.path(),
+        BuildOptions {
+            tests: false,
+            opt: Level::O0,
+            offline: false,
+        },
+    )
+    .unwrap();
+    let program = Program::from_bytes(&built.wasm).unwrap();
+    let run = |options: HostOptions| match program.run_entry(options).unwrap() {
+        Outcome::Stop(stop) => stop.message,
+        other => panic!("expected a stop, got {other:?}"),
+    };
+    let imports = || ilang_host::services::testing(Default::default());
+    assert_eq!(
+        run(HostOptions::new(imports())).as_deref(),
+        Some("host: value is not correct\napp/main:5:7\napp/main:11:3")
+    );
+    assert_eq!(
+        run(HostOptions {
+            imports: imports(),
+            check_replies: true,
+        })
+        .as_deref(),
+        Some("host: value is not correct")
+    );
+}

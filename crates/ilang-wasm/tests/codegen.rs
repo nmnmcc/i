@@ -235,3 +235,42 @@ fn bindings_that_may_fail_report_to_assert() {
     let g = function(&text, "app/main.g");
     assert!(!g.contains("array.get $env"), "{g}");
 }
+
+/// A function with `n` calls that may suspend, each in a clause of its own
+/// `case` (§9.4).
+fn many_points(n: usize) -> String {
+    let mut s = String::from(
+        "import (i/control)\n\
+         s = (b: Boundary(Int, Never, Never), v: Int) -> Int {\n  control.suspend(b, (k) { control.resume(k, v) })\n}\n\
+         f = (b: Boundary(Int, Never, Never), x: Int) -> Int {\n  a0 = x\n",
+    );
+    for i in 1..=n {
+        let p = i - 1;
+        s.push_str(&format!(
+            "  a{i} = case a{p} % 3 {{ 0 -> s(b, a{p} + 1)  _ -> a{p} + 2 }}\n"
+        ));
+    }
+    s.push_str(&format!(
+        "  a{n}\n}}\n@main\nmain = () {{ control.boundary((b) {{ f(b, 0) }})  Nil }}\n"
+    ));
+    s
+}
+
+#[test]
+fn segments_grow_linearly() {
+    // The code after each `case` with a point is one join that the
+    // segments go on with, so it is not copied into every segment.
+    let size = |n| {
+        let text = wat(&many_points(n));
+        assert_eq!(text.matches(";; app/main.f after point").count(), n);
+        assert_eq!(text.contains(";; app/main.f join"), n > 0);
+        text.len()
+    };
+    let (small, large) = (size(50), size(200));
+    let base = size(0);
+    let ratio = (large - base) as f64 / (small - base) as f64;
+    assert!(ratio < 5.0, "{base} {small} {large}: {ratio}");
+    let start = std::time::Instant::now();
+    wasm(&many_points(200)).unwrap();
+    assert!(start.elapsed().as_secs() < 30);
+}

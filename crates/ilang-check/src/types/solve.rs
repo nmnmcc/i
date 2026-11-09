@@ -370,12 +370,25 @@ impl Solver {
     /// only for its own: with `x <: y <: Cell(String)` and `x <: Cell(Int)`,
     /// `x` has both. Two lower bounds also have their parts put together,
     /// so that the environments of two function types are checked.
+    ///
+    /// The checks of two upper bounds only make arguments equal or check
+    /// the number of parameters, which hold for all bounds when they hold
+    /// for each with one other. Every two upper bounds with one type
+    /// constructor that a variable has are already checked, so a new one
+    /// is only checked with the first of them: else a variable with many
+    /// upper bounds of one type constructor, as a parameter used at many
+    /// calls, would make a number of constraints that grows with the
+    /// square of their number.
     fn add_bound(&mut self, v: V, t: Ty, lower: bool, env: bool) {
         self.touched.push(v);
         let level = self.var(v).level;
         // The variables whose bounds now have `t` too, and their bounds.
         let preds = self.reach(vec![v], !lower).0;
-        let others = self.reach(preds, lower).1;
+        let mut others = self.reach(preds, lower).1;
+        if !lower {
+            let mut heads = HashSet::new();
+            others.retain(|b| heads.insert(b.head()));
+        }
         let new = match &t {
             Ty::Var(u) => self.reach(vec![*u], lower).1,
             Ty::Con(..) | Ty::Fn(_) => vec![t.clone()],
@@ -405,10 +418,12 @@ impl Solver {
     /// and the bounds of those variables that are not variables.
     fn reach(&self, starts: Vec<V>, lower: bool) -> (Vec<V>, Vec<Ty>) {
         let mut seen: Vec<V> = Vec::new();
+        let mut visited: HashSet<V> = HashSet::new();
+        let mut found: HashSet<&Ty> = HashSet::new();
         let mut stack = starts;
         let mut out = Vec::new();
         while let Some(x) = stack.pop() {
-            if seen.contains(&x) {
+            if !visited.insert(x) {
                 continue;
             }
             seen.push(x);
@@ -421,7 +436,7 @@ impl Solver {
             for b in bounds {
                 match b {
                     Ty::Var(u) => stack.push(*u),
-                    Ty::Con(..) | Ty::Fn(_) if !out.contains(b) => out.push(b.clone()),
+                    Ty::Con(..) | Ty::Fn(_) if found.insert(b) => out.push(b.clone()),
                     _ => {}
                 }
             }

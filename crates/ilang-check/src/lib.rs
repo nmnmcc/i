@@ -64,6 +64,7 @@ pub mod code {
     pub const EXTERNAL_HOST_TYPE: &str = "E0318";
     pub const EXTERNAL_EFFECTS: &str = "E0319";
     pub const HOST_TYPE: &str = "E0320";
+    pub const EXPORT_NAME_TWICE: &str = "E0321";
     pub const DEPRECATED: &str = "W0301";
     // Order.
     pub const NEEDS_ITSELF: &str = "E0401";

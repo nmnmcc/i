@@ -6,6 +6,13 @@
 //! `$abi_*_out` functions encode a value for the host: export results and
 //! import parameters. Buffers come from `ilang_alloc`; an empty buffer has
 //! the address 0 and is not allocated.
+//!
+//! Every buffer that the host gives, also an empty one (an `Int` of count 0,
+//! a `String` of length 0, a `BitArray` of 0 bits), must be inside memory:
+//! its address plus its size is at most the size of memory (B.2). The
+//! buffers of the results of an import are freed whenever their address is
+//! not 0, also when they are empty: the host may make them with
+//! `ilang_alloc(0)` (B.1, B.3).
 
 pub fn wat() -> String {
     WAT.to_owned()
@@ -39,9 +46,9 @@ const WAT: &str = r#"
     (then (call $stop_host_value) unreachable))
   (if (i32.ne (i32.eqz (local.get $sign)) (i32.eqz (local.get $count)))
     (then (call $stop_host_value) unreachable))
-  (if (i32.eqz (local.get $count)) (then (return (ref.i31 (i32.const 0)))))
   (call $abi_buffer_check (local.get $address)
     (i64.shl (i64.extend_i32_u (local.get $count)) (i64.const 2)))
+  (if (i32.eqz (local.get $count)) (then (return (ref.i31 (i32.const 0)))))
   (local.set $limbs (array.new_default $limbs (local.get $count)))
   (block $done (loop $each
     (br_if $done (i32.ge_u (local.get $i) (local.get $count)))
@@ -133,21 +140,23 @@ const WAT: &str = r#"
 (func $abi_ref_out (param $value eqref) (result externref)
   (call $host_ref_get (local.get $value)))
 
-;; The results of an import: read, then the buffer is freed (B.3).
+;; The results of an import: read, then the buffer is freed (B.3), also
+;; when it is empty; `$free` does nothing for the address 0.
 (func $abi_int_take (param $sign i32) (param $address i32) (param $count i32) (result eqref)
   (local $v eqref)
   (local.set $v (call $abi_int_in (local.get $sign) (local.get $address) (local.get $count)))
-  (if (local.get $count) (then (call $free (local.get $address) (i32.const 0))))
+  (call $free (local.get $address) (i32.shl (local.get $count) (i32.const 2)))
   (local.get $v))
 (func $abi_string_take (param $address i32) (param $length i32) (result eqref)
   (local $v eqref)
   (local.set $v (call $abi_string_in (local.get $address) (local.get $length)))
-  (if (local.get $length) (then (call $free (local.get $address) (i32.const 0))))
+  (call $free (local.get $address) (local.get $length))
   (local.get $v))
 (func $abi_bits_take (param $address i32) (param $bits i32) (result eqref)
   (local $v eqref)
   (local.set $v (call $abi_bits_in (local.get $address) (local.get $bits)))
-  (if (local.get $bits) (then (call $free (local.get $address) (i32.const 0))))
+  (call $free (local.get $address)
+    (i32.wrap_i64 (i64.shr_u (i64.add (i64.extend_i32_u (local.get $bits)) (i64.const 7)) (i64.const 3))))
   (local.get $v))
 
 ;; The error tag of a result: 0, or 1 to the number of error members.
