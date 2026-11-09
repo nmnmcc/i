@@ -1072,7 +1072,10 @@ These are normal functions: they are called, given, and compared like any other 
 
 ## Appendix A. Choices
 
-This appendix lists the rules that were chosen without a full discussion, until they are confirmed. Each one says which rule of Gleam or TypeScript it follows, or why it does not. All choices so far have been confirmed, so the list is empty.
+This appendix lists the rules that were chosen without a full discussion, until they are confirmed. Each one says which rule of Gleam or TypeScript it follows, or why it does not.
+
+1. A `///` comment is the documentation of an item only when nothing but other comments and the item's attributes come between them. A `///` comment in other places, such as inside a function body, before `import`, or at the end of the file, documents nothing and is a normal comment. As in Gleam, it is not an error (§1.2).
+2. A `////` comment is the documentation of the module wherever it is in the file, also after `import` or between items. Gleam does the same. The lines of all such comments, in order, are the documentation (§1.2).
 
 ## Appendix B. The binary interface
 
