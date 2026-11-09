@@ -26,6 +26,7 @@ tempfile = "3"
 wasm-encoder = "=0.262.0"
 wasmparser = "=0.262.0"
 petgraph = "0.8"
+rustc-hash = "2"
 ilang-syntax = { path = "crates/ilang-syntax" }
 ilang-package = { path = "crates/ilang-package" }
 ilang-check = { path = "crates/ilang-check" }

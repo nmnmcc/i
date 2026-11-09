@@ -11,7 +11,8 @@
 use super::solve::Solver;
 use super::{FnTy, Head, Ty, V, Variance};
 use crate::hir::TypeRef;
-use std::collections::{HashMap, HashSet};
+// Fast hashing for the small keys of coalescing (docs/performance.md).
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 /// What a shown type keeps.
 #[derive(Clone, Copy, Default)]
@@ -45,13 +46,19 @@ pub(crate) fn simplify(s: &Solver, t: &Ty, keep: Option<u32>) -> Result<Ty, ()> 
 }
 
 fn simplify_with(s: &Solver, t: &Ty, keep: Option<u32>, opts: Opts) -> Result<Ty, ()> {
+    let rep = cycles(s, t, keep);
+    let mut members: HashMap<V, Vec<V>> = HashMap::default();
+    for (m, r) in &rep {
+        members.entry(*r).or_default().push(*m);
+    }
     let mut c = Coalescer {
         s,
         keep,
         mono: opts.mono,
-        stack: Vec::new(),
+        stack: HashMap::default(),
         occurs: false,
-        rep: cycles(s, keep),
+        rep,
+        members,
     };
     let t = c.go(t, true, 0, false);
     if c.occurs {
@@ -84,29 +91,61 @@ pub(crate) fn show(s: &Solver, t: &Ty) -> String {
 /// The variables that are equal because they are in a cycle of bounds that
 /// are variables (`a <: b <: a`), each with the one that stands for them
 /// all: a variable kept as it is, else a written one, else the first.
-fn cycles(s: &Solver, keep: Option<u32>) -> HashMap<V, V> {
-    let n = s.vars.len();
+///
+/// Only the variables that `t` reaches through bounds, in either direction,
+/// are looked at: coalescing goes to no other, and a cycle of one of them
+/// has only such variables. So the cost is the size of the type, not of
+/// the program.
+fn cycles(s: &Solver, t: &Ty, keep: Option<u32>) -> HashMap<V, V> {
+    // The variables reached, numbered in the order they are found.
+    let mut number: HashMap<V, usize> = HashMap::default();
+    let mut found: Vec<V> = Vec::new();
+    let mut todo: Vec<V> = Vec::new();
+    let add = |v: V, number: &mut HashMap<V, usize>, found: &mut Vec<V>, todo: &mut Vec<V>| {
+        if !number.contains_key(&v) {
+            number.insert(v, found.len());
+            found.push(v);
+            todo.push(v);
+        }
+    };
+    let mut vars = Vec::new();
+    ty_vars(t, &mut vars);
+    for v in vars.drain(..) {
+        add(v, &mut number, &mut found, &mut todo);
+    }
+    while let Some(v) = todo.pop() {
+        let st = &s.vars[v.0 as usize];
+        for b in st.lower.iter().chain(&st.upper) {
+            ty_vars(b, &mut vars);
+        }
+        vars.extend(st.from.iter().chain(&st.into).copied());
+        for u in vars.drain(..) {
+            add(u, &mut number, &mut found, &mut todo);
+        }
+    }
+    let n = found.len();
     let mut edges: Vec<Vec<usize>> = vec![Vec::new(); n];
-    for (i, st) in s.vars.iter().enumerate() {
+    for (i, v) in found.iter().enumerate() {
+        let st = &s.vars[v.0 as usize];
         for u in &st.upper {
             if let Ty::Var(u) = u {
-                edges[i].push(u.0 as usize);
+                edges[i].push(number[u]);
             }
         }
         for l in &st.lower {
             if let Ty::Var(l) = l {
-                edges[l.0 as usize].push(i);
+                edges[number[l]].push(i);
             }
         }
     }
     let comp = scc(&edges);
-    let mut best: HashMap<usize, V> = HashMap::new();
+    let mut best: HashMap<usize, V> = HashMap::default();
     let rank = |v: V| {
         let st = &s.vars[v.0 as usize];
         (!rigid(s, keep, v), st.name.is_none(), v.0)
     };
     for (i, c) in comp.iter().enumerate() {
-        let v = V(i as u32);
+        let v = found[i];
         match best.get(c) {
             Some(b) if rank(*b) <= rank(v) => {}
             _ => {
@@ -114,15 +153,38 @@ fn cycles(s: &Solver, keep: Option<u32>) -> HashMap<V, V> {
             }
         }
     }
-    let mut size: HashMap<usize, usize> = HashMap::new();
+    let mut size: HashMap<usize, usize> = HashMap::default();
     for c in &comp {
         *size.entry(*c).or_default() += 1;
     }
     comp.iter()
         .enumerate()
         .filter(|(_, c)| size[c] > 1)
-        .map(|(i, c)| (V(i as u32), best[c]))
+        .map(|(i, c)| (found[i], best[c]))
         .collect()
+}
+
+/// The variables of a type, with repeats.
+fn ty_vars(t: &Ty, out: &mut Vec<V>) {
+    match t {
+        Ty::Var(v) => out.push(*v),
+        Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| ty_vars(x, out)),
+        Ty::Fn(f) => {
+            f.params.iter().for_each(|p| ty_vars(&p.1, out));
+            [&f.ret, &f.err, &f.env]
+                .into_iter()
+                .for_each(|x| ty_vars(x, out));
+        }
+        Ty::Diff(a, h) => {
+            ty_vars(a, out);
+            h.iter().for_each(|x| ty_vars(x, out));
+        }
+        Ty::Both(a, b) => {
+            ty_vars(a, out);
+            ty_vars(b, out);
+        }
+        Ty::Never | Ty::Top => {}
+    }
 }
 
 /// The strongly connected components of a graph, as a number for each node
@@ -188,23 +250,21 @@ struct Coalescer<'s> {
     mono: bool,
     /// The variables being expanded, with the number of type constructors
     /// above them.
-    stack: Vec<(V, u32)>,
+    stack: HashMap<V, u32>,
     occurs: bool,
     /// The variables that stand for a cycle of variables.
     rep: HashMap<V, V>,
+    /// The variables of the cycle of each variable of `rep`.
+    members: HashMap<V, Vec<V>>,
 }
 
 impl Coalescer<'_> {
     /// The variables that `v` stands for.
     fn members(&self, v: V) -> Vec<V> {
-        if !self.rep.values().any(|r| *r == v) {
-            return vec![v];
+        match self.members.get(&v) {
+            Some(ms) => ms.clone(),
+            None => vec![v],
         }
-        self.rep
-            .iter()
-            .filter(|(_, r)| **r == v)
-            .map(|(m, _)| *m)
-            .collect()
     }
 
     /// `env`: the type is an environment, whose members have arguments that
@@ -218,13 +278,13 @@ impl Coalescer<'_> {
                     return Ty::Var(v);
                 }
                 let mono = self.mono && self.s.vars[v.0 as usize].level == 0;
-                if let Some(&(_, d)) = self.stack.iter().find(|x| x.0 == v) {
+                if let Some(&d) = self.stack.get(&v) {
                     if depth > d {
                         self.occurs = true;
                     }
                     return if mono { Ty::Never } else { Ty::Var(v) };
                 }
-                self.stack.push((v, depth));
+                self.stack.insert(v, depth);
                 let mut parts = Vec::new();
                 if mono {
                     // Not generalized: the types that come to it (§4.7).
@@ -246,7 +306,7 @@ impl Coalescer<'_> {
                         }
                     }
                 }
-                self.stack.pop();
+                self.stack.remove(&v);
                 if pos || mono {
                     Ty::Union(parts)
                 } else {
@@ -628,7 +688,7 @@ impl Norm<'_> {
 
     /// The next variable to replace, and what it is replaced by.
     fn step(&self, t: &Ty) -> Option<(V, Ty)> {
-        let mut occ: HashMap<V, Occ> = HashMap::new();
+        let mut occ: HashMap<V, Occ> = HashMap::default();
         let mut order = Vec::new();
         self.walk(t, true, &mut occ, &mut order, false);
         for v in &order {
@@ -835,8 +895,8 @@ impl<'s> Namer<'s> {
     fn new(s: &'s Solver) -> Namer<'s> {
         Namer {
             s,
-            names: HashMap::new(),
-            taken: HashSet::new(),
+            names: HashMap::default(),
+            taken: HashSet::default(),
         }
     }
 
@@ -1038,7 +1098,7 @@ fn render(t: &Ty, prec: u8, name: &mut dyn FnMut(V) -> String, tn: &[String]) ->
 /// changed to `Top`, shown `_`: only the type constructors of `H` matter
 /// there (§4.4), and such a variable has no other effect.
 fn holes(t: &Ty) -> Ty {
-    let mut outside = HashSet::new();
+    let mut outside = HashSet::default();
     outer_vars(t, &mut outside);
     hide(t, &outside, false)
 }
@@ -1183,7 +1243,7 @@ pub(crate) fn known_norm(s: &Solver, t: &Ty) -> Ty {
 /// The text of a known type: a part that is not known is `_`, and the type
 /// variables of a scheme are named.
 pub(crate) fn show_known(s: &Solver, t: &Ty) -> String {
-    let mut names: HashMap<V, String> = HashMap::new();
+    let mut names: HashMap<V, String> = HashMap::default();
     let mut next = 0u8;
     render(
         t,

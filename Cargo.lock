@@ -639,6 +639,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "petgraph",
+ "rustc-hash",
  "tempfile",
 ]
 
