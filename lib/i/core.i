@@ -1,11 +1,35 @@
 //// The operations that are not written in i (§13).
 
 export (
-  not, to_float, truncate, floor, ceiling, sqrt, float_to_bits,
-  float_from_bits, bit_and, bit_or, bit_xor, bit_not, shift_left,
-  shift_right, concat, byte_size, byte_slice, codepoints, from_codepoints,
-  codepoint_to_int, int_to_codepoint, to_upper, to_lower, index_of, bit_size,
-  bit_array_to_string, bit_array_concat, inspect, hash
+	not
+	to_float
+	truncate
+	floor
+	ceiling
+	sqrt
+	float_to_bits
+	float_from_bits
+	bit_and
+	bit_or
+	bit_xor
+	bit_not
+	shift_left
+	shift_right
+	concat
+	byte_size
+	byte_slice
+	codepoints
+	from_codepoints
+	codepoint_to_int
+	int_to_codepoint
+	to_upper
+	to_lower
+	index_of
+	bit_size
+	bit_array_to_string
+	bit_array_concat
+	inspect
+	hash
 )
 
 /// `True` for `False`, and `False` for `True`.

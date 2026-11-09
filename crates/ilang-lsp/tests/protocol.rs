@@ -306,13 +306,23 @@ fn an_editor_session() {
     assert_eq!(r[0]["label"], "double");
     assert_eq!(r[0]["detail"], "(n: Int) -> Int");
 
-    // Formatting is not in this build.
-    if ilang_lsp::format::formatter().is_none() {
-        let e = c.try_request::<lsp::request::Formatting>(json!({
+    // Formatting gives the text of `i fmt` as one edit of the whole document.
+    c.change(&main, 7, MAIN);
+    let edits = c
+        .try_request::<lsp::request::Formatting>(json!({
             "textDocument": { "uri": main },
-            "options": { "tabSize": 2, "insertSpaces": true }
-        }));
-        assert!(e.unwrap_err().contains("not available"));
+            "options": { "tabSize": 4, "insertSpaces": false }
+        }))
+        .unwrap();
+    let expected = ilang_syntax::format::format(MAIN).unwrap();
+    if expected == MAIN {
+        assert!(
+            edits.is_null()
+                || edits.as_array().is_some_and(|e| e.is_empty())
+                || edits[0]["newText"] == expected
+        );
+    } else {
+        assert_eq!(edits[0]["newText"], expected);
     }
 
     c.shutdown();

@@ -1,6 +1,11 @@
 //// One operation to pause a computation and go on with it later (§9.4).
 
-export (boundary, suspend, resume, cancel)
+export (
+	boundary
+	suspend
+	resume
+	cancel
+)
 
 /// Makes a boundary `b` and does `body(b)`.
 @external("ilang:control", "boundary")
@@ -9,7 +14,10 @@ boundary: (body: (b: Boundary(r, e, n)) -> r ? e ! n) -> r ? e ! n
 /// Pauses the computation back to the boundary `b`, and does `f(k)` in the
 /// place of the boundary.
 @external("ilang:control", "suspend")
-suspend: (b: Boundary(r, e, n), f: (k: Continuation(a, r, e, n)) -> r ? e ! n) -> a
+suspend: (
+	b: Boundary(r, e, n)
+	f: (k: Continuation(a, r, e, n)) -> r ? e ! n
+) -> a
 
 /// Goes on with the paused computation, with `value` as the value of `suspend`.
 @external("ilang:control", "resume")

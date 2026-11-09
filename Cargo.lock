@@ -677,6 +677,7 @@ dependencies = [
  "ilang-host",
  "ilang-lsp",
  "ilang-package",
+ "ilang-syntax",
  "ilang-wasm",
  "num-bigint",
  "tempfile",

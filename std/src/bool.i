@@ -4,21 +4,24 @@
 //// `or` are the same as functions, for example for `list.fold`. They do
 //// both sides, because the arguments of a call are always worked out.
 
-import (i/core, order = (Order, Less, Equal, Greater) = std/order)
+import (
+	i/core
+	order = (Order, Less, Equal, Greater) = std/order
+)
 
 export (
-  not
-  and
-  or
-  xor
-  nand
-  nor
-  exclusive_nor
-  to_string
-  to_int
-  compare
-  guard
-  lazy_guard
+	not
+	and
+	or
+	xor
+	nand
+	nor
+	exclusive_nor
+	to_string
+	to_int
+	compare
+	guard
+	lazy_guard
 )
 
 /// `False` for `True`, and `True` for `False`.
@@ -44,27 +47,27 @@ exclusive_nor = (a: Bool, b: Bool) -> Bool { a == b }
 
 /// `"True"` or `"False"`.
 to_string = (bool: Bool) -> String {
-  case bool {
-    True -> "True"
-    False -> "False"
-  }
+	case bool {
+		True  -> "True"
+		False -> "False"
+	}
 }
 
 /// `1` for `True` and `0` for `False`.
 to_int = (bool: Bool) -> Int {
-  case bool {
-    True -> 1
-    False -> 0
-  }
+	case bool {
+		True  -> 1
+		False -> 0
+	}
 }
 
 /// Compares two bools, with `False < True`.
 compare = (a: Bool, with: Bool) -> Order {
-  case (a, with) {
-    (True, False) -> Greater
-    (False, True) -> Less
-    _ -> Equal
-  }
+	case (a, with) {
+		(True, False) -> Greater
+		(False, True) -> Less
+		_             -> Equal
+	}
 }
 
 /// Gives `return` when `when` is `True`, and the value of `otherwise()`
@@ -74,16 +77,20 @@ compare = (a: Bool, with: Bool) -> Order {
 /// bool.guard(when: n < 0, return: "negative", otherwise: () { "positive" })
 /// ```
 guard = (when: Bool, return: a, otherwise: () -> a ? e ! n) -> a ? e ! n {
-  case when {
-    True -> return
-    False -> otherwise()
-  }
+	case when {
+		True  -> return
+		False -> otherwise()
+	}
 }
 
 /// Like `guard`, but the value for `True` is made by a function too.
-lazy_guard = (when: Bool, return: () -> a ? e ! n, otherwise: () -> a ? e ! n) -> a ? e ! n {
-  case when {
-    True -> return()
-    False -> otherwise()
-  }
+lazy_guard = (
+	when: Bool
+	return: () -> a ? e ! n
+	otherwise: () -> a ? e ! n
+) -> a ? e ! n {
+	case when {
+		True  -> return()
+		False -> otherwise()
+	}
 }

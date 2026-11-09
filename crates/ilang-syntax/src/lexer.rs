@@ -19,6 +19,14 @@ pub struct DocComment {
     pub span: Span,
 }
 
+/// Any comment, `//`, `///`, or `////`, from its `//` to the end of its
+/// line (§1.2). Comments have no meaning; the formatter puts them back.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Comment {
+    pub text: String,
+    pub span: Span,
+}
+
 /// The result of lexing a file.
 #[derive(Clone, Debug)]
 pub struct Lexed {
@@ -27,6 +35,8 @@ pub struct Lexed {
     /// For each `(`, `[`, `{`, and `<<`, the index of its closing token.
     pub close: Vec<Option<u32>>,
     pub docs: Vec<DocComment>,
+    /// Every comment, in source order, documentation or not.
+    pub comments: Vec<Comment>,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -37,6 +47,7 @@ pub fn lex(source: &str) -> Lexed {
         pos: 0,
         tokens: Vec::new(),
         docs: Vec::new(),
+        comments: Vec::new(),
         diags: Vec::new(),
     };
     if source.starts_with('\u{feff}') {
@@ -46,6 +57,7 @@ pub fn lex(source: &str) -> Lexed {
     let Lexer {
         mut tokens,
         docs,
+        comments,
         mut diags,
         ..
     } = lexer;
@@ -55,6 +67,7 @@ pub fn lex(source: &str) -> Lexed {
         tokens,
         close,
         docs,
+        comments,
         diagnostics: diags,
     }
 }
@@ -115,6 +128,7 @@ struct Lexer<'a> {
     pos: usize,
     tokens: Vec<Token>,
     docs: Vec<DocComment>,
+    comments: Vec<Comment>,
     diags: Vec<Diagnostic>,
 }
 
@@ -176,6 +190,10 @@ impl Lexer<'_> {
         while self.pos < self.src.len() && !matches!(self.src[self.pos], b'\n' | b'\r') {
             self.pos += 1;
         }
+        self.comments.push(Comment {
+            text: self.source[start..self.pos].to_string(),
+            span: self.span(start),
+        });
         if slashes >= 3 {
             self.docs.push(DocComment {
                 module: slashes == 4,

@@ -75,6 +75,16 @@ enum Command {
     Package(commands::package::PackageCommand),
     /// Run the language server, on standard input and output.
     Lsp,
+    /// Format source files; by default every `.i` file in `src/` and `test/`.
+    Fmt {
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        /// Write nothing; list the files that would change, and fail if any.
+        #[arg(long)]
+        check: bool,
+        /// Files or directories to format instead.
+        paths: Vec<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -105,6 +115,11 @@ fn main() -> ExitCode {
         } => cmd_test(&project, opt, offline, filter.as_deref()),
         Command::Package(c) => commands::package::run(c),
         Command::Lsp => commands::lsp::run(),
+        Command::Fmt {
+            project,
+            check,
+            paths,
+        } => commands::fmt::run(&project, check, &paths),
     };
     match result {
         Ok(code) => code,

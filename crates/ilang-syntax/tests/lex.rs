@@ -72,6 +72,17 @@ fn docs_are_kept() {
 }
 
 #[test]
+fn every_comment_is_kept() {
+    let src = "//// m\n/// d\n// c\nx = 1 // t\n";
+    let lexed = lex(src);
+    let texts: Vec<&str> = lexed.comments.iter().map(|c| c.text.as_str()).collect();
+    assert_eq!(texts, ["//// m", "/// d", "// c", "// t"]);
+    for c in &lexed.comments {
+        assert_eq!(&src[c.span.start as usize..c.span.end as usize], c.text);
+    }
+}
+
+#[test]
 fn carriage_returns_are_line_ends() {
     assert_eq!(breaks("a\r\nb\rc"), [false, true, true, false]);
     let lexed = lex("\"x\r\ny\rz\"");
