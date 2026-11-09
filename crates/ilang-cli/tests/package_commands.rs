@@ -677,3 +677,118 @@ fn new_makes_files_that_are_formatted() {
     let project = w.path().join("demo").display().to_string();
     w.ok(&["fmt", "--check", "--project", &project]);
 }
+
+/// The package `badmod`, whose module path is not correct (E0623): it is
+/// found only after its location is got.
+fn bad_repo(w: &World) {
+    w.repo(
+        "badmod",
+        &[(
+            "1.0.0",
+            &[
+                ("i.toml", "name = \"badmod\"\n"),
+                ("src/Bad-Name.i", "x = 1\n"),
+            ],
+        )],
+    );
+}
+
+#[test]
+fn a_failed_add_or_update_leaves_i_toml_and_i_lock_as_they_were() {
+    let w = World::new();
+    lib_repo(&w);
+    bad_repo(&w);
+    let dir = app(&w);
+    let project = dir.display().to_string();
+
+    // With no `i.lock` before, there is none after.
+    let err = w.fails(&[
+        "add",
+        "bm",
+        "example.com/badmod@1.0.0",
+        "--project",
+        &project,
+    ]);
+    assert!(err.contains("E0623"), "{err}");
+    assert_eq!(read(&dir.join("i.toml")), APP_TOML);
+    assert!(!dir.join("i.lock").exists());
+
+    // With an `i.lock`, it stays as it was.
+    w.ok(&["add", "lib", "example.com/lib@1.0.0", "--project", &project]);
+    let toml = read(&dir.join("i.toml"));
+    let lock = read(&dir.join("i.lock"));
+    let err = w.fails(&[
+        "add",
+        "bm",
+        "example.com/badmod@1.0.0",
+        "--project",
+        &project,
+    ]);
+    assert!(err.contains("E0623"), "{err}");
+    assert_eq!(read(&dir.join("i.toml")), toml);
+    assert_eq!(read(&dir.join("i.lock")), lock);
+
+    // `i update` to a version that does not load.
+    w.tag(
+        "lib",
+        "1.5.0",
+        &[
+            ("i.toml", "name = \"lib\"\n"),
+            ("src/Bad-Name.i", "x = 1\n"),
+        ],
+    );
+    let err = w.fails(&["update", "--project", &project]);
+    assert!(err.contains("E0623"), "{err}");
+    assert_eq!(read(&dir.join("i.toml")), toml);
+    assert_eq!(read(&dir.join("i.lock")), lock);
+}
+
+#[test]
+fn update_and_add_keep_the_comments_of_an_entry() {
+    let w = World::new();
+    lib_repo(&w);
+    let toml = "name = \"app\"\n\n[dependencies]\n# why we use lib\nlib = \"example.com/lib@1.0.0\" # pinned\n# the other one\nother = \"example.com/lib@2.0.0\"\n";
+    let dir = w.project(
+        "app",
+        &[("i.toml", toml), ("src/main.i", "export (x)\n\nx = 1\n")],
+    );
+    let project = dir.display().to_string();
+    w.ok(&["update", "lib", "--project", &project]);
+    assert_eq!(
+        read(&dir.join("i.toml")),
+        toml.replace("lib@1.0.0", "lib@1.2.0")
+    );
+    w.ok(&["add", "lib", "example.com/lib@1.1.0", "--project", &project]);
+    assert_eq!(
+        read(&dir.join("i.toml")),
+        toml.replace("lib@1.0.0", "lib@1.1.0")
+    );
+}
+
+#[test]
+fn add_and_update_keep_crlf_line_ends() {
+    let w = World::new();
+    lib_repo(&w);
+    let toml =
+        "# The app.\r\nname = \"app\"\r\n\r\n[dependencies]\r\nlib = \"example.com/lib@1.0.0\"\r\n";
+    let dir = w.project(
+        "app",
+        &[("i.toml", toml), ("src/main.i", "export (x)\n\nx = 1\n")],
+    );
+    let project = dir.display().to_string();
+    w.ok(&["update", "--project", &project]);
+    let toml = toml.replace("lib@1.0.0", "lib@1.2.0");
+    assert_eq!(read(&dir.join("i.toml")), toml);
+    w.ok(&[
+        "add",
+        "two",
+        "example.com/lib@2.0.0",
+        "--dev",
+        "--project",
+        &project,
+    ]);
+    assert_eq!(
+        read(&dir.join("i.toml")),
+        format!("{toml}\r\n[dev-dependencies]\r\ntwo = \"example.com/lib@2.0.0\"\r\n")
+    );
+}

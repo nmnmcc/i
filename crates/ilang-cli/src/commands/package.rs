@@ -4,7 +4,7 @@
 //! These are tools, not rules of the language (§0). `i.toml` is changed with
 //! `toml_edit`, so its formatting and comments are kept, and then the
 //! package is loaded, which brings `i.lock` up to date (§2.8). When loading
-//! fails, `i.toml` is put back as it was, and `i.lock` is not written.
+//! fails, `i.toml` and `i.lock` are both put back as they were.
 //!
 //! `i add` and `i update` print the host services and external functions
 //! that the new versions declare and the old ones did not, as
@@ -230,6 +230,10 @@ struct PackageFile {
     path: PathBuf,
     /// The text as it was read, to put back when something fails.
     text: String,
+    /// `i.lock` as it was before, or `None` when there was none, to put
+    /// back when something fails: loading may write it before it finds a
+    /// problem.
+    lock: Option<Vec<u8>>,
     doc: DocumentMut,
     manifest: manifest::Manifest,
 }
@@ -249,9 +253,11 @@ impl PackageFile {
             let why: Vec<String> = diags.iter().map(|d| d.message.clone()).collect();
             bail!("`{}` is not correct: {}", path.display(), why.join("; "));
         };
+        let lock = std::fs::read(project.join("i.lock")).ok();
         Ok(PackageFile {
             path,
             text,
+            lock,
             doc,
             manifest,
         })
@@ -281,24 +287,47 @@ impl PackageFile {
     }
 
     /// Sets the dependency `name` in its table to `value`, keeping the
-    /// comments around an entry that was there.
+    /// comments around an entry that was there: the key, with the comments
+    /// above it, stays, and the value keeps its trailing comment.
     fn set(&mut self, dev: bool, name: &str, mut value: Value) -> Result<()> {
         let table = self.table(dev)?;
-        if let Some(old) = table.get(name).and_then(Item::as_value) {
-            *value.decor_mut() = old.decor().clone();
+        match table.get_mut(name) {
+            Some(old) => {
+                if let Some(v) = old.as_value() {
+                    *value.decor_mut() = v.decor().clone();
+                }
+                *old = Item::Value(value);
+            }
+            None => {
+                table.insert(name, Item::Value(value));
+            }
         }
-        table.insert(name, Item::Value(value));
         Ok(())
     }
 
+    /// The changed text, with the line ends of the file as it was read.
+    fn changed_text(&self) -> String {
+        let text = self.doc.to_string();
+        if self.text.contains("\r\n") {
+            text.replace("\r\n", "\n").replace('\n', "\r\n")
+        } else {
+            text
+        }
+    }
+
     fn write(&self) -> Result<()> {
-        std::fs::write(&self.path, self.doc.to_string())
+        std::fs::write(&self.path, self.changed_text())
             .with_context(|| format!("`{}` could not be written", self.path.display()))
     }
 
-    /// Puts the file back as it was read.
+    /// Puts `i.toml` and `i.lock` back as they were read.
     fn restore(&self) {
         let _ = std::fs::write(&self.path, &self.text);
+        let lock = self.path.with_file_name("i.lock");
+        let _ = match &self.lock {
+            Some(bytes) => std::fs::write(&lock, bytes),
+            None => std::fs::remove_file(&lock),
+        };
     }
 }
 
@@ -310,8 +339,9 @@ fn write_and_load(project: &Path, file: &PackageFile, before: &Report) -> Result
     let (graph, diags) = load(project, true);
     if diags.iter().any(Diagnostic::is_error) || graph.root.is_none() {
         file.restore();
-        return Err(problems(&graph, &diags)
-            .context("the package could not be loaded, so `i.toml` was not changed"));
+        return Err(problems(&graph, &diags).context(
+            "the package could not be loaded, so `i.toml` and `i.lock` were not changed",
+        ));
     }
     match report(&graph) {
         Ok(after) => print_new_permissions(before, &after),
@@ -408,8 +438,9 @@ fn remove(project: &Path, name: &str) -> Result<ExitCode> {
     let (graph, diags) = load(project, true);
     if diags.iter().any(Diagnostic::is_error) || graph.root.is_none() {
         file.restore();
-        return Err(problems(&graph, &diags)
-            .context("the package could not be loaded, so `i.toml` was not changed"));
+        return Err(problems(&graph, &diags).context(
+            "the package could not be loaded, so `i.toml` and `i.lock` were not changed",
+        ));
     }
     println!("removed `{name}` from [{}]", TABLES[dev as usize]);
     Ok(ExitCode::SUCCESS)
