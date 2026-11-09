@@ -87,7 +87,7 @@ Node runs the same file with `node:wasi`. On this target:
 - Every other host service and external function is still an import, encoded
   as in the spec's Appendix B. Async host services are blocking calls.
 - A module linked in can give an import whose parameters, value, and errors
-  are `Nil`, `Bool`, `Float`, or host references, for example
+  are `Nil`, `Bool`, or `Float`, for example
   `@host("app:math/v1") Math { Math(cbrt: (x: Float) -> Float) }` with
   `wasmtime run --preload app:math/v1=math.wasm app.wasm`, where `math.wasm`
   exports `cbrt` as `(f64) -> f64`. A preloaded module is made before the
@@ -95,7 +95,9 @@ Node runs the same file with `node:wasi`. On this target:
   import with an `Int`, `String`, or `BitArray` needs a host that defines it
   with the exports of the instance: a Rust embedder with Wasmtime's `Linker`
   and `Caller::get_export`, a JavaScript host around `node:wasi`, or a
-  module linked in statically.
+  module linked in statically. An import with a host reference needs such a
+  host too: only the host makes host references, and the program then also
+  imports `reference_id` of `ilang:host/v1`.
 - The program needs a `@main`. Tests run only with `i test`, because each test
   needs a new instance.
 - The host chooses how deep the stack may be. Wasmtime allows less than
