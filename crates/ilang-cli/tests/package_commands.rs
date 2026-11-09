@@ -667,3 +667,335 @@ fn publish_compares_the_interface() {
     assert!(out.contains("git push origin v2.0.0"), "{out}");
     assert_eq!(tags(&dir), "v1.0.0\nv1.0.1\nv1.1.0\nv2.0.0");
 }
+
+// ---- Regression tests ----
+
+#[test]
+fn new_makes_files_that_are_formatted() {
+    let w = World::new();
+    w.ok(&["new", "demo"]);
+    let project = w.path().join("demo").display().to_string();
+    w.ok(&["fmt", "--check", "--project", &project]);
+}
+
+/// The package `badmod`, whose module path is not correct (E0623): it is
+/// found only after its location is got.
+fn bad_repo(w: &World) {
+    w.repo(
+        "badmod",
+        &[(
+            "1.0.0",
+            &[
+                ("i.toml", "name = \"badmod\"\n"),
+                ("src/Bad-Name.i", "x = 1\n"),
+            ],
+        )],
+    );
+}
+
+#[test]
+fn a_failed_add_or_update_leaves_i_toml_and_i_lock_as_they_were() {
+    let w = World::new();
+    lib_repo(&w);
+    bad_repo(&w);
+    let dir = app(&w);
+    let project = dir.display().to_string();
+
+    // With no `i.lock` before, there is none after.
+    let err = w.fails(&[
+        "add",
+        "bm",
+        "example.com/badmod@1.0.0",
+        "--project",
+        &project,
+    ]);
+    assert!(err.contains("E0623"), "{err}");
+    assert_eq!(read(&dir.join("i.toml")), APP_TOML);
+    assert!(!dir.join("i.lock").exists());
+
+    // With an `i.lock`, it stays as it was.
+    w.ok(&["add", "lib", "example.com/lib@1.0.0", "--project", &project]);
+    let toml = read(&dir.join("i.toml"));
+    let lock = read(&dir.join("i.lock"));
+    let err = w.fails(&[
+        "add",
+        "bm",
+        "example.com/badmod@1.0.0",
+        "--project",
+        &project,
+    ]);
+    assert!(err.contains("E0623"), "{err}");
+    assert_eq!(read(&dir.join("i.toml")), toml);
+    assert_eq!(read(&dir.join("i.lock")), lock);
+
+    // `i update` to a version that does not load.
+    w.tag(
+        "lib",
+        "1.5.0",
+        &[
+            ("i.toml", "name = \"lib\"\n"),
+            ("src/Bad-Name.i", "x = 1\n"),
+        ],
+    );
+    let err = w.fails(&["update", "--project", &project]);
+    assert!(err.contains("E0623"), "{err}");
+    assert_eq!(read(&dir.join("i.toml")), toml);
+    assert_eq!(read(&dir.join("i.lock")), lock);
+}
+
+#[test]
+fn update_and_add_keep_the_comments_of_an_entry() {
+    let w = World::new();
+    lib_repo(&w);
+    let toml = "name = \"app\"\n\n[dependencies]\n# why we use lib\nlib = \"example.com/lib@1.0.0\" # pinned\n# the other one\nother = \"example.com/lib@2.0.0\"\n";
+    let dir = w.project(
+        "app",
+        &[("i.toml", toml), ("src/main.i", "export (x)\n\nx = 1\n")],
+    );
+    let project = dir.display().to_string();
+    w.ok(&["update", "lib", "--project", &project]);
+    assert_eq!(
+        read(&dir.join("i.toml")),
+        toml.replace("lib@1.0.0", "lib@1.2.0")
+    );
+    w.ok(&["add", "lib", "example.com/lib@1.1.0", "--project", &project]);
+    assert_eq!(
+        read(&dir.join("i.toml")),
+        toml.replace("lib@1.0.0", "lib@1.1.0")
+    );
+}
+
+#[test]
+fn add_and_update_keep_crlf_line_ends() {
+    let w = World::new();
+    lib_repo(&w);
+    let toml =
+        "# The app.\r\nname = \"app\"\r\n\r\n[dependencies]\r\nlib = \"example.com/lib@1.0.0\"\r\n";
+    let dir = w.project(
+        "app",
+        &[("i.toml", toml), ("src/main.i", "export (x)\n\nx = 1\n")],
+    );
+    let project = dir.display().to_string();
+    w.ok(&["update", "--project", &project]);
+    let toml = toml.replace("lib@1.0.0", "lib@1.2.0");
+    assert_eq!(read(&dir.join("i.toml")), toml);
+    w.ok(&[
+        "add",
+        "two",
+        "example.com/lib@2.0.0",
+        "--dev",
+        "--project",
+        &project,
+    ]);
+    assert_eq!(
+        read(&dir.join("i.toml")),
+        format!("{toml}\r\n[dev-dependencies]\r\ntwo = \"example.com/lib@2.0.0\"\r\n")
+    );
+}
+
+/// Writes `files` in the package `dir`, commits them, and runs
+/// `i publish <version> --dry-run`: whether it passes, and what it printed.
+fn try_publish(w: &World, dir: &Path, files: &[(&str, &str)], version: &str) -> (bool, String) {
+    write(dir, files);
+    git(dir, &["add", "-A"]);
+    git(dir, &["commit", "-q", "--allow-empty", "-m", version]);
+    let project = dir.display().to_string();
+    let out = w.i(&["publish", version, "--dry-run", "--project", &project]);
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    (out.status.success(), text)
+}
+
+/// A package `pub` with the modules `a` and `b`, each with its own type
+/// `T`, and `src/api.i` as given, published as v1.0.0.
+fn two_types(w: &World, name: &str, api: &str) -> PathBuf {
+    let dir = w.project(
+        name,
+        &[
+            ("i.toml", "name = \"pub\"\n"),
+            (".gitignore", "/build/\n"),
+            ("src/a.i", "export (T(..))\n\nT { T(Int) }\n"),
+            ("src/b.i", "export (T(..))\n\nT { T(String) }\n"),
+            ("src/api.i", api),
+        ],
+    );
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "first");
+    let project = dir.display().to_string();
+    w.ok(&["publish", "1.0.0", "--project", &project]);
+    dir
+}
+
+#[test]
+fn publish_compares_types_by_what_they_are_not_by_their_names() {
+    let w = World::new();
+    // A field whose type is another type of the same name.
+    let dir = two_types(
+        &w,
+        "field",
+        "import (pub/a, pub/b)\nexport (W(..))\n\nW { W(a.T) }\n",
+    );
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[(
+            "src/api.i",
+            "import (pub/a, pub/b)\nexport (W(..))\n\nW { W(b.T) }\n",
+        )],
+        "1.0.1",
+    );
+    assert!(!ok, "{out}");
+    assert!(out.contains("changed constructors api.W: W(a.T)"), "{out}");
+    assert!(out.contains("to constructors api.W: W(b.T)"), "{out}");
+    assert!(out.contains("a new major version"), "{out}");
+
+    // An alias of another type of the same name.
+    let dir = two_types(
+        &w,
+        "alias",
+        "import (pub/a, pub/b)\nexport (U)\n\nU = a.T\n",
+    );
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[(
+            "src/api.i",
+            "import (pub/a, pub/b)\nexport (U)\n\nU = b.T\n",
+        )],
+        "1.0.1",
+    );
+    assert!(!ok, "{out}");
+    assert!(out.contains("changed type api.U"), "{out}");
+
+    // The same text, but the import names are swapped.
+    let dir = two_types(
+        &w,
+        "swap",
+        "import (x = pub/a, y = pub/b)\nexport (f)\n\nf = (v: x.T) { v }\n",
+    );
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[(
+            "src/api.i",
+            "import (x = pub/b, y = pub/a)\nexport (f)\n\nf = (v: x.T) { v }\n",
+        )],
+        "1.0.1",
+    );
+    assert!(!ok, "{out}");
+    assert!(out.contains("changed value api.f"), "{out}");
+    assert!(out.contains("a new major version"), "{out}");
+
+    // Renamed type variables and other names for the same imports are no
+    // change.
+    let dir = two_types(
+        &w,
+        "same",
+        "import (pub/a)\nexport (id, f, g)\n\nid = (x: a) -> a { x }\n\nf = (v: a.T) { v }\n\ng = (v: a.T) { v }\n",
+    );
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[(
+            "src/api.i",
+            "import (aa = pub/a, (T) = pub/a)\nexport (id, f, g)\n\nid = (x: b) -> b { x }\n\nf = (v: aa.T) { v }\n\ng = (v: T) { v }\n",
+        )],
+        "1.0.1",
+    );
+    assert!(ok, "{out}");
+    assert!(
+        out.contains("the public interface is the same as in v1.0.0"),
+        "{out}"
+    );
+}
+
+#[test]
+fn publish_sees_a_new_major_version_of_a_dependency() {
+    let w = World::new();
+    let v = |ty: &str| format!("export (V(..))\n\nV {{ V({ty}) }}\n");
+    let (v1, v2) = (v("Int"), v("String"));
+    w.repo(
+        "dep",
+        &[
+            ("1.0.0", &[("i.toml", "name = \"dep\"\n"), ("src/v.i", &v1)]),
+            ("2.0.0", &[("i.toml", "name = \"dep\"\n"), ("src/v.i", &v2)]),
+        ],
+    );
+    let api = "import (dep/v)\nexport (f, W(..))\n\nf = (x: v.V) { 1 }\n\nW { W(v.V) }\n";
+    let dir = w.project(
+        "pub",
+        &[
+            (
+                "i.toml",
+                "name = \"pub\"\n\n[dependencies]\ndep = \"example.com/dep@1.0.0\"\n",
+            ),
+            (".gitignore", "/build/\n"),
+            ("src/api.i", api),
+        ],
+    );
+    let project = dir.display().to_string();
+    w.ok(&["check", "--project", &project]);
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "first");
+    w.ok(&["publish", "1.0.0", "--project", &project]);
+    w.ok(&["add", "dep", "example.com/dep@2.0.0", "--project", &project]);
+    let (ok, out) = try_publish(&w, &dir, &[], "1.0.1");
+    assert!(!ok, "{out}");
+    assert!(
+        out.contains("changed value api.f: (x: example.com/dep@1:v.V) -> Int"),
+        "{out}"
+    );
+    assert!(
+        out.contains("changed constructors api.W: W(example.com/dep@1:v.V)"),
+        "{out}"
+    );
+    assert!(out.contains("a new major version"), "{out}");
+}
+
+#[test]
+fn publish_sees_what_the_host_must_give() {
+    let w = World::new();
+    let api = "export (now, Io)\n\n@external(\"env\", \"now\")\nnow: () -> Int\n\n@host(\"pub:io/v1\")\nIo { Io(print: (text: String) -> Nil) }\n";
+    let dir = w.project(
+        "pub",
+        &[
+            ("i.toml", "name = \"pub\"\n"),
+            (".gitignore", "/build/\n"),
+            ("src/api.i", api),
+        ],
+    );
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "first");
+    let project = dir.display().to_string();
+    w.ok(&["publish", "1.0.0", "--project", &project]);
+
+    // Another import of the external function.
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[("src/api.i", &api.replace("\"now\")", "\"now2\")"))],
+        "1.0.1",
+    );
+    assert!(!ok, "{out}");
+    assert!(
+        out.contains("changed value api.now: @external(\"env\", \"now\") () -> Int"),
+        "{out}"
+    );
+
+    // Another label of a host service function, though its constructor is
+    // not exported.
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[("src/api.i", &api.replace("print:", "show:"))],
+        "1.0.2",
+    );
+    assert!(!ok, "{out}");
+    assert!(
+        out.contains("changed constructors api.Io: Io(print: (text: String) -> Nil)"),
+        "{out}"
+    );
+}
