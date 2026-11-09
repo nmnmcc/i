@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-cd "${ILANG_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
-export BLAZE_HOME="${BLAZE_HOME:-$PWD/.devenv/state/blaze}"
-unset CARGO_TARGET_DIR
-exec blaze run --bin i -- "$@"
