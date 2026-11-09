@@ -105,9 +105,14 @@ devenv test
 devenv tasks run release
 ```
 
-Verification uses Rust 1.99.1 and `target/cargo`, independently of Blaze output.
-It checks formatting and Clippy, runs the workspace tests, builds the
-workspace, and executes the Node SDK and Chromium/Firefox/WebKit browser tests. The browser
+Verification (`scripts/dev-verify`) uses Rust 1.99.1 and `target/cargo`,
+independently of Blaze output. It checks the Rust formatting and Clippy, runs
+the workspace tests, builds the workspace and the release `i`, and checks
+with that `i` the formatting of the i sources (`i fmt --check lib std bench
+examples`). It then runs the tests of `std`, `examples/hello`, and `bench`
+with `i test` at `--opt 0` and `--opt 2`, runs `scripts/wasi-smoke`, which
+runs WASI-target builds in Wasmtime and Node's `node:wasi`, and executes the
+Node SDK and Chromium/Firefox/WebKit browser tests. The browser
 binaries come from Nix; npm does not download a second browser bundle. Release artifacts are built
 with Cargo in `target/cargo/release`, then packaged with checksums under
 `target/release`. See [release packaging](release.md) for archive contents and
