@@ -377,7 +377,11 @@ fn needs_an_entry() {
 fn the_standard_service_is_the_one_of_i_io() {
     let twice = "@host(\"i:io/v1\")\nMine { Mine(print: (text: String) -> Nil) }\n\
                  @main\nmain = (io ! Mine) { io.print(\"x\") }\n";
-    assert!(build_error(twice).contains("E0311"));
+    let e = build_error(twice);
+    assert!(
+        e.contains("E0311") && e.contains("the host service `Io` of `i/io`"),
+        "{e}"
+    );
     let other = "@host(\"i:io/v1\")\nInput { Input(read: () -> String) }\n\
                  @main\nmain = (input ! Input) { input.read() }\n";
     let dir = package(other);

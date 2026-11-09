@@ -2501,7 +2501,8 @@ impl<'a> Resolver<'a> {
         self.host_fns();
         // §9.7: two host services may not have the same namespace and a
         // field with the same label.
-        let mut seen: HashMap<(String, String), ()> = HashMap::new();
+        // The error names the service that has the label first.
+        let mut seen: HashMap<(String, String), usize> = HashMap::new();
         for t in 0..self.p.types.len() {
             let def = &self.p.types[t];
             let (Some(host), TypeBody::Custom(ctors)) = (&def.host, &def.body) else {
@@ -2510,23 +2511,26 @@ impl<'a> Resolver<'a> {
             let mut twice = Vec::new();
             for c in ctors {
                 for f in &c.fields {
-                    if let Some(label) = &f.label
-                        && seen
-                            .insert((host.namespace.clone(), label.name.clone()), ())
-                            .is_some()
-                    {
-                        twice.push((label.span, label.name.clone()));
+                    let Some(label) = &f.label else { continue };
+                    let key = (host.namespace.clone(), label.name.clone());
+                    match seen.get(&key) {
+                        Some(&other) => twice.push((label.span, label.name.clone(), other)),
+                        None => {
+                            seen.insert(key, t);
+                        }
                     }
                 }
             }
             let (m, ns) = (def.module, host.namespace.clone());
-            for (span, label) in twice {
-                self.cur = m;
-                self.error(
-                    code::HOST_TWICE,
-                    span,
-                    format!("another host service has the namespace `{ns}` and a field `{label}`"),
+            for (span, label, other) in twice {
+                let other = &self.p.types[other];
+                let message = format!(
+                    "the host service `{}` of `{}` also has the namespace `{ns}` and a field `{label}`",
+                    other.name,
+                    self.module_name(other.module)
                 );
+                self.cur = m;
+                self.error(code::HOST_TWICE, span, message);
             }
         }
         self.wasm_exports();
