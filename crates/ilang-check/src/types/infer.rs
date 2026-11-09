@@ -7,8 +7,9 @@
 //! the rest of a block after an environment statement starts a new entry.
 
 use super::display;
+use super::known;
 use super::solve::{FailKind, Pol, Solver, builtin_variance};
-use super::{FnTy, Ty, Typed, Variance};
+use super::{FnTy, Head, Ty, Typed, Variance};
 use crate::code;
 use crate::hir::*;
 use crate::resolve::subst;
@@ -59,13 +60,11 @@ pub(crate) struct Checker<'a> {
     defs: HashMap<DefId, Scheme>,
     /// The solver variable of each type variable written in an annotation.
     pub tyvars: HashMap<TyVarId, Ty>,
-    /// The type written at the top of the pattern that binds a name, or of
-    /// an environment parameter: what is known of it before inference. Used
-    /// for `.f`, `.k`, and calls by label until known types come (M3d).
+    /// The type written at the top of the pattern that binds a name: its
+    /// type is shown as written (§2.4).
     pub written: HashMap<VarId, Type>,
-    /// The labels of a name whose written type, or whose value, is a
-    /// function (§4.6).
-    pub labels: HashMap<VarId, Vec<Option<String>>>,
+    /// The known type of each name (§4.8), where it is used now.
+    pub kvars: HashMap<VarId, Ty>,
     effects: Vec<Effects>,
     pub b: Builtins,
     alias_depth: u32,
@@ -74,8 +73,8 @@ pub(crate) struct Checker<'a> {
     pub known: HashMap<VarId, CtorRef>,
     /// Names bound by choices that give them different constructors.
     pub known_conflict: HashSet<VarId>,
-    /// The uses of names known to be made by a constructor (§7.5).
-    known_uses: HashMap<(ModuleId, Span), CtorRef>,
+    /// What the code generator needs, gathered while typing.
+    pub out: Typed,
     /// The `case` expressions of the group being typed, whose coverage is
     /// checked with the types that inference finds (§4.8 rule 11).
     pub cases: Vec<super::pattern::PendingCase>,
@@ -105,13 +104,13 @@ impl<'a> Checker<'a> {
             defs: HashMap::new(),
             tyvars: HashMap::new(),
             written: HashMap::new(),
-            labels: HashMap::new(),
+            kvars: HashMap::new(),
             effects: Vec::new(),
             b,
             alias_depth: 0,
             known: HashMap::new(),
             known_conflict: HashSet::new(),
-            known_uses: HashMap::new(),
+            out: Typed::default(),
             cases: Vec::new(),
         }
     }
@@ -155,11 +154,9 @@ impl<'a> Checker<'a> {
         for group in &p.order.groups {
             self.group(group);
         }
+        self.entry_points();
         // The shown type schemes (§4.7).
-        let mut typed = Typed {
-            known_ctors: std::mem::take(&mut self.known_uses),
-            ..Typed::default()
-        };
+        let mut typed = std::mem::take(&mut self.out);
         for (mi, m) in p.modules.iter().enumerate() {
             self.set_module(ModuleId(mi as u32));
             for (di, d) in m.defs.iter().enumerate() {
@@ -199,15 +196,25 @@ impl<'a> Checker<'a> {
                 holders.push((*d, v));
             }
         }
+        // §4.8: inside the group, its names are known only from what is
+        // written.
+        for b in group {
+            self.set_module(b.module);
+            let binding = &p.binding(*b).binding;
+            self.new_tyvars(&binding.ty_vars);
+            self.own_known(binding);
+        }
+        let mut knowns = Vec::new();
         for b in group {
             self.set_module(b.module);
             let top = p.binding(*b);
             let binding = &top.binding;
             let mark = self.occurs_mark();
             self.check_pattern_places(&binding.pattern, Pol::Pos);
-            self.new_tyvars(&binding.ty_vars);
             self.effects.push(Effects::default());
-            let a = self.infer(&binding.value);
+            let expected = self.binding_expected(binding);
+            let (a, k) = self.infer_k(&binding.value, &expected);
+            knowns.push(k);
             self.fit(&binding.pattern, &a);
             if self.may_fail(&binding.pattern, &a) {
                 self.add_env(Ty::named(self.b.assert, Vec::new()));
@@ -249,27 +256,163 @@ impl<'a> Checker<'a> {
                 .map(|s| s.ty.clone())
                 .unwrap_or(Ty::Never);
             self.sub(&t, holder, span);
-            types.push((*d, t, span));
+            types.push((*d, var, t, span));
         }
-        if let Some((d, _, span)) = types.first() {
+        if let Some((d, _, _, span)) = types.first() {
             self.set_module(d.module);
             self.check_occurs(mark, *span);
         }
-        for (d, t, _) in types {
+        for (d, var, t, _) in types {
             self.set_module(d.module);
             let scheme = if direct {
-                Scheme {
+                let s = Scheme {
                     level: 0,
                     ty: self.generalize(&t, 0),
-                }
+                };
+                // §4.8: outside its group, a generalized name has its type
+                // scheme as its known type.
+                let k = display::known(&self.s, &s.ty, 0);
+                self.kvars.insert(var, k);
+                s
             } else {
                 Scheme::mono(t)
             };
             self.defs.insert(d, scheme);
         }
+        for (b, k) in group.iter().zip(knowns) {
+            self.out.generalized.insert(*b, direct);
+            if !direct {
+                self.fit_known(&p.binding(*b).binding.pattern, &k, false);
+            }
+        }
         // §7.4: coverage, with the types of the group.
         for c in std::mem::take(&mut self.cases) {
             self.check_case(c);
+        }
+    }
+
+    /// §10.2: the entry points of the compiled package: the program entry,
+    /// the tests, and the host exports.
+    fn entry_points(&mut self) {
+        let p = self.p;
+        let Some(root) = p.root else {
+            return;
+        };
+        let mut entries = Vec::new();
+        for m in p.modules.iter().filter(|m| m.package == root) {
+            for b in m.bindings.iter().filter(|b| b.main || b.test) {
+                entries.extend(b.defs.first().map(|d| (*d, b.test, false)));
+            }
+        }
+        entries.extend(p.host_exports.iter().map(|d| (*d, false, true)));
+        for (d, test, export) in entries {
+            self.entry_point(d, test, export);
+        }
+    }
+
+    /// §10.2 and §10.3 for one entry point, with its inferred type: a test
+    /// gives `Nil`; a host export takes and gives types that the host can
+    /// take; and the environment has only host services and `Assert`.
+    fn entry_point(&mut self, d: DefId, test: bool, export: bool) {
+        self.set_module(d.module);
+        let def = self.p.def(d);
+        let (name, span) = (def.name.clone(), def.span);
+        let Some(scheme) = self.defs.get(&d) else {
+            return;
+        };
+        let opts = display::Opts {
+            mono: true,
+            written: false,
+        };
+        let Ok(t) = display::shown(&self.s, &scheme.ty, opts) else {
+            return;
+        };
+        let show = |c: &Self, t: &Ty| display::show_known(&c.s, t);
+        let Ty::Fn(f) = display::both(&t) else {
+            if export {
+                let t = show(self, &t);
+                self.error(
+                    code::ENTRY_TYPE,
+                    span,
+                    format!("`{name}` is a host export, so it is a function (§10.2), but its type is `{t}`"),
+                );
+            }
+            return;
+        };
+        for m in known::members(&f.env) {
+            let ok = match &m {
+                Ty::Con(Head::Named(TypeRef::Custom(id)), _) => {
+                    self.p.ty(*id).host.is_some() || TypeRef::Custom(*id) == self.b.assert
+                }
+                _ => false,
+            };
+            if !ok {
+                let m = show(self, &m);
+                self.error(
+                    code::ENTRY_ENV,
+                    span,
+                    format!(
+                        "`{name}` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `{m}`, which must be given before it gets to the entry point"
+                    ),
+                );
+            }
+        }
+        let nil = Ty::named(self.b.nil, Vec::new());
+        if test && f.ret != nil && f.ret != Ty::Never {
+            let r = show(self, &f.ret);
+            self.error(
+                code::ENTRY_TYPE,
+                span,
+                format!("`{name}` is a test, so it gives `Nil` (§10.2), but it gives `{r}`"),
+            );
+        }
+        if !export {
+            return;
+        }
+        let parts = f
+            .params
+            .iter()
+            .map(|p| ("a parameter", &p.1))
+            .chain([("the value", &f.ret)]);
+        for (what, t) in parts {
+            if !self.host_type(t) {
+                let t = show(self, t);
+                self.error(
+                    code::ENTRY_TYPE,
+                    span,
+                    format!(
+                        "`{name}` is a host export, so {what} must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `{t}`"
+                    ),
+                );
+            }
+        }
+        let errors_ok = known::members(&f.err).iter().all(|m| {
+            matches!(m, Ty::Con(Head::Named(r), xs) if xs.is_empty() && (*r == self.b.nil || *r == self.b.bool_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
+        });
+        if !errors_ok {
+            let e = show(self, &f.err);
+            self.error(
+                code::ENTRY_TYPE,
+                span,
+                format!(
+                    "`{name}` is a host export, so its errors must be a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray` (§10.3), but they are `{e}`"
+                ),
+            );
+        }
+    }
+
+    /// §10.3: a type that the host can take. `Never` has no values, so it
+    /// is one.
+    fn host_type(&self, t: &Ty) -> bool {
+        match t {
+            Ty::Never => true,
+            Ty::Con(Head::Named(TypeRef::Builtin(b)), _) => host_builtin(*b),
+            Ty::Con(Head::Named(r @ TypeRef::Custom(id)), _) => {
+                *r == self.b.nil
+                    || *r == self.b.bool_
+                    || matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty())
+            }
+            _ => false,
         }
     }
 
@@ -724,21 +867,7 @@ impl<'a> Checker<'a> {
         cur
     }
 
-    /// The labels of a written function type.
-    fn written_labels(&self, t: &Type) -> Option<Vec<Option<String>>> {
-        match self.expand(t).kind {
-            TypeKind::Fn { params, .. } => Some(
-                params
-                    .iter()
-                    .map(|p| p.label.as_ref().map(|l| l.name.clone()))
-                    .collect(),
-            ),
-            _ => None,
-        }
-    }
-
-    /// Notes what is written at the top of the pattern of a binding: its
-    /// type, and the labels of a function (§4.6).
+    /// Notes the type written at the top of the pattern of a binding.
     fn note_binding(&mut self, b: &Binding) {
         let mut p = &b.pattern;
         let mut names = Vec::new();
@@ -748,35 +877,17 @@ impl<'a> Checker<'a> {
                     names.push(binder.var);
                     p = pattern;
                 }
-                PatternKind::Var(binder) => {
-                    names.push(binder.var);
-                    break;
-                }
                 PatternKind::Typed {
                     binder: Some(binder),
-                    ..
+                    ty,
                 } => {
                     names.push(binder.var);
+                    for v in names {
+                        self.written.insert(v, ty.clone());
+                    }
                     break;
                 }
                 _ => break,
-            }
-        }
-        let labels = match &p.kind {
-            PatternKind::Typed { ty, .. } => {
-                for v in &names {
-                    self.written.insert(*v, ty.clone());
-                }
-                self.written_labels(ty)
-            }
-            _ => match &b.value.kind {
-                ExprKind::Fn(f) => Some(fn_labels(f)),
-                _ => None,
-            },
-        };
-        if let Some(labels) = labels {
-            for v in names {
-                self.labels.insert(v, labels.clone());
             }
         }
     }
@@ -851,40 +962,85 @@ impl<'a> Checker<'a> {
     // ---- Expressions ----
 
     pub fn infer(&mut self, e: &Expr) -> Ty {
+        self.infer_k(e, &Ty::Top).0
+    }
+
+    /// The type of `e`, and its known type (§4.8), `Top` when it has none.
+    /// `expected` is the expected type of its place, `Top` for none.
+    pub fn infer_k(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
+        let same = |t: Ty| (t.clone(), t);
         match &e.kind {
-            ExprKind::Int(_) => self.prim(BuiltinType::Int),
-            ExprKind::Float(_) => self.prim(BuiltinType::Float),
-            ExprKind::String(_) => self.prim(BuiltinType::String),
+            ExprKind::Int(_) => same(self.prim(BuiltinType::Int)),
+            ExprKind::Float(_) => same(self.prim(BuiltinType::Float)),
+            ExprKind::String(_) => same(self.prim(BuiltinType::String)),
             ExprKind::Name(ValueRef::Local(v)) => {
                 self.note_use(*v, e.span);
-                match self.locals.get(v).cloned() {
+                let t = match self.locals.get(v).cloned() {
                     Some(s) => self.instantiate(&s),
                     None => self.s.fresh_input(),
-                }
+                };
+                (t, self.kvars.get(v).cloned().unwrap_or(Ty::Top))
             }
             ExprKind::Name(ValueRef::Def(d)) => {
-                if let DefKind::Binding { var, .. } = self.p.def(*d).kind {
-                    self.note_use(var, e.span);
-                }
-                match self.defs.get(d).cloned() {
+                let k = match self.p.def(*d).kind {
+                    DefKind::Binding { var, .. } => {
+                        self.note_use(var, e.span);
+                        self.kvars.get(&var).cloned().unwrap_or(Ty::Top)
+                    }
+                    DefKind::External { .. } => self
+                        .defs
+                        .get(d)
+                        .map_or(Ty::Top, |s| display::known(&self.s, &s.ty, s.level)),
+                };
+                let t = match self.defs.get(d).cloned() {
                     Some(s) => self.instantiate(&s),
                     None => self.s.fresh_input(),
-                }
+                };
+                (t, k)
             }
-            ExprKind::Name(ValueRef::Ctor(c)) => self.ctor_value(*c),
-            ExprKind::Tuple(items) => Ty::tuple(items.iter().map(|x| self.infer(x)).collect()),
+            ExprKind::Name(ValueRef::Ctor(c)) => {
+                let t = self.ctor_value(*c);
+                (t, self.ctor_known(*c))
+            }
+            ExprKind::Tuple(items) => {
+                // A part has the matching part of the expected type (§4.8).
+                let parts = match known::members(expected).as_slice() {
+                    [Ty::Con(Head::Tuple(n), xs)] if *n as usize == items.len() => xs.clone(),
+                    _ => vec![Ty::Top; items.len()],
+                };
+                let (ts, ks) = items
+                    .iter()
+                    .zip(&parts)
+                    .map(|(x, p)| self.infer_k(x, p))
+                    .unzip();
+                (Ty::tuple(ts), Ty::tuple(ks))
+            }
             ExprKind::List { items, rest } => {
+                let head = Some(Head::Named(TypeRef::Builtin(BuiltinType::List)));
+                let (item_exp, list_exp) = match known::members(expected).as_slice() {
+                    [m @ Ty::Con(_, xs)] if m.head() == head && xs.len() == 1 => {
+                        (xs[0].clone(), m.clone())
+                    }
+                    _ => (Ty::Top, Ty::Top),
+                };
                 let t = self.s.fresh();
+                let mut ks = Vec::new();
                 for x in items {
-                    let xt = self.infer(x);
+                    let (xt, xk) = self.infer_k(x, &item_exp);
                     self.sub(&xt, &t, x.span);
+                    ks.push(xk);
                 }
                 let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![t]);
                 if let Some(r) = rest {
-                    let rt = self.infer(r);
+                    let (rt, rk) = self.infer_k(r, &list_exp);
                     self.sub(&rt, &list, r.span);
+                    ks.push(match known::member(&rk, head) {
+                        Some(Ty::Con(_, xs)) if xs.len() == 1 => xs[0].clone(),
+                        _ => Ty::Top,
+                    });
                 }
-                list
+                let k = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![self.kunion(ks)]);
+                (list, k)
             }
             ExprKind::BitArray(segs) => {
                 for s in segs {
@@ -892,18 +1048,23 @@ impl<'a> Checker<'a> {
                     let t = self.infer(&s.value);
                     self.sub(&t, &want, s.value.span);
                 }
-                self.prim(BuiltinType::BitArray)
+                same(self.prim(BuiltinType::BitArray))
             }
-            ExprKind::Block(b) => self.block(&b.stmts, b.span),
-            ExprKind::Fn(f) => self.function(f),
-            ExprKind::Case { subject, clauses } => self.case(subject, clauses, e.span),
+            ExprKind::Block(b) => self.block(&b.stmts, b.span, expected),
+            ExprKind::Fn(f) => self.function(f, expected),
+            ExprKind::Case { subject, clauses } => self.case(subject, clauses, e.span, expected),
             ExprKind::Call { callee, args } => self.call(callee, None, args, e.span),
-            ExprKind::Field { target, name } => self.field(target, name),
+            ExprKind::Field { target, name } => self.field(target, name, e.span),
             ExprKind::TupleIndex {
                 target,
                 index,
                 index_span,
-            } => self.tuple_index(target, index.to_u32().unwrap_or(u32::MAX), *index_span),
+            } => self.tuple_index(
+                target,
+                index.to_u32().unwrap_or(u32::MAX),
+                *index_span,
+                e.span,
+            ),
             ExprKind::RecordUpdate {
                 ctor,
                 ctor_span,
@@ -917,24 +1078,23 @@ impl<'a> Checker<'a> {
                 });
                 let t = self.infer(expr);
                 self.sub(&t, &want, expr.span);
-                want
+                same(want)
             }
             ExprKind::Binary { op, lhs, rhs } => self.binary(*op, lhs, rhs, e.span),
-            ExprKind::Error => self.s.fresh_input(),
+            ExprKind::Error => (self.s.fresh_input(), Ty::Top),
         }
     }
 
     /// Rule 8 and §6.9.
-    fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr, span: Span) -> Ty {
+    fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr, span: Span) -> (Ty, Ty) {
         use BinOp::*;
         if op == Pipe {
             // `a |> f(b)` is `f(a, b)`, and `a |> f` is `f(a)`.
-            let a = self.infer(lhs);
+            let (a, k) = self.infer_k(lhs, &Ty::Top);
+            let first = Some((a, k, lhs.span));
             return match &rhs.kind {
-                ExprKind::Call { callee, args } => {
-                    self.call(callee, Some((a, lhs.span)), args, span)
-                }
-                _ => self.call(rhs, Some((a, lhs.span)), &[], span),
+                ExprKind::Call { callee, args } => self.call(callee, first, args, span),
+                _ => self.call(rhs, first, &[], span),
             };
         }
         let (operand, result) = match op {
@@ -958,45 +1118,132 @@ impl<'a> Checker<'a> {
             ),
             Pipe => unreachable!(),
         };
-        // TODO(M3d): `==` and `!=` on known types that are disjoint are a
-        // compile error (§6.9).
-        let lt = self.infer(lhs);
-        let rt = self.infer(rhs);
+        let (lt, lk) = self.infer_k(lhs, &Ty::Top);
+        let (rt, rk) = self.infer_k(rhs, &Ty::Top);
+        // §6.9: `==` on values of disjoint known types would always give the
+        // same result.
+        if matches!(op, Eq | NotEq) && lk != Ty::Top && rk != Ty::Top && known::disjoint(&lk, &rk) {
+            let (l, r) = (
+                display::show_known(&self.s, &lk),
+                display::show_known(&self.s, &rk),
+            );
+            self.error(
+                code::EQ_DISJOINT,
+                span,
+                format!(
+                    "the two sides have the known types `{l}` and `{r}`, which are disjoint, so the result would always be the same (§6.9)"
+                ),
+            );
+        }
         if let Some(want) = operand {
             self.sub(&lt, &want, lhs.span);
             self.sub(&rt, &want, rhs.span);
         }
-        result
+        (result.clone(), result)
     }
 
-    /// Rule 5: `f(a1, …)`. `first` is the left side of `|>`.
-    fn call(&mut self, callee: &Expr, first: Option<(Ty, Span)>, args: &[Arg], span: Span) -> Ty {
-        let f = self.infer(callee);
-        let mut given: Vec<(Option<&Ident>, Ty, Span)> = Vec::new();
-        if let Some((t, s)) = first {
-            given.push((None, t, s));
-        }
-        for a in args {
-            let t = self.infer(&a.value);
-            given.push((a.label.as_ref(), t, a.value.span));
-        }
-        let placed = if given.iter().any(|g| g.0.is_some()) {
-            let Some(labels) = self.known_labels(callee) else {
-                self.error(
-                    code::NEEDS_KNOWN_TYPE,
-                    callee.span,
-                    "a call with an argument by label needs a known function type for the function (§6.6); write the type of the function, or give the arguments by position",
-                );
-                return self.s.fresh();
-            };
-            match self.place(&labels, given, span) {
-                Some(p) => p,
-                None => return self.s.fresh(),
+    /// Rule 5: `f(a1, …)`. `first` is the left side of `|>`, with its known
+    /// type.
+    fn call(
+        &mut self,
+        callee: &Expr,
+        first: Option<(Ty, Ty, Span)>,
+        args: &[Arg],
+        span: Span,
+    ) -> (Ty, Ty) {
+        let (f, kf) = self.infer_k(callee, &Ty::Top);
+        let kfn = known::one_fn(&kf);
+        let skip = usize::from(first.is_some());
+        let n = skip + args.len();
+        // §6.6: the parameter that each argument goes to.
+        let to: Option<Vec<usize>> = if args.iter().any(|a| a.label.is_some()) {
+            match &kfn {
+                None => {
+                    self.error(
+                        code::NEEDS_KNOWN_TYPE,
+                        callee.span,
+                        "a call with an argument by label needs a known function type for the function (§6.6, §4.8); write the type of the function, or give the arguments by position",
+                    );
+                    None
+                }
+                Some(k) => {
+                    let labels: Vec<Option<String>> =
+                        k.params.iter().map(|p| p.0.clone()).collect();
+                    let given: Vec<(Option<&Ident>, Span)> = first
+                        .iter()
+                        .map(|x| (None, x.2))
+                        .chain(args.iter().map(|a| (a.label.as_ref(), a.value.span)))
+                        .collect();
+                    self.place(&labels, &given, span)
+                }
             }
         } else {
-            given.into_iter().map(|g| (g.1, g.2)).collect()
+            Some((0..n).collect())
         };
-        match &f {
+        // §4.8: an argument has the expected type of its parameter, with the
+        // type variables that matching the other arguments fixes. Function
+        // expressions with a parameter with no written type are typed after
+        // the others, and are left out of that matching.
+        let params: Option<Vec<Ty>> = match (&kfn, &to) {
+            (Some(k), Some(to)) => Some(
+                to.iter()
+                    .map(|i| k.params.get(*i).map_or(Ty::Top, |p| p.1.clone()))
+                    .collect(),
+            ),
+            _ => None,
+        };
+        let mut typed: Vec<Option<(Ty, Ty)>> = vec![None; n];
+        let mut sigma = known::Sigma::new();
+        if let Some((t, k, _)) = &first {
+            if let Some(ps) = &params {
+                self.match_k(&ps[0], k, &mut sigma, 0);
+            }
+            typed[0] = Some((t.clone(), k.clone()));
+        }
+        for later in [false, true] {
+            for (j, a) in args.iter().enumerate() {
+                let i = skip + j;
+                if (params.is_some() && known::open_fn(&a.value)) != later {
+                    continue;
+                }
+                let expected = match &params {
+                    Some(ps) => self.ksubst(&ps[i], &sigma, true).unwrap_or(Ty::Top),
+                    None => Ty::Top,
+                };
+                let (t, k) = self.infer_k(&a.value, &expected);
+                if let (Some(ps), false) = (&params, later) {
+                    self.match_k(&ps[i], &k, &mut sigma, 0);
+                }
+                typed[i] = Some((t, k));
+            }
+        }
+        let typed: Vec<(Ty, Ty)> = typed.into_iter().flatten().collect();
+        let spans: Vec<Span> = first
+            .iter()
+            .map(|x| x.2)
+            .chain(args.iter().map(|a| a.value.span))
+            .collect();
+        let Some(to) = to else {
+            return (self.s.fresh(), Ty::Top);
+        };
+        // `order[p]` is the argument that goes to the parameter `p`.
+        let mut order = vec![0u32; n];
+        for (g, p) in to.iter().enumerate() {
+            order[*p] = g as u32;
+        }
+        self.out.args.insert((self.module, span), order.clone());
+        let placed: Vec<(Ty, Span)> = order
+            .iter()
+            .map(|g| (typed[*g as usize].0.clone(), spans[*g as usize]))
+            .collect();
+        let known = match &kfn {
+            Some(k) if k.params.len() == n => {
+                let ks: Vec<Ty> = order.iter().map(|g| typed[*g as usize].1.clone()).collect();
+                self.call_known(k, &ks)
+            }
+            _ => Ty::Top,
+        };
+        let t = match &f {
             Ty::Fn(ft) if ft.params.len() == placed.len() => {
                 for ((t, s), (_, p)) in placed.iter().zip(&ft.params) {
                     self.sub2(t, p, *s, callee.span);
@@ -1038,21 +1285,24 @@ impl<'a> Checker<'a> {
                 self.add_env(n);
                 r
             }
-        }
+        };
+        (t, known)
     }
 
     /// §6.6: arguments by position go to the first parameters, and
-    /// arguments by label to the parameter with that label.
+    /// arguments by label to the parameter with that label. Gives the
+    /// parameter of each argument.
     fn place(
         &mut self,
         labels: &[Option<String>],
-        given: Vec<(Option<&Ident>, Ty, Span)>,
+        given: &[(Option<&Ident>, Span)],
         span: Span,
-    ) -> Option<Vec<(Ty, Span)>> {
-        let mut slots: Vec<Option<(Ty, Span)>> = vec![None; labels.len()];
+    ) -> Option<Vec<usize>> {
+        let mut slots: Vec<bool> = vec![false; labels.len()];
+        let mut to = Vec::new();
         let mut pos = 0;
         let mut ok = true;
-        for (label, t, s) in given {
+        for (label, s) in given {
             let i = match label {
                 None => {
                     pos += 1;
@@ -1063,7 +1313,10 @@ impl<'a> Checker<'a> {
                     .position(|x| x.as_deref() == Some(l.name.as_str())),
             };
             match (i, label) {
-                (Some(i), _) if slots[i].is_none() => slots[i] = Some((t, s)),
+                (Some(i), _) if !slots[i] => {
+                    slots[i] = true;
+                    to.push(i);
+                }
                 (Some(_), Some(l)) => {
                     ok = false;
                     self.error(
@@ -1084,18 +1337,18 @@ impl<'a> Checker<'a> {
                     ok = false;
                     self.error(
                         code::FN_ARITY,
-                        s,
+                        *s,
                         format!("the function has only {} parameters", labels.len()),
                     );
                 }
             }
         }
-        if ok && slots.iter().any(Option::is_none) {
+        if ok && slots.iter().any(|s| !s) {
             let missing: Vec<String> = labels
                 .iter()
                 .zip(&slots)
                 .enumerate()
-                .filter(|(_, (_, s))| s.is_none())
+                .filter(|(_, (_, s))| !**s)
                 .map(|(i, (l, _))| match l {
                     Some(l) => format!("`{l}`"),
                     None => format!("{}", i + 1),
@@ -1112,68 +1365,14 @@ impl<'a> Checker<'a> {
             );
             return None;
         }
-        ok.then(|| slots.into_iter().map(Option::unwrap).collect())
-    }
-
-    /// The labels of the function that `callee` is, from what is written:
-    /// a constructor, a declaration, a name whose written type or value is
-    /// a function, a generalized binding, or a function expression.
-    ///
-    /// TODO(M3d): the full known types of §4.8.
-    fn known_labels(&self, callee: &Expr) -> Option<Vec<Option<String>>> {
-        let from_scheme = |s: Option<&Scheme>| match s.map(|s| &s.ty) {
-            Some(Ty::Fn(f)) => Some(f.params.iter().map(|p| p.0.clone()).collect()),
-            _ => None,
-        };
-        match &callee.kind {
-            ExprKind::Name(ValueRef::Ctor(c)) => {
-                let TypeBody::Custom(ctors) = &self.p.ty(c.ty).body else {
-                    return None;
-                };
-                Some(
-                    ctors[c.index as usize]
-                        .fields
-                        .iter()
-                        .map(|f| f.label.as_ref().map(|l| l.name.clone()))
-                        .collect(),
-                )
-            }
-            ExprKind::Name(ValueRef::Def(d)) => match &self.p.def(*d).kind {
-                DefKind::External { ty, .. } => self.written_labels(ty),
-                DefKind::Binding { var, .. } => self
-                    .labels
-                    .get(var)
-                    .cloned()
-                    .or_else(|| from_scheme(self.defs.get(d))),
-            },
-            ExprKind::Name(ValueRef::Local(v)) => self
-                .labels
-                .get(v)
-                .cloned()
-                .or_else(|| from_scheme(self.locals.get(v))),
-            ExprKind::Fn(f) => Some(fn_labels(f)),
-            _ => None,
-        }
-    }
-
-    /// The written type of a name, with the aliases at its top expanded.
-    fn known_written(&self, e: &Expr) -> Option<Type> {
-        let var = match &e.kind {
-            ExprKind::Name(ValueRef::Local(v)) => *v,
-            ExprKind::Name(ValueRef::Def(d)) => match self.p.def(*d).kind {
-                DefKind::Binding { var, .. } => var,
-                DefKind::External { .. } => return None,
-            },
-            _ => return None,
-        };
-        self.written.get(&var).map(|t| self.expand(t))
+        ok.then_some(to)
     }
 
     /// §7.5: records a use of a name that is known to be made by a
     /// constructor.
     fn note_use(&mut self, v: VarId, span: Span) {
         if let Some(c) = self.known.get(&v) {
-            self.known_uses.insert((self.module, span), *c);
+            self.out.known_ctors.insert((self.module, span), *c);
         }
     }
 
@@ -1190,125 +1389,206 @@ impl<'a> Checker<'a> {
         self.known.get(&var).copied()
     }
 
-    /// Rule 13 for `v.f`, where `v` is a name with a written custom type,
-    /// or a name known to be made by a constructor (§6.7, §7.5).
-    ///
-    /// TODO(M3d): every value with a known type (§4.8).
-    fn field(&mut self, target: &Expr, name: &Ident) -> Ty {
-        let t = self.infer(target);
-        if let Some(c) = self.known_ctor(target) {
-            // §6.7: the one constructor that may have made `v`.
-            let targs = self.fresh_args(c.ty);
-            let fields = self.ctor_fields(c, &targs);
-            let Some((_, ft)) = fields
-                .into_iter()
-                .find(|f| f.0.as_deref() == Some(&name.name))
-            else {
-                let cname = match &self.p.ty(c.ty).body {
-                    TypeBody::Custom(cs) => cs[c.index as usize].name.clone(),
-                    TypeBody::Alias(_) => String::new(),
-                };
+    fn ctor_name(&self, c: CtorRef) -> String {
+        match &self.p.ty(c.ty).body {
+            TypeBody::Custom(cs) => cs[c.index as usize].name.clone(),
+            TypeBody::Alias(_) => String::new(),
+        }
+    }
+
+    /// Rule 13 and §6.7 for `v.f`: every constructor that may have made `v`
+    /// has a field with the label `f`, and `v.f` has the union of their
+    /// types.
+    fn field(&mut self, target: &Expr, name: &Ident, span: Span) -> (Ty, Ty) {
+        let (t, kv) = self.infer_k(target, &Ty::Top);
+        // The constructors that may have made `v`, each with the arguments
+        // of its type in the known type of `v`, when they are known.
+        let mut ctors: Vec<(CtorRef, Option<Vec<Ty>>)> = Vec::new();
+        let known_ctor = self.known_ctor(target);
+        if let Some(c) = known_ctor {
+            let args = match known::member(&kv, Some(Head::Named(TypeRef::Custom(c.ty)))) {
+                Some(Ty::Con(_, xs)) => Some(xs),
+                _ => None,
+            };
+            ctors.push((c, args));
+        } else {
+            if kv == Ty::Top {
                 self.error(
-                    code::NO_FIELD,
+                    code::NEEDS_KNOWN_TYPE,
                     name.span,
                     format!(
-                        "the constructor `{cname}`, which made this value (§7.5), has no field with the label `{}` (§4.8 rule 13)",
+                        "`.{}` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`",
                         name.name
                     ),
                 );
-                return self.s.fresh();
-            };
-            self.sub(&t, &Ty::named(TypeRef::Custom(c.ty), targs), target.span);
-            return ft;
-        }
-        let known = self.known_written(target);
-        let Some(TypeKind::Named {
-            ty: TypeRef::Custom(id),
-            ..
-        }) = known.as_ref().map(|k| &k.kind)
-        else {
-            self.error(
-                code::NOT_SUPPORTED,
-                name.span,
-                format!(
-                    "`.{}` needs a known type for its value; for now that is a name with a written custom type, such as `x: T` or `x ! T` (known types are not supported yet)",
-                    name.name
-                ),
-            );
-            return self.s.fresh();
-        };
-        let id = *id;
-        let TypeBody::Custom(ctors) = &self.p.ty(id).body else {
-            return self.s.fresh();
-        };
-        let n = ctors.len();
-        let targs = self.fresh_args(id);
-        let mut parts = Vec::new();
-        for i in 0..n {
-            let fields = self.ctor_fields(
-                CtorRef {
-                    ty: id,
-                    index: i as u32,
-                },
-                &targs,
-            );
-            match fields
-                .into_iter()
-                .find(|f| f.0.as_deref() == Some(&name.name))
-            {
-                Some((_, ft)) => parts.push(ft),
-                None => {
-                    let tname = &self.p.ty(id).name;
+                return (self.s.fresh(), Ty::Top);
+            }
+            for m in known::members(&kv) {
+                let custom = match &m {
+                    Ty::Con(Head::Named(TypeRef::Custom(id)), xs) => match &self.p.ty(*id).body {
+                        TypeBody::Custom(cs) => Some((*id, xs.clone(), cs.len())),
+                        TypeBody::Alias(_) => None,
+                    },
+                    _ => None,
+                };
+                let Some((id, xs, count)) = custom else {
+                    let (k, m) = (
+                        display::show_known(&self.s, &kv),
+                        display::show_known(&self.s, &m),
+                    );
                     self.error(
                         code::NO_FIELD,
                         name.span,
                         format!(
-                            "not every constructor of `{tname}` has a field with the label `{}` (§4.8 rule 13)",
+                            "`.{}` needs every member of the known type `{k}` of its value to be a custom type (§6.7), but `{m}` is not one",
                             name.name
                         ),
                     );
-                    return self.s.fresh();
+                    return (self.s.fresh(), Ty::Top);
+                };
+                if count == 0 {
+                    let tname = &self.p.ty(id).name;
+                    self.error(
+                        code::NO_FIELD,
+                        name.span,
+                        format!("`{tname}` has no constructors, so its values have no fields"),
+                    );
+                    return (self.s.fresh(), Ty::Top);
+                }
+                for i in 0..count {
+                    let c = CtorRef {
+                        ty: id,
+                        index: i as u32,
+                    };
+                    ctors.push((c, Some(xs.clone())));
                 }
             }
         }
-        if n == 0 {
-            let tname = &self.p.ty(id).name;
-            self.error(
-                code::NO_FIELD,
-                name.span,
-                format!("`{tname}` has no constructors, so its values have no fields"),
-            );
-            return self.s.fresh();
+        let mut found: Vec<(CtorRef, u32)> = Vec::new();
+        for (c, _) in &ctors {
+            let TypeBody::Custom(cs) = &self.p.ty(c.ty).body else {
+                continue;
+            };
+            let at = cs[c.index as usize]
+                .fields
+                .iter()
+                .position(|f| f.label.as_ref().is_some_and(|l| l.name == name.name));
+            match at {
+                Some(i) => found.push((*c, i as u32)),
+                None => {
+                    let message = if known_ctor.is_some() {
+                        format!(
+                            "the constructor `{}`, which made this value (§7.5), has no field with the label `{}` (§4.8 rule 13)",
+                            self.ctor_name(*c),
+                            name.name
+                        )
+                    } else {
+                        format!(
+                            "not every constructor of `{}` has a field with the label `{}` (§4.8 rule 13)",
+                            self.p.ty(c.ty).name,
+                            name.name
+                        )
+                    };
+                    self.error(code::NO_FIELD, name.span, message);
+                    return (self.s.fresh(), Ty::Top);
+                }
+            }
         }
-        self.sub(&t, &Ty::named(TypeRef::Custom(id), targs), target.span);
-        self.union(parts, name.span)
+        // The type of `v` is a subtype of its known type (rule 13), and of
+        // the type of the constructor that made it. The field types are
+        // those of the forms of these types in that bound.
+        let mut forms: Vec<Ty> = match kv {
+            Ty::Top => Vec::new(),
+            _ => known::members(&kv)
+                .iter()
+                .map(|m| self.known_bound(m))
+                .collect(),
+        };
+        let mut parts = Vec::new();
+        for (c, i) in &found {
+            let h = Some(Head::Named(TypeRef::Custom(c.ty)));
+            let targs = match forms.iter().find(|f| f.head() == h) {
+                Some(Ty::Con(_, xs)) => xs.clone(),
+                _ => {
+                    let a = self.fresh_args(c.ty);
+                    forms.push(Ty::named(TypeRef::Custom(c.ty), a.clone()));
+                    a
+                }
+            };
+            parts.push(self.ctor_fields(*c, &targs)[*i as usize].1.clone());
+        }
+        let bound = self.union(forms, target.span);
+        self.sub(&t, &bound, target.span);
+        let ks = ctors
+            .iter()
+            .zip(&found)
+            .map(|((c, args), (_, i))| self.field_known(*c, *i as usize, args.as_deref()))
+            .collect();
+        let k = self.kunion(ks);
+        self.out
+            .access
+            .insert((self.module, span), super::Access::Field(found));
+        (self.union(parts, name.span), k)
     }
 
-    /// Rule 13 for `v.k`, where `v` is a name with a written tuple type.
-    fn tuple_index(&mut self, target: &Expr, k: u32, span: Span) -> Ty {
-        let t = self.infer(target);
-        let Some(TypeKind::Tuple(parts)) = self.known_written(target).map(|k| k.kind) else {
+    /// Rule 13 for `v.k`: every member of the known type of `v` is a tuple
+    /// with more than k parts.
+    fn tuple_index(&mut self, target: &Expr, k: u32, index_span: Span, span: Span) -> (Ty, Ty) {
+        let (t, kv) = self.infer_k(target, &Ty::Top);
+        if kv == Ty::Top {
             self.error(
-                code::NOT_SUPPORTED,
-                span,
-                "`.k` needs a known type for its value; for now that is a name with a written tuple type (known types are not supported yet)",
+                code::NEEDS_KNOWN_TYPE,
+                index_span,
+                "`.k` needs a known type for its value (§4.8 rule 13); write its type, such as `x: (A, B)`",
             );
-            return self.s.fresh();
-        };
-        if k as usize >= parts.len() {
-            self.error(
-                code::NO_FIELD,
-                span,
-                format!(
-                    "the tuple has {} parts, so it has no part {k} (§6.4)",
-                    parts.len()
-                ),
-            );
-            return self.s.fresh();
+            return (self.s.fresh(), Ty::Top);
         }
-        let fresh: Vec<Ty> = parts.iter().map(|_| self.s.fresh()).collect();
-        self.sub(&t, &Ty::tuple(fresh.clone()), target.span);
-        fresh[k as usize].clone()
+        let mut forms = Vec::new();
+        let mut parts = Vec::new();
+        let mut kparts = Vec::new();
+        for m in known::members(&kv) {
+            match &m {
+                Ty::Con(Head::Tuple(n), xs) if k < *n => {
+                    let form = self.known_bound(&m);
+                    if let Ty::Con(_, ys) = &form {
+                        parts.push(ys[k as usize].clone());
+                    }
+                    forms.push(form);
+                    kparts.push(xs[k as usize].clone());
+                }
+                Ty::Con(Head::Tuple(n), _) => {
+                    self.error(
+                        code::NO_FIELD,
+                        index_span,
+                        format!(
+                            "the tuple has {n} part{}, so it has no part {k} (§6.4)",
+                            if *n == 1 { "" } else { "s" }
+                        ),
+                    );
+                    return (self.s.fresh(), Ty::Top);
+                }
+                _ => {
+                    let (whole, m) = (
+                        display::show_known(&self.s, &kv),
+                        display::show_known(&self.s, &m),
+                    );
+                    self.error(
+                        code::NO_FIELD,
+                        index_span,
+                        format!(
+                            "`.{k}` needs every member of the known type `{whole}` of its value to be a tuple (§4.8 rule 13), but `{m}` is not one"
+                        ),
+                    );
+                    return (self.s.fresh(), Ty::Top);
+                }
+            }
+        }
+        let bound = self.union(forms, target.span);
+        self.sub(&t, &bound, target.span);
+        self.out
+            .access
+            .insert((self.module, span), super::Access::Part(k));
+        (self.union(parts, index_span), self.kunion(kparts))
     }
 
     /// §6.7: `C(..base, f: e)`.
@@ -1318,10 +1598,10 @@ impl<'a> Checker<'a> {
         ctor_span: Span,
         base: &Expr,
         fields: &[(Ident, Expr)],
-    ) -> Ty {
-        let bt = self.infer(base);
+    ) -> (Ty, Ty) {
+        let (bt, bk) = self.infer_k(base, &Ty::Top);
         let TypeBody::Custom(ctors) = &self.p.ty(ctor.ty).body else {
-            return self.s.fresh();
+            return (self.s.fresh(), Ty::Top);
         };
         if ctors.len() != 1 && self.known_ctor(base) != Some(ctor) {
             let cname = ctors[ctor.index as usize].name.clone();
@@ -1342,15 +1622,15 @@ impl<'a> Checker<'a> {
         );
         let old_fields = self.ctor_fields(ctor, &old);
         let new_fields = self.ctor_fields(ctor, &new);
-        let mut given = vec![false; new_fields.len()];
+        let mut given: Vec<Option<Ty>> = vec![None; new_fields.len()];
         for (label, e) in fields {
-            let t = self.infer(e);
+            let (t, k) = self.infer_k(e, &Ty::Top);
             match new_fields
                 .iter()
                 .position(|f| f.0.as_deref() == Some(&label.name))
             {
-                Some(i) if !given[i] => {
-                    given[i] = true;
+                Some(i) if given[i].is_none() => {
+                    given[i] = Some(k);
                     self.sub(&t, &new_fields[i].1, e.span);
                 }
                 Some(_) => self.error(
@@ -1369,11 +1649,26 @@ impl<'a> Checker<'a> {
             }
         }
         for (i, g) in given.iter().enumerate() {
-            if !g {
+            if g.is_none() {
                 self.sub(&old_fields[i].1, &new_fields[i].1, base.span);
             }
         }
-        Ty::named(TypeRef::Custom(ctor.ty), new)
+        // §4.8: the known type of the call of `C` with the given fields and
+        // the other fields of `v`.
+        let base_args = match known::member(&bk, Some(Head::Named(TypeRef::Custom(ctor.ty)))) {
+            Some(Ty::Con(_, xs)) => Some(xs),
+            _ => None,
+        };
+        let ks: Vec<Ty> = given
+            .into_iter()
+            .enumerate()
+            .map(|(i, g)| g.unwrap_or_else(|| self.field_known(ctor, i, base_args.as_deref())))
+            .collect();
+        let k = match known::one_fn(&self.ctor_known(ctor)) {
+            Some(f) => self.call_known(&f, &ks),
+            None => Ty::Top,
+        };
+        (Ty::named(TypeRef::Custom(ctor.ty), new), k)
     }
 
     /// §8.2: the type of the value of a segment.
@@ -1382,50 +1677,19 @@ impl<'a> Checker<'a> {
             return self.prim(BuiltinType::Int);
         };
         let name = f.name.name.as_str();
-        let int = |s: &str| {
-            let (digits, end) = match s.strip_suffix("be").or_else(|| s.strip_suffix("le")) {
-                Some(d) => (d, true),
-                None => (s, false),
-            };
-            let n: u32 = match digits.parse() {
-                Ok(n) if !digits.starts_with('0') && digits.bytes().all(|b| b.is_ascii_digit()) => {
-                    n
-                }
-                _ => return false,
-            };
-            if end {
-                n >= 16 && n.is_multiple_of(8)
-            } else {
-                n >= 1 && (n <= 8 || !n.is_multiple_of(8))
-            }
-        };
-        let (ty, arg) = match name {
-            "u" | "i" => (Some(BuiltinType::Int), Some(true)),
-            "bits" | "bytes" => (Some(BuiltinType::BitArray), None),
-            "f16be" | "f16le" | "f32be" | "f32le" | "f64be" | "f64le" => {
-                (Some(BuiltinType::Float), Some(false))
-            }
-            "utf8" | "utf16be" | "utf16le" | "utf32be" | "utf32le" => {
-                (Some(BuiltinType::String), Some(false))
-            }
-            "utf8_codepoint" | "utf16be_codepoint" | "utf16le_codepoint" | "utf32be_codepoint"
-            | "utf32le_codepoint" => (Some(BuiltinType::UtfCodepoint), Some(false)),
-            _ if name
-                .strip_prefix('u')
-                .or_else(|| name.strip_prefix('i'))
-                .is_some_and(int) =>
-            {
-                (Some(BuiltinType::Int), Some(false))
-            }
-            _ => (None, None),
-        };
-        let Some(ty) = ty else {
+        let Some(ty) = known::format_prim(name) else {
             self.error(
                 code::BAD_FORMAT,
                 f.name.span,
                 format!("there is no bit array format `{name}` (§8.2)"),
             );
             return self.s.fresh();
+        };
+        // Whether the format needs a length, has none, or may have one.
+        let arg = match name {
+            "u" | "i" => Some(true),
+            "bits" | "bytes" => None,
+            _ => Some(false),
         };
         match (arg, &f.arg) {
             (Some(true), None) => self.error(
@@ -1451,12 +1715,13 @@ impl<'a> Checker<'a> {
 
     // ---- Blocks, functions, and bindings ----
 
-    /// Rule 9: `{ s1 … sn e }`.
-    pub fn block(&mut self, stmts: &[Stmt], span: Span) -> Ty {
+    /// Rule 9: `{ s1 … sn e }`. The last expression has the expected type
+    /// of the block, and the block has its known type (§4.8).
+    pub fn block(&mut self, stmts: &[Stmt], span: Span, expected: &Ty) -> (Ty, Ty) {
         for (i, s) in stmts.iter().enumerate() {
             match s {
                 Stmt::Bind(b) => self.local_binding(b),
-                Stmt::Expr(e) if i + 1 == stmts.len() => return self.infer(e),
+                Stmt::Expr(e) if i + 1 == stmts.len() => return self.infer_k(e, expected),
                 Stmt::Expr(e) => {
                     self.infer(e);
                 }
@@ -1464,10 +1729,13 @@ impl<'a> Checker<'a> {
                     // `! T = e1` and the rest `r`: `A ? E ! N1 | M - T`.
                     self.check_places(ty, Pol::Pos, 0);
                     let t = self.conv(ty, &HashMap::new());
+                    if let Some(super::Head::Named(r)) = t.head() {
+                        self.out.services.insert((self.module, *span), r);
+                    }
                     let v = self.infer(value);
                     self.sub2(&v, &t, value.span, ty.span);
                     self.effects.push(Effects::default());
-                    let a = self.block(&stmts[i + 1..], *span);
+                    let a = self.block(&stmts[i + 1..], *span, expected);
                     let (err, env) = self.pop_effects(*span);
                     self.add_err(err);
                     let rest = self.s.env_diff(env, vec![t]);
@@ -1479,11 +1747,26 @@ impl<'a> Checker<'a> {
         }
         // The last statement is not an expression: reported by the parser.
         let _ = span;
-        Ty::named(self.b.nil, Vec::new())
+        let nil = Ty::named(self.b.nil, Vec::new());
+        (nil.clone(), nil)
     }
 
-    /// Rule 4: a function expression.
-    fn function(&mut self, f: &Function) -> Ty {
+    /// Rule 4: a function expression, and its known type (§4.8). With an
+    /// expected function type with as many parameters, a parameter with no
+    /// type written at its top gets the known type of the matching
+    /// parameter.
+    fn function(&mut self, f: &Function, expected: &Ty) -> (Ty, Ty) {
+        let count = f
+            .params
+            .iter()
+            .filter(|p| matches!(p, Param::Pattern { .. }))
+            .count();
+        let expected: Vec<Ty> = match known::members(expected).as_slice() {
+            [Ty::Fn(g)] if g.params.len() == count => {
+                g.params.iter().map(|p| p.1.clone()).collect()
+            }
+            _ => Vec::new(),
+        };
         let mut params = Vec::new();
         let mut env_tys = Vec::new();
         let mut fails = false;
@@ -1495,12 +1778,21 @@ impl<'a> Checker<'a> {
                     let t = self.param(pattern);
                     self.s.mark_inputs(start);
                     fails |= self.may_fail(pattern, &t);
+                    let k = match known::top_written(pattern) {
+                        Some(ty) => self.kconv(ty, &HashMap::new()),
+                        None => expected.get(params.len()).cloned().unwrap_or(Ty::Top),
+                    };
+                    self.fit_known(pattern, &k, false);
                     params.push((label.clone(), t));
                 }
-                Param::Env { var, ty, .. } => {
+                Param::Env { var, name, ty } => {
                     self.check_places(ty, Pol::Pos, 0);
                     let t = self.conv(ty, &HashMap::new());
-                    self.written.insert(*var, ty.clone());
+                    if let Some(super::Head::Named(r)) = t.head() {
+                        self.out.services.insert((self.module, name.span), r);
+                    }
+                    let k = self.kconv(ty, &HashMap::new());
+                    self.kvars.insert(*var, k);
                     self.locals.insert(*var, Scheme::mono(t.clone()));
                     env_tys.push(t);
                 }
@@ -1531,11 +1823,18 @@ impl<'a> Checker<'a> {
                 .map_or(Ty::Never, |t| self.conv(t, &HashMap::new()));
             (value, err, env)
         });
+        // §4.8: the body of a function with a written `->` part has that
+        // type as its expected type.
+        let body_expected = f
+            .ret
+            .as_ref()
+            .map_or(Ty::Top, |r| self.kconv(&r.value, &HashMap::new()));
         self.effects.push(Effects::default());
-        let a = self.block(&f.body.stmts, f.body.span);
+        let (a, body_known) = self.block(&f.body.stmts, f.body.span, &body_expected);
+        let known = self.fn_known(f, &expected, body_known);
         let (err, env) = self.pop_effects(f.span);
         let assert = Ty::named(self.b.assert, Vec::new());
-        match (ret, &f.ret) {
+        let t = match (ret, &f.ret) {
             (Some((value, rerr, renv)), Some(written)) => {
                 // §6.8: the written `->` part is the type after the
                 // parameters; `! N` has the environment parameters and
@@ -1577,7 +1876,8 @@ impl<'a> Checker<'a> {
                     env,
                 }))
             }
-        }
+        };
+        (t, known)
     }
 
     /// Rule 10 for a binding in a block, and rule 14.
@@ -1589,19 +1889,21 @@ impl<'a> Checker<'a> {
         }
         self.check_pattern_places(&b.pattern, Pol::Pos);
         self.new_tyvars(&b.ty_vars);
-        self.note_binding(b);
         let mut binders = Vec::new();
         super::pattern::binders(&b.pattern, &mut binders);
         let mut holders = Vec::new();
         if direct {
-            // §6.10: inside its own value, a name is not general.
+            // §6.10: inside its own value, a name is not general, and it is
+            // known only from what is written (§4.8).
             for v in &binders {
                 let h = self.s.fresh();
                 self.locals.insert(*v, Scheme::mono(h.clone()));
                 holders.push((*v, h));
             }
+            self.own_known(b);
         }
-        let a = self.infer(&b.value);
+        let expected = self.binding_expected(b);
+        let (a, k) = self.infer_k(&b.value, &expected);
         self.fit(&b.pattern, &a);
         if self.may_fail(&b.pattern, &a) {
             self.add_env(Ty::named(self.b.assert, Vec::new()));
@@ -1618,9 +1920,14 @@ impl<'a> Checker<'a> {
             for v in &binders {
                 if let Some(s) = self.locals.get(v).cloned() {
                     let ty = self.generalize(&s.ty, level);
+                    // §4.8: a generalized name has its type scheme.
+                    let known = display::known(&self.s, &ty, level);
+                    self.kvars.insert(*v, known);
                     self.locals.insert(*v, Scheme { level, ty });
                 }
             }
+        } else {
+            self.fit_known(&b.pattern, &k, false);
         }
     }
 
@@ -1749,15 +2056,12 @@ fn has_both(t: &Ty) -> bool {
     }
 }
 
-/// The labels of the parameters of a function expression (§6.11).
-fn fn_labels(f: &Function) -> Vec<Option<String>> {
-    f.params
-        .iter()
-        .filter_map(|p| match p {
-            Param::Pattern { label, .. } => Some(label.clone()),
-            Param::Env { .. } => None,
-        })
-        .collect()
+/// §10.3: the built-in types that the host can take.
+fn host_builtin(b: BuiltinType) -> bool {
+    matches!(
+        b,
+        BuiltinType::Int | BuiltinType::Float | BuiltinType::String | BuiltinType::BitArray
+    )
 }
 
 /// §4.5 rules 6 and 7: the variance of every parameter of every custom

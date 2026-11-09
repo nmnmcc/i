@@ -31,3 +31,44 @@ bad_pattern = (u) {
   User(n, a) = u
   n
 }
+
+// Labels come from known function types (§4.8).
+// A name that is not generalized gets its labels from its value.
+id = (x) { x }
+through = () {
+  g = id(make)
+  g(age: 1, name: "x")
+}
+// A `_` part is fine: only the labels are needed.
+holes = (f: (x: _) -> Int) { f(x: 1) }
+// Positional arguments first, also with `|>`.
+minus = (a: Int, b: Int) { a - b }
+piped = 5 |> minus(b: 1)
+// A function that uses its own result by label needs a written `->`.
+Node { Node(value: Int, rest: Int) }
+walk = (n: Int) -> Node {
+  case n {
+    0 -> Node(0, 0)
+    _ -> Node(value: walk(n: n - 1).value + 1, rest: 0)
+  }
+}
+walk_unwritten = (n: Int) {
+  case n {
+    0 -> Node(0, 0)
+    _ -> Node(walk_unwritten(n - 1).value + 1, 0)
+  }
+}
+// In a group, the names are known from what is written.
+ping = (n: Int) { pong(m: n) }
+pong = (m: Int) {
+  case m {
+    0 -> 0
+    _ -> ping(n: m - 1)
+  }
+}
+// An annotation label wins over the labels of the value.
+wins: (x: Int) -> Int = (y) { y }
+wins_ok = wins(x: 1)
+wins_value = wins(y: 1)
+// A function expression in a group, called directly.
+direct = { (a: Int, b: String) { b } }(b: "x", a: 1)

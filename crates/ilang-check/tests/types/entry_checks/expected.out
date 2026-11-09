@@ -1,0 +1,30 @@
+app/main.add : (a: Int, b: Int) -> Int
+app/main.opaque : (h: Handle, flag: Bool) -> Handle
+app/main.errors : (x: Int) -> Nil ? Int | String
+app/main.never : (s: String) -> Never
+app/main.bad_param : (xs: List(Int)) -> Int
+app/main.bad_value : () -> (Int, Int)
+app/main.generic : (x: a) -> a
+app/main.bad_errors : () -> Int ? (Int, Int)
+app/main.twice_error : () -> Int ? Handle
+app/main.number : Int
+app/main.with_host : () -> Int ! Assert | Storage
+app/main.with_clock : () -> Int ! Clock
+app/main.main : () -> Nil ! Storage | Clock
+app/main.core_text : (n: Int) -> String
+app/main_test.passes : () -> Nil ! Assert
+app/main_test.host : () -> Nil ! Assert | Storage
+app/main_test.gives_int : () -> Int
+app/main_test.needs_clock : () -> Nil ! Assert | Clock
+app/main_test.never : () -> Never
+src/main.i:42:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `Clock`, which must be given before it gets to the entry point
+test/main_test.i:12:1: error[E0521]: `gives_int` is a test, so it gives `Nil` (§10.2), but it gives `Int`
+test/main_test.i:15:1: error[E0522]: `needs_clock` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `Clock`, which must be given before it gets to the entry point
+src/main.i:27:1: error[E0521]: `bad_param` is a host export, so a parameter must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `List(Int)`
+src/main.i:28:1: error[E0521]: `bad_value` is a host export, so the value must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `(Int, Int)`
+src/main.i:29:1: error[E0521]: `generic` is a host export, so a parameter must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `a`
+src/main.i:29:1: error[E0521]: `generic` is a host export, so the value must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `a`
+src/main.i:30:1: error[E0521]: `bad_errors` is a host export, so its errors must be a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray` (§10.3), but they are `(Int, Int)`
+src/main.i:31:1: error[E0521]: `twice_error` is a host export, so its errors must be a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray` (§10.3), but they are `Handle`
+src/main.i:39:1: error[E0522]: `with_clock` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `Clock`, which must be given before it gets to the entry point
+src/main.i:33:1: error[E0521]: `number` is a host export, so it is a function (§10.2), but its type is `Int`

@@ -12,20 +12,19 @@
 //!   narrowing (rule 12), and known constructors (§7.5).
 //! - `coverage.rs`: Maranget's usefulness algorithm, for "can not fail"
 //!   (§7.3), "taken" (rule 12), coverage and "never used" (§7.4).
+//! - `known.rs`: known types and expected types (§4.8), found from what
+//!   is written, in the order of inference.
 //! - `display.rs`: coalescing, simplification, and the text of a type in
 //!   the syntax of §3.
-//!
-//! TODO(M3d): known types and expected types (§4.8), fields and tuple parts
-//! (rule 13) on values with no written type, and the disjointness check of
-//! `==` (§6.9).
 
 mod coverage;
 mod display;
 mod infer;
+mod known;
 mod pattern;
 mod solve;
 
-use crate::hir::{CtorRef, DefId, ModuleId, Program, TypeRef};
+use crate::hir::{BindingRef, CtorRef, DefId, ModuleId, Program, TypeRef};
 use ilang_package::{Diagnostic, Sources};
 use ilang_syntax::span::Span;
 use std::collections::HashMap;
@@ -37,7 +36,7 @@ pub(crate) struct V(pub u32);
 /// The type constructor of a member (§4.4). All function types are one
 /// head, and so are the tuples of one size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum Head {
+pub enum Head {
     Named(TypeRef),
     Tuple(u32),
     Fn,
@@ -127,15 +126,49 @@ impl Variance {
     }
 }
 
-/// The result of type checking.
+/// How `v.f` or `v.k` reads a part of its value (§4.8 rule 13).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Access {
+    /// `v.f`: each constructor that may have made `v` (§6.7), with the
+    /// index of its field with the label `f`. At run time, the constructor
+    /// of the value picks one.
+    Field(Vec<(CtorRef, u32)>),
+    /// `v.k`: part `k` of a tuple, whatever its size.
+    Part(u32),
+}
+
+/// The result of type checking: the shown types, and what the code
+/// generator needs. Places are keyed by the module and the span of the
+/// node in the HIR, which is unique among the nodes of one kind.
 #[derive(Clone, Debug, Default)]
 pub struct Typed {
     /// The type scheme of each top-level name, simplified and shown in the
     /// syntax of §3 (§4.7).
     pub schemes: HashMap<DefId, String>,
     /// §7.5: each use of a name that is known to be made by a constructor,
-    /// by the module and the place of the name.
+    /// by the span of the `Name` expression.
     pub known_ctors: HashMap<(ModuleId, Span), CtorRef>,
+    /// Each `Field` and `TupleIndex` expression that type checks, by its
+    /// span: what it reads.
+    pub access: HashMap<(ModuleId, Span), Access>,
+    /// Each call whose arguments could be put in their places, by the span
+    /// of its `Call` expression, or
+    /// of the `Binary` `|>` expression for `a |> f(…)` and `a |> f`: for
+    /// each parameter in order, the index of the argument that goes to it
+    /// (§6.6). Arguments count in the order they are written, with the
+    /// left side of `|>` first; they are worked out in that order (§6.2).
+    pub args: HashMap<(ModuleId, Span), Vec<u32>>,
+    /// Each type test `x: T` or `_: T` in a `case` clause pattern, by the
+    /// span of the `Typed` pattern: the type constructors of the members of
+    /// `T`, which are tested at run time (§7.1).
+    pub type_tests: HashMap<(ModuleId, Span), Vec<Head>>,
+    /// The type constructor of the service of each environment parameter,
+    /// by the span of its name, and of each environment statement, by the
+    /// span of the statement (§9.2). Aliases are expanded.
+    pub services: HashMap<(ModuleId, Span), TypeRef>,
+    /// Whether each top-level binding was generalized (§4.7): its value is
+    /// a direct value, as are the values of its group.
+    pub generalized: HashMap<BindingRef, bool>,
 }
 
 impl Typed {

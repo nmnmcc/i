@@ -2380,6 +2380,7 @@ impl<'a> Resolver<'a> {
         let Some(root) = self.graph.root else {
             return;
         };
+        self.p.root = Some(root);
         let pkg = &self.graph.packages[root];
         let Some(source) = pkg.manifest_source else {
             return;
@@ -2440,9 +2441,13 @@ impl<'a> Resolver<'a> {
                     ))
                 }
             }
-            if let Some((code, message)) = problem {
-                self.diags
-                    .push(Diagnostic::error(code, Some(source), e.span, message));
+            match (problem, def) {
+                (Some((code, message)), _) => {
+                    self.diags
+                        .push(Diagnostic::error(code, Some(source), e.span, message));
+                }
+                (None, Some(d)) => self.p.host_exports.push(d),
+                (None, None) => {}
             }
         }
     }

@@ -5,14 +5,10 @@
 //! Every node keeps its span; spans are byte ranges in the file of the
 //! module that holds the node (`Module::source`).
 //!
-//! §2.4 for the inferred type of an exported binding is checked by type
-//! inference (`types/infer.rs`); resolution checks the written types.
-//!
-//! TODO(M3): checks that need the inferred types, for type inference:
-//! - §10.2: the parameters, value, and errors of a host export are types
-//!   that the host can take (§10.3); a `@test` gives `Nil`; and the
-//!   environment of an entry point (the program entry, a test, or a host
-//!   export) has only host services and `Assert`.
+//! §2.4 for the inferred type of an exported binding, and the rules of
+//! §10.2 and §10.3 that need the inferred type of an entry point, are
+//! checked by type inference (`types/infer.rs`); resolution checks the
+//! written types.
 
 use ilang_package::{ModuleKind, PackageId, SourceId};
 use ilang_syntax::ast::{BinOp, Ident, UnOp};
@@ -62,6 +58,12 @@ pub struct Program {
     pub types: Vec<TypeDef>,
     /// The module of the built-in names (§12), in the package `i`.
     pub prelude: Option<ModuleId>,
+    /// The package that is compiled: its `@main` and `@test` bindings are
+    /// entry points (§10.2).
+    pub root: Option<PackageId>,
+    /// The host exports (§10.2): the names in `[wasm].exports` of the
+    /// compiled package that are exported functions of a module.
+    pub host_exports: Vec<DefId>,
     /// The number of `VarId`s and `TyVarId`s given out.
     pub var_count: u32,
     pub ty_var_count: u32,

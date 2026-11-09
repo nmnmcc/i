@@ -1,0 +1,17 @@
+name = "app"
+
+[wasm]
+exports = [
+  "app/main.add",
+  "app/main.opaque",
+  "app/main.errors",
+  "app/main.never",
+  "app/main.bad_param",
+  "app/main.bad_value",
+  "app/main.generic",
+  "app/main.bad_errors",
+  "app/main.twice_error",
+  "app/main.with_host",
+  "app/main.with_clock",
+  "app/main.number",
+]

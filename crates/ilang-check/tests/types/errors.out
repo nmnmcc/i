@@ -29,8 +29,8 @@ bad_bits : BitArray
 22:26: error[E0502]: the function types `(Int) -> _ ? _ ! _` and `(Int, Int) -> _ ? _ ! _` have different numbers of parameters
 24:17: error[E0518]: a union with two or more type variables as members may only be in an output place (§4.4): inference could not choose the variable for a value that comes here
 25:32: error[E0504]: a value of `Int` could go to more than one type variable of `_ | _` (§4.4) (the type at 25:22 needs it)
-27:17: error[E0508]: `.name` needs a known type for its value; for now that is a name with a written custom type, such as `x: T` or `x ! T` (known types are not supported yet)
-28:16: error[E0508]: `.k` needs a known type for its value; for now that is a name with a written tuple type (known types are not supported yet)
+27:17: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
+28:16: error[E0506]: `.k` needs a known type for its value (§4.8 rule 13); write its type, such as `x: (A, B)`
 31:25: error[E0512]: not every constructor of `Shape` has a field with the label `radius` (§4.8 rule 13)
 35:1: error[E0509]: a top-level binding may not need an environment (§2.5), but this one has `Clock`
 36:1: error[E0509]: a top-level binding may not give errors (§2.5), but this one has `Int`

@@ -302,7 +302,7 @@ impl Coalescer<'_> {
 /// an input, is shown as one type: the input side, which every value that
 /// comes there is in, and which is enough for every use there; when the
 /// input side has nothing, the output side (§4.5 rules 6 and 7).
-fn both(t: &Ty) -> Ty {
+pub(crate) fn both(t: &Ty) -> Ty {
     match t {
         Ty::Both(a, b) => {
             if **b == Ty::Top {
@@ -1096,4 +1096,89 @@ fn type_name(r: TypeRef, types: &[String]) -> String {
             .cloned()
             .unwrap_or_else(|| format!("T{}", id.0)),
     }
+}
+
+// ---- Known types (§4.8) ----
+
+/// The known type of a name with the type scheme `t`, whose variables
+/// deeper than `level` are general: the scheme in its simpler form (§4.7).
+/// A variable that is not general is not known, so it is `_` (`Top`).
+pub(crate) fn known(s: &Solver, t: &Ty, level: u32) -> Ty {
+    match simplify(s, t, Some(level)) {
+        Ok(t) => known_norm(s, &not_general(s, &both(&t), level)),
+        Err(()) => Ty::Top,
+    }
+}
+
+fn not_general(s: &Solver, t: &Ty, level: u32) -> Ty {
+    let go = |x: &Ty| not_general(s, x, level);
+    match t {
+        Ty::Var(v) if s.vars.get(v.0 as usize).is_none_or(|x| x.level <= level) => Ty::Top,
+        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(go).collect()),
+        Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
+        Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+            params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
+            ret: go(&f.ret),
+            err: go(&f.err),
+            env: go(&f.env),
+        })),
+        Ty::Diff(a, h) => Ty::Diff(Box::new(go(a)), h.iter().map(go).collect()),
+        Ty::Both(a, b) => Ty::Both(Box::new(go(a)), Box::new(go(b))),
+        t => t.clone(),
+    }
+}
+
+fn known_ops(s: &Solver) -> Norm<'_> {
+    Norm {
+        s,
+        keep: None,
+        written: false,
+    }
+}
+
+/// The union of known types (§4.4), with no constraints: `_` in a union is
+/// `_`, because a part that is not known makes the union not known.
+pub(crate) fn known_union(s: &Solver, ms: Vec<Ty>) -> Ty {
+    known_ops(s).union(ms)
+}
+
+pub(crate) fn known_inter(s: &Solver, ms: Vec<Ty>) -> Ty {
+    known_ops(s).inter(ms)
+}
+
+pub(crate) fn known_diff(s: &Solver, a: Ty, h: Vec<Ty>) -> Ty {
+    known_ops(s).diff(a, h)
+}
+
+/// A known type with its unions, intersections, and differences worked
+/// out again, after type variables were put in.
+pub(crate) fn known_norm(s: &Solver, t: &Ty) -> Ty {
+    known_ops(s).norm(t.clone())
+}
+
+/// The text of a known type: a part that is not known is `_`, and the type
+/// variables of a scheme are named.
+pub(crate) fn show_known(s: &Solver, t: &Ty) -> String {
+    let mut names: HashMap<V, String> = HashMap::new();
+    let mut next = 0u8;
+    render(
+        t,
+        0,
+        &mut |v| {
+            names
+                .entry(v)
+                .or_insert_with(|| {
+                    let n = s
+                        .vars
+                        .get(v.0 as usize)
+                        .and_then(|x| x.name.clone())
+                        .unwrap_or_else(|| ((b'a' + next % 26) as char).to_string());
+                    next += 1;
+                    n
+                })
+                .clone()
+        },
+        &s.type_names,
+    )
 }

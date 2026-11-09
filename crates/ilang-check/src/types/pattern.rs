@@ -4,6 +4,7 @@
 
 use super::coverage::{self, Col, Ctor, Pat};
 use super::infer::{Checker, Scheme};
+use super::known;
 use super::{FnTy, Head, Ty};
 use crate::code;
 use crate::hir::*;
@@ -60,6 +61,8 @@ pub(crate) fn part_label(p: &Pattern) -> Option<&str> {
 struct Place {
     /// `B`: the type of the values at this place.
     ty: Ty,
+    /// The known type of the values at this place (§4.8).
+    known: Ty,
     /// The pattern types of the patterns here that are not catch-alls.
     pats: Vec<Ty>,
     /// The arguments shared by the patterns here with one type constructor.
@@ -270,7 +273,7 @@ impl Checker<'_> {
 
     /// §7.1: the parts of a constructor pattern and the fields they are
     /// matched to: by position to the fields without labels, then by label.
-    fn match_fields<'p>(
+    pub fn match_fields<'p>(
         &mut self,
         span: Span,
         fields: &[(Option<String>, Ty)],
@@ -366,10 +369,20 @@ impl Checker<'_> {
 
     // ---- case (rules 11 and 12) ----
 
-    pub fn case(&mut self, subject: &Expr, clauses: &[Clause], span: Span) -> Ty {
-        let a = self.infer(subject);
+    /// Rule 11, and the known type of a `case` (§4.8): the union of the
+    /// known types of its clause expressions, which have the expected type
+    /// of the `case`.
+    pub fn case(
+        &mut self,
+        subject: &Expr,
+        clauses: &[Clause],
+        span: Span,
+        expected: &Ty,
+    ) -> (Ty, Ty) {
+        let (a, subject_known) = self.infer_k(subject, &Ty::Top);
         let mut places = vec![Place {
             ty: a.clone(),
+            known: subject_known,
             pats: Vec::new(),
             heads: Vec::new(),
             catch_here: false,
@@ -415,12 +428,27 @@ impl Checker<'_> {
             let b = places[i].ty.clone();
             self.sub(&b, &want, if i == 0 { subject.span } else { span });
         }
-        // Rule 12: each catch-all gets `B - H`.
+        // Rule 12: each catch-all gets `B - H`, and its known type less the
+        // members that are taken (§4.8).
         for k in 0..v.catches.len() {
             let c = &v.catches[k];
             let (pattern, ci, choice, place) = (c.pattern, c.clause, c.choice, c.place);
-            let t = self.narrow(&rows, clauses, ci, choice, k as u32, &places[place]);
+            let (t, taken) = self.narrow(&rows, clauses, ci, choice, k as u32, &places[place]);
             self.bind_catch_all(pattern, &t, true);
+            let known = match taken {
+                None => Ty::Never,
+                Some(hs) => {
+                    let ms = known::members(&places[place].known)
+                        .into_iter()
+                        .filter(|m| m.head().is_none_or(|h| !hs.contains(&h)))
+                        .collect();
+                    match &places[place].known {
+                        Ty::Top => Ty::Top,
+                        _ => self.kunion(ms),
+                    }
+                }
+            };
+            self.fit_known(pattern, &known, true);
         }
         // §7.5: inside a clause `C(…)`, the name of the subject is known to
         // be made by `C`.
@@ -433,6 +461,7 @@ impl Checker<'_> {
             _ => None,
         };
         let r = self.s.fresh();
+        let mut knowns = Vec::new();
         for c in clauses {
             let known = subject_var.and_then(|x| {
                 let mut ctors = c.patterns.iter().map(top_ctor);
@@ -445,7 +474,8 @@ impl Checker<'_> {
                 let want = self.bool_ty();
                 self.sub(&t, &want, g.span);
             }
-            let t = self.infer(&c.body);
+            let (t, k) = self.infer_k(&c.body, expected);
+            knowns.push(k);
             self.sub(&t, &r, c.body.span);
             if let Some((x, old)) = before {
                 match old {
@@ -474,7 +504,7 @@ impl Checker<'_> {
                 })
                 .collect(),
         });
-        r
+        (r, self.kunion(knowns))
     }
 
     /// Rule 12: the type of the catch-all `id` of choice `choice` of clause
@@ -482,6 +512,8 @@ impl Checker<'_> {
     /// earlier clauses without a guard take there. "Every value that the
     /// clause pattern matches" is any value at the other places: the types
     /// are not known yet, so the columns have no type.
+    /// Also gives the type constructors that are taken, or `None` when every
+    /// one is.
     fn narrow(
         &mut self,
         rows: &[Vec<Pat>],
@@ -490,7 +522,7 @@ impl Checker<'_> {
         choice: usize,
         id: u32,
         place: &Place,
-    ) -> Ty {
+    ) -> (Ty, Option<Vec<Head>>) {
         let earlier: Vec<Vec<Pat>> = (0..ci)
             .filter(|i| clauses[*i].guard.is_none())
             .map(|i| vec![Pat::Or(rows[i].clone())])
@@ -505,7 +537,7 @@ impl Checker<'_> {
             )
             .is_none()
         {
-            return Ty::Never;
+            return (Ty::Never, None);
         }
         let mut candidates: Vec<(Head, usize)> = Vec::new();
         for (c, unguarded, h, n) in &place.seen {
@@ -514,9 +546,11 @@ impl Checker<'_> {
             }
         }
         let mut taken = Vec::new();
+        let mut heads = Vec::new();
         for (h, n) in candidates {
             let q = coverage::replace(&rows[ci][choice], id, &Pat::Head(h, n));
             if self.useful(&earlier, &[q], &[Col::Any]).is_none() {
+                heads.push(h);
                 let args: Vec<Ty> = (0..n).map(|_| self.s.fresh()).collect();
                 taken.push(match h {
                     Head::Fn => Ty::Fn(Box::new(FnTy {
@@ -530,11 +564,11 @@ impl Checker<'_> {
             }
         }
         if taken.is_empty() {
-            return place.ty.clone();
+            return (place.ty.clone(), Some(heads));
         }
         let t = self.s.diff(place.ty.clone(), taken);
         self.flush(place_span(clauses, ci), None);
-        t
+        (t, Some(heads))
     }
 
     /// Checks the coverage (§7.4) of a `case`, and warns about the clauses
@@ -570,13 +604,22 @@ impl Checker<'_> {
         }
     }
 
-    /// The place below `at` by `step`, with the type `ty` when it is new.
-    fn child(&mut self, places: &mut Vec<Place>, at: usize, step: Step, ty: Ty) -> usize {
+    /// The place below `at` by `step`, with the type `ty` and the known
+    /// type `known` when it is new.
+    fn child(
+        &mut self,
+        places: &mut Vec<Place>,
+        at: usize,
+        step: Step,
+        ty: Ty,
+        known: Ty,
+    ) -> usize {
         if let Some((_, i)) = places[at].children.iter().find(|c| c.0 == step) {
             return *i;
         }
         places.push(Place {
             ty,
+            known,
             pats: Vec::new(),
             heads: Vec::new(),
             catch_here: false,
@@ -626,6 +669,8 @@ impl Checker<'_> {
         if let PatternKind::Named { binder, pattern } = &q.kind {
             let (t, pat) = self.visit(pattern, at, v, places);
             self.bind(binder, t.clone(), true);
+            let k = self.member_for(pattern, &places[at].known);
+            self.kbind(binder.var, k, true);
             self.note_known(binder, pattern);
             return (t, pat);
         }
@@ -657,6 +702,14 @@ impl Checker<'_> {
                     )
                 };
                 if let Pat::Or(alts) = &pat {
+                    let heads = alts
+                        .iter()
+                        .filter_map(|a| match a {
+                            Pat::Head(h, _) => Some(*h),
+                            _ => None,
+                        })
+                        .collect();
+                    self.out.type_tests.insert((self.module, q.span), heads);
                     for a in alts {
                         if let Pat::Head(h, n) = a {
                             places[at].seen.push((v.clause, v.unguarded, *h, *n));
@@ -674,6 +727,8 @@ impl Checker<'_> {
                 }
                 if let Some(b) = binder {
                     self.bind(b, t.clone(), true);
+                    let k = self.kconv(ty, &HashMap::new());
+                    self.kbind(b.var, k, true);
                 }
                 (t, pat)
             }
@@ -682,13 +737,22 @@ impl Checker<'_> {
                 let n = self.p.ty(ctor.ty).params.len();
                 let targs = self.shared(places, at, h, n);
                 let fields = self.ctor_fields(*ctor, &targs);
+                let kargs = match known::member(&places[at].known, Some(h)) {
+                    Some(Ty::Con(_, xs)) => Some(xs),
+                    _ => None,
+                };
                 let mut parts = vec![Pat::Wild(None); fields.len()];
                 for (arg, i) in self.match_fields(q.span, &fields, args, *spread) {
+                    let k = match &kargs {
+                        Some(xs) => self.field_known(*ctor, i, Some(xs)),
+                        None => Ty::Top,
+                    };
                     let c = self.child(
                         places,
                         at,
                         Step::Field(*ctor, i as u32),
                         fields[i].1.clone(),
+                        k,
                     );
                     parts[i] = self.visit(arg, c, v, places).1;
                 }
@@ -702,9 +766,19 @@ impl Checker<'_> {
                 let n = ps.len() as u32;
                 let h = Head::Tuple(n);
                 let parts = self.shared(places, at, h, ps.len());
+                let kparts = match known::member(&places[at].known, Some(h)) {
+                    Some(Ty::Con(_, xs)) => xs,
+                    _ => vec![Ty::Top; ps.len()],
+                };
                 let mut pats = Vec::new();
                 for (i, x) in ps.iter().enumerate() {
-                    let c = self.child(places, at, Step::Part(n, i as u32), parts[i].clone());
+                    let c = self.child(
+                        places,
+                        at,
+                        Step::Part(n, i as u32),
+                        parts[i].clone(),
+                        kparts[i].clone(),
+                    );
                     pats.push(self.visit(x, c, v, places).1);
                 }
                 places[at].seen.push((v.clause, v.unguarded, h, ps.len()));
@@ -714,15 +788,21 @@ impl Checker<'_> {
                 let h = Head::Named(TypeRef::Builtin(BuiltinType::List));
                 let e = self.shared(places, at, h, 1).remove(0);
                 let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![e.clone()]);
+                let klist = known::member(&places[at].known, Some(h)).unwrap_or(Ty::Top);
+                let kitem = match &klist {
+                    Ty::Con(_, xs) if xs.len() == 1 => xs[0].clone(),
+                    _ => Ty::Top,
+                };
                 let mut pats = Vec::new();
                 for (i, x) in items.iter().enumerate() {
-                    let c = self.child(places, at, Step::Item(i as u32), e.clone());
+                    let c = self.child(places, at, Step::Item(i as u32), e.clone(), kitem.clone());
                     pats.push(self.visit(x, c, v, places).1);
                 }
                 if let Some(r) = rest {
-                    let c = self.child(places, at, Step::Rest, list.clone());
+                    let c = self.child(places, at, Step::Rest, list.clone(), klist.clone());
                     if let Some(b) = r {
                         self.bind(b, list.clone(), true);
+                        self.kbind(b.var, klist, true);
                     }
                     if v.unguarded {
                         places[c].catch_here = true;
@@ -733,6 +813,7 @@ impl Checker<'_> {
             }
             _ => {
                 let t = self.leaf(q, true);
+                self.fit_known(q, &Ty::Top, true);
                 let pat = match coverage::literal(q) {
                     Some(l) => {
                         let c = Ctor::Lit(l);

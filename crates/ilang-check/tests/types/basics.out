@@ -21,3 +21,4 @@ apply : (f: (a) -> b ? e ! n, x: a) -> b ? e ! n
 compose : (f: (a) -> b ? e ! n, g: (c) -> a ? e2 ! n2) -> (x: c) -> b ? e2 | e ! n2 | n
 twice : (f: (a | b) -> b & c ? e ! n, x: a) -> c ? e ! n
 ignore : (x: a) -> Int
+16:8: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)

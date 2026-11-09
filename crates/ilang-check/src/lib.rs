@@ -74,7 +74,8 @@ pub mod code {
     pub const TYPE_OCCURS: &str = "E0505";
     pub const NEEDS_KNOWN_TYPE: &str = "E0506";
     pub const CALL_LABELS: &str = "E0507";
-    pub const NOT_SUPPORTED: &str = "E0508";
+    // E0508 is no longer given: every value with a known type (§4.8) may
+    // use `.f` and `.k`, and E0506 is given for one with no known type.
     pub const TOP_LEVEL_EFFECT: &str = "E0509";
     pub const PATTERN_FIELDS: &str = "E0510";
     pub const CASE_TYPE_VAR: &str = "E0511";
@@ -86,6 +87,9 @@ pub mod code {
     pub const NOT_KNOWN_CTOR: &str = "E0517";
     pub const TYPE_PLACE: &str = "E0518";
     pub const BIT_PATTERN: &str = "E0519";
+    pub const EQ_DISJOINT: &str = "E0520";
+    pub const ENTRY_TYPE: &str = "E0521";
+    pub const ENTRY_ENV: &str = "E0522";
     pub const NEVER_USED: &str = "W0501";
 }
 
