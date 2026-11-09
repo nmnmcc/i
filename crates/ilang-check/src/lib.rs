@@ -6,6 +6,7 @@
 
 pub mod hir;
 pub mod order;
+pub mod query;
 pub mod resolve;
 pub mod types;
 
