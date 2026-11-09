@@ -403,3 +403,66 @@ fn types_in_a_program_with_errors() {
     assert_eq!(f.hover("app/main", "m = ", 0), "m: Int");
     assert_eq!(f.hover("app/main", "f = ", 0), "f: (n: Int) -> Int");
 }
+
+#[test]
+fn types_of_parameters_that_share_a_type_variable() {
+    let f = Fixture::new(&[(
+        "src/main.i",
+        "h3 = (f, x) { f(x) + 1 }\n\
+         apply = (f, v) { f(v) }\n\
+         h1 = (f) { f(1) }\n\
+         id = (a) { a }\n",
+    )]);
+    assert!(!f.checked.diags.iter().any(|d| d.is_error()));
+    // The parameter type of `f` is the type of `x`, which the scheme names.
+    assert_eq!(
+        f.hover("app/main", "h3", 0),
+        "h3: (f: (a) -> Int ? e ! n, x: a) -> Int ? e ! n"
+    );
+    assert_eq!(f.hover("app/main", "f, x", 0), "f: (a) -> Int ? e ! n");
+    assert_eq!(f.hover("app/main", "f(x)", 0), "f: (a) -> Int ? e ! n");
+    assert_eq!(f.hover("app/main", "x)", 0), "x: a");
+    assert_eq!(f.hover("app/main", "f, v", 0), "f: (a) -> b ? e ! n");
+    assert_eq!(f.hover("app/main", "v)", 0), "v: a");
+    // Not shared: as before.
+    assert_eq!(f.hover("app/main", "f) {", 0), "f: (Int) -> a ? e ! n");
+    assert_eq!(f.hover("app/main", "a) {", 0), "a: a");
+}
+
+#[test]
+fn completions_of_the_name_being_bound() {
+    let f = Fixture::new(&[(
+        "src/main.i",
+        "g = (alpha) {\n  xs = [1, 2]\n  y = alpha\n  loop = (n) { loop(n) }\n  pair = (() { pair }, 1)\n  (xs, y, loop, pair)\n}\n",
+    )]);
+    // A direct value: its own names only inside its function bodies.
+    let cs = f.completions("app/main", "1, 2]", 0);
+    assert!(!labels(&cs).contains(&"xs"), "{cs:?}");
+    let cs = f.completions("app/main", "alpha\n", 1);
+    assert!(!labels(&cs).contains(&"y"), "{cs:?}");
+    assert!(labels(&cs).contains(&"alpha"), "{cs:?}");
+    let cs = f.completions("app/main", "loop(n)", 0);
+    assert!(labels(&cs).contains(&"loop"), "{cs:?}");
+    let cs = f.completions("app/main", "pair }", 0);
+    assert!(labels(&cs).contains(&"pair"), "{cs:?}");
+    let cs = f.completions("app/main", ", 1)", 2);
+    assert!(!labels(&cs).contains(&"pair"), "{cs:?}");
+}
+
+#[test]
+fn completions_after_any_expression() {
+    let f = Fixture::new(&[(
+        "src/main.i",
+        "Point { Point(x: Int, y: Int) }\n\
+         make = () -> Point { Point(1, 2) }\n\
+         f = (t: Point) {\n  a = make().x\n  b = { t }.y\n  a + b\n}\n",
+    )]);
+    assert!(!f.checked.diags.iter().any(|d| d.is_error()));
+    let cs = f.completions("app/main", "make().x", 7);
+    assert_eq!(labels(&cs), vec!["x", "y"]);
+    let cs = f.completions("app/main", "{ t }.y", 6);
+    assert_eq!(labels(&cs), vec!["x", "y"]);
+    // With some letters written.
+    let cs = f.completions("app/main", "make().x", 8);
+    assert_eq!(labels(&cs), vec!["x", "y"]);
+}

@@ -33,6 +33,19 @@ pub(crate) fn scheme(s: &Solver, t: &Ty, opts: Opts) -> Result<String, ()> {
     Ok(Namer::new(s).show(&t))
 }
 
+/// The shown type of `t`, simplified together with the types in `context`:
+/// a variable that `t` shares with them is kept, as it is in the type
+/// scheme that they are part of, and only `t` is shown.
+pub(crate) fn scheme_in(s: &Solver, t: &Ty, context: &[Ty], opts: Opts) -> Result<String, ()> {
+    let mut parts = context.to_vec();
+    parts.push(t.clone());
+    let whole = Ty::Con(super::Head::Tuple(parts.len() as u32), parts);
+    match simplify_with(s, &whole, None, opts)? {
+        Ty::Con(_, mut parts) => Ok(Namer::new(s).show(&parts.pop().ok_or(())?)),
+        _ => Err(()),
+    }
+}
+
 /// The shown type, as a type, for checks of what it uses.
 pub(crate) fn shown(s: &Solver, t: &Ty, opts: Opts) -> Result<Ty, ()> {
     simplify_with(s, t, None, opts)

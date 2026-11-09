@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 use std::fs;
 use std::path::Path;
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 struct Client {
     conn: Connection,
@@ -23,10 +23,14 @@ const TIMEOUT: Duration = Duration::from_secs(30);
 
 impl Client {
     fn start() -> Client {
+        Client::with_debounce(Duration::from_millis(20))
+    }
+
+    fn with_debounce(debounce: Duration) -> Client {
         let (server, client) = Connection::memory();
         let handle = std::thread::spawn(move || {
             let options = Options {
-                debounce: Duration::from_millis(20),
+                debounce,
                 offline: true,
             };
             ilang_lsp::run(&server, options).unwrap();
@@ -114,6 +118,19 @@ impl Client {
         };
         let p: lsp::PublishDiagnosticsParams = serde_json::from_value(n.params).unwrap();
         p.diagnostics
+    }
+
+    /// Diagnostics for `uri` have come and have not been read, without
+    /// waiting for any.
+    fn has_diagnostics(&mut self, uri: &str) -> bool {
+        while let Ok(m) = self.conn.receiver.try_recv() {
+            if let Message::Notification(n) = m {
+                self.pending.push(n);
+            }
+        }
+        self.pending.iter().any(|n| {
+            n.method == lsp::notification::PublishDiagnostics::METHOD && n.params["uri"] == uri
+        })
     }
 
     fn open(&mut self, uri: &str, text: &str) {
@@ -382,5 +399,241 @@ fn a_definition_in_the_library() {
     let written = fs::read_to_string(uri::to_path(&uri).unwrap()).unwrap();
     let line = d["range"]["start"]["line"].as_u64().unwrap() as usize;
     assert!(written.lines().nth(line).unwrap().starts_with("panic:"));
+    c.shutdown();
+}
+
+/// The files of the library are written in a new directory that only this
+/// user may use, never in a place that another user could know of and put
+/// a link in.
+#[test]
+fn the_library_is_written_in_a_private_directory() {
+    let dir = tempfile::tempdir().unwrap();
+    let text = "main = () { panic(\"no\") }\n";
+    package(dir.path(), &[("src/main.i", text)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    // A link at the place where the library was once written, to a file
+    // of the user.
+    let victim = dir.path().join("victim.txt");
+    fs::write(&victim, "mine\n").unwrap();
+    let old = std::env::temp_dir().join(format!("ilang-lsp-{}-library", env!("CARGO_PKG_VERSION")));
+    let link = old.join("prelude.i");
+    #[cfg(unix)]
+    let planted = fs::create_dir_all(&old).is_ok()
+        && (fs::symlink_metadata(&link).is_err() || fs::remove_file(&link).is_ok())
+        && std::os::unix::fs::symlink(&victim, &link).is_ok();
+    #[cfg(not(unix))]
+    let planted = false;
+
+    let mut c = Client::start();
+    c.open(&main, text);
+    let d = c.request::<lsp::request::GotoDefinition>(position_params(&main, 0, 13));
+    let uri: lsp::Uri = d["uri"].as_str().unwrap().parse().unwrap();
+    let target = uri::to_path(&uri).unwrap();
+    let library = target.parent().unwrap().to_path_buf();
+    assert!(!target.starts_with(&old), "{}", target.display());
+    assert!(fs::read_to_string(&target).unwrap().contains("panic:"));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = fs::metadata(&library).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o700, "{mode:o}");
+    }
+    assert_eq!(fs::read_to_string(&victim).unwrap(), "mine\n");
+    if planted {
+        let _ = fs::remove_file(&link);
+    }
+    // The directory is removed when the server stops.
+    c.shutdown();
+    assert!(!library.exists(), "{}", library.display());
+}
+
+/// An `i.toml` with changes that are not saved: it is loaded from the
+/// file, so its problems are only shown when the document is the file.
+#[test]
+fn an_unsaved_manifest() {
+    let dir = tempfile::tempdir().unwrap();
+    let manifest = "name = \"app\"\n\n[dependencies]\nnope = { path = \"../nowhere\" }\n";
+    package(dir.path(), &[("src/main.i", "x = 1\n")]);
+    fs::write(dir.path().join("i.toml"), manifest).unwrap();
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let toml = file_uri(&dir.path().join("i.toml"));
+    let mut c = Client::start();
+    c.open(&main, "x = 1\n");
+    let diags = c.diagnostics(&toml);
+    assert_eq!(diags.len(), 1, "{diags:?}");
+    assert_eq!(diags[0].range.start, lsp::Position::new(3, 0));
+    // Three lines more in the document: the problem found in the file is
+    // not put on the wrong line.
+    let edited = format!("# one\n# two\n# three\n{manifest}");
+    c.open(&toml, &edited);
+    assert_eq!(c.diagnostics(&toml), vec![]);
+    // Saved: the problem is shown where it is.
+    fs::write(dir.path().join("i.toml"), &edited).unwrap();
+    c.notify::<lsp::notification::DidSaveTextDocument>(json!({
+        "textDocument": { "uri": toml }
+    }));
+    let diags = c.diagnostics(&toml);
+    assert_eq!(diags.len(), 1, "{diags:?}");
+    assert_eq!(diags[0].range.start, lsp::Position::new(6, 0));
+    c.shutdown();
+}
+
+/// A new document in `src/` that is not a file yet is a module.
+#[test]
+fn a_new_document() {
+    let dir = tempfile::tempdir().unwrap();
+    package(dir.path(), &[("src/main.i", "x = 1\n")]);
+    let path = dir.path().canonicalize().unwrap().join("src/new.i");
+    let new = uri::from_path(&path).unwrap().as_str().to_string();
+    let text = "y = 2\nz = y + \"s\"\n";
+    let mut c = Client::start();
+    c.open(&new, text);
+    let diags = c.diagnostics(&new);
+    assert!(
+        diags
+            .iter()
+            .any(|d| d.code == Some(lsp::NumberOrString::String("E0501".into()))),
+        "{diags:?}"
+    );
+    let h = c.request::<lsp::request::HoverRequest>(position_params(&new, 0, 0));
+    assert_eq!(h["contents"]["value"], "```i\ny: Int\n```");
+    // Fixed: the problems are cleared.
+    c.change(&new, 2, "y = 2\nz = y + 1\n");
+    assert_eq!(c.diagnostics(&new), vec![]);
+    c.shutdown();
+}
+
+/// Completion after a dot that follows an expression that is not a name.
+#[test]
+fn completion_after_an_expression() {
+    let dir = tempfile::tempdir().unwrap();
+    let text = "Point { Point(x: Int, y: Int) }\n\
+                make = () -> Point { Point(1, 2) }\n\
+                f = (t: Point) {\n  a = make().x\n  b = { t }.y\n  a + b\n}\n";
+    package(dir.path(), &[("src/main.i", text)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut c = Client::start();
+    c.open(&main, text);
+    assert_eq!(c.diagnostics(&main), vec![]);
+    for (version, (from, to)) in [("make().x", "make()."), ("{ t }.y", "{ t }.")]
+        .into_iter()
+        .enumerate()
+    {
+        let typing = text.replace(from, to);
+        c.change(&main, version as i32 + 2, &typing);
+        let (l, ch) = find(&typing, to, 0);
+        let r =
+            c.request::<lsp::request::Completion>(position_params(&main, l, ch + to.len() as u32));
+        let labels: Vec<&str> = r
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|i| i["label"].as_str().unwrap())
+            .collect();
+        assert_eq!(labels, vec!["x", "y"], "after {to}");
+    }
+    c.shutdown();
+}
+
+fn labels(r: &Value) -> Vec<&str> {
+    r.as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["label"].as_str().unwrap())
+        .collect()
+}
+
+/// While a package waits to be checked again after a change, hover and go
+/// to definition are answered from the last check where the text around
+/// the position has not changed; elsewhere they wait for a new check,
+/// which starts at once.
+#[test]
+fn answers_from_the_last_check() {
+    let dir = tempfile::tempdir().unwrap();
+    package(dir.path(), &[("src/main.i", MAIN), ("src/util.i", UTIL)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    // Long enough that no check starts by itself during the test.
+    let mut c = Client::with_debounce(Duration::from_secs(600));
+    c.open(&main, MAIN);
+    assert_eq!(c.diagnostics(&main), vec![]);
+    let started = Instant::now();
+    // A line before everything.
+    let edited = format!("\n{MAIN}");
+    c.change(&main, 2, &edited);
+    let (l, ch) = find(&edited, "add(1", 0);
+    let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch + 1));
+    let value = h["contents"]["value"].as_str().unwrap();
+    assert!(value.contains("add: (x: Int, y: Int) -> Int"), "{value}");
+    assert_eq!(h["range"]["start"], json!({ "line": l, "character": ch }));
+    let d = c.request::<lsp::request::GotoDefinition>(position_params(&main, l, ch));
+    let (dl, dch) = find(&edited, "add =", 0);
+    assert_eq!(d["range"]["start"], json!({ "line": dl, "character": dch }));
+    // Answered without a check: none has published problems.
+    assert!(!c.has_diagnostics(&main));
+    assert!(started.elapsed() < Duration::from_secs(300));
+    // New bindings at the end. In the new text, hover waits for a check,
+    // which publishes the new problem.
+    let edited = format!("{edited}extra = add(1, 2)\nbad = nope\n");
+    c.change(&main, 3, &edited);
+    let (l, ch) = find(&edited, "extra", 0);
+    let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch));
+    assert_eq!(h["contents"]["value"], "```i\nextra: Int\n```");
+    let diags = c.diagnostics(&main);
+    assert_eq!(diags.len(), 1, "{diags:?}");
+    assert_eq!(
+        diags[0].range.start,
+        lsp::Position::new(find(&edited, "nope", 0).0, 6)
+    );
+    c.shutdown();
+}
+
+/// Completion after a dot just written is answered at once: from the last
+/// check where it knows the name before the dot, else from a check of the
+/// text with a name after the dot, without waiting for the package to be
+/// checked again.
+#[test]
+fn completion_after_a_dot_just_written() {
+    let dir = tempfile::tempdir().unwrap();
+    let text = format!("{MAIN}\nmake = () -> User {{ User(\"a\", 1) }}\nm = make().name\n");
+    package(dir.path(), &[("src/main.i", &text), ("src/util.i", UTIL)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut c = Client::with_debounce(Duration::from_secs(600));
+    c.open(&main, &text);
+    assert_eq!(c.diagnostics(&main), vec![]);
+    let started = Instant::now();
+    for (version, (from, to)) in [("u.name", "u."), ("make().name", "make().")]
+        .into_iter()
+        .enumerate()
+    {
+        let typing = text.replace(from, to);
+        c.change(&main, version as i32 + 2, &typing);
+        let (l, ch) = find(&typing, to, 0);
+        let r =
+            c.request::<lsp::request::Completion>(position_params(&main, l, ch + to.len() as u32));
+        assert_eq!(labels(&r), vec!["name", "age"], "after {to}");
+    }
+    assert!(!c.has_diagnostics(&main));
+    assert!(started.elapsed() < Duration::from_secs(300));
+    c.shutdown();
+}
+
+/// Changes that come quickly one after the other are checked once.
+#[test]
+fn quick_changes_are_checked_once() {
+    let dir = tempfile::tempdir().unwrap();
+    package(dir.path(), &[("src/main.i", MAIN), ("src/util.i", UTIL)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut c = Client::with_debounce(Duration::from_millis(300));
+    c.open(&main, MAIN);
+    assert_eq!(c.diagnostics(&main), vec![]);
+    for i in 0..10 {
+        let text = format!("{MAIN}{}bad = nope\n", "\n".repeat(i));
+        c.change(&main, i as i32 + 2, &text);
+    }
+    let diags = c.diagnostics(&main);
+    assert_eq!(diags.len(), 1, "{diags:?}");
+    assert_eq!(diags[0].range.start.line, MAIN.lines().count() as u32 + 9);
+    std::thread::sleep(Duration::from_millis(900));
+    assert!(!c.has_diagnostics(&main));
     c.shutdown();
 }

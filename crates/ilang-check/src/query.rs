@@ -178,7 +178,7 @@ impl<'a> Query<'a> {
     /// and for a type its definition.
     pub fn type_at(&self, m: ModuleId, offset: u32) -> Option<Hover> {
         let (span, target) = self.target_at(m, offset)?;
-        let (code, doc_at) = self.describe(m, &target)?;
+        let (code, doc_at) = self.describe(m, span.start, &target)?;
         Some(Hover {
             span,
             code,
@@ -186,17 +186,22 @@ impl<'a> Query<'a> {
         })
     }
 
-    /// The text for a target, and the place of the definition whose
-    /// documentation goes with it.
-    fn describe(&self, m: ModuleId, target: &Target) -> Option<(String, Option<(ModuleId, Span)>)> {
+    /// The text for a target at `at`, and the place of the definition
+    /// whose documentation goes with it.
+    fn describe(
+        &self,
+        m: ModuleId,
+        at: u32,
+        target: &Target,
+    ) -> Option<(String, Option<(ModuleId, Span)>)> {
         let p = self.program;
         Some(match target {
             Target::Local(v) => {
                 if let Some(d) = self.def_of_var(m, *v) {
-                    return self.describe(m, &Target::Def(d));
+                    return self.describe(m, at, &Target::Def(d));
                 }
                 let name = self.local_name(m, *v)?;
-                let ty = self.local_type(m, *v);
+                let ty = self.local_type(m, *v, at);
                 (with_type(&name, ty.as_deref()), None)
             }
             Target::Def(d) => {
@@ -245,8 +250,25 @@ impl<'a> Query<'a> {
         }
     }
 
-    fn local_type(&self, m: ModuleId, v: VarId) -> Option<String> {
-        self.types?.locals.as_ref()?.show(self.program, m, v)
+    /// The type of a local name used at `at`, in the context of the
+    /// top-level binding there, whose type scheme names the type variables
+    /// that the name shares with the other names of the binding.
+    fn local_type(&self, m: ModuleId, v: VarId, at: u32) -> Option<String> {
+        let mut context = Vec::new();
+        if let Some(b) = self
+            .program
+            .module(m)
+            .bindings
+            .iter()
+            .find(|b| contains(b.binding.span, at))
+        {
+            pattern_binders(&b.binding.pattern, &mut context);
+        }
+        let context: Vec<VarId> = context.iter().map(|b| b.var).collect();
+        self.types?
+            .locals
+            .as_ref()?
+            .show_in(self.program, m, v, &context)
     }
 
     /// The top-level name that a variable of a top-level pattern binds.
@@ -543,6 +565,7 @@ impl<'a> Query<'a> {
             text: self.text(m),
             occ: Vec::new(),
             binders: HashMap::new(),
+            fields: Vec::new(),
         };
         let p = self.program;
         let module = p.module(m);
@@ -662,12 +685,42 @@ impl<'a> Query<'a> {
             while base > 0 && is_word_byte(bytes[base - 1]) {
                 base -= 1;
             }
-            if base == end {
-                return Vec::new();
+            let found = if base == end {
+                Vec::new()
+            } else {
+                self.member_completions(m, Span::new(base as u32, end as u32))
+            };
+            if !found.is_empty() {
+                return found;
             }
-            return self.member_completions(m, Span::new(base as u32, end as u32));
+            // Any other expression before the dot, such as `f(x).` or
+            // `{ t }.`: what the checker knew of its value there.
+            return self.field_completions(m, start as u32);
         }
         self.scope_completions(m, offset as u32)
+    }
+
+    /// The fields that may be written after the dot of the field access
+    /// whose name starts at `name_start`, from the known type of the value
+    /// before the dot (§6.7).
+    fn field_completions(&self, m: ModuleId, name_start: u32) -> Vec<Completion> {
+        let w = self.walk(m);
+        let Some(&(_, span)) = w.fields.iter().find(|(n, _)| n.start == name_start) else {
+            return Vec::new();
+        };
+        let ctors = self
+            .types
+            .and_then(|t| t.locals.as_ref())
+            .and_then(|l| l.field_ctors(m, span).map(<[CtorRef]>::to_vec))
+            .unwrap_or_default();
+        self.fields_of_ctors(&ctors)
+    }
+
+    /// The members that may be written after `base.`, where `base` is the
+    /// span of a name in the text of the module (the text need not have
+    /// the dot: it may be the text before the dot was written).
+    pub fn member_completions_of(&self, m: ModuleId, base: Span) -> Vec<Completion> {
+        self.member_completions(m, base)
     }
 
     /// The members after `base.`.
@@ -844,13 +897,14 @@ impl<'a> Query<'a> {
         Scope {
             offset,
             out: &mut scope,
+            direct: Vec::new(),
         }
         .module(module);
         for b in scope.iter().rev() {
             out.push(Completion {
                 label: b.name.clone(),
                 kind: CompletionKind::Local,
-                detail: self.local_type(m, b.var),
+                detail: self.local_type(m, b.var, offset),
             });
         }
         // The top-level names of the module.
@@ -1100,6 +1154,8 @@ struct Walk<'q> {
     text: &'q str,
     occ: Vec<(Span, Target)>,
     binders: HashMap<VarId, Span>,
+    /// Each field access `e.f`: the span of `f`, and of `e.f`.
+    fields: Vec<(Span, Span)>,
 }
 
 impl Walk<'_> {
@@ -1264,6 +1320,7 @@ impl Walk<'_> {
             }
             ExprKind::Field { target, name } => {
                 self.expr(target);
+                self.fields.push((name.span, e.span));
                 let access = self.q.types.and_then(|t| t.access.get(&(self.m, e.span)));
                 if let Some(Access::Field(fields)) = access {
                     self.occ.push((name.span, Target::Field(fields.clone())));
@@ -1307,6 +1364,9 @@ impl Walk<'_> {
 struct Scope<'o> {
     offset: u32,
     out: &'o mut Vec<Binder>,
+    /// The names of the direct values that the offset is in: they are in
+    /// scope only inside the function bodies of the value (§6.10).
+    direct: Vec<Binder>,
 }
 
 fn contains(span: Span, offset: u32) -> bool {
@@ -1360,7 +1420,7 @@ impl Scope<'_> {
                         // §6.10: the names of a direct value may be used in
                         // the function bodies of the value.
                         if b.direct {
-                            pattern_binders(&b.pattern, self.out);
+                            pattern_binders(&b.pattern, &mut self.direct);
                         }
                         self.expr(&b.value);
                     }
@@ -1384,6 +1444,7 @@ impl Scope<'_> {
         }
         match &e.kind {
             ExprKind::Fn(f) => {
+                self.out.append(&mut self.direct);
                 for p in &f.params {
                     match p {
                         Param::Pattern { pattern, .. } => pattern_binders(pattern, self.out),

@@ -106,6 +106,9 @@ pub(crate) struct Checker<'a> {
     pub cases: Vec<super::pattern::PendingCase>,
     /// Keep the solver and the types of the local names (`Typed::locals`).
     pub keep_locals: bool,
+    /// With `keep_locals`: for each `v.f`, by its span, the constructors
+    /// that may have made `v` (`LocalTypes::field_ctors`).
+    field_ctors: HashMap<(ModuleId, Span), Vec<CtorRef>>,
 }
 
 impl<'a> Checker<'a> {
@@ -143,6 +146,7 @@ impl<'a> Checker<'a> {
             out: Typed::default(),
             cases: Vec::new(),
             keep_locals: false,
+            field_ctors: HashMap::new(),
         }
     }
 
@@ -214,6 +218,7 @@ impl<'a> Checker<'a> {
             typed.locals = Some(std::sync::Arc::new(super::LocalTypes {
                 types: self.locals.into_iter().map(|(v, s)| (v, s.ty)).collect(),
                 known: self.kvars,
+                fields: self.field_ctors,
                 s: std::sync::Mutex::new(self.s),
             }));
         }
@@ -1498,6 +1503,32 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// For editors: the constructors that may have made the value of `v` in
+    /// `v.f`, whose fields may be written after the dot, whatever `f` is.
+    fn note_field_ctors(&mut self, known_ctor: Option<CtorRef>, kv: &Ty, span: Span) {
+        let ctors = match known_ctor {
+            Some(c) => vec![c],
+            None if *kv == Ty::Top => return,
+            None => {
+                let mut out = Vec::new();
+                for m in known::members(kv) {
+                    match &m {
+                        Ty::Con(Head::Named(TypeRef::Custom(id)), _) => {
+                            if let TypeBody::Custom(cs) = &self.p.ty(*id).body {
+                                out.extend(
+                                    (0..cs.len() as u32).map(|index| CtorRef { ty: *id, index }),
+                                );
+                            }
+                        }
+                        _ => return,
+                    }
+                }
+                out
+            }
+        };
+        self.field_ctors.insert((self.module, span), ctors);
+    }
+
     /// Rule 13 and §6.7 for `v.f`: every constructor that may have made `v`
     /// has a field with the label `f`, and `v.f` has the union of their
     /// types.
@@ -1507,6 +1538,9 @@ impl<'a> Checker<'a> {
         // of its type in the known type of `v`, when they are known.
         let mut ctors: Vec<(CtorRef, Option<Vec<Ty>>)> = Vec::new();
         let known_ctor = self.known_ctor(target);
+        if self.keep_locals {
+            self.note_field_ctors(known_ctor, &kv, span);
+        }
         if let Some(c) = known_ctor {
             let args = match known::member(&kv, Some(Head::Named(TypeRef::Custom(c.ty)))) {
                 Some(Ty::Con(_, xs)) => Some(xs),
