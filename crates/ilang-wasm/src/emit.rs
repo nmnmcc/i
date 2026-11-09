@@ -456,6 +456,7 @@ pub fn wat(p: &Program) -> String {
     let mut e = Emitter {
         p,
         arities: BTreeSet::new(),
+        ctors: BTreeSet::new(),
         strings: HashMap::new(),
         data: String::new(),
         out: String::new(),
@@ -521,6 +522,14 @@ pub fn wat(p: &Program) -> String {
     m.push_str(SUPPORT);
     m.push_str(EFFECTS);
     m.push_str(&e.data);
+    for (ctor, ty) in &e.ctors {
+        let _ = writeln!(
+            m,
+            "(global $k{ctor}_{ty} eqref (struct.new $obj (i32.const 5) (i32.const {ctor}) \
+             (i64.const {ty}) (f64.const 0) (ref.null $bytes) (ref.null $values) (ref.null $limbs) \
+             (ref.null $call)))"
+        );
+    }
     for g in 0..p.globals {
         let _ = writeln!(m, "(global $g{g} (mut eqref) (ref.null eq))");
     }
@@ -567,6 +576,9 @@ fn closure(arity: u32, f: FuncId, captures: &str) -> String {
 struct Emitter<'p> {
     p: &'p Program,
     arities: BTreeSet<u32>,
+    /// The constructors without fields that are used, as (constructor id,
+    /// type id).
+    ctors: BTreeSet<(u32, u32)>,
     strings: HashMap<Vec<u8>, usize>,
     data: String,
     out: String,
@@ -1058,10 +1070,12 @@ impl<'p> Emitter<'p> {
                 x.to_bits() as i64
             ),
             Atom::String(s) => self.string(s),
-            Atom::Ctor { ctor, ty } => format!(
-                "(struct.new $obj (i32.const 5) (i32.const {ctor}) (i64.const {ty}) (f64.const 0) \
-                 (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call))"
-            ),
+            // A constructor without fields is made once, in a global: its
+            // values are equal however many there are (§11.4).
+            Atom::Ctor { ctor, ty } => {
+                self.ctors.insert((*ctor, *ty));
+                format!("(global.get $k{ctor}_{ty})")
+            }
             Atom::EmptyList => "(global.get $value_empty_list)".into(),
         }
     }
