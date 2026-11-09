@@ -1,0 +1,405 @@
+//! The queries for editors (`ilang_check::query`) on small packages.
+
+use ilang_check::Checked;
+use ilang_check::hir::ModuleId;
+use ilang_check::query::{CompletionKind, Query, SymbolKind, check_for_queries};
+use ilang_package::PackageGraph;
+use std::fs;
+
+struct Fixture {
+    _dir: tempfile::TempDir,
+    graph: PackageGraph,
+    checked: Checked,
+}
+
+impl Fixture {
+    /// A package named `app` with these files.
+    fn new(files: &[(&str, &str)]) -> Fixture {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        for (path, text) in files {
+            let p = dir.path().join(path);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(p, text).unwrap();
+        }
+        let (graph, diags) = ilang_package::load(dir.path());
+        assert!(diags.is_empty(), "{diags:?}");
+        let checked = check_for_queries(&graph);
+        Fixture {
+            _dir: dir,
+            graph,
+            checked,
+        }
+    }
+
+    fn query(&self) -> Query<'_> {
+        Query::new(
+            &self.graph,
+            self.checked.program.as_ref().unwrap(),
+            self.checked.types.as_ref(),
+        )
+    }
+
+    fn module(&self, path: &str) -> ModuleId {
+        let p = self.checked.program.as_ref().unwrap();
+        ModuleId(p.modules.iter().position(|m| m.path == path).unwrap() as u32)
+    }
+
+    fn text(&self, path: &str) -> &str {
+        let p = self.checked.program.as_ref().unwrap();
+        &self
+            .graph
+            .sources
+            .get(p.module(self.module(path)).source)
+            .text
+    }
+
+    /// The offset of the `nth` occurrence of `needle` in the module,
+    /// plus `delta`.
+    fn at(&self, path: &str, needle: &str, nth: usize, delta: u32) -> u32 {
+        let text = self.text(path);
+        let (i, _) = text
+            .match_indices(needle)
+            .nth(nth)
+            .unwrap_or_else(|| panic!("no {needle:?} #{nth}"));
+        i as u32 + delta
+    }
+
+    fn hover(&self, path: &str, needle: &str, nth: usize) -> String {
+        let at = self.at(path, needle, nth, 0);
+        let h = self
+            .query()
+            .type_at(self.module(path), at)
+            .unwrap_or_else(|| panic!("no hover at {needle:?}"));
+        let text = self.text(path);
+        assert!(
+            text[h.span.start as usize..h.span.end as usize].starts_with(
+                needle
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()
+                    .unwrap()
+            ),
+            "span {:?}",
+            h.span
+        );
+        h.code
+    }
+
+    /// The text at the definition of the name at the occurrence, with its
+    /// module path.
+    fn definition(&self, path: &str, needle: &str, nth: usize) -> (String, String) {
+        let at = self.at(path, needle, nth, 0);
+        let loc = self
+            .query()
+            .definition_at(self.module(path), at)
+            .unwrap_or_else(|| panic!("no definition at {needle:?}"));
+        let p = self.checked.program.as_ref().unwrap();
+        let m = p.module(loc.module);
+        let text = &self.graph.sources.get(loc.source).text;
+        (
+            m.path.clone(),
+            text[loc.span.start as usize..loc.span.end as usize].to_string(),
+        )
+    }
+
+    fn completions(&self, path: &str, needle: &str, delta: u32) -> Vec<(String, CompletionKind)> {
+        let at = self.at(path, needle, 0, delta);
+        self.query()
+            .completions_at(self.module(path), at)
+            .into_iter()
+            .map(|c| (c.label, c.kind))
+            .collect()
+    }
+}
+
+const MAIN: &str = r#"import (
+  util = app/util
+  (User, greet) = app/user
+)
+
+/// Adds two numbers.
+add = (x, y) {
+  z = x * 2
+  z + y
+}
+
+id = (a) { a }
+
+describe = (u: User) {
+  label = u.name
+  label <> greet(u)
+}
+
+first = (o) {
+  case o {
+    Some(v) -> v
+    None -> 0
+  }
+}
+
+Option(a) { Some(a) None }
+
+total = util.double(add(1, 2))
+"#;
+
+const UTIL: &str = r#"export (double)
+
+/// Twice the number.
+double = (n: Int) -> Int { n * 2 }
+"#;
+
+const USER: &str = r#"export (User(..), greet)
+
+User { User(name: String, age: Int) }
+
+greet = (u: User) { "hi " <> u.name }
+"#;
+
+fn fixture() -> Fixture {
+    let f = Fixture::new(&[
+        ("src/main.i", MAIN),
+        ("src/util.i", UTIL),
+        ("src/user.i", USER),
+    ]);
+    let errors: Vec<_> = f.checked.diags.iter().filter(|d| d.is_error()).collect();
+    assert!(errors.is_empty(), "{errors:?}");
+    f
+}
+
+#[test]
+fn type_of_top_level_names() {
+    let f = fixture();
+    assert_eq!(
+        f.hover("app/main", "add = ", 0),
+        "add: (x: Int, y: Int) -> Int"
+    );
+    assert_eq!(
+        f.hover("app/main", "add(1", 0),
+        "add: (x: Int, y: Int) -> Int"
+    );
+    assert_eq!(f.hover("app/main", "id = ", 0), "id: (a: a) -> a");
+    assert_eq!(f.hover("app/main", "total", 0), "total: Int");
+    // A name of another module, after `m.`.
+    assert_eq!(f.hover("app/main", "double", 0), "double: (n: Int) -> Int");
+    // Imported by name.
+    assert_eq!(
+        f.hover("app/main", "greet(u)", 0),
+        "greet: (u: User) -> String"
+    );
+}
+
+#[test]
+fn type_of_local_names() {
+    let f = fixture();
+    // A parameter, where it is bound and where it is used.
+    assert_eq!(f.hover("app/main", "x, y", 0), "x: Int");
+    assert_eq!(f.hover("app/main", "x * 2", 0), "x: Int");
+    // A binding in a block.
+    assert_eq!(f.hover("app/main", "z = ", 0), "z: Int");
+    assert_eq!(f.hover("app/main", "z + y", 0), "z: Int");
+    // A parameter of any type.
+    assert_eq!(f.hover("app/main", "a) {", 0), "a: a");
+    assert_eq!(f.hover("app/main", "label = ", 0), "label: String");
+    assert_eq!(f.hover("app/main", "v) -> v", 0), "v: a");
+    assert_eq!(f.hover("app/main", "o) {", 0), "o: Option(a)");
+}
+
+#[test]
+fn type_of_other_things() {
+    let f = fixture();
+    assert_eq!(f.hover("app/main", "Some(v)", 0), "Some: (a) -> Option(a)");
+    assert_eq!(f.hover("app/main", "None ->", 0), "None: Option(a)");
+    assert_eq!(f.hover("app/main", "name", 0), "name: String");
+    assert_eq!(
+        f.hover("app/main", "User)", 0),
+        "User { User(name: String, age: Int) }"
+    );
+    assert_eq!(f.hover("app/main", "2\n", 0), "Int");
+    assert_eq!(f.hover("app/main", "util.", 0), "module app/util");
+    let h = f
+        .query()
+        .type_at(f.module("app/main"), f.at("app/main", "add = ", 0, 0))
+        .unwrap();
+    assert_eq!(h.doc.as_deref(), Some("Adds two numbers."));
+}
+
+#[test]
+fn definitions() {
+    let f = fixture();
+    let main = "app/main".to_string();
+    // A local name goes to its binder.
+    assert_eq!(
+        f.definition("app/main", "z + y", 0),
+        (main.clone(), "z".into())
+    );
+    assert_eq!(
+        f.definition("app/main", "y\n}", 0),
+        (main.clone(), "y".into())
+    );
+    assert_eq!(
+        f.definition("app/main", "v\n", 0),
+        (main.clone(), "v".into())
+    );
+    // A top-level name of this module and of others.
+    assert_eq!(
+        f.definition("app/main", "add(1", 0),
+        (main.clone(), "add".into())
+    );
+    assert_eq!(
+        f.definition("app/main", "double", 0),
+        ("app/util".into(), "double".into())
+    );
+    assert_eq!(
+        f.definition("app/main", "greet(u)", 0),
+        ("app/user".into(), "greet".into())
+    );
+    // Constructors, types, and fields.
+    assert_eq!(
+        f.definition("app/main", "Some(v)", 0),
+        (main.clone(), "Some".into())
+    );
+    assert_eq!(
+        f.definition("app/main", "User)", 0),
+        ("app/user".into(), "User".into())
+    );
+    assert_eq!(
+        f.definition("app/main", "name", 0),
+        ("app/user".into(), "name".into())
+    );
+    // A module, and the names in `import`.
+    assert_eq!(
+        f.definition("app/main", "util.", 0),
+        ("app/util".into(), "".into())
+    );
+    assert_eq!(
+        f.definition("app/main", "greet)", 0),
+        ("app/user".into(), "greet".into())
+    );
+    // A built-in name, in the library.
+    let f = Fixture::new(&[("src/main.i", "main = () { panic(\"no\") }\n")]);
+    assert_eq!(
+        f.definition("app/main", "panic", 0),
+        ("i/prelude".into(), "panic".into())
+    );
+}
+
+#[test]
+fn definitions_with_a_syntax_error() {
+    let f = Fixture::new(&[(
+        "src/main.i",
+        "f = (n) { n + 1 }\ng = () { f(1) }\nh = (x) { x + }\n",
+    )]);
+    assert!(f.checked.diags.iter().any(|d| d.is_error()));
+    assert_eq!(
+        f.definition("app/main", "f(1", 0),
+        ("app/main".into(), "f".into())
+    );
+}
+
+fn labels(cs: &[(String, CompletionKind)]) -> Vec<&str> {
+    cs.iter().map(|c| c.0.as_str()).collect()
+}
+
+#[test]
+fn completions_in_scope() {
+    let f = fixture();
+    let cs = f.completions("app/main", "z + y", 0);
+    let ls = labels(&cs);
+    for name in [
+        "z", "x", "y", "add", "id", "describe", "util", "greet", "User", "Some",
+    ] {
+        assert!(ls.contains(&name), "{name} in {ls:?}");
+    }
+    // Built-in names and types, and keywords.
+    for name in ["panic", "assert", "True", "Ok", "Int", "List", "case"] {
+        assert!(ls.contains(&name), "{name} in {ls:?}");
+    }
+    // Names of other functions are not in scope.
+    assert!(!ls.contains(&"label") && !ls.contains(&"a"), "{ls:?}");
+    assert!(cs.contains(&("z".into(), CompletionKind::Local)));
+    assert!(cs.contains(&("add".into(), CompletionKind::Function)));
+    assert!(cs.contains(&("total".into(), CompletionKind::Value)));
+    // A binding is not in scope in its own value, unless it is direct.
+    let cs = f.completions("app/main", "u.name", 0);
+    assert!(!labels(&cs).contains(&"label"));
+    assert!(labels(&cs).contains(&"u"));
+}
+
+#[test]
+fn completions_of_members() {
+    let f = fixture();
+    // After `util.`: the exported names of the module.
+    let cs = f.completions("app/main", "util.double", 5);
+    assert_eq!(cs, vec![("double".to_string(), CompletionKind::Function)]);
+    // With some letters already written.
+    let cs = f.completions("app/main", "util.double", 7);
+    assert_eq!(labels(&cs), vec!["double"]);
+    // After `u.`: the fields of its type.
+    let cs = f.completions("app/main", "u.name", 2);
+    assert_eq!(labels(&cs), vec!["name", "age"]);
+}
+
+#[test]
+fn completions_of_fields_from_inference() {
+    let f = Fixture::new(&[(
+        "src/main.i",
+        "Point { Point(x: Int, y: Int) }\n\
+         origin = Point(0, 0)\n\
+         f = () {\n  p = origin\n  p.x + origin.y\n}\n\
+         g = (o) {\n  case o {\n    Point(..) -> o.x\n  }\n}\n",
+    )]);
+    assert!(!f.checked.diags.iter().any(|d| d.is_error()));
+    // A local name whose type is inferred.
+    let cs = f.completions("app/main", "p.x", 2);
+    assert_eq!(labels(&cs), vec!["x", "y"]);
+    // A top-level name.
+    let cs = f.completions("app/main", "origin.y", 7);
+    assert_eq!(labels(&cs), vec!["x", "y"]);
+    // A name known to be made by a constructor (§7.5).
+    let cs = f.completions("app/main", "o.x", 2);
+    assert_eq!(labels(&cs), vec!["x", "y"]);
+}
+
+#[test]
+fn symbols_of_a_module() {
+    let f = fixture();
+    let syms = f.query().symbols(f.module("app/main"));
+    let names: Vec<(&str, SymbolKind)> = syms.iter().map(|s| (s.name.as_str(), s.kind)).collect();
+    assert_eq!(
+        names,
+        vec![
+            ("add", SymbolKind::Function),
+            ("id", SymbolKind::Function),
+            ("describe", SymbolKind::Function),
+            ("first", SymbolKind::Function),
+            ("Option", SymbolKind::Type),
+            ("total", SymbolKind::Value),
+        ]
+    );
+    let option = &syms[4];
+    let ctors: Vec<&str> = option.children.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(ctors, vec!["Some", "None"]);
+    assert_eq!(syms[0].detail.as_deref(), Some("(x: Int, y: Int) -> Int"));
+    // The span is the whole item; the name span is the name.
+    let text = f.text("app/main");
+    let s = &syms[1];
+    assert_eq!(
+        &text[s.span.start as usize..s.span.end as usize],
+        "id = (a) { a }"
+    );
+    assert_eq!(
+        &text[s.name_span.start as usize..s.name_span.end as usize],
+        "id"
+    );
+}
+
+#[test]
+fn types_in_a_program_with_errors() {
+    let f = Fixture::new(&[(
+        "src/main.i",
+        "f = (n: Int) {\n  m = n + 1\n  m\n}\ng = () { nope }\n",
+    )]);
+    assert!(f.checked.diags.iter().any(|d| d.is_error()));
+    assert_eq!(f.hover("app/main", "m = ", 0), "m: Int");
+    assert_eq!(f.hover("app/main", "f = ", 0), "f: (n: Int) -> Int");
+}

@@ -73,6 +73,8 @@ enum Command {
     },
     #[command(flatten)]
     Package(commands::package::PackageCommand),
+    /// Run the language server, on standard input and output.
+    Lsp,
 }
 
 fn main() -> ExitCode {
@@ -102,6 +104,7 @@ fn main() -> ExitCode {
             filter,
         } => cmd_test(&project, opt, offline, filter.as_deref()),
         Command::Package(c) => commands::package::run(c),
+        Command::Lsp => commands::lsp::run(),
     };
     match result {
         Ok(code) => code,

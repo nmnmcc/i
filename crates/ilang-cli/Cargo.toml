@@ -23,6 +23,7 @@ ilang-binaryen.workspace = true
 ilang-host.workspace = true
 toml_edit.workspace = true
 tempfile.workspace = true
+ilang-lsp.workspace = true
 
 [dev-dependencies]
 num-bigint.workspace = true

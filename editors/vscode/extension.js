@@ -5,6 +5,7 @@
 
 "use strict";
 
+const path = require("path");
 const vscode = require("vscode");
 const { LanguageClient, TransportKind } = require("vscode-languageclient/node");
 
@@ -13,10 +14,22 @@ let client;
 /** @type {vscode.OutputChannel | undefined} */
 let outputChannel;
 
+/**
+ * The `i` executable: `ilang.path`, or `i` on the `PATH`. A relative path
+ * with a directory in it, such as `./target/debug/i`, is taken from the
+ * first workspace folder.
+ */
 function serverPath() {
   const configured = vscode.workspace.getConfiguration("ilang").get("path");
   const value = typeof configured === "string" ? configured.trim() : "";
-  return value.length > 0 ? value : "i";
+  if (value.length === 0) {
+    return "i";
+  }
+  const folders = vscode.workspace.workspaceFolders;
+  if (!path.isAbsolute(value) && /[\\/]/.test(value) && folders && folders.length > 0) {
+    return path.join(folders[0].uri.fsPath, value);
+  }
+  return value;
 }
 
 function createClient() {
@@ -104,4 +117,4 @@ function deactivate() {
   return stopClient();
 }
 
-module.exports = { activate, deactivate };
+module.exports = { activate, deactivate, serverPath };

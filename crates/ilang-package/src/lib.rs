@@ -134,6 +134,12 @@ impl Sources {
         &self.files[id.0 as usize]
     }
 
+    /// Replaces the text of a file, as an editor does with a file that has
+    /// changes that are not saved.
+    pub fn set_text(&mut self, id: SourceId, text: String) {
+        self.files[id.0 as usize].text = text;
+    }
+
     /// `path:line:col: error[CODE]: message`.
     pub fn render(&self, d: &Diagnostic) -> String {
         let mut out = String::new();

@@ -1,0 +1,26 @@
+[package]
+name = "ilang-lsp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[features]
+# Formatting (`textDocument/formatting`) with
+# `ilang_syntax::format::format_source`. Off until that function is in the
+# tree; see `src/format.rs`.
+format = []
+
+[dependencies]
+anyhow.workspace = true
+crossbeam-channel = "0.5"
+ilang-check.workspace = true
+ilang-package.workspace = true
+ilang-syntax.workspace = true
+lsp-server = "0.10.0"
+lsp-types = "0.97.0"
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

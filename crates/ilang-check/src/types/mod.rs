@@ -183,6 +183,85 @@ pub struct Typed {
     /// The host services in the environment of each entry point (§10.2),
     /// which the host gives (§9.7).
     pub entry_services: HashMap<DefId, Vec<crate::hir::TypeId>>,
+    /// The types of the local names, only from [`check_keeping_locals`]:
+    /// for editors (`crate::query`).
+    pub locals: Option<std::sync::Arc<LocalTypes>>,
+}
+
+/// The solver after inference, with the type and the known type (§4.8) of
+/// every name bound by a pattern or a parameter, so that the type of a
+/// local name can be shown when it is asked for.
+pub struct LocalTypes {
+    /// In a lock, because the names of the types are set for the module
+    /// where a type is shown.
+    s: std::sync::Mutex<solve::Solver>,
+    types: HashMap<crate::hir::VarId, Ty>,
+    known: HashMap<crate::hir::VarId, Ty>,
+}
+
+impl std::fmt::Debug for LocalTypes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LocalTypes({} names)", self.types.len())
+    }
+}
+
+impl LocalTypes {
+    /// The type of a name, simplified and shown in the syntax of §3: the
+    /// types of the values that come to it (its output side). When no value
+    /// is known to come to it, as for a parameter, what its values must be
+    /// for its uses (its input side).
+    pub fn show(
+        &self,
+        program: &Program,
+        module: ModuleId,
+        v: crate::hir::VarId,
+    ) -> Option<String> {
+        let t = self.types.get(&v)?;
+        let mut s = self.s.lock().unwrap_or_else(|e| e.into_inner());
+        s.type_names = infer::type_names(program, module);
+        let side = |out: bool| {
+            let (a, b) = if out {
+                (t.clone(), Ty::Top)
+            } else {
+                (Ty::Top, t.clone())
+            };
+            let both = Ty::Both(Box::new(a), Box::new(b));
+            display::scheme(&s, &both, display::Opts::default()).ok()
+        };
+        match side(true) {
+            Some(s) if s != "Never" => Some(s),
+            _ => side(false),
+        }
+    }
+
+    /// The named types that are members of the known type of a name (§4.8),
+    /// or else of its inferred type: where its fields come from (§6.7).
+    pub fn named_types(&self, v: crate::hir::VarId) -> Vec<TypeRef> {
+        let heads = |t: &Ty| -> Vec<TypeRef> {
+            known::members(t)
+                .iter()
+                .filter_map(|m| match m.head() {
+                    Some(Head::Named(r)) => Some(r),
+                    _ => None,
+                })
+                .collect()
+        };
+        if let Some(k) = self.known.get(&v) {
+            let found = heads(&display::both(k));
+            if !found.is_empty() {
+                return found;
+            }
+        }
+        let Some(t) = self.types.get(&v) else {
+            return Vec::new();
+        };
+        let both = Ty::Both(Box::new(t.clone()), Box::new(t.clone()));
+        let s = self.s.lock().unwrap_or_else(|e| e.into_inner());
+        match display::shown(&s, &both, display::Opts::default()) {
+            Ok(t) => heads(&display::both(&t)),
+            Err(()) => Vec::new(),
+        }
+    }
 }
 
 /// A type that the host can take (§10.3), as one part of a host export.
@@ -227,4 +306,11 @@ impl Typed {
 /// errors.
 pub fn check(program: &Program, sources: &Sources) -> (Typed, Vec<Diagnostic>) {
     infer::Checker::new(program, sources).run()
+}
+
+/// `check`, keeping the types of the local names in `Typed::locals`.
+pub fn check_keeping_locals(program: &Program, sources: &Sources) -> (Typed, Vec<Diagnostic>) {
+    let mut c = infer::Checker::new(program, sources);
+    c.keep_locals = true;
+    c.run()
 }

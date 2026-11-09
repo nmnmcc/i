@@ -19,6 +19,26 @@ use ilang_syntax::span::{LineIndex, Span};
 use num_traits::ToPrimitive;
 use std::collections::{HashMap, HashSet};
 
+/// The names of the custom types as the module `m` writes them: the types
+/// of other modules with the name of their module (§2.3).
+pub(super) fn type_names(p: &Program, m: ModuleId) -> Vec<String> {
+    let here = p.module(m);
+    p.types
+        .iter()
+        .enumerate()
+        .map(|(i, t)| {
+            let id = TypeId(i as u32);
+            if t.module == m || Some(t.module) == p.prelude || here.imported_types.contains(&id) {
+                t.name.clone()
+            } else if let Some((alias, _)) = here.import_names.iter().find(|x| x.1 == t.module) {
+                format!("{alias}.{}", t.name)
+            } else {
+                format!("{}.{}", p.module(t.module).path, t.name)
+            }
+        })
+        .collect()
+}
+
 /// `∀ (variables deeper than level). ty`. A name that is not generalized
 /// has the level `u32::MAX`.
 #[derive(Clone, Debug)]
@@ -84,6 +104,8 @@ pub(crate) struct Checker<'a> {
     /// The `case` expressions of the group being typed, whose coverage is
     /// checked with the types that inference finds (§4.8 rule 11).
     pub cases: Vec<super::pattern::PendingCase>,
+    /// Keep the solver and the types of the local names (`Typed::locals`).
+    pub keep_locals: bool,
 }
 
 impl<'a> Checker<'a> {
@@ -120,6 +142,7 @@ impl<'a> Checker<'a> {
             group_defs: HashSet::new(),
             out: Typed::default(),
             cases: Vec::new(),
+            keep_locals: false,
         }
     }
 
@@ -186,6 +209,13 @@ impl<'a> Checker<'a> {
                 }
                 self.exported_type(d, &scheme.ty.clone(), opts);
             }
+        }
+        if self.keep_locals {
+            typed.locals = Some(std::sync::Arc::new(super::LocalTypes {
+                types: self.locals.into_iter().map(|(v, s)| (v, s.ty)).collect(),
+                known: self.kvars,
+                s: std::sync::Mutex::new(self.s),
+            }));
         }
         (typed, self.diags)
     }
@@ -674,25 +704,7 @@ impl<'a> Checker<'a> {
             return;
         }
         self.module = m;
-        let p = self.p;
-        let here = p.module(m);
-        self.s.type_names = p
-            .types
-            .iter()
-            .enumerate()
-            .map(|(i, t)| {
-                let id = TypeId(i as u32);
-                if t.module == m || Some(t.module) == p.prelude || here.imported_types.contains(&id)
-                {
-                    t.name.clone()
-                } else if let Some((alias, _)) = here.import_names.iter().find(|x| x.1 == t.module)
-                {
-                    format!("{alias}.{}", t.name)
-                } else {
-                    format!("{}.{}", p.module(t.module).path, t.name)
-                }
-            })
-            .collect();
+        self.s.type_names = type_names(self.p, m);
     }
 
     /// Where the occurs check of a binding starts: the number of variables
