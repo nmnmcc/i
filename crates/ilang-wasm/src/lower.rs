@@ -519,6 +519,8 @@ struct Lowerer<'a> {
     services: HashMap<TypeRef, u32>,
     /// The function that calls each import (B.4).
     import_funcs: HashMap<ImportId, FuncId>,
+    /// Where each import is declared first, by its index in `out.imports`.
+    import_sites: Vec<(ModuleId, Span)>,
     /// The function of each external function outside the library (§10.1),
     /// or `None` when it has a problem, which is told one time.
     external_funcs: HashMap<DefId, Option<FuncId>>,
@@ -553,6 +555,7 @@ impl<'a> Lowerer<'a> {
             lines: HashMap::new(),
             services: HashMap::new(),
             import_funcs: HashMap::new(),
+            import_sites: Vec::new(),
             external_funcs: HashMap::new(),
             out: ir::Program::default(),
             diags: Vec::new(),
@@ -994,14 +997,15 @@ impl<'a> Lowerer<'a> {
                 return;
             };
             let abi = host_abi(hf);
-            match self.import(&host.namespace, &label.name, abi, kind) {
+            let site = (def.module, label.span);
+            match self.import(&host.namespace, &label.name, abi, kind, site) {
                 Ok(import) => {
                     let f = self.import_func(import);
                     self.constants.insert(f);
                     fields.push(f);
                 }
-                Err(message) => {
-                    self.error(def.module, label.span, message);
+                Err((module, span, message)) => {
+                    self.error(module, span, message);
                     return;
                 }
             }
@@ -1041,38 +1045,49 @@ impl<'a> Lowerer<'a> {
             );
             return None;
         };
-        match self.import(module, function, host_abi(hf), ImportKind::External) {
+        let site = (d.module, def.span);
+        match self.import(module, function, host_abi(hf), ImportKind::External, site) {
             Ok(import) => {
                 // §11.4: each declaration is one value, so two declarations
                 // of one import have two functions, which call the same
                 // import.
                 Some(self.make_import_func(import))
             }
-            Err(message) => {
-                self.error(d.module, def.span, message);
+            Err((module, span, message)) => {
+                self.error(module, span, message);
                 None
             }
         }
     }
 
-    /// The import with this module and name (B.4). One import may be
-    /// declared more than once, with one type.
+    /// The import with this module and name (B.4), declared at `site`.
+    /// One import may be declared more than once, with one type. A problem
+    /// is told at `site`, or, when two declarations do not agree and
+    /// `site` is in the library, at the other declaration, which the
+    /// program has in its source.
     fn import(
         &mut self,
         module: &str,
         name: &str,
         abi: ExportAbi,
         kind: ImportKind,
-    ) -> Result<ImportId, String> {
+        site: (ModuleId, Span),
+    ) -> Result<ImportId, (ModuleId, Span, String)> {
         if module == "ilang:host/v1" {
-            return Err(format!(
-                "the import module `{module}` is the module of the runtime imports (B.4)"
+            return Err((
+                site.0,
+                site.1,
+                format!("the import module `{module}` is the module of the runtime imports (B.4)"),
             ));
         }
         if self.options.target == ir::Target::Wasi && module == WASI && WASI_RUNTIME.contains(&name)
         {
-            return Err(format!(
-                "on the WASI target, the runtime imports `{module}` `{name}` itself, so a program may not import it (B.7)"
+            return Err((
+                site.0,
+                site.1,
+                format!(
+                    "on the WASI target, the runtime imports `{module}` `{name}` itself, so a program may not import it (B.7)"
+                ),
             ));
         }
         if let Some(i) = self
@@ -1085,8 +1100,18 @@ impl<'a> Lowerer<'a> {
             if x.abi == abi && x.kind == kind {
                 return Ok(i as ImportId);
             }
-            return Err(format!(
-                "the import `{module}` `{name}` is declared two times, with different types or kinds (B.4)"
+            let first = self.import_sites[i];
+            let (m, span) = if self.is_library(site.0) && !self.is_library(first.0) {
+                first
+            } else {
+                site
+            };
+            return Err((
+                m,
+                span,
+                format!(
+                    "the import `{module}` `{name}` is declared two times, with different types or kinds (B.4)"
+                ),
             ));
         }
         self.out.imports.push(Import {
@@ -1095,6 +1120,7 @@ impl<'a> Lowerer<'a> {
             abi,
             kind,
         });
+        self.import_sites.push(site);
         Ok(self.out.imports.len() as ImportId - 1)
     }
 

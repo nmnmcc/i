@@ -389,6 +389,25 @@ fn the_standard_service_is_the_one_of_i_io() {
     assert!(imports(&wasm).contains(&("i:io/v1".into(), "read".into())));
 }
 
+/// When an external function of the program and `Io` of `i/io` do not
+/// agree about the import `i:io/v1` `print`, the error is told at the
+/// declaration in the program, not in the library.
+#[test]
+fn an_import_that_does_not_agree_with_the_library_is_told_in_the_program() {
+    let source = "import ((Io) = i/io)\n\
+                  @external(\"i:io/v1\", \"print\") p: (text: String) -> Nil\n\
+                  @main\nmain = (io ! Io) {\n\tio.print(\"a\")\n\tp(\"b\")\n}\n";
+    for target in [Target::Wasi, Target::Ilang] {
+        let dir = package(source);
+        let e = match build(dir.path(), options(Level::O0, target)) {
+            Err(e @ BuildError::Program { .. }) => e.to_string(),
+            Err(e) => panic!("{e}"),
+            Ok(_) => panic!("built"),
+        };
+        assert!(e.contains("src/main.i:2:31: error[E0701]"), "{e}");
+    }
+}
+
 /// The runtime imports `fd_write` and `proc_exit` itself (B.7), so a
 /// program may not import them, as an external function or as a field of
 /// a host service. Other WASI functions are imports like any other.
