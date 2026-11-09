@@ -21,6 +21,7 @@ ilang-check.workspace = true
 ilang-wasm.workspace = true
 ilang-binaryen.workspace = true
 ilang-host.workspace = true
+ilang-lsp.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
