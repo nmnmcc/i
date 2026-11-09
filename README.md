@@ -17,7 +17,28 @@ The compiler is being rebuilt to follow the spec. The first version of i grew ou
 - [Binaryen](https://github.com/WebAssembly/binaryen), built from source and linked into `i` as a library, for optimization, so the compiler itself only has to be simple and correct;
 - a Wasmtime host and a JavaScript SDK for browsers.
 
-`i check`, `i build`, `i run` and `i test` work on the whole language. The spec suite in `tests/spec` runs every case unoptimized and optimized, and requires the same result.
+The spec suite in `tests/spec` runs every case unoptimized and optimized, and requires the same result.
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `i new NAME` | Make a new package, with a program and a test |
+| `i check` | Check a package for errors |
+| `i build [--target ilang\|wasi]` | Build a package into a Wasm module (see [Run on a stock Wasmtime](#run-on-a-stock-wasmtime)) |
+| `i run` | Build and run the program entry of a package |
+| `i test [--time]` | Build and run the tests of a package |
+| `i fmt [--check]` | Format the `.i` files of `src/` and `test/`, or the paths given |
+| `i add NAME [LOCATION[@VERSION]]` | Add a dependency to `i.toml` and bring `i.lock` up to date |
+| `i remove NAME` | Take a dependency out of `i.toml` and bring `i.lock` up to date |
+| `i update [NAMES]` | Raise dependencies to the newest version with the same major version |
+| `i deps` | Print the packages the program uses, and the host services and external functions each one declares |
+| `i publish VERSION [--dry-run]` | Check the package and tag the new version `vX.Y.Z` in git; nothing is pushed |
+| `i lsp` | Run the language server on standard input and output |
+
+Packages are git repositories, found by their location as in Go, and versions are chosen by minimal version selection (§2 of the spec). Every command takes `--help`.
+
+The VS Code extension, with syntax highlighting and the language server, is in [editors/vscode](editors/vscode).
 
 ## Host services of `i run` and `i test`
 

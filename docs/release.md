@@ -16,8 +16,13 @@ To package artifacts that have already been built, use:
 ```
 
 The archive contains `bin/i`, which has the compiler, Binaryen, the library
-modules and the Wasmtime host built in, and the JavaScript SDK under
-`share/ilang/javascript`.
+modules, the Wasmtime host, the package commands, the formatter and the
+language server built in, and the JavaScript SDK under
+`share/ilang/javascript`. Nothing else is needed to build for either target:
+`i build --target wasi` makes a module that a stock `wasmtime run` or Node's
+`node:wasi` runs. The VS Code extension is not in the archive; it is built from
+`editors/vscode` and runs `i lsp` with the `i` on `PATH`, or the one its
+`ilang.path` setting names.
 
 The package also contains documentation, the licenses of i and of included
 third-party code (Gleam, Binaryen), dependency/toolchain lockfiles, and a
