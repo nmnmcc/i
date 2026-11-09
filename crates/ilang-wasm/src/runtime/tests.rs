@@ -112,9 +112,7 @@ pub(crate) fn run_export(source: &str, export: &str) -> usize {
     let directory = tempfile::tempdir().expect("temporary directory");
     let path = directory.path().join("runtime.wasm");
     std::fs::write(&path, binary).expect("write test module");
-    let wasmtime = std::env::var_os("ILANG_WASMTIME")
-        .or_else(|| std::env::var_os("WASMTIME"))
-        .unwrap_or_else(|| "wasmtime".into());
+    let wasmtime = std::env::var_os("WASMTIME").unwrap_or_else(|| "wasmtime".into());
     let output = std::process::Command::new(wasmtime)
         .args([
             "run",

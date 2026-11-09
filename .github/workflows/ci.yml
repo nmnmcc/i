@@ -14,32 +14,47 @@ concurrency:
 
 jobs:
   verify:
+    name: verify (${{ matrix.part }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        # The parts of scripts/dev-verify, which run at the same time.
+        part: [rust, i, js]
     steps:
-      # The Nix store of the development environment (about 8 GiB) and the
-      # Cargo builds do not fit in the free space of the runner, so take out
-      # the preinstalled tools that this job does not use.
+      # The Rust toolchain, Wasmtime and the Cargo builds do not fit in the
+      # free space of the runner, so take out preinstalled tools not used here.
       - name: Free disk space
+        if: matrix.part != 'js'
         run: |
-          df -h /
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
             /opt/hostedtoolcache /usr/local/share/boost /usr/local/share/powershell \
             /usr/share/swift /usr/local/julia* /opt/az /opt/microsoft /opt/google \
             /usr/local/share/chromium /usr/lib/jvm
-          sudo docker image prune --all --force > /dev/null || true
           df -h /
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          submodules: true
+          submodules: ${{ matrix.part != 'js' }}
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
-      - name: Verify fixed Cargo toolchain and all hosts
-        run: nix run github:cachix/devenv/v2.4.0 -- test
-      - name: Retain test evidence
-        if: always()
+      # devenv 2.4.0, prebuilt in the binary cache of nixpkgs.
+      - name: Install devenv
+        run: nix profile install nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: matrix.part != 'js'
+        with:
+          key: ${{ matrix.part }}
+          # Run rustc and cargo of the Devenv shell, not those of the runner.
+          cmd-format: devenv shell -- {0}
+          # Only main writes the cache, so that it stays small; every branch reads it.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Verify ${{ matrix.part }}
+        run: devenv shell -- ./scripts/dev-verify ${{ matrix.part }}
+      - name: Keep the browser test results
+        if: always() && matrix.part == 'js'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: verify-${{ github.run_id }}
+          name: browser-${{ github.run_id }}
           path: |
             target/browser
             test-results

@@ -1,20 +1,50 @@
 #!/usr/bin/env bash
+# Verifies the project. The parts are independent, so CI runs them in
+# parallel; with no arguments, all of them run one after another.
+#
+#   scripts/dev-verify            rust, i and js
+#   scripts/dev-verify rust       Rust formatting, Clippy and the workspace tests
+#   scripts/dev-verify i          the release `i`, and with it the i sources
+#   scripts/dev-verify js         the JavaScript SDK and browser tests
 set -euo pipefail
-cd "${ILANG_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
-export CARGO_TARGET_DIR="${ILANG_CARGO_TARGET_DIR:-$PWD/target/cargo}"
-git submodule update --init crates/ilang-binaryen/binaryen
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked "$@"
-cargo build --workspace --locked
-cargo build --release --locked -p ilang-cli
-"$CARGO_TARGET_DIR/release/i" fmt --check lib std bench examples
-for level in 0 2; do
-  "$CARGO_TARGET_DIR/release/i" test --project std --opt "$level"
-  "$CARGO_TARGET_DIR/release/i" test --project examples/hello --opt "$level"
-  "$CARGO_TARGET_DIR/release/i" test --project bench --opt "$level"
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+
+binaryen() {
+  git submodule update --init crates/ilang-binaryen/binaryen
+}
+
+rust() {
+  binaryen
+  cargo fmt --all -- --check
+  cargo clippy --workspace --all-targets --locked -- -D warnings
+  cargo test --workspace --locked
+}
+
+i() {
+  binaryen
+  cargo build --release --locked -p ilang-cli
+  local i
+  i="$(realpath "${CARGO_TARGET_DIR:-target}")/release/i"
+  "$i" fmt --check lib std bench examples
+  for level in 0 2; do
+    "$i" test --project std --opt "$level"
+    "$i" test --project examples/hello --opt "$level"
+    "$i" test --project bench --opt "$level"
+  done
+  ./scripts/wasi-smoke "$i"
+}
+
+js() {
+  npm ci --ignore-scripts
+  npm test
+  npm run test:browser
+}
+
+parts=("$@")
+if [[ ${#parts[@]} -eq 0 ]]; then parts=(rust i js); fi
+for part in "${parts[@]}"; do
+  case "$part" in
+    rust | i | js) "$part" ;;
+    *) echo "dev-verify: unknown part '$part' (rust, i or js)" >&2; exit 2 ;;
+  esac
 done
-./scripts/wasi-smoke "$CARGO_TARGET_DIR/release/i"
-npm ci --ignore-scripts
-npm test
-npm run test:browser

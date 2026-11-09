@@ -1,7 +1,7 @@
 # Release packages
 
-Run `devenv tasks run release` to build with Rust 1.99.1 and produce the archive
-and its SHA-256 sidecar in `target/release`. The archive name is
+Run `./scripts/dev-release` in the Devenv shell to build with Rust 1.99.1 and
+produce the archive and its SHA-256 sidecar in `target/dist`. The archive name is
 `ilang-<version>-<Rust target triple>.tar.gz`.
 
 To package artifacts that have already been built, use:
@@ -9,7 +9,7 @@ To package artifacts that have already been built, use:
 ```sh
 ./scripts/dev-package
 # Explicit cross-compiled artifact directory and target:
-./scripts/dev-package --binaries target/cargo/aarch64-unknown-linux-gnu/release \
+./scripts/dev-package --binaries target/aarch64-unknown-linux-gnu/release \
   --target aarch64-unknown-linux-gnu
 # Include runtime libraries for transfer to another Nix host:
 ./scripts/dev-package --nix-runtime

@@ -4,9 +4,7 @@ use std::{env, path::Path, process::Command};
 
 #[test]
 fn deep_values_and_memory_boundaries_match_the_runtime_oracle() {
-    let wasmtime = env::var_os("ILANG_WASMTIME")
-        .or_else(|| env::var_os("WASMTIME"))
-        .unwrap_or_else(|| "wasmtime".into());
+    let wasmtime = env::var_os("WASMTIME").unwrap_or_else(|| "wasmtime".into());
     let wasm_tools = env::var_os("WASM_TOOLS").unwrap_or_else(|| "wasm-tools".into());
     let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/runtime_values.py");
     let directory = tempfile::tempdir().expect("temporary directory");
@@ -29,7 +27,7 @@ fn deep_values_and_memory_boundaries_match_the_runtime_oracle() {
 
     assert!(
         output.status.success(),
-        "runtime oracle failed ({}). Run inside Devenv, or set ILANG_WASMTIME/WASMTIME and WASM_TOOLS.\nstdout:\n{}\nstderr:\n{}",
+        "runtime oracle failed ({}). Run inside Devenv, or set WASMTIME and WASM_TOOLS.\nstdout:\n{}\nstderr:\n{}",
         output.status,
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr),

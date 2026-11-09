@@ -8,6 +8,6 @@
 #
 # ILANG_GC=copying|drc|null picks the garbage collector (crates/ilang-host).
 set -euo pipefail
-cd "${ILANG_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 cargo build --release -p ilang-cli --quiet
 exec target/release/i test --project bench --opt 2 --time "$@"

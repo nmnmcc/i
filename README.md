@@ -107,25 +107,21 @@ Node runs the same file with `node:wasi`. On this target:
   and exits with code 134.
 - The engine needs WebAssembly GC, typed function references, tail calls, and
   exception handling. Wasmtime turns these on by default from version 47 on
-  (tested with 50), with the Cranelift compiler, not Winch.
+  (tested with 49 and 50), with the Cranelift compiler, not Winch.
 
 ## Develop
 
-Install Nix and Devenv 2.4.0, fetch the Binaryen sources once, then enter the checkout:
+Install Nix and Devenv 2.4.0, fetch the Binaryen sources once, then work in the Devenv shell with Cargo:
 
 ```sh
 git submodule update --init crates/ilang-binaryen/binaryen
 devenv shell
-devenv tasks run dev:build
-devenv tasks run dev:test
+cargo build
+cargo test
 ```
 
-Run the complete verification pipeline with:
+Run the complete verification with `devenv test`, or one part of it with `./scripts/dev-verify rust`, `i`, or `js`.
 
-```sh
-devenv test
-```
-
-See [the development guide](docs/development.md) for exact tool versions and verification commands, and [release packages](docs/release.md) for the archive layout.
+See [the development guide](docs/development.md) for the tools of the shell and the verification commands, and [release packages](docs/release.md) for the archive layout.
 
 i is distributed under the [Apache-2.0 license](LICENSE). The licenses of included third-party code are in [licenses](licenses).

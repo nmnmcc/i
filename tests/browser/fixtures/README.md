@@ -6,7 +6,7 @@ version 2 of `docs/spec.md` (Appendix B). They are not compiler output, except
 `compiled.wasm`.
 
 Regenerate the checked-in binaries with `bash scripts/build-abi-fixture.sh` from
-a Devenv shell with wasm-tools 1.262.0 (`WASM_TOOLS` can point at another
+the Devenv shell, which has wasm-tools (`WASM_TOOLS` can point at another
 executable). The script validates the modules and writes the feature probe into
 `bindings/javascript/ilang.mjs`.
 

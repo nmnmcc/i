@@ -76,7 +76,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binaries", type=Path, help="directory containing the release i binary")
     parser.add_argument("--target", help="Rust target triple; defaults to rustc's host")
-    parser.add_argument("--output", type=Path, default=ROOT / "target/release", help="archive output directory")
+    parser.add_argument("--output", type=Path, default=ROOT / "target/dist", help="archive output directory")
     parser.add_argument("--nix-runtime", action="store_true", help="include the ELF Nix runtime closure and an import script")
     args = parser.parse_args()
 
@@ -90,7 +90,7 @@ def main() -> None:
     if not 0 <= epoch <= 0xFFFFFFFF:
         raise ValueError("SOURCE_DATE_EPOCH must be an integer between 0 and 4294967295")
 
-    cargo_target = Path(os.environ.get("ILANG_CARGO_TARGET_DIR", os.environ.get("CARGO_TARGET_DIR", ROOT / "target/cargo")))
+    cargo_target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target"))
     binaries = args.binaries or cargo_target / "release"
     suffix = ".exe" if "windows" in target else ""
     entries: dict[str, tuple[bytes, int]] = {}

@@ -34,7 +34,7 @@ expect() { # what, want stdout, want stderr, want code, command...
 for level in 0 2; do
   "$i" build --project "$root/examples/hello" --target wasi --opt "$level" --out "$work/hello.wasm"
   "$i" build --project "$work/stop" --target wasi --opt "$level" --out "$work/stop.wasm"
-  for runner in "${ILANG_WASMTIME:-wasmtime} run" "node --no-warnings $work/node-wasi.mjs"; do
+  for runner in "${WASMTIME:-wasmtime} run" "node --no-warnings $work/node-wasi.mjs"; do
     # shellcheck disable=SC2086
     expect "hello ($runner, O$level)" "Hello from i!" "" 0 $runner "$work/hello.wasm"
     # shellcheck disable=SC2086

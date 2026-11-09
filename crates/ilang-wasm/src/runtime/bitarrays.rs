@@ -945,15 +945,13 @@ mod tests {
             let module = wat::parse_str(&source).unwrap();
             wasmparser::Validator::new().validate_all(&module).unwrap();
             std::fs::write(&path, module).unwrap();
-            let executable = std::env::var_os("ILANG_WASMTIME")
-                .or_else(|| std::env::var_os("WASMTIME"))
-                .unwrap_or_else(|| "wasmtime".into());
+            let executable = std::env::var_os("WASMTIME").unwrap_or_else(|| "wasmtime".into());
             let output = Command::new(executable)
                 .args(["run", "--invoke", "check"])
                 .arg(&path)
                 .output()
                 .expect(
-                    "Wasmtime is required for runtime tests; use devenv test or ILANG_WASMTIME",
+                    "Wasmtime is required for runtime tests; run them in the Devenv shell or set WASMTIME",
                 );
             assert!(
                 output.status.success(),

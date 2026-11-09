@@ -1,5 +1,7 @@
 /target/
-/.devenv/
+/.devenv*
+/devenv.local.nix
+/devenv.local.yaml
 /.direnv/
 /.env
 /node_modules/
