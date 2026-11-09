@@ -84,6 +84,8 @@ pub mod code {
     pub const ENV_FORMS: &str = "E0515";
     pub const CASE_NOT_COVERED: &str = "E0516";
     pub const NOT_KNOWN_CTOR: &str = "E0517";
+    pub const TYPE_PLACE: &str = "E0518";
+    pub const BIT_PATTERN: &str = "E0519";
     pub const NEVER_USED: &str = "W0501";
 }
 

@@ -7,7 +7,7 @@
 //! the rest of a block after an environment statement starts a new entry.
 
 use super::display;
-use super::solve::{FailKind, Solver, builtin_variance};
+use super::solve::{FailKind, Pol, Solver, builtin_variance};
 use super::{FnTy, Ty, Typed, Variance};
 use crate::code;
 use crate::hir::*;
@@ -98,10 +98,7 @@ impl<'a> Checker<'a> {
         Checker {
             p,
             sources,
-            s: Solver::new(
-                variances(p),
-                p.types.iter().map(|t| t.name.clone()).collect(),
-            ),
+            s: Solver::new(variances(p), Vec::new()),
             diags: Vec::new(),
             module: ModuleId(0),
             locals: HashMap::new(),
@@ -125,9 +122,20 @@ impl<'a> Checker<'a> {
         let p = self.p;
         // Declarations have their written types (§10.1), generalized.
         for (mi, m) in p.modules.iter().enumerate() {
-            self.module = ModuleId(mi as u32);
+            self.set_module(ModuleId(mi as u32));
+            // Field types are output places (§4.5 rule 6).
+            for t in &m.types {
+                if let TypeBody::Custom(ctors) = &p.ty(*t).body {
+                    for c in ctors {
+                        for f in &c.fields {
+                            self.check_places(&f.ty, Pol::Pos, 0);
+                        }
+                    }
+                }
+            }
             for (di, d) in m.defs.iter().enumerate() {
                 if let DefKind::External { ty, ty_vars, .. } = &d.kind {
+                    self.check_places(ty, Pol::Pos, 0);
                     self.s.level = 1;
                     self.new_tyvars(ty_vars);
                     let t = self.conv(ty, &HashMap::new());
@@ -153,7 +161,7 @@ impl<'a> Checker<'a> {
             ..Typed::default()
         };
         for (mi, m) in p.modules.iter().enumerate() {
-            self.module = ModuleId(mi as u32);
+            self.set_module(ModuleId(mi as u32));
             for (di, d) in m.defs.iter().enumerate() {
                 let id = DefId {
                     module: ModuleId(mi as u32),
@@ -162,12 +170,16 @@ impl<'a> Checker<'a> {
                 let Some(scheme) = self.defs.get(&id) else {
                     continue;
                 };
-                match display::scheme(&self.s, &scheme.ty) {
-                    Ok(text) => {
-                        typed.schemes.insert(id, text);
-                    }
-                    Err(()) => self.occurs(d.span),
+                let opts = display::Opts {
+                    mono: true,
+                    written: matches!(d.kind, DefKind::External { .. }),
+                };
+                // A type with itself inside it has been reported by the
+                // occurs check, and is not shown.
+                if let Ok(text) = display::scheme(&self.s, &scheme.ty, opts) {
+                    typed.schemes.insert(id, text);
                 }
+                self.exported_type(d, &scheme.ty.clone(), opts);
             }
         }
         (typed, self.diags)
@@ -188,9 +200,11 @@ impl<'a> Checker<'a> {
             }
         }
         for b in group {
-            self.module = b.module;
+            self.set_module(b.module);
             let top = p.binding(*b);
             let binding = &top.binding;
+            let mark = self.occurs_mark();
+            self.check_pattern_places(&binding.pattern, Pol::Pos);
             self.new_tyvars(&binding.ty_vars);
             self.effects.push(Effects::default());
             let a = self.infer(&binding.value);
@@ -216,24 +230,37 @@ impl<'a> Checker<'a> {
                     );
                 }
             }
+            self.check_occurs(mark, binding.span);
         }
         self.s.level = 0;
-        for (d, holder) in holders {
-            let DefKind::Binding { var, binding } = p.def(d).kind else {
+        // §4.7: the names of the group are linked to their values, all of
+        // them, before any is generalized.
+        let mark = self.occurs_mark();
+        let mut types = Vec::new();
+        for (d, holder) in &holders {
+            let DefKind::Binding { var, binding } = p.def(*d).kind else {
                 continue;
             };
             let span = p.module(d.module).bindings[binding as usize].binding.span;
-            self.module = d.module;
+            self.set_module(d.module);
             let t = self
                 .locals
                 .get(&var)
                 .map(|s| s.ty.clone())
                 .unwrap_or(Ty::Never);
-            self.sub(&t, &holder, span);
+            self.sub(&t, holder, span);
+            types.push((*d, t, span));
+        }
+        if let Some((d, _, span)) = types.first() {
+            self.set_module(d.module);
+            self.check_occurs(mark, *span);
+        }
+        for (d, t, _) in types {
+            self.set_module(d.module);
             let scheme = if direct {
                 Scheme {
                     level: 0,
-                    ty: self.generalize(&t, 0, span),
+                    ty: self.generalize(&t, 0),
                 }
             } else {
                 Scheme::mono(t)
@@ -259,8 +286,11 @@ impl<'a> Checker<'a> {
 
     pub fn error(&mut self, code: &'static str, span: Span, message: impl Into<String>) {
         let source = self.p.module(self.module).source;
-        self.diags
-            .push(Diagnostic::error(code, Some(source), span, message));
+        let d = Diagnostic::error(code, Some(source), span, message);
+        // One problem found two times at one place is reported once.
+        if !self.diags.contains(&d) {
+            self.diags.push(d);
+        }
     }
 
     pub fn warning(&mut self, code: &'static str, span: Span, message: impl Into<String>) {
@@ -269,12 +299,196 @@ impl<'a> Checker<'a> {
             .push(Diagnostic::warning(code, Some(source), span, message));
     }
 
-    fn occurs(&mut self, span: Span) {
-        self.error(
-            code::TYPE_OCCURS,
-            span,
-            "this type has itself inside it, through a type variable (§4.7)",
-        );
+    /// §2.4: the inferred type of an exported binding may not use a type
+    /// of its module that is not exported. A written type at the top of
+    /// its pattern is checked by name resolution.
+    fn exported_type(&mut self, d: &Def, t: &Ty, opts: display::Opts) {
+        let DefKind::Binding { var, .. } = d.kind else {
+            return;
+        };
+        if !d.exported || self.written.contains_key(&var) {
+            return;
+        }
+        let Ok(shown) = display::shown(&self.s, t, opts) else {
+            return;
+        };
+        let mut found = Vec::new();
+        uses_types(&shown, &mut found);
+        let mut names: Vec<String> = Vec::new();
+        for id in found {
+            let def = self.p.ty(id);
+            if def.module == self.module && !def.exported && !names.contains(&def.name) {
+                names.push(def.name.clone());
+            }
+        }
+        for name in names {
+            self.error(
+                code::EXPORT_HIDDEN_TYPE,
+                d.span,
+                format!(
+                    "`{}` is exported, but its inferred type uses the type `{name}` of this module, which is not exported (§2.4)",
+                    d.name
+                ),
+            );
+        }
+    }
+
+    /// §4.4: in a written type, a union with two or more type variables as
+    /// members may only be in an output place, and an intersection with a
+    /// type variable only in an input place. `pol` is the place of `t`.
+    fn check_places(&mut self, t: &Type, pol: Pol, depth: u32) {
+        if depth > 64 {
+            return;
+        }
+        match &t.kind {
+            TypeKind::Named { ty, args } => {
+                if let TypeRef::Custom(id) = ty
+                    && matches!(self.p.ty(*id).body, TypeBody::Alias(_))
+                {
+                    let e = self.expand(t);
+                    self.check_places(&e, pol, depth + 1);
+                    return;
+                }
+                let vs = match ty {
+                    TypeRef::Custom(id) => self.s.variance.get(id).cloned().unwrap_or_default(),
+                    TypeRef::Builtin(b) => builtin_variance(*b),
+                };
+                for (i, a) in args.iter().enumerate() {
+                    let v = vs.get(i).copied().unwrap_or(Variance::Inv);
+                    self.check_places(a, pol.by(v), depth);
+                }
+            }
+            TypeKind::Tuple(ts) => {
+                for a in ts {
+                    self.check_places(a, pol, depth);
+                }
+            }
+            TypeKind::Fn {
+                params,
+                ret,
+                err,
+                env,
+            } => {
+                for p in params {
+                    self.check_places(&p.ty, pol.flip(), depth);
+                }
+                for x in [Some(&**ret), err.as_deref(), env.as_deref()]
+                    .into_iter()
+                    .flatten()
+                {
+                    self.check_places(x, pol, depth);
+                }
+            }
+            TypeKind::Union(ts) => {
+                let vars = ts
+                    .iter()
+                    .filter(|m| matches!(self.expand(m).kind, TypeKind::Var(_)))
+                    .count();
+                if vars >= 2 && pol != Pol::Pos {
+                    self.error(
+                        code::TYPE_PLACE,
+                        t.span,
+                        "a union with two or more type variables as members may only be in an output place (§4.4): inference could not choose the variable for a value that comes here",
+                    );
+                }
+                for a in ts {
+                    self.check_places(a, pol, depth);
+                }
+            }
+            TypeKind::Inter(ts) => {
+                if pol != Pol::Neg
+                    && ts
+                        .iter()
+                        .any(|m| matches!(self.expand(m).kind, TypeKind::Var(_)))
+                {
+                    self.error(
+                        code::TYPE_PLACE,
+                        t.span,
+                        "an intersection with a type variable may only be in an input place (§4.4): inference could not give a value that is in both",
+                    );
+                }
+                for a in ts {
+                    self.check_places(a, pol, depth);
+                }
+            }
+            TypeKind::Diff(ts) => {
+                if let Some((first, rest)) = ts.split_first() {
+                    self.check_places(first, pol, depth);
+                    for a in rest {
+                        self.check_places(a, Pol::Both, depth);
+                    }
+                }
+            }
+            TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
+        }
+    }
+
+    /// `check_places` for the types written in a pattern of a binding
+    /// (`Pos`) or a parameter (`Neg`).
+    fn check_pattern_places(&mut self, q: &Pattern, pol: Pol) {
+        match &q.kind {
+            PatternKind::Typed { ty, .. } => self.check_places(ty, pol, 0),
+            PatternKind::Named { pattern, .. } => self.check_pattern_places(pattern, pol),
+            PatternKind::Constructor { args: ps, .. }
+            | PatternKind::Tuple(ps)
+            | PatternKind::Error(ps)
+            | PatternKind::List { items: ps, .. } => {
+                for x in ps {
+                    self.check_pattern_places(x, pol);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Sets the module whose code is typed or shown: types of other modules
+    /// are shown with the name of their module (§3).
+    pub fn set_module(&mut self, m: ModuleId) {
+        if self.module == m && !self.s.type_names.is_empty() {
+            return;
+        }
+        self.module = m;
+        let p = self.p;
+        let here = p.module(m);
+        self.s.type_names = p
+            .types
+            .iter()
+            .enumerate()
+            .map(|(i, t)| {
+                let id = TypeId(i as u32);
+                if t.module == m || Some(t.module) == p.prelude || here.imported_types.contains(&id)
+                {
+                    t.name.clone()
+                } else if let Some((alias, _)) = here.import_names.iter().find(|x| x.1 == t.module)
+                {
+                    format!("{alias}.{}", t.name)
+                } else {
+                    format!("{}.{}", p.module(t.module).path, t.name)
+                }
+            })
+            .collect();
+    }
+
+    /// Where the occurs check of a binding starts: the number of variables
+    /// and of bounds given so far.
+    pub fn occurs_mark(&self) -> (usize, usize) {
+        (self.s.vars.len(), self.s.touched.len())
+    }
+
+    /// §4.7: reports a type that has itself inside it, among the variables
+    /// made or given bounds since `mark`.
+    pub fn check_occurs(&mut self, mark: (usize, usize), span: Span) {
+        let mut roots: Vec<super::V> = (mark.0..self.s.vars.len())
+            .map(|i| super::V(i as u32))
+            .collect();
+        roots.extend(self.s.touched[mark.1..].iter().copied());
+        if self.s.occurs(roots) {
+            self.error(
+                code::TYPE_OCCURS,
+                span,
+                "this type has itself inside it, through a type variable (§4.7)",
+            );
+        }
     }
 
     fn position(&self, span: Span) -> String {
@@ -324,7 +538,7 @@ impl<'a> Checker<'a> {
             FailKind::EnvForms => (
                 code::ENV_FORMS,
                 format!(
-                    "`{l}` and `{r}` must be equal: an environment may not have two forms of one type constructor with different arguments (§9.2)"
+                    "`{l}` and `{r}` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)"
                 ),
             ),
             FailKind::Ambiguous => (
@@ -1248,6 +1462,7 @@ impl<'a> Checker<'a> {
                 }
                 Stmt::Env { ty, value, span } => {
                     // `! T = e1` and the rest `r`: `A ? E ! N1 | M - T`.
+                    self.check_places(ty, Pol::Pos, 0);
                     let t = self.conv(ty, &HashMap::new());
                     let v = self.infer(value);
                     self.sub2(&v, &t, value.span, ty.span);
@@ -1283,11 +1498,25 @@ impl<'a> Checker<'a> {
                     params.push((label.clone(), t));
                 }
                 Param::Env { var, ty, .. } => {
+                    self.check_places(ty, Pol::Pos, 0);
                     let t = self.conv(ty, &HashMap::new());
                     self.written.insert(*var, ty.clone());
                     self.locals.insert(*var, Scheme::mono(t.clone()));
                     env_tys.push(t);
                 }
+            }
+        }
+        for p in &f.params {
+            if let Param::Pattern { pattern, .. } = p {
+                self.check_pattern_places(pattern, Pol::Neg);
+            }
+        }
+        if let Some(r) = &f.ret {
+            for t in [Some(&r.value), r.err.as_ref(), r.env.as_ref()]
+                .into_iter()
+                .flatten()
+            {
+                self.check_places(t, Pol::Pos, 0);
             }
         }
         let ret = f.ret.as_ref().map(|r| {
@@ -1353,10 +1582,12 @@ impl<'a> Checker<'a> {
 
     /// Rule 10 for a binding in a block, and rule 14.
     fn local_binding(&mut self, b: &Binding) {
+        let mark = self.occurs_mark();
         let direct = b.direct;
         if direct {
             self.s.level += 1;
         }
+        self.check_pattern_places(&b.pattern, Pol::Pos);
         self.new_tyvars(&b.ty_vars);
         self.note_binding(b);
         let mut binders = Vec::new();
@@ -1380,12 +1611,13 @@ impl<'a> Checker<'a> {
                 self.sub(&s.ty, &h, b.pattern.span);
             }
         }
+        self.check_occurs(mark, b.pattern.span);
         if direct {
             self.s.level -= 1;
             let level = self.s.level;
             for v in &binders {
                 if let Some(s) = self.locals.get(v).cloned() {
-                    let ty = self.generalize(&s.ty, level, b.pattern.span);
+                    let ty = self.generalize(&s.ty, level);
                     self.locals.insert(*v, Scheme { level, ty });
                 }
             }
@@ -1396,13 +1628,11 @@ impl<'a> Checker<'a> {
     /// form (§4.7): the bounds of its variables are coalesced and simplified
     /// once, so that each use copies only the simplified type. Variables at
     /// `level` or below are not generalized and are kept as they are.
-    fn generalize(&mut self, t: &Ty, level: u32, span: Span) -> Ty {
+    fn generalize(&mut self, t: &Ty, level: u32) -> Ty {
         let simple = match display::simplify(&self.s, t, Some(level)) {
             Ok(simple) => simple,
-            Err(()) => {
-                self.occurs(span);
-                return t.clone();
-            }
+            // Reported by the occurs check of the binding.
+            Err(()) => return t.clone(),
         };
         if has_both(&simple) {
             // An argument that does not change, with different bounds as
@@ -1444,10 +1674,18 @@ impl<'a> Checker<'a> {
             Ty::Top => Ty::Var(self.s.fresh_at(level + 1)),
             Ty::Diff(a, h) => {
                 let a = go(self, a);
-                let h = h
+                let h: Vec<Ty> = h
                     .iter()
                     .map(|x| self.rebuild(x, level, map, true))
                     .collect();
+                // The scheme keeps the constraint of the difference (§4.4):
+                // a new variable has no bounds, so it is given again.
+                if let Ty::Var(v) = &a
+                    && self.s.vars[v.0 as usize].level > level
+                {
+                    let hs: Vec<Ty> = h.iter().map(|x| self.s.no_top(x, level + 1)).collect();
+                    self.s.diff_bound(&a, &hs, false);
+                }
                 Ty::Diff(Box::new(a), h)
             }
             Ty::Con(h, args) => Ty::Con(*h, args.iter().map(|a| go(self, a)).collect()),
@@ -1465,6 +1703,36 @@ impl<'a> Checker<'a> {
             })),
             Ty::Never | Ty::Both(..) => t.clone(),
         }
+    }
+}
+
+/// The custom types that a type uses.
+fn uses_types(t: &Ty, out: &mut Vec<TypeId>) {
+    match t {
+        Ty::Con(h, xs) => {
+            if let super::Head::Named(TypeRef::Custom(id)) = h
+                && !out.contains(id)
+            {
+                out.push(*id);
+            }
+            xs.iter().for_each(|x| uses_types(x, out));
+        }
+        Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| uses_types(x, out)),
+        Ty::Fn(f) => {
+            f.params.iter().for_each(|p| uses_types(&p.1, out));
+            [&f.ret, &f.err, &f.env]
+                .into_iter()
+                .for_each(|x| uses_types(x, out));
+        }
+        Ty::Diff(a, h) => {
+            uses_types(a, out);
+            h.iter().for_each(|x| uses_types(x, out));
+        }
+        Ty::Both(a, b) => {
+            uses_types(a, out);
+            uses_types(b, out);
+        }
+        _ => {}
     }
 }
 

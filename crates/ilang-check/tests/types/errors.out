@@ -1,5 +1,5 @@
 id : (x: a) -> a
-ids : (x: Never) -> Int | String
+ids : (x: Int | String) -> Int | String
 n : Int
 s : String
 add : (x: Int) -> Int
@@ -8,8 +8,8 @@ bad_op : () -> Int
 bad_guard : (x: a) -> a | Int
 arity : () -> Never
 arity_var : (f: (Int) -> a ? e ! n) -> (a, Never) ? e ! n
-ambiguous : (x: b) -> b
-use_ambiguous : () -> Int
+ambiguous : (x: a | b) -> a | b
+use_ambiguous : () -> Never
 field : (u: a) -> Never
 part : (t: a) -> Never
 radius : (s: Shape) -> Never
@@ -27,6 +27,8 @@ bad_bits : BitArray
 16:10: error[E0501]: `Int` is not a subtype of `Bool`
 21:14: error[E0502]: this call gives 2 arguments, but the function has 1 parameter (§6.6)
 22:26: error[E0502]: the function types `(Int) -> _ ? _ ! _` and `(Int, Int) -> _ ? _ ! _` have different numbers of parameters
+24:17: error[E0518]: a union with two or more type variables as members may only be in an output place (§4.4): inference could not choose the variable for a value that comes here
+25:32: error[E0504]: a value of `Int` could go to more than one type variable of `_ | _` (§4.4) (the type at 25:22 needs it)
 27:17: error[E0508]: `.name` needs a known type for its value; for now that is a name with a written custom type, such as `x: T` or `x ! T` (known types are not supported yet)
 28:16: error[E0508]: `.k` needs a known type for its value; for now that is a name with a written tuple type (known types are not supported yet)
 31:25: error[E0512]: not every constructor of `Shape` has a field with the label `radius` (§4.8 rule 13)

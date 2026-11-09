@@ -5,11 +5,10 @@
 //! Every node keeps its span; spans are byte ranges in the file of the
 //! module that holds the node (`Module::source`).
 //!
+//! §2.4 for the inferred type of an exported binding is checked by type
+//! inference (`types/infer.rs`); resolution checks the written types.
+//!
 //! TODO(M3): checks that need the inferred types, for type inference:
-//! - §2.4: the type of an exported definition may not use a type of its
-//!   module that is not exported. Resolution checks the written types
-//!   (`resolve.rs`, phase 5); the inferred type of an exported binding is
-//!   left, with `Def::exported` and `TypeDef::exported`.
 //! - §10.2: the parameters, value, and errors of a host export are types
 //!   that the host can take (§10.3); a `@test` gives `Nil`; and the
 //!   environment of an entry point (the program entry, a test, or a host
@@ -98,6 +97,10 @@ pub struct Module {
     pub kind: ModuleKind,
     /// The modules that this module imports.
     pub imports: Vec<ModuleId>,
+    /// The name that each import gives to its module (§2.3).
+    pub import_names: Vec<(String, ModuleId)>,
+    /// The types that imports put into this module by name (§2.3).
+    pub imported_types: Vec<TypeId>,
     /// The top-level value names: names bound by top-level bindings, and
     /// declarations.
     pub defs: Vec<Def>,

@@ -220,6 +220,7 @@ impl Checker<'_> {
                 prim(BuiltinType::String)
             }
             PatternKind::BitArray(segs) => {
+                self.check_bit_pattern(segs);
                 for s in segs {
                     let ft = self.format(s.format.as_ref(), s.span);
                     if catch_all(&s.value) {
@@ -239,6 +240,30 @@ impl Checker<'_> {
                     }
                 }
                 self.s.fresh()
+            }
+        }
+    }
+
+    /// §8.4: a string format in a pattern needs a string literal, and
+    /// `bits` or `bytes` with no length may only be the last segment.
+    fn check_bit_pattern(&mut self, segs: &[Segment<Pattern>]) {
+        for (i, seg) in segs.iter().enumerate() {
+            let Some(f) = &seg.format else { continue };
+            let name = f.name.name.as_str();
+            let string = matches!(name, "utf8" | "utf16be" | "utf16le" | "utf32be" | "utf32le");
+            if string && !matches!(seg.value.kind, PatternKind::String(_)) {
+                self.error(
+                    code::BIT_PATTERN,
+                    seg.value.span,
+                    format!("the format `{name}` in a pattern needs a string literal, which gives the bits to match (§8.4)"),
+                );
+            }
+            if matches!(name, "bits" | "bytes") && f.arg.is_none() && i + 1 < segs.len() {
+                self.error(
+                    code::BIT_PATTERN,
+                    f.name.span,
+                    format!("`{name}` with no length takes all the bits that are left, so it may only be the last segment (§8.4)"),
+                );
             }
         }
     }
@@ -515,7 +540,7 @@ impl Checker<'_> {
     /// Checks the coverage (§7.4) of a `case`, and warns about the clauses
     /// that are never used, with the types that inference found.
     pub fn check_case(&mut self, c: PendingCase) {
-        self.module = c.module;
+        self.set_module(c.module);
         let col = [Col::of(c.subject.clone())];
         let mut rows: Vec<Vec<Pat>> = Vec::new();
         for (pat, guarded, span) in &c.clauses {
@@ -637,6 +662,15 @@ impl Checker<'_> {
                             places[at].seen.push((v.clause, v.unguarded, *h, *n));
                         }
                     }
+                    // Rule 11: the test takes every value of the type
+                    // constructors of `T`, so those values must be in `T`:
+                    // `B <: T | r - T`.
+                    let r = self.s.fresh();
+                    let rest = self.s.diff(r, members.clone());
+                    let mut want = members.clone();
+                    want.push(rest);
+                    let b = places[at].ty.clone();
+                    self.sub(&b, &Ty::Union(want), ty.span);
                 }
                 if let Some(b) = binder {
                     self.bind(b, t.clone(), true);

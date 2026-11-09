@@ -19,7 +19,7 @@ list_items : (xs: List(Bool)) -> Int
 tuples : (p: (Bool, Bool)) -> Int
 only_ok : (r: Result(Int, Never)) -> Int
 empty : Int
-any : (x: a & Int) -> Int
+any : (x: Int) -> Int
 unknown : (f: () -> Bool ? e ! n) -> Int ? e ! n
 no_error : () -> Int
 14:8: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Point`

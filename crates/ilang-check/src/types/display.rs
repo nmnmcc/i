@@ -13,28 +13,55 @@ use super::{FnTy, Head, Ty, V, Variance};
 use crate::hir::TypeRef;
 use std::collections::{HashMap, HashSet};
 
+/// What a shown type keeps.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct Opts {
+    /// Variables at level 0 are not generalized (the bindings of the top
+    /// level whose values are not direct values): each is shown as the
+    /// union of the types that come to it.
+    pub mono: bool,
+    /// Written variables are kept, also on one side only: a declared type
+    /// is shown as it is written (§10.1).
+    pub written: bool,
+}
+
 /// The shown type scheme of `t`. `Err` when the type has itself inside it
 /// through a type variable (§4.7).
-pub(crate) fn scheme(s: &Solver, t: &Ty) -> Result<String, ()> {
-    let t = simplify(s, t, None)?;
+pub(crate) fn scheme(s: &Solver, t: &Ty, opts: Opts) -> Result<String, ()> {
+    let t = simplify_with(s, t, None, opts)?;
     Ok(Namer::new(s).show(&t))
+}
+
+/// The shown type, as a type, for checks of what it uses.
+pub(crate) fn shown(s: &Solver, t: &Ty, opts: Opts) -> Result<Ty, ()> {
+    simplify_with(s, t, None, opts)
 }
 
 /// `t` with the bounds of its variables coalesced, simplified. The
 /// variables at `keep` or below are not generalized: they are kept as they
 /// are. `Err` when the type has itself inside it through a type variable.
 pub(crate) fn simplify(s: &Solver, t: &Ty, keep: Option<u32>) -> Result<Ty, ()> {
+    simplify_with(s, t, keep, Opts::default())
+}
+
+fn simplify_with(s: &Solver, t: &Ty, keep: Option<u32>, opts: Opts) -> Result<Ty, ()> {
     let mut c = Coalescer {
         s,
         keep,
+        mono: opts.mono,
         stack: Vec::new(),
         occurs: false,
+        rep: cycles(s, keep),
     };
-    let t = c.go(t, true, 0);
+    let t = c.go(t, true, 0, false);
     if c.occurs {
         return Err(());
     }
-    let n = Norm { s, keep };
+    let n = Norm {
+        s,
+        keep,
+        written: opts.written,
+    };
     let mut t = n.norm(t);
     for _ in 0..64 {
         match n.step(&t) {
@@ -51,7 +78,106 @@ fn rigid(s: &Solver, keep: Option<u32>, v: V) -> bool {
 
 /// A type as it is in the solver, for messages: variables are `_`.
 pub(crate) fn show(s: &Solver, t: &Ty) -> String {
-    render(t, 0, &mut |_| "_".to_string(), &s.type_names)
+    render(&both(t), 0, &mut |_| "_".to_string(), &s.type_names)
+}
+
+/// The variables that are equal because they are in a cycle of bounds that
+/// are variables (`a <: b <: a`), each with the one that stands for them
+/// all: a variable kept as it is, else a written one, else the first.
+fn cycles(s: &Solver, keep: Option<u32>) -> HashMap<V, V> {
+    let n = s.vars.len();
+    let mut edges: Vec<Vec<usize>> = vec![Vec::new(); n];
+    for (i, st) in s.vars.iter().enumerate() {
+        for u in &st.upper {
+            if let Ty::Var(u) = u {
+                edges[i].push(u.0 as usize);
+            }
+        }
+        for l in &st.lower {
+            if let Ty::Var(l) = l {
+                edges[l.0 as usize].push(i);
+            }
+        }
+    }
+    let comp = scc(&edges);
+    let mut best: HashMap<usize, V> = HashMap::new();
+    let rank = |v: V| {
+        let st = &s.vars[v.0 as usize];
+        (!rigid(s, keep, v), st.name.is_none(), v.0)
+    };
+    for (i, c) in comp.iter().enumerate() {
+        let v = V(i as u32);
+        match best.get(c) {
+            Some(b) if rank(*b) <= rank(v) => {}
+            _ => {
+                best.insert(*c, v);
+            }
+        }
+    }
+    let mut size: HashMap<usize, usize> = HashMap::new();
+    for c in &comp {
+        *size.entry(*c).or_default() += 1;
+    }
+    comp.iter()
+        .enumerate()
+        .filter(|(_, c)| size[c] > 1)
+        .map(|(i, c)| (V(i as u32), best[c]))
+        .collect()
+}
+
+/// The strongly connected components of a graph, as a number for each node
+/// (Tarjan, without recursion).
+fn scc(edges: &[Vec<usize>]) -> Vec<usize> {
+    let n = edges.len();
+    let mut index = vec![usize::MAX; n];
+    let mut low = vec![0; n];
+    let mut on = vec![false; n];
+    let mut stack = Vec::new();
+    let mut comp = vec![usize::MAX; n];
+    let (mut next, mut ncomp) = (0, 0);
+    for root in 0..n {
+        if index[root] != usize::MAX {
+            continue;
+        }
+        let mut work = vec![(root, 0usize)];
+        index[root] = next;
+        low[root] = next;
+        next += 1;
+        stack.push(root);
+        on[root] = true;
+        while let Some(&mut (v, ref mut ei)) = work.last_mut() {
+            if *ei < edges[v].len() {
+                let w = edges[v][*ei];
+                *ei += 1;
+                if index[w] == usize::MAX {
+                    index[w] = next;
+                    low[w] = next;
+                    next += 1;
+                    stack.push(w);
+                    on[w] = true;
+                    work.push((w, 0));
+                } else if on[w] {
+                    low[v] = low[v].min(index[w]);
+                }
+            } else {
+                work.pop();
+                if let Some(&(u, _)) = work.last() {
+                    low[u] = low[u].min(low[v]);
+                }
+                if low[v] == index[v] {
+                    while let Some(w) = stack.pop() {
+                        on[w] = false;
+                        comp[w] = ncomp;
+                        if w == v {
+                            break;
+                        }
+                    }
+                    ncomp += 1;
+                }
+            }
+        }
+    }
+    comp
 }
 
 // ---- Coalescing ----
@@ -59,32 +185,69 @@ pub(crate) fn show(s: &Solver, t: &Ty) -> String {
 struct Coalescer<'s> {
     s: &'s Solver,
     keep: Option<u32>,
+    mono: bool,
     /// The variables being expanded, with the number of type constructors
     /// above them.
     stack: Vec<(V, u32)>,
     occurs: bool,
+    /// The variables that stand for a cycle of variables.
+    rep: HashMap<V, V>,
 }
 
 impl Coalescer<'_> {
-    fn go(&mut self, t: &Ty, pos: bool, depth: u32) -> Ty {
+    /// The variables that `v` stands for.
+    fn members(&self, v: V) -> Vec<V> {
+        if !self.rep.values().any(|r| *r == v) {
+            return vec![v];
+        }
+        self.rep
+            .iter()
+            .filter(|(_, r)| **r == v)
+            .map(|(m, _)| *m)
+            .collect()
+    }
+
+    /// `env`: the type is an environment, whose members have arguments that
+    /// are compared as equal (§4.5 rule 4), so they are both outputs and
+    /// inputs.
+    fn go(&mut self, t: &Ty, pos: bool, depth: u32, env: bool) -> Ty {
         match t {
-            Ty::Var(v) if rigid(self.s, self.keep, *v) => t.clone(),
             Ty::Var(v) => {
-                if let Some(&(_, d)) = self.stack.iter().find(|x| x.0 == *v) {
+                let v = self.rep.get(v).copied().unwrap_or(*v);
+                if rigid(self.s, self.keep, v) {
+                    return Ty::Var(v);
+                }
+                let mono = self.mono && self.s.vars[v.0 as usize].level == 0;
+                if let Some(&(_, d)) = self.stack.iter().find(|x| x.0 == v) {
                     if depth > d {
                         self.occurs = true;
                     }
-                    return t.clone();
+                    return if mono { Ty::Never } else { Ty::Var(v) };
                 }
-                self.stack.push((*v, depth));
-                let st = &self.s.vars[v.0 as usize];
-                let bounds = if pos { &st.lower } else { &st.upper };
-                let mut parts = vec![t.clone()];
-                for b in bounds.clone() {
-                    parts.push(self.go(&b, pos, depth));
+                self.stack.push((v, depth));
+                let mut parts = Vec::new();
+                if mono {
+                    // Not generalized: the types that come to it (§4.7).
+                    for m in self.members(v) {
+                        let st = &self.s.vars[m.0 as usize];
+                        let mut bounds = st.lower.clone();
+                        bounds.extend(st.from.iter().map(|w| Ty::Var(*w)));
+                        for b in bounds {
+                            parts.push(self.go(&b, true, depth, env));
+                        }
+                    }
+                } else {
+                    parts.push(Ty::Var(v));
+                    for m in self.members(v) {
+                        let st = &self.s.vars[m.0 as usize];
+                        let bounds = if pos { &st.lower } else { &st.upper };
+                        for b in bounds.clone() {
+                            parts.push(self.go(&b, pos, depth, env));
+                        }
+                    }
                 }
                 self.stack.pop();
-                if pos {
+                if pos || mono {
                     Ty::Union(parts)
                 } else {
                     Ty::Inter(parts)
@@ -96,11 +259,15 @@ impl Coalescer<'_> {
                     .iter()
                     .zip(vs)
                     .map(|(a, v)| match v {
-                        Variance::Co | Variance::Bi => self.go(a, pos, depth + 1),
-                        Variance::Contra => self.go(a, !pos, depth + 1),
+                        _ if env => Ty::Both(
+                            Box::new(self.go(a, true, depth + 1, false)),
+                            Box::new(self.go(a, false, depth + 1, false)),
+                        ),
+                        Variance::Co | Variance::Bi => self.go(a, pos, depth + 1, false),
+                        Variance::Contra => self.go(a, !pos, depth + 1, false),
                         Variance::Inv => Ty::Both(
-                            Box::new(self.go(a, true, depth + 1)),
-                            Box::new(self.go(a, false, depth + 1)),
+                            Box::new(self.go(a, true, depth + 1, false)),
+                            Box::new(self.go(a, false, depth + 1, false)),
                         ),
                     })
                     .collect();
@@ -110,24 +277,51 @@ impl Coalescer<'_> {
                 params: f
                     .params
                     .iter()
-                    .map(|(l, p)| (l.clone(), self.go(p, !pos, depth + 1)))
+                    .map(|(l, p)| (l.clone(), self.go(p, !pos, depth + 1, false)))
                     .collect(),
-                ret: self.go(&f.ret, pos, depth + 1),
-                err: self.go(&f.err, pos, depth + 1),
-                env: self.go(&f.env, pos, depth + 1),
+                ret: self.go(&f.ret, pos, depth + 1, false),
+                err: self.go(&f.err, pos, depth + 1, false),
+                env: self.go(&f.env, pos, depth + 1, true),
             })),
-            Ty::Union(ms) => Ty::Union(ms.iter().map(|m| self.go(m, pos, depth)).collect()),
-            Ty::Inter(ms) => Ty::Inter(ms.iter().map(|m| self.go(m, pos, depth)).collect()),
+            Ty::Union(ms) => Ty::Union(ms.iter().map(|m| self.go(m, pos, depth, env)).collect()),
+            Ty::Inter(ms) => Ty::Inter(ms.iter().map(|m| self.go(m, pos, depth, env)).collect()),
             Ty::Diff(a, h) => Ty::Diff(
-                Box::new(self.go(a, pos, depth)),
-                h.iter().map(|m| self.go(m, pos, depth)).collect(),
+                Box::new(self.go(a, pos, depth, env)),
+                h.iter().map(|m| self.go(m, pos, depth, false)).collect(),
             ),
             Ty::Both(a, b) => Ty::Both(
-                Box::new(self.go(a, true, depth)),
-                Box::new(self.go(b, false, depth)),
+                Box::new(self.go(a, true, depth, env)),
+                Box::new(self.go(b, false, depth, env)),
             ),
             Ty::Never | Ty::Top => t.clone(),
         }
+    }
+}
+
+/// An argument that does not change, with its bounds as an output and as
+/// an input, is shown as one type: the input side, which every value that
+/// comes there is in, and which is enough for every use there; when the
+/// input side has nothing, the output side (§4.5 rules 6 and 7).
+fn both(t: &Ty) -> Ty {
+    match t {
+        Ty::Both(a, b) => {
+            if **b == Ty::Top {
+                both(a)
+            } else {
+                both(b)
+            }
+        }
+        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(both).collect()),
+        Ty::Union(xs) => Ty::Union(xs.iter().map(both).collect()),
+        Ty::Inter(xs) => Ty::Inter(xs.iter().map(both).collect()),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+            params: f.params.iter().map(|(l, p)| (l.clone(), both(p))).collect(),
+            ret: both(&f.ret),
+            err: both(&f.err),
+            env: both(&f.env),
+        })),
+        Ty::Diff(a, h) => Ty::Diff(Box::new(both(a)), h.iter().map(both).collect()),
+        t => t.clone(),
     }
 }
 
@@ -136,6 +330,7 @@ impl Coalescer<'_> {
 struct Norm<'s> {
     s: &'s Solver,
     keep: Option<u32>,
+    written: bool,
 }
 
 /// The occurrences of a variable: how many on each side, and the members
@@ -167,7 +362,7 @@ impl Norm<'_> {
                         .collect(),
                     ret: self.norm(f.ret),
                     err: self.norm(f.err),
-                    env: self.norm(f.env),
+                    env: self.env(f.env),
                 }))
             }
             Ty::Both(a, b) => {
@@ -182,7 +377,20 @@ impl Norm<'_> {
         }
     }
 
+    /// An environment: two forms of one type constructor are not put
+    /// together, because their arguments must be equal (§9.2).
+    fn env(&self, t: Ty) -> Ty {
+        match t {
+            Ty::Union(ms) => self.union_in(ms.into_iter().map(|m| self.norm(m)).collect(), true),
+            t => self.norm(t),
+        }
+    }
+
     fn union(&self, ms: Vec<Ty>) -> Ty {
+        self.union_in(ms, false)
+    }
+
+    fn union_in(&self, ms: Vec<Ty>, env: bool) -> Ty {
         let mut flat = Vec::new();
         super::solve::flatten_union(&ms, &mut flat);
         let mut out: Vec<Ty> = Vec::new();
@@ -197,6 +405,7 @@ impl Norm<'_> {
                 .head()
                 .and_then(|h| out.iter().position(|o| o.head() == Some(h)))
             {
+                Some(_) if env => out.push(m),
                 Some(i) => {
                     let old = std::mem::replace(&mut out[i], Ty::Never);
                     out[i] = self.merge(old, m, true);
@@ -263,6 +472,53 @@ impl Norm<'_> {
                 m => flat.push(m),
             }
         }
+        // `{ A | B } & C` is `A & C | B & C` (§4.4), for unions of types
+        // with type constructors.
+        let (unions, rest): (Vec<Ty>, Vec<Ty>) =
+            flat.into_iter().partition(|m| matches!(m, Ty::Union(_)));
+        let conc: Vec<Ty> = rest
+            .iter()
+            .filter(|m| m.head().is_some())
+            .cloned()
+            .collect();
+        let headed = |u: &Ty| match u {
+            Ty::Union(xs) => xs.iter().all(|x| x.head().is_some()),
+            _ => false,
+        };
+        let combos: usize = unions
+            .iter()
+            .map(|u| match u {
+                Ty::Union(xs) => xs.len(),
+                _ => 1,
+            })
+            .product();
+        if (unions.len() >= 2 || (unions.len() == 1 && !conc.is_empty()))
+            && unions.iter().all(headed)
+            && combos <= 64
+        {
+            let mut alts: Vec<Vec<Ty>> = vec![conc];
+            for u in &unions {
+                let Ty::Union(xs) = u else { continue };
+                alts = alts
+                    .into_iter()
+                    .flat_map(|a| {
+                        xs.iter().map(move |x| {
+                            let mut a = a.clone();
+                            a.push(x.clone());
+                            a
+                        })
+                    })
+                    .collect();
+            }
+            let joined = self.union(alts.into_iter().map(|a| self.inter(a)).collect());
+            let mut ms: Vec<Ty> = rest.into_iter().filter(|m| m.head().is_none()).collect();
+            if ms.is_empty() {
+                return joined;
+            }
+            ms.push(joined);
+            return self.inter(ms);
+        }
+        let flat: Vec<Ty> = rest.into_iter().chain(unions).collect();
         let mut out: Vec<Ty> = Vec::new();
         for m in flat {
             if m == Ty::Top || out.contains(&m) {
@@ -374,7 +630,7 @@ impl Norm<'_> {
     fn step(&self, t: &Ty) -> Option<(V, Ty)> {
         let mut occ: HashMap<V, Occ> = HashMap::new();
         let mut order = Vec::new();
-        self.walk(t, true, &mut occ, &mut order);
+        self.walk(t, true, &mut occ, &mut order, false);
         for v in &order {
             if rigid(self.s, self.keep, *v) {
                 continue;
@@ -398,6 +654,11 @@ impl Norm<'_> {
                     .find(|w| matches!(w, Ty::Var(x) if !self.named(*x)))
                 {
                     return Some((*w, Ty::Var(*v)));
+                }
+                // §4.7: a variable on one side only has no effect, also a
+                // written one, but not in a declared type.
+                if !self.written {
+                    return Some((*v, if o.neg == 0 { Ty::Never } else { Ty::Top }));
                 }
                 continue;
             }
@@ -427,49 +688,62 @@ impl Norm<'_> {
                 .is_some_and(|s| s.name.is_some())
     }
 
-    fn walk(&self, t: &Ty, pos: bool, occ: &mut HashMap<V, Occ>, order: &mut Vec<V>) {
-        let group: Vec<Ty> = match t {
-            Ty::Union(ms) | Ty::Inter(ms) => ms.clone(),
-            _ => vec![t.clone()],
+    /// `env`: the type is an environment, whose members have arguments that
+    /// are compared as equal (§4.5 rule 4): they count on both sides.
+    fn walk(&self, t: &Ty, pos: bool, occ: &mut HashMap<V, Occ>, order: &mut Vec<V>, env: bool) {
+        // Only a union in an output place and an intersection in an input
+        // place say that a variable comes with the other members.
+        let (group, together): (Vec<Ty>, bool) = match t {
+            Ty::Union(ms) => (ms.clone(), pos),
+            Ty::Inter(ms) => (ms.clone(), !pos),
+            _ => (vec![t.clone()], true),
         };
         for (i, m) in group.iter().enumerate() {
             match m {
                 Ty::Var(v) => {
-                    let with: Vec<Ty> = group
-                        .iter()
-                        .enumerate()
-                        .filter(|(j, _)| *j != i)
-                        .map(|(_, x)| x.clone())
-                        .collect();
+                    let with: Vec<Ty> = if together {
+                        group
+                            .iter()
+                            .enumerate()
+                            .filter(|(j, _)| *j != i)
+                            .map(|(_, x)| x.clone())
+                            .collect()
+                    } else {
+                        Vec::new()
+                    };
                     record(occ, order, *v, pos, with);
                 }
-                Ty::Union(_) | Ty::Inter(_) => self.walk(m, pos, occ, order),
+                Ty::Union(_) | Ty::Inter(_) => self.walk(m, pos, occ, order, env),
                 // Only the type constructors of `H` matter in `A - H`
                 // (§4.4), so the variables in `H` are not counted.
                 Ty::Diff(a, _) => match &**a {
                     Ty::Var(v) => record(occ, order, *v, pos, Vec::new()),
-                    a => self.walk(a, pos, occ, order),
+                    a => self.walk(a, pos, occ, order, env),
                 },
                 Ty::Con(h, args) => {
                     let vs = self.s.variances(*h, args.len());
                     for (a, v) in args.iter().zip(vs) {
                         match v {
-                            Variance::Contra => self.walk(a, !pos, occ, order),
-                            _ => self.walk(a, pos, occ, order),
+                            _ if env => {
+                                self.walk(a, true, occ, order, false);
+                                self.walk(a, false, occ, order, false);
+                            }
+                            Variance::Contra => self.walk(a, !pos, occ, order, false),
+                            _ => self.walk(a, pos, occ, order, false),
                         }
                     }
                 }
                 Ty::Fn(f) => {
                     for (_, p) in &f.params {
-                        self.walk(p, !pos, occ, order);
+                        self.walk(p, !pos, occ, order, false);
                     }
-                    self.walk(&f.ret, pos, occ, order);
-                    self.walk(&f.err, pos, occ, order);
-                    self.walk(&f.env, pos, occ, order);
+                    self.walk(&f.ret, pos, occ, order, false);
+                    self.walk(&f.err, pos, occ, order, false);
+                    self.walk(&f.env, pos, occ, order, true);
                 }
                 Ty::Both(a, b) => {
-                    self.walk(a, true, occ, order);
-                    self.walk(b, false, occ, order);
+                    self.walk(a, true, occ, order, false);
+                    self.walk(b, false, occ, order, false);
                 }
                 Ty::Never | Ty::Top => {}
             }
@@ -569,7 +843,7 @@ impl<'s> Namer<'s> {
     fn show(mut self, t: &Ty) -> String {
         // `Top` is a variable that has no effect: each gets its own name.
         let mut next = u32::MAX;
-        let t = tops(t, &mut next);
+        let t = tops(&holes(&both(t)), &mut next);
         let mut order = Vec::new();
         roles(&t, Role::Value, &mut order);
         // Written names first, then the others.
@@ -742,6 +1016,7 @@ fn render(t: &Ty, prec: u8, name: &mut dyn FnMut(V) -> String, tn: &[String]) ->
             wrap(ms.join(" & "), 1)
         }
         Ty::Diff(a, h) => {
+            // Only the type constructors of `H` matter (§4.4).
             let mut s = render(a, 2, name, tn);
             for m in h {
                 s.push_str(" - ");
@@ -756,6 +1031,60 @@ fn render(t: &Ty, prec: u8, name: &mut dyn FnMut(V) -> String, tn: &[String]) ->
                 render(a, prec, name, tn)
             }
         }
+    }
+}
+
+/// `t` with the variables of `H` in each difference that are nowhere else
+/// changed to `Top`, shown `_`: only the type constructors of `H` matter
+/// there (§4.4), and such a variable has no other effect.
+fn holes(t: &Ty) -> Ty {
+    let mut outside = HashSet::new();
+    outer_vars(t, &mut outside);
+    hide(t, &outside, false)
+}
+
+fn outer_vars(t: &Ty, out: &mut HashSet<V>) {
+    match t {
+        Ty::Var(v) => {
+            out.insert(*v);
+        }
+        Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+            xs.iter().for_each(|x| outer_vars(x, out))
+        }
+        Ty::Fn(f) => {
+            f.params.iter().for_each(|p| outer_vars(&p.1, out));
+            [&f.ret, &f.err, &f.env]
+                .into_iter()
+                .for_each(|x| outer_vars(x, out));
+        }
+        Ty::Diff(a, _) => outer_vars(a, out),
+        Ty::Both(a, b) => {
+            outer_vars(a, out);
+            outer_vars(b, out);
+        }
+        Ty::Never | Ty::Top => {}
+    }
+}
+
+fn hide(t: &Ty, outside: &HashSet<V>, in_h: bool) -> Ty {
+    let go = |x: &Ty| hide(x, outside, in_h);
+    match t {
+        Ty::Var(v) if in_h && !outside.contains(v) => Ty::Top,
+        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(go).collect()),
+        Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
+        Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+            params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
+            ret: go(&f.ret),
+            err: go(&f.err),
+            env: go(&f.env),
+        })),
+        Ty::Diff(a, h) => Ty::Diff(
+            Box::new(go(a)),
+            h.iter().map(|x| hide(x, outside, true)).collect(),
+        ),
+        Ty::Both(a, b) => Ty::Both(Box::new(go(a)), Box::new(go(b))),
+        t => t.clone(),
     }
 }
 

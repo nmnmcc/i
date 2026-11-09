@@ -1,6 +1,6 @@
 id : (x: a) -> a
 both : (Int, String)
-ids : (x: a) -> a | Int | String
+ids : (x: Int | String) -> Int | String
 use_ids : () -> (Int | String, Int | String)
 local : () -> (Int, String)
 local_mono : () -> (Int | String, Int | String)

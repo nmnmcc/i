@@ -398,6 +398,8 @@ impl<'a> Resolver<'a> {
                 source: parsed.source,
                 kind: parsed.kind,
                 imports: Vec::new(),
+                import_names: Vec::new(),
+                imported_types: Vec::new(),
                 defs: Vec::new(),
                 types: Vec::new(),
                 bindings: Vec::new(),
@@ -848,6 +850,9 @@ impl<'a> Resolver<'a> {
                 continue;
             };
             self.p.modules[mi].imports.push(target);
+            self.p.modules[mi]
+                .import_names
+                .push((alias.name.clone(), target));
             self.put_value(&mut scope, &alias.name, alias.span, Entry::Module(target));
             for n in &item.names {
                 self.import_name(&mut scope, target, n);
@@ -950,6 +955,7 @@ impl<'a> Resolver<'a> {
                 scope
                     .types
                     .insert(name.to_string(), (TypeRef::Custom(t), true));
+                self.p.modules[self.cur.0 as usize].imported_types.push(t);
             }
         }
     }
@@ -2237,9 +2243,8 @@ impl<'a> Resolver<'a> {
     /// annotation at the top of the pattern of an exported binding. An
     /// alias of this module that is not exported is looked through.
     ///
-    /// TODO(M3): the inferred type of an exported binding with no written
-    /// type, or whose written type is only part of its type, is checked by
-    /// type inference.
+    /// The inferred type of an exported binding with no written type at
+    /// the top of its pattern is checked by type inference.
     fn exported_types(&mut self, m: ModuleId) {
         self.cur = m;
         let module = self.p.module(m);
