@@ -119,6 +119,10 @@ const CORE: &[&str] = &[
     "bit_array_to_string",
     "inspect",
     "hash",
+    "to_upper",
+    "to_lower",
+    "index_of",
+    "bit_array_concat",
 ];
 
 const CORE_FUNCS: &[&str] = &[
@@ -147,6 +151,10 @@ const CORE_FUNCS: &[&str] = &[
     "core_bit_array_to_string",
     "core_inspect",
     "core_hash",
+    "core_to_upper",
+    "core_to_lower",
+    "core_index_of",
+    "core_bit_array_concat",
 ];
 
 /// The state of one function while it is lowered.

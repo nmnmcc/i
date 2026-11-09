@@ -61,6 +61,10 @@ fn library_names() {
                 "int_to_codepoint",
                 "bit_size",
                 "bit_array_to_string",
+                "to_upper",
+                "to_lower",
+                "index_of",
+                "bit_array_concat",
                 "inspect",
                 "hash",
             ],
@@ -130,6 +134,7 @@ fn library_labels() {
     assert_eq!(labels("i/fail", "catch"), ["body"]);
     assert_eq!(labels("i/resource", "ensure"), ["body", "with"]);
     assert_eq!(labels("i/core", "byte_slice"), ["_", "start", "length"]);
+    assert_eq!(labels("i/core", "index_of"), ["in", "find", "from"]);
     assert_eq!(labels("i/prelude", "panic"), ["message"]);
 }
 
