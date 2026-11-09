@@ -1072,7 +1072,9 @@ These are normal functions: they are called, given, and compared like any other 
 
 ## Appendix A. Choices
 
-This appendix lists the rules that were chosen without a full discussion, until they are confirmed. Each one says which rule of Gleam or TypeScript it follows, or why it does not. All choices so far have been confirmed, so the list is empty.
+This appendix lists the rules that were chosen without a full discussion, until they are confirmed. Each one says which rule of Gleam or TypeScript it follows, or why it does not.
+
+1. Major version 0 is a major version like the others: a newer `0.y.z` must be able to take the place of an older one, so `0.2.0` must work where `0.1.0` did. Semantic Versioning, which the packages of Gleam (Hex) and TypeScript (npm) follow, lets any `0.y` step break. It cannot here, because `0.1.0` and `0.2.0` are one package, and minimal version selection may give either one to code that asked for `0.1.0` (§2.7).
 
 ## Appendix B. The binary interface
 
