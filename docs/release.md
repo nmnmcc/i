@@ -49,7 +49,7 @@ the binaries' loader and runtime library search paths. It uses `nix-store` to
 export those paths and their dependencies; it does not bundle the Rust compiler
 merely because its path occurs in debug information. On the destination host,
 install Nix, verify the archive, and run `./runtime/restore` from the extracted
-package to import the closure before starting iLang. Importing requires the
+package to import the closure before starting i. Importing requires the
 destination Nix store's usual authorization. The package records every exported
 store path in `runtime/paths.txt` and its build manifest. This mode does not
 support Mach-O/Windows artifacts or replace a host's kernel and Nix installation.

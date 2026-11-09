@@ -12,9 +12,9 @@ const load = async () => {
 
 test("the engine has GC, typed references, tail calls and exnref", async ({ page }) => {
   const result = await page.evaluate(async (loader) => {
-    const { instantiate, supportsRequiredFeatures, hostImports, iLangError } = await eval(loader)();
+    const { instantiate, supportsRequiredFeatures, hostImports, GuestError } = await eval(loader)();
     const printed = [];
-    const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(iLangError, printed) });
+    const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(GuestError, printed) });
     return { supported: supportsRequiredFeatures(), printed, initialized: guest.exports.initialized(), typedCall: guest.exports.feature_probe(), tails: guest.exports.tail_count(1_000_000, 0), sum: guest.exports.gc_sum(100_000), exceptions: guest.call("exceptions") };
   }, `(${load})`);
   expect(result).toEqual({ supported: true, printed: ["start\n"], initialized: 1, typedCall: 42, tails: 1_000_000, sum: 705_082_704, exceptions: 42 });
@@ -22,8 +22,8 @@ test("the engine has GC, typed references, tail calls and exnref", async ({ page
 
 test("arbitrary precision values and UTF-8 survive copying and memory growth", async ({ page }) => {
   const result = await page.evaluate(async (loader) => {
-    const { instantiate, hostImports, iLangError } = await eval(loader)();
-    const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(iLangError) });
+    const { instantiate, hostImports, GuestError } = await eval(loader)();
+    const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(GuestError) });
     const numbers = [0n, 1n, -1n, 1n << 30n, -(1n << 64n), (1n << 4096n) + 0x123456789abcdefn];
     for (const number of numbers) if (guest.call("int_roundtrip", [number]) !== number) throw new Error("Integer lost precision");
     const strings = ["", "é 👩🏽‍🚀 中文\0", "界".repeat(65536)];
@@ -37,13 +37,13 @@ test("arbitrary precision values and UTF-8 survive copying and memory growth", a
 
 test("errors carry their tag and every member of the error type", async ({ page }) => {
   const result = await page.evaluate(async (loader) => {
-    const { instantiate, hostImports, customAbi, customImports, iLangError } = await eval(loader)();
-    const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(iLangError) });
-    const custom = await instantiate("/tests/browser/fixtures/custom-imports.wasm", { abi: customAbi, imports: customImports(iLangError) });
+    const { instantiate, hostImports, customAbi, customImports, GuestError } = await eval(loader)();
+    const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(GuestError) });
+    const custom = await instantiate("/tests/browser/fixtures/custom-imports.wasm", { abi: customAbi, imports: customImports(GuestError) });
     const errors = (value, name) => [1, 2, 3, 4, 5, 6].map((selector) => {
       try { value.call(name, [selector]); return "no error"; } catch (error) {
         const thrown = error.value;
-        return error instanceof iLangError ? (thrown && thrown.bytes ? [...thrown.bytes] : typeof thrown === "bigint" ? `${thrown}n` : thrown ?? "nil") : error.message;
+        return error instanceof GuestError ? (thrown && thrown.bytes ? [...thrown.bytes] : typeof thrown === "bigint" ? `${thrown}n` : thrown ?? "nil") : error.message;
       }
     });
     return {
@@ -65,8 +65,8 @@ test("errors carry their tag and every member of the error type", async ({ page 
 
 test("opaque references keep identity through reference_id", async ({ page }) => {
   const result = await page.evaluate(async (loader) => {
-    const { instantiate, hostImports, iLangError } = await eval(loader)();
-    const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(iLangError) });
+    const { instantiate, hostImports, GuestError } = await eval(loader)();
+    const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(GuestError) });
     const reference = { value: 42 };
     return {
       same: guest.call("opaque_roundtrip", [reference]) === reference,
@@ -80,24 +80,24 @@ test("opaque references keep identity through reference_id", async ({ page }) =>
 
 test("a stop reports its message, makes the instance unusable, and fails only its own test", async ({ page }) => {
   const result = await page.evaluate(async (loader) => {
-    const { instantiate, runTests, hostImports, iLangError, HOST_VALUE_REASON } = await eval(loader)();
+    const { instantiate, runTests, hostImports, GuestError, HOST_VALUE_REASON } = await eval(loader)();
     const printed = [];
-    const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(iLangError, printed) });
+    const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(GuestError, printed) });
     guest.run();
     let stop;
     try { guest.call("stop", ["panic: boom\napp/users:12:5"]); } catch (error) { stop = { name: error.name, message: error.stopMessage }; }
     let refused;
     try { guest.call("nil_roundtrip"); } catch (error) { refused = error.name; }
-    const incorrect = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(iLangError) });
+    const incorrect = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(GuestError) });
     let host;
     try { incorrect.call("float_roundtrip", [NaN]); } catch (error) { host = error.stopMessage === HOST_VALUE_REASON; }
-    const tests = await runTests("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(iLangError) });
+    const tests = await runTests("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(GuestError) });
     return { printed, stop, refused, host, tests: tests.map(({ passed }) => passed), message: tests[1].error.stopMessage };
   }, `(${load})`);
   expect(result).toEqual({
     printed: ["start\n", "fixture main\n"],
-    stop: { name: "iLangStop", message: "panic: boom\napp/users:12:5" },
-    refused: "iLangAbiError",
+    stop: { name: "Stop", message: "panic: boom\napp/users:12:5" },
+    refused: "AbiError",
     host: true,
     tests: [true, false, false, true, true, true],
     message: "assertion failed: fixture\napp/test:3:5",
@@ -106,8 +106,8 @@ test("a stop reports its message, makes the instance unusable, and fails only it
 
 test("async exports wait for host functions", async ({ page }) => {
   const result = await page.evaluate(async (loader) => {
-    const { instantiate, hostImports, iLangError } = await eval(loader)();
-    const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(iLangError) });
+    const { instantiate, hostImports, GuestError } = await eval(loader)();
+    const guest = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(GuestError) });
     const value = await guest.callAsync("app/async.later", [1.5]);
     let error;
     try { await guest.callAsync("app/async.later", [-1]); } catch (thrown) { error = thrown.value; }
@@ -118,9 +118,9 @@ test("async exports wait for host functions", async ({ page }) => {
 
 test("a module built by the compiler runs with sync and async host services", async ({ page }) => {
   const result = await page.evaluate(async (loader) => {
-    const { instantiate, compiledImports, iLangError } = await eval(loader)();
+    const { instantiate, compiledImports, GuestError } = await eval(loader)();
     const printed = [];
-    const guest = await instantiate("/tests/browser/fixtures/compiled.wasm", { imports: compiledImports(iLangError, printed) });
+    const guest = await instantiate("/tests/browser/fixtures/compiled.wasm", { imports: compiledImports(GuestError, printed) });
     const size = guest.call("app/app.greet", ["i"]);
     let error;
     try { guest.call("app/app.lookup", ["other"]); } catch (thrown) { error = thrown.value; }
@@ -135,29 +135,29 @@ test("a module built by the compiler runs with sync and async host services", as
 
 test("Wasm linking rejects signatures that do not match the metadata", async ({ page }) => {
   const result = await page.evaluate(async (loader) => {
-    const { instantiate, customAbi, customImports, iLangError } = await eval(loader)();
+    const { instantiate, customAbi, customImports, GuestError } = await eval(loader)();
     const errors = [];
     try {
-      await instantiate("/tests/browser/fixtures/custom-imports.wasm", { abi: { ...customAbi, exports: { ...customAbi.exports, echo_bool: { params: ["float"], result: "float" } } }, imports: customImports(iLangError) });
+      await instantiate("/tests/browser/fixtures/custom-imports.wasm", { abi: { ...customAbi, exports: { ...customAbi.exports, echo_bool: { params: ["float"], result: "float" } } }, imports: customImports(GuestError) });
     } catch (error) { errors.push(error.name); }
     try {
-      await instantiate("/tests/browser/fixtures/custom-imports.wasm", { abi: { ...customAbi, externals: { custom: { ...customAbi.externals.custom, echo_bool: { params: ["float"], result: "float" } } } }, imports: customImports(iLangError) });
+      await instantiate("/tests/browser/fixtures/custom-imports.wasm", { abi: { ...customAbi, externals: { custom: { ...customAbi.externals.custom, echo_bool: { params: ["float"], result: "float" } } } }, imports: customImports(GuestError) });
     } catch (error) { errors.push(error.name); }
     return errors;
   }, `(${load})`);
-  expect(result).toEqual(["iLangAbiError", "LinkError"]);
+  expect(result).toEqual(["AbiError", "LinkError"]);
 });
 
 test("host functions never throw into the module, and the module checks their answers", async ({ page }) => {
   const result = await page.evaluate(async (loader) => {
-    const { instantiate, customAbi, customImports, compiledImports, iLangError } = await eval(loader)();
+    const { instantiate, customAbi, customImports, compiledImports, GuestError } = await eval(loader)();
     const failure = new Error("the host is gone");
     const guarded = {};
     for (const [name, args] of [["nil", []], ["float", [1.5]]]) {
-      const custom = await instantiate("/tests/browser/fixtures/custom-imports.wasm", { abi: customAbi, imports: customImports(iLangError, { [`echo_${name}`]: () => { throw failure; } }) });
+      const custom = await instantiate("/tests/browser/fixtures/custom-imports.wasm", { abi: customAbi, imports: customImports(GuestError, { [`echo_${name}`]: () => { throw failure; } }) });
       try { guarded[name] = custom.call(`guarded_${name}`, args); } catch (error) { guarded[name] = error === failure ? "thrown to the caller" : String(error); }
     }
-    const compiled = await instantiate("/tests/browser/fixtures/compiled.wasm", { imports: { ...compiledImports(iLangError), "app:math/v1": { hypot: () => NaN } } });
+    const compiled = await instantiate("/tests/browser/fixtures/compiled.wasm", { imports: { ...compiledImports(GuestError), "app:math/v1": { hypot: () => NaN } } });
     let stop;
     try { compiled.call("app/app.distance", [3, 4]); } catch (error) { stop = error.stopMessage; }
     return { guarded, stop };

@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Wasmtime embedding and versioned host ABI for iLang"
+description = "Wasmtime embedding and versioned host ABI for the i programming language"
 
 [dependencies]
 anyhow.workspace = true

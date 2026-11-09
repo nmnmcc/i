@@ -29,27 +29,27 @@ export function supportsRequiredFeatures() {
 }
 
 /** The program stopped (spec §11.7). `stopMessage` is null for a trap without one. */
-export class iLangStop extends Error {
+export class Stop extends Error {
   constructor(stopMessage, options) {
     super(stopMessage ?? `trap: ${options?.cause?.message ?? "the module trapped"}`, options);
-    this.name = "iLangStop";
+    this.name = "Stop";
     this.stopMessage = stopMessage ?? null;
   }
 }
 
 /** An error of a function's `? E`. A host service throws one to give an error. */
-export class iLangError extends Error {
+export class GuestError extends Error {
   constructor(value) {
     super(`i error: ${describe(value)}`);
-    this.name = "iLangError";
+    this.name = "GuestError";
     this.value = value;
   }
 }
 
-export class iLangAbiError extends Error {
+export class AbiError extends Error {
   constructor(message, options) {
     super(message, options);
-    this.name = "iLangAbiError";
+    this.name = "AbiError";
   }
 }
 
@@ -61,7 +61,7 @@ function describe(value) {
 }
 
 function expect(condition, message) {
-  if (!condition) throw new iLangAbiError(message);
+  if (!condition) throw new AbiError(message);
 }
 
 function leb(value) {
@@ -93,7 +93,7 @@ function typedFunction(fn, params, results, location) {
   try {
     return new WebAssembly.Instance(module, { a: { f: fn } }).exports.f;
   } catch (cause) {
-    throw new iLangAbiError(`Wasm signature does not match ABI descriptor for ${location}`, { cause });
+    throw new AbiError(`Wasm signature does not match ABI descriptor for ${location}`, { cause });
   }
 }
 
@@ -129,7 +129,7 @@ function guardedFunction(fn, broken, params, results, location) {
   try {
     return new WebAssembly.Instance(module, { a: { f: fn, b: broken } }).exports.f;
   } catch (cause) {
-    throw new iLangAbiError(`Wasm signature does not match ABI descriptor for ${location}`, { cause });
+    throw new AbiError(`Wasm signature does not match ABI descriptor for ${location}`, { cause });
   }
 }
 
@@ -205,22 +205,22 @@ function functions(value, location, external) {
 export function readAbi(module, supplied) {
   if (supplied === undefined && embeddedAbis.has(module)) return embeddedAbis.get(module);
   const sections = WebAssembly.Module.customSections(module, "ilang.abi");
-  if (sections.length > 1) throw new iLangAbiError("Duplicate ilang.abi sections");
+  if (sections.length > 1) throw new AbiError("Duplicate ilang.abi sections");
   let embedded;
   if (sections.length) {
     try {
       embedded = JSON.parse(decoder.decode(sections[0]));
     } catch (cause) {
-      throw new iLangAbiError("Malformed ilang.abi metadata", { cause });
+      throw new AbiError("Malformed ilang.abi metadata", { cause });
     }
   }
-  if (sections.length && supplied !== undefined) throw new iLangAbiError("An embedded ABI cannot be overridden");
+  if (sections.length && supplied !== undefined) throw new AbiError("An embedded ABI cannot be overridden");
   const value = sections.length ? embedded : supplied === undefined ? { version, entry: null, tests: [], exports: {}, services: {}, externals: {} } : supplied;
   plainObject(value, "ABI metadata");
   const fields = ["version", "entry", "tests", "exports", "services", "externals"];
   only(value, fields, "the ABI metadata");
   for (const field of fields) expect(field in value, `The ABI metadata needs the field ${field}`);
-  if (value.version !== version) throw new iLangAbiError(`Unsupported i ABI version ${value.version}`);
+  if (value.version !== version) throw new AbiError(`Unsupported i ABI version ${value.version}`);
   const exports = Object.create(null);
   for (const [name, signature] of Object.entries(plainObject(value.exports === undefined ? {} : value.exports, "ABI exports"))) {
     expect(!reserved(name), `Export ${name} uses a name of the binary interface`);
@@ -244,7 +244,7 @@ export function readAbi(module, supplied) {
 
 function unsigned(value, label) {
   if (typeof value !== "number" || !Number.isInteger(value) || value < -0x80000000 || value > 0xffffffff) {
-    throw new iLangAbiError(`${label} must be a Wasm i32`);
+    throw new AbiError(`${label} must be a Wasm i32`);
   }
   return value >>> 0;
 }
@@ -337,7 +337,7 @@ function correct(type, value) {
 }
 
 /** A value that the module gave and that is not correct (B.2). */
-class GuestFault extends iLangAbiError {
+class GuestFault extends AbiError {
   constructor(message) {
     super(`The module gave a value that is not correct: ${message}`);
   }
@@ -359,13 +359,13 @@ class Bridge {
   pending = [];
 
   exports() {
-    if (!this.instance) throw new iLangAbiError("Host memory access before instantiation");
+    if (!this.instance) throw new AbiError("Host memory access before instantiation");
     return this.instance.exports;
   }
 
   memory() {
     const memory = this.exports().memory;
-    if (!(memory instanceof WebAssembly.Memory)) throw new iLangAbiError("The module does not export memory");
+    if (!(memory instanceof WebAssembly.Memory)) throw new AbiError("The module does not export memory");
     return memory;
   }
 
@@ -411,7 +411,7 @@ class Bridge {
   /** The program stops with `host: value is not correct`. */
   hostValueStop() {
     this.unusable = HOST_VALUE_REASON;
-    return new iLangStop(HOST_VALUE_REASON);
+    return new Stop(HOST_VALUE_REASON);
   }
 
   /** Run Wasm; a trap or exception makes the instance unusable. */
@@ -449,7 +449,7 @@ class Bridge {
       this.unusable = error.message;
       return error;
     }
-    const stop = new iLangStop(this.stopMessage, { cause: error });
+    const stop = new Stop(this.stopMessage, { cause: error });
     this.stopMessage = null;
     this.unusable = stop.message;
     return stop;
@@ -470,7 +470,7 @@ class Bridge {
       }
       case "bit_array": return [this.allocate(value.bytes, owned), value.bitLength];
       case "externref": return [value];
-      default: throw new iLangAbiError(`Unsupported ABI type ${type}`);
+      default: throw new AbiError(`Unsupported ABI type ${type}`);
     }
   }
 
@@ -505,7 +505,7 @@ class Bridge {
         if (!correctBits({ bytes, bitLength })) throw new GuestFault("a BitArray whose bits after the end are not 0");
         return { bytes, bitLength };
       }
-      default: throw new iLangAbiError(`Unsupported ABI type ${type}`);
+      default: throw new AbiError(`Unsupported ABI type ${type}`);
     }
   }
 
@@ -520,7 +520,7 @@ class Bridge {
     return result;
   }
 
-  /** The results of an export: the value, or an iLangError for the tag. */
+  /** The results of an export: the value, or an GuestError for the tag. */
   liftResults(signature, values, owned) {
     if (!signature.errors.length) return { value: this.lift(signature.result, values, owned) };
     const tag = values[0];
@@ -531,7 +531,7 @@ class Bridge {
       const count = wasmTypes[types[index]].length;
       if (index === tag) {
         const value = this.lift(types[index], values.slice(offset, offset + count), owned);
-        return tag === 0 ? { value } : { error: new iLangError(value) };
+        return tag === 0 ? { value } : { error: new GuestError(value) };
       }
       offset += count;
     }
@@ -596,20 +596,20 @@ async function compile(source) {
   if (source instanceof WebAssembly.Module) return source;
   if (typeof source === "string" || source instanceof URL || source instanceof Request) source = await fetch(source);
   if (source instanceof Response) {
-    if (!source.ok) throw new iLangAbiError(`Unable to fetch Wasm: HTTP ${source.status}`);
+    if (!source.ok) throw new AbiError(`Unable to fetch Wasm: HTTP ${source.status}`);
     source = await source.arrayBuffer();
   }
   try { return await WebAssembly.compile(source); } catch (cause) {
-    throw new iLangAbiError("Unable to compile the i module; the engine must support WasmGC, typed function references, tail calls and exnref", { cause });
+    throw new AbiError("Unable to compile the i module; the engine must support WasmGC, typed function references, tail calls and exnref", { cause });
   }
 }
 
-/** The answer of a host service function: its value, or the value of an iLangError it threw. */
+/** The answer of a host service function: its value, or the value of an GuestError it threw. */
 function reply(fn, args) {
   try {
     return { value: fn(...args) };
   } catch (error) {
-    if (error instanceof iLangError) return { error: error.value };
+    if (error instanceof GuestError) return { error: error.value };
     throw error;
   }
 }
@@ -618,12 +618,12 @@ function reply(fn, args) {
  * Load a module, link its imports and call `ilang_start` once (B.1).
  * `imports[module][name]` are the host service functions and external
  * functions of the metadata. They take and give ordinary JavaScript values; a
- * service function throws `iLangError(value)` to give an error of its `? E`,
+ * service function throws `GuestError(value)` to give an error of its `? E`,
  * and an async one gives a Promise.
  */
 export async function instantiate(source, options = {}) {
   if (!supportsRequiredFeatures()) {
-    throw new iLangAbiError("This engine does not support WasmGC, typed function references, tail calls and exnref");
+    throw new AbiError("This engine does not support WasmGC, typed function references, tail calls and exnref");
   }
   const module = await compile(source);
   const abi = readAbi(module, options.abi);
@@ -646,7 +646,7 @@ export async function instantiate(source, options = {}) {
       let id = identities.get(value);
       if (id === undefined) {
         if (nextReferenceId > 0x7fffffffffffffffn) {
-          bridge.breakIn({ result: "nil", errors: [] }, { error: new iLangAbiError("Host reference identity space exhausted") });
+          bridge.breakIn({ result: "nil", errors: [] }, { error: new AbiError("Host reference identity space exhausted") });
           return 0n;
         }
         id = nextReferenceId++;
@@ -681,7 +681,7 @@ export async function instantiate(source, options = {}) {
             const args = bridge.liftAll(signature.params, raw);
             if (signature.async) {
               const work = Promise.resolve().then(() => fn(...args)).then((value) => ({ value }), (error) => {
-                if (error instanceof iLangError) return { error: error.value };
+                if (error instanceof GuestError) return { error: error.value };
                 throw error;
               });
               work.catch(() => {});
@@ -783,8 +783,8 @@ export async function instantiate(source, options = {}) {
     /** Why the instance cannot be used any more, or null. */
     get unusable() { return bridge.unusable; },
     /**
-     * Call a host export. Gives its value, throws iLangError for an error of
-     * its `? E`, and iLangStop when the program stops. Arguments that are not
+     * Call a host export. Gives its value, throws GuestError for an error of
+     * its `? E`, and Stop when the program stops. Arguments that are not
      * correct values stop the program with `host: value is not correct`.
      */
     call(name, args = []) {

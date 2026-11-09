@@ -1,6 +1,6 @@
 # The i Language
 
-This document is the definition of the i language. A compiler or a program that does not keep to it is wrong. The present compiler does not yet do everything in this document.
+This document is the definition of the i programming language. A compiler or a program that does not keep to it is wrong. The present compiler does not yet do everything in this document.
 
 This document is complete in itself. It defines:
 

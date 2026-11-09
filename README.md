@@ -1,6 +1,6 @@
 # The i Programming Language
 
-**i** is a programming language made for WebAssembly. The name stands for *Internet*: i compiles straight to WebAssembly GC, so the same program runs in every browser and in Wasmtime. A single small letter also says what the language aims to be: small, simple and easy to understand. When a longer name is clearer, call it **iLang**. The i is always lowercase.
+**i** is a programming language made for WebAssembly. The name stands for *Internet*: i compiles straight to WebAssembly GC, so the same program runs in every browser and in Wasmtime. A single small letter also says what the language aims to be: small, simple and easy to understand. When a longer name is clearer, say **the i programming language**. Where a name must be longer than one letter, such as crate names, ABI symbols and file names, write `ilang`, all lowercase. The i is always lowercase.
 
 i programs live in `.i` files, and each package is described by an `i.toml` file. The command-line tool is just `i`.
 

@@ -1,7 +1,7 @@
 {
   "name": "ilang",
   "displayName": "i",
-  "description": "Syntax highlighting and language server support for the i programming language (iLang).",
+  "description": "Syntax highlighting and language server support for the i programming language.",
   "version": "0.1.0",
   "publisher": "ilang",
   "license": "Apache-2.0",
@@ -28,7 +28,7 @@
         "id": "i",
         "aliases": [
           "i",
-          "iLang"
+          "ilang"
         ],
         "extensions": [
           ".i"

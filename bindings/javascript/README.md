@@ -6,7 +6,7 @@ browsers and Node.js without npm runtime dependencies. `ilang.d.ts` describes th
 same API for TypeScript.
 
 ```javascript
-import { instantiate, iLangError, iLangStop } from "./ilang.mjs";
+import { instantiate, GuestError, Stop } from "./ilang.mjs";
 
 const app = await instantiate(new URL("./app.wasm", import.meta.url), {
   imports: {
@@ -14,7 +14,7 @@ const app = await instantiate(new URL("./app.wasm", import.meta.url), {
     "app:console/v1": { print: (text) => console.log(text) },
     "app:storage/v1": {
       read: (key) => {
-        if (!records.has(key)) throw new iLangError(`no ${key}`); // an error of `? String`
+        if (!records.has(key)) throw new GuestError(`no ${key}`); // an error of `? String`
         return records.get(key);
       },
     },
@@ -27,8 +27,8 @@ app.run(); // the program entry
 try {
   const sum = app.call("app/math.add", [1n, 2n]);
 } catch (error) {
-  if (error instanceof iLangError) console.log("error", error.value);
-  else if (error instanceof iLangStop) console.log(error.stopMessage);
+  if (error instanceof GuestError) console.log("error", error.value);
+  else if (error instanceof Stop) console.log(error.stopMessage);
   else throw error;
 }
 ```
@@ -47,8 +47,8 @@ section; it cannot replace a section. `rawImports` adds other Wasm imports.
 ## Calls and stops
 
 `call(name, args)` calls a host export (B.2). It gives the value, throws
-`iLangError` with `.value` when the function gives an error of its `? E`, and
-throws `iLangStop` when the program stops. `stopMessage` is the stop message of
+`GuestError` with `.value` when the function gives an error of its `? E`, and
+throws `Stop` when the program stops. `stopMessage` is the stop message of
 spec §11.7 (the reason, then the source positions), or `null` when the module
 trapped without one. After a stop, or any other trap, the instance refuses every
 call (B.5); make a new one. `unusable` says why.
@@ -68,7 +68,7 @@ of the metadata in a new instance (spec §10.2), giving `{ name, passed, error? 
 
 When a function has errors, its results start with an `i32` tag: 0 for the
 value, i for the i-th member of `E` in the canonical order Nil, Bool, Int, Float,
-String, BitArray. A host service gives an error by throwing `iLangError(value)`;
+String, BitArray. A host service gives an error by throwing `GuestError(value)`;
 the type of the value selects the member.
 
 ## Values that are not correct
@@ -86,9 +86,9 @@ program with `host: value is not correct` and no positions. With the option
 `checkReplies: true`, the loader also checks the answers of the right type, and
 stops the program for them in the same way.
 
-A wrong number of arguments or an unknown export is an `iLangAbiError` and
+A wrong number of arguments or an unknown export is an `AbiError` and
 leaves the instance usable. A value from the module that is not correct is an
-`iLangAbiError` too, and the instance becomes unusable.
+`AbiError` too, and the instance becomes unusable.
 
 ## Exceptions of host functions
 

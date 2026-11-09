@@ -35,7 +35,7 @@ export const customAbi = {
 };
 
 /** The externals echo their argument; fallible gives each kind of error. */
-export function customImports(iLangError, overrides = {}) {
+export function customImports(GuestError, overrides = {}) {
   const custom = Object.fromEntries(Object.keys(customAbi.externals.custom).map((name) => [name, overrides[name] ?? ((value) => value)]));
   const errors = [undefined, false, 1n << 100n, -0.5, "oops", { bytes: Uint8Array.of(0xc0), bitLength: 2 }];
   return {
@@ -43,25 +43,25 @@ export function customImports(iLangError, overrides = {}) {
     "custom:fallible/v1": {
       fallible: overrides.fallible ?? ((selector) => {
         if (selector === 0) return "fine";
-        throw new iLangError(errors[Math.min(selector, 6) - 1]);
+        throw new GuestError(errors[Math.min(selector, 6) - 1]);
       }),
     },
   };
 }
 
 /** The host functions of host-abi.wasm; print writes to `printed`. */
-export function hostImports(iLangError, printed = [], overrides = {}) {
+export function hostImports(GuestError, printed = [], overrides = {}) {
   return {
     "app:console/v1": { print: (text) => { printed.push(text); } },
     "app:storage/v1": {
       read: overrides.read ?? ((key) => {
         if (key === "name") return "i";
-        throw new iLangError(`no ${key}`);
+        throw new GuestError(`no ${key}`);
       }),
     },
     "app:clock/v1": {
       later: overrides.later ?? (async (x) => {
-        if (x < 0) throw new iLangError("negative");
+        if (x < 0) throw new GuestError("negative");
         return x;
       }),
     },
@@ -74,8 +74,8 @@ export function hostImports(iLangError, printed = [], overrides = {}) {
  * tests/browser/fixtures/compiled: those of host-abi.wasm, and the async
  * `tick` of `app:clock/v1`, which gives n + 1.
  */
-export function compiledImports(iLangError, printed = [], overrides = {}) {
-  const imports = hostImports(iLangError, printed, overrides);
+export function compiledImports(GuestError, printed = [], overrides = {}) {
+  const imports = hostImports(GuestError, printed, overrides);
   return {
     ...imports,
     "app:clock/v1": { ...imports["app:clock/v1"], tick: overrides.tick ?? (async (n) => n + 1n) },

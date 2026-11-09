@@ -27,7 +27,7 @@ export interface Options {
   abi?: Abi;
   /**
    * Host service functions and external functions, by import module and name.
-   * A service function throws `iLangError(value)` to give an error; an async
+   * A service function throws `GuestError(value)` to give an error; an async
    * one gives a Promise.
    */
   imports?: Record<string, Record<string, (...args: any[]) => unknown>>;
@@ -47,7 +47,7 @@ export interface Guest {
   readonly abi: Readonly<Required<Abi>>;
   /** Why the instance cannot be used any more, or null. */
   readonly unusable: string | null;
-  /** Gives the value; throws iLangError for an error of `? E` and iLangStop when the program stops. */
+  /** Gives the value; throws GuestError for an error of `? E` and Stop when the program stops. */
   call(name: string, args?: unknown[]): unknown;
   callAsync(name: string, args?: unknown[]): Promise<unknown>;
   /** Run the program entry; a Promise when it is async. */
@@ -55,15 +55,15 @@ export interface Guest {
   runEntryPoint(name: string): void | Promise<void>;
 }
 /** The program stopped. `stopMessage` is the stop message, or null for a trap without one. */
-export class iLangStop extends Error {
+export class Stop extends Error {
   readonly stopMessage: string | null;
 }
 /** An error value of a function's `? E`. */
-export class iLangError extends Error {
+export class GuestError extends Error {
   constructor(value: unknown);
   readonly value: unknown;
 }
-export class iLangAbiError extends Error {}
+export class AbiError extends Error {}
 export const HOST_VALUE_REASON: "host: value is not correct";
 export function supportsRequiredFeatures(): boolean;
 export function integerToLimbs(value: bigint): { sign: number; bytes: Uint8Array };

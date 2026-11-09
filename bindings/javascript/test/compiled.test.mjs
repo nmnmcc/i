@@ -5,10 +5,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { compiledImports } from "../../../tests/browser/fixture-abi.mjs";
-import { instantiate, iLangError, iLangStop } from "../ilang.mjs";
+import { instantiate, GuestError, Stop } from "../ilang.mjs";
 
 const compiled = await readFile(new URL("../../../tests/browser/fixtures/compiled.wasm", import.meta.url));
-const guest = (printed = [], overrides = {}) => instantiate(compiled, { imports: compiledImports(iLangError, printed, overrides) });
+const guest = (printed = [], overrides = {}) => instantiate(compiled, { imports: compiledImports(GuestError, printed, overrides) });
 
 test("a compiled module lists the host functions that its entry points need", async () => {
   const value = await guest();
@@ -26,7 +26,7 @@ test("sync host services and external functions of a compiled module", async () 
   assert.equal(value.call("app/app.greet", ["é"]), 2n);
   assert.deepEqual(printed, ["hello é"]);
   assert.equal(value.call("app/app.lookup", ["name"]), "i");
-  assert.throws(() => value.call("app/app.lookup", ["other"]), (error) => error instanceof iLangError && error.value === "no other");
+  assert.throws(() => value.call("app/app.lookup", ["other"]), (error) => error instanceof GuestError && error.value === "no other");
   assert.equal(value.call("app/app.distance", [3, 4]), 5);
   assert.equal(value.unusable, null);
 });
@@ -35,7 +35,7 @@ test("async host services of a compiled module wait for the host", async () => {
   const printed = [];
   const value = await guest(printed);
   assert.equal(await value.callAsync("app/app.wait_sum", [1.5, 2]), 3.5);
-  await assert.rejects(value.callAsync("app/app.wait_sum", [1, -1]), (error) => error instanceof iLangError && error.value === "negative");
+  await assert.rejects(value.callAsync("app/app.wait_sum", [1, -1]), (error) => error instanceof GuestError && error.value === "negative");
   await value.run();
   assert.deepEqual(printed, ["main 42 1.5"]);
   assert.equal(value.unusable, null);
@@ -55,15 +55,15 @@ test("an answer of the host that is not correct stops the program in the module"
   // By default the module checks the answer, and the stop has the position
   // of the call (B.2, §11.7).
   const value = await guest([], { later: async () => NaN });
-  await assert.rejects(value.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof iLangStop && error.stopMessage === "host: value is not correct\napp/app:35:50");
+  await assert.rejects(value.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:35:50");
   assert.ok(value.unusable);
-  const sync = await instantiate(compiled, { imports: { ...compiledImports(iLangError), "app:math/v1": { hypot: () => Infinity } } });
-  assert.throws(() => sync.call("app/app.distance", [3, 4]), (error) => error instanceof iLangStop && error.stopMessage === "host: value is not correct\napp/app:32:35");
+  const sync = await instantiate(compiled, { imports: { ...compiledImports(GuestError), "app:math/v1": { hypot: () => Infinity } } });
+  assert.throws(() => sync.call("app/app.distance", [3, 4]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:32:35");
   // With `checkReplies`, the host stops the program, with no positions.
-  const checked = await instantiate(compiled, { imports: compiledImports(iLangError, [], { later: async () => NaN }), checkReplies: true });
-  await assert.rejects(checked.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof iLangStop && error.stopMessage === "host: value is not correct");
-  const checkedSync = await instantiate(compiled, { imports: { ...compiledImports(iLangError), "app:math/v1": { hypot: () => Infinity } }, checkReplies: true });
-  assert.throws(() => checkedSync.call("app/app.distance", [3, 4]), (error) => error instanceof iLangStop && error.stopMessage === "host: value is not correct");
+  const checked = await instantiate(compiled, { imports: compiledImports(GuestError, [], { later: async () => NaN }), checkReplies: true });
+  await assert.rejects(checked.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct");
+  const checkedSync = await instantiate(compiled, { imports: { ...compiledImports(GuestError), "app:math/v1": { hypot: () => Infinity } }, checkReplies: true });
+  assert.throws(() => checkedSync.call("app/app.distance", [3, 4]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct");
 });
 
 test("an exception of a host function goes to the caller", async () => {

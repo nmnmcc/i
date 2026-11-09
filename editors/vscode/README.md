@@ -1,6 +1,6 @@
 # i for Visual Studio Code
 
-Editor support for **the i programming language** (iLang), as defined in
+Editor support for **the i programming language**, as defined in
 `docs/spec.md`.
 
 ## Features
