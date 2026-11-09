@@ -824,9 +824,9 @@ The module `i/control` has one operation to pause a computation and go on with i
 `Boundary` and `Continuation` are built-in types. They are not custom types: their values are made only by `control.boundary` and `control.suspend`, and the host cannot take them (§10.3).
 
 1. `boundary(body)` makes a boundary `b` and does `body(b)`. The value of `body` is the value of `boundary`. `b` is **active** while the computation between it and the running code is on the stack: from the start of `body` until `body` ends, but not while that part is paused in a continuation. After `resume`, it is active again.
-2. `suspend(b, f)` pauses the computation from this point back to the boundary `b`. That paused part is a **continuation** `k`. Then `f(k)` is done in the place of the boundary, and its value is the value of `boundary`. If `b` is not active, the program stops.
+2. `suspend(b, f)` pauses the computation from this point back to the boundary `b`. That paused part is a **continuation** `k`. Then `f(k)` is done in the place of the boundary, with the environment of that place, and its value is the value of `boundary`. If `b` is not active, the program stops.
 3. `resume(k, v)` goes on with the paused computation, with `v` as the value of `suspend`. It goes on on top of the place where `resume` is called, and the value that the computation has when it gets to the boundary is the value of `resume`. The paused part keeps the environment statements that were inside it; for the rest, it gets the environment of the place where `resume` is called.
-4. `cancel(k)` unwinds the paused computation (§9.5) and gives `Nil`.
+4. `cancel(k)` unwinds the paused computation (§9.5) and gives `Nil`. While it unwinds, the boundary stays not active, and the final functions get the environment as in rule 3, from the place where `cancel` is called.
 5. **One use only**: `resume` and `cancel` together may be used one time for a continuation. A second use stops the program.
 6. If a continuation is never resumed or cancelled, its final functions are not run.
 
