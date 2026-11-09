@@ -11,7 +11,9 @@ pub const MODULES: &[(&str, &str)] = &[
     ("i/assertion", include_str!("../../../lib/i/assertion.i")),
     ("i/core", include_str!("../../../lib/i/core.i")),
     ("i/io", include_str!("../../../lib/i/io.i")),
-    // Reserved modules. They are empty for now.
+    // Reserved modules. They are empty for now. docs/spec.md does not name
+    // them yet: it still says `i` has six library modules (§0, §2.1, §12).
+    // The spec text for them comes with later tracks (IO and R).
     ("i/task", include_str!("../../../lib/i/task.i")),
     ("i/clock", include_str!("../../../lib/i/clock.i")),
     ("i/random", include_str!("../../../lib/i/random.i")),

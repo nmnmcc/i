@@ -254,6 +254,10 @@ const RESERVED: [&str; 7] = [
 ];
 
 /// User code imports every reserved module with no problems.
+///
+/// Known gap: docs/spec.md (§0, §2.1, §12) still names only the six library
+/// modules. The spec text for the reserved modules belongs to later tracks
+/// (IO and R), so this test runs ahead of the spec until they land.
 #[test]
 fn reserved_modules_import_cleanly() {
     let imports: String = RESERVED.iter().map(|p| format!("  {p}\n")).collect();
@@ -294,4 +298,23 @@ fn reserved_modules_have_no_names() {
         rendered,
         ["src/main.i:5:10: error[E0203]: `i/task` has no `spawn`"]
     );
+}
+
+/// Only the registered paths are modules of `i`. Any other path in `i` is
+/// still a missing module, as §2.1 says, so the reserved modules do not
+/// open the whole of `i` to user imports.
+#[test]
+fn unknown_library_path_is_missing() {
+    for path in ["i/nope", "i/tasks", "i/std", "i/fs/file"] {
+        let main = format!("import ({path})\n\nx = 1\n");
+        let (graph, _, diags) = common::check_files(&[("src/main.i", &main)]);
+        let rendered = graph.sources.render_all(&diags);
+        assert_eq!(
+            rendered,
+            [format!(
+                "src/main.i:1:9: error[E0210]: there is no module `{path}`"
+            )],
+            "{path}"
+        );
+    }
 }
