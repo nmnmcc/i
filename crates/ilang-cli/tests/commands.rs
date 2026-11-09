@@ -165,7 +165,15 @@ alias = add
         ),
     ]);
     for opt in [Level::O0, Level::O2] {
-        let built = build(dir.path(), BuildOptions { tests: false, opt }).unwrap();
+        let built = build(
+            dir.path(),
+            BuildOptions {
+                tests: false,
+                opt,
+                offline: false,
+            },
+        )
+        .unwrap();
         let program = Program::from_bytes(&built.wasm).unwrap();
         assert!(program.abi().entry.is_none());
         let mut instance = program.instantiate(HostOptions::default()).unwrap();
@@ -276,7 +284,15 @@ bits = (b: Bool) -> Nil ? BitArray {
         ),
     ]);
     for opt in [Level::O0, Level::O2] {
-        let built = build(dir.path(), BuildOptions { tests: false, opt }).unwrap();
+        let built = build(
+            dir.path(),
+            BuildOptions {
+                tests: false,
+                opt,
+                offline: false,
+            },
+        )
+        .unwrap();
         let program = Program::from_bytes(&built.wasm).unwrap();
         let divide = &program.abi().exports["app/math.divide"];
         assert_eq!(
@@ -361,7 +377,15 @@ fn an_error_stops_a_test() {
         ),
     ]);
     for opt in [Level::O0, Level::O2] {
-        let built = build(dir.path(), BuildOptions { tests: true, opt }).unwrap();
+        let built = build(
+            dir.path(),
+            BuildOptions {
+                tests: true,
+                opt,
+                offline: false,
+            },
+        )
+        .unwrap();
         let program = Program::from_bytes(&built.wasm).unwrap();
         match ilang_cli::run_test(&program, "app/app_test.raises") {
             ilang_host::TestResult::Stopped(stop) => assert_eq!(
@@ -370,5 +394,107 @@ fn an_error_stops_a_test() {
             ),
             other => panic!("{other:?}"),
         }
+    }
+}
+
+/// Runs git with no user configuration and a fixed identity.
+fn git(dir: &Path, args: &[&str]) {
+    let out = Command::new("git")
+        .current_dir(dir)
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_AUTHOR_NAME", "Test")
+        .env("GIT_AUTHOR_EMAIL", "test@example.com")
+        .env("GIT_COMMITTER_NAME", "Test")
+        .env("GIT_COMMITTER_EMAIL", "test@example.com")
+        .args([
+            "-c",
+            "init.defaultBranch=main",
+            "-c",
+            "commit.gpgsign=false",
+        ])
+        .args(["-c", "tag.gpgsign=false"])
+        .args(args)
+        .output()
+        .expect("git runs");
+    assert!(
+        out.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+/// A package with a location, got from a local bare repository: its source
+/// positions have the `location@major ` prefix (§11.7), and `--offline` uses
+/// only the cache.
+#[test]
+fn located_packages() {
+    let w = tempfile::tempdir().unwrap();
+    let work = w.path().join("work/lib");
+    let bare = w.path().join("remotes/lib");
+    std::fs::create_dir_all(work.join("src")).unwrap();
+    std::fs::create_dir_all(&bare).unwrap();
+    git(&work, &["init", "-q"]);
+    git(&bare, &["init", "-q", "--bare"]);
+    std::fs::write(work.join("i.toml"), "name = \"lib\"\n").unwrap();
+    std::fs::write(
+        work.join("src/lib.i"),
+        "export (boom)\n\nboom = (m) {\n  panic(m)\n}\n",
+    )
+    .unwrap();
+    git(&work, &["add", "-A"]);
+    git(&work, &["commit", "-q", "-m", "v1.2.0"]);
+    git(&work, &["tag", "v1.2.0"]);
+    let remote = bare.to_str().unwrap();
+    git(&work, &["push", "-q", remote, "HEAD:refs/heads/main"]);
+    git(&work, &["push", "-q", "--tags", remote]);
+    let app = package(&[
+        (
+            "i.toml",
+            "name = \"app\"\n[dependencies]\nlib = \"example.com/lib@1.2.0\"\n",
+        ),
+        (
+            "src/main.i",
+            "import (lib/lib)\n\n@main\nmain = () {\n  lib.boom(\"x\")\n  Nil\n}\n",
+        ),
+    ]);
+    let run = |cache: &str, args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(args)
+            .arg("--project")
+            .arg(app.path())
+            .env_remove("ILANG_OFFLINE")
+            .env(
+                "ILANG_GIT_URLS",
+                format!(
+                    "example.com/=file://{}/",
+                    w.path().join("remotes").display()
+                ),
+            )
+            .env("ILANG_CACHE", w.path().join(cache))
+            .output()
+            .unwrap()
+    };
+    for opt in ["0", "2"] {
+        let out = run("cache", &["run", "--opt", opt]);
+        assert_eq!(
+            String::from_utf8(out.stderr).unwrap(),
+            "panic: x\nexample.com/lib@1 lib/lib:4:3\napp/main:5:3\n"
+        );
+    }
+    // Everything is in the cache now.
+    let out = run("cache", &["run", "--offline"]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .starts_with("panic: x\n")
+    );
+    // With an empty cache, `--offline` is an error.
+    for command in ["check", "build", "run", "test"] {
+        let out = run("empty", &[command, "--offline"]);
+        assert_eq!(out.status.code(), Some(1), "{command}");
+        let err = String::from_utf8(out.stderr).unwrap();
+        assert!(err.contains("E0634"), "{command}: {err}");
     }
 }

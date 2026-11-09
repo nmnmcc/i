@@ -16,14 +16,15 @@
 //! - Every call passes the environment of its place (§9.2): environment
 //!   parameters read a slot of it, and environment statements make a new one
 //!   for the rest of their block.
-//! - `fail.raise`, `fail.catch`, `resource.ensure`, and `assertion.catch` are
-//!   operations of the code generator (`emit.rs`); `fail.from_result`,
-//!   `fail.map_error`, `resource.acquire`, and `assert` are i code.
+//! - `fail.raise`, `fail.catch`, `resource.ensure`, and the four functions
+//!   of `i/control` (§9.4) are operations of the code generator (`emit.rs`);
+//!   `fail.from_result`, `fail.map_error`, `resource.acquire`,
+//!   `assertion.catch`, and `assert` are i code.
 //! - A binding or a parameter whose pattern may fail (the checker decides,
 //!   §7.3) calls `fail` of the `Assert` service when it does not match
 //!   (§6.10, §6.11).
 //!
-//! `i/control` (§9.4) comes later and is reported as not supported yet.
+//! The calls that may suspend are found and split afterwards (`control.rs`).
 
 use crate::ir::Stmt;
 use crate::ir::{self, *};
@@ -464,6 +465,7 @@ pub fn lower(
     let mut l = Lowerer::new(graph, program, typed, options);
     l.run();
     if l.diags.is_empty() {
+        crate::control::split(&mut l.out);
         Ok(l.out)
     } else {
         Err(l.diags)
@@ -961,9 +963,13 @@ impl<'a> Lowerer<'a> {
             Some(&i) => i,
             None => {
                 let i = self.out.site_modules.len() as u32;
-                // Only path dependencies exist, so no path has the
-                // `location@major ` prefix of §11.7.
-                self.out.site_modules.push(module.path.clone());
+                // A package with a location puts `location@major ` first
+                // (§11.7).
+                self.out.site_modules.push(format!(
+                    "{}{}",
+                    graph.packages[module.package].position_prefix(),
+                    module.path
+                ));
                 self.module_index.insert(fx.module, i);
                 i
             }
@@ -985,33 +991,6 @@ impl<'a> Lowerer<'a> {
     }
 
     // ---- Names ----
-
-    /// Why a top-level name of the library cannot be used yet.
-    fn unsupported(&self, d: DefId) -> Option<String> {
-        let m = self.program.module(d.module);
-        if m.package != self.graph.library {
-            return None;
-        }
-        let def = self.program.def(d);
-        match m.path.as_str() {
-            "i/control" => Some(format!(
-                "`control.{}` is not supported yet: control comes later (§9.4)",
-                def.name
-            )),
-            _ => None,
-        }
-    }
-
-    /// The library functions written in i that the code generator gives
-    /// itself, until what they use is supported: `assertion.catch` is
-    /// written with `i/control` (§9.6), and is done with an exception here.
-    fn intrinsic(&self, d: DefId) -> Option<(Op, u32)> {
-        let m = self.program.module(d.module);
-        (m.package == self.graph.library
-            && m.path == "i/assertion"
-            && self.program.def(d).name == "catch")
-            .then_some((Op::AssertCatch, 1))
-    }
 
     /// The operation of an external function of the library.
     fn external_op(&self, d: DefId) -> Result<(Op, u32), String> {
@@ -1043,9 +1022,13 @@ impl<'a> Lowerer<'a> {
             "ilang:fail" if function == "raise" => Ok((Op::Raise, arity)),
             "ilang:fail" if function == "catch" => Ok((Op::Catch, arity)),
             "ilang:resource" if function == "ensure" => Ok((Op::Ensure, arity)),
-            "ilang:control" => Err(format!(
-                "`control.{function}` is not supported yet: control comes later (§9.4)"
-            )),
+            "ilang:control" => match function.as_str() {
+                "boundary" => Ok((Op::Boundary, arity)),
+                "suspend" => Ok((Op::Suspend, arity)),
+                "resume" => Ok((Op::Resume, arity)),
+                "cancel" => Ok((Op::Cancel, arity)),
+                _ => Err(format!("`control.{function}` is not known")),
+            },
             _ => Err(format!(
                 "the external function `{module}` `{function}` is not supported yet (§10.1)"
             )),
@@ -1063,35 +1046,24 @@ impl<'a> Lowerer<'a> {
                     Atom::Local(fx.var(v))
                 }
             },
-            ValueRef::Def(d) => {
-                if let Some((op, arity)) = self.intrinsic(d) {
-                    return Atom::Func(self.op_func(op, arity));
-                }
-                if let Some(message) = self.unsupported(d) {
-                    if !fx.library {
+            ValueRef::Def(d) => match self.program.def(d).kind {
+                DefKind::External { .. } => match self.external_op(d) {
+                    Ok((op, arity)) => Atom::Func(self.op_func(op, arity)),
+                    Err(message) => {
                         self.error(fx.module, e.span, message);
+                        Atom::Nil
                     }
-                    return Atom::Nil;
-                }
-                match self.program.def(d).kind {
-                    DefKind::External { .. } => match self.external_op(d) {
-                        Ok((op, arity)) => Atom::Func(self.op_func(op, arity)),
-                        Err(message) => {
-                            self.error(fx.module, e.span, message);
-                            Atom::Nil
-                        }
-                    },
-                    DefKind::Binding { .. } => {
-                        if self.known.contains_key(&d) {
-                            let f = self.def_func(d);
-                            self.constants.insert(f);
-                            Atom::Func(f)
-                        } else {
-                            Atom::Global(self.global(d))
-                        }
+                },
+                DefKind::Binding { .. } => {
+                    if self.known.contains_key(&d) {
+                        let f = self.def_func(d);
+                        self.constants.insert(f);
+                        Atom::Func(f)
+                    } else {
+                        Atom::Global(self.global(d))
                     }
                 }
-            }
+            },
             ValueRef::Ctor(c) => {
                 let info = &self.ctors[&c];
                 match info.repr {
@@ -1464,26 +1436,21 @@ impl<'a> Lowerer<'a> {
     /// What a callee is, worked out when it is a value.
     fn target(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, callee: &Expr) -> Target {
         match &callee.kind {
-            ExprKind::Name(ValueRef::Def(d)) if self.intrinsic(*d).is_some() => {
-                Target::Op(self.intrinsic(*d).expect("an intrinsic").0)
-            }
-            ExprKind::Name(ValueRef::Def(d)) if self.unsupported(*d).is_none() => {
-                match self.program.def(*d).kind {
-                    DefKind::External { .. } => match self.external_op(*d) {
-                        Ok((op, _)) => Target::Op(op),
-                        Err(message) => {
-                            self.error(fx.module, callee.span, message);
-                            Target::Op(Op::Panic)
-                        }
-                    },
-                    DefKind::Binding { .. } if self.known.contains_key(d) => {
-                        Target::Callee(Callee::Direct(self.def_func(*d)))
+            ExprKind::Name(ValueRef::Def(d)) => match self.program.def(*d).kind {
+                DefKind::External { .. } => match self.external_op(*d) {
+                    Ok((op, _)) => Target::Op(op),
+                    Err(message) => {
+                        self.error(fx.module, callee.span, message);
+                        Target::Op(Op::Panic)
                     }
-                    DefKind::Binding { .. } => {
-                        Target::Callee(Callee::Value(Atom::Global(self.global(*d))))
-                    }
+                },
+                DefKind::Binding { .. } if self.known.contains_key(d) => {
+                    Target::Callee(Callee::Direct(self.def_func(*d)))
                 }
-            }
+                DefKind::Binding { .. } => {
+                    Target::Callee(Callee::Value(Atom::Global(self.global(*d))))
+                }
+            },
             ExprKind::Name(ValueRef::Ctor(c)) => Target::Ctor(*c),
             _ => Target::Callee(Callee::Value(self.expr(fx, out, callee))),
         }

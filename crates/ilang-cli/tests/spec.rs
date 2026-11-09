@@ -175,7 +175,14 @@ fn stop_text(stop: &ilang_host::Stop) -> String {
 }
 
 fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
-    let built = match build(project, BuildOptions { tests: true, opt }) {
+    let built = match build(
+        project,
+        BuildOptions {
+            tests: true,
+            opt,
+            offline: false,
+        },
+    ) {
         Ok(b) => b,
         Err(BuildError::Program { lines, codes, .. }) => {
             return Ok(Outcome2::CompileError {

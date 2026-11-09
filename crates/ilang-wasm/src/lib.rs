@@ -5,11 +5,14 @@
 //! - `ir`: the intermediate form, in A-normal form, and the calling
 //!   convention.
 //! - `lower`: from the checked program to the intermediate form.
+//! - `control`: finds the calls that may suspend and splits their functions
+//!   (§9.4).
 //! - `emit`: from the intermediate form to a Wasm module with the binary
 //!   interface of Appendix B.
 //!
 //! The code is simple and not optimized: `ilang-binaryen` optimizes it.
 
+pub mod control;
 pub mod emit;
 pub mod ir;
 pub mod lower;

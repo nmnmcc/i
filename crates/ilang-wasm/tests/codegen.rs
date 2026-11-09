@@ -132,16 +132,45 @@ fn not_supported_yet() {
         Err(Error::Diagnostics(d)) => d.iter().map(|d| (d.code, d.message.clone())).collect(),
         other => panic!("{:?}", other.map(|_| ())),
     };
-    let found: Vec<(&str, String)> = codes(
-        "import (i/control)\nf = () { control.boundary((b) { 1 }) }\n@main\nmain = () { f() }\n",
-    );
+    let external = "@external(\"app:math/v1\", \"sqrt\")\nsqrt: (x: Float) -> Float\n";
+    let found: Vec<(&str, String)> = codes(&format!(
+        "{external}f = () {{ sqrt(2.0) }}\n@main\nmain = () {{ f()  Nil }}\n"
+    ));
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(found.iter().all(|(c, _)| *c == "E0701"));
     // Functions that are not used are not compiled.
-    let ok = wasm(
-        "import (i/control)\nf = () { control.boundary((b) { 1 }) }\n@main\nmain = () { Nil }\n",
-    );
+    let ok = wasm(&format!(
+        "{external}f = () {{ sqrt(2.0) }}\n@main\nmain = () {{ Nil }}\n"
+    ));
     assert!(ok.is_ok());
+}
+
+#[test]
+fn calls_that_may_suspend_are_split() {
+    let text = wat("import (i/control)\n\
+         twice = (f) { f(1) + f(2) }\n\
+         last = (f) { f(1) }\n\
+         plain = (n) { n + 1 }\n\
+         uses = (n) { plain(n) + twice((x) { x }) }\n\
+         @main\nmain = () {\n  control.boundary((b) { uses(1) + last((x) { x }) })\n  Nil\n}\n");
+    // Each call of a closure that is not a tail call is in a handler that
+    // adds its frame record (§9.4), with a segment and a re-entry function.
+    let twice = function(&text, "app/main.twice");
+    assert_eq!(twice.matches("(catch_ref $capture").count(), 2, "{twice}");
+    assert!(text.contains(";; app/main.twice after point"), "{text}");
+    // A tail call leaves no frame, and a function that calls no closure and
+    // nothing that may suspend is not split.
+    let last = function(&text, "app/main.last");
+    assert!(!last.contains("$capture"), "{last}");
+    assert!(last.contains("return_call_ref"), "{last}");
+    let plain = function(&text, "app/main.plain");
+    assert!(!plain.contains("$capture"), "{plain}");
+    // A known call of a function that may suspend may suspend, but not a
+    // known call of one that does not.
+    let uses = function(&text, "app/main.uses");
+    assert_eq!(uses.matches("(catch_ref $capture").count(), 1, "{uses}");
+    // `assertion.catch` is i code now.
+    assert!(wasm("import (i/assertion)\n@main\nmain = () {\n  assertion.catch(() { assert(False) })\n  Nil\n}\n").is_ok());
 }
 
 #[test]

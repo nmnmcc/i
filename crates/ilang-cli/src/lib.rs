@@ -12,6 +12,9 @@ pub struct BuildOptions {
     /// Compile the tests of the package (§10.2).
     pub tests: bool,
     pub opt: Level,
+    /// Do not use the network to get packages (§2.7); `ILANG_OFFLINE` in
+    /// the environment also turns this on.
+    pub offline: bool,
 }
 
 /// A module that was built.
@@ -64,9 +67,24 @@ fn program_error(graph: &PackageGraph, diags: &[Diagnostic]) -> BuildError {
     }
 }
 
+/// Loads the package in `project` and the packages it uses, with its tests
+/// only when `tests` is on, and offline when `offline` or the environment
+/// says so.
+pub fn load(project: &Path, tests: bool, offline: bool) -> (PackageGraph, Vec<Diagnostic>) {
+    let env = ilang_package::LoadOptions::from_env();
+    ilang_package::load_with(
+        project,
+        &ilang_package::LoadOptions {
+            tests,
+            offline: offline || env.offline,
+            ..env
+        },
+    )
+}
+
 /// Loads, checks, and compiles the package in `project`.
 pub fn build(project: &Path, options: BuildOptions) -> Result<Built, BuildError> {
-    let (graph, mut diags) = ilang_package::load(project);
+    let (graph, mut diags) = load(project, options.tests, options.offline);
     let Some(root) = graph.root else {
         return Err(program_error(&graph, &diags));
     };

@@ -31,11 +31,30 @@
 //! # Errors and unwinding (§9.3, §9.5)
 //!
 //! Errors are the Wasm exception `$error (param eqref)`. Unwinding a
-//! computation for an `Assert` failure taken by `assertion.catch` is the
-//! exception `$cancel (param eqref)`, which `control.cancel` will also use.
-//! `fail.catch` takes only `$error`; `resource.ensure` takes both, runs its
-//! final function, and throws the same exception again. No handler takes
-//! anything else, so a stop (a trap) never runs handlers.
+//! cancelled continuation is the exception `$cancel (param eqref)`, whose
+//! value is the continuation. `fail.catch` takes only `$error`;
+//! `resource.ensure` takes both, runs its final function, and throws the
+//! exception again. No handler takes anything else, so a stop (a trap) never
+//! runs handlers.
+//!
+//! # Control (§9.4)
+//!
+//! Frames are captured lazily, with the exception `$capture`. `suspend`
+//! throws it with a capture object; every frame between it and its boundary
+//! adds a **frame record** to the object as the exception goes through, and
+//! throws it again. The boundary makes the continuation from the records.
+//!
+//! A function **may suspend** when it makes a call that is not a tail call to
+//! a closure, to an operation that calls i code or captures
+//! ([`Op::suspends`]), or to a function that may suspend. In such a
+//! function, each such call is a [`Stmt::Suspendable`] with a [`Point`]: a
+//! handler around the call adds the frame record of the point. The point has
+//! a **segment**, a function with the rest of the function after the call,
+//! and a **re-entry** function that rebuilds the frame when the
+//! continuation is resumed: it puts the frame on the shadow stack, rebuilds
+//! the environment, re-enters the inner frames, and goes on with the
+//! segment. The normal path does not use the segment: the rest of the
+//! function stays where it is. See `control.rs` and `emit.rs`.
 
 /// The service id of `Assert` (§9.6).
 pub const ASSERT_SERVICE: u32 = 0;
@@ -48,6 +67,8 @@ pub type Local = u32;
 pub type Label = u32;
 /// An index in the site table (§11.7).
 pub type Site = u32;
+/// An index in [`Program::points`].
+pub type PointId = u32;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FuncId(pub u32);
@@ -142,9 +163,14 @@ pub enum Op {
     Catch,
     /// `resource.ensure(body, with)`.
     Ensure,
-    /// `assertion.catch(body)`: `Ok` of the value, or `Error` of the first
-    /// `Assert` failure (§9.6).
-    AssertCatch,
+    /// `control.boundary(body)` (§9.4).
+    Boundary,
+    /// `control.suspend(b, f)`: it throws `$capture`.
+    Suspend,
+    /// `control.resume(k, value)`.
+    Resume,
+    /// `control.cancel(k)`.
+    Cancel,
 }
 
 impl Op {
@@ -161,13 +187,28 @@ impl Op {
                 | Op::Runtime { .. }
                 | Op::Catch
                 | Op::Ensure
-                | Op::AssertCatch
+                | Op::Boundary
+                | Op::Suspend
+                | Op::Resume
+                | Op::Cancel
         )
     }
 
     /// Whether the operation calls i code, which gets the environment.
     pub fn needs_env(self) -> bool {
-        matches!(self, Op::Catch | Op::Ensure | Op::AssertCatch)
+        matches!(
+            self,
+            Op::Catch | Op::Ensure | Op::Boundary | Op::Resume | Op::Cancel
+        )
+    }
+
+    /// Whether a `$capture` may go through the operation: it calls i code,
+    /// or it is `suspend`.
+    pub fn suspends(self) -> bool {
+        matches!(
+            self,
+            Op::Catch | Op::Ensure | Op::Boundary | Op::Suspend | Op::Resume | Op::Cancel
+        )
     }
 }
 
@@ -370,6 +411,18 @@ pub enum Stmt {
         value: Atom,
     },
     SetGlobal(GlobalId, Atom),
+    /// `dst = value`, as `Let`, for a call that may suspend in a function
+    /// that may suspend (§9.4): a `$capture` that goes through the call gets
+    /// the frame record of `point`. Made by `control.rs`.
+    Suspendable {
+        dst: Local,
+        value: Value,
+        site: Option<Site>,
+        point: PointId,
+    },
+    /// Goes on with the segment of a point, after its `Suspendable`: a tail
+    /// call with the locals that the segment needs. Only in segments.
+    Continue(PointId),
 }
 
 /// A function of the program.
@@ -383,6 +436,53 @@ pub struct Func {
     pub body: Vec<Stmt>,
     /// Whether the function has a frame on the shadow stack (§11.7).
     pub frame: bool,
+}
+
+/// A call that may suspend in a function that may suspend (§9.4), and how
+/// its frame is captured and rebuilt. Its segment and re-entry function have
+/// the locals of the function `func`.
+#[derive(Clone, Debug)]
+pub struct Point {
+    pub func: FuncId,
+    /// The site of the call, put on the shadow stack when the frame is
+    /// rebuilt (§11.7).
+    pub site: Option<Site>,
+    /// The environment of the call, given to the inner frames when they are
+    /// rebuilt.
+    pub env: Env,
+    /// The value of the call.
+    pub dst: Local,
+    /// The locals that the segment needs, in order: its parameters after
+    /// the environment, and before the value of the call.
+    pub params: Vec<Local>,
+    /// The environment locals of the function that the re-entry rebuilds
+    /// from the environment where the continuation is resumed, in order:
+    /// `dst` is the environment `from` with the service `service`, whose
+    /// value is in the frame record (§9.4 rule 3).
+    pub envs: Vec<EnvLink>,
+    /// The rest of the function after the call.
+    pub segment: Vec<Stmt>,
+    /// The locals of the function that the segment declares.
+    pub locals: Vec<Local>,
+}
+
+/// An environment statement that a frame rebuilds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EnvLink {
+    pub dst: Local,
+    pub from: Env,
+    pub service: u32,
+}
+
+impl Point {
+    /// The locals whose values are in the frame record, before the values
+    /// of the environment statements of `envs`.
+    pub fn saved<'a>(&'a self, locals: &'a [LocalType]) -> impl Iterator<Item = Local> + 'a {
+        self.params
+            .iter()
+            .copied()
+            .filter(|&l| locals[l as usize] != LocalType::Env)
+    }
 }
 
 /// How a function is made.
@@ -464,6 +564,8 @@ pub struct SitePos {
 #[derive(Clone, Debug, Default)]
 pub struct Program {
     pub funcs: Vec<FuncKind>,
+    /// The points of the calls that may suspend (§9.4).
+    pub points: Vec<Point>,
     /// The functions with one constant closure, used by `Atom::Func`.
     pub constants: Vec<FuncId>,
     /// The number of globals for top-level values.

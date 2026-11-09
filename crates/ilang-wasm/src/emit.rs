@@ -41,13 +41,41 @@ const SUPPORT: &str = r#"
     (else (i32.const 0))))
 "#;
 
-/// Errors, unwinding, and the environment (`ir.rs`). The functions that call
-/// i code save the depth of the shadow stack, and put it back when they take
-/// an exception (`runtime/mod.rs`). No handler takes an exception of another
-/// tag (no `catch_all`), so a stop, which traps, runs no handlers (§9.5).
+/// Errors, unwinding, the environment, and control (`ir.rs`). The functions
+/// that call i code save the depth of the shadow stack, and put it back when
+/// they take an exception (`runtime/mod.rs`). No handler takes an exception
+/// of another tag (no `catch_all`), so a stop, which traps, runs no handlers
+/// (§9.5).
+///
+/// # Control (§9.4)
+///
+/// - A boundary is a `$boundary` whose field 8 is 1 while it is active.
+/// - `suspend` throws `$capture` with a `$cap`: the boundary, `f`, and the
+///   frame records so far. Each frame that the exception goes through puts
+///   its record first and throws it again (`$capture_rethrow`), so the list
+///   is outermost first.
+/// - A frame record is a `$frame`: the re-entry function and the values it
+///   needs. A re-entry function (`$refn`) gets its record, the records of
+///   the frames inside it, the environment, and what to do at the innermost
+///   frame: give `v`, or unwind with `$cancel` when `cancel` (the
+///   continuation) is not null. It rebuilds its frame, re-enters the inner
+///   ones (`$reenter_next`) in a `$capture` handler that puts the same record
+///   first again, and goes on.
+/// - Each runtime function that calls i code has a record of its own:
+///   `$catch_reenter` (`fail.catch`), `$ensure_reenter` and
+///   `$final_reenter` (`resource.ensure`, also while its final function
+///   runs), `$boundary_reenter` (a boundary that a capture for another
+///   boundary went through), and `$cancel_reenter` (a final function that
+///   `cancel` runs suspended).
+/// - The boundary takes the `$capture` of its own boundary, makes the
+///   continuation `$cont`, and calls `f(k)` as a tail call in its place.
+///   `resume` re-enters the records inside a boundary that is active again,
+///   so the value at the boundary is the value of `resume`. `cancel`
+///   re-enters them with the `$cancel` of the continuation, and takes it.
 const EFFECTS: &str = r#"
 (tag $error (param eqref))
 (tag $cancel (param eqref))
+(tag $capture (param (ref $cap)))
 (global $root_env (mut (ref null $env)) (ref.null $env))
 
 ;; `env` with `v` in the slot `id` (§9.2): a new array.
@@ -64,75 +92,281 @@ const EFFECTS: &str = r#"
   (call_ref $fn0 (ref.cast (ref $clo0) (local.get $f)) (local.get $env)
     (struct.get $clo0 8 (ref.cast (ref $clo0) (local.get $f)))))
 
-;; `fail.catch(body)` (§9.3).
-(func $fail_catch (param $body eqref) (param $env (ref null $env)) (result eqref)
-  (local $depth i32) (local $e eqref)
-  (local.set $depth (call $shadow_depth))
-  (local.set $e
-    (block $caught (result eqref)
-      (return (call $result_ok
-        (try_table (result eqref) (catch $error $caught)
-          (call $call0 (local.get $body) (local.get $env)))))))
-  (call $shadow_restore (local.get $depth))
-  (call $result_error (local.get $e)))
+;; Calls a function of one parameter with the environment.
+(func $call1 (param $f eqref) (param $a eqref) (param $env (ref null $env)) (result eqref)
+  (call_ref $fn1 (ref.cast (ref $clo1) (local.get $f)) (local.get $env) (local.get $a)
+    (struct.get $clo1 8 (ref.cast (ref $clo1) (local.get $f)))))
 
-;; `resource.ensure(body, with)` (§9.5): `with` runs after `body`, also when
-;; an error or an unwinding goes through, which then goes on.
-(func $resource_ensure (param $body eqref) (param $with eqref) (param $env (ref null $env)) (result eqref)
-  (local $depth i32) (local $v eqref) (local $x exnref)
-  (local.set $depth (call $shadow_depth))
-  (block $unwind (result eqref exnref)
-    (local.set $v
-      (try_table (result eqref) (catch_ref $error $unwind) (catch_ref $cancel $unwind)
-        (call $call0 (local.get $body) (local.get $env))))
-    (drop (call $call0 (local.get $with) (local.get $env)))
-    (return (local.get $v)))
-  (local.set $x)
-  (drop)
-  (call $shadow_restore (local.get $depth))
-  (drop (call $call0 (local.get $with) (local.get $env)))
+;; Puts the frame record `f` first in the capture `c`, and throws `x` again.
+(func $capture_rethrow (param $c (ref $cap)) (param $x exnref) (param $f (ref $frame))
+  (struct.set $cap 2 (local.get $c) (struct.new $flist (local.get $f) (struct.get $cap 2 (local.get $c))))
   (throw_ref (local.get $x)))
 
-;; `assertion.catch(body)` (§9.6): `body` runs with an `Assert` whose `fail`
-;; unwinds to here with `$cancel`, while this boundary is active. The value
-;; of `$cancel` is the tuple (boundary, failure).
-(func $assertion_catch (param $body eqref) (param $env (ref null $env)) (result eqref)
-  (local $b (ref $boundary)) (local $depth i32) (local $v eqref) (local $p eqref) (local $x exnref)
-  (local.set $b (struct.new $boundary (i32.const 11) (i32.const 0) (i64.const 0) (f64.const 0)
-    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1)))
+;; Re-enters the frames `rest`, the outermost first. At the innermost frame,
+;; gives `v`, or unwinds with `$cancel` when `cancel` is not null.
+(func $reenter_next (param $rest (ref null $flist)) (param $env (ref null $env)) (param $v eqref)
+    (param $cancel eqref) (result eqref)
+  (local $f (ref $frame))
+  (if (ref.is_null (local.get $rest))
+    (then
+      (if (i32.eqz (ref.is_null (local.get $cancel))) (then (throw $cancel (local.get $cancel))))
+      (return (local.get $v))))
+  (local.set $f (struct.get $flist 0 (ref.as_non_null (local.get $rest))))
+  (return_call_ref $refn (local.get $f) (struct.get $flist 1 (ref.as_non_null (local.get $rest)))
+    (local.get $env) (local.get $v) (local.get $cancel) (struct.get $frame 0 (local.get $f))))
+
+;; `fail.catch(body)` (§9.3).
+(func $fail_catch (param $body eqref) (param $env (ref null $env)) (result eqref)
+  (return_call $catch_run (local.get $env) (local.get $body) (ref.null $flist) (ref.null eq) (ref.null eq)
+    (ref.null $frame)))
+
+;; Calls `body`, or re-enters `rest` when `body` is null, and takes `$error`.
+(func $catch_run (param $env (ref null $env)) (param $body eqref) (param $rest (ref null $flist))
+    (param $v eqref) (param $cancel eqref) (param $frame (ref null $frame)) (result eqref)
+  (local $depth i32) (local $e eqref) (local $r eqref)
+  (local.set $depth (call $shadow_depth))
+  (block $captured (result (ref $cap) exnref)
+    (local.set $e
+      (block $caught (result eqref)
+        (local.set $r
+          (try_table (result eqref) (catch $error $caught) (catch_ref $capture $captured)
+            (if (result eqref) (ref.is_null (local.get $body))
+              (then (call $reenter_next (local.get $rest) (local.get $env) (local.get $v) (local.get $cancel)))
+              (else (call $call0 (local.get $body) (local.get $env))))))
+        (return (call $result_ok (local.get $r)))))
+    (call $shadow_restore (local.get $depth))
+    (return (call $result_error (local.get $e))))
+  (call $capture_rethrow
+    (if (result (ref $frame)) (ref.is_null (local.get $frame))
+      (then (struct.new $frame (ref.func $catch_reenter) (ref.null $values)))
+      (else (ref.as_non_null (local.get $frame)))))
+  (unreachable))
+
+(func $catch_reenter (type $refn) (param $frame (ref $frame)) (param $rest (ref null $flist))
+    (param $env (ref null $env)) (param $v eqref) (param $cancel eqref) (result eqref)
+  (return_call $catch_run (local.get $env) (ref.null eq) (local.get $rest) (local.get $v) (local.get $cancel)
+    (local.get $frame)))
+
+;; `resource.ensure(body, with)` (§9.5): `with` runs after `body`, also when
+;; an error or an unwinding goes through, which then goes on. A capture
+;; does not run it: the computation is paused.
+(func $resource_ensure (param $body eqref) (param $with eqref) (param $env (ref null $env)) (result eqref)
+  (return_call $ensure_run (local.get $with) (local.get $env) (local.get $body) (ref.null $flist)
+    (ref.null eq) (ref.null eq) (ref.null $frame)))
+
+(func $ensure_run (param $with eqref) (param $env (ref null $env)) (param $body eqref)
+    (param $rest (ref null $flist)) (param $v eqref) (param $cancel eqref) (param $frame (ref null $frame))
+    (result eqref)
+  (local $depth i32) (local $r eqref)
+  (local.set $depth (call $shadow_depth))
+  (block $captured (result (ref $cap) exnref)
+    (block $cancelled (result eqref)
+      (block $failed (result eqref)
+        (local.set $r
+          (try_table (result eqref) (catch $error $failed) (catch $cancel $cancelled)
+              (catch_ref $capture $captured)
+            (if (result eqref) (ref.is_null (local.get $body))
+              (then (call $reenter_next (local.get $rest) (local.get $env) (local.get $v) (local.get $cancel)))
+              (else (call $call0 (local.get $body) (local.get $env))))))
+        (return_call $ensure_final (local.get $with) (local.get $env) (i32.const 0) (local.get $r)))
+      (local.set $r)
+      (call $shadow_restore (local.get $depth))
+      (return_call $ensure_final (local.get $with) (local.get $env) (i32.const 1) (local.get $r)))
+    (local.set $r)
+    (call $shadow_restore (local.get $depth))
+    (return_call $ensure_final (local.get $with) (local.get $env) (i32.const 2) (local.get $r)))
+  (call $capture_rethrow
+    (if (result (ref $frame)) (ref.is_null (local.get $frame))
+      (then (struct.new $frame (ref.func $ensure_reenter) (array.new_fixed $values 1 (local.get $with))))
+      (else (ref.as_non_null (local.get $frame)))))
+  (unreachable))
+
+(func $ensure_reenter (type $refn) (param $frame (ref $frame)) (param $rest (ref null $flist))
+    (param $env (ref null $env)) (param $v eqref) (param $cancel eqref) (result eqref)
+  (return_call $ensure_run
+    (array.get $values (ref.as_non_null (struct.get $frame 1 (local.get $frame))) (i32.const 0))
+    (local.get $env) (ref.null eq) (local.get $rest) (local.get $v) (local.get $cancel) (local.get $frame)))
+
+;; Runs the final function, then ends as `body` did: mode 0 gives `r`, 1
+;; throws the error `r`, 2 goes on unwinding the continuation `r`.
+(func $ensure_final (param $with eqref) (param $env (ref null $env)) (param $mode i32) (param $r eqref)
+    (result eqref)
+  (block $captured (result (ref $cap) exnref)
+    (drop (try_table (result eqref) (catch_ref $capture $captured)
+      (call $call0 (local.get $with) (local.get $env))))
+    (return_call $ensure_end (local.get $mode) (local.get $r)))
+  (call $capture_rethrow (struct.new $frame (ref.func $final_reenter)
+    (array.new_fixed $values 2 (local.get $r) (ref.i31 (local.get $mode)))))
+  (unreachable))
+
+(func $ensure_end (param $mode i32) (param $r eqref) (result eqref)
+  (if (i32.eq (local.get $mode) (i32.const 1)) (then (throw $error (local.get $r))))
+  (if (i32.eq (local.get $mode) (i32.const 2)) (then (throw $cancel (local.get $r))))
+  (local.get $r))
+
+(func $final_reenter (type $refn) (param $frame (ref $frame)) (param $rest (ref null $flist))
+    (param $env (ref null $env)) (param $v eqref) (param $cancel eqref) (result eqref)
+  (local $saved (ref $values))
+  (local.set $saved (ref.as_non_null (struct.get $frame 1 (local.get $frame))))
+  (block $captured (result (ref $cap) exnref)
+    (drop (try_table (result eqref) (catch_ref $capture $captured)
+      (call $reenter_next (local.get $rest) (local.get $env) (local.get $v) (local.get $cancel))))
+    (return_call $ensure_end
+      (i31.get_u (ref.cast (ref i31) (array.get $values (local.get $saved) (i32.const 1))))
+      (array.get $values (local.get $saved) (i32.const 0))))
+  (call $capture_rethrow (local.get $frame))
+  (unreachable))
+
+;; `control.boundary(body)` (§9.4).
+(func $control_boundary (param $body eqref) (param $env (ref null $env)) (result eqref)
+  (return_call $boundary_run
+    (struct.new $boundary (i32.const 11) (i32.const 0) (i64.const 0) (f64.const 0)
+      (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1))
+    (local.get $env) (local.get $body) (ref.null $flist) (ref.null eq) (ref.null eq) (ref.null $frame)))
+
+;; The active boundary `b`, in the place where `env` is: calls `body(b)`,
+;; or re-enters `rest` when `body` is null. It is not active once the code
+;; inside it is not on the stack (§9.4 rule 1).
+(func $boundary_run (param $b (ref $boundary)) (param $env (ref null $env)) (param $body eqref)
+    (param $rest (ref null $flist)) (param $v eqref) (param $cancel eqref) (param $frame (ref null $frame))
+    (result eqref)
+  (local $depth i32) (local $r eqref) (local $c (ref null $cap)) (local $x exnref) (local $f eqref)
   (local.set $depth (call $shadow_depth))
   (block $unwind (result eqref exnref)
-    (local.set $v
-      (try_table (result eqref) (catch_ref $cancel $unwind)
-        (call $call0 (local.get $body)
-          (call $env_with (local.get $env) (i32.const 0)
-            (call $record (i32.const 3) (i64.const 2) (array.new_fixed $values 1
-              (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0)
-                (ref.null $bytes) (array.new_fixed $values 1 (local.get $b)) (ref.null $limbs)
-                (ref.null $call) (ref.func $assertion_fail))))))))
+    (block $captured (result (ref $cap) exnref)
+      (local.set $r
+        (try_table (result eqref) (catch_ref $capture $captured) (catch_ref $error $unwind)
+            (catch_ref $cancel $unwind)
+          (if (result eqref) (ref.is_null (local.get $body))
+            (then (call $reenter_next (local.get $rest) (local.get $env) (local.get $v) (local.get $cancel)))
+            (else (call $call1 (local.get $body) (local.get $b) (local.get $env))))))
+      (struct.set $boundary 8 (local.get $b) (i32.const 0))
+      (return (local.get $r)))
+    (local.set $x)
+    (local.set $c)
     (struct.set $boundary 8 (local.get $b) (i32.const 0))
-    (return (call $result_ok (local.get $v))))
+    (if (ref.eq (struct.get $cap 0 (local.get $c)) (local.get $b))
+      (then
+        ;; Rule 2: `f(k)` is done in the place of the boundary.
+        (call $shadow_restore (local.get $depth))
+        (local.set $f (struct.get $cap 1 (local.get $c)))
+        (return_call_ref $fn1 (ref.cast (ref $clo1) (local.get $f)) (local.get $env)
+          (struct.new $cont (i32.const 12) (i32.const 0) (i64.const 0) (f64.const 0)
+            (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)
+            (i32.const 0) (local.get $b) (struct.get $cap 2 (local.get $c)))
+          (struct.get $clo1 8 (ref.cast (ref $clo1) (local.get $f))))))
+    ;; A capture for an outer boundary: this one is paused with it.
+    (if (ref.is_null (local.get $frame))
+      (then (local.set $frame
+        (struct.new $frame (ref.func $boundary_reenter) (array.new_fixed $values 1 (local.get $b))))))
+    (call $capture_rethrow (ref.as_non_null (local.get $c)) (local.get $x) (ref.as_non_null (local.get $frame)))
+    (unreachable))
   (local.set $x)
-  (local.set $p)
+  (drop)
   (struct.set $boundary 8 (local.get $b) (i32.const 0))
-  (if (i32.eqz (ref.eq (call $field (local.get $p) (i32.const 0)) (local.get $b)))
-    (then (throw_ref (local.get $x))))
-  (call $shadow_restore (local.get $depth))
-  (call $result_error (call $field (local.get $p) (i32.const 1))))
+  (throw_ref (local.get $x)))
 
-(func $assertion_fail (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env)) (param $failure eqref) (result eqref)
+(func $boundary_reenter (type $refn) (param $frame (ref $frame)) (param $rest (ref null $flist))
+    (param $env (ref null $env)) (param $v eqref) (param $cancel eqref) (result eqref)
   (local $b (ref $boundary))
-  (local.set $b (ref.cast (ref $boundary) (array.get $values
-    (ref.as_non_null (struct.get $obj 5 (ref.as_non_null (local.get $clo)))) (i32.const 0))))
-  (if (i32.eqz (struct.get $boundary 8 (local.get $b)))
+  (local.set $b (ref.cast (ref $boundary)
+    (array.get $values (ref.as_non_null (struct.get $frame 1 (local.get $frame))) (i32.const 0))))
+  (struct.set $boundary 8 (local.get $b) (i32.const 1))
+  (return_call $boundary_run (local.get $b) (local.get $env) (ref.null eq) (local.get $rest) (local.get $v)
+    (local.get $cancel) (local.get $frame)))
+
+;; `control.suspend(b, f)`: stops when `b` is not active.
+(func $control_suspend (param $b eqref) (param $f eqref) (result eqref)
+  (local $boundary (ref $boundary))
+  (local.set $boundary (ref.cast (ref $boundary) (local.get $b)))
+  (if (i32.eqz (struct.get $boundary 8 (local.get $boundary)))
     (then (call $stop_boundary_inactive) (unreachable)))
-  (throw $cancel (call $tuple (array.new_fixed $values 2 (local.get $b) (local.get $failure)))))
+  (throw $capture (struct.new $cap (local.get $boundary) (local.get $f) (ref.null $flist))))
+
+;; The continuation `k`, used now: stops when it was already used (rule 5).
+(func $continuation_take (param $k eqref) (result (ref $cont))
+  (local $c (ref $cont))
+  (local.set $c (ref.cast (ref $cont) (local.get $k)))
+  (if (struct.get $cont 8 (local.get $c)) (then (call $stop_continuation_used) (unreachable)))
+  (struct.set $cont 8 (local.get $c) (i32.const 1))
+  (local.get $c))
+
+;; `control.resume(k, v)`: the paused computation goes on in a boundary that
+;; is active again, on top of this place (rule 3).
+(func $control_resume (param $k eqref) (param $v eqref) (param $env (ref null $env)) (result eqref)
+  (local $c (ref $cont)) (local $b (ref $boundary))
+  (local.set $c (call $continuation_take (local.get $k)))
+  (local.set $b (struct.get $cont 9 (local.get $c)))
+  (struct.set $boundary 8 (local.get $b) (i32.const 1))
+  (return_call $boundary_run (local.get $b) (local.get $env) (ref.null eq) (struct.get $cont 10 (local.get $c))
+    (local.get $v) (ref.null eq) (ref.null $frame)))
+
+;; `control.cancel(k)`: unwinds the paused computation (rule 4). Its
+;; boundary stays not active.
+(func $control_cancel (param $k eqref) (param $env (ref null $env)) (result eqref)
+  (local $c (ref $cont))
+  (local.set $c (call $continuation_take (local.get $k)))
+  (return_call $cancel_run (local.get $c) (struct.get $cont 10 (local.get $c)) (local.get $env)
+    (ref.null eq) (local.get $c) (ref.null $frame)))
+
+(func $cancel_run (param $k (ref $cont)) (param $rest (ref null $flist)) (param $env (ref null $env))
+    (param $v eqref) (param $cancel eqref) (param $frame (ref null $frame)) (result eqref)
+  (local $depth i32) (local $e eqref) (local $x exnref)
+  (local.set $depth (call $shadow_depth))
+  (block $captured (result (ref $cap) exnref)
+    (block $cancelled (result eqref exnref)
+      (drop (try_table (result eqref) (catch_ref $cancel $cancelled) (catch_ref $capture $captured)
+        (call $reenter_next (local.get $rest) (local.get $env) (local.get $v) (local.get $cancel))))
+      (return (ref.null eq)))
+    (local.set $x)
+    (local.set $e)
+    (if (i32.eqz (ref.eq (local.get $e) (local.get $k))) (then (throw_ref (local.get $x))))
+    (call $shadow_restore (local.get $depth))
+    (return (ref.null eq)))
+  (call $capture_rethrow
+    (if (result (ref $frame)) (ref.is_null (local.get $frame))
+      (then (struct.new $frame (ref.func $cancel_reenter) (array.new_fixed $values 1 (local.get $k))))
+      (else (ref.as_non_null (local.get $frame)))))
+  (unreachable))
+
+(func $cancel_reenter (type $refn) (param $frame (ref $frame)) (param $rest (ref null $flist))
+    (param $env (ref null $env)) (param $v eqref) (param $cancel eqref) (result eqref)
+  (return_call $cancel_run
+    (ref.cast (ref $cont)
+      (array.get $values (ref.as_non_null (struct.get $frame 1 (local.get $frame))) (i32.const 0)))
+    (local.get $rest) (local.get $env) (local.get $v) (local.get $cancel) (local.get $frame)))
 
 ;; The `fail` of the `Assert` of an entry point (§9.6, §11.7).
 (func $entry_assert_fail (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env)) (param $failure eqref) (result eqref)
   (call $stop_assertion (call $field (local.get $failure) (i32.const 0)))
   (unreachable))
 "#;
+
+/// The types of control (§9.4), after `$env`.
+const CONTROL_TYPES: &str = r#"
+(type $boundary (sub final $obj (struct (field i32) (field i32) (field i64) (field f64)
+  (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs))
+  (field (ref null $call)) (field (mut i32)))))
+(rec
+  (type $frame (struct (field (ref $refn)) (field (ref null $values))))
+  (type $refn (func (param (ref $frame) (ref null $flist) (ref null $env) eqref eqref) (result eqref)))
+  (type $flist (struct (field (ref $frame)) (field (ref null $flist)))))
+(type $cont (sub final $obj (struct (field i32) (field i32) (field i64) (field f64)
+  (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs))
+  (field (ref null $call)) (field (mut i32)) (field (ref $boundary)) (field (ref null $flist)))))
+(type $cap (struct (field (ref $boundary)) (field eqref) (field (mut (ref null $flist)))))
+(type $box (struct (field i64)))
+"#;
+
+/// The runtime functions whose references are taken.
+const DECLARED: &[&str] = &[
+    "$entry_assert_fail",
+    "$catch_reenter",
+    "$ensure_reenter",
+    "$final_reenter",
+    "$boundary_reenter",
+    "$cancel_reenter",
+];
 
 /// The WAT text of the whole module.
 pub fn wat(p: &Program) -> String {
@@ -148,6 +382,9 @@ pub fn wat(p: &Program) -> String {
     for (i, f) in p.funcs.iter().enumerate() {
         e.func(FuncId(i as u32), f);
     }
+    for i in 0..p.points.len() {
+        e.point(i as PointId);
+    }
     if let Some(start) = &p.start {
         e.code("$start", start);
     }
@@ -156,12 +393,7 @@ pub fn wat(p: &Program) -> String {
     let mut m = String::from("(module\n");
     m.push_str(runtime::TYPES);
     m.push_str("(type $env (array (mut eqref)))\n");
-    // A boundary (§9.4): field 8 is 1 while it is active.
-    m.push_str(
-        "(type $boundary (sub final $obj (struct (field i32) (field i32) (field i64) (field f64) \
-         (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs)) \
-         (field (ref null $call)) (field (mut i32)))))\n",
-    );
+    m.push_str(CONTROL_TYPES);
     for n in &e.arities {
         let params = " eqref".repeat(*n as usize);
         let _ = writeln!(
@@ -191,8 +423,8 @@ pub fn wat(p: &Program) -> String {
     }
     m.push_str(&e.out);
     let mut declared: Vec<String> = (0..p.funcs.len()).map(|i| format!("$f{i}")).collect();
-    declared.push("$assertion_fail".into());
-    declared.push("$entry_assert_fail".into());
+    declared.extend((0..p.points.len()).map(|i| format!("$r{i}")));
+    declared.extend(DECLARED.iter().map(|d| d.to_string()));
     let _ = writeln!(m, "(elem declare func {})", declared.join(" "));
     m.push_str(")\n");
     m
@@ -214,7 +446,7 @@ struct Emitter<'p> {
     out: String,
 }
 
-impl Emitter<'_> {
+impl<'p> Emitter<'p> {
     fn func(&mut self, id: FuncId, f: &FuncKind) {
         let name = format!("$f{}", id.0);
         match f {
@@ -247,13 +479,7 @@ impl Emitter<'_> {
         }
         self.out.push_str(" (result eqref)\n");
         for (i, t) in locals.iter().enumerate().skip(arity as usize) {
-            let t = match t {
-                LocalType::Value => "eqref",
-                LocalType::I64 => "i64",
-                LocalType::I32 => "i32",
-                LocalType::Env => "(ref null $env)",
-            };
-            let _ = write!(self.out, " (local $l{i} {t})");
+            let _ = write!(self.out, " (local $l{i} {})", local_type(*t));
         }
         self.out.push('\n');
     }
@@ -381,7 +607,177 @@ impl Emitter<'_> {
                 let a = self.atom(a);
                 let _ = writeln!(out, "(global.set $g{} {a})", g.0);
             }
+            Stmt::Suspendable {
+                dst,
+                value,
+                site,
+                point,
+            } => {
+                if let Some(site) = site {
+                    let _ = writeln!(out, "(call $shadow_site (i32.const {site}))");
+                }
+                let v = self.value(value);
+                let record = self.record(*point);
+                let _ = writeln!(
+                    out,
+                    "(local.set $l{dst} (block $ok{point} (result eqref)\n\
+                     (block $cap{point} (result (ref $cap) exnref)\n\
+                     (br $ok{point} (try_table (result eqref) (catch_ref $capture $cap{point})\n\
+                     {v})))\n\
+                     (call $capture_rethrow {record}) (unreachable)))"
+                );
+            }
+            Stmt::Continue(q) => {
+                let program: &'p Program = self.p;
+                let point = &program.points[*q as usize];
+                let args: String = point
+                    .params
+                    .iter()
+                    .map(|l| format!(" (local.get $l{l})"))
+                    .collect();
+                let _ = writeln!(
+                    out,
+                    "(return_call $s{q} (local.get $env){args} (local.get $l{}))",
+                    point.dst
+                );
+            }
         }
+    }
+
+    /// The locals of the function of a point.
+    fn func_of(&self, point: &Point) -> &'p Func {
+        let p: &'p Program = self.p;
+        match &p.funcs[point.func.0 as usize] {
+            FuncKind::Code(f) => f,
+            _ => unreachable!("a point is in code"),
+        }
+    }
+
+    /// The frame record of a point (§9.4): its re-entry function, the saved
+    /// locals, then the values of the environment statements it rebuilds.
+    /// Numbers are boxed.
+    fn record(&self, p: PointId) -> String {
+        let program: &'p Program = self.p;
+        let point = &program.points[p as usize];
+        let locals = &self.func_of(point).locals;
+        let mut items = Vec::new();
+        for l in point.saved(locals) {
+            items.push(match locals[l as usize] {
+                LocalType::Value => format!("(local.get $l{l})"),
+                LocalType::I64 => format!("(struct.new $box (local.get $l{l}))"),
+                LocalType::I32 => format!("(struct.new $box (i64.extend_i32_u (local.get $l{l})))"),
+                LocalType::Env => unreachable!("environments are rebuilt"),
+            });
+        }
+        for link in &point.envs {
+            items.push(format!(
+                "(array.get $env (local.get $l{}) (i32.const {}))",
+                link.dst, link.service
+            ));
+        }
+        let saved = if items.is_empty() {
+            "(ref.null $values)".to_string()
+        } else {
+            format!(
+                "(array.new_fixed $values {} {})",
+                items.len(),
+                items.join(" ")
+            )
+        };
+        format!("(struct.new $frame (ref.func $r{p}) {saved})")
+    }
+
+    /// The segment `$s…` and the re-entry function `$r…` of a point (§9.4).
+    fn point(&mut self, p: PointId) {
+        let program: &'p Program = self.p;
+        let point = &program.points[p as usize];
+        let f = self.func_of(point);
+        let locals = &f.locals;
+        let ty = |l: Local| local_type(locals[l as usize]);
+        // The segment: the environment, the locals it needs, and the value
+        // of the call.
+        let _ = write!(
+            self.out,
+            ";; {} after point {p}\n(func $s{p} (param $env (ref null $env))",
+            f.name.replace('\n', " ")
+        );
+        for (j, &l) in point.params.iter().enumerate() {
+            let _ = write!(self.out, " (param $a{j} {})", ty(l));
+        }
+        self.out
+            .push_str(" (param $res eqref) (result eqref)\n (local $clo (ref null $obj))");
+        for &l in &point.locals {
+            let _ = write!(self.out, " (local $l{l} {})", ty(l));
+        }
+        self.out.push('\n');
+        for (j, &l) in point.params.iter().enumerate() {
+            let _ = writeln!(self.out, "(local.set $l{l} (local.get $a{j}))");
+        }
+        let _ = writeln!(self.out, "(local.set $l{} (local.get $res))", point.dst);
+        let mut body = String::new();
+        self.stmts(&mut body, &point.segment, f.frame);
+        self.out.push_str(&body);
+        self.out.push_str("(unreachable))\n");
+        // The re-entry: rebuild the frame, re-enter the inner frames in a
+        // handler that adds this record again, and go on with the segment.
+        let _ = write!(
+            self.out,
+            "(func $r{p} (type $refn) (param $frame (ref $frame)) (param $rest (ref null $flist)) \
+             (param $env (ref null $env)) (param $v eqref) (param $cancel eqref) (result eqref)\n \
+             (local $saved (ref null $values)) (local $res eqref)"
+        );
+        let saved: Vec<Local> = point.saved(locals).collect();
+        let mut declared: BTreeSet<Local> = saved.iter().copied().collect();
+        declared.extend(point.envs.iter().map(|e| e.dst));
+        for &l in &declared {
+            let _ = write!(self.out, " (local $l{l} {})", ty(l));
+        }
+        self.out
+            .push_str("\n(local.set $saved (struct.get $frame 1 (local.get $frame)))\n");
+        for (j, &l) in saved.iter().enumerate() {
+            let get =
+                format!("(array.get $values (ref.as_non_null (local.get $saved)) (i32.const {j}))");
+            let v = match locals[l as usize] {
+                LocalType::I64 => format!("(struct.get $box 0 (ref.cast (ref $box) {get}))"),
+                LocalType::I32 => {
+                    format!("(i32.wrap_i64 (struct.get $box 0 (ref.cast (ref $box) {get})))")
+                }
+                _ => get,
+            };
+            let _ = writeln!(self.out, "(local.set $l{l} {v})");
+        }
+        // §9.4 rule 3: the environment statements of the frame, on the
+        // environment of the place of `resume`.
+        for (k, link) in point.envs.iter().enumerate() {
+            let _ = writeln!(
+                self.out,
+                "(local.set $l{} (call $env_with {} (i32.const {}) \
+                 (array.get $values (ref.as_non_null (local.get $saved)) (i32.const {}))))",
+                link.dst,
+                env_text(link.from),
+                link.service,
+                saved.len() + k
+            );
+        }
+        if f.frame {
+            let site = point.site.map_or(-1, |s| s as i64);
+            let _ = writeln!(self.out, "(call $shadow_enter (i32.const {site}))");
+        }
+        let args: String = point
+            .params
+            .iter()
+            .map(|l| format!(" (local.get $l{l})"))
+            .collect();
+        let _ = writeln!(
+            self.out,
+            "(local.set $res (block $ok (result eqref)\n\
+             (block $cap (result (ref $cap) exnref)\n\
+             (br $ok (try_table (result eqref) (catch_ref $capture $cap)\n\
+             (call $reenter_next (local.get $rest) {} (local.get $v) (local.get $cancel)))))\n\
+             (call $capture_rethrow (local.get $frame)) (unreachable)))\n\
+             (return_call $s{p} (local.get $env){args} (local.get $res)))",
+            env_text(point.env)
+        );
     }
 
     fn call(&mut self, callee: &Callee, args: &[Atom], tail: bool, env: &str) -> String {
@@ -486,7 +882,10 @@ impl Emitter<'_> {
             Op::Raise => format!("(throw $error {a})"),
             Op::Catch => format!("(call $fail_catch {a} {env})"),
             Op::Ensure => format!("(call $resource_ensure {a} {b} {env})"),
-            Op::AssertCatch => format!("(call $assertion_catch {a} {env})"),
+            Op::Boundary => format!("(call $control_boundary {a} {env})"),
+            Op::Suspend => format!("(call $control_suspend {a} {b})"),
+            Op::Resume => format!("(call $control_resume {a} {b} {env})"),
+            Op::Cancel => format!("(call $control_cancel {a} {env})"),
         }
     }
 
@@ -927,6 +1326,15 @@ fn value_tag(t: AbiType) -> u32 {
         AbiType::Int => 8,
         AbiType::BitArray => 9,
         AbiType::Externref => 10,
+    }
+}
+
+fn local_type(t: LocalType) -> &'static str {
+    match t {
+        LocalType::Value => "eqref",
+        LocalType::I64 => "i64",
+        LocalType::I32 => "i32",
+        LocalType::Env => "(ref null $env)",
     }
 }
 

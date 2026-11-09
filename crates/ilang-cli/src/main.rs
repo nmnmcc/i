@@ -20,6 +20,9 @@ enum Command {
         /// The package directory, with its `i.toml`.
         #[arg(long, default_value = ".")]
         project: PathBuf,
+        /// Do not use the network to get packages; only the cache is used.
+        #[arg(long)]
+        offline: bool,
         /// Print the type of every top-level name of the package, as
         /// `module/path.name : type`.
         #[arg(long)]
@@ -29,6 +32,9 @@ enum Command {
     Build {
         #[arg(long, default_value = ".")]
         project: PathBuf,
+        /// Do not use the network to get packages; only the cache is used.
+        #[arg(long)]
+        offline: bool,
         /// Optimization level: 0, 2, or 3.
         #[arg(long, default_value_t = 2)]
         opt: u8,
@@ -43,6 +49,9 @@ enum Command {
     Run {
         #[arg(long, default_value = ".")]
         project: PathBuf,
+        /// Do not use the network to get packages; only the cache is used.
+        #[arg(long)]
+        offline: bool,
         /// Optimization level: 0, 2, or 3.
         #[arg(long, default_value_t = 2)]
         opt: u8,
@@ -51,6 +60,9 @@ enum Command {
     Test {
         #[arg(long, default_value = ".")]
         project: PathBuf,
+        /// Do not use the network to get packages; only the cache is used.
+        #[arg(long)]
+        offline: bool,
         /// Optimization level: 0, 2, or 3.
         #[arg(long, default_value_t = 0)]
         opt: u8,
@@ -62,19 +74,29 @@ enum Command {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let result = match cli.command {
-        Command::Check { project, types } => return check(&project, types),
+        Command::Check {
+            project,
+            offline,
+            types,
+        } => return check(&project, offline, types),
         Command::Build {
             project,
+            offline,
             opt,
             out,
             wat,
-        } => cmd_build(&project, opt, out, wat),
-        Command::Run { project, opt } => cmd_run(&project, opt),
+        } => cmd_build(&project, opt, offline, out, wat),
+        Command::Run {
+            project,
+            offline,
+            opt,
+        } => cmd_run(&project, opt, offline),
         Command::Test {
             project,
+            offline,
             opt,
             filter,
-        } => cmd_test(&project, opt, filter.as_deref()),
+        } => cmd_test(&project, opt, offline, filter.as_deref()),
     };
     match result {
         Ok(code) => code,
@@ -85,9 +107,13 @@ fn main() -> ExitCode {
     }
 }
 
-fn options(opt: u8, tests: bool) -> anyhow::Result<BuildOptions> {
+fn options(opt: u8, tests: bool, offline: bool) -> anyhow::Result<BuildOptions> {
     let opt = level(opt).ok_or_else(|| anyhow::anyhow!("--opt must be 0, 2, or 3"))?;
-    Ok(BuildOptions { tests, opt })
+    Ok(BuildOptions {
+        tests,
+        opt,
+        offline,
+    })
 }
 
 fn built(project: &Path, options: BuildOptions) -> anyhow::Result<Option<ilang_cli::Built>> {
@@ -106,8 +132,14 @@ fn built(project: &Path, options: BuildOptions) -> anyhow::Result<Option<ilang_c
     }
 }
 
-fn cmd_build(project: &Path, opt: u8, out: Option<PathBuf>, wat: bool) -> anyhow::Result<ExitCode> {
-    let Some(b) = built(project, options(opt, false)?)? else {
+fn cmd_build(
+    project: &Path,
+    opt: u8,
+    offline: bool,
+    out: Option<PathBuf>,
+    wat: bool,
+) -> anyhow::Result<ExitCode> {
+    let Some(b) = built(project, options(opt, false, offline)?)? else {
         return Ok(ExitCode::FAILURE);
     };
     let out = out.unwrap_or_else(|| project.join("build").join(format!("{}.wasm", b.name)));
@@ -118,7 +150,7 @@ fn cmd_build(project: &Path, opt: u8, out: Option<PathBuf>, wat: bool) -> anyhow
     }
     std::fs::write(&out, &b.wasm)?;
     if wat {
-        let (graph, _) = ilang_package::load(project);
+        let (graph, _) = ilang_cli::load(project, false, offline);
         let checked = ilang_check::check(&graph);
         if let (Some(p), Some(t)) = (&checked.program, &checked.types)
             && let Ok(text) =
@@ -131,8 +163,8 @@ fn cmd_build(project: &Path, opt: u8, out: Option<PathBuf>, wat: bool) -> anyhow
     Ok(ExitCode::SUCCESS)
 }
 
-fn cmd_run(project: &Path, opt: u8) -> anyhow::Result<ExitCode> {
-    let Some(b) = built(project, options(opt, false)?)? else {
+fn cmd_run(project: &Path, opt: u8, offline: bool) -> anyhow::Result<ExitCode> {
+    let Some(b) = built(project, options(opt, false, offline)?)? else {
         return Ok(ExitCode::FAILURE);
     };
     let program = Program::from_bytes(&b.wasm)?;
@@ -152,8 +184,13 @@ fn cmd_run(project: &Path, opt: u8) -> anyhow::Result<ExitCode> {
     }
 }
 
-fn cmd_test(project: &Path, opt: u8, filter: Option<&str>) -> anyhow::Result<ExitCode> {
-    let Some(b) = built(project, options(opt, true)?)? else {
+fn cmd_test(
+    project: &Path,
+    opt: u8,
+    offline: bool,
+    filter: Option<&str>,
+) -> anyhow::Result<ExitCode> {
+    let Some(b) = built(project, options(opt, true, offline)?)? else {
         return Ok(ExitCode::FAILURE);
     };
     let program = Program::from_bytes(&b.wasm)?;
@@ -194,9 +231,10 @@ fn cmd_test(project: &Path, opt: u8, filter: Option<&str>) -> anyhow::Result<Exi
 /// Parses, resolves, and type checks every module of the package, its
 /// dependencies, and the library, and prints the problems as
 /// `path:line:col: error[CODE]: …`. With `types`, prints the type of each
-/// top-level name of the package's modules, in source order.
-fn check(project: &Path, types: bool) -> ExitCode {
-    let (graph, mut diags) = ilang_package::load(project);
+/// top-level name of the package's modules, in source order. The tests are
+/// checked too.
+fn check(project: &Path, offline: bool, types: bool) -> ExitCode {
+    let (graph, mut diags) = ilang_cli::load(project, true, offline);
     if graph.root.is_some() {
         let checked = ilang_check::check(&graph);
         diags.extend(checked.diags);

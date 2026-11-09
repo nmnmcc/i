@@ -68,8 +68,11 @@
 //! - On a normal return: `call $shadow_leave`.
 //! - Before a tail call: `call $shadow_leave`, so the replaced call is gone.
 //! - Where an exception is caught (`try_table`), restore the depth saved with
-//!   `$shadow_depth` when the handler was entered: `call $shadow_restore`. The
-//!   same applies when a continuation is resumed or cancelled.
+//!   `$shadow_depth` when the handler was entered: `call $shadow_restore`.
+//!   A capture (`$capture`) restores it only at its boundary.
+//! - When a continuation is resumed or cancelled, each frame that is rebuilt
+//!   enters again with the site of the call it was paused at, on top of the
+//!   frames of the place of `resume` (spec §9.4).
 //!
 //! Site ids index the site table, installed once at the very start of
 //! `ilang_start` with `$sites_install (param (ref $sites) (ref $values))`:
