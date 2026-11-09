@@ -204,7 +204,11 @@ impl Lexer<'_> {
                     None => {
                         let ch = self.source[self.pos..].chars().next().unwrap();
                         self.pos += ch.len_utf8();
-                        let msg = format!("unexpected character `{ch}`");
+                        let msg = if ch.is_control() {
+                            format!("unexpected character U+{:04X}", ch as u32)
+                        } else {
+                            format!("unexpected character `{ch}`")
+                        };
                         self.error(Code::UnexpectedChar, self.span(start), msg);
                         continue;
                     }

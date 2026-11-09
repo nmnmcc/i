@@ -1,0 +1,20 @@
+a = x |> 1
+
+b = x |> [f]
+
+c = x |> -f
+
+d = x |> f + 1
+
+e = x |> { f }
+
+ok = 1
+--- explicit ---
+c = x |> { -f }
+d = x |> { f + 1 }
+--- errors ---
+E0111 @1:10 the right side of `|>` must be a name, a call, or a function
+E0111 @2:10 the right side of `|>` must be a name, a call, or a function
+E0111 @3:10 the right side of `|>` must be a name, a call, or a function
+E0111 @4:10 the right side of `|>` must be a name, a call, or a function
+E0111 @5:10 the right side of `|>` must be a name, a call, or a function

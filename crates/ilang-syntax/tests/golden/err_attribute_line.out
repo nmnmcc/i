@@ -1,0 +1,3 @@
+main = () { Nil }
+--- errors ---
+E0101 @2:1 expected an item: a type definition, or a binding `pattern = value`, found a line break before `(`

@@ -3,7 +3,7 @@ b = 1 * 2 + 3
 c = a || b && c == d
 d = a < b == c
 e = "a" <> "b" |> f
-f = x |> g + 1
+f = x + 1 |> g
 g = -a.b(c)
 h = -x * y
 i = a - b - c

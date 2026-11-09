@@ -25,11 +25,14 @@ pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
         pos: 0,
         diags: Vec::new(),
         no_brace: false,
+        guard: false,
     };
     let module = parser.module();
     let mut diags = lexed.diagnostics.clone();
     diags.append(&mut parser.diags);
     diags.sort_by_key(|d| d.span.start);
+    // Recovery may go on at the token that failed, and fail there again.
+    diags.dedup();
     (module, diags)
 }
 
@@ -43,6 +46,9 @@ struct Parser<'a> {
     /// Set in the expression after `case`: a `{` after a complete expression
     /// ends it (§1.7). Cleared inside brackets.
     no_brace: bool,
+    /// Set in a guard: a `->` ends the clause head, so it never makes a `( )`
+    /// a function (§6.1). Cleared inside brackets.
+    guard: bool,
 }
 
 fn binop(kind: &T) -> Option<BinOp> {
@@ -73,6 +79,17 @@ fn binop(kind: &T) -> Option<BinOp> {
         T::SlashDot => DivFloat,
         _ => return None,
     })
+}
+
+/// `Name` of §6.1: `x`, `C`, `m.C`, or `m.x`, which is a field here.
+fn is_name(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Name { .. } => true,
+        ExprKind::Field { target, .. } => {
+            matches!(target.kind, ExprKind::Name { module: None, .. })
+        }
+        _ => false,
+    }
 }
 
 impl Parser<'_> {
@@ -184,20 +201,22 @@ impl Parser<'_> {
         Ok(Some(module))
     }
 
-    /// Runs `f` inside brackets, where the `case` restriction does not hold.
+    /// Runs `f` inside brackets, where the `case` and guard restrictions do
+    /// not hold.
     fn nested<X>(&mut self, f: impl FnOnce(&mut Self) -> PResult<X>) -> PResult<X> {
-        let saved = std::mem::replace(&mut self.no_brace, false);
+        let saved = (self.no_brace, self.guard);
+        (self.no_brace, self.guard) = (false, false);
         let result = f(self);
-        self.no_brace = saved;
+        (self.no_brace, self.guard) = saved;
         result
     }
 
     /// The parts of a bracketed list, after the opening bracket, with `,` or a
-    /// break between them. Consumes the closing bracket.
+    /// break between them and maybe a `,` at the end. Consumes the closing
+    /// bracket.
     fn seq<X>(
         &mut self,
         close: T,
-        trailing: bool,
         empty: bool,
         mut part: impl FnMut(&mut Self) -> PResult<X>,
     ) -> PResult<Vec<X>> {
@@ -214,11 +233,7 @@ impl Parser<'_> {
                 if p.at(&close) {
                     break;
                 }
-                if p.eat(&T::Comma) {
-                    if p.at(&close) && !trailing {
-                        return p.error("a part after `,`");
-                    }
-                } else if !p.tok().brk {
+                if !p.eat(&T::Comma) && !p.tok().brk {
                     return p.error(&format!("`,` or `{}`", close.text()));
                 }
             }
@@ -315,7 +330,7 @@ impl Parser<'_> {
     fn import(&mut self) -> PResult<Vec<ImportItem>> {
         self.bump();
         self.expect(&T::LParen)?;
-        self.seq(T::RParen, true, true, |p| {
+        self.seq(T::RParen, true, |p| {
             let start = p.start();
             let alias = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Eq {
                 let alias = p.name()?;
@@ -326,7 +341,7 @@ impl Parser<'_> {
             };
             let mut names = Vec::new();
             if p.eat(&T::LParen) {
-                names = p.seq(T::RParen, true, false, |p| match p.kind() {
+                names = p.seq(T::RParen, false, |p| match p.kind() {
                     T::UpName(_) => p.up_name(),
                     _ => p.name(),
                 })?;
@@ -353,7 +368,7 @@ impl Parser<'_> {
     fn export(&mut self) -> PResult<Vec<ExportItem>> {
         self.bump();
         self.expect(&T::LParen)?;
-        self.seq(T::RParen, true, true, |p| {
+        self.seq(T::RParen, true, |p| {
             let start = p.start();
             if matches!(p.kind(), T::Name(_)) {
                 let name = p.name()?;
@@ -384,11 +399,13 @@ impl Parser<'_> {
             let msg = "`import` and `export` come first in a file, `import` before `export`, at most once each";
             return Err(Diagnostic::new(Code::ImportPlacement, self.tok().span, msg));
         }
-        let doc = self.take_docs();
+        let mut doc = self.take_docs();
         let start = self.start();
         let mut attributes = Vec::new();
         while self.at(&T::At) {
             attributes.push(self.attribute()?);
+            // §1.2: a `///` after an attribute is still before the item.
+            doc.extend(self.take_docs());
         }
         let kind = if attributes.iter().any(|a| a.name.name == "external") {
             let name = self.name()?;
@@ -425,7 +442,7 @@ impl Parser<'_> {
         let mut args = Vec::new();
         if self.at_joined(&T::LParen) {
             self.bump();
-            args = self.seq(T::RParen, false, false, |p| match p.kind() {
+            args = self.seq(T::RParen, false, |p| match p.kind() {
                 T::Str(s) => {
                     let s = s.clone();
                     Ok((s, p.bump()))
@@ -446,7 +463,7 @@ impl Parser<'_> {
         let mut params = Vec::new();
         if self.at_joined(&T::LParen) {
             self.bump();
-            params = self.seq(T::RParen, false, false, Self::name)?;
+            params = self.seq(T::RParen, false, Self::name)?;
         }
         if self.eat(&T::Eq) {
             let body = TypeBody::Alias(self.ty()?);
@@ -464,7 +481,7 @@ impl Parser<'_> {
                 let mut fields = Vec::new();
                 if p.at_joined(&T::LParen) {
                     p.bump();
-                    fields = p.seq(T::RParen, false, false, |p| {
+                    fields = p.seq(T::RParen, false, |p| {
                         let start = p.start();
                         let label = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Colon {
                             let label = p.name()?;
@@ -613,6 +630,13 @@ impl Parser<'_> {
             }
             self.bump();
             let rhs = self.binary(op.level())?;
+            if op == BinOp::Pipe
+                && !(is_name(&rhs) || matches!(rhs.kind, ExprKind::Call { .. } | ExprKind::Fn(_)))
+            {
+                let msg = "the right side of `|>` must be a name, a call, or a function";
+                self.diags
+                    .push(Diagnostic::new(Code::PipeTarget, rhs.span, msg));
+            }
             lhs = Expr {
                 kind: ExprKind::Binary {
                     op,
@@ -672,7 +696,7 @@ impl Parser<'_> {
     fn call(&mut self, callee: Expr) -> PResult<ExprKind> {
         self.bump();
         if !self.at(&T::DotDot) {
-            let args = self.seq(T::RParen, true, true, |p| {
+            let args = self.seq(T::RParen, true, |p| {
                 let label = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Colon {
                     let label = p.name()?;
                     p.bump();
@@ -685,18 +709,20 @@ impl Parser<'_> {
                     value: p.expr()?,
                 })
             })?;
+            // §6.6: arguments by position come before arguments by label.
+            let mut labeled = false;
+            for arg in &args {
+                labeled |= arg.label.is_some();
+                if labeled && arg.label.is_none() {
+                    let msg = "an argument by position may not come after an argument by label";
+                    self.diags
+                        .push(Diagnostic::new(Code::ArgOrder, arg.value.span, msg));
+                }
+            }
             let callee = Box::new(callee);
             return Ok(ExprKind::Call { callee, args });
         }
-        // `Name` of §6.1: `x`, `C`, `m.C`, or `m.x`, which is a field here.
-        let is_name = match &callee.kind {
-            ExprKind::Name { .. } => true,
-            ExprKind::Field { target, .. } => {
-                matches!(target.kind, ExprKind::Name { module: None, .. })
-            }
-            _ => false,
-        };
-        if !is_name {
+        if !is_name(&callee) {
             let msg = "a record update `C(..v, …)` needs a constructor name before it";
             return Err(Diagnostic::new(Code::BadSpread, callee.span, msg));
         }
@@ -755,7 +781,7 @@ impl Parser<'_> {
             T::LBracket => self.list()?,
             T::LtLt => {
                 self.bump();
-                ExprKind::BitArray(self.seq(T::GtGt, true, true, |p| {
+                ExprKind::BitArray(self.seq(T::GtGt, true, |p| {
                     let start = p.start();
                     let value = p.expr()?;
                     p.segment(value, start)
@@ -794,18 +820,20 @@ impl Parser<'_> {
     }
 
     /// `(` at a primary: a function when `->`, or a `{` on the same line, comes
-    /// after its `)`; a tuple when not (§6.1, §1.7).
+    /// after its `)`; a tuple when not (§6.1, §1.7). In a guard, `->` does not
+    /// count.
     fn paren(&mut self) -> PResult<Expr> {
         let start = self.start();
         let is_fn = self.close[self.pos].is_some_and(|c| {
             let next = &self.toks[c as usize + 1];
-            next.kind == T::Arrow || next.kind == T::LBrace && !next.brk && !self.no_brace
+            next.kind == T::Arrow && !self.guard
+                || next.kind == T::LBrace && !next.brk && !self.no_brace
         });
         self.bump();
         let kind = if is_fn {
             ExprKind::Fn(Box::new(self.function()?))
         } else {
-            ExprKind::Tuple(self.seq(T::RParen, true, true, Self::expr)?)
+            ExprKind::Tuple(self.seq(T::RParen, true, Self::expr)?)
         };
         Ok(Expr {
             kind,
@@ -815,7 +843,7 @@ impl Parser<'_> {
 
     /// After the `(` of a function (§6.8).
     fn function(&mut self) -> PResult<Function> {
-        let params = self.seq(T::RParen, true, true, |p| {
+        let params = self.seq(T::RParen, true, |p| {
             let env =
                 matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Bang && !p.toks[p.pos + 1].brk;
             if !env {
@@ -892,7 +920,14 @@ impl Parser<'_> {
             while p.eat(&T::Pipe) {
                 patterns.push(p.pattern()?);
             }
-            let guard = if p.eat(&T::If) { Some(p.expr()?) } else { None };
+            let guard = if p.eat(&T::If) {
+                p.guard = true;
+                let guard = p.expr();
+                p.guard = false;
+                Some(guard?)
+            } else {
+                None
+            };
             p.expect(&T::Arrow)?;
             let body = p.expr()?;
             Ok(Clause {
@@ -1010,12 +1045,12 @@ impl Parser<'_> {
             }
             T::LParen => {
                 self.bump();
-                PatternKind::Tuple(self.seq(T::RParen, true, true, Self::pattern)?)
+                PatternKind::Tuple(self.seq(T::RParen, true, Self::pattern)?)
             }
             T::LBracket => self.list_pattern()?,
             T::LtLt => {
                 self.bump();
-                PatternKind::BitArray(self.seq(T::GtGt, true, true, |p| {
+                PatternKind::BitArray(self.seq(T::GtGt, true, |p| {
                     let start = p.start();
                     let value = p.pattern_in(true)?;
                     p.segment(value, start)
@@ -1148,6 +1183,14 @@ impl Parser<'_> {
         } else {
             None
         };
+        // §3: this `->` is the nearest one, and it has taken what it can.
+        if self.at(&T::Question) || self.at_joined(&T::Bang) {
+            let msg = format!(
+                "the nearest `->` cannot take this {}: it already has one, or `!` came first; put the inner function type in `{{ }}`",
+                self.kind()
+            );
+            return Err(Diagnostic::new(Code::ArrowTail, self.tok().span, msg));
+        }
         Ok((value, err, env))
     }
 
@@ -1161,7 +1204,7 @@ impl Parser<'_> {
         let mut args = Vec::new();
         if self.at_joined(&T::LParen) {
             self.bump();
-            args = self.seq(T::RParen, false, false, Self::ty)?;
+            args = self.seq(T::RParen, false, Self::ty)?;
         }
         Ok(TypeExpr {
             kind: TypeKind::Named { module, name, args },
@@ -1177,9 +1220,9 @@ impl Parser<'_> {
                     .is_some_and(|c| self.toks[c as usize + 1].kind == T::Arrow);
                 self.bump();
                 if !is_fn {
-                    TypeKind::Tuple(self.seq(T::RParen, true, true, Self::ty)?)
+                    TypeKind::Tuple(self.seq(T::RParen, true, Self::ty)?)
                 } else {
-                    let params = self.seq(T::RParen, true, true, |p| {
+                    let params = self.seq(T::RParen, true, |p| {
                         let label = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Colon {
                             let label = p.name()?;
                             p.bump();
@@ -1202,6 +1245,10 @@ impl Parser<'_> {
             T::LBrace => {
                 self.bump();
                 let inner = self.nested(Self::ty)?;
+                if self.tok().brk {
+                    let msg = "a line break directly inside a `{ }` that groups a type is a compile error";
+                    return Err(Diagnostic::new(Code::TypeGroupBreak, self.tok().span, msg));
+                }
                 self.expect(&T::RBrace)?;
                 return Ok(inner);
             }

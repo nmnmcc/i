@@ -1,0 +1,10 @@
+/// doc
+@external("m", "f")
+f: Int
+
+/// before
+/// after
+/// last
+@deprecated("old")
+@main
+main = () { Nil }

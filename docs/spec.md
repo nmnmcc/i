@@ -71,7 +71,7 @@ A keyword may not be used as a name.
 +.  -.  *.  /.      <.  <=.  >.  >=.
 ```
 
-Source text is cut into tokens from left to right. At every point, the longest token that matches is taken: `<=.` is one token, and `<<` is one token. Spaces, line ends, and comments come between tokens, and some line ends are breaks (§1.7). After `.`, digits are read as a `decimal`, never as a float: `t.0.1` is `(t.0).1`. A token may not be followed directly by a letter, a digit, or `_` that would continue it as a word or a number: `12px`, `0xG`, `1.0E5`, and `fooBar` are compile errors.
+Source text is cut into tokens from left to right. At every point, the longest token that matches is taken: `<=.` is one token, and `<<` is one token. Spaces (U+0020 and tab), line ends, and comments come between tokens, and some line ends are breaks (§1.7). After `.`, digits are read as a `decimal`, never as a float: `t.0.1` is `(t.0).1`. A token may not be followed directly by a letter, a digit, or `_` that would continue it as a word or a number: `12px`, `0xG`, `1.0E5`, and `fooBar` are compile errors.
 
 ### 1.6 Literals
 
@@ -102,6 +102,7 @@ Comments are not tokens, so the tokens on the two sides of a comment are what co
 A break ends something. What it ends depends on the brackets it is directly inside:
 
 - Directly inside `{ }` (a block, the clauses of a `case`, or the constructors of a type), and at the top level of a file, a break ends a statement, a clause, a constructor, or an item. Attributes are part of the item after them, so a break after an attribute does not end the item.
+- Directly inside a `{ }` that groups a type (§3), a break is a compile error.
 - Directly inside `( )`, `[ ]`, or `<< >>`, a break is the same as a `,`. A `,` at the end of a line may be left out.
 
 With no break, as on one line, a statement or a clause is the longest expression that may be read from its start, and a `,` is needed between parts. So statements and clauses may share a line: `case b { True -> 1  False -> 0 }`.
@@ -303,7 +304,7 @@ NamedType = [ name "." ] UpName [ "(" Type { "," Type } [ "," ] ")" ] .
 - `( … )` with `->` after it is a function type. Without `->`, it is a tuple type.
 - A parameter of a function type may have a label: `(in: String, each: String) -> String` (§4.6).
 - A function type goes as far to the right as it can: `(A) -> B | C` gives `B | C`. `{ }` puts a type in a group: `{ (A) -> B } | C`, `(a) -> { (b) -> c } ! E`.
-- `?` and `!` are part of the nearest `->`. `?` comes before `!`.
+- `?` and `!` are part of the nearest `->`. `?` comes before `!`. A `?` or `!` that the nearest `->` cannot take, because it already has one or because `!` came first, is a compile error: in `(A) -> (B) -> C ! N ? E`, the inner function type is put in `{ }` to give `? E` to the outer `->`.
 - In a written function type, a missing `? E` means `? Never`, and a missing `! N` means `! Never`. This is the same in every place where a type is written.
 
 ## 4. Types
@@ -494,7 +495,7 @@ Primary   = int_lit | float_lit | string_lit | Name | Tuple | List | BitArray
           | Block | Function | Case | RecordUpdate .
 Name      = [ name "." ] ( name | UpName ) .
 Tuple     = "(" [ Expr { "," Expr } [ "," ] ] ")" .
-List      = "[" [ Expr { "," Expr } [ "," ".." Expr ] ] [ "," ] "]" .
+List      = "[" [ Expr { "," Expr } [ "," ".." Expr ] [ "," ] ] "]" .
 Block     = "{" { Statement } Expr "}" .
 Statement = Pattern "=" Expr | "!" NamedType "=" Expr | Expr .
 Function  = "(" [ Param { "," Param } [ "," ] ] ")" [ "->" Union [ "?" Union ] [ "!" Union ] ] Block .
@@ -504,7 +505,7 @@ Case      = "case" Expr "{" { Clause } "}" .
 Clause    = Pattern { "|" Pattern } [ "if" Expr ] "->" Expr .
 ```
 
-- `( … )` that is not a call is a function when `{` or `->` comes after it, and a tuple when not (§1.7). So its parts are patterns in a function and expressions in a tuple.
+- `( … )` that is not a call is a function when `{` or `->` comes after it, and a tuple when not (§1.7). So its parts are patterns in a function and expressions in a tuple. In a guard, a `->` that is not inside brackets always ends the clause head. So in `n if (a) -> 1`, the guard is the tuple `(a)`, which is a compile error because a guard must be a `Bool`, and not a function.
 - A statement that starts with a pattern and then `=` is a binding. When more than one such pattern may be read, the longest is taken: in `a = (x, y) = e`, the pattern is `a = (x, y)`. A statement that starts with `!` is an environment statement. Every other statement is an expression.
 
 ### 6.2 Order of evaluation

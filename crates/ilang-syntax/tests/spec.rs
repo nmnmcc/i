@@ -29,8 +29,6 @@ fn spec_blocks_parse() {
     let blocks = blocks(spec);
     assert!(blocks.len() >= 11, "found {} blocks", blocks.len());
     for (line, src) in blocks {
-        // §9.1 writes an elided body as `{ ... }`, which is not i.
-        let src = src.replace("{ ... }", "{ panic(\"elided\") }");
         let (module, diags) = parse_module(&src);
         assert!(
             diags.is_empty(),

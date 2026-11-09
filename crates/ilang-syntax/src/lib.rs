@@ -35,6 +35,10 @@ pub enum Code {
     DiscardValue,
     BadSpread,
     BadPattern,
+    ArrowTail,
+    ArgOrder,
+    PipeTarget,
+    TypeGroupBreak,
 }
 
 impl Code {
@@ -58,6 +62,10 @@ impl Code {
             Code::DiscardValue => "E0106",
             Code::BadSpread => "E0107",
             Code::BadPattern => "E0108",
+            Code::ArrowTail => "E0109",
+            Code::ArgOrder => "E0110",
+            Code::PipeTarget => "E0111",
+            Code::TypeGroupBreak => "E0112",
         }
     }
 }
