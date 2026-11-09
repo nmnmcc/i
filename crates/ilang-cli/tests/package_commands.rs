@@ -211,7 +211,7 @@ fn new_makes_a_package_that_checks_runs_and_tests() {
     let dir = w.path().join("demo");
     assert_eq!(read(&dir.join("i.toml")), "name = \"demo\"\n");
     assert_eq!(read(&dir.join(".gitignore")), "/build/\n");
-    assert!(read(&dir.join("src/main.i")).contains("@host(\"i:io/v1\")"));
+    assert!(read(&dir.join("src/main.i")).contains("(Io) = i/io"));
     assert!(read(&dir.join("src/main.i")).contains("@main"));
     assert!(read(&dir.join("test/main_test.i")).contains("@test"));
 
@@ -221,6 +221,53 @@ fn new_makes_a_package_that_checks_runs_and_tests() {
     assert_eq!(out, "Hello, demo!\n");
     let out = w.ok(&["test", "--project", &project]);
     assert!(out.contains("1 passed, 0 failed"), "{out}");
+}
+
+/// Two packages made by `i new` both print with `Io` of `i/io`, so one may
+/// depend on the other: neither declares the standard service (§9.7). The
+/// dependency is still shown as able to print.
+#[test]
+fn two_new_packages_work_together() {
+    let w = World::new();
+    w.ok(&["new", "greet"]);
+    w.ok(&["new", "app"]);
+    let app = w.path().join("app");
+    let project = app.display().to_string();
+    let greet = w.path().join("greet").display().to_string();
+    let out = w.ok(&["add", "greet", "--path", &greet, "--project", &project]);
+    assert!(
+        out.contains(
+            "new permission: greet (path ../greet) can use host service \"i:io/v1\" (greet/main imports i/io.Io)"
+        ),
+        "{out}"
+    );
+    w.ok(&["check", "--project", &project]);
+    w.ok(&["run", "--project", &project]);
+
+    // `app` uses `greet`.
+    write(
+        &app,
+        &[(
+            "src/main.i",
+            "import (\n\t(Io) = i/io\n\tgreet = greet/main\n)\n\nexport (greeting)\n\n\
+             greeting = (who: String) { greet.greeting(who) }\n\n\
+             @main\nmain = (io ! Io) { io.print(greeting(\"i\")) }\n",
+        )],
+    );
+    let out = w.ok(&["check", "--project", &project]);
+    assert_eq!(out, "", "no warnings");
+    w.ok(&["build", "--project", &project]);
+    let out = w.ok(&["run", "--project", &project]);
+    assert_eq!(out, "Hello, i!\n");
+    let out = w.ok(&["test", "--project", &project]);
+    assert!(out.contains("1 passed, 0 failed"), "{out}");
+    let out = w.ok(&["deps", "--project", &project]);
+    assert!(
+        out.contains(
+            "greet (path ../greet)\n  host service \"i:io/v1\" (greet/main imports i/io.Io)\n"
+        ),
+        "{out}"
+    );
 }
 
 #[test]
@@ -269,12 +316,12 @@ fn add_takes_the_newest_tag_and_keeps_comments() {
     ]);
     assert!(
         out.contains(
-            "new permission: example.com/lib 1.1.0 declares host service \"lib:net/v1\" (lib/math.Net)"
+            "new permission: example.com/lib 1.1.0 can use host service \"lib:net/v1\" (lib/math.Net)"
         ),
         "{out}"
     );
     assert!(
-        out.contains("new permission: example.com/lib 1.1.0 declares external \"env\" \"now\""),
+        out.contains("new permission: example.com/lib 1.1.0 can use external \"env\" \"now\""),
         "{out}"
     );
     let toml = read(&dir.join("i.toml"));
@@ -431,13 +478,13 @@ fn update_raises_within_the_major_version_and_shows_new_permissions() {
     assert!(!out.contains("two:"), "{out}");
     assert!(
         out.contains(
-            "new permission: example.com/lib 1.2.0 declares host service \"lib:net/v1\" (lib/math.Net)"
+            "new permission: example.com/lib 1.2.0 can use host service \"lib:net/v1\" (lib/math.Net)"
         ),
         "{out}"
     );
     assert!(
         out.contains(
-            "new permission: example.com/lib 1.2.0 declares external \"env\" \"now\" (lib/math.now)"
+            "new permission: example.com/lib 1.2.0 can use external \"env\" \"now\" (lib/math.now)"
         ),
         "{out}"
     );
@@ -998,6 +1045,35 @@ fn publish_sees_what_the_host_must_give() {
         out.contains("changed constructors api.Io: Io(print: (text: String) -> Nil)"),
         "{out}"
     );
+}
+
+/// A package that starts to print imports `i/io`: the host must give the
+/// standard service, as if the package declared it (§9.7).
+#[test]
+fn publish_sees_the_standard_service_of_i_io() {
+    let w = World::new();
+    let api = "export (f)\n\nf = () { 1 }\n";
+    let dir = w.project(
+        "pub",
+        &[
+            ("i.toml", "name = \"pub\"\n"),
+            (".gitignore", "/build/\n"),
+            ("src/api.i", api),
+        ],
+    );
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "first");
+    let project = dir.display().to_string();
+    w.ok(&["publish", "1.0.0", "--project", &project]);
+
+    let printing = "import ((Io) = i/io)\n\nexport (f, say)\n\nf = () { 1 }\n\nsay = (io ! Io) { io.print(\"one\") }\n";
+    let (ok, out) = try_publish(&w, &dir, &[("src/api.i", printing)], "1.0.1");
+    assert!(!ok, "{out}");
+    assert!(
+        out.contains("added host \"i:io/v1\": (print: (text: String) -> Nil)"),
+        "{out}"
+    );
+    assert!(out.contains("a new minor version"), "{out}");
 }
 
 #[test]

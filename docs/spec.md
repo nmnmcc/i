@@ -5,13 +5,13 @@ This document is the definition of the i programming language. A compiler or a p
 This document is complete in itself. It defines:
 
 - the source language (§1 to §8);
-- effects, and the library modules `i/fail`, `i/control`, `i/resource`, and `i/assertion` (§9);
+- effects, and the library modules `i/fail`, `i/control`, `i/resource`, `i/assertion`, and `i/io` (§9);
 - the library module `i/core`, which has the operations that are not written in i (§13);
 - packages, versions, and the files `i.toml` and `i.lock` (§2.1, §2.6 to §2.8);
 - what programs do when they run, and the text form of values (§11);
 - the binary interface between a compiled module and its host (§10 and Appendix B).
 
-Every compiler must give the five library modules above. Other library modules, the command-line tools, and the way test results are shown are not part of the language.
+Every compiler must give the six library modules above. Other library modules, the command-line tools, and the way test results are shown are not part of the language.
 
 i is small, and every part of it is what it looks like. A thing that looks like a function is a normal function. A binding is a binding wherever it is written. Where two forms look the same, they have the same rules.
 
@@ -131,7 +131,7 @@ Modules in `test/` are only compiled when the tests of their package are run. Th
 
 In a module, the first part of a module path says which package the module is in. It must be one of these:
 
-- `i`, for the five **library modules** (§9, §13), which every compiler gives. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
+- `i`, for the six **library modules** (§9, §13), which every compiler gives. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
 - the `name` of the module's own package;
 - a dependency name of the module's own package (§2.6); in a test module, also a dev-dependency name.
 
@@ -914,7 +914,7 @@ Storage { Storage(read: (key: String) -> String ? String) }
 - With `@host("namespace", "async")`, the host does the functions **later**: the program waits at the call, and goes on from the call when the host gives a value or an error. In i code, such a call is a normal call.
 - A host service in the environment of an entry point (§10.2) is given by the host. Every field is the Wasm import with the import module `namespace` and the field label as its name, encoded as in Appendix B.
 - i code may also give a host service with an environment statement, for example to put a fake in its place in a test.
-- The namespace `i:io/v1` is the **standard service**, which every host gives: `@host("i:io/v1") Io { Io(print: (text: String) -> Nil) }`. `print` writes the text and a line feed to the standard output. A program declares it like any host service; a host service with this namespace and other fields is a compile error on the WASI target (§B.7).
+- The library module `i/io` declares and exports the **standard service**: `@host("i:io/v1") Io { Io(print: (text: String) -> Nil) }`. `print` writes the text and a line feed to the standard output. A program that prints imports it, for example `import ((Io) = i/io)`, and takes it from the environment of an entry point like any host service. `i run` and `i test` give it to every program, and on the WASI target the module gives it itself (§B.7). Any other host, such as an embedder or the JavaScript SDK, gives it like any other host service, or the program cannot run there. A host service declared in another module with the namespace `i:io/v1` is a normal host service, and the rule above about namespaces and labels is true for it as for any other: with a field `print`, it is a compile error.
 
 ## 10. The host boundary
 
@@ -1041,7 +1041,7 @@ These names may be used in every module. Other names may cover them.
 | `panic` | `(message: String) -> Never` | §11.7 |
 | `assert` | `(c: Bool) -> Nil ! Assert` | §9.6 |
 
-These are normal functions and types. The modules `i/fail` (§9.3), `i/control` (§9.4), `i/resource` (§9.5), `i/assertion` (§9.6), and `i/core` (§13) have the other functions.
+These are normal functions and types. The modules `i/fail` (§9.3), `i/control` (§9.4), `i/resource` (§9.5), `i/assertion` (§9.6), `i/io` (§9.7), and `i/core` (§13) have the other functions and types.
 
 ## 13. The module `i/core`
 
@@ -1089,6 +1089,7 @@ This appendix lists the rules that were chosen without a full discussion, until 
 6. A `////` comment is the documentation of the module wherever it is in the file, also after `import` or between items. Gleam does the same. The lines of all such comments, in order, are the documentation (§1.2).
 7. A statement that is not the last and does nothing gives a warning, not an error (§6.10). Gleam also warns about an unused literal or pure value; TypeScript's `noUnusedExpressions` (in ESLint) is an error only when it is turned on. Calls are never warned about, also when their value is not `Nil`, as in Gleam, because a call may have an effect.
 8. The WASI target (§B.7) is a WASI preview 1 command, not a WASI 0.2 component. A command runs with `wasmtime run` and Node's `node:wasi` with no other step, and keeps the values of §B.2, so there is one binary interface. A component would need a second encoding of `Int`, `BitArray`, and errors in WIT. Gleam's JavaScript and Erlang targets are also chosen with `--target`, as here.
+9. The standard service is declared one time, in the library module `i/io`, and a program that prints imports it (§9.7). If every program declared it, two packages that both print could not be used together, because two host services may not have the same namespace and a field with the same label. Gleam does the same: its standard output is `io.println` of the module `gleam/io`, which a program imports. In TypeScript, `console.log` is a global name that every host gives with no import; in i, a program says with its imports and its environment what the host must give, so `Io` is not a built-in name (§12).
 
 ## Appendix B. The binary interface
 
@@ -1186,7 +1187,7 @@ The custom section `ilang.abi` is UTF-8 JSON in this form:
 `i build --target wasi` makes the module a WASI preview 1 command, which a WASI host such as `wasmtime run` or Node's `node:wasi` runs with no other step. It is the module of §B.1 to §B.6 with these changes:
 
 - It imports `fd_write` and `proc_exit` from `wasi_snapshot_preview1`, and not `panic` from `ilang:host/v1`. The stop message (§11.7) and a line feed are written to file descriptor 2, then the process ends with exit code 1. `reference_id` is imported from `ilang:host/v1` only when a type of an import or export is a custom type with no constructors, because only the host can make such a value.
-- `print` of the standard service `i:io/v1` (§9.7) is not an import: the module writes the text and a line feed to file descriptor 1. A write that fails is given up. The metadata does not list it.
+- `print` of the standard service, `Io` of `i/io` (§9.7), is not an import: the module writes the text and a line feed to file descriptor 1. A write that fails is given up. The metadata does not list it. Another host service with the namespace `i:io/v1` is an import like any other.
 - Because the runtime imports `fd_write` and `proc_exit`, an external function or a field of a host service with the import module `wasi_snapshot_preview1` and one of these names is a compile error. Other functions of `wasi_snapshot_preview1` may be imported.
 - Every other host service and external function is an import as in §B.4, so a host that has them can give them. A module that the host makes before the program, such as one given with `wasmtime run --preload`, cannot use the program's `memory` or `ilang_alloc`, so it can only give functions whose parameters, values, and errors are `Nil`, `Bool`, `Float`, or host references. An import with an `Int`, `String`, or `BitArray` needs a host that defines it with the exports of the instance, such as an embedder, or a module linked in statically.
 - A function of an async host service is a blocking import, with the results of a function that is not async (§B.2). Nothing is async, and there are no `ilang_resume:…` and `ilang_result:…` exports.

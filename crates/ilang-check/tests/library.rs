@@ -1,4 +1,4 @@
-//! The five library modules and the prelude parse and resolve with no
+//! The six library modules and the prelude parse and resolve with no
 //! problems, and they have the names and labels of the spec tables.
 
 mod common;
@@ -20,7 +20,8 @@ fn library_resolves_cleanly() {
             "i/control",
             "i/resource",
             "i/assertion",
-            "i/core"
+            "i/core",
+            "i/io"
         ]
     );
 }
@@ -70,6 +71,7 @@ fn library_names() {
             ],
         ),
         ("i/prelude", &["panic", "assert"]),
+        ("i/io", &[]),
     ];
     for (path, names) in expect {
         let m = program.module(common::module(&program, path));

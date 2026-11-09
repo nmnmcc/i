@@ -1,14 +1,15 @@
 //! Host services that come with the host (spec §9.7, §10.1).
 //!
 //! - [`standard`] is what `i run` and `i test` give every program: the
-//!   standard service of spec §9.7, which a program declares like this:
+//!   standard service of spec §9.7, `Io` of the library module `i/io`,
+//!   which a program imports like this:
 //!
 //!   ```text
-//!   @host("i:io/v1")
-//!   Io { Io(print: (text: String) -> Nil) }
+//!   import ((Io) = i/io)
 //!   ```
 //!
-//!   `print` writes the text and a line feed.
+//!   `print` writes the text and a line feed. Another embedder gives it like
+//!   any host service, for example with this function.
 //! - [`testing`] is what the spec suite gives: services and external
 //!   functions under `test:` namespaces, which keep a [`Log`].
 //!
@@ -23,7 +24,7 @@ use std::sync::{Arc, Mutex};
 
 const ONE: &str = "each function is given once";
 
-/// The namespace of the standard `Io` service.
+/// The namespace of the standard service `Io` of `i/io`.
 pub const IO: &str = "i:io/v1";
 
 /// The standard services, which print with `print`.

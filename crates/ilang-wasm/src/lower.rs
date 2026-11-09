@@ -63,9 +63,6 @@ pub struct Options {
     pub target: ir::Target,
 }
 
-/// The namespace of the standard service `Io` (§9.7).
-pub const IO: &str = "i:io/v1";
-
 /// The WASI functions that the runtime imports on the WASI target (B.7).
 const WASI: &str = "wasi_snapshot_preview1";
 const WASI_RUNTIME: [&str; 2] = ["fd_write", "proc_exit"];
@@ -986,7 +983,7 @@ impl<'a> Lowerer<'a> {
         };
         let kind = if self.host_is_async(host) {
             ImportKind::AsyncService
-        } else if host.namespace == IO && self.options.target == ir::Target::Wasi {
+        } else if self.options.target == ir::Target::Wasi && is_standard_service(program, t) {
             ImportKind::WasiStdout
         } else {
             ImportKind::Service
@@ -997,21 +994,6 @@ impl<'a> Lowerer<'a> {
                 return;
             };
             let abi = host_abi(hf);
-            if kind == ImportKind::WasiStdout
-                && !(label.name == "print"
-                    && abi.params == [AbiType::String]
-                    && abi.result == AbiType::Nil
-                    && abi.errors.is_empty())
-            {
-                self.error(
-                    def.module,
-                    label.span,
-                    format!(
-                        "the standard service `{IO}` has one function, `print: (text: String) -> Nil` (§9.7)"
-                    ),
-                );
-                return;
-            }
             match self.import(&host.namespace, &label.name, abi, kind) {
                 Ok(import) => {
                     let f = self.import_func(import);
@@ -2587,6 +2569,15 @@ fn abi_type(t: HostType) -> AbiType {
         HostType::BitArray => AbiType::BitArray,
         HostType::Opaque(_) => AbiType::Externref,
     }
+}
+
+/// The standard service (§9.7): the type `Io` of the library module
+/// `i/io`. No other package may have a module path that starts with `i/`
+/// (§2.1), so this is that type and no other. A host service declared
+/// elsewhere with the namespace `i:io/v1` is a normal host service.
+fn is_standard_service(program: &hir::Program, t: TypeId) -> bool {
+    let def = program.ty(t);
+    def.name == "Io" && program.module(def.module).path == "i/io"
 }
 
 /// The parts of B.2 of a function at the host boundary.

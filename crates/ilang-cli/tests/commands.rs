@@ -568,11 +568,11 @@ fn run_gives_the_standard_services() {
         ("i.toml", "name = \"app\"\n"),
         (
             "src/main.i",
-            "export (Io)\n\n@host(\"i:io/v1\")\nIo { Io(print: (text: String) -> Nil) }\n\n@main\nmain = (io ! Io) {\n  io.print(\"one\")\n  io.print(\"two\")\n}\n",
+            "import ((Io) = i/io)\n\n@main\nmain = (io ! Io) {\n  io.print(\"one\")\n  io.print(\"two\")\n}\n",
         ),
         (
             "test/main_test.i",
-            "import (app/main)\n\n@test\nprints = (io ! main.Io) { io.print(\"in a test\") }\n",
+            "import (i/io)\n\n@test\nprints = (out ! io.Io) { out.print(\"in a test\") }\n",
         ),
     ]);
     let out = i(&["run"], dir.path());

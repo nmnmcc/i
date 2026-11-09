@@ -639,8 +639,8 @@ pub enum ImportKind {
     /// A function of an async host service: no results; the answer comes
     /// through `ilang_resume:…` (B.5).
     AsyncService,
-    /// `print` of the standard service `i:io/v1` on the WASI target: the
-    /// module defines it, with `fd_write` to the standard output (B.7).
+    /// `print` of the standard service, `Io` of `i/io`, on the WASI target:
+    /// the module defines it, with `fd_write` to the standard output (B.7).
     WasiStdout,
 }
 

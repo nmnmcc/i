@@ -7,8 +7,10 @@
 //! fails, `i.toml` and `i.lock` are both put back as they were.
 //!
 //! `i add` and `i update` print the host services and external functions
-//! that the new versions declare and the old ones did not, as
-//! `new permission: …`; `i deps` prints them all.
+//! that the new versions can use and the old ones could not, as
+//! `new permission: …`; `i deps` prints them all. A package can use what
+//! its modules declare, and the host services of the library modules that
+//! they import: a module that imports `i/io` can print (§9.7).
 
 use anyhow::{Context, Result, anyhow, bail};
 use clap::Subcommand;
@@ -79,7 +81,7 @@ pub enum PackageCommand {
         project: PathBuf,
     },
     /// Print the packages that the program uses, and the host services and
-    /// external functions that each one declares.
+    /// external functions that each one can use.
     Deps {
         #[arg(long, default_value = ".")]
         project: PathBuf,
@@ -147,14 +149,12 @@ fn formatted(source: String) -> String {
 
 fn main_module(name: &str) -> String {
     format!(
-        r#"//// The package `{name}`. `i run` gives the program the host service `Io`
-//// (`i:io/v1`), so it can print.
+        r#"//// The package `{name}`. It imports the standard service `Io` from `i/io`
+//// (§9.7), and `i run` gives it, so the program can print.
 
-export (Io, greeting)
+import ((Io) = i/io)
 
-/// The host service that prints a line (§9.7). The host gives it.
-@host("i:io/v1")
-Io {{ Io(print: (text: String) -> Nil) }}
+export (greeting)
 
 /// The greeting for `who`.
 greeting = (who: String) -> String {{ "Hello, " <> who <> "!" }}
@@ -581,7 +581,7 @@ fn update(project: &Path, names: &[String]) -> Result<ExitCode> {
 
 // ---- Permissions: i deps ----
 
-/// What one package that the program uses declares.
+/// What one package that the program uses can use.
 #[derive(Clone, Debug, Default)]
 struct PackageReport {
     /// How the package is shown: `location version`, `path dir`, or the
@@ -590,7 +590,9 @@ struct PackageReport {
     /// Only the tests of the compiled package use it.
     dev: bool,
     /// Each permission, as `host service "ns"` or `external "m" "f"`, and
-    /// the names that declare it, as `module/path.Name`.
+    /// where it comes from: the names that declare it, as
+    /// `module/path.Name`, and the modules that import a library module
+    /// that declares it, as `module/path imports i/io.Io`.
     permissions: BTreeMap<String, BTreeSet<String>>,
 }
 
@@ -603,7 +605,9 @@ struct Report {
 }
 
 /// The host services (§9.7) and the external functions (§10.1) that each
-/// package of the graph declares, from the resolved program.
+/// package of the graph can use, from the resolved program: those that its
+/// modules declare, and the host services of the library modules that they
+/// import.
 fn report(graph: &PackageGraph) -> Result<Report> {
     let (program, diags) = ilang_check::resolve_program(graph);
     let Some(program) = program else {
@@ -659,20 +663,29 @@ fn report(graph: &PackageGraph) -> Result<Report> {
             r.permissions.entry(what).or_default().insert(at);
         }
     };
+    let service = |host: &hir::Host| -> String {
+        if host.is_async {
+            format!("host service \"{}\" (async)", host.namespace)
+        } else {
+            format!("host service \"{}\"", host.namespace)
+        }
+    };
     for t in &program.types {
         if let Some(host) = &t.host {
             let m = program.module(t.module);
-            let what = if host.is_async {
-                format!("host service \"{}\" (async)", host.namespace)
-            } else {
-                format!("host service \"{}\"", host.namespace)
-            };
-            add(m.package, what, format!("{}.{}", m.path, t.name));
+            add(m.package, service(host), format!("{}.{}", m.path, t.name));
         }
     }
     for m in &program.modules {
         if m.package == graph.library {
             continue;
+        }
+        for t in library_hosts(&program, graph.library, m) {
+            let def = program.ty(t);
+            let Some(host) = &def.host else { continue };
+            let from = program.module(def.module);
+            let at = format!("{} imports {}.{}", m.path, from.path, def.name);
+            add(m.package, service(host), at);
         }
         for d in &m.defs {
             if let DefKind::External {
@@ -685,6 +698,22 @@ fn report(graph: &PackageGraph) -> Result<Report> {
         }
     }
     Ok(out)
+}
+
+/// The host services (§9.7) of the library `i` that the module `m`
+/// imports. The standard service is declared in `i/io`, so a package whose
+/// module imports `i/io` can print as if it declared the service itself.
+fn library_hosts<'a>(
+    program: &'a hir::Program,
+    library: PackageId,
+    m: &'a hir::Module,
+) -> impl Iterator<Item = hir::TypeId> + 'a {
+    m.imports
+        .iter()
+        .map(|&i| program.module(i))
+        .filter(move |i| i.package == library)
+        .flat_map(|i| i.types.iter().copied())
+        .filter(|&t| program.ty(t).host.is_some())
 }
 
 fn deps(project: &Path) -> Result<ExitCode> {
@@ -717,7 +746,7 @@ fn print_new_permissions(before: &Report, after: &Report) {
             }
             let at: Vec<&str> = at.iter().map(String::as_str).collect();
             println!(
-                "new permission: {} declares {what} ({})",
+                "new permission: {} can use {what} ({})",
                 p.shown,
                 at.join(", ")
             );
@@ -1024,7 +1053,8 @@ struct Entry {
 /// What the host must give is part of it too, exported or not, since an
 /// exported function may use it: each external function (§10.1), as
 /// `external "module" "function"` with its type, and each host service
-/// (§9.7), as `host "namespace"` with the fields of its constructor.
+/// (§9.7) that it declares or imports from a library module, such as `Io`
+/// of `i/io`, as `host "namespace"` with the fields of its constructor.
 type Interface = BTreeMap<String, Entry>;
 
 /// The interface of the package in `dir`, checked without its tests. The
@@ -1097,7 +1127,15 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                 },
             );
         }
-        for &t in &m.types {
+        // The host services of the library modules that this module
+        // imports (§9.7) are part of what the host must give, as if the
+        // module declared them.
+        let types = m
+            .types
+            .iter()
+            .copied()
+            .chain(library_hosts(program, graph.library, m));
+        for t in types {
             let def = program.ty(t);
             let shown = TypeShow::new(program, def, &shown_names, false);
             let canonical = TypeShow::new(program, def, &canonical_names, true);
@@ -1118,7 +1156,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                 s.insert(fields(&shown));
                 c.insert(fields(&canonical));
             }
-            if !def.exported {
+            if !def.exported || def.module != module {
                 continue;
             }
             out.insert(

@@ -8,7 +8,8 @@ use ilang_host::{Abi, Outcome, Program, Stop};
 use std::path::Path;
 use wasmtime::{Caller, Config, Engine, Extern, Linker, Module, Store};
 
-const IO: &str = "@host(\"i:io/v1\")\nIo { Io(print: (text: String) -> Nil) }\n";
+/// The import of the standard service (spec §9.7).
+const IO: &str = "import ((Io) = i/io)\n";
 
 fn package(main: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
@@ -219,7 +220,7 @@ fn stops_write_the_message_and_exit_with_1() {
         ),
     ];
     for (imports, source) in programs {
-        let dir = package(&format!("{imports}{IO}{source}"));
+        let dir = package(&format!("{imports}{source}"));
         let message = ilang_stop(dir.path());
         for opt in LEVELS {
             let ran = run(&wasi(dir.path(), opt), 5, no_imports);
@@ -338,11 +339,11 @@ fn async_services_are_blocking_calls() {
 
 #[test]
 fn host_references_keep_the_reference_id_import() {
-    let dir = package(&format!(
-        "{IO}Handle {{ }}\n@host(\"app:files/v1\")\n\
-         Files {{ Files(open: () -> Handle, same: (a: Handle, b: Handle) -> Bool) }}\n\
-         @main\nmain = (f ! Files) {{ f.open() == f.open() }}\n"
-    ));
+    let dir = package(
+        "Handle { }\n@host(\"app:files/v1\")\n\
+         Files { Files(open: () -> Handle, same: (a: Handle, b: Handle) -> Bool) }\n\
+         @main\nmain = (f ! Files) { f.open() == f.open() }\n",
+    );
     let wasm = wasi(dir.path(), Level::O0);
     assert!(imports(&wasm).contains(&("ilang:host/v1".into(), "reference_id".into())));
     // Without host references, `reference_id` is defined in the module.
@@ -365,14 +366,23 @@ fn build_error(source: &str) -> String {
 }
 
 #[test]
-fn needs_an_entry_and_the_standard_print() {
+fn needs_an_entry() {
     assert!(build_error("f = () { 1 }\n").contains("needs a program entry"));
-    let wrong = "@host(\"i:io/v1\")\nIo { Io(print: (text: String) -> Int) }\n\
-                 @main\nmain = (io ! Io) { io.print(\"x\") }\n";
-    assert!(build_error(wrong).contains("has one function"));
-    let other = "@host(\"i:io/v1\")\nIo { Io(read: () -> String) }\n\
-                 @main\nmain = (io ! Io) { io.read() }\n";
-    assert!(build_error(other).contains("has one function"));
+}
+
+/// The standard service is `Io` of `i/io`. Another declaration of `print`
+/// in `i:io/v1` is two host services with one field (E0311); one with
+/// another field is a normal host service, and stays an import.
+#[test]
+fn the_standard_service_is_the_one_of_i_io() {
+    let twice = "@host(\"i:io/v1\")\nMine { Mine(print: (text: String) -> Nil) }\n\
+                 @main\nmain = (io ! Mine) { io.print(\"x\") }\n";
+    assert!(build_error(twice).contains("E0311"));
+    let other = "@host(\"i:io/v1\")\nInput { Input(read: () -> String) }\n\
+                 @main\nmain = (input ! Input) { input.read() }\n";
+    let dir = package(other);
+    let wasm = wasi(dir.path(), Level::O0);
+    assert!(imports(&wasm).contains(&("i:io/v1".into(), "read".into())));
 }
 
 /// The runtime imports `fd_write` and `proc_exit` itself (B.7), so a

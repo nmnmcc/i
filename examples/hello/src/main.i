@@ -1,18 +1,16 @@
-//// A first program in i. `i run` and `i test` give it the host service
-//// `Io` (`i:io/v1`), so it can print: `i run` prints `Hello from i!`.
+//// A first program in i. It imports the standard service `Io` from `i/io`
+//// (§9.7), and `i run` gives it, so the program can print: `i run` prints
+//// `Hello from i!`.
+
+import (
+	(Io) = i/io
+)
 
 export (
 	Greeting(..)
-	Io
 	greet
 	repeat
 )
-
-/// The host service that prints a line (§9.7). The host gives it.
-@host("i:io/v1")
-Io {
-	Io(print: (text: String) -> Nil)
-}
 
 Greeting {
 	Greeting(name: String, times: Int)

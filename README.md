@@ -32,7 +32,7 @@ The spec suite in `tests/spec` runs every case unoptimized and optimized, and re
 | `i add NAME [LOCATION[@VERSION]]` | Add a dependency to `i.toml` and bring `i.lock` up to date |
 | `i remove NAME` | Take a dependency out of `i.toml` and bring `i.lock` up to date |
 | `i update [NAMES]` | Raise dependencies to the newest version with the same major version |
-| `i deps` | Print the packages the program uses, and the host services and external functions each one declares |
+| `i deps` | Print the packages the program uses, and the host services and external functions each one can use |
 | `i publish VERSION [--dry-run]` | Check the package and tag the new version `vX.Y.Z` in git; nothing is pushed |
 | `i lsp` | Run the language server on standard input and output |
 
@@ -43,11 +43,11 @@ The VS Code extension, with syntax highlighting and the language server, is in [
 ## Host services of `i run` and `i test`
 
 A program talks to its host through host services (§9.7 of the spec). `i run`
-and `i test` give every program one service, which it declares like this:
+and `i test` give every program the standard service `Io` (`i:io/v1`), which
+is declared in the library module `i/io`. A program that prints imports it:
 
 ```i
-@host("i:io/v1")
-Io { Io(print: (text: String) -> Nil) }
+import ((Io) = i/io)
 
 @main
 main = (io ! Io) { io.print("Hello from i!") }
@@ -56,9 +56,14 @@ main = (io ! Io) { io.print("Hello from i!") }
 `print` writes the text and a line feed to the standard output; see
 [examples/hello](examples/hello). A test may put a fake in the place of a host
 service with an environment statement, `! Io = Io(print: (text) { Nil })`. An
-embedder gives its own services with `ilang_host::HostImports` (Rust) or the
+embedder gives `i:io/v1` and its own services with `ilang_host::HostImports`
+(Rust; `ilang_host::services::standard` is the `Io` of `i run`) or the
 `imports` option of `bindings/javascript/ilang.mjs`. The spec suite gives the
 services of `ilang_host::services::testing`, under `test:` namespaces.
+
+`i add`, `i update`, and `i deps` show what each package can use: the host
+services and external functions that it declares, and `i:io/v1` when one of
+its modules imports `i/io`.
 
 ## Run on a stock Wasmtime
 
@@ -74,8 +79,9 @@ wasmtime run examples/hello/build/hello.wasm
 
 Node runs the same file with `node:wasi`. On this target:
 
-- `print` of the standard service `i:io/v1` writes to the standard output,
-  and a stop writes its message to the standard error and exits with code 1.
+- `print` of the standard service `Io` of `i/io` writes to the standard
+  output, and a stop writes its message to the standard error and exits with
+  code 1.
 - The runtime imports `fd_write` and `proc_exit` of `wasi_snapshot_preview1`
   itself, so a program may not import them; other WASI functions it may.
 - Every other host service and external function is still an import, encoded

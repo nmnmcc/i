@@ -1,15 +1,16 @@
-//! The library package `i` (§2.1), which every program has: the five library
+//! The library package `i` (§2.1), which every program has: the six library
 //! modules (§9, §13) and the prelude of built-in names (§12).
 
 use crate::{ModuleKind, ModuleSource, Package, PackageGraph};
 
 /// The module paths and sources of the library modules, and of the prelude.
-pub const MODULES: [(&str, &str); 5] = [
+pub const MODULES: [(&str, &str); 6] = [
     ("i/fail", include_str!("../../../lib/i/fail.i")),
     ("i/control", include_str!("../../../lib/i/control.i")),
     ("i/resource", include_str!("../../../lib/i/resource.i")),
     ("i/assertion", include_str!("../../../lib/i/assertion.i")),
     ("i/core", include_str!("../../../lib/i/core.i")),
+    ("i/io", include_str!("../../../lib/i/io.i")),
 ];
 
 pub const PRELUDE: (&str, &str) = ("i/prelude", include_str!("../../../lib/prelude.i"));
