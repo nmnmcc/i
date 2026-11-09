@@ -11,7 +11,15 @@
 //! // spec: 6.10
 //! // expect: pass | compile-error <code> | stop "<first line>" | warning <code>
 //! // at: spec/case:3:5          (for a stop: each further line of the message)
+//! // output: text               (each text that the `@main` gave to a host function)
 //! ```
+//!
+//! The host gives the services and external functions of
+//! `ilang_host::services::testing` under `test:` namespaces, and does not
+//! check their answers, so that the module stops for an answer that is not
+//! correct (B.2). With `output` lines, the texts that the `@main` gave to
+//! `test:io/v1` `print` and to the functions of `test:async/v1` are exactly
+//! those, in order.
 //!
 //! - `pass`: the `@main`, when there is one, ends without a stop, and every
 //!   `@test` passes.
@@ -24,7 +32,8 @@
 //! `cargo test -p ilang-cli --test spec -- <filter>` runs the cases whose
 //! path has the filter.
 
-use ilang_cli::{BuildError, BuildOptions, Level, build, run_test};
+use ilang_cli::{BuildError, BuildOptions, Level, build, run_test_with};
+use ilang_host::services::{Log, testing};
 use ilang_host::{HostOptions, Outcome, Program, TestResult};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -42,12 +51,15 @@ struct Case {
     /// The package directory to build.
     project: PathBuf,
     expect: Expect,
+    /// The texts that the `@main` gives to the host, when they are checked.
+    output: Option<Vec<String>>,
     _temp: Option<tempfile::TempDir>,
 }
 
-fn header(text: &str, comment: &str) -> Result<Expect, String> {
+fn header(text: &str, comment: &str) -> Result<(Expect, Option<Vec<String>>), String> {
     let mut expect = None;
     let mut at = Vec::new();
+    let mut output: Option<Vec<String>> = None;
     let mut spec = false;
     for line in text.lines() {
         let Some(rest) = line.strip_prefix(comment) else {
@@ -79,14 +91,18 @@ fn header(text: &str, comment: &str) -> Result<Expect, String> {
             });
         } else if let Some(a) = rest.strip_prefix("at:") {
             at.push(a.trim().to_string());
+        } else if let Some(o) = rest.strip_prefix("output:") {
+            output
+                .get_or_insert_with(Vec::new)
+                .push(o.trim().to_string());
         }
     }
     if !spec {
         return Err("the header has no `spec:` line".into());
     }
     match expect {
-        Some(Expect::Stop(m, _)) => Ok(Expect::Stop(m, at)),
-        Some(e) => Ok(e),
+        Some(Expect::Stop(m, _)) => Ok((Expect::Stop(m, at), output)),
+        Some(e) => Ok((e, output)),
         None => Err("the header has no `expect:` line".into()),
     }
 }
@@ -113,39 +129,34 @@ fn cases(root: &Path) -> Vec<Result<Case, String>> {
                 .into_owned();
             if path.is_dir() {
                 let text = std::fs::read_to_string(path.join("i.toml")).unwrap_or_default();
-                out.push(
-                    header(&text, "#")
-                        .map_err(|e| format!("{name}: {e}"))
-                        .map(|expect| Case {
-                            name,
-                            project: path.clone(),
-                            expect,
-                            _temp: None,
-                        }),
-                );
+                out.push(header(&text, "#").map_err(|e| format!("{name}: {e}")).map(
+                    |(expect, output)| Case {
+                        name,
+                        project: path.clone(),
+                        expect,
+                        output,
+                        _temp: None,
+                    },
+                ));
             } else if path.extension().is_some_and(|e| e == "i") {
                 let text = std::fs::read_to_string(&path).unwrap();
                 let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
-                out.push(
-                    header(&text, "//")
-                        .map_err(|e| format!("{name}: {e}"))
-                        .map(|expect| {
-                            let dir = tempfile::tempdir().unwrap();
-                            std::fs::write(dir.path().join("i.toml"), "name = \"spec\"\n").unwrap();
-                            std::fs::create_dir_all(dir.path().join("test")).unwrap();
-                            std::fs::write(
-                                dir.path().join("test").join(format!("{stem}.i")),
-                                &text,
-                            )
+                out.push(header(&text, "//").map_err(|e| format!("{name}: {e}")).map(
+                    |(expect, output)| {
+                        let dir = tempfile::tempdir().unwrap();
+                        std::fs::write(dir.path().join("i.toml"), "name = \"spec\"\n").unwrap();
+                        std::fs::create_dir_all(dir.path().join("test")).unwrap();
+                        std::fs::write(dir.path().join("test").join(format!("{stem}.i")), &text)
                             .unwrap();
-                            Case {
-                                name,
-                                project: dir.path().to_path_buf(),
-                                expect,
-                                _temp: Some(dir),
-                            }
-                        }),
-                );
+                        Case {
+                            name,
+                            project: dir.path().to_path_buf(),
+                            expect,
+                            output,
+                            _temp: Some(dir),
+                        }
+                    },
+                ));
             }
         }
     }
@@ -163,6 +174,8 @@ enum Outcome2 {
         warnings: Vec<String>,
         /// `None` when there is no `@main`; else `Ok` or the stop message.
         main: Option<Result<(), String>>,
+        /// What the `@main` gave to the host.
+        output: Vec<String>,
         tests: Vec<(String, Result<(), String>)>,
     },
 }
@@ -193,9 +206,14 @@ fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
         Err(e) => return Err(e.to_string()),
     };
     let program = Program::from_bytes(&built.wasm).map_err(|e| format!("{e:#}"))?;
+    let options = |log: &Log| HostOptions {
+        imports: testing(log.clone()),
+        unchecked_replies: true,
+    };
+    let log = Log::default();
     let main = match &program.abi().entry {
         None => None,
-        Some(_) => Some(match program.run_entry(HostOptions::default()) {
+        Some(_) => Some(match program.run_entry(options(&log)) {
             Ok(Outcome::Ok(_)) => Ok(()),
             Ok(Outcome::Stop(stop)) => Err(stop_text(&stop)),
             Ok(Outcome::Err(e)) => Err(format!("error {:?}", e.0)),
@@ -204,21 +222,29 @@ fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
     };
     let mut tests = Vec::new();
     for t in &program.abi().tests {
-        let r = match run_test(&program, &t.name) {
+        let r = match run_test_with(&program, &t.name, options(&Log::default())) {
             TestResult::Passed => Ok(()),
             TestResult::Stopped(stop) => Err(stop_text(&stop)),
             TestResult::Failed(e) => return Err(format!("{}: {e:#}", t.name)),
         };
         tests.push((t.name.clone(), r));
     }
+    let output = log.lock().unwrap().clone();
     Ok(Outcome2::Ran {
         warnings: built.warnings,
         main,
+        output,
         tests,
     })
 }
 
-fn check(expect: &Expect, o: &Outcome2) -> Result<(), String> {
+fn check(case: &Case, o: &Outcome2) -> Result<(), String> {
+    if let (Some(want), Outcome2::Ran { output, .. }) = (&case.output, o)
+        && want != output
+    {
+        return Err(format!("expected the output {want:?}, got {output:?}"));
+    }
+    let expect = &case.expect;
     match (expect, o) {
         (Expect::CompileError(code), Outcome2::CompileError { codes, text }) => {
             if codes.iter().any(|c| c == code) {
@@ -237,6 +263,7 @@ fn check(expect: &Expect, o: &Outcome2) -> Result<(), String> {
                 warnings,
                 main,
                 tests,
+                ..
             },
         ) => {
             if let Expect::Warning(code) = expect
@@ -345,9 +372,9 @@ fn main() {
 
 fn run_case(case: &Case) -> Result<(), String> {
     let o0 = run(&case.project, Level::O0).map_err(|e| format!("--opt 0: {e}"))?;
-    check(&case.expect, &o0).map_err(|e| format!("--opt 0: {e}"))?;
+    check(case, &o0).map_err(|e| format!("--opt 0: {e}"))?;
     let o2 = run(&case.project, Level::O2).map_err(|e| format!("--opt 2: {e}"))?;
-    check(&case.expect, &o2).map_err(|e| format!("--opt 2: {e}"))?;
+    check(case, &o2).map_err(|e| format!("--opt 2: {e}"))?;
     if o0 != o2 {
         return Err(format!("--opt 0 and --opt 2 differ:\n{o0:#?}\n{o2:#?}"));
     }

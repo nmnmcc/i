@@ -17,7 +17,27 @@ The compiler is being rebuilt to follow the spec. The first version of i grew ou
 - [Binaryen](https://github.com/WebAssembly/binaryen), built from source and linked into `i` as a library, for optimization, so the compiler itself only has to be simple and correct;
 - a Wasmtime host and a JavaScript SDK for browsers.
 
-Until the new pipeline is complete, the `i` commands report that they are not available yet.
+`i check`, `i build`, `i run` and `i test` work on the whole language. The spec suite in `tests/spec` runs every case unoptimized and optimized, and requires the same result.
+
+## Host services of `i run` and `i test`
+
+A program talks to its host through host services (§9.7 of the spec). `i run`
+and `i test` give every program one service, which it declares like this:
+
+```i
+@host("i:io/v1")
+Io { Io(print: (text: String) -> Nil) }
+
+@main
+main = (io ! Io) { io.print("Hello from i!") }
+```
+
+`print` writes the text and a line feed to the standard output; see
+[examples/hello](examples/hello). A test may put a fake in the place of a host
+service with an environment statement, `! Io = Io(print: (text) { Nil })`. An
+embedder gives its own services with `ilang_host::HostImports` (Rust) or the
+`imports` option of `bindings/javascript/ilang.mjs`. The spec suite gives the
+services of `ilang_host::services::testing`, under `test:` namespaces.
 
 ## Develop
 

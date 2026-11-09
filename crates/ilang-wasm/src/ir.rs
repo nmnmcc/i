@@ -55,6 +55,16 @@
 //! the environment, re-enters the inner frames, and goes on with the
 //! segment. The normal path does not use the segment: the rest of the
 //! function stays where it is. See `control.rs` and `emit.rs`.
+//!
+//! # The host boundary (§9.7, §10, Appendix B)
+//!
+//! Each [`Import`] has a function of the program that calls it, with the
+//! encoding of B.2 ([`Value::HostCall`]). An async entry point runs inside a
+//! root boundary; a function of an async host service starts its import
+//! ([`Value::HostStart`]), suspends to that boundary with `control.suspend`,
+//! and reads the answer when its `ilang_resume:…` export resumes it
+//! ([`Value::HostReply`]). So the control machinery of §9.4 saves the frames
+//! while the program waits.
 
 /// The service id of `Assert` (§9.6).
 pub const ASSERT_SERVICE: u32 = 0;
@@ -65,10 +75,27 @@ use num_bigint::BigInt;
 pub type Local = u32;
 /// A label of a `Block`.
 pub type Label = u32;
-/// An index in the site table (§11.7).
+/// An index in the site table (§11.7). With [`TAIL_SITE`], it is a **tail
+/// site**: the position of a call in tail position, which is printed only
+/// as the first position of a stop (§11.7).
 pub type Site = u32;
+
+/// The flag of a tail site.
+pub const TAIL_SITE: Site = 1 << 31;
+
+/// The number that the shadow stack holds for a site: the index, or
+/// `-2 - index` for a tail site (`runtime/stops.rs`).
+pub fn site_code(s: Site) -> i64 {
+    if s & TAIL_SITE != 0 {
+        -2 - (s & !TAIL_SITE) as i64
+    } else {
+        s as i64
+    }
+}
 /// An index in [`Program::points`].
 pub type PointId = u32;
+/// An index in [`Program::imports`].
+pub type ImportId = u32;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FuncId(pub u32);
@@ -293,6 +320,22 @@ pub enum Value {
         start: Num,
         length: Num,
     },
+    // The host boundary (§9.7, §10.1, B.2–B.4).
+    /// Calls the import with the arguments, and gives its value or throws
+    /// its error. A value that is not correct stops (B.2).
+    HostCall {
+        import: ImportId,
+        args: Vec<Atom>,
+    },
+    /// Starts the async import with the arguments, and records that the
+    /// program waits for it (B.4). Its value is Nil.
+    HostStart {
+        import: ImportId,
+        args: Vec<Atom>,
+    },
+    /// The answer of the async import, given to its `ilang_resume:…`
+    /// export (B.5): its value, or its error thrown.
+    HostReply(ImportId),
 }
 
 /// An `i64` value for a `Let` into an `I64` local.
@@ -306,6 +349,10 @@ pub enum NumValue {
     /// The length of a segment when a bit array is made: the Int times
     /// `unit`; stops when it is negative (§8.3).
     LengthOf(Atom, u32),
+    /// The length of a `bits(n)` or `bytes(n)` segment when a bit array is
+    /// made: as `LengthOf`, but a length that no bit array can have is
+    /// still a number, so that the value is too short (§8.3).
+    TakeLength(Atom, u32),
     /// The length of a segment in a pattern: the Int times `unit`, or -1
     /// when it is negative or too big, which never matches (§8.4).
     WidthOf(Atom, u32),
@@ -388,11 +435,15 @@ pub enum Stmt {
     Break(Label),
     /// Leaves the function with the value.
     Return(Atom),
-    /// A call in tail position (§11.6): the frame is gone first.
+    /// A call in tail position (§11.6): the frame is gone first. Its site,
+    /// a tail site, is the first position of a stop until the callee works
+    /// out an expression of its own (§11.7). Library code has none, and
+    /// passes on the tail site of its own call.
     TailCall {
         callee: Callee,
         args: Vec<Atom>,
         env: Env,
+        site: Option<Site>,
     },
     /// `dst` is `env` with the service `value` in the slot `service`: an
     /// environment statement (§6.10, §9.2).
@@ -550,6 +601,39 @@ pub struct Export {
     /// For the program entry and tests: the site of the binding, the only
     /// position of the stop for an error that comes to it (§11.7).
     pub site: Option<Site>,
+    /// For an async entry point (§10.2, B.5): a function of one parameter,
+    /// the root boundary, whose captures are the arguments; it calls the
+    /// entry point with them.
+    pub async_body: Option<FuncId>,
+}
+
+/// What an import of the host is (B.4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ImportKind {
+    External,
+    Service,
+    /// A function of an async host service: no results; the answer comes
+    /// through `ilang_resume:…` (B.5).
+    AsyncService,
+}
+
+/// A Wasm import of a function of the host (B.4).
+#[derive(Clone, Debug)]
+pub struct Import {
+    pub module: String,
+    pub name: String,
+    pub abi: ExportAbi,
+    pub kind: ImportKind,
+}
+
+/// A host service that the host gives (§9.7): its value is put in the root
+/// environment, a record of closures of `fields`, which call the imports.
+#[derive(Clone, Debug)]
+pub struct HostService {
+    pub service: u32,
+    pub ctor: u32,
+    pub ty: u32,
+    pub fields: Vec<FuncId>,
 }
 
 /// One position of the site table: module index, line, column.
@@ -582,4 +666,8 @@ pub struct Program {
     pub constructors: Vec<String>,
     /// The `ilang.abi` metadata (B.6).
     pub abi_json: String,
+    /// The functions that the host gives (B.4).
+    pub imports: Vec<Import>,
+    /// The host services of the root environment (§9.7).
+    pub host_services: Vec<HostService>,
 }

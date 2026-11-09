@@ -1,12 +1,13 @@
-// spec: 9.5
+// spec: 9.5, 11.7
 // expect: stop "panic: final"
-// at: spec/ensure_normal:7:14
-// at: spec/ensure_normal:12:3
+// at: spec/ensure_normal:6:14
 import (i/resource)
 
 final = () { panic("final") }
 
-// `with` runs after `body` ends normally.
+// `with` runs after `body` ends normally. The call of `resource.ensure` is
+// in tail position, so it counts as a tail call: its position is gone
+// (§11.7).
 @main
 main = () {
   resource.ensure(() { 1 }, final)

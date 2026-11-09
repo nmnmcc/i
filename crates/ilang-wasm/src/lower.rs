@@ -11,7 +11,8 @@
 //! - `case` (§6.12) tests the clauses one after the other, each pattern with
 //!   plain tests (§7.2, §8.4).
 //! - Every call, operator, and `<<` of the program source that may stop has a
-//!   site on the shadow stack (§11.7).
+//!   site on the shadow stack (§11.7). A call in tail position, also of a
+//!   library function, has a tail site: it is only the first position.
 //! - Top-level values are worked out in `ilang_start`, in `order.init` (§2.5).
 //! - Every call passes the environment of its place (§9.2): environment
 //!   parameters read a slot of it, and environment statements make a new one
@@ -23,6 +24,15 @@
 //! - A binding or a parameter whose pattern may fail (the checker decides,
 //!   §7.3) calls `fail` of the `Assert` service when it does not match
 //!   (§6.10, §6.11).
+//! - The host boundary (§9.7, §10, Appendix B): each external function
+//!   outside the library, and each field of a host service that an entry
+//!   point needs, is an import with a function that calls it
+//!   ([`Value::HostCall`]). The host services are records of these functions
+//!   in the root environment. A function of an async host service starts
+//!   its import and suspends to the root boundary of its async entry point
+//!   ([`Value::HostStart`]); when the host answers, it reads the answer
+//!   ([`Value::HostReply`]). An entry point is async when an async host
+//!   service is in its environment.
 //!
 //! The calls that may suspend are found and split afterwards (`control.rs`).
 
@@ -493,6 +503,10 @@ struct Lowerer<'a> {
     lines: HashMap<ModuleId, LineIndex<'a>>,
     /// The service id of each service type constructor (§9.2).
     services: HashMap<TypeRef, u32>,
+    /// The function that calls each import (B.4).
+    import_funcs: HashMap<ImportId, FuncId>,
+    /// The function of each external function outside the library (§10.1).
+    external_funcs: HashMap<DefId, FuncId>,
     out: ir::Program,
     diags: Vec<Diagnostic>,
 }
@@ -523,6 +537,8 @@ impl<'a> Lowerer<'a> {
             module_index: HashMap::new(),
             lines: HashMap::new(),
             services: HashMap::new(),
+            import_funcs: HashMap::new(),
+            external_funcs: HashMap::new(),
             out: ir::Program::default(),
             diags: Vec::new(),
         };
@@ -704,6 +720,22 @@ impl<'a> Lowerer<'a> {
                 }
             }
         }
+        // §10.1, B.6: every external function of the compiled packages is
+        // an import.
+        for (mi, m) in self.program.modules.iter().enumerate() {
+            let mid = ModuleId(mi as u32);
+            if !self.included(mid) || self.is_library(mid) {
+                continue;
+            }
+            for (di, d) in m.defs.iter().enumerate() {
+                if matches!(d.kind, DefKind::External { .. }) {
+                    self.external_func(DefId {
+                        module: mid,
+                        index: di as u32,
+                    });
+                }
+            }
+        }
         self.start();
         self.entries();
         while let Some((id, d)) = self.work.pop() {
@@ -773,11 +805,13 @@ impl<'a> Lowerer<'a> {
         g
     }
 
-    /// The program entry, the tests, and the host exports (§10.2, B.5).
+    /// The program entry, the tests, and the host exports (§10.2, B.5),
+    /// and the host services that they need (§9.7).
     fn entries(&mut self) {
         let program = self.program;
         let mut entry = None;
         let mut tests = Vec::new();
+        let mut needed: BTreeSet<TypeId> = BTreeSet::new();
         for (mi, m) in program.modules.iter().enumerate() {
             let mid = ModuleId(mi as u32);
             if Some(m.package) != program.root || !self.included(mid) {
@@ -792,16 +826,19 @@ impl<'a> Lowerer<'a> {
                 let callee = self.def_callee(d);
                 let fx = Fx::new(mid, false);
                 let site = self.site(&fx, b.binding.span.start);
+                let is_async = self.entry_async(d, &mut needed);
+                let async_body = is_async.then(|| self.async_body(&callee, 0));
                 self.out.exports.push(Export {
                     name: name.clone(),
                     callee,
                     abi: None,
                     site,
+                    async_body,
                 });
                 if b.main {
-                    entry = Some(name);
+                    entry = Some((name, is_async));
                 } else {
-                    tests.push(name);
+                    tests.push((name, is_async));
                 }
             }
         }
@@ -823,15 +860,259 @@ impl<'a> Lowerer<'a> {
                 errors: sig.errors.iter().map(|t| abi_type(*t)).collect(),
             };
             let callee = self.def_callee(d);
-            exports.push((name.clone(), abi.clone()));
+            let is_async = self.entry_async(d, &mut needed);
+            let async_body = is_async.then(|| self.async_body(&callee, abi.params.len() as u32));
+            exports.push((name.clone(), abi.clone(), is_async));
             self.out.exports.push(Export {
                 name,
                 callee,
                 abi: Some(abi),
                 site: None,
+                async_body,
             });
         }
-        self.out.abi_json = abi_json(entry, &tests, &exports);
+        for t in needed {
+            self.host_service(t);
+        }
+        self.out.abi_json = abi_json(entry, &tests, &exports, &self.out.imports);
+    }
+
+    /// Whether an entry point is async: it may call a function of an async
+    /// host service (§10.2). Every such call gets the service from the
+    /// environment, and only the host gives it at an entry point, so this
+    /// is when an async host service is in the environment of its type. The
+    /// host services of the environment go to `needed`.
+    fn entry_async(&self, d: DefId, needed: &mut BTreeSet<TypeId>) -> bool {
+        let Some(services) = self.typed.entry_services.get(&d) else {
+            return false;
+        };
+        needed.extend(services.iter().copied());
+        services.iter().any(|t| {
+            self.program
+                .ty(*t)
+                .host
+                .as_ref()
+                .is_some_and(|h| h.is_async)
+        })
+    }
+
+    /// The body of an async entry point inside its root boundary (B.5): a
+    /// function of the boundary, whose captures are the arguments.
+    fn async_body(&mut self, callee: &Callee, n: u32) -> FuncId {
+        let mut body = Vec::new();
+        for i in 0..n {
+            body.push(Stmt::Let {
+                dst: 1 + i,
+                value: Value::Capture(i),
+                site: None,
+            });
+        }
+        body.push(Stmt::TailCall {
+            callee: callee.clone(),
+            args: (1..=n).map(Atom::Local).collect(),
+            env: Env::Param,
+            site: None,
+        });
+        let f = self.new_func();
+        self.out.funcs[f.0 as usize] = FuncKind::Code(Func {
+            name: "async entry".into(),
+            arity: 1,
+            locals: vec![LocalType::Value; 1 + n as usize],
+            body,
+            frame: true,
+        });
+        f
+    }
+
+    /// A host service in the environment of an entry point (§9.7): one
+    /// import for each field, and its value in the root environment.
+    fn host_service(&mut self, t: TypeId) {
+        let program = self.program;
+        let def = program.ty(t);
+        let (Some(host), TypeBody::Custom(ctors)) = (&def.host, &def.body) else {
+            return;
+        };
+        let [c] = ctors.as_slice() else {
+            return;
+        };
+        let Some(&service) = self.services.get(&TypeRef::Custom(t)) else {
+            // No code takes it from the environment.
+            return;
+        };
+        let CtorRepr::Record { ctor, ty } = self.ctors[&CtorRef { ty: t, index: 0 }].repr else {
+            return;
+        };
+        let kind = if host.is_async {
+            ImportKind::AsyncService
+        } else {
+            ImportKind::Service
+        };
+        let mut fields = Vec::new();
+        for (i, f) in c.fields.iter().enumerate() {
+            let (Some(label), Some(hf)) = (&f.label, program.host_fns.get(&(t, i as u32))) else {
+                return;
+            };
+            match self.import(&host.namespace, &label.name, host_abi(hf), kind) {
+                Ok(import) => {
+                    let f = self.import_func(import);
+                    self.constants.insert(f);
+                    fields.push(f);
+                }
+                Err(message) => {
+                    self.error(def.module, label.span, message);
+                    return;
+                }
+            }
+        }
+        self.out.host_services.push(HostService {
+            service,
+            ctor,
+            ty,
+            fields,
+        });
+    }
+
+    /// The function of an external function outside the library (§10.1),
+    /// which calls its import.
+    fn external_func(&mut self, d: DefId) -> Option<FuncId> {
+        if let Some(&f) = self.external_funcs.get(&d) {
+            return Some(f);
+        }
+        let def = self.program.def(d);
+        let DefKind::External {
+            module, function, ..
+        } = &def.kind
+        else {
+            return None;
+        };
+        let Some(hf) = self.program.external_fns.get(&d) else {
+            self.error(
+                d.module,
+                def.span,
+                "the type of this external function is not one that the host can take (§10.1)",
+            );
+            return None;
+        };
+        match self.import(module, function, host_abi(hf), ImportKind::External) {
+            Ok(import) => {
+                let f = self.import_func(import);
+                self.external_funcs.insert(d, f);
+                Some(f)
+            }
+            Err(message) => {
+                self.error(d.module, def.span, message);
+                None
+            }
+        }
+    }
+
+    /// The import with this module and name (B.4). One import may be
+    /// declared more than once, with one type.
+    fn import(
+        &mut self,
+        module: &str,
+        name: &str,
+        abi: ExportAbi,
+        kind: ImportKind,
+    ) -> Result<ImportId, String> {
+        if module == "ilang:host/v1" {
+            return Err(format!(
+                "the import module `{module}` is the module of the runtime imports (B.4)"
+            ));
+        }
+        if let Some(i) = self
+            .out
+            .imports
+            .iter()
+            .position(|x| x.module == module && x.name == name)
+        {
+            let x = &self.out.imports[i];
+            if x.abi == abi && x.kind == kind {
+                return Ok(i as ImportId);
+            }
+            return Err(format!(
+                "the import `{module}` `{name}` is declared two times, with different types or kinds (B.4)"
+            ));
+        }
+        self.out.imports.push(Import {
+            module: module.to_string(),
+            name: name.to_string(),
+            abi,
+            kind,
+        });
+        Ok(self.out.imports.len() as ImportId - 1)
+    }
+
+    /// The function that calls an import: its parameters go to the host
+    /// encoded as in B.2, and its value or error comes back. An async
+    /// import waits for the host at the root boundary (B.4, B.5).
+    fn import_func(&mut self, import: ImportId) -> FuncId {
+        if let Some(&f) = self.import_funcs.get(&import) {
+            return f;
+        }
+        let x = self.out.imports[import as usize].clone();
+        let n = x.abi.params.len() as u32;
+        let args: Vec<Atom> = (0..n).map(Atom::Local).collect();
+        let mut locals = vec![LocalType::Value; n as usize];
+        let mut body = Vec::new();
+        match x.kind {
+            ImportKind::External | ImportKind::Service => {
+                locals.push(LocalType::Value);
+                body.push(Stmt::Let {
+                    dst: n,
+                    value: Value::HostCall { import, args },
+                    site: None,
+                });
+                body.push(Stmt::Return(Atom::Local(n)));
+            }
+            ImportKind::AsyncService => {
+                let wait = self.op_func(
+                    Op::Runtime {
+                        name: "host_wait",
+                        arity: 1,
+                    },
+                    1,
+                );
+                locals.extend([LocalType::Value; 4]);
+                body.push(Stmt::Let {
+                    dst: n,
+                    value: Value::HostStart { import, args },
+                    site: None,
+                });
+                body.push(Stmt::Let {
+                    dst: n + 1,
+                    value: Value::Op(
+                        Op::Runtime {
+                            name: "host_root_boundary",
+                            arity: 0,
+                        },
+                        vec![],
+                    ),
+                    site: None,
+                });
+                body.push(Stmt::Let {
+                    dst: n + 2,
+                    value: Value::Op(Op::Suspend, vec![Atom::Local(n + 1), Atom::Func(wait)]),
+                    site: None,
+                });
+                body.push(Stmt::Let {
+                    dst: n + 3,
+                    value: Value::HostReply(import),
+                    site: None,
+                });
+                body.push(Stmt::Return(Atom::Local(n + 3)));
+            }
+        }
+        let f = self.new_func();
+        self.out.funcs[f.0 as usize] = FuncKind::Code(Func {
+            name: format!("import {} {}", x.module, x.name),
+            arity: n,
+            locals,
+            body,
+            frame: true,
+        });
+        self.import_funcs.insert(import, f);
+        f
     }
 
     fn def_callee(&mut self, d: DefId) -> Callee {
@@ -1030,7 +1311,7 @@ impl<'a> Lowerer<'a> {
                 _ => Err(format!("`control.{function}` is not known")),
             },
             _ => Err(format!(
-                "the external function `{module}` `{function}` is not supported yet (§10.1)"
+                "the library has no operation `{module}` `{function}`"
             )),
         }
     }
@@ -1047,6 +1328,15 @@ impl<'a> Lowerer<'a> {
                 }
             },
             ValueRef::Def(d) => match self.program.def(d).kind {
+                DefKind::External { .. } if !self.is_library(d.module) => {
+                    match self.external_func(d) {
+                        Some(f) => {
+                            self.constants.insert(f);
+                            Atom::Func(f)
+                        }
+                        None => Atom::Nil,
+                    }
+                }
                 DefKind::External { .. } => match self.external_op(d) {
                     Ok((op, arity)) => Atom::Func(self.op_func(op, arity)),
                     Err(message) => {
@@ -1437,6 +1727,14 @@ impl<'a> Lowerer<'a> {
     fn target(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, callee: &Expr) -> Target {
         match &callee.kind {
             ExprKind::Name(ValueRef::Def(d)) => match self.program.def(*d).kind {
+                // §10.1: a call of an external function is done when it is
+                // reached, like all calls.
+                DefKind::External { .. } if !self.is_library(d.module) => {
+                    match self.external_func(*d) {
+                        Some(f) => Target::Callee(Callee::Direct(f)),
+                        None => Target::Op(Op::Panic),
+                    }
+                }
                 DefKind::External { .. } => match self.external_op(*d) {
                     Ok((op, _)) => Target::Op(op),
                     Err(message) => {
@@ -1505,10 +1803,14 @@ impl<'a> Lowerer<'a> {
                 finish(out, tail, a)
             }
             Target::Op(op) => {
-                // Operations of the runtime are not tail calls: their
-                // position stays on the shadow stack (§11.7). Those that
-                // call i code take errors there, or run final functions.
-                let site = self.site(fx, span.start);
+                // Operations of the runtime are not Wasm tail calls: those
+                // that call i code take errors there, or run final
+                // functions. But a call of a library function in tail
+                // position counts as a tail call (§11.7): its position is
+                // a tail site.
+                let site = self
+                    .site(fx, span.start)
+                    .map(|s| if tail { s | TAIL_SITE } else { s });
                 let value = if op.needs_env() {
                     Value::OpEnv(op, args, fx.env)
                 } else {
@@ -1520,7 +1822,16 @@ impl<'a> Lowerer<'a> {
             Target::Callee(callee) => {
                 let env = fx.env;
                 if tail {
-                    out.push(Stmt::TailCall { callee, args, env });
+                    // §11.7: the position of a call in tail position is
+                    // given when the stop comes before the callee works out
+                    // an expression of the program source.
+                    let site = self.site(fx, span.start).map(|s| s | TAIL_SITE);
+                    out.push(Stmt::TailCall {
+                        callee,
+                        args,
+                        env,
+                        site,
+                    });
                     None
                 } else {
                     let site = self.site(fx, span.start);
@@ -1599,7 +1910,7 @@ impl<'a> Lowerer<'a> {
                     };
                     let n = self.expr(fx, out, x);
                     let site = self.site(fx, e.span.start);
-                    let w = let_num(fx, out, NumValue::LengthOf(n, unit), site);
+                    let w = let_num(fx, out, NumValue::TakeLength(n, unit), site);
                     let_value(fx, out, Value::BitsTake(v, w), site)
                 }
                 Some(Fmt::Bytes(None)) => {
@@ -2098,6 +2409,8 @@ impl<'a> Lowerer<'a> {
             let source = text
                 .get(p.span.start as usize..p.span.end as usize)
                 .unwrap_or("");
+            // §1.1: `\r\n` and `\r` are the same as `\n`.
+            let source = source.replace("\r\n", "\n").replace('\r', "\n");
             let prefix = Atom::String(format!("pattern {source} did not match "));
             let shown = let_value(
                 fx,
@@ -2197,35 +2510,81 @@ fn abi_type(t: HostType) -> AbiType {
     }
 }
 
+/// The parts of B.2 of a function at the host boundary.
+fn host_abi(f: &ilang_check::hir::HostFn) -> ExportAbi {
+    ExportAbi {
+        params: f.params.iter().map(|t| abi_type(*t)).collect(),
+        result: abi_type(f.result),
+        errors: f.errors.iter().map(|t| abi_type(*t)).collect(),
+    }
+}
+
+fn names(ts: &[AbiType]) -> Vec<&'static str> {
+    ts.iter().map(|t| t.name()).collect()
+}
+
 /// The `ilang.abi` metadata (B.6).
-fn abi_json(entry: Option<String>, tests: &[String], exports: &[(String, ExportAbi)]) -> String {
+fn abi_json(
+    entry: Option<(String, bool)>,
+    tests: &[(String, bool)],
+    exports: &[(String, ExportAbi, bool)],
+    imports: &[Import],
+) -> String {
     let entry = match entry {
-        Some(name) => serde_json::json!({ "name": name, "async": false }),
+        Some((name, is_async)) => serde_json::json!({ "name": name, "async": is_async }),
         None => serde_json::Value::Null,
     };
     let tests: Vec<serde_json::Value> = tests
         .iter()
-        .map(|t| serde_json::json!({ "name": t, "async": false }))
+        .map(|(t, is_async)| serde_json::json!({ "name": t, "async": is_async }))
         .collect();
     let mut map = serde_json::Map::new();
-    for (name, abi) in exports {
+    for (name, abi, is_async) in exports {
         map.insert(
             name.clone(),
             serde_json::json!({
-                "params": abi.params.iter().map(|p| p.name()).collect::<Vec<_>>(),
+                "params": names(&abi.params),
                 "result": abi.result.name(),
-                "errors": abi.errors.iter().map(|p| p.name()).collect::<Vec<_>>(),
-                "async": false,
+                "errors": names(&abi.errors),
+                "async": is_async,
             }),
         );
+    }
+    let mut services = serde_json::Map::new();
+    let mut externals = serde_json::Map::new();
+    for x in imports {
+        let (table, sig) = match x.kind {
+            ImportKind::External => (
+                &mut externals,
+                serde_json::json!({
+                    "params": names(&x.abi.params),
+                    "result": x.abi.result.name(),
+                }),
+            ),
+            ImportKind::Service | ImportKind::AsyncService => (
+                &mut services,
+                serde_json::json!({
+                    "params": names(&x.abi.params),
+                    "result": x.abi.result.name(),
+                    "errors": names(&x.abi.errors),
+                    "async": x.kind == ImportKind::AsyncService,
+                }),
+            ),
+        };
+        let module = table
+            .entry(x.module.clone())
+            .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()));
+        if let serde_json::Value::Object(m) = module {
+            m.insert(x.name.clone(), sig);
+        }
     }
     serde_json::json!({
         "version": 2,
         "entry": entry,
         "tests": tests,
         "exports": map,
-        "services": {},
-        "externals": {},
+        "services": services,
+        "externals": externals,
     })
     .to_string()
 }

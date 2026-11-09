@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Assemble the hand-written host ABI fixtures (tests/browser/fixtures/*.wat),
-# validate them, and embed the feature probe in the JavaScript SDK.
+# validate them, and embed the feature probe in the JavaScript SDK. Then build
+# tests/browser/fixtures/compiled.wasm with the compiler, from the package in
+# tests/browser/fixtures/compiled.
 set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -18,3 +20,11 @@ probe="$("$wasm_tools" strip "$fixture_dir/required-features.wasm" | base64 | tr
 sed -i.bak -E "s|^(const featureProbe = Uint8Array\.from\(atob\(\")[A-Za-z0-9+/=]*(\"\).*)$|\1$probe\2|" "$sdk"
 rm -f "$sdk.bak"
 grep -q "atob(\"$probe\")" "$sdk" || { echo "could not update the feature probe in $sdk" >&2; exit 1; }
+
+# The module built by the compiler (`I` can point at another `i` executable).
+if [ -n "${I:-}" ]; then
+  "$I" build --project "$fixture_dir/compiled" --out "$fixture_dir/compiled.wasm"
+else
+  cargo run --quiet -p ilang-cli -- build --project "$fixture_dir/compiled" --out "$fixture_dir/compiled.wasm"
+fi
+"$wasm_tools" validate "$fixture_dir/compiled.wasm"

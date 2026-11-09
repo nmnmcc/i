@@ -8,19 +8,91 @@ mod float_format;
 /// Runtime definitions, to be inserted after the common value types.
 pub fn wat() -> String {
     let source = r#"
+  ;; The text form is written into one growable byte buffer, `$ib` with the
+  ;; length `$il`, so that inspecting is linear in the size of the text. Only
+  ;; `$inspect` uses it, and it runs no i code.
+  (global $ib (mut (ref null $bytes)) (ref.null $bytes))
+  (global $il (mut i32) (i32.const 0))
+
+  ;; Room for `n` more bytes.
+  (func $ib_reserve (param $n i32)
+    (local $old (ref $bytes)) (local $need i64) (local $cap i64) (local $new (ref $bytes))
+    (local.set $old (ref.as_non_null (global.get $ib)))
+    (local.set $need (i64.add (i64.extend_i32_u (global.get $il)) (i64.extend_i32_u (local.get $n))))
+    (if (i64.le_u (local.get $need) (i64.extend_i32_u (array.len (local.get $old)))) (then (return)))
+    (if (i64.gt_u (local.get $need) (i64.const 2147483647)) (then unreachable))
+    (local.set $cap (i64.shl (i64.extend_i32_u (array.len (local.get $old))) (i64.const 1)))
+    (if (i64.gt_u (local.get $cap) (i64.const 2147483647)) (then (local.set $cap (i64.const 2147483647))))
+    (if (i64.lt_u (local.get $cap) (local.get $need)) (then (local.set $cap (local.get $need))))
+    (local.set $new (array.new_default $bytes (i32.wrap_i64 (local.get $cap))))
+    (array.copy $bytes $bytes (local.get $new) (i32.const 0) (local.get $old) (i32.const 0) (global.get $il))
+    (global.set $ib (local.get $new)))
+
+  (func $ib_byte (param $b i32)
+    (call $ib_reserve (i32.const 1))
+    (array.set $bytes (ref.as_non_null (global.get $ib)) (global.get $il) (local.get $b))
+    (global.set $il (i32.add (global.get $il) (i32.const 1))))
+
+  (func $ib_comma
+    (call $ib_reserve (i32.const 2))
+    (array.set $bytes (ref.as_non_null (global.get $ib)) (global.get $il) (i32.const 44))
+    (array.set $bytes (ref.as_non_null (global.get $ib)) (i32.add (global.get $il) (i32.const 1)) (i32.const 32))
+    (global.set $il (i32.add (global.get $il) (i32.const 2))))
+
+  ;; The bytes of a String value.
+  (func $ib_string (param $s eqref)
+    (local $b (ref $bytes)) (local $n i32)
+    (local.set $b (call $string_bytes (local.get $s)))
+    (local.set $n (array.len (local.get $b)))
+    (call $ib_reserve (local.get $n))
+    (array.copy $bytes $bytes (ref.as_non_null (global.get $ib)) (global.get $il)
+      (local.get $b) (i32.const 0) (local.get $n))
+    (global.set $il (i32.add (global.get $il) (local.get $n))))
+
+  ;; The decimal digits of a small Int, with `-` when it is negative.
+  (func $ib_small_int (param $v i32)
+    (local $u i64) (local $buf (ref $bytes)) (local $start i32) (local $i i32) (local $j i32) (local $t i32)
+    (call $ib_reserve (i32.const 12))
+    (local.set $buf (ref.as_non_null (global.get $ib)))
+    (local.set $i (global.get $il))
+    (local.set $u (i64.extend_i32_s (local.get $v)))
+    (if (i64.lt_s (local.get $u) (i64.const 0))
+      (then
+        (array.set $bytes (local.get $buf) (local.get $i) (i32.const 45))
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (local.set $u (i64.sub (i64.const 0) (local.get $u)))))
+    (local.set $start (local.get $i))
+    (loop $digits
+      (array.set $bytes (local.get $buf) (local.get $i)
+        (i32.add (i32.const 48) (i32.wrap_i64 (i64.rem_u (local.get $u) (i64.const 10)))))
+      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+      (local.set $u (i64.div_u (local.get $u) (i64.const 10)))
+      (br_if $digits (i64.ne (local.get $u) (i64.const 0))))
+    (global.set $il (local.get $i))
+    (local.set $j (i32.sub (local.get $i) (i32.const 1)))
+    (block $reversed (loop $reverse
+      (br_if $reversed (i32.ge_s (local.get $start) (local.get $j)))
+      (local.set $t (array.get_u $bytes (local.get $buf) (local.get $start)))
+      (array.set $bytes (local.get $buf) (local.get $start) (array.get_u $bytes (local.get $buf) (local.get $j)))
+      (array.set $bytes (local.get $buf) (local.get $j) (local.get $t))
+      (local.set $start (i32.add (local.get $start) (i32.const 1)))
+      (local.set $j (i32.sub (local.get $j) (i32.const 1)))
+      (br $reverse))))
+
   ;; Quoting works on UTF-8 bytes. C0, DEL and the UTF-8 encoded C1 controls use
   ;; i escapes; all other valid UTF-8 is copied unchanged.
-  (func $inspect_quote (param $s eqref) (result eqref)
-    (local $bytes (ref $bytes)) (local $n i32) (local $size i32)
-    (local $ptr i32) (local $out i32) (local $i i32) (local $b i32)
-    (local $escape i32) (local $control i32) (local $answer eqref)
-    (local.set $bytes (ref.as_non_null (struct.get $obj 4 (ref.cast (ref $obj) (local.get $s)))))
+  (func $ib_quote (param $s eqref)
+    (local $bytes (ref $bytes)) (local $n i32) (local $buf (ref $bytes))
+    (local $out i32) (local $i i32) (local $b i32)
+    (local $escape i32) (local $control i32)
+    (local.set $bytes (call $string_bytes (local.get $s)))
     (local.set $n (array.len (local.get $bytes)))
-    (if (i32.gt_u (local.get $n) (i32.const 536870911)) (then unreachable))
-    (local.set $size (i32.add (i32.mul (local.get $n) (i32.const 8)) (i32.const 2)))
-    (local.set $ptr (call $alloc (local.get $size)))
-    (i32.store8 (local.get $ptr) (i32.const 34))
-    (local.set $out (i32.const 1))
+    (if (i32.gt_u (local.get $n) (i32.const 268435455)) (then unreachable))
+    (call $ib_reserve (i32.add (i32.mul (local.get $n) (i32.const 8)) (i32.const 2)))
+    (local.set $buf (ref.as_non_null (global.get $ib)))
+    (local.set $out (global.get $il))
+    (array.set $bytes (local.get $buf) (local.get $out) (i32.const 34))
+    (local.set $out (i32.add (local.get $out) (i32.const 1)))
     (block $done
       (loop $next
         (br_if $done (i32.ge_u (local.get $i) (local.get $n)))
@@ -36,8 +108,8 @@ pub fn wat() -> String {
           (then (local.set $escape (local.get $b))))
         (if (local.get $escape)
           (then
-            (i32.store8 (i32.add (local.get $ptr) (local.get $out)) (i32.const 92))
-            (i32.store8 (i32.add (local.get $ptr) (i32.add (local.get $out) (i32.const 1))) (local.get $escape))
+            (array.set $bytes (local.get $buf) (local.get $out) (i32.const 92))
+            (array.set $bytes (local.get $buf) (i32.add (local.get $out) (i32.const 1)) (local.get $escape))
             (local.set $out (i32.add (local.get $out) (i32.const 2))))
           (else
             (if (i32.and (i32.eq (local.get $b) (i32.const 194)) (i32.lt_u (local.get $i) (local.get $n)))
@@ -49,25 +121,23 @@ pub fn wat() -> String {
                     (local.set $i (i32.add (local.get $i) (i32.const 1)))))))
             (if (local.get $control)
               (then
-                (i32.store8 (i32.add (local.get $ptr) (local.get $out)) (i32.const 92))
-                (i32.store8 (i32.add (local.get $ptr) (i32.add (local.get $out) (i32.const 1))) (i32.const 117))
-                (i32.store8 (i32.add (local.get $ptr) (i32.add (local.get $out) (i32.const 2))) (i32.const 123))
-                (i32.store8 (i32.add (local.get $ptr) (i32.add (local.get $out) (i32.const 3))) (i32.const 48))
-                (i32.store8 (i32.add (local.get $ptr) (i32.add (local.get $out) (i32.const 4))) (i32.const 48))
-                (i32.store8 (i32.add (local.get $ptr) (i32.add (local.get $out) (i32.const 5)))
+                (array.set $bytes (local.get $buf) (local.get $out) (i32.const 92))
+                (array.set $bytes (local.get $buf) (i32.add (local.get $out) (i32.const 1)) (i32.const 117))
+                (array.set $bytes (local.get $buf) (i32.add (local.get $out) (i32.const 2)) (i32.const 123))
+                (array.set $bytes (local.get $buf) (i32.add (local.get $out) (i32.const 3)) (i32.const 48))
+                (array.set $bytes (local.get $buf) (i32.add (local.get $out) (i32.const 4)) (i32.const 48))
+                (array.set $bytes (local.get $buf) (i32.add (local.get $out) (i32.const 5))
                   (call $inspect_hex (i32.shr_u (local.get $b) (i32.const 4))))
-                (i32.store8 (i32.add (local.get $ptr) (i32.add (local.get $out) (i32.const 6)))
+                (array.set $bytes (local.get $buf) (i32.add (local.get $out) (i32.const 6))
                   (call $inspect_hex (i32.and (local.get $b) (i32.const 15))))
-                (i32.store8 (i32.add (local.get $ptr) (i32.add (local.get $out) (i32.const 7))) (i32.const 125))
+                (array.set $bytes (local.get $buf) (i32.add (local.get $out) (i32.const 7)) (i32.const 125))
                 (local.set $out (i32.add (local.get $out) (i32.const 8))))
               (else
-                (i32.store8 (i32.add (local.get $ptr) (local.get $out)) (local.get $b))
+                (array.set $bytes (local.get $buf) (local.get $out) (local.get $b))
                 (local.set $out (i32.add (local.get $out) (i32.const 1)))))))
         (br $next)))
-    (i32.store8 (i32.add (local.get $ptr) (local.get $out)) (i32.const 34))
-    (local.set $answer (call $string_from_mem (local.get $ptr) (i32.add (local.get $out) (i32.const 1))))
-    (call $free (local.get $ptr) (local.get $size))
-    (local.get $answer))
+    (array.set $bytes (local.get $buf) (local.get $out) (i32.const 34))
+    (global.set $il (i32.add (local.get $out) (i32.const 1))))
 
   (func $inspect_hex (param $n i32) (result i32)
     (i32.add (local.get $n) (if (result i32) (i32.lt_u (local.get $n) (i32.const 10))
@@ -147,19 +217,35 @@ pub fn wat() -> String {
       (then (return {{unknown}})))
     (array.get $values (local.get $names) (local.get $index)))
 
-  ;; Aggregate traversal uses GC continuation frames rather than Wasm calls.
-  ;; The fragment list is flattened once, so deeply nested values are linear
-  ;; in their rendered size rather than copying every ancestor's output.
-  (type $inspect_task (struct
-    (field i32) (field eqref) (field i32) (field (ref null $inspect_task))))
+  ;; Aggregate traversal uses an explicit stack of tasks rather than Wasm
+  ;; calls, so deep values do not use the Wasm stack. A task is a value and a
+  ;; number, `kind | index << 2`, in two growable arrays.
+  (global $it_values (mut (ref null $values)) (ref.null $values))
+  (global $it_meta (mut (ref null $frames)) (ref.null $frames))
+  (global $it_sp (mut i32) (i32.const 0))
 
   (func $inspect_push (param $kind i32) (param $value eqref) (param $index i32)
-    (param $next (ref null $inspect_task)) (result (ref $inspect_task))
-    (struct.new $inspect_task (local.get $kind) (local.get $value)
-      (local.get $index) (local.get $next)))
+    (local $sp i32) (local $n i32) (local $values (ref $values)) (local $meta (ref $frames))
+    (local.set $sp (global.get $it_sp))
+    (local.set $n (array.len (ref.as_non_null (global.get $it_values))))
+    (if (i32.ge_u (local.get $sp) (local.get $n))
+      (then
+        (if (i32.ge_u (local.get $n) (i32.const 268435456)) (then unreachable))
+        (local.set $values (array.new_default $values (i32.shl (local.get $n) (i32.const 1))))
+        (local.set $meta (array.new_default $frames (i32.shl (local.get $n) (i32.const 1))))
+        (array.copy $values $values (local.get $values) (i32.const 0)
+          (ref.as_non_null (global.get $it_values)) (i32.const 0) (local.get $n))
+        (array.copy $frames $frames (local.get $meta) (i32.const 0)
+          (ref.as_non_null (global.get $it_meta)) (i32.const 0) (local.get $n))
+        (global.set $it_values (local.get $values))
+        (global.set $it_meta (local.get $meta))))
+    (array.set $values (ref.as_non_null (global.get $it_values)) (local.get $sp) (local.get $value))
+    (array.set $frames (ref.as_non_null (global.get $it_meta)) (local.get $sp)
+      (i32.or (local.get $kind) (i32.shl (local.get $index) (i32.const 2))))
+    (global.set $it_sp (i32.add (local.get $sp) (i32.const 1))))
 
-  ;; Atoms contain no recursively inspected values. Keeping this separate also
-  ;; avoids allocating traversal frames for the common scalar-only path.
+  ;; Values with no parts that are inspected; not Ints and Strings, which
+  ;; `$ib_atom` writes itself.
   (func $inspect_atom (param $value eqref) (param $tag i32) (result eqref)
     (local $obj (ref $obj))
     (if (i32.eqz (local.get $tag)) (then (return {{nil}})))
@@ -167,7 +253,6 @@ pub fn wat() -> String {
     (if (i32.eq (local.get $tag) (i32.const 1))
       (then (return (if (result eqref) (call $bool_get (local.get $value)) (then {{true}}) (else {{false}})))))
     (if (i32.eq (local.get $tag) (i32.const 2)) (then (return_call $float_to_string (local.get $value))))
-    (if (i32.eq (local.get $tag) (i32.const 3)) (then (return_call $inspect_quote (local.get $value))))
     (if (i32.eq (local.get $tag) (i32.const 9)) (then (return_call $inspect_bits (local.get $value))))
     (if (i32.eq (local.get $tag) (i32.const 10)) (then (return {{opaque}})))
     (if (i32.eq (local.get $tag) (i32.const 11)) (then (return {{boundary}})))
@@ -180,62 +265,62 @@ pub fn wat() -> String {
         (call $string_from_codepoints (call $list_cons (local.get $value) (call $list_nil)))) {{paren_close}}))))
     {{unknown}})
 
+  (func $ib_atom (param $value eqref) (param $tag i32)
+    (if (ref.test (ref i31) (local.get $value))
+      (then (return_call $ib_small_int (i31.get_s (ref.cast (ref i31) (local.get $value))))))
+    (if (i32.eq (local.get $tag) (i32.const 3)) (then (return_call $ib_quote (local.get $value))))
+    (return_call $ib_string (call $inspect_atom (local.get $value) (local.get $tag))))
+
   (func $inspect (param $value eqref) (result eqref)
-    (local $work (ref null $inspect_task)) (local $task (ref $inspect_task)) (local $obj (ref $obj))
-    (local $fields (ref null $values)) (local $out eqref)
-    (local $kind i32) (local $index i32) (local $tag i32)
-    (local.set $tag (call $value_tag (local.get $value)))
-    (if (i32.eqz (i32.or
-      (i32.or (i32.eq (local.get $tag) (i32.const 4)) (i32.eq (local.get $tag) (i32.const 5)))
-      (i32.eq (local.get $tag) (i32.const 6))))
-      (then (return_call $inspect_atom (local.get $value) (local.get $tag))))
-    (local.set $out (call $list_nil))
-    (local.set $work (call $inspect_push (i32.const 0) (local.get $value) (i32.const 0) (ref.null $inspect_task)))
+    (local $obj (ref $obj)) (local $fields (ref null $values)) (local $out (ref $bytes))
+    (local $kind i32) (local $index i32) (local $tag i32) (local $sp i32) (local $meta i32)
+    (global.set $ib (array.new_default $bytes (i32.const 64)))
+    (global.set $il (i32.const 0))
+    (global.set $it_values (array.new_default $values (i32.const 64)))
+    (global.set $it_meta (array.new_default $frames (i32.const 64)))
+    (global.set $it_sp (i32.const 0))
+    (call $inspect_push (i32.const 0) (local.get $value) (i32.const 0))
     (block $done (loop $next
-      (br_if $done (ref.is_null (local.get $work)))
-      (local.set $task (ref.as_non_null (local.get $work)))
-      (local.set $work (struct.get $inspect_task 3 (local.get $task)))
-      (local.set $kind (struct.get $inspect_task 0 (local.get $task)))
-      (local.set $value (struct.get $inspect_task 1 (local.get $task)))
-      (local.set $index (struct.get $inspect_task 2 (local.get $task)))
+      (local.set $sp (global.get $it_sp))
+      (br_if $done (i32.eqz (local.get $sp)))
+      (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
+      (global.set $it_sp (local.get $sp))
+      (local.set $value (array.get $values (ref.as_non_null (global.get $it_values)) (local.get $sp)))
+      (array.set $values (ref.as_non_null (global.get $it_values)) (local.get $sp) (ref.null eq))
+      (local.set $meta (array.get $frames (ref.as_non_null (global.get $it_meta)) (local.get $sp)))
+      (local.set $kind (i32.and (local.get $meta) (i32.const 3)))
+      (local.set $index (i32.shr_u (local.get $meta) (i32.const 2)))
 
-      ;; 1: already-rendered literal fragment.
+      ;; 1: the byte `index`.
       (if (i32.eq (local.get $kind) (i32.const 1))
-        (then
-          (local.set $out (call $list_cons (local.get $value) (local.get $out)))
-          (br $next)))
+        (then (call $ib_byte (local.get $index)) (br $next)))
 
-      ;; 2: tuple/record field sequence, retaining its next index.
+      ;; 2: the parts of a tuple or a custom value, from `index` on.
       (if (i32.eq (local.get $kind) (i32.const 2))
         (then
           (local.set $fields (struct.get $obj 5 (ref.cast (ref $obj) (local.get $value))))
           (if (ref.is_null (local.get $fields)) (then (br $next)))
           (br_if $next (i32.ge_u (local.get $index) (array.len (ref.as_non_null (local.get $fields)))))
-          (if (local.get $index) (then (local.set $out (call $list_cons {{comma}} (local.get $out)))))
-          (local.set $work (call $inspect_push (i32.const 2) (local.get $value)
-            (i32.add (local.get $index) (i32.const 1)) (local.get $work)))
-          (local.set $work (call $inspect_push (i32.const 0)
-            (array.get $values (ref.as_non_null (local.get $fields)) (local.get $index))
-            (i32.const 0) (local.get $work)))
+          (if (local.get $index) (then (call $ib_comma)))
+          (call $inspect_push (i32.const 2) (local.get $value) (i32.add (local.get $index) (i32.const 1)))
+          (call $inspect_push (i32.const 0)
+            (array.get $values (ref.as_non_null (local.get $fields)) (local.get $index)) (i32.const 0))
           (br $next)))
 
-      ;; 3: list continuation. An empty tail emits the closing bracket.
+      ;; 3: the rest of a list; `index` is 1 after its first part.
       (if (i32.eq (local.get $kind) (i32.const 3))
         (then
           (local.set $fields (struct.get $obj 5 (ref.cast (ref $obj) (local.get $value))))
           (if (ref.is_null (local.get $fields))
-            (then (local.set $out (call $list_cons {{list_close}} (local.get $out))) (br $next)))
-          (if (local.get $index) (then (local.set $out (call $list_cons {{comma}} (local.get $out)))))
-          (local.set $work (call $inspect_push (i32.const 3)
-            (array.get $values (ref.as_non_null (local.get $fields)) (i32.const 1))
-            (i32.const 1) (local.get $work)))
-          (local.set $work (call $inspect_push (i32.const 0)
-            (array.get $values (ref.as_non_null (local.get $fields)) (i32.const 0))
-            (i32.const 0) (local.get $work)))
+            (then (call $ib_byte (i32.const 93)) (br $next)))
+          (if (local.get $index) (then (call $ib_comma)))
+          (call $inspect_push (i32.const 3)
+            (array.get $values (ref.as_non_null (local.get $fields)) (i32.const 1)) (i32.const 1))
+          (call $inspect_push (i32.const 0)
+            (array.get $values (ref.as_non_null (local.get $fields)) (i32.const 0)) (i32.const 0))
           (br $next)))
 
-      ;; 0: inspect a value, scheduling aggregate children without calling back
-      ;; into inspection on the Wasm call stack.
+      ;; 0: a value.
       (local.set $tag (call $value_tag (local.get $value)))
       (if (i32.or (i32.eq (local.get $tag) (i32.const 4)) (i32.eq (local.get $tag) (i32.const 5)))
         (then
@@ -244,21 +329,27 @@ pub fn wat() -> String {
           (if (i32.eq (local.get $tag) (i32.const 5))
             (then
               ;; A constructor without fields is only its name: `Nil`, `True`.
-              (local.set $out (call $list_cons (call $constructor_name (struct.get $obj 1 (local.get $obj))) (local.get $out)))
+              (call $ib_string (call $constructor_name (struct.get $obj 1 (local.get $obj))))
               (if (ref.is_null (local.get $fields)) (then (br $next)))
               (br_if $next (i32.eqz (array.len (ref.as_non_null (local.get $fields)))))))
-          (local.set $out (call $list_cons {{paren_open}} (local.get $out)))
-          (local.set $work (call $inspect_push (i32.const 1) {{paren_close}} (i32.const 0) (local.get $work)))
-          (local.set $work (call $inspect_push (i32.const 2) (local.get $value) (i32.const 0) (local.get $work)))
+          (call $ib_byte (i32.const 40))
+          (call $inspect_push (i32.const 1) (ref.null eq) (i32.const 41))
+          (call $inspect_push (i32.const 2) (local.get $value) (i32.const 0))
           (br $next)))
       (if (i32.eq (local.get $tag) (i32.const 6))
         (then
-          (local.set $out (call $list_cons {{list_open}} (local.get $out)))
-          (local.set $work (call $inspect_push (i32.const 3) (local.get $value) (i32.const 0) (local.get $work)))
+          (call $ib_byte (i32.const 91))
+          (call $inspect_push (i32.const 3) (local.get $value) (i32.const 0))
           (br $next)))
-      (local.set $out (call $list_cons (call $inspect_atom (local.get $value) (local.get $tag)) (local.get $out)))
+      (call $ib_atom (local.get $value) (local.get $tag))
       (br $next)))
-    (call $string_concat (call $list_reverse (local.get $out))))
+    (local.set $out (array.new_default $bytes (global.get $il)))
+    (array.copy $bytes $bytes (local.get $out) (i32.const 0)
+      (ref.as_non_null (global.get $ib)) (i32.const 0) (global.get $il))
+    (global.set $ib (ref.null $bytes))
+    (global.set $it_values (ref.null $values))
+    (global.set $it_meta (ref.null $frames))
+    (call $string_from_bytes (local.get $out)))
 
   (func $value_inspect (param $value eqref) (result eqref)
     (return_call $inspect (local.get $value)))
@@ -269,9 +360,6 @@ pub fn wat() -> String {
         source,
         &[
             ("comma", ", "),
-            ("list_open", "["),
-            ("list_close", "]"),
-            ("paren_open", "("),
             ("paren_close", ")"),
             ("bits_open", "<<"),
             ("bits_close", ">>"),

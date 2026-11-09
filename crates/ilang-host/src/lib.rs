@@ -21,6 +21,7 @@
 //! thread of its own with a native stack of [`THREAD_STACK`] bytes, so that
 //! the Wasm stack always fits in it, whatever thread calls the host.
 
+pub mod services;
 #[cfg(test)]
 mod tests;
 
@@ -501,6 +502,15 @@ impl HostImports {
         )
     }
 
+    /// Adds every function of `other`. A function that is in both is an
+    /// error.
+    pub fn merge(&mut self, other: HostImports) -> Result<()> {
+        for ((module, name), function) in other.0 {
+            self.insert(module, name, function)?;
+        }
+        Ok(())
+    }
+
     /// An external function (`@external("module", "function")`).
     pub fn external(
         &mut self,
@@ -519,11 +529,20 @@ impl HostImports {
 #[derive(Clone, Default)]
 pub struct HostOptions {
     pub imports: HostImports,
+    /// Give the answers of host functions to the module when they have the
+    /// right types, without checking that they are correct (a `Float` that
+    /// is not finite, a `BitArray` with bits after the end): the module
+    /// checks them and stops, with the positions of the call (B.2, §11.7).
+    /// When off, the host stops the program itself, with no positions.
+    pub unchecked_replies: bool,
 }
 
 impl HostOptions {
     pub fn new(imports: HostImports) -> Self {
-        Self { imports }
+        Self {
+            imports,
+            unchecked_replies: false,
+        }
     }
 }
 
@@ -620,7 +639,15 @@ impl Program {
                         | (HostFunction::External(_), false, _) => {}
                         _ => bail!("host function {module} {name} has the wrong kind"),
                     }
-                    define_import(&mut linker, &self.engine, module, name, signature, function)?;
+                    define_import(
+                        &mut linker,
+                        &self.engine,
+                        module,
+                        name,
+                        signature,
+                        function,
+                        !options.unchecked_replies,
+                    )?;
                 }
             }
         }
@@ -646,6 +673,7 @@ impl Program {
             instance,
             abi: self.abi.clone(),
             unusable: None,
+            checked: !options.unchecked_replies,
         };
         let start = instance
             .instance
@@ -739,6 +767,8 @@ pub struct Instance {
     instance: WasmInstance,
     abi: Abi,
     unusable: Option<String>,
+    /// Whether the answers of host functions are checked by the host.
+    checked: bool,
 }
 
 impl Instance {
@@ -983,10 +1013,18 @@ impl Instance {
                 pending.namespace, pending.label
             ))?;
             let bridge = Bridge::from_instance(&self.instance, &mut self.store);
+            let checked = self.checked;
             let invoked = {
                 let mut scope = RootScope::new(&mut self.store);
                 let mut values = Vec::new();
-                match lower_reply(&mut scope, bridge, &pending.signature, reply, &mut values) {
+                match lower_reply(
+                    &mut scope,
+                    bridge,
+                    &pending.signature,
+                    reply,
+                    &mut values,
+                    checked,
+                ) {
                     Ok(true) => Some(invoke_in(&mut scope, resume, &values, &mut status)),
                     Ok(false) => None,
                     Err(error) => Some(Invoked::Failed(error)),
@@ -1211,6 +1249,7 @@ fn define_import(
     name: &str,
     signature: &Signature,
     function: HostFunction,
+    checked: bool,
 ) -> Result<()> {
     let results = if signature.is_async {
         Vec::new()
@@ -1258,7 +1297,7 @@ fn define_import(
             Err(error) => return Err(fail(&mut caller, error)),
         };
         let mut values = Vec::new();
-        match lower_reply(&mut caller, bridge, &signature, reply, &mut values) {
+        match lower_reply(&mut caller, bridge, &signature, reply, &mut values, checked) {
             Ok(true) => {
                 results.clone_from_slice(&values);
                 Ok(())
@@ -1277,26 +1316,32 @@ fn define_import(
 }
 
 /// Encode the answer of a host function as results of B.2. `Ok(false)` when
-/// the answer is not a correct value: the program then stops.
+/// the answer is not a correct value: the program then stops. Unless
+/// `checked`, a value of the right type is given to the module even when it
+/// is not correct, and the module stops.
 fn lower_reply(
     context: &mut impl AsContextMut<Data = State>,
     bridge: Bridge,
     signature: &Signature,
     reply: std::result::Result<Value, Value>,
     values: &mut Vec<Val>,
+    checked: bool,
 ) -> Result<bool> {
+    let fits = |value: &Value, kind: AbiType| {
+        if checked {
+            value.is_correct(kind)
+        } else {
+            value.abi_type() == kind
+        }
+    };
     let (tag, value) = match &reply {
         Ok(value) => (0, value),
-        Err(error) => match signature
-            .errors
-            .iter()
-            .position(|kind| error.is_correct(*kind))
-        {
+        Err(error) => match signature.errors.iter().position(|kind| fits(error, *kind)) {
             Some(index) => (index + 1, error),
             None => return Ok(false),
         },
     };
-    if tag == 0 && !value.is_correct(signature.result) {
+    if tag == 0 && !fits(value, signature.result) {
         return Ok(false);
     }
     // The buffers belong to the module after a successful return (B.3).

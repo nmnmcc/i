@@ -71,6 +71,21 @@ pub struct Program {
     pub ty_var_names: Vec<String>,
     /// Filled by `order.rs`.
     pub order: Order,
+    /// The functions of the host services (§9.7), by the service type and
+    /// the index of the field, when their types are correct.
+    pub host_fns: std::collections::HashMap<(TypeId, u32), HostFn>,
+    /// The external functions outside the package `i` (§10.1), when their
+    /// types are correct.
+    pub external_fns: std::collections::HashMap<DefId, HostFn>,
+}
+
+/// A function at the host boundary (§9.7, §10.1), with the parts of B.2.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HostFn {
+    pub params: Vec<crate::types::HostType>,
+    pub result: crate::types::HostType,
+    /// The members of the errors, in the canonical order of B.2.
+    pub errors: Vec<crate::types::HostType>,
 }
 
 impl Program {

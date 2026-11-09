@@ -142,9 +142,25 @@ pub fn level(n: u8) -> Option<Level> {
     }
 }
 
-/// Runs one test in a new instance (§10.2).
+/// The host options of `i run` and `i test`: the standard host services
+/// of `ilang_host::services::standard`, which print to the standard output.
+pub fn standard_options() -> ilang_host::HostOptions {
+    ilang_host::HostOptions::new(ilang_host::services::stdout())
+}
+
+/// Runs one test in a new instance (§10.2), with the standard host services.
 pub fn run_test(program: &ilang_host::Program, name: &str) -> ilang_host::TestResult {
-    let mut instance = match program.instantiate(ilang_host::HostOptions::default()) {
+    run_test_with(program, name, standard_options())
+}
+
+/// Runs one test in a new instance (§10.2) with these host services. An
+/// async test is waited for (B.5).
+pub fn run_test_with(
+    program: &ilang_host::Program,
+    name: &str,
+    options: ilang_host::HostOptions,
+) -> ilang_host::TestResult {
+    let mut instance = match program.instantiate(options) {
         Ok(i) => i,
         Err(e) => {
             return match e.downcast::<ilang_host::Stop>() {
@@ -153,7 +169,17 @@ pub fn run_test(program: &ilang_host::Program, name: &str) -> ilang_host::TestRe
             };
         }
     };
-    match instance.run(name) {
+    let is_async = program
+        .abi()
+        .tests
+        .iter()
+        .any(|t| t.name == name && t.is_async);
+    let outcome = if is_async {
+        ilang_host::block_on(instance.run_async(name))
+    } else {
+        instance.run(name)
+    };
+    match outcome {
         Ok(ilang_host::Outcome::Ok(_)) => ilang_host::TestResult::Passed,
         Ok(ilang_host::Outcome::Stop(stop)) => ilang_host::TestResult::Stopped(stop),
         Ok(ilang_host::Outcome::Err(e)) => {

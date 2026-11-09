@@ -2,7 +2,7 @@
 
 use clap::{Parser, Subcommand};
 use ilang_cli::{BuildOptions, build, level, run_test};
-use ilang_host::{HostOptions, Outcome, Program, TestResult};
+use ilang_host::{Outcome, Program, TestResult};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -171,7 +171,7 @@ fn cmd_run(project: &Path, opt: u8, offline: bool) -> anyhow::Result<ExitCode> {
     if program.abi().entry.is_none() {
         anyhow::bail!("the package has no `@main` (§10.2)");
     }
-    match program.run_entry(HostOptions::default())? {
+    match program.run_entry(ilang_cli::standard_options())? {
         Outcome::Ok(_) => Ok(ExitCode::SUCCESS),
         Outcome::Stop(stop) => {
             eprintln!("{stop}");

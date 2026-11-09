@@ -179,7 +179,9 @@ fn mentioned(
             Stmt::Block { body, .. } => mentioned(body, set, point),
             Stmt::Break(_) | Stmt::Unreachable => {}
             Stmt::Return(a) | Stmt::SetGlobal(_, a) => atom_uses(a, &mut add),
-            Stmt::TailCall { callee, args, env } => call_uses(callee, args, *env, &mut add),
+            Stmt::TailCall {
+                callee, args, env, ..
+            } => call_uses(callee, args, *env, &mut add),
             Stmt::LetEnv {
                 dst, env, value, ..
             } => {
@@ -480,7 +482,9 @@ fn live_stmt(
                 live.insert(l);
             });
         }
-        Stmt::TailCall { callee, args, env } => {
+        Stmt::TailCall {
+            callee, args, env, ..
+        } => {
             live = Live::new();
             call_uses(callee, args, *env, &mut |l| {
                 live.insert(l);
@@ -548,7 +552,10 @@ fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
         | Value::BitsWhole(a)
         | Value::BitsFromFloat { value: a, .. }
         | Value::BitsFromUtf { value: a, .. } => atom_uses(a, f),
-        Value::Capture(_) | Value::BitsEmpty => {}
+        Value::Capture(_) | Value::BitsEmpty | Value::HostReply(_) => {}
+        Value::HostCall { args, .. } | Value::HostStart { args, .. } => {
+            args.iter().for_each(|a| atom_uses(a, f))
+        }
         Value::Call { callee, args, env } => call_uses(callee, args, *env, f),
         Value::Op(_, args) | Value::Tuple(args) => args.iter().for_each(|a| atom_uses(a, f)),
         Value::OpEnv(_, args, env) => {
@@ -600,9 +607,10 @@ fn num_value_uses(v: &NumValue, f: &mut dyn FnMut(Local)) {
             num_uses(a, f);
             num_uses(b, f);
         }
-        NumValue::BitsLength(a) | NumValue::LengthOf(a, _) | NumValue::WidthOf(a, _) => {
-            atom_uses(a, f)
-        }
+        NumValue::BitsLength(a)
+        | NumValue::LengthOf(a, _)
+        | NumValue::TakeLength(a, _)
+        | NumValue::WidthOf(a, _) => atom_uses(a, f),
     }
 }
 
@@ -681,6 +689,7 @@ mod tests {
                     callee: Callee::Value(Atom::Local(3)),
                     args: vec![],
                     env: Env::Local(2),
+                    site: None,
                 }],
                 otherwise: vec![Stmt::Return(Atom::Nil)],
             },

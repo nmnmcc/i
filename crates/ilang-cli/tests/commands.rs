@@ -82,6 +82,7 @@ fn run_the_example() {
             "{}",
             String::from_utf8_lossy(&out.stderr)
         );
+        assert_eq!(String::from_utf8(out.stdout).unwrap(), "Hello from i!\n");
     }
     let out = i(&["test"], &hello);
     assert!(out.status.success());
@@ -365,6 +366,227 @@ bits = (b: Bool) -> Nil ? BitArray {
             other => panic!("{other:?}"),
         }
     }
+}
+
+/// Host exports with host services: a sync service with errors, and an
+/// async service, whose exports are async (§10.2, B.5) and wait for the
+/// host through `ilang_resume:…`; their results come from `ilang_result:…`.
+#[test]
+fn host_exports_with_services_and_async() {
+    let dir = package(&[
+        (
+            "i.toml",
+            "name = \"app\"\n\n[wasm]\nexports = [\"app/api.lookup\", \"app/api.quadruple\", \"app/api.both\", \"app/api.pure\"]\n",
+        ),
+        (
+            "src/api.i",
+            r#"import (i/core)
+
+export (Kv, Later, lookup, quadruple, both, pure)
+
+@host("test:kv/v1")
+Kv { Kv(get: (key: String) -> String ? String) }
+
+@host("test:async/v1", "async")
+Later { Later(double: (n: Int) -> Int ? String, echo: (text: String) -> String) }
+
+lookup = (key: String, kv ! Kv) { kv.get(key) }
+
+quadruple = (n: Int, later ! Later) { later.double(later.double(n)) }
+
+both = (key: String, kv ! Kv, later ! Later) {
+  later.echo(kv.get(key) <> "!")
+}
+
+pure = (n: Int) { n + 1 }
+"#,
+        ),
+    ]);
+    let int = |n: i64| Value::Int(n.into());
+    for opt in [Level::O0, Level::O2] {
+        let built = build(
+            dir.path(),
+            BuildOptions {
+                tests: false,
+                opt,
+                offline: false,
+            },
+        )
+        .unwrap();
+        let program = Program::from_bytes(&built.wasm).unwrap();
+        let abi = program.abi();
+        assert!(!abi.exports["app/api.lookup"].is_async);
+        assert!(abi.exports["app/api.quadruple"].is_async);
+        assert!(abi.exports["app/api.both"].is_async);
+        assert!(!abi.exports["app/api.pure"].is_async);
+        assert_eq!(
+            abi.services.keys().collect::<Vec<_>>(),
+            ["test:async/v1", "test:kv/v1"]
+        );
+        assert!(abi.services["test:async/v1"]["double"].is_async);
+        assert!(!abi.services["test:kv/v1"]["get"].is_async);
+        assert!(abi.externals.is_empty());
+        let log = ilang_host::services::Log::default();
+        let mut instance = program
+            .instantiate(HostOptions::new(ilang_host::services::testing(log.clone())))
+            .unwrap();
+        let show = |o: Outcome| format!("{o:?}");
+        assert_eq!(
+            show(
+                instance
+                    .call("app/api.lookup", &[Value::String("name".into())])
+                    .unwrap()
+            ),
+            show(Outcome::Ok(Value::String("i".into())))
+        );
+        assert_eq!(
+            show(
+                instance
+                    .call("app/api.lookup", &[Value::String("x".into())])
+                    .unwrap()
+            ),
+            show(Outcome::Err(ilang_host::GuestError(Value::String(
+                "no x".into()
+            ))))
+        );
+        // An async export must be called with `call_async`.
+        assert!(instance.call("app/api.quadruple", &[int(3)]).is_err());
+        let r = ilang_host::block_on(instance.call_async("app/api.quadruple", &[int(3)]));
+        assert_eq!(show(r.unwrap()), show(Outcome::Ok(int(12))));
+        let r = ilang_host::block_on(instance.call_async("app/api.quadruple", &[int(-3)]));
+        assert_eq!(
+            show(r.unwrap()),
+            show(Outcome::Err(ilang_host::GuestError(Value::String(
+                "negative".into()
+            ))))
+        );
+        let r = ilang_host::block_on(
+            instance.call_async("app/api.both", &[Value::String("lang".into())]),
+        );
+        assert_eq!(
+            show(r.unwrap()),
+            show(Outcome::Ok(Value::String("i language!".into())))
+        );
+        // The error of the sync service comes before the async call.
+        let r =
+            ilang_host::block_on(instance.call_async("app/api.both", &[Value::String("y".into())]));
+        assert_eq!(
+            show(r.unwrap()),
+            show(Outcome::Err(ilang_host::GuestError(Value::String(
+                "no y".into()
+            ))))
+        );
+        assert_eq!(
+            show(instance.call("app/api.pure", &[int(1)]).unwrap()),
+            show(Outcome::Ok(int(2)))
+        );
+        assert_eq!(
+            *log.lock().unwrap(),
+            ["double 3", "double 6", "double -3", "echo i language!"]
+        );
+        assert!(instance.unusable().is_none());
+    }
+}
+
+/// An entry point is async when it may call a function of an async host
+/// service (§10.2); a test that gives a fake in its place is not (§9.7). The
+/// metadata lists only the host services that the entry points need (B.6).
+#[test]
+fn async_entry_points_and_needed_services() {
+    let spec = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec/9.7/fake_service.i");
+    let text = std::fs::read_to_string(spec).unwrap();
+    let dir = package(&[
+        ("i.toml", "name = \"spec\"\n"),
+        ("test/fake_service.i", &text),
+        (
+            "src/main.i",
+            "@host(\"test:unused/v1\")\nUnused { Unused(f: () -> Nil) }\n\n@main\nmain = () { Nil }\n",
+        ),
+    ]);
+    let built = build(
+        dir.path(),
+        BuildOptions {
+            tests: true,
+            opt: Level::O0,
+            offline: false,
+        },
+    )
+    .unwrap();
+    let program = Program::from_bytes(&built.wasm).unwrap();
+    let abi = program.abi();
+    assert!(!abi.entry.as_ref().unwrap().is_async);
+    let tests: Vec<(&str, bool)> = abi
+        .tests
+        .iter()
+        .map(|t| (t.name.as_str(), t.is_async))
+        .collect();
+    assert_eq!(
+        tests,
+        [
+            ("spec/fake_service.with_fakes", false),
+            ("spec/fake_service.with_the_host", true)
+        ]
+    );
+    // `Kv` is given by a fake in both tests, and nothing needs `Unused`.
+    assert_eq!(abi.services.keys().collect::<Vec<_>>(), ["test:async/v1"]);
+}
+
+/// `tests/browser/fixtures/compiled.wasm`, which the JavaScript and browser
+/// tests run, has the metadata that the compiler gives its package now.
+/// `bash scripts/build-abi-fixture.sh` builds it again.
+#[test]
+fn the_compiled_fixture_is_current() {
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/browser/fixtures");
+    let built = build(
+        &fixtures.join("compiled"),
+        BuildOptions {
+            tests: false,
+            opt: Level::O2,
+            offline: false,
+        },
+    )
+    .unwrap();
+    let fresh = ilang_host::Abi::from_wasm(&built.wasm).unwrap().unwrap();
+    let saved = std::fs::read(fixtures.join("compiled.wasm")).unwrap();
+    let saved = ilang_host::Abi::from_wasm(&saved).unwrap().unwrap();
+    assert_eq!(
+        fresh, saved,
+        "run `bash scripts/build-abi-fixture.sh` to build the fixture again"
+    );
+    assert!(fresh.entry.unwrap().is_async);
+}
+
+/// `i run` gives the standard host services: `examples/hello` prints.
+#[test]
+fn run_gives_the_standard_services() {
+    let dir = package(&[
+        ("i.toml", "name = \"app\"\n"),
+        (
+            "src/main.i",
+            "export (Io)\n\n@host(\"i:io/v1\")\nIo { Io(print: (text: String) -> Nil) }\n\n@main\nmain = (io ! Io) {\n  io.print(\"one\")\n  io.print(\"two\")\n}\n",
+        ),
+        (
+            "test/main_test.i",
+            "import (app/main)\n\n@test\nprints = (io ! main.Io) { io.print(\"in a test\") }\n",
+        ),
+    ]);
+    let out = i(&["run"], dir.path());
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8(out.stdout).unwrap(), "one\ntwo\n");
+    let out = i(&["test"], dir.path());
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        "in a test\npass app/main_test.prints\n1 passed, 0 failed\n"
+    );
 }
 
 #[test]

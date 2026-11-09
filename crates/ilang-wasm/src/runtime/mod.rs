@@ -61,12 +61,19 @@
 //! number of frames in use. Slot `sp - 1` belongs to the running function and
 //! holds the site of the expression it is working out.
 //!
-//! - On function entry: `call $shadow_enter (site)`, which grows the array when
-//!   it is full. `site` may be -1, which is not printed.
+//! - On function entry: `call $shadow_enter_call`, which pushes the tail site
+//!   of the tail call that called the function, or -1, which is not printed.
+//!   `call $shadow_enter (site)` pushes a site; both grow the array when it
+//!   is full.
 //! - Before a call, an operator that may stop, a `<<`, or a binding that may
 //!   stop: `call $shadow_site (site)` (store into slot `sp - 1`).
 //! - On a normal return: `call $shadow_leave`.
-//! - Before a tail call: `call $shadow_leave`, so the replaced call is gone.
+//! - Before a tail call: `call $shadow_leave_tail (site)`, so the replaced
+//!   call is gone, and its site goes to the callee as a tail site. Library
+//!   code gives -1, and passes on the tail site of its own slot.
+//! - A **tail site** is stored as `-2 - site`: the position of a call in tail
+//!   position, also of a library function (spec §11.7). A stop prints it
+//!   only when it would be the first position.
 //! - Where an exception is caught (`try_table`), restore the depth saved with
 //!   `$shadow_depth` when the handler was entered: `call $shadow_restore`.
 //!   A capture (`$capture`) restores it only at its boundary.
@@ -155,7 +162,8 @@
 //! | `<<a, b>>` | `$bits_concat (a, b)`; `$bits_empty` |
 //! | integers | `$bits_from_int (v, width i64, little i32)` |
 //! | floats | `$bits_from_float (v, width i64, little i32)`: stops when the rounded value is not finite |
-//! | `u(n)`, `bits(n)`, `bytes(n)` lengths | `$bits_length (n, unit i64) -> i64`: stops when negative |
+//! | `u(n)` lengths | `$bits_length (n, unit i64) -> i64`: stops when negative |
+//! | `bits(n)`, `bytes(n)` lengths | `$bits_take_length (n, unit i64) -> i64`: stops when negative; at most 2^62 |
 //! | `bits(n)`, `bytes(n)` | `$bits_take (v, bits i64)`: stops when the value is too short |
 //! | `bytes` | `$bits_whole (v)`: stops when the length is not a multiple of 8 |
 //! | strings, codepoints | `$bits_from_utf (v, encoding i32, little i32, codepoint i32)` |
@@ -179,6 +187,9 @@
 //! | BitArray | `$abi_bits_in (address, bits i32)` | `$abi_bits_out (v) -> i32 i32` |
 //! | externref | `$abi_ref_in (externref)` | `$abi_ref_out (v) -> externref` |
 //! | error tag | `$abi_tag_in (tag i32, members i32) -> i32` | |
+//!
+//! `$abi_int_take`, `$abi_string_take` and `$abi_bits_take` read an import
+//! result like the `in` functions, then free its buffer.
 //!
 //! The `in` functions copy; they never free. The `out` functions make a new
 //! buffer with `ilang_alloc` (address 0 when it would be empty). So for an

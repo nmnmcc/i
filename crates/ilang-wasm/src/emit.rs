@@ -336,6 +336,88 @@ const EFFECTS: &str = r#"
       (array.get $values (ref.as_non_null (struct.get $frame 1 (local.get $frame))) (i32.const 0)))
     (local.get $rest) (local.get $env) (local.get $v) (local.get $cancel) (local.get $frame)))
 
+;; # The host boundary (§9.7, B.4, B.5)
+;;
+;; An async entry point runs in a root boundary, `$host_root`. A function of
+;; an async host service starts the import, records it in `$host_pending`,
+;; and suspends to the root boundary, where `$host_wait` keeps the
+;; continuation in `$host_k` and gives `$host_waiting`: the status is 1. The
+;; export `ilang_resume:…` of the import puts the answer in the globals of the
+;; import and resumes the continuation, so the function reads the answer
+;; with the frames of the program on the shadow stack (§11.7).
+(global $host_root (mut (ref null $boundary)) (ref.null $boundary))
+(global $host_k (mut eqref) (ref.null eq))
+(global $host_pending (mut i32) (i32.const -1))
+(global $host_waiting eqref (struct.new $waiting (i32.const 0)))
+;; The async entry point that runs: whether it is a host export, which gives
+;; its errors to the host, and the site of its binding (§11.7).
+(global $async_export (mut i32) (i32.const 0))
+(global $async_site (mut i32) (i32.const -1))
+;; How it ended: its value or error, and 1 for an error.
+(global $async_value (mut eqref) (ref.null eq))
+(global $async_error (mut i32) (i32.const 0))
+
+(func $host_wait (param $k eqref) (result eqref)
+  (global.set $host_k (local.get $k))
+  (global.get $host_waiting))
+
+(func $host_root_boundary (result eqref)
+  (if (ref.is_null (global.get $host_root)) (then unreachable))
+  (global.get $host_root))
+
+(func $host_boundary (param $body eqref) (param $env (ref null $env)) (result eqref)
+  (local $b (ref $boundary))
+  (local.set $b (struct.new $boundary (i32.const 11) (i32.const 0) (i64.const 0) (f64.const 0)
+    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1)))
+  (global.set $host_root (local.get $b))
+  (return_call $boundary_run (local.get $b) (local.get $env) (local.get $body) (ref.null $flist)
+    (ref.null eq) (ref.null eq) (ref.null $frame)))
+
+(func $host_resume_k (result eqref)
+  (local $k eqref)
+  (global.set $host_pending (i32.const -1))
+  (local.set $k (global.get $host_k))
+  (global.set $host_k (ref.null eq))
+  (return_call $control_resume (local.get $k) (ref.null eq) (global.get $root_env)))
+
+;; The start of an async entry point. While one waits, the host may only
+;; answer it (B.5).
+(func $async_begin (param $export i32) (param $site i32)
+  (if (i32.ne (global.get $host_pending) (i32.const -1)) (then unreachable))
+  (global.set $async_export (local.get $export))
+  (global.set $async_site (local.get $site))
+  (global.set $async_value (ref.null eq))
+  (global.set $async_error (i32.const 0)))
+
+;; `ilang_result:…` may only be called when the entry point has ended.
+(func $async_result
+  (if (i32.ne (global.get $host_pending) (i32.const -1)) (then unreachable)))
+
+;; Runs the body of an async entry point in a new root boundary, or, when
+;; `body` is null, goes on with it after the host answered. Gives the status
+;; of B.5: 1 while it waits, 0 when it has ended.
+(func $async_run (param $body eqref) (result i32)
+  (local $r eqref) (local $e eqref) (local $depth i32)
+  (local.set $depth (call $shadow_depth))
+  (local.set $e (block $error (result eqref)
+    (block $cancel (result eqref)
+      (local.set $r (try_table (result eqref) (catch $error $error) (catch $cancel $cancel)
+        (if (result eqref) (ref.is_null (local.get $body))
+          (then (call $host_resume_k))
+          (else (call $host_boundary (local.get $body) (global.get $root_env))))))
+      (if (ref.eq (local.get $r) (global.get $host_waiting)) (then (return (i32.const 1))))
+      (global.set $async_value (local.get $r))
+      (return (i32.const 0)))
+    (drop) (call $stop_boundary_inactive) (unreachable)))
+  ;; An error stops the program entry and tests; a host export gives it to
+  ;; the host (§10.2).
+  (if (i32.eqz (global.get $async_export))
+    (then (call $stop_error (local.get $e) (global.get $async_site)) (unreachable)))
+  (call $shadow_restore (local.get $depth))
+  (global.set $async_value (local.get $e))
+  (global.set $async_error (i32.const 1))
+  (i32.const 0))
+
 ;; The `fail` of the `Assert` of an entry point (§9.6, §11.7).
 (func $entry_assert_fail (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env)) (param $failure eqref) (result eqref)
   (call $stop_assertion (call $field (local.get $failure) (i32.const 0)))
@@ -356,6 +438,7 @@ const CONTROL_TYPES: &str = r#"
   (field (ref null $call)) (field (mut i32)) (field (ref $boundary)) (field (ref null $flist)))))
 (type $cap (struct (field (ref $boundary)) (field eqref) (field (mut (ref null $flist)))))
 (type $box (struct (field i64)))
+(type $waiting (struct (field i32)))
 "#;
 
 /// The runtime functions whose references are taken.
@@ -390,6 +473,7 @@ pub fn wat(p: &Program) -> String {
     }
     e.start();
     e.exports();
+    e.resume_exports();
     let mut m = String::from("(module\n");
     m.push_str(runtime::TYPES);
     m.push_str("(type $env (array (mut eqref)))\n");
@@ -405,12 +489,51 @@ pub fn wat(p: &Program) -> String {
         );
     }
     m.push_str(runtime::HOST);
+    // The imports of B.4, before every definition.
+    for (i, x) in p.imports.iter().enumerate() {
+        let params: Vec<&str> = x
+            .abi
+            .params
+            .iter()
+            .flat_map(|t| abi_in(*t).0.iter().copied())
+            .collect();
+        let results = if x.kind == ImportKind::AsyncService {
+            String::new()
+        } else {
+            result_list(&import_results(&x.abi))
+        };
+        let _ = writeln!(
+            m,
+            "(import \"{}\" \"{}\" (func $imp{i}{}{results}))",
+            wat_string(&x.module),
+            wat_string(&x.name),
+            if params.is_empty() {
+                String::new()
+            } else {
+                format!(" (param {})", params.join(" "))
+            }
+        );
+    }
     m.push_str(runtime::wat());
     m.push_str(SUPPORT);
     m.push_str(EFFECTS);
     m.push_str(&e.data);
     for g in 0..p.globals {
         let _ = writeln!(m, "(global $g{g} (mut eqref) (ref.null eq))");
+    }
+    // The Wasm values of the parameters and results of each import (B.2).
+    for (i, x) in p.imports.iter().enumerate() {
+        let params = x
+            .abi
+            .params
+            .iter()
+            .flat_map(|t| abi_in(*t).0.iter().copied());
+        for (j, t) in params.enumerate() {
+            let _ = writeln!(m, "(global $hp{i}_{j} (mut {t}) {})", zero(t));
+        }
+        for (j, t) in import_results(&x.abi).into_iter().enumerate() {
+            let _ = writeln!(m, "(global $hr{i}_{j} (mut {t}) {})", zero(t));
+        }
     }
     for &f in &p.constants {
         let n = p.funcs[f.0 as usize].arity();
@@ -451,19 +574,30 @@ impl<'p> Emitter<'p> {
         let name = format!("$f{}", id.0);
         match f {
             FuncKind::Code(func) => self.code(&name, func),
+            // A constructor or a library function used as a value has a
+            // frame too, so that it takes the tail site of a tail call
+            // (§11.7).
             FuncKind::Ctor { ctor, ty, arity } => {
-                self.header(&name, *arity, &[]);
+                let locals = vec![LocalType::Value; *arity as usize + 1];
+                self.header(&name, *arity, &locals);
                 let fields: String = (0..*arity).map(|i| format!(" (local.get $l{i})")).collect();
                 let _ = writeln!(
                     self.out,
-                    "(call $record (i32.const {ctor}) (i64.const {ty}) (array.new_fixed $values {arity}{fields})))"
+                    "(call $shadow_enter_call)\n\
+                     (local.set $l{arity} (call $record (i32.const {ctor}) (i64.const {ty}) (array.new_fixed $values {arity}{fields})))\n\
+                     (call $shadow_leave) (local.get $l{arity}))"
                 );
             }
             FuncKind::Runtime { op, arity } => {
-                self.header(&name, *arity, &[]);
+                let locals = vec![LocalType::Value; *arity as usize + 1];
+                self.header(&name, *arity, &locals);
                 let args: Vec<String> = (0..*arity).map(|i| format!("(local.get $l{i})")).collect();
                 let body = self.op(*op, &args, "(local.get $env)");
-                let _ = writeln!(self.out, "{body})");
+                let _ = writeln!(
+                    self.out,
+                    "(call $shadow_enter_call)\n(local.set $l{arity} {body})\n\
+                     (call $shadow_leave) (local.get $l{arity}))"
+                );
             }
         }
     }
@@ -488,7 +622,7 @@ impl<'p> Emitter<'p> {
         let _ = writeln!(self.out, ";; {}", f.name.replace('\n', " "));
         self.header(name, f.arity, &f.locals);
         if f.frame {
-            self.out.push_str("(call $shadow_enter (i32.const -1))\n");
+            self.out.push_str("(call $shadow_enter_call)\n");
         }
         let mut body = String::new();
         self.stmts(&mut body, &f.body, f.frame);
@@ -506,7 +640,7 @@ impl<'p> Emitter<'p> {
         match s {
             Stmt::Let { dst, value, site } => {
                 if let Some(site) = site {
-                    let _ = writeln!(out, "(call $shadow_site (i32.const {site}))");
+                    let _ = writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
                 }
                 if let Value::Op(Op::Panic, args) = value {
                     let a = self.atom(&args[0]);
@@ -521,7 +655,7 @@ impl<'p> Emitter<'p> {
             }
             Stmt::LetNum { dst, value, site } => {
                 if let Some(site) = site {
-                    let _ = writeln!(out, "(call $shadow_site (i32.const {site}))");
+                    let _ = writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
                 }
                 let v = self.num_value(value);
                 let _ = writeln!(out, "(local.set $l{dst} {v})");
@@ -571,9 +705,15 @@ impl<'p> Emitter<'p> {
                 }
                 let _ = writeln!(out, "(return {a})");
             }
-            Stmt::TailCall { callee, args, env } => {
+            Stmt::TailCall {
+                callee,
+                args,
+                env,
+                site,
+            } => {
                 if frame {
-                    out.push_str("(call $shadow_leave)\n");
+                    let s = site.map_or(-1, site_code);
+                    let _ = writeln!(out, "(call $shadow_leave_tail (i32.const {s}))");
                 }
                 let call = self.call(callee, args, true, &env_text(*env));
                 let _ = writeln!(out, "{call}");
@@ -614,7 +754,7 @@ impl<'p> Emitter<'p> {
                 point,
             } => {
                 if let Some(site) = site {
-                    let _ = writeln!(out, "(call $shadow_site (i32.const {site}))");
+                    let _ = writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
                 }
                 let v = self.value(value);
                 let record = self.record(*point);
@@ -760,7 +900,7 @@ impl<'p> Emitter<'p> {
             );
         }
         if f.frame {
-            let site = point.site.map_or(-1, |s| s as i64);
+            let site = point.site.map_or(-1, site_code);
             let _ = writeln!(self.out, "(call $shadow_enter (i32.const {site}))");
         }
         let args: String = point
@@ -1009,7 +1149,106 @@ impl<'p> Emitter<'p> {
                 num(start),
                 num(length)
             ),
+            Value::HostCall { import, args } => {
+                let call = self.host_call(*import, args);
+                let reply = self.host_reply(*import);
+                format!("(block (result eqref)\n{call}\n{reply})")
+            }
+            Value::HostStart { import, args } => {
+                let call = self.host_call(*import, args);
+                format!(
+                    "(block (result eqref)\n\
+                     (if (i32.ne (global.get $host_pending) (i32.const -1)) (then unreachable))\n\
+                     {call}\n(global.set $host_pending (i32.const {import})) (ref.null eq))"
+                )
+            }
+            Value::HostReply(import) => self.host_reply(*import),
         }
+    }
+
+    /// Calls an import (B.2, B.3): the arguments are encoded in new buffers
+    /// through the globals `$hp…`, the results go to the globals `$hr…`, and
+    /// the buffers of the arguments are freed.
+    fn host_call(&mut self, i: ImportId, args: &[Atom]) -> String {
+        let program: &'p Program = self.p;
+        let x = &program.imports[i as usize];
+        let mut code = String::new();
+        let mut k = 0;
+        let mut frees = Vec::new();
+        for (t, a) in x.abi.params.iter().zip(args) {
+            let n = abi_in(*t).0.len();
+            if n == 0 {
+                continue;
+            }
+            let (_, out) = abi_out(*t, &self.atom(a));
+            code.push_str(&out);
+            for j in (k..k + n).rev() {
+                let _ = write!(code, " (global.set $hp{i}_{j})");
+            }
+            code.push('\n');
+            match t {
+                AbiType::Int => frees.push(k + 1),
+                AbiType::String | AbiType::BitArray => frees.push(k),
+                _ => {}
+            }
+            k += n;
+        }
+        let gets: String = (0..k)
+            .map(|j| format!(" (global.get $hp{i}_{j})"))
+            .collect();
+        let _ = write!(code, "(call $imp{i}{gets})");
+        if x.kind != ImportKind::AsyncService {
+            for j in (0..import_results(&x.abi).len()).rev() {
+                let _ = write!(code, " (global.set $hr{i}_{j})");
+            }
+        }
+        for j in frees {
+            let _ = write!(code, "\n(call $free (global.get $hp{i}_{j}) (i32.const 0))");
+        }
+        code
+    }
+
+    /// The value of the results of an import in the globals `$hr…` (B.2):
+    /// the value, or the error thrown. The result buffers are freed (B.3);
+    /// a value that is not correct stops.
+    fn host_reply(&self, i: ImportId) -> String {
+        let x = &self.p.imports[i as usize];
+        let take = |t: AbiType, k: usize| -> String {
+            let g = |j: usize| format!("(global.get $hr{i}_{})", k + j);
+            match t {
+                AbiType::Nil => "(ref.null eq)".to_string(),
+                AbiType::Bool => format!("(call $abi_bool_in {})", g(0)),
+                AbiType::Float => format!("(call $abi_float_in {})", g(0)),
+                AbiType::Int => format!("(call $abi_int_take {} {} {})", g(0), g(1), g(2)),
+                AbiType::String => format!("(call $abi_string_take {} {})", g(0), g(1)),
+                AbiType::BitArray => format!("(call $abi_bits_take {} {})", g(0), g(1)),
+                AbiType::Externref => format!("(call $abi_ref_in {})", g(0)),
+            }
+        };
+        if x.abi.errors.is_empty() {
+            return take(x.abi.result, 0);
+        }
+        let mut offsets = Vec::new();
+        let mut k = 1;
+        for t in std::iter::once(x.abi.result).chain(x.abi.errors.iter().copied()) {
+            offsets.push((t, k));
+            k += abi_in(t).0.len();
+        }
+        let n = x.abi.errors.len();
+        let mut chain = format!("(throw $error {})", take(offsets[n].0, offsets[n].1));
+        for m in (1..n).rev() {
+            chain = format!(
+                "(if (result eqref) (i32.eq (global.get $hr{i}_0) (i32.const {m}))\n\
+                 (then (throw $error {})) (else {chain}))",
+                take(offsets[m].0, offsets[m].1)
+            );
+        }
+        format!(
+            "(block (result eqref)\n\
+             (global.set $hr{i}_0 (call $abi_tag_in (global.get $hr{i}_0) (i32.const {n})))\n\
+             (if (result eqref) (i32.eqz (global.get $hr{i}_0)) (then {}) (else {chain})))",
+            take(offsets[0].0, offsets[0].1)
+        )
     }
 
     fn num_value(&mut self, v: &NumValue) -> String {
@@ -1020,6 +1259,12 @@ impl<'p> Emitter<'p> {
             NumValue::BitsLength(a) => format!("(call $bits_len64 {})", self.atom(a)),
             NumValue::LengthOf(a, unit) => {
                 format!("(call $bits_length {} (i64.const {unit}))", self.atom(a))
+            }
+            NumValue::TakeLength(a, unit) => {
+                format!(
+                    "(call $bits_take_length {} (i64.const {unit}))",
+                    self.atom(a)
+                )
             }
             NumValue::WidthOf(a, unit) => format!(
                 "(call $bits_width {} (i64.const {unit}) (i32.const 0))",
@@ -1139,6 +1384,24 @@ impl<'p> Emitter<'p> {
              (ref.null $values) (ref.null $limbs) (ref.null $call) (ref.func $entry_assert_fail)))))",
             self.p.services.max(1)
         );
+        // §9.7: the host services that the entry points need, made of
+        // closures that call the imports.
+        for s in &self.p.host_services {
+            let fields: String = s
+                .fields
+                .iter()
+                .map(|f| format!(" (global.get $c{})", f.0))
+                .collect();
+            let _ = writeln!(
+                self.out,
+                "(array.set $env (ref.as_non_null (global.get $root_env)) (i32.const {})\n\
+                 (call $record (i32.const {}) (i64.const {}) (array.new_fixed $values {}{fields})))",
+                s.service,
+                s.ctor,
+                s.ty,
+                s.fields.len()
+            );
+        }
         if self.p.start.is_some() {
             self.out
                 .push_str("(drop (call $start (ref.null $obj) (global.get $root_env)))\n");
@@ -1152,8 +1415,13 @@ impl<'p> Emitter<'p> {
     /// (B.2). An unwinding that comes to an entry point has lost its
     /// boundary.
     fn exports(&mut self) {
-        for e in &self.p.exports {
-            let name = e.name.replace('\\', "\\\\").replace('"', "\\\"");
+        let program: &'p Program = self.p;
+        for e in &program.exports {
+            let name = wat_string(&e.name);
+            if let Some(body) = e.async_body {
+                self.async_export(&name, e, body);
+                continue;
+            }
             match &e.abi {
                 None => {
                     let call = self.call(&e.callee, &[], false, "(global.get $root_env)");
@@ -1174,24 +1442,98 @@ impl<'p> Emitter<'p> {
         }
     }
 
-    fn host_export(&mut self, name: &str, callee: &Callee, abi: &ExportAbi) {
-        let mut sig = String::new();
-        let mut converted = Vec::new();
-        let mut k = 0;
-        for p in &abi.params {
-            let (types, convert) = abi_in(*p);
-            if types.is_empty() {
-                converted.push("(ref.null eq)".to_string());
+    /// An async entry point (B.5): it runs in a root boundary and gives a
+    /// status; `ilang_result:name` gives its results when it has ended.
+    fn async_export(&mut self, name: &str, e: &Export, body: FuncId) {
+        let (sig, converted) = match &e.abi {
+            Some(abi) => export_params(abi),
+            None => (String::new(), Vec::new()),
+        };
+        let captures = if converted.is_empty() {
+            "(ref.null $values)".to_string()
+        } else {
+            format!(
+                "(array.new_fixed $values {} {})",
+                converted.len(),
+                converted.join(" ")
+            )
+        };
+        let (export, site) = match &e.abi {
+            Some(_) => (1, -1),
+            None => (0, e.site.map_or(-1, |s| s as i64)),
+        };
+        let _ = writeln!(
+            self.out,
+            "(func (export \"{name}\"){sig} (result i32)\n\
+             (call $async_begin (i32.const {export}) (i32.const {site}))\n\
+             (call $async_run {}))",
+            closure(1, body, &captures)
+        );
+        let Some(abi) = &e.abi else {
+            let _ = writeln!(
+                self.out,
+                "(func (export \"ilang_result:{name}\") (call $async_result))"
+            );
+            return;
+        };
+        let value = "(global.get $async_value)";
+        if abi.errors.is_empty() {
+            let (types, out) = abi_out(abi.result, value);
+            let _ = writeln!(
+                self.out,
+                "(func (export \"ilang_result:{name}\"){} (call $async_result) {out})",
+                result_list(&types)
+            );
+            return;
+        }
+        let parts = parts(abi);
+        let mut f = format!(
+            "(func (export \"ilang_result:{name}\"){} (call $async_result)\n\
+             (if (i32.eqz (global.get $async_error)) (then (return (i32.const 0){})))\n",
+            result_list(&import_results(abi)),
+            with_value(&parts, 0, value)
+        );
+        for (i, m) in abi.errors.iter().enumerate() {
+            let _ = writeln!(
+                f,
+                "(if (i32.eq (call $value_tag {value}) (i32.const {})) (then (return (i32.const {}){})))",
+                value_tag(*m),
+                i + 1,
+                with_value(&parts, i + 1, value)
+            );
+        }
+        f.push_str("(unreachable))\n");
+        self.out.push_str(&f);
+    }
+
+    /// `ilang_resume:namespace:label` of each async import (B.5): the
+    /// answer of the host goes to the globals of the import, and the
+    /// program goes on. Calling it when the program does not wait for this
+    /// import traps.
+    fn resume_exports(&mut self) {
+        let program: &'p Program = self.p;
+        for (i, x) in program.imports.iter().enumerate() {
+            if x.kind != ImportKind::AsyncService {
                 continue;
             }
-            let mut gets = String::new();
-            for t in types {
-                let _ = write!(sig, " (param {t})");
-                let _ = write!(gets, " (local.get {k})");
-                k += 1;
-            }
-            converted.push(format!("(call {convert}{gets})"));
+            let types = import_results(&x.abi);
+            let params: String = types.iter().map(|t| format!(" (param {t})")).collect();
+            let sets: String = (0..types.len())
+                .map(|j| format!(" (global.set $hr{i}_{j} (local.get {j}))"))
+                .collect();
+            let _ = writeln!(
+                self.out,
+                "(func (export \"ilang_resume:{}:{}\"){params} (result i32)\n\
+                 (if (i32.ne (global.get $host_pending) (i32.const {i})) (then unreachable)){sets}\n\
+                 (call $async_run (ref.null eq)))",
+                wat_string(&x.module),
+                wat_string(&x.name)
+            );
         }
+    }
+
+    fn host_export(&mut self, name: &str, callee: &Callee, abi: &ExportAbi) {
+        let (sig, converted) = export_params(abi);
         let n = abi.params.len() as u32;
         self.arities.insert(n);
         let env = "(global.get $root_env)";
@@ -1216,32 +1558,9 @@ impl<'p> Emitter<'p> {
             let _ = writeln!(self.out, "(func (export \"{name}\"){sig}{results} {out})");
             return;
         }
-        // B.2: the tag, the value, then each member of the errors; the
-        // values that are not used are 0 or null.
-        let parts: Vec<AbiType> = std::iter::once(abi.result)
-            .chain(abi.errors.iter().copied())
-            .collect();
-        let mut all = vec!["i32"];
-        for p in &parts {
-            all.extend(abi_in(*p).0);
-        }
-        let results = result_list(&all);
-        let with = |at: usize, value: &str| -> String {
-            let mut out = String::new();
-            for (i, p) in parts.iter().enumerate() {
-                if i == at {
-                    out.push(' ');
-                    // For `Nil`, the value is dropped: nothing is passed.
-                    out.push_str(&abi_out(*p, value).1);
-                } else {
-                    for t in abi_in(*p).0 {
-                        out.push(' ');
-                        out.push_str(zero(t));
-                    }
-                }
-            }
-            out
-        };
+        let parts = parts(abi);
+        let results = result_list(&import_results(abi));
+        let with = |at: usize, value: &str| with_value(&parts, at, value);
         // The error is given to the host, and the instance may be used
         // again: its shadow stack is put back (`runtime/mod.rs`).
         let mut f = format!(
@@ -1267,6 +1586,55 @@ impl<'p> Emitter<'p> {
         f.push_str("(unreachable))\n");
         self.out.push_str(&f);
     }
+}
+
+/// The parameters of a host export: their Wasm types, and the values made
+/// from them (B.2).
+fn export_params(abi: &ExportAbi) -> (String, Vec<String>) {
+    let mut sig = String::new();
+    let mut converted = Vec::new();
+    let mut k = 0;
+    for p in &abi.params {
+        let (types, convert) = abi_in(*p);
+        if types.is_empty() {
+            converted.push("(ref.null eq)".to_string());
+            continue;
+        }
+        let mut gets = String::new();
+        for t in types {
+            let _ = write!(sig, " (param {t})");
+            let _ = write!(gets, " (local.get {k})");
+            k += 1;
+        }
+        converted.push(format!("(call {convert}{gets})"));
+    }
+    (sig, converted)
+}
+
+/// The value and the members of the errors of a function (B.2).
+fn parts(abi: &ExportAbi) -> Vec<AbiType> {
+    std::iter::once(abi.result)
+        .chain(abi.errors.iter().copied())
+        .collect()
+}
+
+/// B.2: the value, then each member of the errors, with `value` at `at`;
+/// the values that are not used are 0 or null.
+fn with_value(parts: &[AbiType], at: usize, value: &str) -> String {
+    let mut out = String::new();
+    for (i, p) in parts.iter().enumerate() {
+        if i == at {
+            out.push(' ');
+            // For `Nil`, the value is dropped: nothing is passed.
+            out.push_str(&abi_out(*p, value).1);
+        } else {
+            for t in abi_in(*p).0 {
+                out.push(' ');
+                out.push_str(zero(t));
+            }
+        }
+    }
+    out
 }
 
 /// The Wasm types of a value (B.2) and the function that makes it from
@@ -1305,6 +1673,33 @@ fn result_list(types: &[&str]) -> String {
     } else {
         format!(" (result {})", types.join(" "))
     }
+}
+
+/// The results of a function at the host boundary (B.2): the tag when
+/// there are errors, the value, then each member of the errors.
+fn import_results(abi: &ExportAbi) -> Vec<&'static str> {
+    let mut out = Vec::new();
+    if !abi.errors.is_empty() {
+        out.push("i32");
+    }
+    out.extend(abi_in(abi.result).0);
+    for e in &abi.errors {
+        out.extend(abi_in(*e).0);
+    }
+    out
+}
+
+/// A string of the WAT text.
+fn wat_string(s: &str) -> String {
+    let mut out = String::new();
+    for b in s.bytes() {
+        if b == b'"' || b == b'\\' || !(0x20..0x7f).contains(&b) {
+            let _ = write!(out, "\\{b:02x}");
+        } else {
+            out.push(b as char);
+        }
+    }
+    out
 }
 
 fn zero(t: &str) -> &'static str {

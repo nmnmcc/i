@@ -396,6 +396,17 @@ const WAT: &str = r#"
       (then unreachable))
     (i64.mul (call $int_to_i64 (local.get $size)) (local.get $unit)))
 
+  ;; The length of a `bits(n)` or `bytes(n)` segment in bits: n times unit.
+  ;; A negative n stops (spec §8.3). A length that no bit array can have is
+  ;; 2^62, so that `$bits_take` stops because the value is too short.
+  (func $bits_take_length (param $size eqref) (param $unit i64) (result i64)
+    (if (i32.lt_s (call $int_sign (local.get $size)) (i32.const 0))
+      (then (call $stop_bits_negative) unreachable))
+    (if (i32.gt_s (call $int_compare (local.get $size)
+          (call $int_from_i64 (i64.div_u (i64.const 4611686018427387904) (local.get $unit)))) (i32.const 0))
+      (then (return (i64.const 4611686018427387904))))
+    (i64.mul (call $int_to_i64 (local.get $size)) (local.get $unit)))
+
   ;; The first `length` bits of a `bits(n)` or `bytes(n)` segment value.
   (func $bits_take (param $value eqref) (param $length i64) (result eqref)
     (if (i64.lt_u (call $bits_len64 (local.get $value)) (local.get $length))

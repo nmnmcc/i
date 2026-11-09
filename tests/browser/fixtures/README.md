@@ -2,7 +2,8 @@
 
 These modules are written by hand to test the Rust host (`crates/ilang-host`)
 and the JavaScript host (`bindings/javascript`) against the binary interface
-version 2 of `docs/spec.md` (Appendix B). They are not compiler output.
+version 2 of `docs/spec.md` (Appendix B). They are not compiler output, except
+`compiled.wasm`.
 
 Regenerate the checked-in binaries with `bash scripts/build-abi-fixture.sh` from
 a Devenv shell with wasm-tools 1.262.0 (`WASM_TOOLS` can point at another
@@ -58,3 +59,20 @@ host as its own results.
 A dependency-free probe with a GC structure, a typed tail call through
 `return_call_ref`, and `try_table` with `catch_ref` and `throw_ref`. Its `probe`
 export gives 42. The SDK validates it to detect the required features.
+
+## compiled.wasm
+
+Built by the compiler (`i build --opt 2`) from the package in `compiled/`, so
+that the hosts run real compiler output. The script above builds it again. It
+uses the host functions of `hostImports` in `tests/browser/fixture-abi.mjs`, and
+an async `app:clock/v1` `tick(Int) -> Int` (`compiledImports`):
+
+- `app/app.greet(String) -> Int` prints through the sync service `print`.
+- `app/app.lookup(String) -> String ? String` reads through `read`.
+- `app/app.distance(Float, Float) -> Float` calls the external `hypot`.
+- `app/app.wait_sum(Float, Float) -> Float ? String` is async: it waits for
+  `later` two times.
+- The async entry `app/app.main` waits for `tick` and `later`, and prints.
+
+`crates/ilang-cli/tests/commands.rs` checks that its metadata is what the
+compiler gives now.

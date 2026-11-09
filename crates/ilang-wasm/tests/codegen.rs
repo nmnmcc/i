@@ -70,8 +70,10 @@ fn tail_calls_are_return_calls() {
     assert!(!e.contains("return_call"), "{e}");
     let r = function(&text, "app/main.right");
     assert!(r.contains("(return_call $f"), "{r}");
-    // Every frame is left before a tail call (§11.7).
-    assert!(l.contains("(call $shadow_leave)\n(return_call"), "{l}");
+    // Every frame is left before a tail call, and the callee gets its
+    // position as a tail site (§11.7).
+    assert!(l.contains("(call $shadow_leave_tail (i32.const -"), "{l}");
+    assert!(l.contains("))\n(return_call"), "{l}");
 }
 
 #[test]
@@ -126,23 +128,42 @@ fn metadata() {
     }
 }
 
+/// An external function is a Wasm import (§10.1, B.4), and the metadata
+/// lists every external function, also one that is not used (B.6).
 #[test]
-fn not_supported_yet() {
-    let codes = |source: &str| match wasm(source) {
-        Err(Error::Diagnostics(d)) => d.iter().map(|d| (d.code, d.message.clone())).collect(),
-        other => panic!("{:?}", other.map(|_| ())),
-    };
+fn externals_are_imports() {
     let external = "@external(\"app:math/v1\", \"sqrt\")\nsqrt: (x: Float) -> Float\n";
-    let found: Vec<(&str, String)> = codes(&format!(
-        "{external}f = () {{ sqrt(2.0) }}\n@main\nmain = () {{ f()  Nil }}\n"
-    ));
-    assert_eq!(found.len(), 1, "{found:?}");
-    assert!(found.iter().all(|(c, _)| *c == "E0701"));
-    // Functions that are not used are not compiled.
-    let ok = wasm(&format!(
-        "{external}f = () {{ sqrt(2.0) }}\n@main\nmain = () {{ Nil }}\n"
-    ));
-    assert!(ok.is_ok());
+    for main in ["main = () { f()  Nil }", "main = () { Nil }"] {
+        let bytes = wasm(&format!(
+            "{external}f = () {{ sqrt(2.0) }}\n@main\n{main}\n"
+        ))
+        .unwrap();
+        let mut imports = Vec::new();
+        let mut abi = None;
+        for payload in wasmparser::Parser::new(0).parse_all(&bytes) {
+            match payload.unwrap() {
+                wasmparser::Payload::ImportSection(s) => {
+                    for i in s.into_imports() {
+                        let i = i.unwrap();
+                        imports.push(format!("{} {}", i.module, i.name));
+                    }
+                }
+                wasmparser::Payload::CustomSection(s) if s.name() == "ilang.abi" => {
+                    abi = Some(String::from_utf8(s.data().to_vec()).unwrap());
+                }
+                _ => {}
+            }
+        }
+        assert!(
+            imports.contains(&"app:math/v1 sqrt".to_string()),
+            "{imports:?}"
+        );
+        let json: serde_json::Value = serde_json::from_str(&abi.unwrap()).unwrap();
+        assert_eq!(
+            json["externals"],
+            serde_json::json!({ "app:math/v1": { "sqrt": { "params": ["float"], "result": "float" } } })
+        );
+    }
 }
 
 #[test]

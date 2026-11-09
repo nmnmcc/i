@@ -228,19 +228,35 @@ const CORE: &str = r#"
   (local $kind i32) (local $h i32) (local $i i32)
   (local $o (ref null $obj)) (local $xs (ref null $values))
   (local $bs (ref null $bytes)) (local $ls (ref null $limbs))
-  (local $n i32) (local $word i64) (local $bit i64) (local $pending eqref)
+  (local $n i32) (local $word i64) (local $bit i64)
+  ;; The parts still to hash, on a growable stack: linear in the size.
+  (local $stack (ref $values)) (local $sp i32) (local $grown (ref $values))
   (local.set $h (i32.const -2128831035))
-  (local.set $pending (call $list_cons (local.get $v) (call $list_nil)))
+  (local.set $stack (array.new_default $values (i32.const 16)))
+  (array.set $values (local.get $stack) (i32.const 0) (local.get $v))
+  (local.set $sp (i32.const 1))
   (block $done (loop $walk
-    (br_if $done (call $list_is_empty (local.get $pending)))
-    (local.set $v (call $list_head (local.get $pending)))
-    (local.set $pending (call $list_tail (local.get $pending)))
+    (br_if $done (i32.eqz (local.get $sp)))
+    (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
+    (local.set $v (array.get $values (local.get $stack) (local.get $sp)))
     (local.set $kind (call $value_tag (local.get $v)))
     (local.set $h (call $hash_mix (local.get $h) (local.get $kind)))
     (br_if $walk (i32.eqz (local.get $kind)))
     ;; Identity values hash by their tag alone: equal values are one value.
     (br_if $walk (call $value_identity_kind (local.get $kind)))
     (local.set $i (i32.const 0))
+    ;; A small Int: as below, with its one part, without making the parts.
+    (if (ref.test (ref i31) (local.get $v)) (then
+      (local.set $n (i31.get_s (ref.cast (ref i31) (local.get $v))))
+      (local.set $h (call $hash_mix (local.get $h) (call $int_sign (local.get $v))))
+      (if (i32.eqz (local.get $n))
+        (then (local.set $h (call $hash_mix (local.get $h) (i32.const 0))))
+        (else
+          (local.set $h (call $hash_mix (local.get $h) (i32.const 1)))
+          (if (i32.lt_s (local.get $n) (i32.const 0))
+            (then (local.set $n (i32.sub (i32.const 0) (local.get $n)))))
+          (local.set $h (call $hash_mix (local.get $h) (local.get $n)))))
+      (br $walk)))
     (if (i32.eq (local.get $kind) (i32.const 8)) (then
       (local.set $h (call $hash_mix (local.get $h) (call $int_sign (local.get $v))))
       (local.set $ls (call $int_limbs (local.get $v)))
@@ -290,11 +306,19 @@ const CORE: &str = r#"
     (br_if $walk (ref.is_null (local.get $xs)))
     (local.set $n (array.len (local.get $xs)))
     (local.set $h (call $hash_mix (local.get $h) (local.get $n)))
+    ;; The parts go on the stack last first, so the first is hashed first.
+    (if (i32.gt_u (i32.add (local.get $sp) (local.get $n)) (array.len (local.get $stack))) (then
+      (if (i32.ge_u (array.len (local.get $stack)) (i32.const 268435456)) (then unreachable))
+      (local.set $grown (array.new_default $values
+        (i32.add (i32.shl (array.len (local.get $stack)) (i32.const 1)) (local.get $n))))
+      (array.copy $values $values (local.get $grown) (i32.const 0) (local.get $stack) (i32.const 0) (local.get $sp))
+      (local.set $stack (local.get $grown))))
     (local.set $i (local.get $n))
     (block $fields_done (loop $fields_each
       (br_if $fields_done (i32.eqz (local.get $i)))
       (local.set $i (i32.sub (local.get $i) (i32.const 1)))
-      (local.set $pending (call $list_cons (array.get $values (local.get $xs) (local.get $i)) (local.get $pending)))
+      (array.set $values (local.get $stack) (local.get $sp) (array.get $values (local.get $xs) (local.get $i)))
+      (local.set $sp (i32.add (local.get $sp) (i32.const 1)))
       (br $fields_each)))
     (br $walk)))
   (local.get $h))

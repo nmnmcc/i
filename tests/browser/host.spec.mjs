@@ -116,6 +116,23 @@ test("async exports wait for host functions", async ({ page }) => {
   expect(result).toEqual({ value: 2.5, error: "negative", allocations: 0 });
 });
 
+test("a module built by the compiler runs with sync and async host services", async ({ page }) => {
+  const result = await page.evaluate(async (loader) => {
+    const { instantiate, compiledImports, iLangError } = await eval(loader)();
+    const printed = [];
+    const guest = await instantiate("/tests/browser/fixtures/compiled.wasm", { imports: compiledImports(iLangError, printed) });
+    const size = guest.call("app/app.greet", ["i"]);
+    let error;
+    try { guest.call("app/app.lookup", ["other"]); } catch (thrown) { error = thrown.value; }
+    const sum = await guest.callAsync("app/app.wait_sum", [1.5, 2]);
+    let negative;
+    try { await guest.callAsync("app/app.wait_sum", [1, -1]); } catch (thrown) { negative = thrown.value; }
+    await guest.run();
+    return { size: String(size), error, distance: guest.call("app/app.distance", [3, 4]), sum, negative, printed, unusable: guest.unusable };
+  }, `(${load})`);
+  expect(result).toEqual({ size: "1", error: "no other", distance: 5, sum: 3.5, negative: "negative", printed: ["hello i", "main 42 1.5"], unusable: null });
+});
+
 test("Wasm linking rejects signatures that do not match the metadata", async ({ page }) => {
   const result = await page.evaluate(async (loader) => {
     const { instantiate, customAbi, customImports, iLangError } = await eval(loader)();

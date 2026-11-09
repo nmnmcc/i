@@ -133,6 +133,23 @@ const WAT: &str = r#"
 (func $abi_ref_out (param $value eqref) (result externref)
   (call $host_ref_get (local.get $value)))
 
+;; The results of an import: read, then the buffer is freed (B.3).
+(func $abi_int_take (param $sign i32) (param $address i32) (param $count i32) (result eqref)
+  (local $v eqref)
+  (local.set $v (call $abi_int_in (local.get $sign) (local.get $address) (local.get $count)))
+  (if (local.get $count) (then (call $free (local.get $address) (i32.const 0))))
+  (local.get $v))
+(func $abi_string_take (param $address i32) (param $length i32) (result eqref)
+  (local $v eqref)
+  (local.set $v (call $abi_string_in (local.get $address) (local.get $length)))
+  (if (local.get $length) (then (call $free (local.get $address) (i32.const 0))))
+  (local.get $v))
+(func $abi_bits_take (param $address i32) (param $bits i32) (result eqref)
+  (local $v eqref)
+  (local.set $v (call $abi_bits_in (local.get $address) (local.get $bits)))
+  (if (local.get $bits) (then (call $free (local.get $address) (i32.const 0))))
+  (local.get $v))
+
 ;; The error tag of a result: 0, or 1 to the number of error members.
 (func $abi_tag_in (param $tag i32) (param $members i32) (result i32)
   (if (i32.gt_u (local.get $tag) (local.get $members)) (then (call $stop_host_value) unreachable))

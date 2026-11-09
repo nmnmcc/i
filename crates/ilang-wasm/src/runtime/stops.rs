@@ -56,6 +56,30 @@ const WAT: &str = r#"
 (func $shadow_leave
   (global.set $sp (i32.sub (global.get $sp) (i32.const 1))))
 
+;; A tail site (spec §11.7) is kept as `-2 - site`: the position of a call in
+;; tail position. It is printed only when no position is printed before it.
+;; `$tail` holds the tail site of the tail call being made, until the callee
+;; enters with `$shadow_enter_call`; -1 when there is none.
+(global $tail (mut i32) (i32.const -1))
+
+;; The entry of a function: its slot holds the tail site of the tail call
+;; that called it, if there is one.
+(func $shadow_enter_call
+  (call $shadow_enter (global.get $tail))
+  (global.set $tail (i32.const -1)))
+
+;; Before a tail call: the frame is gone, and the tail site goes to the
+;; callee. Library code has no site (-1): it passes on its own tail site.
+(func $shadow_leave_tail (param $site i32)
+  (local $sp i32)
+  (local.set $sp (i32.sub (global.get $sp) (i32.const 1)))
+  (if (i32.eq (local.get $site) (i32.const -1))
+    (then
+      (local.set $site (array.get $frames (global.get $shadow) (local.get $sp)))
+      (if (i32.gt_s (local.get $site) (i32.const -2)) (then (local.set $site (i32.const -1))))))
+  (global.set $tail (local.get $site))
+  (global.set $sp (local.get $sp)))
+
 (func $shadow_site (param $site i32)
   (if (i32.eqz (global.get $sp)) (then (return_call $shadow_enter (local.get $site))))
   (array.set $frames (global.get $shadow) (i32.sub (global.get $sp) (i32.const 1)) (local.get $site)))
@@ -114,18 +138,33 @@ const WAT: &str = r#"
 
 ;; The reason, then every position on the shadow stack, innermost first.
 (func $stop (param $reason eqref)
-  (local $parts eqref) (local $i i32)
+  (local $parts eqref) (local $i i32) (local $site i32) (local $printed i32)
   (if (global.get $stopping) (then unreachable))
   (global.set $stopping (i32.const 1))
   (local.set $parts (call $list_cons (local.get $reason) (call $list_nil)))
+  ;; A tail call whose callee has not entered yet.
+  (if (i32.le_s (global.get $tail) (i32.const -2))
+    (then
+      (local.set $parts (call $stop_add_site (local.get $parts)
+        (i32.sub (i32.const -2) (global.get $tail))))
+      (local.set $printed (i32.const 1))))
   (local.set $i (global.get $sp))
   (if (i32.gt_u (local.get $i) (array.len (global.get $shadow)))
     (then (local.set $i (array.len (global.get $shadow)))))
   (block $done (loop $each
     (br_if $done (i32.eqz (local.get $i)))
     (local.set $i (i32.sub (local.get $i) (i32.const 1)))
-    (local.set $parts (call $stop_add_site (local.get $parts)
-      (array.get $frames (global.get $shadow) (local.get $i))))
+    (local.set $site (array.get $frames (global.get $shadow) (local.get $i)))
+    ;; A tail site is only the first position (§11.7).
+    (if (i32.le_s (local.get $site) (i32.const -2))
+      (then
+        (local.set $site (if (result i32) (local.get $printed)
+          (then (i32.const -1))
+          (else (i32.sub (i32.const -2) (local.get $site)))))))
+    (if (i32.ge_s (local.get $site) (i32.const 0))
+      (then
+        (local.set $parts (call $stop_add_site (local.get $parts) (local.get $site)))
+        (local.set $printed (i32.const 1))))
     (br $each)))
   (call $stop_send (call $string_concat (call $list_reverse (local.get $parts))))
   unreachable)

@@ -180,6 +180,9 @@ pub struct Typed {
     /// The signature of each host export (§10.2, B.2) whose types the host
     /// can take.
     pub host_exports: HashMap<DefId, HostSignature>,
+    /// The host services in the environment of each entry point (§10.2),
+    /// which the host gives (§9.7).
+    pub entry_services: HashMap<DefId, Vec<crate::hir::TypeId>>,
 }
 
 /// A type that the host can take (§10.3), as one part of a host export.

@@ -364,9 +364,13 @@ impl<'a> Checker<'a> {
             }
             return;
         };
+        let mut services = Vec::new();
         for m in known::members(&f.env) {
             let ok = match &m {
                 Ty::Con(Head::Named(TypeRef::Custom(id)), _) => {
+                    if self.p.ty(*id).host.is_some() {
+                        services.push(*id);
+                    }
                     self.p.ty(*id).host.is_some() || TypeRef::Custom(*id) == self.b.assert
                 }
                 _ => false,
@@ -382,6 +386,9 @@ impl<'a> Checker<'a> {
                 );
             }
         }
+        services.sort();
+        services.dedup();
+        self.out.entry_services.insert(d, services);
         let nil = Ty::named(self.b.nil, Vec::new());
         if test && f.ret != nil && f.ret != Ty::Never {
             let r = show(self, &f.ret);

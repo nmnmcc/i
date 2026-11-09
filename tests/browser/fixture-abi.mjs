@@ -66,3 +66,16 @@ export function hostImports(iLangError, printed = [], overrides = {}) {
     "app:math/v1": { hypot: (a, b) => Math.hypot(a, b) },
   };
 }
+
+/**
+ * The host functions of compiled.wasm, built by the compiler from
+ * tests/browser/fixtures/compiled: those of host-abi.wasm, and the async
+ * `tick` of `app:clock/v1`, which gives n + 1.
+ */
+export function compiledImports(iLangError, printed = [], overrides = {}) {
+  const imports = hostImports(iLangError, printed, overrides);
+  return {
+    ...imports,
+    "app:clock/v1": { ...imports["app:clock/v1"], tick: overrides.tick ?? (async (n) => n + 1n) },
+  };
+}

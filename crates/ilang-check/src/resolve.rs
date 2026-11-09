@@ -13,6 +13,7 @@
 use crate::Parsed;
 use crate::code;
 use crate::hir::*;
+use crate::types::HostType;
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast;
 use ilang_syntax::span::Span;
@@ -1450,6 +1451,133 @@ impl<'a> Resolver<'a> {
         head
     }
 
+    /// §9.7: the parameters, values, and errors of the functions of a host
+    /// service are types that the host can take (§10.3), and they have no
+    /// environment. Each such function is put in `host_fns`.
+    fn host_fns(&mut self) {
+        for t in 0..self.p.types.len() {
+            let def = &self.p.types[t];
+            let (Some(_), TypeBody::Custom(ctors)) = (&def.host, &def.body) else {
+                continue;
+            };
+            let [ctor] = ctors.as_slice() else {
+                continue;
+            };
+            let module = def.module;
+            let fields: Vec<FieldDef> = ctor.fields.clone();
+            for (i, f) in fields.iter().enumerate() {
+                if !matches!(f.ty.kind, TypeKind::Fn { .. }) {
+                    continue;
+                }
+                match self.host_fn(&f.ty, true) {
+                    Some(hf) => {
+                        self.p.host_fns.insert((TypeId(t as u32), i as u32), hf);
+                    }
+                    None => {
+                        self.cur = module;
+                        self.error(
+                            code::HOST_TYPE,
+                            f.ty.span,
+                            "the parameters and the value of a function of a host service are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors; its errors are a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; and it has no environment (§9.7, §10.3)",
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// The parts of B.2 of a written function type at the host boundary,
+    /// or `None` when a part is not a type that the host can take. Errors
+    /// are only allowed with `errors`.
+    fn host_fn(&self, t: &Type, errors: bool) -> Option<HostFn> {
+        let TypeKind::Fn {
+            params,
+            ret,
+            err,
+            env,
+        } = &self.expand(t).kind
+        else {
+            return None;
+        };
+        if let Some(env) = env
+            && !self.is_never(env)
+        {
+            return None;
+        }
+        let params = params
+            .iter()
+            .map(|p| self.host_part(&p.ty))
+            .collect::<Option<Vec<_>>>()?;
+        let result = self.host_part(ret)?;
+        let mut members = Vec::new();
+        if let Some(err) = err {
+            if !errors && !self.is_never(err) {
+                return None;
+            }
+            let err = self.expand(err);
+            let parts: Vec<Type> = match &err.kind {
+                TypeKind::Union(ms) => ms.clone(),
+                _ => vec![err.clone()],
+            };
+            for m in parts {
+                if self.is_never(&m) {
+                    continue;
+                }
+                let h = self.host_part(&m)?;
+                if matches!(h, HostType::Opaque(_)) || members.contains(&h) {
+                    return None;
+                }
+                members.push(h);
+            }
+        }
+        members.sort();
+        Some(HostFn {
+            params,
+            result,
+            errors: members,
+        })
+    }
+
+    fn is_never(&self, t: &Type) -> bool {
+        matches!(
+            self.expand(t).kind,
+            TypeKind::Named {
+                ty: TypeRef::Builtin(BuiltinType::Never),
+                ..
+            }
+        )
+    }
+
+    /// The part of B.2 for a type that the host can take (§10.3).
+    fn host_part(&self, t: &Type) -> Option<HostType> {
+        match &self.expand(t).kind {
+            TypeKind::Named {
+                ty: TypeRef::Builtin(b),
+                ..
+            } => match b {
+                BuiltinType::Int => Some(HostType::Int),
+                BuiltinType::Float => Some(HostType::Float),
+                BuiltinType::String => Some(HostType::String),
+                BuiltinType::BitArray => Some(HostType::BitArray),
+                _ => None,
+            },
+            TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                ..
+            } => {
+                let def = self.p.ty(*id);
+                let prelude = Some(def.module) == self.p.prelude;
+                match &def.body {
+                    TypeBody::Custom(ctors) if ctors.is_empty() => Some(HostType::Opaque(*id)),
+                    TypeBody::Custom(_) if prelude && def.name == "Nil" => Some(HostType::Nil),
+                    TypeBody::Custom(_) if prelude && def.name == "Bool" => Some(HostType::Bool),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
     /// §10.1: the written type of an external function outside the package
     /// `i`. It is a function type with no `_` and no type variables, whose
     /// parameters and value are types that the host can take (§10.3), with
@@ -1550,7 +1678,19 @@ impl<'a> Resolver<'a> {
                     // The operations of the library are not host imports
                     // (§2.1), so their types are not limited.
                     if !self.in_library() {
+                        let before = self.diags.len();
                         self.external_type(&t);
+                        if self.diags.len() == before
+                            && let Some(f) = self.host_fn(&t, false)
+                        {
+                            self.p.external_fns.insert(
+                                DefId {
+                                    module: m,
+                                    index: d,
+                                },
+                                f,
+                            );
+                        }
                     }
                     if let DefKind::External {
                         ty: slot_ty,
@@ -2342,6 +2482,7 @@ impl<'a> Resolver<'a> {
                 "the compiled package has more than one `@main`",
             );
         }
+        self.host_fns();
         // §9.7: two host services may not have the same namespace and a
         // field with the same label.
         let mut seen: HashMap<(String, String), ()> = HashMap::new();

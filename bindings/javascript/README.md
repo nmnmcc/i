@@ -112,5 +112,6 @@ npm run test:browser:host
 
 The browser suite uses the same checked-in Wasm fixtures in Chromium, Firefox and
 WebKit. Regenerate them, and the feature probe in `ilang.mjs`, with
-`bash scripts/build-abi-fixture.sh`. They test the host contract, not the
-compiler.
+`bash scripts/build-abi-fixture.sh`. The hand-written ones test the host
+contract; `compiled.wasm` is built by the compiler, and runs sync and async host
+services, external functions, and host exports of a real program.

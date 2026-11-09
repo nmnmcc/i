@@ -802,7 +802,29 @@ impl Checker<'_> {
                     _ => None,
                 };
                 let mut parts = vec![Pat::Wild(None); fields.len()];
-                for (arg, i) in self.match_fields(q.span, &fields, args, *spread) {
+                let matched = self.match_fields(q.span, &fields, args, *spread);
+                // Rule 11: `..` counts as a catch-all at the places of the
+                // fields that it leaves out.
+                if *spread && v.unguarded {
+                    for (i, field) in fields.iter().enumerate() {
+                        if matched.iter().any(|m| m.1 == i) {
+                            continue;
+                        }
+                        let k = match &kargs {
+                            Some(xs) => self.field_known(*ctor, i, Some(xs)),
+                            None => Ty::Top,
+                        };
+                        let c = self.child(
+                            places,
+                            at,
+                            Step::Field(*ctor, i as u32),
+                            field.1.clone(),
+                            k,
+                        );
+                        places[c].catch_here = true;
+                    }
+                }
+                for (arg, i) in matched {
                     let k = match &kargs {
                         Some(xs) => self.field_known(*ctor, i, Some(xs)),
                         None => Ty::Top,

@@ -1,10 +1,11 @@
-//// A first program in the pure core of i. It has no output yet: host
-//// services, which print, come later. So `i run` is quiet when the program
-//// works, and shows a stop message when a check fails.
+//// A first program in i. `i run` and `i test` give it the host service
+//// `Io` (`i:io/v1`), so it can print: `i run` prints `Hello from i!`.
 
-import (i/core)
+export (Greeting(..), Io, greet, repeat)
 
-export (Greeting(..), greet, repeat)
+/// The host service that prints a line (§9.7). The host gives it.
+@host("i:io/v1")
+Io { Io(print: (text: String) -> Nil) }
 
 Greeting { Greeting(name: String, times: Int) }
 
@@ -20,10 +21,6 @@ repeat = (text: String, times: Int, sep: String) -> String {
 greet = (g: Greeting) { repeat("hello " <> g.name <> "!", g.times, " ") }
 
 @main
-main = () {
-  text = greet(Greeting(name: "world", times: 3))
-  case text == "hello world! hello world! hello world!" {
-    True -> core.inspect([1, 2, 3])
-    False -> panic(text)
-  }
+main = (io ! Io) {
+  io.print("Hello from i!")
 }
