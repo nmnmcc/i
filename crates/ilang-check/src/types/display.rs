@@ -1110,6 +1110,29 @@ pub(crate) fn known(s: &Solver, t: &Ty, level: u32) -> Ty {
     }
 }
 
+/// `known`, but with the variables that are not general kept, for the
+/// matching that gives them types (§4.8).
+pub(crate) fn known_keep(s: &Solver, t: &Ty, level: u32) -> Ty {
+    match simplify(s, t, Some(level)) {
+        Ok(t) => known_norm(s, &both(&t)),
+        Err(()) => Ty::Top,
+    }
+}
+
+/// The known type of a name of another module (§4.8): its type scheme in
+/// the simpler form of §4.7, where a variable that is not generalized is
+/// the union of the types that come to it.
+pub(crate) fn known_shown(s: &Solver, t: &Ty) -> Ty {
+    let opts = Opts {
+        mono: true,
+        written: false,
+    };
+    match shown(s, t, opts) {
+        Ok(t) => known_norm(s, &both(&t)),
+        Err(()) => Ty::Top,
+    }
+}
+
 fn not_general(s: &Solver, t: &Ty, level: u32) -> Ty {
     let go = |x: &Ty| not_general(s, x, level);
     match t {

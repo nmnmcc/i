@@ -71,8 +71,14 @@ pub(crate) struct Checker<'a> {
     /// §7.5: the names known to be made by a constructor, where they are
     /// used now.
     pub known: HashMap<VarId, CtorRef>,
-    /// Names bound by choices that give them different constructors.
-    pub known_conflict: HashSet<VarId>,
+    /// §7.5: a subject name inside a clause `C(…)`: the type arguments of
+    /// the pattern type at the top place, which its value is in there.
+    pub known_args: HashMap<VarId, Vec<Ty>>,
+    /// The type variables of known types that are generalized variables of
+    /// type schemes: they stand for any type (§4.8).
+    pub kgen: HashSet<super::V>,
+    /// The names of the group being typed.
+    group_defs: HashSet<DefId>,
     /// What the code generator needs, gathered while typing.
     pub out: Typed,
     /// The `case` expressions of the group being typed, whose coverage is
@@ -109,7 +115,9 @@ impl<'a> Checker<'a> {
             b,
             alias_depth: 0,
             known: HashMap::new(),
-            known_conflict: HashSet::new(),
+            known_args: HashMap::new(),
+            kgen: HashSet::new(),
+            group_defs: HashSet::new(),
             out: Typed::default(),
             cases: Vec::new(),
         }
@@ -189,6 +197,10 @@ impl<'a> Checker<'a> {
         let direct = group.iter().all(|b| p.binding(*b).binding.direct);
         self.s.level = u32::from(direct);
         let mut holders = Vec::new();
+        self.group_defs = group
+            .iter()
+            .flat_map(|b| p.binding(*b).defs.iter().copied())
+            .collect();
         for b in group {
             for d in &p.binding(*b).defs {
                 let v = self.s.fresh();
@@ -262,27 +274,40 @@ impl<'a> Checker<'a> {
             self.set_module(d.module);
             self.check_occurs(mark, *span);
         }
-        for (d, var, t, _) in types {
+        for (d, _, t, _) in types {
             self.set_module(d.module);
             let scheme = if direct {
-                let s = Scheme {
+                Scheme {
                     level: 0,
                     ty: self.generalize(&t, 0),
-                };
-                // §4.8: outside its group, a generalized name has its type
-                // scheme as its known type.
-                let k = display::known(&self.s, &s.ty, 0);
-                self.kvars.insert(var, k);
-                s
+                }
             } else {
                 Scheme::mono(t)
             };
             self.defs.insert(d, scheme);
         }
+        self.group_defs.clear();
         for (b, k) in group.iter().zip(knowns) {
             self.out.generalized.insert(*b, direct);
-            if !direct {
-                self.fit_known(&p.binding(*b).binding.pattern, &k, false);
+            let top = p.binding(*b);
+            self.set_module(b.module);
+            self.fit_known(&top.binding.pattern, &k, false);
+            if direct {
+                // §4.8: outside its group, a generalized name has its type
+                // scheme as its known type, with the parts of the known
+                // type of its value for the variables that are not
+                // generalized.
+                for d in &top.defs {
+                    let DefKind::Binding { var, .. } = p.def(*d).kind else {
+                        continue;
+                    };
+                    let Some(s) = self.defs.get(d).cloned() else {
+                        continue;
+                    };
+                    let value = self.kvars.get(&var).cloned().unwrap_or(Ty::Top);
+                    let k = self.scheme_known(&s.ty, 0, &value);
+                    self.kvars.insert(var, k);
+                }
             }
         }
         // §7.4: coverage, with the types of the group.
@@ -982,15 +1007,25 @@ impl<'a> Checker<'a> {
                 (t, self.kvars.get(v).cloned().unwrap_or(Ty::Top))
             }
             ExprKind::Name(ValueRef::Def(d)) => {
+                let scheme = self.defs.get(d).cloned();
                 let k = match self.p.def(*d).kind {
+                    // §4.8: an imported name, and a member `m.x` of an
+                    // imported module, have their type scheme.
+                    DefKind::Binding { var, .. }
+                        if d.module != self.module && !self.group_defs.contains(d) =>
+                    {
+                        self.note_use(var, e.span);
+                        scheme.map_or(Ty::Top, |s| self.other_known(&s.ty))
+                    }
                     DefKind::Binding { var, .. } => {
                         self.note_use(var, e.span);
                         self.kvars.get(&var).cloned().unwrap_or(Ty::Top)
                     }
-                    DefKind::External { .. } => self
-                        .defs
-                        .get(d)
-                        .map_or(Ty::Top, |s| display::known(&self.s, &s.ty, s.level)),
+                    DefKind::External { .. } => scheme.map_or(Ty::Top, |s| {
+                        let k = display::known(&self.s, &s.ty, s.level);
+                        self.note_general(&k);
+                        k
+                    }),
                 };
                 let t = match self.defs.get(d).cloned() {
                     Some(s) => self.instantiate(&s),
@@ -1089,9 +1124,9 @@ impl<'a> Checker<'a> {
     fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr, span: Span) -> (Ty, Ty) {
         use BinOp::*;
         if op == Pipe {
-            // `a |> f(b)` is `f(a, b)`, and `a |> f` is `f(a)`.
-            let (a, k) = self.infer_k(lhs, &Ty::Top);
-            let first = Some((a, k, lhs.span));
+            // `a |> f(b)` is `f(a, b)`, and `a |> f` is `f(a)`: `a` is the
+            // first argument, with its expected type (§4.8).
+            let first = Some(lhs);
             return match &rhs.kind {
                 ExprKind::Call { callee, args } => self.call(callee, first, args, span),
                 _ => self.call(rhs, first, &[], span),
@@ -1142,15 +1177,9 @@ impl<'a> Checker<'a> {
         (result.clone(), result)
     }
 
-    /// Rule 5: `f(a1, …)`. `first` is the left side of `|>`, with its known
-    /// type.
-    fn call(
-        &mut self,
-        callee: &Expr,
-        first: Option<(Ty, Ty, Span)>,
-        args: &[Arg],
-        span: Span,
-    ) -> (Ty, Ty) {
+    /// Rule 5: `f(a1, …)`. `first` is the left side of `|>`, the first
+    /// argument.
+    fn call(&mut self, callee: &Expr, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
         let (f, kf) = self.infer_k(callee, &Ty::Top);
         let kfn = known::one_fn(&kf);
         let skip = usize::from(first.is_some());
@@ -1171,7 +1200,7 @@ impl<'a> Checker<'a> {
                         k.params.iter().map(|p| p.0.clone()).collect();
                     let given: Vec<(Option<&Ident>, Span)> = first
                         .iter()
-                        .map(|x| (None, x.2))
+                        .map(|x| (None, x.span))
                         .chain(args.iter().map(|a| (a.label.as_ref(), a.value.span)))
                         .collect();
                     self.place(&labels, &given, span)
@@ -1192,25 +1221,22 @@ impl<'a> Checker<'a> {
             ),
             _ => None,
         };
+        let values: Vec<&Expr> = first
+            .into_iter()
+            .chain(args.iter().map(|a| &a.value))
+            .collect();
         let mut typed: Vec<Option<(Ty, Ty)>> = vec![None; n];
         let mut sigma = known::Sigma::new();
-        if let Some((t, k, _)) = &first {
-            if let Some(ps) = &params {
-                self.match_k(&ps[0], k, &mut sigma, 0);
-            }
-            typed[0] = Some((t.clone(), k.clone()));
-        }
         for later in [false, true] {
-            for (j, a) in args.iter().enumerate() {
-                let i = skip + j;
-                if (params.is_some() && known::open_fn(&a.value)) != later {
+            for (i, a) in values.iter().enumerate() {
+                if (params.is_some() && known::open_fn(a)) != later {
                     continue;
                 }
                 let expected = match &params {
                     Some(ps) => self.ksubst(&ps[i], &sigma, true).unwrap_or(Ty::Top),
                     None => Ty::Top,
                 };
-                let (t, k) = self.infer_k(&a.value, &expected);
+                let (t, k) = self.infer_k(a, &expected);
                 if let (Some(ps), false) = (&params, later) {
                     self.match_k(&ps[i], &k, &mut sigma, 0);
                 }
@@ -1218,11 +1244,7 @@ impl<'a> Checker<'a> {
             }
         }
         let typed: Vec<(Ty, Ty)> = typed.into_iter().flatten().collect();
-        let spans: Vec<Span> = first
-            .iter()
-            .map(|x| x.2)
-            .chain(args.iter().map(|a| a.value.span))
-            .collect();
+        let spans: Vec<Span> = values.iter().map(|a| a.span).collect();
         let Some(to) = to else {
             return (self.s.fresh(), Ty::Top);
         };
@@ -1376,17 +1398,27 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// The variable of a name that is bound by a pattern.
+    fn name_var(&self, e: &Expr) -> Option<VarId> {
+        match &e.kind {
+            ExprKind::Name(ValueRef::Local(v)) => Some(*v),
+            ExprKind::Name(ValueRef::Def(d)) => match self.p.def(*d).kind {
+                DefKind::Binding { var, .. } => Some(var),
+                DefKind::External { .. } => None,
+            },
+            _ => None,
+        }
+    }
+
     /// The constructor that the name `e` is known to be made by (§7.5).
     fn known_ctor(&self, e: &Expr) -> Option<CtorRef> {
-        let var = match &e.kind {
-            ExprKind::Name(ValueRef::Local(v)) => *v,
-            ExprKind::Name(ValueRef::Def(d)) => match self.p.def(*d).kind {
-                DefKind::Binding { var, .. } => var,
-                DefKind::External { .. } => return None,
-            },
-            _ => return None,
-        };
-        self.known.get(&var).copied()
+        self.known.get(&self.name_var(e)?).copied()
+    }
+
+    /// The type arguments of the value of the name `e` inside a clause that
+    /// makes it known to be made by a constructor (§7.5).
+    fn known_ctor_args(&self, e: &Expr) -> Option<Vec<Ty>> {
+        self.known_args.get(&self.name_var(e)?).cloned()
     }
 
     fn ctor_name(&self, c: CtorRef) -> String {
@@ -1496,7 +1528,12 @@ impl<'a> Checker<'a> {
         }
         // The type of `v` is a subtype of its known type (rule 13), and of
         // the type of the constructor that made it. The field types are
-        // those of the forms of these types in that bound.
+        // those of the forms of these types in that bound. Inside a clause
+        // that makes the subject `v` known to be made by `C` (§7.5), the
+        // value is in the pattern type of the clause, and the type of `v`
+        // is not changed, because outside the clause it may have values of
+        // other types.
+        let narrowed = known_ctor.and_then(|_| self.known_ctor_args(target));
         let mut forms: Vec<Ty> = match kv {
             Ty::Top => Vec::new(),
             _ => known::members(&kv)
@@ -1507,9 +1544,10 @@ impl<'a> Checker<'a> {
         let mut parts = Vec::new();
         for (c, i) in &found {
             let h = Some(Head::Named(TypeRef::Custom(c.ty)));
-            let targs = match forms.iter().find(|f| f.head() == h) {
-                Some(Ty::Con(_, xs)) => xs.clone(),
-                _ => {
+            let targs = match (&narrowed, forms.iter().find(|f| f.head() == h)) {
+                (Some(a), _) => a.clone(),
+                (None, Some(Ty::Con(_, xs))) => xs.clone(),
+                (None, _) => {
                     let a = self.fresh_args(c.ty);
                     forms.push(Ty::named(TypeRef::Custom(c.ty), a.clone()));
                     a
@@ -1517,8 +1555,10 @@ impl<'a> Checker<'a> {
             };
             parts.push(self.ctor_fields(*c, &targs)[*i as usize].1.clone());
         }
-        let bound = self.union(forms, target.span);
-        self.sub(&t, &bound, target.span);
+        if !forms.is_empty() {
+            let bound = self.union(forms, target.span);
+            self.sub(&t, &bound, target.span);
+        }
         let ks = ctors
             .iter()
             .zip(&found)
@@ -1613,13 +1653,27 @@ impl<'a> Checker<'a> {
                 ),
             );
         }
-        let old = self.fresh_args(ctor.ty);
+        // Inside a clause that makes the subject `v` known to be made by `C`
+        // (§7.5), the value is in the pattern type of the clause, whose
+        // arguments are `old`; the type of `v` is not changed (as in
+        // `field`).
+        let narrowed = match self.known_ctor(base) {
+            Some(c) if c == ctor => self.known_ctor_args(base),
+            _ => None,
+        };
         let new = self.fresh_args(ctor.ty);
-        self.sub(
-            &bt,
-            &Ty::named(TypeRef::Custom(ctor.ty), old.clone()),
-            base.span,
-        );
+        let old = match narrowed {
+            Some(a) => a,
+            None => {
+                let old = self.fresh_args(ctor.ty);
+                self.sub(
+                    &bt,
+                    &Ty::named(TypeRef::Custom(ctor.ty), old.clone()),
+                    base.span,
+                );
+                old
+            }
+        };
         let old_fields = self.ctor_fields(ctor, &old);
         let new_fields = self.ctor_fields(ctor, &new);
         let mut given: Vec<Option<Ty>> = vec![None; new_fields.len()];
@@ -1914,20 +1968,22 @@ impl<'a> Checker<'a> {
             }
         }
         self.check_occurs(mark, b.pattern.span);
+        self.fit_known(&b.pattern, &k, false);
         if direct {
             self.s.level -= 1;
             let level = self.s.level;
             for v in &binders {
                 if let Some(s) = self.locals.get(v).cloned() {
                     let ty = self.generalize(&s.ty, level);
-                    // §4.8: a generalized name has its type scheme.
-                    let known = display::known(&self.s, &ty, level);
+                    // §4.8: a generalized name has its type scheme, with the
+                    // parts of the known type of its value for the
+                    // variables that are not generalized.
+                    let value = self.kvars.get(v).cloned().unwrap_or(Ty::Top);
+                    let known = self.scheme_known(&ty, level, &value);
                     self.kvars.insert(*v, known);
                     self.locals.insert(*v, Scheme { level, ty });
                 }
             }
-        } else {
-            self.fit_known(&b.pattern, &k, false);
         }
     }
 

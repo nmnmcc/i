@@ -347,22 +347,35 @@ impl Checker<'_> {
             .is_some()
     }
 
-    /// §7.5: `x = C(…)` makes `x` known to be made by `C`. With choices
-    /// that give `x` two constructors, it is not known.
+    /// §7.5: `x = C(…)` in a binding or a parameter makes `x` known to be
+    /// made by `C`. In a `case`, see `clause_known`.
     fn note_known(&mut self, binder: &Binder, inner: &Pattern) {
-        let Some(c) = top_ctor(inner) else {
+        if let Some(c) = top_ctor(inner) {
+            self.known.insert(binder.var, c);
+        }
+    }
+
+    /// §7.5 for the choices of a `case` clause: `x` is known to be made by
+    /// `C` only when every choice binds `x` through `x = C(…)`. A choice
+    /// that binds `x` in another way (`x`, `x: T`, `x = _`) may give it a
+    /// value made by another constructor.
+    fn clause_known(&mut self, choices: &[Pattern]) {
+        let mut each: Vec<Vec<(VarId, Option<CtorRef>)>> = Vec::new();
+        for p in choices {
+            let mut out = Vec::new();
+            ctor_binders(p, &mut out);
+            each.push(out);
+        }
+        let Some((first, rest)) = each.split_first() else {
             return;
         };
-        if self.known_conflict.contains(&binder.var) {
-            return;
-        }
-        match self.known.get(&binder.var) {
-            Some(old) if *old != c => {
-                self.known.remove(&binder.var);
-                self.known_conflict.insert(binder.var);
-            }
-            _ => {
-                self.known.insert(binder.var, c);
+        for (x, c) in first {
+            let Some(c) = c else { continue };
+            let all = rest
+                .iter()
+                .all(|o| o.iter().any(|(y, d)| y == x && *d == Some(*c)));
+            if all {
+                self.known.insert(*x, *c);
             }
         }
     }
@@ -406,6 +419,7 @@ impl Checker<'_> {
                 let (_, pat) = self.visit(p, 0, &mut v, &mut places);
                 choices.push(pat);
             }
+            self.clause_known(&c.patterns);
             rows.push(choices);
         }
         // `B <: P`, or `B <: P | r - P` when a clause without a guard has a
@@ -463,12 +477,23 @@ impl Checker<'_> {
         let r = self.s.fresh();
         let mut knowns = Vec::new();
         for c in clauses {
+            // Every choice of the clause has `C` at its top.
             let known = subject_var.and_then(|x| {
                 let mut ctors = c.patterns.iter().map(top_ctor);
                 let first = ctors.next()??;
                 ctors.all(|o| o == Some(first)).then_some((x, first))
             });
-            let before = known.map(|(x, ctor)| (x, self.known.insert(x, ctor)));
+            // Inside the clause, the value of the subject is in the pattern
+            // type `T(b1, …)` at the top place (rule 11), so its fields have
+            // the types of these arguments. The type of the name is not
+            // changed: outside the clause, it may have other values.
+            let before = known.map(|(x, ctor)| {
+                let h = Head::Named(TypeRef::Custom(ctor.ty));
+                let n = self.p.ty(ctor.ty).params.len();
+                let args = self.shared(&mut places, 0, h, n);
+                let old_args = self.known_args.insert(x, args);
+                (x, self.known.insert(x, ctor), old_args)
+            });
             if let Some(g) = &c.guard {
                 let t = self.infer(g);
                 let want = self.bool_ty();
@@ -477,10 +502,14 @@ impl Checker<'_> {
             let (t, k) = self.infer_k(&c.body, expected);
             knowns.push(k);
             self.sub(&t, &r, c.body.span);
-            if let Some((x, old)) = before {
+            if let Some((x, old, old_args)) = before {
                 match old {
                     Some(o) => self.known.insert(x, o),
                     None => self.known.remove(&x),
+                };
+                match old_args {
+                    Some(o) => self.known_args.insert(x, o),
+                    None => self.known_args.remove(&x),
                 };
             }
         }
@@ -671,7 +700,6 @@ impl Checker<'_> {
             self.bind(binder, t.clone(), true);
             let k = self.member_for(pattern, &places[at].known);
             self.kbind(binder.var, k, true);
-            self.note_known(binder, pattern);
             return (t, pat);
         }
         let (t, pat) = match &q.kind {
@@ -813,7 +841,8 @@ impl Checker<'_> {
             }
             _ => {
                 let t = self.leaf(q, true);
-                self.fit_known(q, &Ty::Top, true);
+                let k = places[at].known.clone();
+                self.fit_known(q, &k, true);
                 let pat = match coverage::literal(q) {
                     Some(l) => {
                         let c = Ctor::Lit(l);
@@ -836,6 +865,27 @@ fn top_ctor(p: &Pattern) -> Option<CtorRef> {
         PatternKind::Constructor { ctor, .. } => Some(*ctor),
         PatternKind::Named { pattern, .. } => top_ctor(pattern),
         _ => None,
+    }
+}
+
+/// Every name that a pattern binds, with the constructor `C` when it is
+/// bound through `x = C(…)` (§7.5).
+fn ctor_binders(p: &Pattern, out: &mut Vec<(VarId, Option<CtorRef>)>) {
+    match &p.kind {
+        PatternKind::Named { binder, pattern } => {
+            out.push((binder.var, top_ctor(pattern)));
+            ctor_binders(pattern, out);
+        }
+        PatternKind::Constructor { args: ps, .. }
+        | PatternKind::Tuple(ps)
+        | PatternKind::Error(ps) => ps.iter().for_each(|q| ctor_binders(q, out)),
+        PatternKind::List { items, .. } => items.iter().for_each(|q| ctor_binders(q, out)),
+        PatternKind::BitArray(segs) => segs.iter().for_each(|s| ctor_binders(&s.value, out)),
+        _ => {
+            let mut vs = Vec::new();
+            binders(p, &mut vs);
+            out.extend(vs.into_iter().map(|v| (v, None)));
+        }
     }
 }
 

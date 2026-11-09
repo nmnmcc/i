@@ -1,5 +1,5 @@
 radius : (s: Shape) -> Float
-side : (s: Shape) -> Float
+side : (s: a) -> Float
 grow : (s: Shape) -> Shape
 grow_named : (s: Shape) -> Shape
 from_binding : (s: Shape) -> Float ! Assert

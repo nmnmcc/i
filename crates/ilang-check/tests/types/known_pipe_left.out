@@ -1,0 +1,10 @@
+apply : (f: (User) -> a, x: User) -> a
+map : (xs: List(a), f: (a) -> b) -> List(b)
+flip : (f: (a) -> b, xs: List(a)) -> List(b)
+u : User
+left_fn : String
+left_fn_later : List(Int)
+pair : (p: ((User) -> Int, Int)) -> ((User) -> Int, Int)
+left_tuple : ((User) -> Int, Int)
+unknown : (g: ((u: a) -> Never) -> b ? e ! n) -> b ? e ! n
+23:25: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`

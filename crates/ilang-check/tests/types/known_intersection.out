@@ -1,0 +1,6 @@
+inc : (x: a & Int) -> a
+same : () -> Bool
+other : () -> Bool
+wide : (v: Int) -> Bool
+6:14: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
+8:19: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)

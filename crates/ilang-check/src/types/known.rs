@@ -42,6 +42,14 @@ pub(super) fn member(k: &Ty, h: Option<Head>) -> Option<Ty> {
     members(k).into_iter().find(|m| m.head() == Some(h))
 }
 
+/// The one member of `k` with the type constructor `h` (§4.8, names in
+/// patterns): `None` when there is not exactly one.
+pub(super) fn one_member(k: &Ty, h: Head) -> Option<Ty> {
+    let mut it = members(k).into_iter().filter(|m| m.head() == Some(h));
+    let m = it.next()?;
+    it.next().is_none().then_some(m)
+}
+
 /// A known function type: `k` has one member, a function type.
 pub(super) fn one_fn(k: &Ty) -> Option<FnTy> {
     match members(k).as_slice() {
@@ -187,6 +195,10 @@ impl Checker<'_> {
             return Ty::Top;
         };
         let n = ctors[c.index as usize].fields.len();
+        // `∀a. …`: the variables are generalized (§4.8).
+        for v in &vars {
+            self.note_general(v);
+        }
         let ret = Ty::named(TypeRef::Custom(c.ty), vars.clone());
         if n == 0 {
             // `∀a. T(a)`, in its simpler form (§4.7): a parameter that goes
@@ -245,10 +257,75 @@ impl Checker<'_> {
         }
     }
 
+    /// Notes the type variables of `t` as variables of a type scheme that
+    /// are generalized: in a known type, they stand for any type, so they
+    /// match nothing (§4.8).
+    pub fn note_general(&mut self, t: &Ty) {
+        match t {
+            Ty::Var(v) => {
+                self.kgen.insert(*v);
+            }
+            Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+                xs.iter().for_each(|x| self.note_general(x))
+            }
+            Ty::Fn(f) => {
+                f.params.iter().for_each(|p| self.note_general(&p.1));
+                [&f.ret, &f.err, &f.env]
+                    .into_iter()
+                    .for_each(|x| self.note_general(x));
+            }
+            Ty::Diff(a, h) => {
+                self.note_general(a);
+                h.iter().for_each(|x| self.note_general(x));
+            }
+            Ty::Both(a, b) => {
+                self.note_general(a);
+                self.note_general(b);
+            }
+            Ty::Never | Ty::Top => {}
+        }
+    }
+
+    /// The known type of a name with the type scheme `t`, whose variables
+    /// deeper than `level` are generalized (§4.8): the scheme in its simpler
+    /// form, where a variable that is not generalized is replaced by the
+    /// matching part of `value`, the known type of the value of the
+    /// binding, or else by `_`.
+    pub fn scheme_known(&mut self, t: &Ty, level: u32, value: &Ty) -> Ty {
+        let simple = display::known_keep(&self.s, t, level);
+        let general = |c: &Self, v: &V| c.s.vars.get(v.0 as usize).is_some_and(|x| x.level > level);
+        let mut sigma = Sigma::new();
+        self.match_k(&simple, value, &mut sigma, 0);
+        sigma.retain(|v, _| !general(self, v));
+        let mut vars = Vec::new();
+        ty_vars(&simple, &mut vars);
+        for v in vars {
+            if general(self, &v) {
+                self.kgen.insert(v);
+                sigma.insert(v, vec![Ty::Var(v)]);
+            }
+        }
+        self.ksubst(&simple, &sigma, true).unwrap_or(Ty::Top)
+    }
+
+    /// The known type of a name of another module (§4.8): its type scheme,
+    /// in its simpler form.
+    pub fn other_known(&mut self, t: &Ty) -> Ty {
+        let k = display::known_shown(&self.s, t);
+        self.note_general(&k);
+        k
+    }
+
     /// Matches a type `p` with a known type `k` (§4.8), adding to `sigma`
-    /// the types its type variables get.
+    /// the types its type variables get. `_` in `k`, and a type variable
+    /// that is generalized in `k`, match nothing.
     pub fn match_k(&self, p: &Ty, k: &Ty, sigma: &mut Sigma, depth: u32) {
         if *k == Ty::Top || depth > 64 {
+            return;
+        }
+        if let Ty::Var(v) = k
+            && self.kgen.contains(v)
+        {
             return;
         }
         match p {
@@ -355,23 +432,21 @@ impl Checker<'_> {
     /// known type `b`: the member of `b` with the type constructor of the
     /// pattern type of `q`, or what is written in `q` (§4.8).
     pub fn member_for(&self, q: &Pattern, b: &Ty) -> Ty {
-        let prim = |t| Ty::named(TypeRef::Builtin(t), Vec::new());
+        let prim = |t| Head::Named(TypeRef::Builtin(t));
         let head = match &q.kind {
             PatternKind::Var(_) | PatternKind::Discard => return b.clone(),
             PatternKind::Typed { ty, .. } => return self.kconv(ty, &HashMap::new()),
             PatternKind::Named { pattern, .. } => return self.member_for(pattern, b),
-            PatternKind::Int { .. } => return prim(BuiltinType::Int),
-            PatternKind::Float { .. } => return prim(BuiltinType::Float),
-            PatternKind::String(_) | PatternKind::Prefix { .. } => {
-                return prim(BuiltinType::String);
-            }
-            PatternKind::BitArray(_) => return prim(BuiltinType::BitArray),
+            PatternKind::Int { .. } => prim(BuiltinType::Int),
+            PatternKind::Float { .. } => prim(BuiltinType::Float),
+            PatternKind::String(_) | PatternKind::Prefix { .. } => prim(BuiltinType::String),
+            PatternKind::BitArray(_) => prim(BuiltinType::BitArray),
             PatternKind::Constructor { ctor, .. } => Head::Named(TypeRef::Custom(ctor.ty)),
             PatternKind::Tuple(ps) => Head::Tuple(ps.len() as u32),
             PatternKind::List { .. } => Head::Named(TypeRef::Builtin(BuiltinType::List)),
             PatternKind::Error(_) => return Ty::Top,
         };
-        member(b, Some(head)).unwrap_or(Ty::Top)
+        one_member(b, head).unwrap_or(Ty::Top)
     }
 
     /// Names in patterns (§4.8): when `q` is fitted to a value with the
@@ -396,7 +471,8 @@ impl Checker<'_> {
                 self.fit_known(pattern, b, in_case);
             }
             PatternKind::Prefix { rest: Some(x), .. } => {
-                self.kbind(x.var, prim(BuiltinType::String), in_case);
+                let k = self.member_for(q, b);
+                self.kbind(x.var, k, in_case);
             }
             PatternKind::Constructor { ctor, args, spread } => {
                 let args_k = match member(b, Some(Head::Named(TypeRef::Custom(ctor.ty)))) {
@@ -547,6 +623,33 @@ impl Checker<'_> {
     /// pattern has `x: T` at its top.
     pub fn binding_expected(&self, b: &Binding) -> Ty {
         top_written(&b.pattern).map_or(Ty::Top, |t| self.kconv(t, &HashMap::new()))
+    }
+}
+
+/// The type variables of `t`.
+fn ty_vars(t: &Ty, out: &mut Vec<V>) {
+    match t {
+        Ty::Var(v) => {
+            if !out.contains(v) {
+                out.push(*v);
+            }
+        }
+        Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| ty_vars(x, out)),
+        Ty::Fn(f) => {
+            f.params.iter().for_each(|p| ty_vars(&p.1, out));
+            [&f.ret, &f.err, &f.env]
+                .into_iter()
+                .for_each(|x| ty_vars(x, out));
+        }
+        Ty::Diff(a, h) => {
+            ty_vars(a, out);
+            h.iter().for_each(|x| ty_vars(x, out));
+        }
+        Ty::Both(a, b) => {
+            ty_vars(a, out);
+            ty_vars(b, out);
+        }
+        Ty::Never | Ty::Top => {}
     }
 }
 

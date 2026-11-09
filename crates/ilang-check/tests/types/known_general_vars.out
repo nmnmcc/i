@@ -1,0 +1,7 @@
+map : (xs: List(a), f: (a) -> b) -> List(b)
+id : (x: a) -> a
+users : List(User)
+through_id : List(Never)
+boxed : List(User)
+written : List(Int)
+15:46: error[E0506]: `.age` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`

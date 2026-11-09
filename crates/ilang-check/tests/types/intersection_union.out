@@ -1,0 +1,6 @@
+unbox : (b: Box(a)) -> a
+call : (x: Box(Int)) -> Int
+bind : (x: Box(Int)) -> Box(Int)
+field : (x: Box(Int)) -> Int
+with_var : (x: Box(Int) | Nil) -> Int
+empty : (x: Never) -> Never

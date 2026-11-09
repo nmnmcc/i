@@ -1,0 +1,9 @@
+app/lib.x : User
+app/lib.xs : List(User)
+app/lib.y : User
+app/lib.mk : (a: a) -> a
+app/main.member : String
+app/main.imported : Int
+app/main.generalized : String
+app/main.call : String
+app/main.list : String

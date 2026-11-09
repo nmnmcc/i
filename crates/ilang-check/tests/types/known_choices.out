@@ -1,0 +1,16 @@
+catch_all : (v: T) -> Never
+named_discard : (v: T) -> T
+first_catch_all : (v: T) -> Never
+type_test : (v: T) -> Never
+nested : (r: Result(T, T)) -> Int
+in_tuple : (p: (T, Int)) -> Never
+subject : (v: T) -> Never
+both : (r: Result(T, T)) -> T
+both_subject : (v: U) -> Int
+7:50: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
+8:56: error[E0517]: `A(..v, …)` needs `v` to be known to be made by `A` (§6.7): its type has other constructors, so `v` must be a name matched with `A(…)` (§7.5)
+9:56: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
+10:53: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
+11:69: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
+12:66: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
+14:44: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)

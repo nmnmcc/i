@@ -285,8 +285,14 @@ impl Solver {
                 // `a & T <: R` is true when `T <: R` or when `a <: R`
                 // (§4.5 rule 2). The members that are not type variables
                 // are tried first; when they fail, each variable is tried.
-                let (vars, conc): (Vec<Ty>, Vec<Ty>) =
-                    ms.iter().cloned().partition(|m| matches!(m, Ty::Var(_)));
+                // Only the members with a type constructor are put together
+                // into one: the others (variables, differences, unions that
+                // stay) are tried one by one, so that the type tried is
+                // always smaller than `l`.
+                let (conc, vars): (Vec<Ty>, Vec<Ty>) = ms
+                    .iter()
+                    .cloned()
+                    .partition(|m| matches!(m, Ty::Con(..) | Ty::Fn(_)));
                 let mut tries = Vec::new();
                 if !conc.is_empty() {
                     tries.push(self.inter(conc));
@@ -724,6 +730,27 @@ impl Solver {
                 Ty::Inter(inner) => flat.extend(inner),
                 m => flat.push(m),
             }
+        }
+        // `{ A | B } & C` is `A & C | B & C` (§4.4), for a union whose
+        // members all have a type constructor. A union with a variable as a
+        // member stays: its parts could not be told apart.
+        if let Some(i) = flat.iter().position(|m| match m {
+            Ty::Union(xs) => xs.iter().all(|x| x.head().is_some()),
+            _ => false,
+        }) && flat.len() > 1
+        {
+            let Ty::Union(xs) = flat.remove(i) else {
+                unreachable!()
+            };
+            let parts = xs
+                .into_iter()
+                .map(|x| {
+                    let mut a = flat.clone();
+                    a.push(x);
+                    self.inter_in(a, env)
+                })
+                .collect();
+            return self.union_in(parts, env);
         }
         let mut out: Vec<Ty> = Vec::new();
         let mut con: Option<Ty> = None;

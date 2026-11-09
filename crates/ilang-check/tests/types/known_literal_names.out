@@ -1,0 +1,7 @@
+lit : (v: a) -> Bool
+prefix : (v: a) -> Bool
+float : (v: a) -> Bool
+lit_known : (v: Int | String) -> Bool
+prefix_known : (v: String) -> Bool
+8:51: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
+9:55: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
