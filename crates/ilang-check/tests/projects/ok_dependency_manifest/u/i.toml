@@ -1,0 +1,11 @@
+# The `[wasm]` and `[dev-dependencies]` of a package that is not compiled are
+# not used (§2.6, §10.2), so their shapes give no errors.
+name = "u"
+
+[wasm]
+exports = ["nope", 5]
+
+[dev-dependencies]
+chk = "not-a-location"
+i = { path = "x" }
+bad = 1

@@ -6,7 +6,8 @@
 //! 2. resolve the imports, and find import circles;
 //! 3. resolve the type definitions, and find alias circles;
 //! 4. resolve the declarations and bindings;
-//! 5. check the rules about the whole program (`@main`, host services,
+//! 5. check that exported definitions use only exported types (§2.4);
+//! 6. check the rules about the whole program (`@main`, host services,
 //!    `[wasm] exports`).
 
 use crate::Parsed;
@@ -37,6 +38,7 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
         fn_depth: 0,
         ty_frames: Vec::new(),
         ty_def: None,
+        circular: HashSet::new(),
     };
     r.create_modules();
     for m in 0..parsed.len() {
@@ -53,6 +55,9 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
     r.alias_circles();
     for m in 0..parsed.len() {
         r.values(ModuleId(m as u32));
+    }
+    for m in 0..parsed.len() {
+        r.exported_types(ModuleId(m as u32));
     }
     r.program_rules();
     (r.p, r.diags)
@@ -137,6 +142,9 @@ struct Resolver<'a> {
     fn_depth: u32,
     ty_frames: Vec<HashMap<String, TyVarId>>,
     ty_def: Option<TyDefMode>,
+    /// The aliases in a circle (§4.3); the circle has been reported, and
+    /// they are not expanded.
+    circular: HashSet<TypeId>,
 }
 
 fn is_upper(name: &str) -> bool {
@@ -528,7 +536,10 @@ impl<'a> Resolver<'a> {
         } else {
             self.types_by_name[mi].insert(def.name.name.clone(), id);
         }
-        let mut params = Vec::new();
+        // A repeated parameter is reported, but it keeps its place, so that
+        // the parameters stay in line with the written ones and the number
+        // of parameters is the written number. Its name refers to the first.
+        let mut params: Vec<(String, TyVarId)> = Vec::new();
         for p in &def.params {
             if params.iter().any(|(n, _)| n == &p.name) {
                 self.error(
@@ -536,7 +547,6 @@ impl<'a> Resolver<'a> {
                     p.span,
                     format!("the type parameter `{}` is given more than once", p.name),
                 );
-                continue;
             }
             let v = self.new_ty_var();
             params.push((p.name.clone(), v));
@@ -669,7 +679,8 @@ impl<'a> Resolver<'a> {
                     let ast::ItemKind::Binding(b) = &item.kind else {
                         unreachable!()
                     };
-                    if !self.entry_form(name, a.span, b) {
+                    let compiled = Some(self.p.module(self.cur).package) == self.graph.root;
+                    if !self.entry_form(name, a.span, b, compiled) {
                         continue;
                     }
                     if name == "test" && !is_test_module {
@@ -682,7 +693,7 @@ impl<'a> Resolver<'a> {
                     }
                     if name == "main" {
                         out.main = true;
-                        if Some(self.p.module(self.cur).package) == self.graph.root {
+                        if compiled {
                             self.mains.push((self.cur, b.pattern.span));
                         }
                     } else {
@@ -705,9 +716,11 @@ impl<'a> Resolver<'a> {
         out
     }
 
-    /// §10.2: `@main` and `@test` are on a binding whose pattern binds one
-    /// name and whose value is a function expression with no parameters.
-    fn entry_form(&mut self, name: &str, span: Span, b: &ast::Binding) -> bool {
+    /// §2.2: `@main` and `@test` are on a binding whose pattern binds one
+    /// name and whose value is a function expression. §10.2: in the
+    /// compiled package, they are entry points, which have no parameters.
+    /// `@main` in other packages is not used, so only §2.2 is checked there.
+    fn entry_form(&mut self, name: &str, span: Span, b: &ast::Binding, compiled: bool) -> bool {
         let mut names = Vec::new();
         ast_binders(&b.pattern, &mut names);
         let ast::ExprKind::Fn(f) = &ungroup(&b.value).kind else {
@@ -726,7 +739,7 @@ impl<'a> Resolver<'a> {
             );
             return false;
         }
-        if f.params.iter().any(|p| matches!(p, ast::Param::Pattern(_))) {
+        if compiled && f.params.iter().any(|p| matches!(p, ast::Param::Pattern(_))) {
             self.error(
                 code::ENTRY_PARAMS,
                 span,
@@ -763,16 +776,10 @@ impl<'a> Resolver<'a> {
             };
             let def = &mut self.p.types[t.0 as usize];
             def.exported = true;
-            if item.constructors {
-                if matches!(def.body, TypeBody::Alias(_)) {
-                    self.error(
-                        code::EXPORT_NO_CONSTRUCTORS,
-                        item.span,
-                        format!("`{name}` is a type alias, so it has no constructors to export; write `{name}`"),
-                    );
-                } else {
-                    def.constructors_exported = true;
-                }
+            // `Alias(..)` is the same as `Alias`: an alias has no
+            // constructors of its own, so there is nothing more to export.
+            if item.constructors && matches!(def.body, TypeBody::Custom(_)) {
+                def.constructors_exported = true;
             }
         }
     }
@@ -1073,8 +1080,12 @@ impl<'a> Resolver<'a> {
                 continue;
             };
             let params = self.p.ty(id).params.clone();
+            let mut by_name = HashMap::new();
+            for (n, v) in &params {
+                by_name.entry(n.clone()).or_insert(*v);
+            }
             self.ty_def = Some(TyDefMode {
-                params: params.iter().cloned().collect(),
+                params: by_name,
                 used: HashSet::new(),
             });
             match &def.body {
@@ -1101,8 +1112,9 @@ impl<'a> Resolver<'a> {
                 }
             }
             let mode = self.ty_def.take().unwrap();
-            for (p, ident) in params.iter().zip(&def.params) {
-                if !mode.used.contains(&p.1) {
+            for (i, (p, ident)) in params.iter().zip(&def.params).enumerate() {
+                let repeated = params[..i].iter().any(|q| q.0 == p.0);
+                if !repeated && !mode.used.contains(&p.1) {
                     self.error(
                         code::TYPE_PARAM_UNUSED,
                         ident.span,
@@ -1161,6 +1173,7 @@ impl<'a> Resolver<'a> {
                 continue;
             }
             for n in scc {
+                self.circular.insert(TypeId(g[n]));
                 let t = self.p.ty(TypeId(g[n]));
                 let (m, span, name) = (t.module, t.span, t.name.clone());
                 self.cur = m;
@@ -1176,6 +1189,20 @@ impl<'a> Resolver<'a> {
     // ---- Types ----
 
     fn lookup_type(&mut self, module: Option<&ast::Ident>, name: &ast::Ident) -> Option<TypeRef> {
+        // §2.3: a local name may cover a module name, in types too.
+        if let Some(m) = module
+            && let Some(Found::Local(_)) = self.find(&m.name)
+        {
+            self.error(
+                code::NOT_A_MODULE,
+                m.span,
+                format!(
+                    "`{}` is a local value here, not a module; a local name covers a module name (§2.3)",
+                    m.name
+                ),
+            );
+            return None;
+        }
         let scope = &self.scopes[self.cur.0 as usize];
         let broken = match module {
             Some(m) => matches!(scope.values.get(&m.name), Some((Entry::Broken, _))),
@@ -1237,8 +1264,8 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// The module named by `m` in `m.T` or `m.C`. Local names are values,
-    /// so they do not cover module names here.
+    /// The module named by the top-level name `m` in `m.T`. Local names
+    /// that cover it are found by the caller.
     fn module_of(&mut self, m: &ast::Ident) -> Option<ModuleId> {
         match self.scopes[self.cur.0 as usize].values.get(&m.name) {
             Some((Entry::Module(t), _)) => Some(*t),
@@ -1355,37 +1382,147 @@ impl<'a> Resolver<'a> {
         TypeKind::Var(v)
     }
 
+    /// The type that the alias `t` stands for, with its arguments put in
+    /// the places of its parameters (§4.3). `None` when `t` is not a use of
+    /// an alias, or of an alias in a circle.
+    fn expand_alias(&self, t: &Type) -> Option<Type> {
+        let TypeKind::Named {
+            ty: TypeRef::Custom(id),
+            args,
+        } = &t.kind
+        else {
+            return None;
+        };
+        let def = self.p.ty(*id);
+        let TypeBody::Alias(body) = &def.body else {
+            return None;
+        };
+        if self.circular.contains(id) || def.params.len() != args.len() {
+            return None;
+        }
+        let map: HashMap<TyVarId, &Type> = def.params.iter().map(|p| p.1).zip(args).collect();
+        Some(subst(body, &map))
+    }
+
+    /// `t`, or the type it stands for when it is a use of an alias, with
+    /// every alias at its top expanded.
+    fn expand(&self, t: &Type) -> Type {
+        let mut cur = t.clone();
+        while let Some(next) = self.expand_alias(&cur) {
+            cur = next;
+        }
+        cur
+    }
+
     /// §9.2: the type of an environment parameter or statement is one named
     /// type: not a type variable alone, a union, or `Never`. An alias is
-    /// looked through.
-    fn env_type(&mut self, t: &Type) {
-        let mut cur = t;
-        let mut seen = HashSet::new();
-        let ok = loop {
-            match &cur.kind {
-                TypeKind::Error => break true,
-                TypeKind::Named {
-                    ty: TypeRef::Builtin(BuiltinType::Never),
-                    ..
-                } => break false,
-                TypeKind::Named {
-                    ty: TypeRef::Custom(id),
-                    ..
-                } => match &self.p.ty(*id).body {
-                    TypeBody::Alias(body) if seen.insert(*id) => cur = body,
-                    TypeBody::Alias(_) => break true, // a circle, reported
-                    TypeBody::Custom(_) => break true,
-                },
-                TypeKind::Named { .. } => break true,
-                _ => break false,
-            }
+    /// expanded with its arguments. Gives back the type constructor, or
+    /// `None` when there is none or a problem has been reported.
+    fn env_type(&mut self, t: &Type) -> Option<TypeRef> {
+        let head = match &self.expand(t).kind {
+            TypeKind::Error => return None,
+            // An alias in a circle; the circle has been reported.
+            TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                ..
+            } if self.circular.contains(id) => return None,
+            TypeKind::Named {
+                ty: TypeRef::Builtin(BuiltinType::Never),
+                ..
+            } => None,
+            TypeKind::Named { ty, .. } => Some(*ty),
+            _ => None,
         };
-        if !ok {
+        if head.is_none() {
             self.error(
                 code::ENV_TYPE,
                 t.span,
                 "a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)",
             );
+        }
+        head
+    }
+
+    /// §10.1: the written type of an external function outside the package
+    /// `i`. It is a function type with no `_` and no type variables, whose
+    /// parameters and value are types that the host can take (§10.3), with
+    /// no errors and no environment.
+    fn external_type(&mut self, t: &Type) {
+        let TypeKind::Fn {
+            params,
+            ret,
+            err,
+            env,
+        } = &t.kind
+        else {
+            if !matches!(t.kind, TypeKind::Error) {
+                self.error(
+                    code::EXTERNAL_NOT_FN,
+                    t.span,
+                    "the type of an external function is a function type (§10.1)",
+                );
+            }
+            return;
+        };
+        for (part, what) in [(err, "errors"), (env, "an environment")] {
+            if let Some(part) = part {
+                self.error(
+                    code::EXTERNAL_EFFECTS,
+                    part.span,
+                    format!("an external function may not have {what} (§10.1)"),
+                );
+            }
+        }
+        for part in params.iter().map(|p| &p.ty).chain([&**ret]) {
+            if let Some(span) = find_in_type(part, &|k| matches!(k, TypeKind::Hole)) {
+                self.error(
+                    code::EXTERNAL_HOLE,
+                    span,
+                    "the full type of an external function must be written, with no `_` (§10.1)",
+                );
+            } else if let Some(span) = find_in_type(part, &|k| matches!(k, TypeKind::Var(_))) {
+                self.error(
+                    code::EXTERNAL_TYPE_VAR,
+                    span,
+                    "the type of an external function may not have type variables (§10.1)",
+                );
+            } else if !self.host_type(part) {
+                self.error(
+                    code::EXTERNAL_HOST_TYPE,
+                    part.span,
+                    "the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3)",
+                );
+            }
+        }
+    }
+
+    /// §10.3: a type that the host can take. Aliases are expanded.
+    fn host_type(&self, t: &Type) -> bool {
+        match &self.expand(t).kind {
+            TypeKind::Error => true,
+            TypeKind::Named {
+                ty: TypeRef::Builtin(b),
+                ..
+            } => matches!(
+                b,
+                BuiltinType::Int | BuiltinType::Float | BuiltinType::String | BuiltinType::BitArray
+            ),
+            TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                ..
+            } => {
+                let def = self.p.ty(*id);
+                match &def.body {
+                    // An alias in a circle; the circle has been reported.
+                    TypeBody::Alias(_) => true,
+                    TypeBody::Custom(ctors) => {
+                        ctors.is_empty()
+                            || (Some(def.module) == self.p.prelude
+                                && matches!(def.name.as_str(), "Nil" | "Bool"))
+                    }
+                }
+            }
+            _ => false,
         }
     }
 
@@ -1403,6 +1540,11 @@ impl<'a> Resolver<'a> {
                     let vars = self.push_ty_frame(&names);
                     let t = self.ty(ty);
                     self.ty_frames.pop();
+                    // The operations of the library are not host imports
+                    // (§2.1), so their types are not limited.
+                    if !self.in_library() {
+                        self.external_type(&t);
+                    }
                     if let DefKind::External {
                         ty: slot_ty,
                         ty_vars,
@@ -1504,8 +1646,22 @@ impl<'a> Resolver<'a> {
                 .all(|x| self.is_direct(x)),
             // Constructors are the only values with an `UpName`.
             E::Call { callee, args } => {
-                matches!(&callee.kind, E::Name { name, .. } if is_upper(&name.name))
-                    && args.iter().all(|a| self.is_direct(&a.value))
+                is_constructor(callee) && args.iter().all(|a| self.is_direct(&a.value))
+            }
+            // §6.9: `a |> C` is `C(a)`, and `a |> C(b)` is `C(a, b)`.
+            E::Binary {
+                op: ast::BinOp::Pipe,
+                lhs,
+                rhs,
+            } => {
+                self.is_direct(lhs)
+                    && match &rhs.kind {
+                        E::Name { .. } => is_constructor(rhs),
+                        E::Call { callee, args } => {
+                            is_constructor(callee) && args.iter().all(|a| self.is_direct(&a.value))
+                        }
+                        _ => false,
+                    }
             }
             _ => false,
         }
@@ -1813,6 +1969,7 @@ impl<'a> Resolver<'a> {
     /// §6.8 and §6.11.
     fn function(&mut self, f: &ast::Function, span: Span) -> Function {
         let mut params = Vec::new();
+        let mut env_heads: Vec<TypeRef> = Vec::new();
         let mut all: Vec<Binder> = Vec::new();
         let mut labels: Vec<String> = Vec::new();
         for p in &f.params {
@@ -1839,7 +1996,19 @@ impl<'a> Resolver<'a> {
                 }
                 ast::Param::Env { name, ty } => {
                     let ty = self.ty(ty);
-                    self.env_type(&ty);
+                    // §9.2: two environment parameters of one function may
+                    // not have the same type constructor.
+                    if let Some(head) = self.env_type(&ty) {
+                        if env_heads.contains(&head) {
+                            let tname = self.type_name(head);
+                            self.error(
+                                code::ENV_PARAMS_SAME,
+                                ty.span,
+                                format!("two environment parameters of this function have the type constructor `{tname}` (§9.2)"),
+                            );
+                        }
+                        env_heads.push(head);
+                    }
                     let var = self.new_var();
                     self.param_name(&all, &name.name, name.span);
                     all.push(Binder {
@@ -2057,7 +2226,105 @@ impl<'a> Resolver<'a> {
         Pattern { kind, span: p.span }
     }
 
-    // ---- Phase 5: rules about the whole program ----
+    // ---- Phase 5: exported types (§2.4) ----
+
+    /// §2.4: if the type of an exported definition uses a type defined in
+    /// this module, that type is exported too. This checks the types that
+    /// are written: the fields of a type exported with its constructors
+    /// (`T(..)`; a type exported alone does not show its fields), the body
+    /// of an exported alias, the type of an exported declaration, and the
+    /// annotation at the top of the pattern of an exported binding. An
+    /// alias of this module that is not exported is looked through.
+    ///
+    /// TODO(M3): the inferred type of an exported binding with no written
+    /// type, or whose written type is only part of its type, is checked by
+    /// type inference.
+    fn exported_types(&mut self, m: ModuleId) {
+        self.cur = m;
+        let module = self.p.module(m);
+        let mut checks: Vec<(String, Type)> = Vec::new();
+        for &t in &module.types {
+            let def = self.p.ty(t);
+            if !def.exported {
+                continue;
+            }
+            match &def.body {
+                TypeBody::Alias(body) => {
+                    checks.push((format!("the alias `{}`", def.name), body.clone()))
+                }
+                TypeBody::Custom(ctors) if def.constructors_exported => {
+                    for c in ctors {
+                        for f in &c.fields {
+                            checks.push((format!("the constructor `{}`", c.name), f.ty.clone()));
+                        }
+                    }
+                }
+                TypeBody::Custom(_) => {}
+            }
+        }
+        let mut exported_vars = HashMap::new();
+        for d in &module.defs {
+            if !d.exported {
+                continue;
+            }
+            match &d.kind {
+                DefKind::External { ty, .. } => checks.push((format!("`{}`", d.name), ty.clone())),
+                DefKind::Binding { var, .. } => {
+                    exported_vars.insert(*var, d.name.clone());
+                }
+            }
+        }
+        for b in &module.bindings {
+            top_annotations(&b.binding.pattern, &exported_vars, &mut checks);
+        }
+        for (what, t) in checks {
+            let mut found = Vec::new();
+            self.hidden_types(m, &t, None, &mut HashSet::new(), &mut found);
+            for (span, name) in found {
+                self.error(
+                    code::EXPORT_HIDDEN_TYPE,
+                    span,
+                    format!(
+                        "{what} is exported, but its type uses the type `{name}` of this module, which is not exported (§2.4)"
+                    ),
+                );
+            }
+        }
+    }
+
+    /// The types of module `m` that are not exported and that `t` uses,
+    /// with the place of their use. `at` is the place of the use of an
+    /// alias that is being looked through.
+    fn hidden_types(
+        &self,
+        m: ModuleId,
+        t: &Type,
+        at: Option<Span>,
+        seen: &mut HashSet<TypeId>,
+        out: &mut Vec<(Span, String)>,
+    ) {
+        if let TypeKind::Named {
+            ty: TypeRef::Custom(id),
+            ..
+        } = &t.kind
+        {
+            let def = self.p.ty(*id);
+            if def.module == m && !def.exported {
+                match &def.body {
+                    TypeBody::Alias(body) => {
+                        if !self.circular.contains(id) && seen.insert(*id) {
+                            self.hidden_types(m, body, Some(at.unwrap_or(t.span)), seen, out);
+                            seen.remove(id);
+                        }
+                    }
+                    TypeBody::Custom(_) => out.push((at.unwrap_or(t.span), def.name.clone())),
+                }
+            }
+        }
+        for_each_child(t, &mut |c| self.hidden_types(m, c, at, seen, out));
+    }
+
+    // ---- Phase 6: rules about the whole program ----
 
     fn program_rules(&mut self) {
         // §10.2: one `@main` in the compiled package.
@@ -2140,7 +2407,11 @@ impl<'a> Resolver<'a> {
             match def {
                 Some(d) if self.p.def(d).exported => {
                     let def = self.p.def(d);
-                    if let DefKind::Binding { binding, .. } = def.kind {
+                    // Only the `@main` and `@test` of the compiled package
+                    // are entry points; the others are not used (§10.2).
+                    if let DefKind::Binding { binding, .. } = def.kind
+                        && self.p.module(d.module).package == root
+                    {
                         let b = &self.p.module(d.module).bindings[binding as usize];
                         if b.main || b.test {
                             problem = Some((
@@ -2194,5 +2465,121 @@ fn named_types(t: &Type, out: &mut Vec<TypeId>) {
             err.iter().chain(env).for_each(|a| named_types(a, out));
         }
         TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
+    }
+}
+
+/// `C` or `m.C`: constructors are the only values with an `UpName`.
+fn is_constructor(e: &ast::Expr) -> bool {
+    matches!(&e.kind, ast::ExprKind::Name { name, .. } if is_upper(&name.name))
+}
+
+/// Calls `f` on each type directly inside `t`.
+fn for_each_child(t: &Type, f: &mut dyn FnMut(&Type)) {
+    match &t.kind {
+        TypeKind::Named { args, .. } => args.iter().for_each(f),
+        TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
+            ts.iter().for_each(f)
+        }
+        TypeKind::Fn {
+            params,
+            ret,
+            err,
+            env,
+        } => {
+            params.iter().for_each(|p| f(&p.ty));
+            f(ret);
+            err.iter().chain(env).for_each(|a| f(a));
+        }
+        TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
+    }
+}
+
+/// The place of the first part of `t`, `t` itself included, whose kind
+/// `is` says yes to.
+fn find_in_type(t: &Type, is: &dyn Fn(&TypeKind) -> bool) -> Option<Span> {
+    if is(&t.kind) {
+        return Some(t.span);
+    }
+    let mut found = None;
+    for_each_child(t, &mut |c| {
+        if found.is_none() {
+            found = find_in_type(c, is);
+        }
+    });
+    found
+}
+
+/// `t` with the type variables in `map` replaced.
+fn subst(t: &Type, map: &HashMap<TyVarId, &Type>) -> Type {
+    let kind = match &t.kind {
+        TypeKind::Var(v) => match map.get(v) {
+            Some(r) => return (*r).clone(),
+            None => TypeKind::Var(*v),
+        },
+        TypeKind::Named { ty, args } => TypeKind::Named {
+            ty: *ty,
+            args: args.iter().map(|a| subst(a, map)).collect(),
+        },
+        TypeKind::Tuple(ts) => TypeKind::Tuple(ts.iter().map(|a| subst(a, map)).collect()),
+        TypeKind::Union(ts) => TypeKind::Union(ts.iter().map(|a| subst(a, map)).collect()),
+        TypeKind::Inter(ts) => TypeKind::Inter(ts.iter().map(|a| subst(a, map)).collect()),
+        TypeKind::Diff(ts) => TypeKind::Diff(ts.iter().map(|a| subst(a, map)).collect()),
+        TypeKind::Fn {
+            params,
+            ret,
+            err,
+            env,
+        } => TypeKind::Fn {
+            params: params
+                .iter()
+                .map(|p| FnParamType {
+                    label: p.label.clone(),
+                    ty: subst(&p.ty, map),
+                })
+                .collect(),
+            ret: Box::new(subst(ret, map)),
+            err: err.as_ref().map(|e| Box::new(subst(e, map))),
+            env: env.as_ref().map(|e| Box::new(subst(e, map))),
+        },
+        TypeKind::Hole => TypeKind::Hole,
+        TypeKind::Error => TypeKind::Error,
+    };
+    Type { kind, span: t.span }
+}
+
+/// §2.4: the annotations at the top of the pattern of a top-level binding
+/// that give the type of an exported name: `x: T`, and `x = y: T`.
+fn top_annotations(p: &Pattern, exported: &HashMap<VarId, String>, out: &mut Vec<(String, Type)>) {
+    fn top_type(p: &Pattern) -> Option<&Type> {
+        match &p.kind {
+            PatternKind::Typed { ty, .. } => Some(ty),
+            PatternKind::Named { pattern, .. } => top_type(pattern),
+            _ => None,
+        }
+    }
+    let mut check = |b: &Binder, ty: Option<&Type>| {
+        if let (Some(name), Some(ty)) = (exported.get(&b.var), ty) {
+            out.push((format!("`{name}`"), ty.clone()));
+        }
+    };
+    match &p.kind {
+        PatternKind::Typed {
+            binder: Some(b),
+            ty,
+        } => check(b, Some(ty)),
+        PatternKind::Named { binder, pattern } => {
+            check(binder, top_type(pattern));
+            top_annotations(pattern, exported, out);
+        }
+        PatternKind::Constructor { args: ps, .. }
+        | PatternKind::Tuple(ps)
+        | PatternKind::Error(ps)
+        | PatternKind::List { items: ps, .. } => {
+            ps.iter().for_each(|a| top_annotations(a, exported, out))
+        }
+        PatternKind::BitArray(segs) => segs
+            .iter()
+            .for_each(|s| top_annotations(&s.value, exported, out)),
+        _ => {}
     }
 }

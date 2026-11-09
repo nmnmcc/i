@@ -28,7 +28,7 @@ pub mod code {
     pub const IMPORT_IS_TOP_LEVEL: &str = "E0213";
     pub const IMPORT_CIRCLE: &str = "E0214";
     pub const EXPORT_UNDEFINED: &str = "E0215";
-    pub const EXPORT_NO_CONSTRUCTORS: &str = "E0216";
+    // E0216 is no longer given: `Alias(..)` is the same as `Alias` (§2.4).
     pub const PATTERN_BINDS_TWICE: &str = "E0217";
     pub const PARAMS_BIND_TWICE: &str = "E0218";
     pub const PARAMS_SAME_LABEL: &str = "E0219";
@@ -39,6 +39,8 @@ pub mod code {
     pub const TYPE_ARITY: &str = "E0224";
     pub const ENV_TYPE: &str = "E0225";
     pub const TYPE_PARAM_TWICE: &str = "E0226";
+    pub const EXPORT_HIDDEN_TYPE: &str = "E0227";
+    pub const ENV_PARAMS_SAME: &str = "E0228";
     // Attributes and entry points.
     pub const UNKNOWN_ATTRIBUTE: &str = "E0301";
     pub const ATTRIBUTE_ARGS: &str = "E0302";
@@ -54,6 +56,11 @@ pub mod code {
     pub const ENTRY_PARAMS: &str = "E0312";
     pub const WASM_EXPORT_UNKNOWN: &str = "E0313";
     pub const WASM_EXPORT_ENTRY: &str = "E0314";
+    pub const EXTERNAL_NOT_FN: &str = "E0315";
+    pub const EXTERNAL_HOLE: &str = "E0316";
+    pub const EXTERNAL_TYPE_VAR: &str = "E0317";
+    pub const EXTERNAL_HOST_TYPE: &str = "E0318";
+    pub const EXTERNAL_EFFECTS: &str = "E0319";
     pub const DEPRECATED: &str = "W0301";
     // Order.
     pub const NEEDS_ITSELF: &str = "E0401";

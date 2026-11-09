@@ -1,0 +1,9 @@
+name = "app"
+
+[dependencies]
+u = { path = "u" }
+
+# `u/x.main` is `@main` in a dependency, which is not the program entry, so
+# it is a plain host export (§10.2).
+[wasm]
+exports = ["u/x.main"]

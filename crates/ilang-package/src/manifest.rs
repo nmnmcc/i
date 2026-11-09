@@ -62,10 +62,22 @@ fn err(code: &'static str, span: Span, message: impl Into<String>) -> Diagnostic
     Diagnostic::error(code, None, span, message)
 }
 
-/// Reads an `i.toml`. The manifest is `None` only when there is no usable
-/// `name`. Other problems are reported, and the bad entries are left out.
-/// Unknown keys are not used (§2.6).
+/// Reads the `i.toml` of the package that is compiled. The manifest is
+/// `None` only when there is no usable `name`. Other problems are reported,
+/// and the bad entries are left out. Unknown keys are not used (§2.6).
 pub fn parse_manifest(text: &str) -> (Option<Manifest>, Vec<Diagnostic>) {
+    parse(text, true)
+}
+
+/// Reads the `i.toml` of a package that the compiled package uses. Its
+/// `[dev-dependencies]` and `[wasm]` are not used (§2.6, §10.2), so they
+/// are not read, and their shapes give no errors. They are empty in the
+/// manifest.
+pub fn parse_dependency_manifest(text: &str) -> (Option<Manifest>, Vec<Diagnostic>) {
+    parse(text, false)
+}
+
+fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
     let mut diags = Vec::new();
     let doc = match DeTable::parse(text) {
         Ok(doc) => doc,
@@ -91,8 +103,10 @@ pub fn parse_manifest(text: &str) -> (Option<Manifest>, Vec<Diagnostic>) {
                 )),
             },
             "dependencies" => deps = dependencies("dependencies", value, &mut diags),
-            "dev-dependencies" => dev_deps = dependencies("dev-dependencies", value, &mut diags),
-            "wasm" => wasm_exports = wasm(value, &mut diags),
+            "dev-dependencies" if compiled => {
+                dev_deps = dependencies("dev-dependencies", value, &mut diags)
+            }
+            "wasm" if compiled => wasm_exports = wasm(value, &mut diags),
             _ => {}
         }
     }

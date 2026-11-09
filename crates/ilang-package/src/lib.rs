@@ -277,7 +277,12 @@ impl Loader {
         };
         let display = self.display(&toml_path);
         let source = self.graph.sources.add(display, text);
-        let (manifest, diags) = manifest::parse_manifest(&self.graph.sources.get(source).text);
+        let text = &self.graph.sources.get(source).text;
+        let (manifest, diags) = if is_root {
+            manifest::parse_manifest(text)
+        } else {
+            manifest::parse_dependency_manifest(text)
+        };
         self.diags.extend(diags.into_iter().map(|d| Diagnostic {
             source: Some(source),
             ..d

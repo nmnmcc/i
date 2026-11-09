@@ -5,9 +5,15 @@
 //! Every node keeps its span; spans are byte ranges in the file of the
 //! module that holds the node (`Module::source`).
 //!
-//! TODO(M3): §2.4 says that the type of an exported definition may not use a
-//! type of its module that is not exported. That needs the inferred types,
-//! so type inference checks it, with `Def::exported` and `TypeDef::exported`.
+//! TODO(M3): checks that need the inferred types, for type inference:
+//! - §2.4: the type of an exported definition may not use a type of its
+//!   module that is not exported. Resolution checks the written types
+//!   (`resolve.rs`, phase 5); the inferred type of an exported binding is
+//!   left, with `Def::exported` and `TypeDef::exported`.
+//! - §10.2: the parameters, value, and errors of a host export are types
+//!   that the host can take (§10.3); a `@test` gives `Nil`; and the
+//!   environment of an entry point (the program entry, a test, or a host
+//!   export) has only host services and `Assert`.
 
 use ilang_package::{ModuleKind, PackageId, SourceId};
 use ilang_syntax::ast::{BinOp, Ident, UnOp};

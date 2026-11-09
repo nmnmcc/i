@@ -1,3 +1,2 @@
 src/main.i:1:9: error[E0215]: `nope` is exported but not defined in this module
 src/main.i:1:15: error[E0215]: the type `Nope` is exported but not defined in this module
-src/main.i:1:21: error[E0216]: `Alias` is a type alias, so it has no constructors to export; write `Alias`

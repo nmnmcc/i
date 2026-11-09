@@ -2,7 +2,8 @@
 
 use ilang_package::code;
 use ilang_package::manifest::{
-    DependencySource, Location, Version, parse_location, parse_manifest, parse_version,
+    DependencySource, Location, Version, parse_dependency_manifest, parse_location, parse_manifest,
+    parse_version,
 };
 
 /// The codes of the problems in a manifest.
@@ -143,6 +144,44 @@ fn wasm_exports() {
     assert_eq!(w(r#"["app/math"]"#), [code::WASM_EXPORT]);
     assert_eq!(w(r#"["app/Math.add"]"#), [code::WASM_EXPORT]);
     assert_eq!(w(r#"["app/math.Add"]"#), [code::WASM_EXPORT]);
+}
+
+/// §2.6, §10.2: the `[dev-dependencies]` and `[wasm]` of a package that is
+/// not compiled are not used, so their shapes give no errors.
+#[test]
+fn dependency_manifest_ignores_dev_dependencies_and_wasm() {
+    let text = "name = \"u\"\n[dependencies]\na = { path = \"x\" }\n[wasm]\nexports = 5\n[dev-dependencies]\nzz = \"nonsense\"\ni = { path = \"x\" }\na = { path = \"y\" }\n";
+    let (m, diags) = parse_dependency_manifest(text);
+    assert!(diags.is_empty(), "{diags:?}");
+    let m = m.unwrap();
+    assert_eq!(m.dependencies.len(), 1);
+    assert!(m.dev_dependencies.is_empty());
+    assert!(m.wasm_exports.is_empty());
+    assert_eq!(
+        parse_dependency_manifest("name = \"u\"\nwasm = 1\ndev-dependencies = 2\n").1,
+        []
+    );
+    // The compiled package keeps every check.
+    let mut all = codes(text);
+    all.sort();
+    assert_eq!(
+        all,
+        [
+            code::DEPENDENCY_NAME,
+            code::DEPENDENCY_TWICE,
+            code::BAD_LOCATION,
+            code::WASM_EXPORT
+        ]
+    );
+    // The rest of a dependency's file is checked as before.
+    assert_eq!(
+        parse_dependency_manifest("name = \"u\"\n[dependencies]\ni = { path = \"x\" }\n")
+            .1
+            .iter()
+            .map(|d| d.code)
+            .collect::<Vec<_>>(),
+        [code::DEPENDENCY_NAME]
+    );
 }
 
 #[test]

@@ -1,0 +1,7 @@
+src/main.i:18:13: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
+src/main.i:19:13: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
+src/main.i:21:5: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
+src/main.i:26:25: error[E0228]: two environment parameters of this function have the type constructor `Clock` (§9.2)
+src/main.i:27:31: error[E0228]: two environment parameters of this function have the type constructor `Clock` (§9.2)
+src/main.i:27:39: error[E0228]: two environment parameters of this function have the type constructor `Clock` (§9.2)
+src/main.i:28:35: error[E0228]: two environment parameters of this function have the type constructor `State` (§9.2)
