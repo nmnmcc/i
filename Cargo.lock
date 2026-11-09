@@ -637,6 +637,7 @@ dependencies = [
  "ilang-package",
  "ilang-syntax",
  "num-bigint",
+ "num-traits",
  "petgraph",
  "tempfile",
 ]
@@ -649,6 +650,7 @@ dependencies = [
  "clap",
  "ilang-check",
  "ilang-package",
+ "tempfile",
 ]
 
 [[package]]

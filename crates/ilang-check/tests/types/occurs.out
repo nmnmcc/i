@@ -1,0 +1,5 @@
+local : () -> Int
+fine : (x: a & List(a)) -> List(a)
+2:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+4:3: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+2:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)

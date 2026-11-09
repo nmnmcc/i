@@ -169,8 +169,8 @@ fn prelude_types() {
 fn hello_example_checks() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello");
     let (graph, mut diags) = ilang_package::load(&dir);
-    let (program, more) = ilang_check::check(&graph);
-    diags.extend(more);
+    let checked = ilang_check::check(&graph);
+    diags.extend(checked.diags);
     assert!(diags.is_empty(), "{:#?}", graph.sources.render_all(&diags));
-    assert!(program.is_some());
+    assert!(checked.program.is_some() && checked.types.is_some());
 }

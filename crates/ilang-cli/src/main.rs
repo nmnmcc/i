@@ -21,6 +21,10 @@ enum Command {
         /// The package directory, with its `i.toml`.
         #[arg(long, default_value = ".")]
         project: PathBuf,
+        /// Print the type of every top-level name of the package, as
+        /// `module/path.name : type`.
+        #[arg(long)]
+        types: bool,
     },
     /// Build a package into a Wasm module.
     Build,
@@ -33,7 +37,7 @@ enum Command {
 fn main() -> anyhow::Result<ExitCode> {
     let cli = Cli::parse();
     let name = match cli.command {
-        Command::Check { project } => return Ok(check(&project)),
+        Command::Check { project, types } => return Ok(check(&project, types)),
         Command::Build => "build",
         Command::Run => "run",
         Command::Test => "test",
@@ -41,13 +45,24 @@ fn main() -> anyhow::Result<ExitCode> {
     anyhow::bail!("`i {name}` is not available yet: the compiler is being rebuilt")
 }
 
-/// Parses and resolves every module of the package, its dependencies, and
-/// the library, and prints the problems as `path:line:col: error[CODE]: …`.
-fn check(project: &std::path::Path) -> ExitCode {
+/// Parses, resolves, and type checks every module of the package, its
+/// dependencies, and the library, and prints the problems as
+/// `path:line:col: error[CODE]: …`. With `types`, prints the type of each
+/// top-level name of the package's modules, in source order.
+fn check(project: &std::path::Path, types: bool) -> ExitCode {
     let (graph, mut diags) = ilang_package::load(project);
     if graph.root.is_some() {
-        let (_, more) = ilang_check::check(&graph);
-        diags.extend(more);
+        let checked = ilang_check::check(&graph);
+        diags.extend(checked.diags);
+        if types && let (Some(program), Some(typed)) = (&checked.program, &checked.types) {
+            for (i, m) in program.modules.iter().enumerate() {
+                if Some(m.package) == graph.root {
+                    for line in typed.lines(program, ilang_check::hir::ModuleId(i as u32)) {
+                        println!("{line}");
+                    }
+                }
+            }
+        }
     }
     for line in graph.sources.render_all(&diags) {
         eprintln!("{line}");

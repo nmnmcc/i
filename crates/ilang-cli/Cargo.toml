@@ -14,3 +14,6 @@ anyhow.workspace = true
 clap.workspace = true
 ilang-package.workspace = true
 ilang-check.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

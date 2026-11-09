@@ -1,0 +1,14 @@
+id : (x: a) -> a
+both : (Int, String)
+ids : (x: a) -> a | Int | String
+use_ids : () -> (Int | String, Int | String)
+local : () -> (Int, String)
+local_mono : () -> (Int | String, Int | String)
+param : (f: (Int | String) -> a & b ? e ! n) -> (a, b) ? e ! n
+fact : (n: Int) -> Int
+loop : (x: a) -> Never
+even : (n: Int) -> Bool
+odd : (n: Int) -> Bool
+f : (x: a) -> Never
+g : (x: a) -> Never
+uses : (Bool, Never, Never)

@@ -17,9 +17,9 @@ pub fn check_files(files: &[(&str, &str)]) -> (PackageGraph, Option<Program>, Ve
         fs::write(p, text).unwrap();
     }
     let (graph, mut diags) = ilang_package::load(dir.path());
-    let (program, more) = ilang_check::check(&graph);
-    diags.extend(more);
-    (graph, program, diags)
+    let checked = ilang_check::check(&graph);
+    diags.extend(checked.diags);
+    (graph, checked.program, diags)
 }
 
 pub fn module(program: &Program, path: &str) -> ModuleId {

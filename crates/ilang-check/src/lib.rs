@@ -1,11 +1,13 @@
-//! Name resolution and the order of top-level values: from the parsed
-//! modules of a package graph to the resolved program (HIR).
+//! Name resolution, the order of top-level values, and type inference: from
+//! the parsed modules of a package graph to the resolved program (HIR) and
+//! its types.
 //!
 //! The only authority is `docs/spec.md`; section numbers refer to it.
 
 pub mod hir;
 pub mod order;
 pub mod resolve;
+pub mod types;
 
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId, SourceId};
 use ilang_syntax::ast;
@@ -64,6 +66,21 @@ pub mod code {
     pub const DEPRECATED: &str = "W0301";
     // Order.
     pub const NEEDS_ITSELF: &str = "E0401";
+    // Types (§4, §9).
+    pub const TYPE_MISMATCH: &str = "E0501";
+    pub const FN_ARITY: &str = "E0502";
+    pub const TYPE_INVARIANT: &str = "E0503";
+    pub const TYPE_AMBIGUOUS: &str = "E0504";
+    pub const TYPE_OCCURS: &str = "E0505";
+    pub const NEEDS_KNOWN_TYPE: &str = "E0506";
+    pub const CALL_LABELS: &str = "E0507";
+    pub const NOT_SUPPORTED: &str = "E0508";
+    pub const TOP_LEVEL_EFFECT: &str = "E0509";
+    pub const PATTERN_FIELDS: &str = "E0510";
+    pub const CASE_TYPE_VAR: &str = "E0511";
+    pub const NO_FIELD: &str = "E0512";
+    pub const TYPE_DIFF_VAR: &str = "E0513";
+    pub const BAD_FORMAT: &str = "E0514";
 }
 
 /// A parsed module of the graph.
@@ -102,7 +119,7 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
 /// Parses, resolves, and orders the whole program. Resolution is skipped
 /// when a module has a syntax error, so that one mistake is not reported
 /// many times.
-pub fn check(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagnostic>) {
+pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagnostic>) {
     let (parsed, mut diags) = parse(graph);
     if diags.iter().any(Diagnostic::is_error) {
         return (None, diags);
@@ -111,4 +128,33 @@ pub fn check(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagnostic>) {
     diags.extend(more);
     order::order(&mut program, &mut diags);
     (Some(program), diags)
+}
+
+/// The result of `check`.
+pub struct Checked {
+    /// `None` when a module has a syntax error.
+    pub program: Option<hir::Program>,
+    /// `None` when the program could not be resolved.
+    pub types: Option<types::Typed>,
+    pub diags: Vec<Diagnostic>,
+}
+
+/// Parses, resolves, orders, and type checks the whole program. Types are
+/// only inferred when resolution found no errors, so that one mistake is
+/// not reported many times.
+pub fn check(graph: &PackageGraph) -> Checked {
+    let (program, mut diags) = resolve_program(graph);
+    let types = match &program {
+        Some(p) if !diags.iter().any(Diagnostic::is_error) => {
+            let (typed, more) = types::check(p, &graph.sources);
+            diags.extend(more);
+            Some(typed)
+        }
+        _ => None,
+    };
+    Checked {
+        program,
+        types,
+        diags,
+    }
 }

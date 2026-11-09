@@ -1,0 +1,37 @@
+id : (x: a) -> a
+ids : (x: Never) -> Int | String
+n : Int
+s : String
+add : (x: Int) -> Int
+bad_arg : () -> Int
+bad_op : () -> Int
+bad_guard : (x: a) -> a | Int
+arity : () -> Never
+arity_var : (f: (Int) -> a ? e ! n) -> (a, Never) ? e ! n
+ambiguous : (x: b) -> b
+use_ambiguous : () -> Int
+field : (u: a) -> Never
+part : (t: a) -> Never
+radius : (s: Shape) -> Never
+now : () -> Int ! Clock
+top_env : Int
+top_err : Never
+top_a : Int
+top_fail : Int
+bits : BitArray
+bad_bits : BitArray
+8:13: error[E0501]: `String` is not a subtype of `Int`
+8:1: error[E0501]: `Int` is not a subtype of `String`
+12:20: error[E0501]: `String` is not a subtype of `Int` (the type at 12:16 needs it)
+13:19: error[E0501]: `String` is not a subtype of `Int`
+16:10: error[E0501]: `Int` is not a subtype of `Bool`
+21:14: error[E0502]: this call gives 2 arguments, but the function has 1 parameter (§6.6)
+22:26: error[E0502]: the function types `(Int) -> _ ? _ ! _` and `(Int, Int) -> _ ? _ ! _` have different numbers of parameters
+27:17: error[E0508]: `.name` needs a known type for its value; for now that is a name with a written custom type, such as `x: T` or `x ! T` (known types are not supported yet)
+28:16: error[E0508]: `.k` needs a known type for its value; for now that is a name with a written tuple type (known types are not supported yet)
+31:25: error[E0512]: not every constructor of `Shape` has a field with the label `radius` (§4.8 rule 13)
+35:1: error[E0509]: a top-level binding may not need an environment (§2.5), but this one has `Clock`
+36:1: error[E0509]: a top-level binding may not give errors (§2.5), but this one has `Int`
+37:1: error[E0509]: a top-level binding may not need an environment (§2.5), but this one has `Assert`
+40:16: error[E0514]: there is no bit array format `u16` (§8.2)
+40:23: error[E0514]: there is no bit array format `x8` (§8.2)

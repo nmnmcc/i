@@ -1,0 +1,18 @@
+exact : (x: Int) -> Int
+general : (x: a) -> a
+holes : (x: List(a)) -> List(a)
+inner : (x: a) -> a
+apart : () -> (Int, String)
+typed_value : Int
+fn_type : (Int) -> Int
+union_arg : (x: Int | String) -> Int | String
+inter_arg : (x: a & Int) -> a
+list_union : List(Int | String)
+result_written : (r: Result(a, e)) -> a ? e
+diff_written : (x: Int | String | Nil) -> Int | Nil
+alias_use : (p: (Int, Int)) -> (Int, Int)
+pair_use : (p: (String, String)) -> (String, String)
+wrong : String
+wrong_ret : (x: Int) -> String
+36:1: error[E0501]: `Int` is not a subtype of `String`
+37:29: error[E0501]: `Int` is not a subtype of `String` (the type at 37:20 needs it)

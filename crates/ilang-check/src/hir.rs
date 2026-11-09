@@ -66,6 +66,8 @@ pub struct Program {
     /// The number of `VarId`s and `TyVarId`s given out.
     pub var_count: u32,
     pub ty_var_count: u32,
+    /// The written name of each `TyVarId`, by index.
+    pub ty_var_names: Vec<String>,
     /// Filled by `order.rs`.
     pub order: Order,
 }

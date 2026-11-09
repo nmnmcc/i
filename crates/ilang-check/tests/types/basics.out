@@ -1,0 +1,23 @@
+one : Int
+pi : Float
+hello : String
+pair : (Int, String)
+unit : ()
+ints : List(Int)
+mixed : List(Int | String)
+empty : List(Never)
+sum : Int
+ratio : Float
+neg : Int
+both : Bool
+cmp : Bool
+text : String
+same : Bool
+id : (x: a) -> a
+const : (x: a, y: b) -> a
+add : (x: Int, y: Int) -> Int
+inc : (x: a & Int) -> a
+apply : (f: (a) -> b ? e ! n, x: a) -> b ? e ! n
+compose : (f: (a) -> b ? e ! n, g: (c) -> a ? e2 ! n2) -> (x: c) -> b ? e2 | e ! n2 | n
+twice : (f: (a | b) -> b & c ? e ! n, x: a) -> c ? e ! n
+ignore : (x: a) -> Int

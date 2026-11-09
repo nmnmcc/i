@@ -1,0 +1,15 @@
+digit : (x: Int) -> String
+digit_or : (x: a) -> String
+either : (r: Result(a, a)) -> a
+inner : (r: Result(a, b)) -> b | String
+swap : (t: (a, b)) -> (b, a)
+sum : (xs: List(Int)) -> Int
+sign : (n: Int) -> Int
+guarded_only : (x: Int) -> Int
+describe : (v: Int | String) -> String
+choice : (r: Result(a, a)) -> a
+mixed : (b: Bool) -> Int | String
+named : (r: Result(a, b)) -> Result(a | Int, b)
+bad : (v: a) -> a
+first_one : (p: (a, b) | c - (_, b)) -> b | Int
+87:8: error[E0511]: in a `case`, `x: T` tests the type constructor, so `T` may not have a type variable as a member (§7.1)

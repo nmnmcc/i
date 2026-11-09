@@ -1,6 +1,7 @@
 //! Golden project tests: each directory in `tests/projects/` is a package.
-//! It is loaded and checked, and the diagnostics are compared with its
-//! `expected.out`. `UPDATE=1` writes the files.
+//! It is loaded and resolved, and the diagnostics are compared with its
+//! `expected.out`. `UPDATE=1` writes the files. These test names and
+//! resolution; types are tested in `tests/types.rs`.
 
 use std::fs;
 use std::path::Path;
@@ -8,7 +9,7 @@ use std::path::Path;
 fn run(dir: &Path) -> String {
     let (graph, mut diags) = ilang_package::load(dir);
     if graph.root.is_some() {
-        let (_, more) = ilang_check::check(&graph);
+        let (_, more) = ilang_check::resolve_program(&graph);
         diags.extend(more);
     }
     let mut out = String::new();

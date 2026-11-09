@@ -1,0 +1,38 @@
+i/prelude.panic : (message: String) -> Never
+i/prelude.assert : (c: Bool) -> Nil ! Assert
+i/fail.raise : (error: e) -> Never ? e
+i/fail.catch : (body: () -> a ? e ! n) -> Result(a, e) ! n
+i/fail.from_result : (result: Result(a, e)) -> a ? e
+i/fail.map_error : (body: () -> a ? e ! n, with: (e) -> e2 ! n) -> a ? e2 ! n
+i/control.boundary : (body: (b: Boundary(r, e, n)) -> r ? e ! n) -> r ? e ! n
+i/control.suspend : (b: Boundary(r, e, n), f: (k: Continuation(a, r, e, n)) -> r ? e ! n) -> a
+i/control.resume : (k: Continuation(a, r, e, n), value: a) -> r ? e ! n
+i/control.cancel : (k: Continuation(a, r, e, n)) -> Nil ! n
+i/resource.ensure : (body: () -> a ? e ! n, with: () -> Nil ! n) -> a ? e ! n
+i/resource.acquire : (open: () -> r ? e ! n, release: (r) -> Nil ! n, use: (r) -> a ? e ! n) -> a ? e ! n
+i/assertion.catch : (body: () -> a ? e ! n) -> Result(a, AssertionFailure) ? e ! n - Assert
+i/core.not : (Bool) -> Bool
+i/core.to_float : (Int) -> Float
+i/core.truncate : (Float) -> Int
+i/core.floor : (Float) -> Float
+i/core.ceiling : (Float) -> Float
+i/core.sqrt : (Float) -> Float
+i/core.float_to_bits : (Float) -> Int
+i/core.float_from_bits : (Int) -> Float
+i/core.bit_and : (Int, Int) -> Int
+i/core.bit_or : (Int, Int) -> Int
+i/core.bit_xor : (Int, Int) -> Int
+i/core.bit_not : (Int) -> Int
+i/core.shift_left : (Int, Int) -> Int
+i/core.shift_right : (Int, Int) -> Int
+i/core.concat : (List(String)) -> String
+i/core.byte_size : (String) -> Int
+i/core.byte_slice : (String, start: Int, length: Int) -> Result(String, Nil)
+i/core.codepoints : (String) -> List(UtfCodepoint)
+i/core.from_codepoints : (List(UtfCodepoint)) -> String
+i/core.codepoint_to_int : (UtfCodepoint) -> Int
+i/core.int_to_codepoint : (Int) -> Result(UtfCodepoint, Nil)
+i/core.bit_size : (BitArray) -> Int
+i/core.bit_array_to_string : (BitArray) -> Result(String, Nil)
+i/core.inspect : (a) -> String
+i/core.hash : (a) -> Int

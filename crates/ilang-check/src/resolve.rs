@@ -345,8 +345,9 @@ impl<'a> Resolver<'a> {
         VarId(self.p.var_count - 1)
     }
 
-    fn new_ty_var(&mut self) -> TyVarId {
+    fn new_ty_var(&mut self, name: &str) -> TyVarId {
         self.p.ty_var_count += 1;
+        self.p.ty_var_names.push(name.to_string());
         TyVarId(self.p.ty_var_count - 1)
     }
 
@@ -548,7 +549,7 @@ impl<'a> Resolver<'a> {
                     format!("the type parameter `{}` is given more than once", p.name),
                 );
             }
-            let v = self.new_ty_var();
+            let v = self.new_ty_var(&p.name);
             params.push((p.name.clone(), v));
         }
         let body = match &def.body {
@@ -1375,7 +1376,7 @@ impl<'a> Resolver<'a> {
         if let Some(v) = self.ty_frames.iter().rev().find_map(|f| f.get(name)) {
             return TypeKind::Var(*v);
         }
-        let v = self.new_ty_var();
+        let v = self.new_ty_var(name);
         if let Some(f) = self.ty_frames.last_mut() {
             f.insert(name.to_string(), v);
         }
@@ -1583,7 +1584,7 @@ impl<'a> Resolver<'a> {
             if frame.contains_key(n) || self.ty_frames.iter().any(|f| f.contains_key(n)) {
                 continue;
             }
-            let v = self.new_ty_var();
+            let v = self.new_ty_var(n);
             frame.insert(n.clone(), v);
             vars.push(v);
         }
@@ -2510,7 +2511,7 @@ fn find_in_type(t: &Type, is: &dyn Fn(&TypeKind) -> bool) -> Option<Span> {
 }
 
 /// `t` with the type variables in `map` replaced.
-fn subst(t: &Type, map: &HashMap<TyVarId, &Type>) -> Type {
+pub(crate) fn subst(t: &Type, map: &HashMap<TyVarId, &Type>) -> Type {
     let kind = match &t.kind {
         TypeKind::Var(v) => match map.get(v) {
             Some(r) => return (*r).clone(),
