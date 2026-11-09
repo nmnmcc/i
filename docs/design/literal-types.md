@@ -17,7 +17,7 @@ send = (m: "GET" | "POST") { m |> { "GET" -> 1  "POST" -> 2 } }
 "a" == "b"                                // E0520: never equal
 (s: String) { s == "a" }                  // correct
 1 + 2                                     // Int, not 3
--1                                        // -1
+-1                                        // -1, and so is -{1}
 -x                                        // Int
 1.5                                       // Float; Float has no literal types
 ```
@@ -41,7 +41,8 @@ Each decision has its reason.
    *Reason:* finite and cofinite subsets of an infinite set are closed under union, intersection and complement. So each head is still a Boolean algebra, the type lattice stays distributive, and the rules of MLsub and MLstruct still give principal types.
 
 2. **The set is a field of `Ty::Con`, not part of `Head`.** `Ty::Con(Head, ValueSet, Vec<Ty>)`.
-   *Reason:* `Head` is `Copy + Hash` and a key in `type_tests`, in coverage and in `Place.seen`. More important, `"a"` and `"b"` must stay one member with one head, so that `union_in`, `route` and coverage keep the rule "one member per head" (§4.4). With the set in `Head`, `"a"` and `String` would be different members: `union_in` would not merge them, `route` would pick only one, and `known::disjoint` would call them disjoint (a false E0520). A separate `Ty::Lit` variant was also rejected: about 40 sites match `Ty::Con(..) | Ty::Fn(_)` and fall through on `_`, so the compiler would not show where a `Lit` is handled wrongly. A new tuple field makes the compiler stop at all 77 `Ty::Con(` sites.
+   *Reason:* `Head` is `Copy + Hash` and a key in `type_tests`, in coverage and in `Place.seen`. More important, `"a"` and `"b"` must stay one member with one head, so that `union_in`, `route` and coverage keep the rule "one member per head" (§4.4). With the set in `Head`, `"a"` and `String` would be different members: `union_in` would not merge them, `route` would pick only one, and `known::disjoint` would call them disjoint (a false E0520). A separate `Ty::Lit` variant was rejected for the same reason: it is a second kind of member for the `Int` and `String` heads, and every rule that finds "the member with this head" would have to look for it too.
+   *What the compiler does not find:* the new field makes the compiler stop where a `Con` is built or bound with its parts named, but not at the 8 sites that match `Ty::Con(..)` (solve.rs :298, :397, :442, :552 `diff_left`, :779 `inter_in`, :893 `diff_in`; display.rs :870 `Norm` diff; known.rs :333 `match_k`), and not where two members are compared with `.head()` (solve.rs :320, :519–521, :711, :782; known.rs :27, :69, :357; coverage.rs :231; pattern.rs :474; display.rs :711, :739, :871). These sites are where most set rules belong. Step 3 of §12 lists them from a search for `Ty::Con(..)` and `.head()`, and each one is changed or marked "the set does not matter here" in the same commit.
 
 3. **Only `Int` and `String` carry sets, and they have no arguments.** So a set never meets variance, type arguments, env mode or `compare()`.
    *Reason:* this keeps every new rule small. Float has no literal types, because Float equality is not identity (`0.0 == -0.0`). BitArray and UtfCodepoint have none, because no use needs them.
@@ -49,19 +50,21 @@ Each decision has its reason.
 4. **No widening, no template literal types, no literal arithmetic.** `x = "a"` gives `x : "a"`. `1 + 1 : Int`, `"a" <> "b" : String`, `-x : Int`.
    *Reason:* values are never changed, so TypeScript's reason for widening (a `let` that is assigned later) does not exist. Widening would also be a special rule that breaks principal types. Template literal types (`"a" <> String`) would make the algebra much bigger, for little use.
 
-5. **`-` directly before an integer literal is part of the literal.** `-1 : -1`. `-(1)`, `-{1}` and `-x` have the type `Int`.
-   *Reason:* patterns already read `-1` this way (§7.1), and direct values already count "a literal, also with `-` before it" (§6.10). It would be odd if `-1` could be written as a pattern and a type, but not get its own type as an expression.
+5. **`-` on an integer literal gives a literal type.** When the operand of the unary `-`, with its groups taken away, is an integer literal, the result has the literal type of the negative number: `-1 : -1`, and `-{1} : -1` too. Every other `-` gives `Int`: `-x`, `-{-1}`, `-f()`. (`-(1)` is a compile error, because `(1)` is a tuple of one part.)
+   *Reason:* patterns already read `-1` this way (§7.1), and direct values already count "a literal, also with `-` before it" (§6.10). It would be odd if `-1` could be written as a pattern and a type, but not get its own type as an expression. The rule looks through groups because `meta.md` §1 says the core trees `(- 1)` and `(- {1})` are the same code, so they must get the same type; there is no negative literal atom in the core tree.
 
 6. **A literal pattern gets its literal type only in a match.** In a clause block with two or more clauses, or with a guard, a literal pattern has its literal type (rule 11). Everywhere a pattern is *fitted*, it has the whole `Int` or `String`: in a binding, a parameter, a clause block with one clause and no guard, and a value inside a bit-array segment.
    *Reason:* fitting needs `B <: Q`. With `Q = "a"`, `"a" = s` with `s: String` would become a type error, but today it compiles and may fail through `Assert`. The prototype first gave literal types in bindings too, and that made 10 false E0501 in std (`0 = string.byte_size("")`, `Error(1) = list.try_each(…)`) and 2 in spec. A segment value such as `<<"hi": utf8, …>>` is matched against a decoded value of the whole segment type, so it must have that type, or `String <: "hi"` fails.
 
-7. **Known types must hold every possible value.** In matching (§4.8), a type variable matched with a `_` part, or with a generalized type variable, gets `_`; and a variable member of a union pattern gets `K` less the other members *by value*, not by head.
-   *Reason:* E0520 is only right when a known type is never smaller than the set of values that can come. Before S2, `result.unwrap(Ok(1), 50)` had the known type `50`, because `Ok(1)` matched nothing. With `Int` for both, nobody saw it. With literal types it gives a false E0520 on `result.unwrap(Ok(1), 50) == 1`, which is `True` when run. The prototype's fix removed the 3 false errors and changed no correct E0520.
+7. **Known types must hold every possible value.** Two changes:
+   - In matching (§4.8), a type variable matched with a `_` part, or with a generalized type variable, gets `_`; and a variable member of a union pattern gets `K` less the other members *by value*, not by head.
+   - In the expected type of a function expression given as an argument (§4.8, "come last"), a type variable that is also in the *result* of the parameter type of a function-expression argument gets the known type from the earlier arguments with every `Int` and `String` member made whole. Such a variable may also get the values that the function expression gives back, which the earlier arguments do not show.
+   *Reason:* E0520 is only right when a known type is never smaller than the set of values that can come. Before S2, `result.unwrap(Ok(1), 50)` had the known type `50`, because `Ok(1)` matched nothing. With `Int` for both, nobody saw it. With literal types it gives a false E0520 on `result.unwrap(Ok(1), 50) == 1`, which is `True` when run. The prototype's fix removed the 3 false errors and changed no correct E0520. The second change is for loops with an accumulator: in `list.fold(xs, 0, (n, x) { n == 3 |> { … } })`, `acc` is matched with `0` only, so without it `n` would get the known type `0`, and `n == 3` a false E0520, though `n` is 3 on the fourth element. The same holds for `index_fold`, `try_fold`, `map_fold` and every loop helper written by users. Making the members whole, and not giving `_`, keeps `s.count` correct in `list.fold(xs, State(0), (s, x) { … s.count … })`, where the field needs a known type. With a callback that gives back a value of another type constructor than the start value, the known type is still too small; that is so at 1865366 too (`fold(xs, Nil, …)` with a callback that gives `Int`), so it is not S2's, and it gets its own ticket.
 
 8. **E0520 compares value sets.** Two members are disjoint when their heads differ, or when they are both `Int` or both `String` and their sets have no value in common. So `x = "a"` then `x == "b"` is an error, as in TypeScript.
    *Reason:* §6.9 already says "disjoint by §4.5 rule 3"; rule 3 just learns about value sets. No new rule is added.
 
-9. **The host may only *give* whole `Int` and `String`.** Where i code gives a value to the host (parameters of an external function, values and errors of a host export, parameters of a host-service function), a literal type counts as its type constructor. Where the host gives a value to i code (the value of an external function, the parameters of a host export, the values and errors of a host-service function), an `Int` or `String` member must have all its values. The existing errors E0318, E0320 and E0521 report it; no new code.
+9. **The host may only *give* whole `Int` and `String`.** Where i code gives a value to the host (parameters of an external function, values and errors of a host export, parameters of a host-service function), a literal type counts as its type constructor, and so does a union of literal types of one type constructor (`"info" | "warn"` counts as `String`). Where the host gives a value to i code (the value of an external function, the parameters of a host export, the values and errors of a host-service function), an `Int` or `String` member must have all its values. The existing errors E0318, E0320 and E0521 report it; no new code.
    *Reason:* the host's values are checked only for their form (§B.2), not against a value set. Without this rule, `@external … -> "a" | "b"` or an export whose parameter is inferred as `"a" | "b"` lets the host give `"c"`. This is an extension of §10.3's existing list, not a new kind of rule. A run-time equality check at the boundary is the other choice; it is left as an open question (§13), because it changes C's code in `emit/host.rs`.
 
 10. **`type_tests` carries the sets.** `HashMap<(ModuleId, Span), Vec<TestMember>>`, with `TestMember { head: Head, values: TestValues }`. A set other than "all" becomes an equality test in `lower.rs`, with the `Cond`s that exist. No new `Cond`.
@@ -72,6 +75,9 @@ Each decision has its reason.
 
 12. **Int values are kept as canonical decimal text.** This is what `coverage::Lit::Int(String)` already does (coverage.rs:30): `0x10` is `16`, and `-0` is `0`. Strings are kept as their decoded scalar values, so `"\u{e9}"` and `"é"` are one value (§11.4). Display sorts Ints by number; the sets themselves only need some fixed order, and byte order is used.
     *Reason:* one canonical form shared by the checker and coverage, so the two can never disagree, and no BigInt work in the hot path.
+
+13. **A literal type is a written type in both surfaces of `meta.md`.** The Lisp surface gets a type row for literals: `"a"`, `1`, and `(- 1)` for `-1`. `members` gives one item for each value of a finite literal member. In the position of a type, the arguments of a macro call are just types, because integer literals and strings are now types. (§5.9.)
+    *Reason:* `meta.md` promises that every `.i` file can be changed into a `.is` file that is the same code (§1), and that a macro gets and gives types as the `Syntax` of written types (§7.4). Without a row, `send = (m: "GET" | "POST") { … }` has no `.is` form, and `type_of(x)` for `to_text(1)` (meta §7.1) gives a type that `subtype` calls a `SyntaxError`. A macro that builds a switch from `members(type_of(m))` with `m: "GET" | "POST"` must see two values, not one member it cannot take apart.
 
 ## 4. Representation
 
@@ -157,7 +163,8 @@ Over one infinite domain D (all Ints, or all Strings). `F` is "only these", `E` 
 ### 5.2 Literal expressions and written types (infer.rs)
 
 - `ExprKind::Int(n)` (:1076) has the type and known type `Ty::lit(Int, only {n})`. `ExprKind::String(s)` (:1078) has `only {s}`.
-- `Unary { Neg, Int(n) }` (:1189) has `only {-n}`, with `-0` as `0`. Any other `Neg` gives `Int`.
+- `Unary { Neg, e }` (:1189), where `e` with its groups taken away (a `Block` with one `Stmt::Expr` and nothing else, as many times as it is there) is `Int(n)`, has `only {-n}`, with `-0` as `0`. Any other `Neg` gives `Int`. One helper, `neg_literal(e) -> Option<&str>`, is used here, in `written_known` and in `known.rs`, so the three can not disagree.
+- `known.rs` `written_known` (:550–560), the known type of a name used in the value of its own group, gives the same literal types: `ExprKind::Int` and `ExprKind::String` give their literal types, and `Unary Neg` gives the literal type when `neg_literal` finds one, else `Int`. Without this, `pair = (1, f)` and `f = () { pair.0 == 2 }` in one group gives no E0520, while the same test outside the group does.
 - The operators of §6.9 give whole types. Their operand constraints (`<: Int`, `<: String`) take literals unchanged.
 - A written literal type becomes `Ty::lit` in `conv` (:852), through a new `hir::TypeKind::Lit` made by `resolve.rs` `fn ty` (:1329). A float literal in a type is a syntax error with the message "Float has no literal types".
 
@@ -172,9 +179,10 @@ Over one infinite domain D (all Ints, or all Strings). `F` is "only these", `E` 
 - **Rule 11** keeps its shape. `P` now holds literal types:
   - no catch-all: `B <: "a" | "b"`, so an unannotated subject infers `"a" | "b"` (as TypeScript does);
   - a catch-all: `B <: P | r - P`, and the route split sends the rest of `String` to `r`.
+  - **The error when values are not taken.** With a subject whose type is known when the block is checked, `(n: Int) { n |> { 0 -> "zero"  1 -> "one" } }` now fails in rule 11 (`Int <: 0 | 1`), before coverage runs; so does `Ok(0)` and `Error(_)` on `Result(Int, Nil)` (`Int <: 0` under `Ok`). Today both are E0516 with a witness, and they must stay so. The `self.sub` of rule 11 (pattern.rs :460) becomes `self.sub_case`, which flushes like `sub` but reports a `Mismatch` whose two sides have the same head and differ only in their value sets as **E0516**, with the witness of §5.5 taken from `S(l) ∖ S(r)` and put in its place in the subject: "no clause without a guard matches `2`" and "no clause without a guard matches `Ok(2)`". Every other failure is reported as today. A failure that comes later through a type variable (an unannotated subject, then `kind("c")`) is an ordinary E0501 at the call, as for any argument.
 - **Rule 12 (`narrow`, :563).**
-  - The candidates at a place are: the whole heads seen in earlier unguarded clauses (as today), each literal seen there, and each member of an earlier type test (its head with its set).
-  - A candidate is taken when the catch-all, replaced by a pattern that matches exactly that candidate, is not useful against the earlier rows. That pattern is `Pat::Head` for a head, `Pat::Ctor(Ctor::Lit(v))` for a literal, and `Pat::Except` for a cofinite type-test member.
+  - The candidates at a place are: the whole heads seen in earlier unguarded clauses (as today), each `Int` or `String` literal seen there (`Lit::Int` and `Lit::Str` only; a Float literal, a `"p" <> r` prefix and a bit-array pattern are never candidates, because they have no literal type), and each member of an earlier type test (its head with its set).
+  - A candidate is taken when the catch-all, replaced by a pattern that matches exactly that candidate, is not useful against the earlier rows. That pattern is `Pat::Head` for a head, `Pat::Ctor(Ctor::Lit(v))` for a literal, `Pat::Or` of `Ctor::Lit` for a finite type-test member, and `Pat::Except` for a cofinite type-test member. How `useful` takes a `Pat::Except` in the first place of `q` is in §5.5.
   - **Fast path:** a literal that is the whole pattern of an earlier unguarded clause at that place, with catch-alls at every other place, is taken without calling `useful()`.
   - `H` is the union of the taken members; taken literals of one head join into one member. The catch-all gets `B - H`.
   - The known-type filter (:474) becomes `display::known_diff(k, H)`, not a filter by head.
@@ -188,11 +196,13 @@ Over one infinite domain D (all Ints, or all Strings). `F` is "only these", `E` 
 - `member` and `one_member` (:40, :47): unchanged, by head.
 - `disjoint` (:64): heads differ, or the same head and `lits::disjoint(S, T)`. A member that is `_` or a type variable is never disjoint.
 - `member_for` (:434): an `Int` or `String` literal pattern gives `one_member(b, head)` met with `only {v}`; `Prefix` gives the member unchanged.
-- `match_k` (:322), the fix of decision 7:
-  - a type variable matched with a `_` part, or with a generalized type variable in `K`, gets `_`;
+- `written_known` (:550): literal types, as in §5.2.
+- `match_k` (:322), the first fix of decision 7:
+  - when the part of `K` is `_` or a generalized type variable, every type variable in the part of `P` there gets `_` (it pushes `Ty::Top`; today the early return at :323–330 pushes nothing). So in `call_known`, `acc` of `list.fold(xs, 0, f)` gets `0 | _`, which is `_`, when the known type of `f`'s result is `_`;
   - in the `Union` branch, a variable member of the pattern gets `K` less the other members by value set, not by head.
+- **The second fix of decision 7** (infer.rs `call`, :1308–1321). Before the pass with `later = true`, find the type variables that are in the result (value, errors) of `ps[i]` for some `i` where `known::open_fn(values[i])`. For each, replace its entries in `sigma` with `known::whole_lits(t)`: the same type with every `Int` and `String` member given all its values. The pass with `later = false` and `call_known` are unchanged. So in `list.fold(xs, 0, (n, x) { … })`, `n` has the known type `Int`, while in `list.map(["a"], (s) { … })`, `s` keeps `"a"`, because `a` is not in the result of `(a) -> b`.
 - `ksubst_in` (:382): passes sets through.
-- **E0520 message** (infer.rs near :1244). When both known types are finite literal sets, say so: "both sides are constants, `1` and `2`, so they are never equal and the result is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters." Types in the message use the shortened text.
+- **E0520 message** (infer.rs near :1244, which handles `==` and `!=` together). The result that is always the same is `False` for `==` and `True` for `!=`. When both known types are one value each, say: "both sides are constants, `1` and `2`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters." When they are finite sets but not both one value: "the values `"a" | "b"` and `"c"` are never equal, so `==` is always `False` (§6.9)". In every other case the text of today. Types in the message use the shortened text.
 
 ### 5.5 Coverage (coverage.rs)
 
@@ -200,7 +210,14 @@ Over one infinite domain D (all Ints, or all Strings). `F` is "only these", `E` 
 - **A side with `other`** (a part such as `r - 0` where `r` may be any value) counts as all values for every head. `values()` cannot write `r - 0`, and without this rule `inter` lost the `Int` values that come through that part, which gave false "never used" warnings in `sign`.
 - `signature(h, col)` (:518): a finite set gives `Some(the Ctor::Lit list)`. A cofinite set or all values gives `None`, as today.
 - Specialization by `Ctor::Lit(c)` keeps: `Lit` rows equal to `c`; `Prefix` rows that `covers(c)` (:267); `Except(h, X)` rows with `c ∉ X`; and `Head`, wildcard and `Or` rows as today. The missing-constructor search in `useful_head` (:420) uses the same test, not `==`, so `"a" <> _` covers `"ab"` in a finite signature.
-- **Default matrix** for a head with no finite signature: the literals present include the `X` of every `Except(h, X)` row in the column. Then the default matrix means "values not among the listed literals", and an `Except` row belongs to it. This is what makes `s |> { "a" -> …  x: String - "a" -> … }` covered. This is the one part with no evidence from the prototype, so it gets its own tests (§10).
+- **`useful_head` for `Int` and `String`** (:420–440 and the finite branch after it). Today a head with no finite signature checks only the default matrix. That is right only because every default row is also in every specialization, and an `Except(h, X)` row breaks it: it is in the default matrix but not in the specialization by a value in `X`. So for `Int` and `String` the two branches are replaced by one rule:
+  1. Let `L` be the **listed values** of the column for `h`: the values of the `Lit::Int` and `Lit::Str` rows, the `X` of every `Except(h, X)` row, and, when the signature is finite, every value in it. Take out the values that are not in the column's set.
+  2. For each `c` in `L`, specialize by `Ctor::Lit(c)` (with the row filter above, so an `Except(h, X)` row stays only when `c ∉ X`) and check `rest_q` against it. The first that is useful gives the witness `c`.
+  3. When the column's set is not finite (all values, or all but a finite set), also check the default matrix: the `Wild` and `Head` rows, the `""` prefix rows, and every `Except` row. Each of these matches every value not in `L`, because every `X` is in `L`. A useful default gives a witness from the column's set less `L` (the witness rule below). A non-empty prefix row is not in the default, as today, which may only make the answer "useful".
+  4. When the signature is finite, `L` holds all of it, so no default is checked.
+  This is what makes `s |> { "a" -> …  x: String - "a" -> … }` covered, `s |> { "a" -> 0  x: String - "a" - "b" -> 1 }` not covered with the witness `"b"`, `(m: "a" | "b" | "c") { m |> { "a" -> 0  x: String - "a" -> 1 } }` covered, and `(s, b) |> { (x: String - "a", _) -> 1  ("a", True) -> 2 }` not covered with the witness `("a", False)`. The cost is one specialization per listed value, as for a finite signature today. Other heads are unchanged.
+- **`Except` in `q`.** Narrowing (§5.3) may put `Pat::Except(h, X)` first in `q`. `useful` takes it as `useful_head` with step 2 skipping the values in `X` (they are not in `q`) and step 3 as written. `useful` today matches `q[0]` against `Or`, `Ctor`, `Head` and `Wild` only, so this is a new arm.
+- The `Except` row and step 3 have no evidence from the prototype, so they get their own tests (§10), at O0 and O2.
 - `sub_cols` (:482): a `Ctor::Lit(c)` whose value is not in the column's set for that head is not useful. So a `"a"` clause on `String - "a"` is reported as never used.
 - **Witnesses.** For a finite column, the missing literal. For a cofinite column `E(X)`, a concrete value not in `X`: for `Int`, the smallest `n ≥ 0` not in `X`; for `String`, the first of `""`, `"a"`, …, `"z"`, `"aa"`, … not in `X`. At most `|X| + 1` tries.
 - **Direction.** Where something is not exact, coverage must answer "useful" or "not covered", never the other way.
@@ -236,8 +253,19 @@ Except(X)    => And(head_cond(v, head), Not(Or(IsX(v, x) for x in X)))
 ### 5.8 Host boundary (resolve.rs, infer.rs)
 
 - `resolve.rs` `host_type` (:1651) gets a direction. For external functions (:1640) the parameters may be literal types, the value may not. For host-service functions (`host_fns`, :1473) the parameters may be literal types, the values and errors may not.
+- `resolve.rs` reads the written `hir::Type`, where `"info" | "warn"` is a `TypeKind::Union`, and both `host_type` and `host_part` (:1571) say no to every `Union` today. So both get one more case: after `expand`, a `Union` whose parts, each expanded again, are all `TypeKind::Lit` of one type constructor, or that type constructor itself, is that type constructor (`HostType::Int` or `HostType::String`) where i code gives the value, and is not taken where the host gives it. This also covers an alias, `Level = "info" | "warn"`, and the parameters of host-service functions. Without it, `log: (level: "info" | "warn") -> Nil` is E0318, and `host_fn` never puts it in `external_fns`.
 - `infer.rs` `host_type` / `host_part` (:503, :528) for host exports: a parameter must have all values; the value and the errors may be literal types and are encoded as `Int` or `String`.
 - The messages of E0318, E0320 and E0521 add: "the host gives this value, so it must be all of `String`, not `"a" | "b"`".
+
+### 5.9 Metaprogramming (docs/design/meta.md, track M4)
+
+Literal types must be written, given and taken in both surfaces, as every other type is. These are changes to `meta.md` and to M4's Lisp parser and printer, not to T1's files; T1 writes them down here so M4's RF can check them (the plan asks M4 to check its interaction with T1).
+
+- **§2.3, Types.** A new row: Literal type, normal `"a"`, `1`, `-1`, Lisp `"a"`, `1`, `(- 1)`. A string or integer atom in the position of a type is a literal type. A `(- k)` with exactly one part, where `k` is an integer atom, is a negative literal type; this does not clash with the difference, which takes two or more parts. So `Int - -1` is `(- Int (- 1))`, `"a" | "b"` is `(| "a" "b")`, and `send = (m: "GET" | "POST") { … }` is `(= send (-> ((: m (| "GET" "POST"))) _ …))`. A float atom in a type is a compile error, as in the normal surface.
+- **§2.3, Expressions.** No change. `-1` stays `(- 1)`, the unary operator on a literal, and §6.3 (decision 5) gives `(- 1)` and `(- {1})` the same type, so "same code" means the same type.
+- **§4.3, macro calls in a type.** "Types, integer literals, and strings" becomes "Types". An integer literal or a string in that position is now a literal type, and its `Syntax` is the same atom as before, so a macro sees no difference; `m(-1)` is now also correct, as `(m (- 1))`.
+- **§7.4, `Types`.** `type_of` may give a literal type, such as `Int(1)` or `Text("x")` as the `Syntax`; `subtype` takes it, so `subtype(type_of(value), `Int)` is `Yes` for `to_text(1)` (meta §7.1). `members(t)` gives one item for each value of an `Int` or `String` member with a finite set, in display order, and a member with all values but a finite set as one item, `String - "a"`. So `members` of `"GET" | "POST"` is the two `Syntax` `"GET"` and `"POST"`, and a macro can build a switch from it. This is the only place where "member" in `meta.md` is not the member of spec §4.4, and the row says so.
+- **Printer.** `i fmt --to=is` and `--to=i` print literal types with the escapes of the surface; a negative literal type is `(- 1)` in the Lisp surface and `-1` in the normal one, so `Int - -1` round-trips.
 
 ## 6. Replacement spec text
 
@@ -289,7 +317,7 @@ Add a subsection at the end:
 - Replace "`A - B` takes out of `A` every member whose type constructor is the type constructor of a member of `B`." with:
   > `A - B` takes out of `A` the values of the members of `B`.
 - Replace the sub-bullet "When `T` and `U` are not type variables: `T - U` is `Never` when they have the same type constructor, and `T` when they do not. …" with:
-  > - When `T` and `U` are not type variables: `T - U` is `T` when they have different type constructors. When they have the same one, `T - U` has the values of `T` that are not in `U`, and is `Never` when none are left. For `Int` and `String` this takes out values: `String - "a"` is every string but `"a"`, `{"a" | "b"} - "a"` is `"b"`, and `"a" - String` is `Never`. Every other type constructor has all its values in a member, so for it `T - U` is `Never`. Tuples of the same size count as one type constructor, and so do all function types.
+  > - When `T` and `U` are not type variables: `T - U` is `T` when they have different type constructors. When they are both `Int` or both `String`, `T - U` has the values of the value set of `T` that are not in the value set of `U`, and is `Never` when none are left: `String - "a"` is every string but `"a"`, `{"a" | "b"} - "a"` is `"b"`, and `"a" - String` is `Never`. For every other type constructor that is the same in both, `T - U` is `Never`, and `T <: U` must be true (below). Tuples of the same size count as one type constructor, and so do all function types.
 - Keep "When `T - U` is `Never`, `T <: U` must be true. …" as it is.
 - Add to the examples:
   > `{ Int | String | Nil } - "a" - 1` is `Int - 1 | String - "a" | Nil`.
@@ -317,24 +345,32 @@ These changes are outside T1's spec list and need approval (§13), but the desig
 - **Bit-array segments.** Add after "The parts get the types of their formats (§8.2).": "A literal value in a segment also has the type of its format, not its literal type."
 - **Rule 12.** Replace the sentence "The catch-all gets the type `B - H`, where `H` is the union of the taken type constructors, each with new type variables as its arguments." with:
   > In the same way, a value `v` of an earlier literal pattern at that place, and a member of the type of an earlier type test at that place, is **taken** when every value that the clause pattern matches with it at that place is matched by an earlier clause without a guard. The catch-all gets the type `B - H`, where `H` is the union of the taken members: each taken type constructor with new type variables as its arguments, the literal type of each taken value, and each taken member of a type test. So in `s |> { "a" -> 0  rest -> f(rest) }` with `s: String`, `rest` gets `String - "a"`.
-- **Rule 11.** Add after "If not, then `B <: P`.": "So a clause block with only literal clauses and no catch-all takes only those values: `{ 0 -> "zero"  1 -> "one" }` has the type `(0 | 1) -> "one" | "zero"`."
+- **Rule 11.** Replace "it takes every value whose type constructor is that of a member of `T` (§7.1), so those values must be in `T`." with "it takes every value that is in a member of `T` (§7.1), and the other values must be able to come to the clauses after it." Add after "If not, then `B <: P`.": "So a clause block with only literal clauses and no catch-all takes only those values: `{ 0 -> "zero"  1 -> "one" }` has the type `(0 | 1) -> "one" | "zero"`. When `B <: P` is not true only because a value of `B` is in no literal of `P`, as `(n: Int) { n |> { 0 -> "zero"  1 -> "one" } }`, the error is the one of §7.4, with a value that no clause matches."
 - **Known types.** Replace "A literal has its type" with "A literal, also `-` and an integer literal, has its type (§6.3)".
+- **Arguments.** After "Function expressions that have a parameter with no written type are left out of this matching, and come last: their expected types use all the other arguments." add:
+  > A type variable that is also in the result of the parameter type of such a function expression may get the values that the function expression gives back, which the other arguments do not show. So where it is put in the expected type of a function expression, every `Int` and `String` member of its type has all its values. In `list.fold(xs, 0, (n, x) { … })`, `n` has the known type `Int`, not `0`.
 - **Matching.** Replace "each type variable in `P` is matched with `K` less the type constructors of the other members of `P` (§4.4). A `_` in `K` matches nothing, and so does a type variable that is generalized in `K`, because it stands for any type." with:
   > each type variable in `P` is matched with `K` less the other members of `P` (§4.4). A type variable in `P` that is matched with a `_` in `K`, or with a type variable that is generalized in `K`, gets `_`, because that part may be any value. So a known type always has every value that may come there, and §6.9 never calls two values disjoint when they may be equal.
-- **Names in patterns.** After "take the one member of `B` with the type constructor of `Q`" add: "; for a literal pattern, only the values of that member that the literal matches, `B & Q`".
+- **Names in patterns.** After "take the one member of `B` with the type constructor of `Q`" add: "; for a literal pattern with the value `v`, only that value, if the member has it: `B & v`, with `v` the literal type of the value (not `B & Q`, because where a pattern is fitted `Q` is the whole `Int` or `String`)". So `x = "a" = s` with `s: String` gives `x` the known type `"a"`.
 
 ### §6.3 Literals and names
 
 Replace the first sentence with:
 
-> The type of an integer literal is its literal type (§4.2): `1` has the type `1`. The operator `-` written directly before an integer literal gives the literal type of the negative number: `-1` has the type `-1`; but `-(1)`, `-{1}` and `-x` have the type `Int`. The type of a string literal is its literal type: `"a"` has the type `"a"`. The type of a float literal is `Float`.
+> The type of an integer literal is its literal type (§4.2): `1` has the type `1`. When the operand of `-` is an integer literal, also inside groups, the result has the literal type of the negative number: `-1` and `-{1}` have the type `-1`. Every other `-e` has the type `Int`, as `-x` and `-{-1}`. The type of a string literal is its literal type: `"a"` has the type `"a"`. The type of a float literal is `Float`.
+
+### §6.5 Lists
+
+Replace "`T` may be a union: `[1, "a"]` has the type `List(Int | String)`." with:
+
+> `T` may be a union: `[1, "a"]` has the type `List(1 | "a")`, and may be used where a `List(Int | String)` is needed.
 
 ### §6.9 Operators
 
 - Add after the table:
   > The operators take values of literal types, because these are subtypes of `Int` and `String`. Their results have the whole type: `1 + 2` has the type `Int`, not `3`, and `"a" <> "b"` has the type `String`.
 - In the `==` bullet, replace "So `1 == "a"` and `(s: String) { s == 1 }` are compile errors, but …" with:
-  > Literal types count. So `1 == "a"`, `1 == 2`, `"a" == "b"`, `x == "b"` after `x = "a"`, and `(s: String) { s == 1 }` are compile errors, but `(s: String) { s == "a" }`, `(m: "a" | "b") { m == "b" }`, `x == Nil` with `x: Int | Nil`, `[1] == []`, `a == b` with a type variable, and `(s) { s == 1 }` are not. To compare two constants when the program runs, for example in a test of `==`, pass them as parameters: `(a, b) { a == b }(1, 2)`.
+  > Literal types count. So `1 == "a"`, `1 == 2`, `1 != 2`, `"a" == "b"`, `x == "b"` after `x = "a"`, and `(s: String) { s == 1 }` are compile errors, but `(s: String) { s == "a" }`, `(m: "a" | "b") { m == "b" }`, `x == Nil` with `x: Int | Nil`, `[1] == []`, `a == b` with a type variable, and `(s) { s == 1 }` are not. To compare two constants when the program runs, for example in a test of `==`, pass them as parameters: `(a, b) { a == b }(1, 2)`.
 
 ### §7.1 Grammar
 
@@ -358,13 +394,15 @@ Add:
 
 Replace "So literal patterns of Int, Float, String, and BitArray never cover their type, and a union is covered when every member is covered." with:
 
-> A literal pattern matches its own value, and `"lit" <> r` matches every string that starts with `"lit"`. So literal patterns cover an `Int` or `String` member whose value set is finite, when every value in it is matched: with `m: "GET" | "POST"`, `m |> { "GET" -> 1  "POST" -> 2 }` is covered. They never cover a member with all its values, or with all but a finite set, and literal patterns of Float and BitArray never cover their type. A union is covered when every member is covered.
+> A literal pattern matches its own value, and `"lit" <> r` matches every string that starts with `"lit"`. So literal patterns cover an `Int` or `String` member whose value set is finite, when every value in it is matched: with `m: "GET" | "POST"`, `m |> { "GET" -> 1  "POST" -> 2 }` is covered. Literal patterns alone never cover a member with all its values, or with all but a finite set; a catch-all or a type test such as `x: String - "a"` must take the other values. Literal patterns of Float and BitArray never cover their type. A union is covered when every member is covered.
+>
+> When the values that are not covered are only values of `Int` or `String` that no literal pattern takes, the type of the clause block already says so (§4.8 rule 11: `(n: Int) { n |> { 0 -> "zero"  1 -> "one" } }` needs `Int <: 0 | 1`). That is reported as this error too, with a value that no clause matches, such as `2`.
 
 ### §10.3 Types the host can take
 
 Replace the first paragraph with:
 
-> `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, and custom types with no constructors (§4.3). Where i code gives the value to the host, a literal type (§4.2) counts as `Int` or `String`. Where the host gives the value (the value and errors of an external function or a host-service function, and the parameters of a host export), an `Int` or `String` member must have all its values, because the host's values are checked only for their form (§B.2). Values of custom types with no constructors go to the host as opaque references. No other type may go to the host. An error type that the host can take is a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`, with no two the same.
+> `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, and custom types with no constructors (§4.3). Where i code gives the value to the host, a literal type (§4.2), or a union of literal types of one type constructor, counts as `Int` or `String`. Where the host gives the value (the value of an external function, the value and errors of a host-service function, and the parameters of a host export), an `Int` or `String` member must have all its values, because the host's values are checked only for their form (§B.2). Values of custom types with no constructors go to the host as opaque references. No other type may go to the host. An error type that the host can take is a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`, with no two the same.
 
 Add this example:
 
@@ -386,18 +424,19 @@ T1's files (plan, "各轨道负责的文件"):
 | `types/solve.rs` | `constrain_in` (:245, Diff and Con arms), `add_bound` (:385), `route` (:516), `diff_left` (:544), `union_in` (:698), `inter_in` (:744), `merge` (:801), `diff_in` (:877); pass-through in the rest |
 | `types/display.rs` | `same_unmarked` (:224), `union_in` (:698), Top rule (near :730), `full` (:753), `inter` (:772), `diff` (:860), `merge` (:889), `tree` (:1176, :1280), rebuilders |
 | `types/shown.rs` | `ShownType::Lit` (:10), `text_limited` next to `text` (:46) and `text_with` (:63) |
-| `types/known.rs` | `members` (:22), `disjoint` (:64), `match_k` (:322), `ksubst_in` (:382), `member_for` (:434) |
-| `types/coverage.rs` | `Vals` (:131), `values` (:173, Diff near :229), `covers` (:267), `useful_head` (:420), `sub_cols` (:482), `signature` (:518), `Pat::Except`, witnesses |
-| `types/pattern.rs` | `leaf` (:213), known filter (:474), `narrow` (:563), W0501 text (:632), type tests (:723–790) |
-| `types/infer.rs` | literals (:1076, :1078), unary minus (:1189), `conv` (:852), E0520 text (:1244), host export checks (:440–560) |
+| `types/known.rs` | `members` (:22), `disjoint` (:64), `match_k` (:322), `ksubst_in` (:382), `member_for` (:434), `written_known` (:550), new `whole_lits` |
+| `types/coverage.rs` | `Vals` (:131), `values` (:173, Diff near :229), `covers` (:267), `useful` (:328, the `Except` arm), `useful_head` (:420), `sub_cols` (:482), `signature` (:518), `Pat::Except`, witnesses |
+| `types/pattern.rs` | `leaf` (:213), known filter (:474), rule 11 `sub_case` (:460), `narrow` (:563), W0501 text (:632), type tests (:723–790) |
+| `types/infer.rs` | literals (:1076, :1078), unary minus (:1189) and `neg_literal`, `conv` (:852), E0520 text (:1244), `call` (:1308–1321, the second fix of decision 7), `sub_case` next to `sub` (:747), host export checks (:440–560) |
 | `crates/ilang-wasm/src/lower.rs` | type test (:2128); `head_cond` (:2211) unchanged |
 | `docs/spec.md` | §3, §4.2, §4.4, §4.5, §6.3, §6.9, §7.1, §7.4 |
 
 Outside T1's list (needs approval, §13):
 
-- `docs/spec.md` §4.1, §4.7, §4.8, §7.2, §7.3, §10.3.
+- `docs/spec.md` §4.1, §4.7, §4.8, §6.5, §7.2, §7.3, §10.3.
 - `crates/ilang-syntax`: the `Literal` Prim in the type parser, the formatter and the printer; `ast::TypeKind::Lit` (A1's crate).
-- `crates/ilang-check/src/hir.rs`: `hir::TypeKind::Lit`; `resolve.rs` `fn ty` (:1329) and `host_type` (:1651), `host_fns` (:1473).
+- `crates/ilang-check/src/hir.rs`: `hir::TypeKind::Lit`; `resolve.rs` `fn ty` (:1329), `host_type` (:1651), `host_part` (:1571), `host_fns` (:1473).
+- `docs/design/meta.md` §2.3 (a Types row), §4.3 (macro arguments in a type), §7.4 (`members`), and the Lisp parser and printer (M4's), as §5.9 says.
 - `crates/ilang-check/src/query.rs` (:1218) literal case.
 - `crates/ilang-cli/src/commands/package.rs` (:1165, :1351).
 - Tests: `crates/ilang-check/tests/codegen.rs` (:108), `tests/query.rs`, the goldens in `crates/ilang-check/tests/types`, and `tests/spec`.
@@ -453,23 +492,29 @@ The scripts are in `/home/agent/Programming/i/.rd/spike-s2/spike/`: `time-std.sh
 - `diff_left`: `(v - "a") <: R` after `v ≥ String` sends exactly `String - "a"` to `R`; all three cases (subset, disjoint, both).
 - `"a" & "b" = Never`; `("a" | "b") & (String - "a") = "b"`; `String - "a"` is cofinite; `"a" - String = Never`; `"a" | String - "a" = String`.
 - Bound fusion: 1000 distinct string lower bounds leave one bound, and an upper bound `"x" | "y"` still rejects the first bad one. Two upper bounds `"a"` and `"b"` stay two bounds.
-- Env mode: a service started from a literal (`State(0)` against `State(Int)`) gives a clear error or none, as the written types say.
+- Env mode (rule 1, sets must be equal): `f = (c ! Counter(0)) { … }` called under `! Counter(Int) = …` is rejected with E0515 (`FailKind::EnvForms`), because `0` and `Int` are different sets; `Counter(Int)` on both sides is accepted; `! Counter(Int) = counter.start(0)` is accepted, because the written type is the type of the environment and `0 <: Int` is an ordinary constraint on the argument. A test for each of the three.
 
 **Display unit tests:** `"a" | _ - "a"` and `0 | _ - 0` show `_`; `_ - String | "a"` does not; `String - "a" - "b"` sorted; `Int - -1`; Ints sorted by number (`-2 | 1 | 10`); a 40-literal union shortened to `… (30 more)` in a message and full in `text()` and the package interface.
 
 **Spec tests** (`tests/spec/<section>/`, in the existing directories). Every "must reject" case is a program that would go wrong when run if it were accepted. Run tests run at O0 and O2.
 
-- `6/literal_types.i`: `x = "a"` is `"a"`; `-1` is `-1`; `-x` and `1 + 1` are `Int`; `[1, 2]` is `List(1 | 2)` and is accepted where `List(Int)` is needed.
+- `6/literal_types.i`: `x = "a"` is `"a"`; `-1` and `-{1}` are `-1`; `-x`, `-{-1}` and `1 + 1` are `Int`; `-(1)` is rejected (a tuple); `[1, 2]` is `List(1 | 2)` and is accepted where `List(Int)` is needed; `[1, "a"]` is `List(1 | "a")`.
+- `4.8/known_fold.i` (run): `count = (xs: List(Int)) { list.fold(xs, 0, (n, x) { n == 3 |> { True -> n  False -> n + 1 } }) }` gives no E0520 and stops at 3 on a list of five; the same with `index_fold` and a loop helper written in the test; `list.fold(xs, State(0), (s, x) { State(s.count + 1) })` still knows `s.count`; `list.map(["a"], (s) { s == "b" })` still gives E0520.
+- `4.8/known_group.i`: `pair = (1, f)` and `f = () { pair.0 == 2 }` in one group gives E0520, as it does outside the group.
+- `7/literal_missing.i`: `(n: Int) { n |> { 0 -> "zero"  1 -> "one" } }` is E0516 with the witness `2`, and `(r: Result(Int, Nil)) { r |> { Ok(0) -> 1  Error(_) -> 2 } }` is E0516 with the witness `Ok(1)`; neither is E0501.
 - `4.8/literal_match.i`: `kind = { "a" -> 1  "b" -> 2 }` has the type `("a" | "b") -> 1 | 2`, and `kind("c")` is rejected. With `_ ->` it shows `(x) -> …`.
 - `4.8/literal_narrow.i`: `s |> { "a" -> 0  t -> g(t) }` with `g: (String - "a") -> Int` is accepted; with `g: ("b") -> Int` it is rejected.
 - `4.8/known_unknown_part.i`: `result.unwrap(Ok(1), 50) == 1` gives no E0520 (regression for decision 7).
 - `7/literal_type_test.i` (run): `x: "a" | "b"` does not match `"c"` or `1`; `x: String - "a"` does not match `3` or `"a"` and matches `"b"`; `x: Int - 5` does not match `5` or `"5"` and matches 2^30, −2^30−1 and 10^30; `x: 1073741824` matches only that number.
-- `7/literal_cover.i`: `"a"`, `"b"` cover `"a" | "b"`; they do not cover `String` (witness: `""`) or `String - "c"`; `"a" <> _` and `"b"` cover `"ab" | "b"`; `"a"` and `x: String - "a"` cover `String`; `"a"` and `x: String - "a" - "b"` do not (witness `"b"`); a `"a"` clause on `String - "a"` is never used; Float literals never cover.
+- `7/literal_cover.i`: `"a"`, `"b"` cover `"a" | "b"`; they do not cover `String` (witness: `""`) or `String - "c"`; `"a" <> _` and `"b"` cover `"ab" | "b"`; `"a"` and `x: String - "a"` cover `String`; `"a"` and `x: String - "a" - "b"` do not (witness `"b"`); `"a"` and `x: String - "a"` cover `m: "a" | "b" | "c"`; `(x: String - "a", _)` and `("a", True)` do not cover `(String, Bool)` (witness `("a", False)`); a `"a"` clause on `String - "a"` is never used; Float literals never cover. Each case that is not covered is also a run test that the checker must reject; each covered case runs at O0 and O2 with the values in every `X`.
+- `4.8/literal_narrow_except.i`: `s |> { x: String - "a" -> 0  t -> g(t) }` gives `t` the type `"a"`; `s |> { 1.5 -> 0  y -> f(y) }` and `s |> { "a" <> _ -> 0  t -> g(t) }` take nothing (`y: Float`, `t: String`).
 - `7/literal_may_fail.i` (run): `"a" = s` with `s: String` needs `Assert` and fails with `"b"`; `"a" = x` with `x: "a"` needs no `Assert`; a segment `<<"hi": utf8, rest: bits>>` against a decoded value is accepted.
-- `6/eq_literal.i`: errors for `x = "a"  x == "b"`, `1 == -1`, and the shortened message for a 40-literal union; no error for `(s: String) { s == "b" }`, `(m: "a" | "b") { m == "b" }`, `(s) { s == 1 }`, and `n == 0x0` with `n = 0`.
-- `10.1/external_literal.i`: `@external … mode: () -> "on" | "off"` is rejected; `log: (level: "info" | "warn") -> Nil` is accepted.
+- `6/eq_literal.i`: errors for `x = "a"  x == "b"`, `1 == -1`, `-{1} == 2`, `1 != 2` (the message says "always `True`"), `(m: "a" | "b") { m == "c" }` (the message does not call `m` a constant), and the shortened message for a 40-literal union; no error for `(s: String) { s == "b" }`, `(m: "a" | "b") { m == "b" }`, `(s) { s == 1 }`, and `n == 0x0` with `n = 0`.
+- `10.1/external_literal.i`: `@external … mode: () -> "on" | "off"` is rejected; `log: (level: "info" | "warn") -> Nil` is accepted and is called; so is `log: (level: Level) -> Nil` with `Level = "info" | "warn"`; a host-service function with a parameter `"a" | "b"` is accepted and one with the value `"a" | "b"` is rejected.
 - `10.2/export_literal.i`: a host export whose parameter is inferred as `"a" | "b"` is rejected; one whose value is `"ok"` is accepted.
 - Principal types: `id = (x) { x }` at `"a"` gives `"a"`; `pick = (b, x, y) { b |> { True -> x  False -> y } }` at `"a"`, `"b"` gives `"a" | "b"`.
+
+**Metaprogramming (M4, after both T1 and M4 land):** a `.i` file with `(m: "GET" | "POST")` and `Int - -1` changed with `i fmt --to=is` and back is the same code; `to_text(1)` and `to_text("x")` give the `Int` and `String` branches; `members(type_of(m))` with `m: "GET" | "POST"` gives two items; a type macro called as `m(-1)` gets `(- 1)`.
 
 **`tests/codegen.rs`** (:108): expect `TestMember`; add one finite and one cofinite case.
 
@@ -477,37 +522,41 @@ The scripts are in `/home/agent/Programming/i/.rd/spike-s2/spike/`: `time-std.sh
 
 ## 11. Risks
 
-1. **More E0520.** No widening means `1 == 2`, `x = "a"` then `x == "b"`, and `f() == 2` where `f` gives a constant are compile errors. The prototype found 6 in `tests/spec`, 2 in the goldens and none in std. In-flight branches (T2, Std, R, IO, json, http) may hit more after rebase; the plan's RF round after T1 counts them. A fallback, if this is too many: known types of function results use the whole type constructor. That is a spec change and needs the user's approval.
+1. **More E0520.** No widening means `1 == 2`, `x = "a"` then `x == "b"`, and `f() == 2` where `f` gives a constant are compile errors. The prototype found 6 in `tests/spec`, 2 in the goldens and none in std. In-flight branches (T2, Std, R, IO, json, http) may hit more after rebase; the plan's RF round after T1 counts them. A fallback, if this is too many: known types of function results use the whole type constructor. That is a spec change and needs the user's approval. Known types that are too small give *false* E0520, which is worse than more E0520: the paths found so far are the `_` part (`unwrap`), and the accumulator of a loop helper (`fold(xs, 0, …)`), both fixed by decision 7. The RF soundness view looks for more paths where a known type comes from some of the values only.
 2. **Inferred types change.** A literal-only match infers a literal union (`digit : (x: 0 | 1) -> "one" | "zero"`). Callers that pass other values now get a type mismatch where they got a coverage error before. Unannotated exports show literal types in their interface (§4.7 text). An invariant parameter (`Boundary`, or a custom type that uses a parameter both ways) written as `Codec(String)` will not take an inferred `Codec("a")`; the user writes `String` where the value is made.
-3. **Rebuild sites.** 77 `Ty::Con` sites must carry the set. A site that writes `ALL` by mistake silently widens a type; where it widens an upper bound, that is unsound. Step 3 of the checklist is reviewed site by site.
+3. **Rebuild sites.** 77 `Ty::Con` sites must carry the set. A site that writes `ALL` by mistake silently widens a type; where it widens an upper bound, that is unsound. The compiler does not stop at the 8 `Ty::Con(..)` sites or at the `.head()` comparisons (decision 2), and these are where most set rules belong. Step 3 of the checklist is reviewed site by site from a search, not from compile errors.
 4. **Route and `diff_left` splits.** A wrong split (for example sending the whole member to the same-head member) makes `String <: "a" | r` fail, and fixing that by over-approximation could let a value escape narrowing. The model-checked algebra and the solver tests guard it, and the RF soundness view aims at it.
 5. **Coverage.** `Prefix` and `Except` rows in finite signatures and default matrices are new interactions, and `Except` has no prototype evidence. A mistake toward "covered" is a run-time failure. Dedicated tests at O0 and O2.
-6. **Host boundary.** Without §10.3's new sentence, external values and export parameters with literal types are a hole. Today no external can have a literal type, because literal types cannot be written yet; the check must land in the same commit as written literal types.
+6. **Host boundary.** Without §10.3's new sentence, external values and export parameters with literal types are a hole. Host exports need no written types (§10.2), so their parameter types are inferred, and they get literal types as soon as literal values do: `handle = (m) { m |> { "GET" -> 1  "POST" -> 2 } }` is inferred as `("GET" | "POST") -> …`, has no `_`, and traps at O0 (or takes a wrong clause at O2) when the host gives `"PUT"`. So the host-export check (`infer.rs` `host_type` / `host_part`) lands in the same commit as literal values (step 7). Externals and host-service functions always have written types, so their check lands with written literal types (step 8).
 7. **Known types.** Giving `_` for a generalized variable as well as for `_` (decision 7) goes slightly past the prototype. It could make a known type less exact and give a new E0506 (needs a known type). The corpus count catches it.
 8. **Performance.** See §9. If the budget is not met after the five fixes, the coordinator decides.
 9. **Display.** Shortened text must never reach package identity or `Typed::schemes`. The Top rule must use the subset check, or ordinary code prints `"a" | _ - "a"`, or worse, `_ - String | "a"` prints as `_` and hides a real constraint.
 10. **Syntax timing.** `-` in types is also the difference. The parser, the formatter and the printer must agree that `-` followed by an integer literal at the start of a `Prim` is a sign, so that `Int - -1` round-trips. That is in A1's crate.
+11. **Metaprogramming.** If M4 lands before the §5.9 rows, a `.i` file with a literal type cannot become `.is`, and typed macros get types that `subtype` and `members` call a `SyntaxError`. If T1 lands first, the same is true of M4's first version. Either order works only if §5.9 is in `meta.md` before M4 writes its type rows.
+12. **Coverage error text.** Rule 11 now finds most missing literal values before coverage does. If `sub_case` maps too little, users see "`Int` is not a subtype of `0 | 1`" where they saw a missing value; if it maps too much, a real type error is shown as E0516. `7/literal_missing.i` pins both.
 
 ## 12. Implementation checklist for T1
 
 Each step is one commit and can be tested in this repo. Steps 2–5 change no behaviour that a user sees, because nothing makes a set other than `ALL` until step 7.
 
-1. **Approvals and spec.** Get the coordinator's approval for the items in §13 (the extra spec sections, the parser branch, `resolve.rs`). Apply §6 to the converted `spec.md`. If the parser's `Literal` Prim has landed with A1, every ```i block parses. If not, the blocks that write literal types (§3, §4.2, §4.4, §4.5, §7.1, §7.4, §10.3) are marked as not yet checked, and step 8 removes the marks.
+1. **Approvals and spec.** Get the coordinator's approval for the items in §13 (the extra spec sections, the parser branch, `resolve.rs`, the `meta.md` rows of §5.9). Send §5.9 to M4, so that its type rows and `members` have literal types from the start. Apply §6 to the converted `spec.md`. If the parser's `Literal` Prim has landed with A1, every ```i block parses. If not, the blocks that write literal types (§3, §4.2, §4.4, §4.5, §7.1, §7.4, §10.3) are marked as not yet checked, and step 8 removes the marks.
 2. **`lits.rs`.** `ValueSet`, `Lits`, the algebra, `join_all`, the canonical constructors, `TestValues`, and the model tests. Share the canonical Int text with `coverage::literal` (:672).
-3. **The field.** `Ty::Con(Head, ValueSet, Vec<Ty>)`, `Ty::lit` with its debug assertion, `Ty::values`, the size assert. Pass the set through at every site; review each rebuild. `type_tests` becomes `Vec<TestMember>`; `lower.rs` maps `All` to `head_cond` and has the `Only` and `Except` branches written but not yet reachable. All tests and wat snapshots stay the same.
+3. **The field.** `Ty::Con(Head, ValueSet, Vec<Ty>)`, `Ty::lit` with its debug assertion, `Ty::values`, the size assert. Pass the set through at every site; review each rebuild. Then search for `Ty::Con(..)` and `.head() ==` / `.head()` comparisons in `types/` (the sites of decision 2, and any new ones) and write the list in the commit message, each site marked "set rule in step 4/5/6" or "the set does not matter here, because …". `type_tests` becomes `Vec<TestMember>`; `lower.rs` maps `All` to `head_cond` and has the `Only` and `Except` branches written but not yet reachable. All tests and wat snapshots stay the same.
 4. **Solver** (§5.1 rules 1–10) with its unit tests and the bound fusion.
-5. **Display, known types, coverage.** `Norm`, the Top rule, `same_unmarked`, `tree`, `ShownType::Lit`, `text_limited`, `package.rs`; `known.rs` including both `match_k` fixes; coverage with sets, `other` as all values, finite signatures, `covers()`, `Pat::Except`, default literals, `sub_cols`, witnesses. Unit tests that build types directly.
-6. **Patterns.** Rule 12 candidates with the fast path, type-test members, the known filter by `known_diff`, the W0501 text. `leaf` keeps the whole types for now.
-7. **Switch on literal values** (one commit, easy to revert). Literal expressions and `-` on an int literal in `infer.rs`; `leaf` gives literal types in a match (not when fitting, never in a segment); the E0520 text. Re-bless the goldens and `query.rs` and read each change. Rewrite the spec cases of §8. Add the tests of §10 that need no written literal type, including `unwrap(Ok(1), 50) == 1`. Run `check-all.sh` and compare with §8; a higher count goes to the coordinator.
-8. **Written literal types** (one commit): the `fn ty` branch and `hir::TypeKind::Lit` (and the parser branch, if A1 did not do it), the Float error, the host boundary (§5.8), and the `lower.rs` equality tests now reachable. Run tests at O0 and O2 for every type-test case of §10. Remove the "not yet checked" marks of step 1.
+5. **Display, known types, coverage.** `Norm`, the Top rule, `same_unmarked`, `tree`, `ShownType::Lit`, `text_limited`, `package.rs`; `known.rs` including both `match_k` fixes, `whole_lits`, and `written_known` with `neg_literal`; coverage with sets, `other` as all values, finite signatures, `covers()`, `Pat::Except`, the listed-values rule of `useful_head` and the `Except` arm of `useful`, `sub_cols`, witnesses. Unit tests that build types directly.
+6. **Patterns.** Rule 12 candidates (Int and String literals only) with the fast path, type-test members, the known filter by `known_diff`, `sub_case` for rule 11, the W0501 text. `leaf` keeps the whole types for now.
+7. **Switch on literal values** (one commit, easy to revert). Literal expressions and `-` on an int literal in `infer.rs`; the second fix of decision 7 in `call`; `leaf` gives literal types in a match (not when fitting, never in a segment); the E0520 text; and the host-export part of §5.8 (`infer.rs` `host_type` / `host_part`: a parameter must have all values), because export parameters are inferred and get literal types in this step (risk 6). Re-bless the goldens and `query.rs` and read each change. Rewrite the spec cases of §8. Add the tests of §10 that need no written literal type, including `unwrap(Ok(1), 50) == 1`, `known_fold.i`, `known_group.i`, `literal_missing.i` and `10.2/export_literal.i`. Run `check-all.sh` and compare with §8; a higher count goes to the coordinator.
+8. **Written literal types** (one commit): the `fn ty` branch and `hir::TypeKind::Lit` (and the parser branch, if A1 did not do it), the Float error, the host boundary for externals and host-service functions (§5.8, `resolve.rs`, with the union-of-literals case), and the `lower.rs` equality tests now reachable. Run tests at O0 and O2 for every type-test case of §10. Remove the "not yet checked" marks of step 1.
 9. **Performance.** `time-std.sh` and `stress-time.sh` against §9's budget; the ignored stress tests. Apply interning only if needed. Open the ticket for `calls`.
 10. **Blind spec tests and RF**, last, as the plan says. The soundness view writes programs that type-check and still go wrong when run, at O0 and O2, aimed at the route split, `diff_left`, `Except` coverage, the host boundary, and i31 against boxed Ints.
 
 ## 13. Open questions
 
-1. **Scope.** §4.1, §4.7, §4.8, §7.2, §7.3 and §10.3 are not in T1's spec list, but the design needs them. May T1 change them? §4.7 and §4.8 are also T2's.
+1. **Scope.** §4.1, §4.7, §4.8, §6.5, §7.2, §7.3 and §10.3 are not in T1's spec list, but the design needs them. May T1 change them? §4.7 and §4.8 are also T2's.
 2. **Parser.** The `Literal` Prim in types (`ilang-syntax` parser, formatter, printer, `ast::TypeKind::Lit`) is A1's crate. Should A1 add it before T1 starts, or may T1 change those lines?
-3. **`resolve.rs`.** The host checks (`host_type` :1651, `host_fns` :1473) and `fn ty` (:1329) are in `resolve.rs`, which T1 does not own. Approve T1 changing those regions?
+3. **`resolve.rs`.** The host checks (`host_type` :1651, `host_part` :1571, `host_fns` :1473) and `fn ty` (:1329) are in `resolve.rs`, which T1 does not own. Approve T1 changing those regions?
 4. **Host values.** This design rejects literal types where the host gives a value. The other choice is to accept them and stop the program when the host's value is not in the set, as §B.2 does for a bad form. That is more general, but it changes C's `emit/host.rs`. Keep rejection for now?
 5. **E0520 on function results.** If the RF count after T1 is high, should known types of function results use the whole type constructor (risk 1)? That is a spec change for the user.
 6. **Known types of generalized variables.** Decision 7 gives `_` for a generalized type variable as well as for `_`. The prototype only did `_`. Keep both, or only `_` until a case shows the need?
+7. **Metaprogramming.** §5.9 changes `meta.md` §2.3, §4.3 and §7.4, which are M4's. Should M4 take these rows as written, and is `members` giving one item per literal value (and not one per §4.4 member) the right API, or should `i/syntax` get a separate `values(t)`?
+8. **The accumulator of a loop helper** (decision 7, second change). This makes `Int` and `String` members whole only. A callback that gives back another type constructor than the start value still gets a known type that is too small, as at 1865366. Fix that in T1 too (the variable gets `_`, which loses field access on records in `fold`), or in its own ticket as proposed?
