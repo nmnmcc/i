@@ -1,5 +1,7 @@
 //! The `i` command.
 
+mod commands;
+
 use clap::{Parser, Subcommand};
 use ilang_cli::{BuildOptions, build, level, run_test};
 use ilang_host::{Outcome, Program, TestResult};
@@ -69,6 +71,16 @@ enum Command {
         /// Only run the tests whose name has this text.
         filter: Option<String>,
     },
+    /// Format source files; by default every `.i` file in `src/` and `test/`.
+    Fmt {
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        /// Write nothing; list the files that would change, and fail if any.
+        #[arg(long)]
+        check: bool,
+        /// Files or directories to format instead.
+        paths: Vec<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -97,6 +109,11 @@ fn main() -> ExitCode {
             opt,
             filter,
         } => cmd_test(&project, opt, offline, filter.as_deref()),
+        Command::Fmt {
+            project,
+            check,
+            paths,
+        } => commands::fmt::run(&project, check, &paths),
     };
     match result {
         Ok(code) => code,
