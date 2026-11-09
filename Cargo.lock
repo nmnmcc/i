@@ -632,6 +632,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ilang-syntax"
+version = "0.1.0"
+dependencies = [
+ "num-bigint",
+ "thiserror",
+]
+
+[[package]]
 name = "ilang-wasm"
 version = "0.1.0"
 dependencies = [

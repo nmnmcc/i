@@ -1,0 +1,47 @@
+a = f(1, x: 2, y: 3)
+
+b = User(..u, name: "x", age: 1)
+
+c = Some(..o)
+
+d = x.y.z
+
+e = t.0.1
+
+f = m.Ctor(1)
+
+g = [1, 2, ..rest]
+
+h = <<1, x:u8, y:bits(n + 1), "s":utf8, <<>>:bits>>
+
+i = () {
+  ! Clock = Clock(now: () { 42 })
+  ! m.State(Int) = s
+  elapsed(40)
+}
+
+j = { a }
+
+k = [1, ..rest]
+
+l = C(..u, name: 1)
+
+m = [1, 2]
+
+n = f(a)
+
+o = []
+
+p = { 1 }.x
+
+q = f(g)(h)
+
+r = case x {
+  _ -> 1
+}.y
+
+s = 1 .x
+
+t = 1.5.0
+
+u = 1 .0

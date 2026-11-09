@@ -71,7 +71,7 @@ A keyword may not be used as a name.
 +.  -.  *.  /.      <.  <=.  >.  >=.
 ```
 
-Source text is cut into tokens from left to right. At every point, the longest token that matches is taken: `<=.` is one token, and `<<` is one token. Spaces, line ends, and comments come between tokens, and some line ends are breaks (§1.7). After `.`, digits are read as a `decimal`, never as a float: `t.0.1` is `(t.0).1`.
+Source text is cut into tokens from left to right. At every point, the longest token that matches is taken: `<=.` is one token, and `<<` is one token. Spaces, line ends, and comments come between tokens, and some line ends are breaks (§1.7). After `.`, digits are read as a `decimal`, never as a float: `t.0.1` is `(t.0).1`. A token may not be followed directly by a letter, a digit, or `_` that would continue it as a word or a number: `12px`, `0xG`, `1.0E5`, and `fooBar` are compile errors.
 
 ### 1.6 Literals
 
@@ -115,7 +115,7 @@ From this rule:
 
 Two rules do not depend on lines:
 
-- In the `->` part of a function, after the `)` of its parameters, a `{` right after `->`, `?`, `!`, `|`, or `-` is part of the type (§3). The first other `{` that is not inside brackets begins the body.
+- In the `->` part of a function, after the `)` of its parameters, a `{` right after `->`, `?`, `!`, `|`, `&`, or `-` is part of the type (§3). The first other `{` that is not inside brackets begins the body.
 - In the expression after `case`, a `{` that comes after a complete expression, and is not inside brackets, ends the expression. This comes before the rule of §6.1, so `case (a, b) { … }` is a `case` on a tuple.
 
 ## 2. Modules
@@ -145,7 +145,7 @@ If modules import one another in a circle, it is a compile error.
 ```
 File      = [ Import ] [ Export ] { Item } .
 Item      = { Attribute } ( TypeDef | Binding | Declaration ) .
-Attribute = "@" name [ "(" string_lit { "," string_lit } ")" ] .
+Attribute = "@" name [ "(" string_lit { "," string_lit } [ "," ] ")" ] .
 ```
 
 A file has at most one `import` and at most one `export`. They come first, `import` before `export`. An item with `@external` is a declaration (§10.1). Any other item that starts with an `UpName` is a type definition (§4.3). Every other item is a binding (§2.5).
@@ -295,7 +295,7 @@ Prim      = FnType | TupleType | NamedType | name | "_" | "{" Type "}" .
 FnType    = "(" [ ParamType { "," ParamType } [ "," ] ] ")" "->" Union [ "?" Union ] [ "!" Union ] .
 ParamType = [ name ":" ] Type .
 TupleType = "(" [ Type { "," Type } [ "," ] ] ")" .
-NamedType = [ name "." ] UpName [ "(" Type { "," Type } ")" ] .
+NamedType = [ name "." ] UpName [ "(" Type { "," Type } [ "," ] ")" ] .
 ```
 
 - A `name` is a type variable. `_` is a hole that type inference fills in.
@@ -343,9 +343,9 @@ The types `Assert` and `AssertionFailure` are in §9.6. The types `Boundary` and
 ### 4.3 Custom types
 
 ```
-TypeDef     = UpName [ "(" name { "," name } ")" ] TypeBody .
+TypeDef     = UpName [ "(" name { "," name } [ "," ] ")" ] TypeBody .
 TypeBody    = "{" { Constructor } "}" | "=" Type .
-Constructor = UpName [ "(" Field { "," Field } ")" ] .
+Constructor = UpName [ "(" Field { "," Field } [ "," ] ")" ] .
 Field       = [ name ":" ] Type .
 ```
 
@@ -740,7 +740,15 @@ i has no special effect definitions. Effects are made from normal things: functi
 A function with no parameters, `() -> A ? E ! N`, is a **computation** that has not been done yet. It is the same idea as an `Effect<A, E, R>` value in Effect-TS. It may be stored, given to other functions, and put together with other computations. Calling it does it. Retrying, time limits, and running at the same time are normal functions:
 
 ```i
-retry = (times: Int, body: () -> a ? e ! n) -> a ? e ! n { ... }
+retry = (times: Int, body: () -> a ? e ! n) -> a ? e ! n {
+  case fail.catch(body) {
+    Ok(value) -> value
+    Error(error) -> case times > 1 {
+      True -> retry(times - 1, body)
+      False -> fail.raise(error)
+    }
+  }
+}
 
 user = retry(3, () { load_user("1") })
 ```

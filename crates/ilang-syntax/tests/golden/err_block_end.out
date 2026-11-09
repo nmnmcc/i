@@ -1,0 +1,14 @@
+f = () {
+  x = 1
+}
+
+g = () {
+  ! Clock = c
+}
+
+h = {
+}
+--- errors ---
+E0105 @1:8 a block ends with an expression
+E0105 @2:8 a block ends with an expression
+E0105 @3:5 a block ends with an expression

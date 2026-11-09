@@ -1,0 +1,3 @@
+b = f(..xs)
+--- errors ---
+E0107 @1:6 `..rest` comes after the parts of a list

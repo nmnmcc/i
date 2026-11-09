@@ -1,0 +1,3 @@
+g = 1
+--- errors ---
+E0102 @2:1 expected the function body, a `{` on the same line, found `{`
