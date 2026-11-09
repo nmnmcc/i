@@ -36,6 +36,12 @@ ilang-binaryen = { path = "crates/ilang-binaryen" }
 [profile.dev]
 debug = 1
 
+# Dependencies such as Wasmtime and Cranelift run i programs in tests, and are
+# many times slower without optimization; the compiler's own crates stay
+# quick to rebuild.
+[profile.dev.package."*"]
+opt-level = 2
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

@@ -7,6 +7,11 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked "$@"
 cargo build --workspace --locked
+cargo build --release --locked -p ilang-cli
+for level in 0 2; do
+  "$CARGO_TARGET_DIR/release/i" test --project std --opt "$level"
+  "$CARGO_TARGET_DIR/release/i" test --project examples/hello --opt "$level"
+done
 npm ci --ignore-scripts
 npm test
 npm run test:browser
