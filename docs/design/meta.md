@@ -24,7 +24,7 @@ Decisions taken with the user:
 - A macro may ask for written definitions (§6).
 - Typed macros work as the "blackbox" macros of Scala do: the type of a call comes from the declared type only, never from what the macro gives (§7).
 
-These decisions were made while the draft was written and reviewed, and the user has confirmed them.
+The user has also confirmed the decisions below, numbered 1 to 15, which were made while the draft was written and reviewed.
 
 About the surfaces:
 
@@ -62,12 +62,18 @@ About typed macros:
 
 The **core tree** is what the parser gives for a file: the imports, the exports, and the items, and everything in them. Documentation comments are part of the item or the module they are on. The core tree has the value of a literal, not its spelling: `0x10` and `16` are the same tree. A group `{ e }` around one expression is a block with one expression, and it is in the core tree.
 
-Two core trees are **the same code** when they are different only in groups: `{ e }` and `e`, and `{ T }` and `T` in a type.
+Two core trees are **the same code** when they are different only in groups: `{ e }` and `e`, and `{ T }` and `T` in a type. The result `_` of a function expression is never in a group: `{ _ }` there is a compile error (§2.3), so a group cannot change whether a function has a `->` part.
 
 Each surface has a parser and a printer. The printer of the normal surface adds the groups that its rules of binding need; the Lisp surface never needs one. So:
 
 - Every `.i` file may be changed into a `.is` file that is the same code.
 - A `.is` file may be changed into a `.i` file that is the same code, but not when it has a quote (§3.3) or an item with `@macro`, because the normal surface cannot write them. Then `i fmt --to=i` reports an error and writes nothing. §2.3 says which other datums the Lisp parser does not take, so that every other file can be changed.
+
+This promise needs three changes to `docs/design/syntax.md`, listed in §12. Until they are made, these `.is` files cannot be changed into `.i` files either, and `i fmt --to=i` and `show_as` report an error for them:
+
+- A statement or an item that is a macro call whose first argument is an `UpName`, as `(decode User text)`, `(log Info)`, or the item `(derive User)`. Syntax.md §6.1 and §2.2 read `name (` and an `UpName` as a binding with type variables, and a group cannot be put around a statement or an item.
+- A declaration with an attribute other than `@external`, as `(@ rpc (: fetch (-> (Id) (! User Http))))`, and a macro call as an item. Syntax.md §2.2 reads the first as a binding, and has no item of the second form.
+- A clause block whose first clause head is a type test, as `{ (-> (: n Int) "int") (-> _ "other") }`. Syntax.md §6.1 keeps `{ n: Int …` for records, and a pattern has no group.
 
 ## 2. The Lisp surface
 
@@ -104,7 +110,7 @@ The parser changes datums into the core tree with the tables of §2.3. The table
 
 ### 2.3 How each core form is written
 
-In the tables, `e` is an expression, `p` a pattern, `T` a type, `x` and `a` a name, `C` and `U` an `UpName`, and `…` zero or more of the thing before it.
+In the tables, `e` is an expression, `p` a pattern, `T` a type, `N` a named type (`U`, `(. a U)`, `(U T…)`, or `((. a U) T…)`), `x` and `a` a name, `C` and `U` an `UpName`, and `…` zero or more of the thing before it.
 
 **Files and items**
 
@@ -113,7 +119,7 @@ In the tables, `e` is an expression, `p` a pattern, `T` a type, `x` and `a` a na
 | Imports | `(a/b/c, x = a/b, (C, y) = a/b, x = (C, y) = a/b)` | `(, (/ a b c) (= x (/ a b)) (= (, C y) (/ a b)) (= x (, C y) (/ a b)))` |
 | Exports | `(x, U, U(..))` | `(, x U (U ..))` |
 | Built-in attribute | `@main Item`, `@host("ns", "async") Item` | `(@ main Item)`, `(@ (host "ns" "async") Item)` |
-| Macro before an item | `@m Item`, `@m(e…) Item`, `@a.m(e…) Item` | `(@ m Item)`, `(@ (m e…) Item)`, `(@ ((. a m) e…) Item)` |
+| Macro before an item | `@m Item`, `@a.m Item`, `@m(e…) Item`, `@a.m(e…) Item` | `(@ m Item)`, `(@ (. a m) Item)`, `(@ (m e…) Item)`, `(@ ((. a m) e…) Item)` |
 | Custom type | `U { C1(T, x: T) C2 }` | `(U { (C1 T (: x T)) C2 })` |
 | Custom type with parameters | `U(A, B) { … }` | `((U A B) { … })` |
 | Type alias | `U = T`, `U(A) = T` | `(= U T)`, `(= (U A) T)` |
@@ -121,10 +127,12 @@ In the tables, `e` is an expression, `p` a pattern, `T` a type, `x` and `a` a na
 | Binding with type variables | `x(A, B) = e` | `(= (x A B) e)` |
 | Declaration | `x: T`, `x(A): T` | `(: x T)`, `(: (x A) T)` |
 | Macro call as an item | `m(e…)`, `a.m(e…)` | `(m e…)`, `((. a m) e…)` |
+| Items from an expansion | none | `{ Item… }` |
 
 - At the top level of a file, a `(, …)` is the imports when it has a `(/ …)` in it, and the exports when not. It may not be empty.
 - A module path `(/ …)` has two or more names. An import item `(= …)` has two parts, or three when it has both a name and a list of names. Every other `(= …)` has exactly two parts.
-- An item that is a `Round` whose head is an `UpName`, or a `Round` whose head is an `UpName`, is a custom type. An `(= …)` whose first part is one of these is a type alias. An item that is a `Round` whose head is a name or a `(. a m)` is a macro call.
+- An item `(U { … })` or `((U A …) { … })` is a custom type. An item `(= U T)` or `(= (U A …) T)` is a type alias. A top-level binding may not have a pattern that starts with an `UpName`, as in syntax.md §2.2. An item that is a `Round` whose head is a name or a `(. a m)` is a macro call. A type alias whose left side is a type pattern (stream T2, as `Schema(User, _) = user`) is written as the same datum, `(= (Schema User _) user)`, and the `UpName`s in the pattern are the names it defines; the exact rule comes with T2 (open question 2).
+- **Items from an expansion.** A `Curly` of zero or more items is only taken as the result of a macro in the position of an item (§4.3). It is never taken in a source file, and it has no form in the normal surface: `show_as` and `i expand` write its items one after the other, as the items of a file.
 - Each `(@ …)` has one attribute. More attributes are put one inside the other, the first on the outside: `@main @deprecated("x") f = e` is `(@ main (@ (deprecated "x") (= f e)))`.
 - `@m Item` gives the macro only the item. `@m()` is not written; `(@ (m) Item)` is a compile error.
 
@@ -161,21 +169,21 @@ In the tables, `e` is an expression, `p` a pattern, `T` a type, `x` and `a` a na
 | Bit array | `<<e1, e2: f, e3: f(e4)>>` | `<<e1 (: e2 f) (: e3 (f e4))>>` |
 | Block, group | `{ s1  s2  e }`, `{ e }` | `{ s1 s2 e }`, `{ e }` |
 | Binding statement | `p = e`, `x(A) = e` | `(= p e)`, `(= (x A) e)` |
-| Environment statement | `! T = e` | `(! T e)` |
+| Environment statement | `! N = e` | `(! N e)` |
 | Clause block | `{ p1 -> e1  p2 -> e2 }`, `{}` | `{ (-> p1 e1) (-> p2 e2) }`, `{}` |
 | Clause with choices | `p1 \| p2 \| p3 -> e` | `(-> (\| p1 p2 p3) e)` |
 | Clause with a guard | `p ? g -> e`, `p1 \| p2 ? g -> e` | `(-> (? p g) e)`, `(-> (? (\| p1 p2) g) e)` |
 | Function with no `->` part | `(p1, p2) { e }` | `(-> (p1 p2) _ e)` |
 | Function with a `->` part | `(p) -> R ? E ! N { e }` | `(-> (p) (! (? R E) N) e)` |
-| Environment parameter | `x ! T` | `(! x T)` |
+| Environment parameter | `x ! N` | `(! x N)` |
 | Record update | `C(..e, x: e2)`, `a.C(..e)` | `(C .. e (: x e2))`, `((. a C) .. e)` |
 | Quote | none | `` `d `` |
 
 - A `Round` with one or more parts whose head is not a symbol is a call, but when its second part is `..` it is a record update. The head is the function. A binary operator takes exactly two parts; `-` and `-.` may take one.
-- **Functions and clauses.** In the position of an expression, a `(-> …)` has three parts: the parameters, the result, and the body. The body is one expression. The result `_` means that the function has no `->` part, so its value, errors, and environment are all inferred (spec §6.8). Any other result is a `->` part, in which a missing `?` or `!` means `Never`; the normal `(x) -> _ { e }` is `(-> (x) (? _ Never) e)`. A clause is a `(-> …)` with two parts, and it is only in a clause block. A function type also has two parts, and it is only in the position of a type. A macro that looks at a `(-> a b)` must know its position to know which of the two it is.
+- **Functions and clauses.** In the position of an expression, a `(-> …)` has three parts: the parameters, the result, and the body. The body is one expression. The result `_` means that the function has no `->` part, so its value, errors, and environment are all inferred (spec §6.8). Any other result is a `->` part, in which a missing `?` or `!` means `Never`; the normal `(x) -> _ { e }` is `(-> (x) (? _ Never) e)`. The result `_` is only the bare atom: a `{ _ }` there is a compile error, in both surfaces. A clause is a `(-> …)` with two parts, and it is only in a clause block. A function type also has two parts, and it is only in the position of a type. A macro that looks at a `(-> a b)` must know its position to know which of the two it is.
 - **Blocks.** A `{ }` in the position of an expression is a clause block when it is empty, or when its first part is a `(-> …)` with two parts. Then every part must be a clause. When not, it is a block, and it has one or more parts.
 - A clause block with one clause, `{ (-> p e) }`, and the function `(-> (p) _ e)` are two core trees with one meaning (`docs/design/syntax.md` §6.12).
-- A clause head is `p`, `(| p1 p2 …)` with two or more choices, or `(? head g)` with a head of the first two kinds. `(| …)` is a compile error in every other position of a pattern. A type test `(: x T)` may only be the last choice, because the normal surface reads `x: T | p` as a union type.
+- A clause head is `p`, `(| p1 p2 …)` with two or more choices, or `(? head g)` with a head of the first two kinds. `(| …)` is a compile error in every other position of a pattern. A type test `(: x T)` may only be the last choice, because the normal surface reads `x: T | p` as a union type. A clause block whose first clause head is a type test cannot yet be written in the normal surface (§1).
 - `(. a x)` is a member of a module or a field, as `a.x` is in the normal surface (spec §2.3).
 
 **Patterns**
@@ -261,7 +269,7 @@ SyntaxError { SyntaxError(message: String, at: Syntax) }
 | `make` | `(node: Node, like: Syntax) -> Syntax` | A new `Syntax` with this node, and the span and the scope of `like`. §5 says how a name made in this way is looked up. |
 | `same_code` | `(Syntax, Syntax) -> Bool` | `True` when the two are the same datum. Spans and scopes are not looked at. |
 | `show` | `(Syntax) -> String` | The datum in the Lisp surface, on one line |
-| `show_as` | `(Syntax, Position) -> String ? SyntaxError` | The code in the normal surface, on one line, read by §2.3 for this position. A `SyntaxError` when it fits no row. |
+| `show_as` | `(Syntax, Position) -> String ? SyntaxError` | The code in the normal surface, on one line, read by §2.3 for this position; a `Curly` of items gives one item on each line. A `SyntaxError` when it fits no row, or when the normal surface cannot write it (§1). |
 | `definition` | | §6 |
 | `type_of`, `signature`, `subtype`, `members` | | §7.4 |
 
@@ -269,7 +277,7 @@ The bodies of these functions are given by the compiler. §8 says where they may
 
 ### 3.3 Quote
 
-A quote is written only in a `.is` file. The code in a quote is a **template**.
+A quote is written only in a `.is` file. The code in a quote is a **template**. A `Quote`, `Unquote`, or `Splice` node in the result of an expansion is a compile error (§4.3), so every quote is in a source file and has the scope of that file.
 
 As an expression, `` `d `` gives the `Syntax` of the datum `d`. Every atom and every bracket in `d` gets its own span in the file, and the scope of the module the quote is written in. Inside `d`:
 
@@ -352,11 +360,12 @@ A **macro call** is written in one of these ways, in both surfaces. `m` is a nam
 | Position | Written | Arguments | The result must be |
 |---|---|---|---|
 | Expression | `m(args)`, `e \|> m`, `e \|> m(args)` | Expressions, with or without labels | An expression |
-| Item at the top level | `m(args)` | Expressions | An item, or a `Curly` of zero or more items |
+| Item at the top level | `m(args)`, `a.m(args)` | Expressions | An item, or a `Curly` of zero or more items |
 | Before an item | `@m Item`, `@m(args) Item` | Expressions, and then the item as the last argument | See below |
 | Type | `m(args)` | Types, integer literals, and strings, with no labels | A type |
 
 - The parser does not know which names are macros. The arguments are always read by the grammar of the position, as in the table, so a file can be read and formatted with no other file. From this, an argument in the position of an expression cannot be a type such as `Int | Nil` or `(Int) -> String`, a discard, or a list pattern with `..`.
+- In the normal surface, a macro call as an item, a declaration with a macro before it, and a call whose first argument is an `UpName` at the start of a statement or an item, as `decode(User, text)`, need the changes to syntax.md listed in §12. Until then they can only be written in a `.is` file (§1).
 - `e |> m` is the macro call `m(e)`, and `e |> m(args)` is the macro call `m(e, args)`, as `|>` works for every call (spec §6.9). This is only in the position of an expression.
 - The number of arguments must be the number of parameters of the macro. An argument with a label goes to the parameter with that label, by the rule of calls (spec §6.6), and the macro gets it with no label.
 - The arguments are not worked out. The macro gets their `Syntax`, and its result says if and when each of them is worked out.
@@ -376,7 +385,8 @@ A **macro call** is written in one of these ways, in both surfaces. `m` is a nam
 **Limits on what a result may have.**
 
 - Imports and exports cannot be in a result.
-- The attributes `@external`, `@host`, `@main`, and `@test` may be in a result only when the attribute came from the code of the caller (it has no marks, §5). So a macro of a package that the program depends on cannot add a host import or an entry point that the caller did not write.
+- A `Quote`, `Unquote`, or `Splice` node cannot be in a result.
+- The attributes `@external`, `@host`, `@main`, and `@test` may be in a result only when the name atom of the attribute came from a source file of the caller and reached the result through the arguments of each run, unchanged. Having no marks is not enough: a name made with `make` (§5) is never such an atom, also when it has no marks after the run. So a macro of a package that the program depends on cannot add a host import or an entry point that the caller did not write.
 - A `Curly` directly inside the `Curly` of a result of items is a compile error.
 
 ### 4.4 Expanding
@@ -407,7 +417,8 @@ Every `Syntax` value, an atom or a bracket, has a scope. A scope is a module and
 - Code read from a file of the module `M` has the scope `M` with no marks.
 - Code in a template written in the module `D` has the scope `D` with no marks.
 - `make(node, like)` gives the scope of `like`. A name made in this way is a **made name**.
-- For each run, the compiler makes a new mark `k`. It puts `k` on every `Syntax` of the arguments, runs the macro, and then changes `k` on every `Syntax` of the result: one that has `k` loses it, and one that does not have `k` gets it. So the code that came from the arguments is as it was, and the code that the macro made has `k`. A run that is done again after it was put off (§6) is a new run with a new mark.
+- For each run, the compiler makes a new mark `k`. It puts `k` on every `Syntax` of the arguments, and on every `Syntax` that `Definitions` or `Types` give in the run (§6, §7.4). It runs the macro, and then changes `k` on every `Syntax` of the result: one that has `k` loses it, and one that does not have `k` gets it. So the code that came from the arguments or from the compiler is as it was, and the code that the macro made has `k`. A run that is done again after it was put off (§6) is a new run with a new mark.
+- A type variable in an answer of `Types` has a scope of its own kind, which names that type variable of the checker (§7.4). Rules 1 to 3 below find that variable directly, and no binding, of a template or of the caller, can bind it.
 
 A name is looked up in this way:
 
@@ -431,6 +442,7 @@ From this:
 - A defined name with marks may only be used by names with the same text and the same scope, so only by code of the same run. It cannot be exported, also not as a constructor through `U(..)`.
 - A defined name with marks may not have the text of a top-level name, an imported name, or a module name of the module of its scope. If it has, it is a compile error. So rule 3 never has two answers.
 - The type of an exported item may not use a type of another module that is not exported there. This is the rule of spec §2.4, for types that a template brings in.
+- The rules that a name is defined one time only (spec §2.2) and that a type parameter or a declared type variable may not have the name of a type that may be used in the module (spec §4.3, §4.7) compare the text and the scope (module and marks), not the text alone. So a type variable `Key` that a template binds does not clash with a type `Key` of the caller, and a marked `helper` does not clash with the caller's `helper`.
 
 **What the compiler does with this.** After expanding, each name with marks is changed to a name that cannot be written in a source file, and each name found in another module by rule 3 becomes a direct reference to that top-level name. In the text form of a value (spec §11.8), a constructor with marks is shown by its text only. `i expand` (§9) shows these names in a form for reading: a name with marks as `l#1`, with the marks numbered in the order they come in the output, and a direct reference as `my/check.failed`. That text is not source text.
 
@@ -446,7 +458,8 @@ definition = (of: Syntax, d ! Definitions) { d.definition(of) }
 `Definitions` is a service type exported by `i/syntax`. The compiler gives the service when it runs a macro. A test may give its own with an environment statement.
 
 - `of` is a type name: an `UpName`, or `(. a U)`. It is looked up among the type names at the top level, by the rules of §5, with the marks it would have in the result of this run. So a name from an argument is looked up where the caller wrote it. Any other datum, and the name of a type variable, is a `SyntaxError`.
-- The value is the `Syntax` of the item that defines the type: a custom type or a type alias, with its attributes. An alias is given as it is written, not the type it stands for. A type with parameters is given with its parameters, not filled in. The `Syntax` has the scopes that the definition has in its module after expanding, so its names mean the same when a macro puts them in its result.
+- The value is the `Syntax` of the item that defines the type: a custom type or a type alias, with its attributes. An alias is given as it is written, not the type it stands for. A type with parameters is given with its parameters, not filled in. The `Syntax` has the scopes that the definition has in its module after expanding. As an argument does, it has the mark of the run only while the run lasts (§5), so its names mean the same when a macro puts them in its result.
+- A type whose definition depends on the type of a value (stream T2, as `User` in `Schema(User, _) = user`) has no written fields or constructors. Asking for it is a `SyntaxError`, so a macro cannot read such a type. Its type is only known after type checking, which a syntax macro may not wait for.
 - What may be seen is what the module of the scope of `of` may see. A type of another module that is not exported is not defined. A type of another module whose constructors are not exported is a `SyntaxError`.
 - Built-in types have no written definition, and asking for one is a `SyntaxError`. But `Bool`, `Nil`, `Result`, `Assert`, and `AssertionFailure` give the definitions that the spec gives for them.
 - A name that is not defined is a compile error at the span of `of`. The macro cannot catch it.
@@ -493,7 +506,7 @@ A **typed macro** is a declaration and a binding with the same name in a `.is` f
 
 - The declaration is the **signature**. It is a full function type, with its type variables declared after the name. It may have errors and an environment. It may not have `_`. The rules for written types (spec §4.4) and for types in exported items (spec §2.4) are used for it.
 - The binding is the **implementation**. It follows the rules of §4.1, with these changes: it has one parameter for each parameter of the signature, in the same order, and it is checked against `(Syntax, …) -> Syntax ? SyntaxError ! Types | Definitions | Assert`.
-- This is the only case where two items have one name, and the only use of a declaration other than `@external`.
+- This is the only case where two items have one name. The declaration has no `@external`; it is read as a declaration by its form (§12).
 - The documentation comment of the macro is on the declaration.
 
 ### 7.2 Checking a call
@@ -513,12 +526,15 @@ Typed macros are expanded after the binding they are in has been type checked, w
 - The result is put in the position of the call. Its syntax macro calls are expanded (§4.4, step 2). Then it is type checked there, with the local names and their types as they are at the call. An argument that is in the result keeps the expected type that it had in §7.2.
 - Then the typed macro calls in the result are expanded in the same way. The limits of §4.4 are used.
 
-**What the result must be.** Before the result is checked, every type variable that the checker has is **fixed**: checking the result may not add a bound to it. Let the **needed type** of the call be the function type of the signature with each of its type variables filled in from the bounds that inference found: in an output position, the union of the types that come to the variable, and in an input position, the intersection of the types it must be (spec §4.5 rule 6, §4.7).
+**What the result must be.** Before the result is checked, each type variable that is local to the binding group of the call and is not generalized is taken to be the union of its lower bounds (the types that come to it), or `Never` when it has none. The binding group has been checked in full, so no more types come to it. Every other type variable that the checker has (a declared or generalized type variable, or a variable of a top-level binding of an earlier group) is **fixed**.
+
+Let the **needed type** of the call be the function type of the signature with each of its type variables filled in with the union of the types that come to it, or `Never` when none comes. This is the same in an output position, an input position, and a position that is both (spec §4.5 rule 6, §4.7). It is sound, because only values of these types reach the call, and the checker has shown that each of them is a subtype of every type the variable must be. It can always be written as a type.
 
 - The type of the result must be a subtype of the result type of the needed type.
 - The errors of the result must be among the errors of the signature and the errors of the arguments. The environment of the result must be in the environment of the signature and of the arguments, by the rule for environments (spec §4.5 rule 4).
-- Checking the result may not need a new bound on a fixed variable. A bound that already follows from the bounds of the variable is not new.
-- In the result, a top-level name of the module of the call that has no marks must be a name that the binding already used before the expansion, or a name of a binding that was type checked before it. A name of a binding that is inferred together with the binding of the call has the type it has at the call, not a general type.
+- A fixed variable `a` is rigid: checking the result never adds a bound to it. A constraint `a <: T` holds only when (1) `a` is `T` or a part of the union `T`; or (2) an upper bound of `a`, followed through the upper bounds of other fixed variables, is a subtype of `T` with no type variable given a bound; or (3) `T` is a union with a part `r` or `r - U`, where `r` is a type variable that checking the result made, and then `a` is added to the lower bounds of `r` as in normal checking. A constraint `T <: a` is the same with lower bounds and an intersection. Type variables that checking the result makes take bounds as in normal checking.
+- So a clause block on an argument with type tests and a last clause `_` is correct: the catch-all part goes to a new variable by (3). A use of the argument as a type that the bounds do not show, such as `(+ ~value 1)` when no upper bound of `a` is a subtype of `Int`, is not.
+- In the result, a top-level name of the module of the call that has no marks must be a name that the binding already used before the expansion, or a name of a binding in a group that the group of the call depends on (spec §4.7). So the names that may be used do not depend on the order in which the checker takes groups that do not use one another. A name of a binding that is inferred together with the binding of the call has the type it has at the call, not a general type.
 - If one of these is not true, it is a compile error at the call. The message says that the macro is wrong, not the caller.
 
 After all expanding, the order of top-level values (spec §2.5) and all later steps use the expanded program.
@@ -546,25 +562,26 @@ Types {
 
 A type is given to a macro, and taken from a macro, as the `Syntax` of a written type (§2.3). In a type that the compiler gives:
 
-- The scopes are set so that every name means the same type in every position where the macro may put it.
-- A type variable is given as a name that stands for that fixed variable. One variable has the same name in every answer of one run. Such a name may be written in the result with no declaration, and the rule of spec §4.4 about where a union or an intersection with a type variable may be written is not used for it. It may not be in a type test of a clause (spec §7.1).
+- The scopes are set so that every name means the same type in every position where the macro may put it. These `Syntax` values have the mark of the run only while the run lasts (§5).
+- The type given is the type after the simplification of spec §4.7, with each variable that is local to the binding group and not generalized replaced by the union of its lower bounds, or `Never` (§7.3). Only fixed variables are left.
+- A fixed variable is given as an `Up` node, as `A`, with a scope of its own kind that names that variable (§5). That scope keeps it apart from every type name and every type variable that a template or the caller declares, also one with the same text. One variable has the same node in every answer of one run. It may be written in the result with no declaration: the rule of syntax.md §4.7 that a type variable must be declared is not used for it, and neither is the rule of spec §4.4 about where a union or an intersection with a type variable may be written. It may not be in a type test of a clause (spec §7.1).
 - A type with no type variable in it is given in full, with its aliases filled in.
 
 | Function | What it gives |
 |---|---|
 | `type_of(s)` | The type that the checker gave to `s` at its position in the call. `s` must be a `Syntax` that the compiler gave to this run: an argument, an expression inside an argument, or a name that a pattern inside an argument binds. For any other `Syntax`, also one made by `make` or by a quote, and for a datum that is not an expression or such a name, it is a `SyntaxError`. |
 | `signature()` | The needed type of the call (§7.3), as a function type. |
-| `subtype(a, b)` | `Yes` when the checker can show from the bounds of the fixed variables that `a` is a subtype of `b` (spec §4.5). `No` when it is not, and neither type has a type variable in it. `NotKnown` in every other case. A `Syntax` that is not a correct type, or has `_` in it, is a `SyntaxError`. |
-| `members(t)` | The members of the type (spec §4.4), in the order of their `show` text. `Never` has no members. `a & Int` and `a - U`, with a type variable `a`, are one member each. `Bool` is one member. The same `SyntaxError` as for `subtype`. |
+| `subtype(a, b)` | `Yes` when `a` is a subtype of `b` (spec §4.5) by the rules for fixed variables in §7.3, with no variable given a bound. The types are taken in the form that `type_of` gives. `No` when it is not, and neither type has a type variable in it. `NotKnown` in every other case. A `Syntax` that is not a correct type, or has `_` in it, is a `SyntaxError`. |
+| `members(t)` | The members of the type (spec §4.4), in the order of their `show` text. `Never` has no members. `A & Int` and `A - U`, with a fixed variable `A`, are one member each. `Bool` is one member. The same `SyntaxError` as for `subtype`. |
 
 - `type_of` gives the type at the position of the argument in the call. When the macro puts the argument in another position of its result, for example inside a clause, the checker checks it again there (§7.3), and its type there may be different.
 - A type is a set of values, and one type may be written in more than one way: `Int | String` and `String | Int` are the same type. So a macro asks `subtype` and `members`, and does not match the `Syntax` of a type by its form.
-- `definition` (§6) gives the constructors and fields of a named type.
+- `definition` (§6) gives the constructors and fields of a named type, but not of a type whose definition depends on the type of a value (stream T2).
 
 ### 7.5 What typed macros cannot do
 
 - The result type of a call cannot depend on the result of the macro. A macro that reads a table of a database cannot give its rows a type that is not in the signature.
-- A type variable of the signature that is only in its result, as in `default(A): () -> A`, has no type that comes to it, so its needed type is `Never` and only a result that never gives a value is correct. So a typed macro cannot choose by the type that the position of the call needs, as in `user: User = decode(text)`. A syntax macro that takes the name of the type, `decode(User, text)`, does this work (open question 5).
+- A type variable of the signature that is only in its result, as in `default(A): () -> A`, has no type that comes to it, so its needed type is `Never` and only a result that never gives a value is correct. So a typed macro cannot choose by the type that the position of the call needs, as in `user: User = decode(text)`. A syntax macro that takes the name of the type, `decode(User, text)`, does this work (open question 5). In the normal surface, such a call at the start of a statement needs the change to syntax.md §6.1 in §12; until then, put it after `=` or in a `.is` file.
 - A typed macro cannot put an argument that has errors or needs an environment inside a function to be called later, because the signature has no way to say that the errors of the argument go to that function.
 - A typed macro cannot choose by the type inside a binding with type variables.
 - A typed macro cannot make items. Syntax macros do that.
@@ -592,7 +609,7 @@ A type is given to a macro, and taken from a macro, as the `Syntax` of a written
 - Every other binding of a module with macros is in the program as for any module (spec §2.5). So in §4.2, `failed` is in a program that uses `check.that`.
 - `i test` runs tests with the functions of `i/syntax`, so a test may call the normal functions that a macro is made of, give its own `Definitions` or `Types`, and compare results with `same_code`. In a test, a quote gives the scope of its module with no marks.
 
-**What the sandbox is for.** A macro of a package that the program depends on runs when the program is compiled, with the limits above. That keeps the machine that compiles safe. It does not make the expanded code safe: the code that a macro gives runs in the program with the services of the program, and it may use any name that can be seen at the call. The limits on attributes in §4.3 keep it from adding host imports and entry points.
+**What the sandbox is for.** A macro of a package that the program depends on runs when the program is compiled, with the limits above. That keeps the machine that compiles safe. It does not make the expanded code safe: the code that a macro gives runs in the program with the services of the program, and it may use any name that can be seen at the call. The limits on attributes in §4.3 keep it from adding host imports and entry points: such an attribute must be one that the caller wrote and that reached the result unchanged, so neither a template nor `make` can give one.
 
 ## 9. Errors and tools
 
@@ -618,27 +635,35 @@ A type is given to a macro, and taken from a macro, as the `Syntax` of a written
 
 ## 11. Open questions
 
-1. **A sign on macro calls.** A call does not show that it is a macro, so a reader cannot see that an argument may be worked out zero or many times. Rust (`m!`) and Julia (`@m`) put a sign on such calls; Elixir and Lisp do not. This draft has no sign and leaves it to the editor (§9).
-2. **Other plans for the syntax.** `docs/design/syntax.md` keeps a lowercase name in a type for "the type of a value" (stream T2), and `{ name: e }` for records (stream T3). This draft uses `m(…)` and `a.m(…)` in a type for a macro call, and reads a `{ }` with one part as a group. Both must be checked together with T2 and T3.
+1. **A sign on macro calls.** A call does not show that it is a macro, so a reader cannot see that an argument may be worked out zero or many times. Rust (`m!`) and Julia (`@m`) put a sign on such calls; Elixir and Lisp do not. This draft has no sign and leaves it to the editor (§9), but no sign is not a confirmed decision: the question is open. Should a macro call have a sign in the source? If yes, the forms of §4.3 and decision 6 change with it.
+2. **Other plans for the syntax.** `docs/design/syntax.md` keeps a lowercase name in a type for "the type of a value" (stream T2), and `{ name: e }` for records (stream T3). This draft uses `m(…)` and `a.m(…)` in a type for a macro call, and reads a `{ }` with one part as a group. Both must be checked together with T2 and T3, and so must the datum for a type alias with a type pattern (§2.3) and what `definition` gives for a type that depends on a value (§6).
 3. **The units and the numbers of the limits** in §4.4.
-4. **The order of work.** After stream A1: the Lisp surface and the changing between surfaces; then syntax macros with marks; then `definition`; then typed macros.
+4. **The order of work.** Not open any more; the number is kept so that the other numbers stay. The order is in §12.
 5. **Choosing by the needed type.** §7.5 does not let a typed macro choose by the type that its call needs. It could be let in for a type variable that is not generalized, by fixing the variable to the type that is needed at the time of the expansion. This needs a careful look at inference (spec §4.7).
 6. **Changes to the core forms.** The tables of §2.3 are what every quote and quote pattern is written against. A change of a core form breaks macros in packages. The tables need the same care as the spec, and maybe a way for a package to say which form it was written for.
-7. **Writing a macro.** A macro has no way to print while it runs; `i expand --trace` is the only help. A function that adds a note to the compiler output may be wanted.
+7. **Writing a macro.** A macro has no way to print while it runs; `i expand --trace` is the only help. Should `i/syntax` have a function, as `note(String)`, that adds a line to the compiler output, with the same result on every machine?
 
 ## 12. What changes
 
 This is not a small addition. Today the compiler reads all modules, resolves them, orders them, and checks them as one program, and makes one Wasm module. Macros need the compiler to work module by module in the order of imports, and to compile and run macro programs in the middle of that. Typed macros need the checker to keep a type for each expression, to give types as written types, to check a piece of code in the middle of a binding, and to check without adding bounds. None of these is in `ilang-check` today.
 
-- **Spec.** §0 and §2.1 (file names, the library module `i/syntax`, the order of modules), §1.1, §1.5 (`` ` ``, `~`), §2.2 (attributes: `@macro`, a macro before an item, two items with one name), §2.4 (exports checked after expanding), §2.5 (a declaration with `@macro`; compile-time bindings), §3 (a macro call in a type), §6.9 (`|>` with a macro), §10.2 (the macro entry point), §11.7 (stops in expanded code), §13 (`hash` in a macro program), a new section for macros, and a new appendix for the Lisp surface.
+The order of work is: after stream A1, the Lisp surface and the changing between surfaces (M1); then the driver and syntax macros with marks (M2); then `definition` (M3); then typed macros (M4).
+
+- **`docs/design/syntax.md`.** This design needs three changes there, so that every `.is` file with no quote and no `@macro` can be written in the normal surface (§1):
+  - §6.1 and §2.2: a statement or an item is a binding with type variables only when `name (` is followed by a list of `UpName`s only and then `) =` (or `) :` for a declaration). It is not decided by the first two tokens.
+  - §2.2: a declaration is an item of the form `name [TypeParams] ":" Type` with no `=`, whatever its attributes. A top-level `m(args)` or `a.m(args)` with no `=` after it is a macro call as an item.
+  - §6.1: a `{` followed by `name :` is a clause block, and not kept for records, when `->`, `|`, or `?` comes after the type.
+- **Spec.** §0 and §2.1 (file names, the library module `i/syntax`, the order of modules), §1.1, §1.5 (`` ` ``, `~`), §2.2 (attributes: `@macro`, a macro before an item, two items with one name; the item forms above; names compared by text and scope, §5), §2.4 (exports checked after expanding), §2.5 (a declaration with `@macro`; compile-time bindings), §3 (a macro call in a type), §4.3 and §4.7 (names compared by text and scope), §6.9 (`|>` with a macro), §10.2 and §10.3 (the macro entry point; the compiler services are not host services), §11.7 (stops in expanded code), §11.8 (the text form of a constructor with marks), §13 (`hash` in a macro program), Appendix B.6 (a new kind of entry), a new section for macros, and a new appendix for the Lisp surface. Other streams change §0, §2.1, §2.5, §3, and §11.8 too, so the order of merging must be set for them.
 - **`ilang-syntax`.** A parser and a printer for the Lisp surface; datums; quote; the attribute form; a macro call as an item and in a type.
 - **A new driver** over the parser, `ilang-check`, `ilang-wasm`, and `ilang-host`: the order of modules, the two steps of §4.4, marks and the lookup of §5, putting off, the limits, and kept results.
-- **`ilang-check`.** The work named above, and resolving names with scopes.
-- **`ilang-wasm`.** The macro entry point and the form of `Syntax` at the boundary; quotes; leaving out compile-time bindings.
-- **`ilang-host`.** Running a macro program with only the services of the compiler, with the limits.
-- **`ilang-package`.** `.is` files as modules; the error when a module has two files.
-- **`ilang-cli`, `ilang-lsp`, editors.** `i fmt` for `.is` and `--to`; `i expand`; `i check` and the language server running macros; a grammar for `.is`; the package template; tests of the spec for the new sections.
+- **`ilang-check`.** The work named above, and resolving names with scopes. Choosing the parser by the end of the file name in `parse` (or a field for the surface in `ModuleSource`). Each expression needs an identity that is different in each expansion (a node id, or a span with a source and an expansion id), because two expansions of one template in one module give nodes with the same span; every table keyed by `(ModuleId, Span)` moves to it. A module whose macro calls are not expanded is type checked without them, also when another module has errors (§9); today any error of resolution stops type checking for the whole program.
+- **`ilang-wasm`.** The macro entry point, as a new kind of entry (spec Appendix B.6), and the form of `Syntax` at the boundary: a private encoding that the host never sees as a `Value`. `Definitions`, `Types`, and `Assert` are services of the compiler, not `@host` services, so the rule of spec §10.3 on host types (E0320) is not used for them. Quotes; leaving out compile-time bindings. Code in function calls and in allocation that counts the units of the limits (§4.4); the counters are in generated code, because the host can only count Wasm instructions and bytes of stack. The limit on how deep calls go must stop a run before the Wasm stack is used up: the stack given to a run is larger than the limit times the largest frame, or deep frames are on the heap.
+- **`ilang-host`.** Running a macro program with only the services of the compiler, and reporting when it goes over a limit.
+- **`ilang-package`.** `.is` files as modules; the error when a module has two files. The names of the files of the library, which today all end in `.i`.
+- **`ilang-cli`, `ilang-lsp`, editors.** `i fmt` for `.is` and `--to`; `i expand`; `i check` and the language server running macros; choosing the parser by the end of the file name, in place of taking only `.i` files; a grammar for `.is`; the package template; tests of the spec for the new sections. For `i test`, the functions of `i/syntax` (`node`, `make`, `same_code`, `show`, `show_as`, `definition`, and the functions of `Types`) are imports that the test runner of the CLI gives, because they need `ilang-syntax`, which `ilang-host` does not depend on (M2b).
 - **Library.** The module `i/syntax`.
+
+Some of this touches files that other streams own: the boundary, the entry kinds, and `emit/host.rs` (streams C and R2); the counters in `emit/control.rs` and the runtime (stream B); `ilang-host` (streams C and IO); and the per-expression tables (streams T1 to T3). Each of these parts of M2 is merged after those streams.
 
 ## References
 
@@ -647,7 +672,7 @@ This is not a small addition. Today the compiler reads all modules, resolves the
 - Kohlbecker, Friedman, Felleisen, Duba, *Hygienic Macro Expansion* (1986); Clinger, Rees, *Macros That Work* (1991); Dybvig, Hieb, Bruggeman, *Syntactic Abstraction in Scheme* (1992), for marks; Flatt, *Binding as Sets of Scopes* (2016).
 - Flatt, *Composable and Compilable Macros: You Want It When?* (2002), for running macros in a separate step.
 - Rafkind, Flatt, *Honu: Syntactic Extension for Algebraic Notation through Enforestation* (2012); Flatt and others, *Rhombus: A New Spin on Macros without All the Parentheses* (2023), for macros in a syntax that is not Lisp.
-- Burmako, *Scala Macros: Let Our Powers Combine!* (2013), for blackbox and whitebox macros.
+- Burmako, *Scala Macros: Let Our Powers Combine! On How Rich Syntax and Static Types Work with Metaprogramming* (2013), for macros in Scala. The names "blackbox" and "whitebox" seem to come later, from the documentation of Scala 2.11 (2014); this reference is likely wrong for them and must be checked.
 - Languages: Reason and OCaml (two syntaxes for one tree); Elixir (a macro call has the form of a call); Swift macros (macros in a sandbox that see only syntax, and macros that add items next to a declaration); Rust procedural macros and the `watt` project (macros as Wasm); Template Haskell `reify` and Nim `getImpl` (asking for definitions).
 
-The years and titles are from memory and must be checked before this text goes into the spec.
+The years, the titles, and what each work or language is said to do are from memory, here and in the body (the decisions, §11). Check all of them before this text goes into the spec.
