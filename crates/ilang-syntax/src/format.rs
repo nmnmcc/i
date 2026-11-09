@@ -13,8 +13,9 @@
 //! items, and the parts of brackets, where a break is a `,`), or where it is
 //! not a break at all (after an operator, `(`, `[`, `{`, `<<`, `->`, `=`, or
 //! before `|>`). Literals are printed as they are written in the source.
-//! Comments are put back where they were: trailing comments at the end of
-//! their line, and other comments on their own lines, in the same order.
+//! Comments are put back where they were, in the same order, and without the
+//! spaces at their ends (but documentation): trailing comments at the end of
+//! their line, and other comments on their own lines.
 
 use crate::ast::*;
 use crate::lexer::{Comment, lex};
@@ -526,10 +527,17 @@ impl<'a> Formatter<'a> {
         self.comments.get(self.next)
     }
 
+    /// The next comment, without the spaces at its end. The text of a `///`
+    /// or `////` comment is documentation, which is kept as it is: in
+    /// Markdown, spaces at the end of a line end the line.
     fn take(&mut self) -> Doc {
         let c = &self.comments[self.next];
         self.next += 1;
-        text(c.text.as_str())
+        if c.text.starts_with("///") {
+            text(c.text.as_str())
+        } else {
+            text(c.text.trim_end())
+        }
     }
 
     /// `label:` and the space after it, where lines of labels are aligned.
