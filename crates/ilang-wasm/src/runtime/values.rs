@@ -24,7 +24,7 @@ const CORE: &str = r#"
   (if (ref.is_null (local.get $v)) (then (return (i32.const 0))))
   (if (ref.test (ref i31) (local.get $v)) (then (return (i32.const 8))))
   (if (ref.test (ref $hostref) (local.get $v)) (then (return (i32.const 10))))
-  (struct.get $obj 0 (ref.cast (ref $obj) (local.get $v))))
+  (struct.get $val 0 (ref.cast (ref $val) (local.get $v))))
 ;; A host reference keeps its reference_id, which never changes (spec B.4).
 (func $host_ref_new (param $r externref) (result eqref)
   (struct.new $hostref (local.get $r) (call $host_reference_id (local.get $r))))
@@ -53,9 +53,7 @@ const CORE: &str = r#"
 (func $list_nil (result eqref)
   (global.get $value_empty_list))
 (func $list_cons (param $head eqref) (param $tail eqref) (result eqref)
-  (struct.new $obj (i32.const 6) (i32.const 0) (i64.const 0) (f64.const 0)
-    (ref.null $bytes) (array.new_fixed $values 2 (local.get $head) (local.get $tail))
-    (ref.null $limbs) (ref.null $call)))
+  (struct.new $cons (i32.const 6) (local.get $head) (local.get $tail)))
 (func $field (param $v eqref) (param $index i32) (result eqref)
   (array.get $values
     (ref.as_non_null (struct.get $obj 5 (ref.cast (ref $obj) (local.get $v))))
@@ -67,11 +65,11 @@ const CORE: &str = r#"
   (struct.new $obj (i32.const 4) (i32.const 0) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (local.get $fields) (ref.null $limbs) (ref.null $call)))
 (func $list_is_empty (param $v eqref) (result i32)
-  (ref.is_null (struct.get $obj 5 (ref.cast (ref $obj) (local.get $v)))))
+  (i32.eqz (ref.test (ref $cons) (local.get $v))))
 (func $list_head (param $v eqref) (result eqref)
-  (call $field (local.get $v) (i32.const 0)))
+  (struct.get $cons 1 (ref.cast (ref $cons) (local.get $v))))
 (func $list_tail (param $v eqref) (result eqref)
-  (call $field (local.get $v) (i32.const 1)))
+  (struct.get $cons 2 (ref.cast (ref $cons) (local.get $v))))
 (func $list_length (param $v eqref) (result eqref) (local $n i64)
   (block $done (loop $each
     (br_if $done (call $list_is_empty (local.get $v)))
@@ -95,11 +93,16 @@ const CORE: &str = r#"
         (i32.wrap_i64 (i64.shr_u (local.get $p) (i64.const 3))))
       (i32.sub (i32.const 7) (i32.wrap_i64 (i64.and (local.get $p) (i64.const 7)))))
     (i32.const 1)))
+;; The siblings still to compare: the parts of two `$values` arrays from
+;; index `i`, or, when the arrays are null, the tails of two lists.
 (type $compare_frame (struct
   (field (ref null $compare_frame))
-  (field (ref $values)) (field (ref $values)) (field (mut i32))))
+  (field (ref null $values)) (field (ref null $values)) (field (mut i32))
+  (field eqref) (field eqref)))
 (func $value_eq (param $a eqref) (param $b eqref) (result i32)
   (if (ref.eq (local.get $a) (local.get $b)) (then (return (i32.const 1))))
+  ;; Two small Ints are equal only when they are the same `i31ref`.
+  (if (call $both_small (local.get $a) (local.get $b)) (then (return (i32.const 0))))
   (i32.eqz (call $value_compare_i32 (local.get $a) (local.get $b))))
 ;; `==` (spec §11.4).
 (func $equal (param $a eqref) (param $b eqref) (result i32)
@@ -112,11 +115,19 @@ const CORE: &str = r#"
   (i32.sub (i32.gt_s (local.get $a) (local.get $b)) (i32.lt_s (local.get $a) (local.get $b))))
 (func $compare_i64 (param $a i64) (param $b i64) (result i32)
   (i32.sub (i64.gt_s (local.get $a) (local.get $b)) (i64.lt_s (local.get $a) (local.get $b))))
+;; Two small Ints that are not the same are compared at once, without
+;; a frame.
+(func $both_small (param $a eqref) (param $b eqref) (result i32)
+  (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b))))
+(func $compare_small (param $a eqref) (param $b eqref) (result i32)
+  (call $compare_i32 (i31.get_s (ref.cast (ref i31) (local.get $a)))
+                     (i31.get_s (ref.cast (ref i31) (local.get $b)))))
 (func $value_compare_i32 (param $a eqref) (param $b eqref) (result i32)
   (local $ka i32) (local $kb i32) (local $c i32)
   (local $oa (ref null $obj)) (local $ob (ref null $obj))
   (local $xa (ref null $values)) (local $xb (ref null $values))
   (local $pending (ref null $compare_frame))
+  (local $ca (ref null $cons)) (local $cb (ref null $cons)) (local $ha eqref) (local $hb eqref)
   (local $i i32) (local $na i32) (local $nb i32) (local $bit i64) (local $ba i64) (local $bb i64)
   ;; A frame records siblings still to compare, never a native call frame.
   ;; Primitive values and single remaining children need no allocation.
@@ -138,6 +149,28 @@ const CORE: &str = r#"
       ;; Identity values that are not ref.eq are different. The order between
       ;; them only has to be consistent within one comparison.
       (if (call $value_identity_kind (local.get $ka)) (then (return (i32.const 1))))
+      ;; Lists: [] comes first; else the heads, then the tails. Equal heads
+      ;; and small Ints need no frame.
+      (if (i32.eq (local.get $ka) (i32.const 6)) (then
+        (local.set $na (ref.test (ref $cons) (local.get $a)))
+        (local.set $nb (ref.test (ref $cons) (local.get $b)))
+        (if (i32.eqz (i32.and (local.get $na) (local.get $nb))) (then
+          (local.set $c (call $compare_i32 (local.get $na) (local.get $nb)))
+          (br $compared)))
+        (local.set $ca (ref.cast (ref $cons) (local.get $a)))
+        (local.set $cb (ref.cast (ref $cons) (local.get $b)))
+        (local.set $ha (struct.get $cons 1 (local.get $ca)))
+        (local.set $hb (struct.get $cons 1 (local.get $cb)))
+        (local.set $a (struct.get $cons 2 (local.get $ca)))
+        (local.set $b (struct.get $cons 2 (local.get $cb)))
+        (br_if $again (ref.eq (local.get $ha) (local.get $hb)))
+        (if (call $both_small (local.get $ha) (local.get $hb)) (then
+          (return (call $compare_small (local.get $ha) (local.get $hb)))))
+        (local.set $pending (struct.new $compare_frame (local.get $pending)
+          (ref.null $values) (ref.null $values) (i32.const 0) (local.get $a) (local.get $b)))
+        (local.set $a (local.get $ha))
+        (local.set $b (local.get $hb))
+        (br $again)))
       (local.set $oa (ref.cast (ref $obj) (local.get $a)))
       (local.set $ob (ref.cast (ref $obj) (local.get $b)))
       (if (i32.eq (local.get $ka) (i32.const 2)) (then
@@ -186,14 +219,21 @@ const CORE: &str = r#"
         (br $compared)))
       (local.set $a (array.get $values (local.get $xa) (local.get $i)))
       (local.set $b (array.get $values (local.get $xb) (local.get $i)))
+      (if (call $both_small (local.get $a) (local.get $b)) (then
+        (return (call $compare_small (local.get $a) (local.get $b)))))
       (local.set $i (i32.add (local.get $i) (i32.const 1)))
       (if (i32.or (i32.ne (local.get $na) (local.get $nb)) (i32.lt_u (local.get $i) (local.get $na)))
         (then (local.set $pending (struct.new $compare_frame (local.get $pending)
-          (ref.as_non_null (local.get $xa)) (ref.as_non_null (local.get $xb)) (local.get $i)))))
+          (local.get $xa) (local.get $xb) (local.get $i) (ref.null eq) (ref.null eq)))))
       (br $again))
     (if (local.get $c) (then (return (local.get $c))))
     (loop $resume
       (if (ref.is_null (local.get $pending)) (then (return (i32.const 0))))
+      (if (ref.is_null (struct.get $compare_frame 1 (local.get $pending))) (then
+        (local.set $a (struct.get $compare_frame 4 (local.get $pending)))
+        (local.set $b (struct.get $compare_frame 5 (local.get $pending)))
+        (local.set $pending (struct.get $compare_frame 0 (local.get $pending)))
+        (br $again)))
       (local.set $xa (struct.get $compare_frame 1 (local.get $pending)))
       (local.set $xb (struct.get $compare_frame 2 (local.get $pending)))
       (local.set $i (struct.get $compare_frame 3 (local.get $pending)))
@@ -214,6 +254,8 @@ const CORE: &str = r#"
         (br $resume)))
       (local.set $a (array.get $values (local.get $xa) (local.get $i)))
       (local.set $b (array.get $values (local.get $xb) (local.get $i)))
+      (if (call $both_small (local.get $a) (local.get $b)) (then
+        (return (call $compare_small (local.get $a) (local.get $b)))))
       (local.set $i (i32.add (local.get $i) (i32.const 1)))
       (if (i32.and (i32.eq (local.get $na) (local.get $nb)) (i32.eq (local.get $i) (local.get $na)))
         (then (local.set $pending (struct.get $compare_frame 0 (local.get $pending))))
@@ -271,6 +313,23 @@ const CORE: &str = r#"
       (local.set $word (call $host_id (local.get $v)))
       (local.set $h (call $hash_mix (call $hash_mix (local.get $h) (i32.wrap_i64 (local.get $word)))
         (i32.wrap_i64 (i64.shr_u (local.get $word) (i64.const 32)))))
+      (br $walk)))
+    ;; A list hashes as it did when its cells were `$obj` values with two
+    ;; parts: constructor id 0, type id 0, then the parts unless it is [].
+    (if (i32.eq (local.get $kind) (i32.const 6)) (then
+      (local.set $h (call $hash_mix (local.get $h) (i32.const 0)))
+      (local.set $h (call $hash_mix (call $hash_mix (local.get $h) (i32.const 0)) (i32.const 0)))
+      (br_if $walk (call $list_is_empty (local.get $v)))
+      (local.set $h (call $hash_mix (local.get $h) (i32.const 2)))
+      (if (i32.gt_u (i32.add (local.get $sp) (i32.const 2)) (array.len (local.get $stack))) (then
+        (if (i32.ge_u (array.len (local.get $stack)) (i32.const 268435456)) (then unreachable))
+        (local.set $grown (array.new_default $values
+          (i32.add (i32.shl (array.len (local.get $stack)) (i32.const 1)) (i32.const 2))))
+        (array.copy $values $values (local.get $grown) (i32.const 0) (local.get $stack) (i32.const 0) (local.get $sp))
+        (local.set $stack (local.get $grown))))
+      (array.set $values (local.get $stack) (local.get $sp) (call $list_tail (local.get $v)))
+      (array.set $values (local.get $stack) (i32.add (local.get $sp) (i32.const 1)) (call $list_head (local.get $v)))
+      (local.set $sp (i32.add (local.get $sp) (i32.const 2)))
       (br $walk)))
     (local.set $o (ref.cast (ref $obj) (local.get $v)))
     (if (i32.eq (local.get $kind) (i32.const 2)) (then

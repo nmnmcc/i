@@ -310,14 +310,11 @@ pub fn wat() -> String {
       ;; 3: the rest of a list; `index` is 1 after its first part.
       (if (i32.eq (local.get $kind) (i32.const 3))
         (then
-          (local.set $fields (struct.get $obj 5 (ref.cast (ref $obj) (local.get $value))))
-          (if (ref.is_null (local.get $fields))
+          (if (call $list_is_empty (local.get $value))
             (then (call $ib_byte (i32.const 93)) (br $next)))
           (if (local.get $index) (then (call $ib_comma)))
-          (call $inspect_push (i32.const 3)
-            (array.get $values (ref.as_non_null (local.get $fields)) (i32.const 1)) (i32.const 1))
-          (call $inspect_push (i32.const 0)
-            (array.get $values (ref.as_non_null (local.get $fields)) (i32.const 0)) (i32.const 0))
+          (call $inspect_push (i32.const 3) (call $list_tail (local.get $value)) (i32.const 1))
+          (call $inspect_push (i32.const 0) (call $list_head (local.get $value)) (i32.const 0))
           (br $next)))
 
       ;; 0: a value.
