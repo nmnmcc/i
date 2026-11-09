@@ -76,6 +76,8 @@ Node runs the same file with `node:wasi`. On this target:
 
 - `print` of the standard service `i:io/v1` writes to the standard output,
   and a stop writes its message to the standard error and exits with code 1.
+- The runtime imports `fd_write` and `proc_exit` of `wasi_snapshot_preview1`
+  itself, so a program may not import them; other WASI functions it may.
 - Every other host service and external function is still an import, encoded
   as in the spec's Appendix B. Give it with a module linked in, for example
   `wasmtime run --preload app:clock/v1=clock.wasm app.wasm`. Async host

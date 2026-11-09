@@ -66,6 +66,10 @@ pub struct Options {
 /// The namespace of the standard service `Io` (§9.7).
 pub const IO: &str = "i:io/v1";
 
+/// The WASI functions that the runtime imports on the WASI target (B.7).
+const WASI: &str = "wasi_snapshot_preview1";
+const WASI_RUNTIME: [&str; 2] = ["fd_write", "proc_exit"];
+
 /// How a constructor is represented (`runtime/mod.rs`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CtorRepr {
@@ -518,8 +522,9 @@ struct Lowerer<'a> {
     services: HashMap<TypeRef, u32>,
     /// The function that calls each import (B.4).
     import_funcs: HashMap<ImportId, FuncId>,
-    /// The function of each external function outside the library (§10.1).
-    external_funcs: HashMap<DefId, FuncId>,
+    /// The function of each external function outside the library (§10.1),
+    /// or `None` when it has a problem, which is told one time.
+    external_funcs: HashMap<DefId, Option<FuncId>>,
     out: ir::Program,
     diags: Vec<Diagnostic>,
 }
@@ -1031,8 +1036,14 @@ impl<'a> Lowerer<'a> {
     /// which calls its import.
     fn external_func(&mut self, d: DefId) -> Option<FuncId> {
         if let Some(&f) = self.external_funcs.get(&d) {
-            return Some(f);
+            return f;
         }
+        let f = self.make_external_func(d);
+        self.external_funcs.insert(d, f);
+        f
+    }
+
+    fn make_external_func(&mut self, d: DefId) -> Option<FuncId> {
         let def = self.program.def(d);
         let DefKind::External {
             module, function, ..
@@ -1053,9 +1064,7 @@ impl<'a> Lowerer<'a> {
                 // §11.4: each declaration is one value, so two declarations
                 // of one import have two functions, which call the same
                 // import.
-                let f = self.make_import_func(import);
-                self.external_funcs.insert(d, f);
-                Some(f)
+                Some(self.make_import_func(import))
             }
             Err(message) => {
                 self.error(d.module, def.span, message);
@@ -1076,6 +1085,12 @@ impl<'a> Lowerer<'a> {
         if module == "ilang:host/v1" {
             return Err(format!(
                 "the import module `{module}` is the module of the runtime imports (B.4)"
+            ));
+        }
+        if self.options.target == ir::Target::Wasi && module == WASI && WASI_RUNTIME.contains(&name)
+        {
+            return Err(format!(
+                "on the WASI target, the runtime imports `{module}` `{name}` itself, so a program may not import it (B.7)"
             ));
         }
         if let Some(i) = self

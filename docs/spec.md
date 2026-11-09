@@ -1187,6 +1187,7 @@ The custom section `ilang.abi` is UTF-8 JSON in this form:
 
 - It imports `fd_write` and `proc_exit` from `wasi_snapshot_preview1`, and not `panic` from `ilang:host/v1`. The stop message (§11.7) and a line feed are written to file descriptor 2, then the process ends with exit code 1. `reference_id` is imported from `ilang:host/v1` only when a type of an import or export is a custom type with no constructors, because only the host can make such a value.
 - `print` of the standard service `i:io/v1` (§9.7) is not an import: the module writes the text and a line feed to file descriptor 1. A write that fails is given up. The metadata does not list it.
+- Because the runtime imports `fd_write` and `proc_exit`, an external function or a field of a host service with the import module `wasi_snapshot_preview1` and one of these names is a compile error. Other functions of `wasi_snapshot_preview1` may be imported.
 - Every other host service and external function is an import as in §B.4, so a host that has them, or a module linked in with them, can give them.
 - A function of an async host service is a blocking import, with the results of a function that is not async (§B.2). Nothing is async, and there are no `ilang_resume:…` and `ilang_result:…` exports.
 - It exports `_start`, which calls `ilang_start` and then the program entry. The program must have a `@main`; if not, it is a compile error. When `_start` returns, the exit code is 0.

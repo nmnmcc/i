@@ -375,6 +375,41 @@ fn needs_an_entry_and_the_standard_print() {
     assert!(build_error(other).contains("has one function"));
 }
 
+/// The runtime imports `fd_write` and `proc_exit` itself (B.7), so a
+/// program may not import them, as an external function or as a field of
+/// a host service. Other WASI functions are imports like any other.
+#[test]
+fn the_wasi_imports_of_the_runtime_are_refused() {
+    let wasi_module = "wasi_snapshot_preview1";
+    for name in ["fd_write", "proc_exit"] {
+        let external = format!(
+            "@external(\"{wasi_module}\", \"{name}\")\nf: (code: String) -> Nil\n\
+             @main\nmain = () {{ f(\"x\") }}\n"
+        );
+        let e = build_error(&external);
+        assert!(e.contains("the runtime imports"), "{name}: {e}");
+        let service = format!(
+            "@host(\"{wasi_module}\")\nW {{ W({name}: (code: Bool) -> Nil) }}\n\
+             @main\nmain = (w ! W) {{ w.{name}(True) }}\n"
+        );
+        let e = build_error(&service);
+        assert!(e.contains("the runtime imports"), "{name}: {e}");
+    }
+    let other = format!(
+        "@external(\"{wasi_module}\", \"sched_yield\")\nyield: () -> Int\n\
+         @main\nmain = () {{ yield() }}\n"
+    );
+    let dir = package(&other);
+    let wasm = wasi(dir.path(), Level::O0);
+    assert!(imports(&wasm).contains(&(wasi_module.into(), "sched_yield".into())));
+    // On the target of the binary interface they are normal imports.
+    let dir = package(&format!(
+        "@external(\"{wasi_module}\", \"proc_exit\")\nexit: (code: Int) -> Nil\n\
+         @main\nmain = () {{ exit(0) }}\n"
+    ));
+    assert!(build(dir.path(), options(Level::O0, Target::Ilang)).is_ok());
+}
+
 #[test]
 fn only_wasi_modules_name_their_target() {
     let dir = package("@main\nmain = () { Nil }\n");
