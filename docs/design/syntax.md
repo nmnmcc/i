@@ -11,6 +11,7 @@ Status: draft for review (stream A0 of the redesign plan). When it is accepted, 
 - A type variable is an `UpName`, and it is declared after the name of its binding: `map(A, B) = …`. Type parameters of type definitions are `UpName`s too.
 - A lowercase name in a type is kept for "the type of a value" (stream T2). Until then it is a compile error.
 - `{ name: e, … }` is kept for records (stream T3).
+- The forms of macros in `docs/design/meta.md` are kept: `@m` and `@m(args)` before an item, a top-level item that is a call, and a call `m(…)` in a type. Until the macro streams, each is a compile error with a message.
 
 Decisions taken with the user:
 
@@ -27,11 +28,13 @@ Each part below has one of two marks after its heading. The mark is not part of 
 
 Sections not named here keep their text. In stream A2, their examples change to the new syntax, and so do the type variables in i code in them: in `i` blocks, in written types and type definitions, and in the types of library names. For example, `Result(a, e) { Ok(a) Error(e) }` in §4.2 becomes `Result(A, E) { Ok(A) Error(E) }`, and the types in the table of §9.4 change in the same way. The letters of the notation of §0 in the rules of §4, such as `a - U` in §4.4 and `∀a1 … an. T` in §4.8, are not i code and do not change.
 
+In §4, only the `i` blocks and the table of §4.2 are i code, so only they change, as in `List(A)` and `Result(A, E) { Ok(A) Error(E) }`. Every other type in §4 keeps its lowercase type variables as notation of §0, also when it is written in i syntax. So these do not change: `(x: a & Int) -> a` and `{ Yield(a) | n } - Yield(a)` in §4.4, `List(a)` and `Continuation(a, r, e, n)` in §4.5 rule 7, and `(x: a | Nil)` in §4.8. The type `Continuation(A, R, E, N)` in the table of §9.4 is i code, and it changes; by §0, the two ways of writing it say the same thing.
+
 ### 0. How to read this document (edits)
 
 A paragraph is added after the paragraph on EBNF:
 
-> In the rules and in the prose about types, a capital letter, alone or with a digit, such as `A`, `T`, `E`, `N`, or `P1`, stands for any type. A lowercase letter, alone or with a digit, such as `a`, `r`, or `b1`, stands for a type variable. This is notation of this document, not i syntax: in i code, a type variable is an `UpName` that is declared (§4.7), as in `id(A): (A) -> A`.
+> Inside a type in the rules and in the prose, a capital letter, alone or with a digit, such as `A`, `T`, `E`, `N`, or `P1`, stands for any type, and a lowercase letter, alone or with a digit, such as `a`, `r`, or `b1`, stands for a type variable. Outside a type, the letters keep the sense that the text gives them: in §4.8, for example, `C` is a constructor, `e` an expression, and `r` an expression or a name. This is notation of this document, not i syntax: in i code, a type variable is an `UpName` that is declared (§4.7), as in `id(A): (A) -> A`.
 
 ### 1.3 Names (full text)
 
@@ -51,6 +54,8 @@ char    = (* any Unicode scalar value but '"' and "\" *) .
 ### 1.4 Keywords (full text)
 
 i has no keywords. Every word is a `name` or an `UpName`, and any `name` may be used as a name. The forms that other languages make with keywords are made with brackets and symbols: imports and exports are groups at the start of a file (§2.2), matching is a call of a clause block (§6.12), and a guard is written with `?`.
+
+Some forms are kept for macros, which are not yet part of i: an attribute that is not built in, such as `@m` or `@m(args)` before an item (§2.2); a top-level item that is a call, `m(args)` or `a.m(args)` (§2.2); and, in a type, a lowercase name or `a.m` followed by `(` (§3). The parser reads each of them in full, and each is a compile error whose message says that the form is kept for macros.
 
 ### 1.7 Lines (full text)
 
@@ -88,9 +93,14 @@ The grammar becomes:
 File      = [ Imports ] [ Exports ] { Item } .
 Imports   = "(" ImportItem { "," ImportItem } [ "," ] ")" .
 Exports   = "(" ExportItem { "," ExportItem } [ "," ] ")" .
-Item      = { Attribute } ( TypeDef | Binding | Declaration ) .
-Attribute = "@" name [ "(" string_lit { "," string_lit } [ "," ] ")" ] .
+Item      = { Attribute } ( TypeDef | Binding | Declaration | MacroItem ) .
+Attribute = "@" [ name "." ] name [ Call ] .
+MacroItem = [ name "." ] name Call .
 ```
+
+A paragraph is added after the grammar:
+
+> `Call` is the call of §6.1, so the arguments of an attribute and of a `MacroItem` are read as expressions.
 
 The first paragraph, "A file has at most one `import` and at most one `export`. …", becomes:
 
@@ -101,9 +111,15 @@ The first paragraph, "A file has at most one `import` and at most one `export`. 
 >
 > A file has at most one imports group and at most one exports group. They come first, the imports before the exports. Neither may be empty: a file with nothing to import or export leaves the group out. A group in `( )` that is followed by `=` is a binding with a tuple pattern, as in `(even, odd) = …`. Any other group in `( )` at the top level is a compile error.
 >
-> An item with `@external` is a declaration (§10.1). Any other item that starts with an `UpName` is a type definition (§4.3). Every other item is a binding (§2.5).
+> An item with `@external` is a declaration (§10.1). Any other item that starts with an `UpName` is a type definition (§4.3). An item that is a call, `m(args)` or `a.m(args)`, with no `=` or `:` after its `)`, is a `MacroItem`. Every other item is a binding (§2.5).
+>
+> A `MacroItem` is kept for macros. It is a compile error, and the message says that a call at the top level is kept for macros.
 
-The paragraph "In one module, every top-level name is defined one time only. …", the paragraph "These are the attributes. …", and the list of the attributes keep their text.
+The paragraph "In one module, every top-level name is defined one time only. …" keeps its text. The paragraph "These are the attributes. …" becomes:
+
+> These are the attributes. An attribute whose name is one of them, with no module name before it, is that attribute, and its arguments must be strings. Any other attribute, such as `@m`, `@m(args)`, or `@a.m(args)`, is a macro before an item. It is kept for macros, and it is a compile error whose message says so. An attribute in another place, or one attribute given two times on one item, is a compile error.
+
+The list of the attributes keeps its text.
 
 ### 2.3 Imports (edits)
 
@@ -154,16 +170,29 @@ TypeParams  = "(" UpName { "," UpName } [ "," ] ")" .
 A paragraph is added after the grammar:
 
 > A binding whose pattern is one name, with or without a type, may declare type variables after the name (§4.7): `map(A, B) = …`, `id(A): (A) -> A = (x) { x }`. A declaration may declare them in the same way: `inspect(A): (A) -> String`.
+>
+> An item that starts with `name ( UpName { , UpName } )` and then `=` or `:` is always a binding or a declaration with type parameters. It is never a binding with a constructor pattern, though `f(A)` could also be read as one (§7.1). So `wrap(A) = (x: A) { Some(x) }` declares `A`. The same is true for a statement of a block (§6.1).
+>
+> An item that is a call, `m(args)` or `a.m(args)`, and has no `=` or `:` after its `)`, is not a binding. It is kept for macros (§2.2).
 
 The rest of the section keeps its text.
 
 ### 3. Type syntax (edits)
 
-The grammar keeps its text. The bullet "A `name` is a type variable. `_` is a hole that type inference fills in." becomes these bullets:
+In the grammar, the rule for `Prim` changes, and two rules are added after `NamedType`. The other rules keep their text.
+
+```
+Prim      = FnType | TupleType | NamedType | TypeCall | name | "_" | "{" Type "}" .
+TypeCall  = [ name "." ] name "(" [ TypeArg { "," TypeArg } [ "," ] ] ")" .
+TypeArg   = Type | int_lit | string_lit .
+```
+
+The bullet "A `name` is a type variable. `_` is a hole that type inference fills in." becomes these bullets:
 
 > - An `UpName` with no module name before it is a type variable when a type variable with that name is declared where the type is written (§4.7, §5), and a type when not. `_` is a hole that type inference fills in.
 > - A type variable takes no arguments: `A(Int)`, where `A` is a declared type variable, is a compile error.
-> - A lowercase `name` in a type is kept for a later use, the type of a value, and is a compile error. It is in the grammar, so a type with it is read in full, and the error says what the name is kept for.
+> - A lowercase `name` in a type with no `(` after it is kept for a later use, the type of a value, and is a compile error. It is in the grammar, so a type with it is read in full, and the error says what the name is kept for.
+> - A lowercase `name`, or `a.m` with a module name `a`, followed by `(` is a `TypeCall`. It is kept for macros, and is a compile error. It is in the grammar, so a type with it is read in full, and the error says that it is kept for macros.
 
 In the bullet on `{ }`, the example `(a) -> { (b) -> c } ! E` becomes `(A) -> { (B) -> C } ! E`. The other bullets keep their text.
 
@@ -252,7 +281,7 @@ RecordUpdate = Name "(" ".." Expr { "," name ":" Expr } [ "," ] ")" .
 
 - `( … )` that is not a call is a function when `{` or `->` comes after it, and a tuple when not (§1.7). So its parts are patterns in a function and expressions in a tuple. In a guard, a `->` that is not inside brackets always ends the clause head. So in `n ? (a) -> 1`, the guard is the tuple `(a)`, which is a compile error because a guard must be a `Bool`, and not a function.
 - A `{` that begins an expression begins a **clause block** when it is `{}`, or when its first statement is a clause (next bullet). When not, it begins a block. So `{ x }` is a block and `{ x -> x }` is a clause block.
-- To find whether the first statement is a clause, the longest pattern `p` at its start is read. When `p` is followed by `|`, `?`, or `->`, the statement is a clause, with one exception. The exception is a binding of a function: `p` is `n1 = … = nk = ( … )`, one or more names, each followed by `=`, and then a tuple pattern; after the `->` that follows `p`, the `->` part of a function, `Union [ "?" Union ] [ "!" Union ]` (§6.8), may be read in full; and a `{` comes after it on the same line. Then the statement is the binding of the pattern `n1 = … = nk` to the function that starts at `( … )`. When `p` is followed by anything else, the statement is not a clause. This test comes before the rule for bindings in the last bullet. So these are blocks:
+- To find whether the first statement is a clause, the longest pattern `p` at its start is read. When `p` is followed by `|`, `?`, or `->`, the statement is a clause, with one exception. The exception is a binding of a function: `p` is `n1 = … = nk = ( … )`, one or more names, each followed by `=`, and then a tuple pattern; after the `->` that follows `p`, the `->` part of a function, `Union [ "?" Union ] [ "!" Union ]` (§6.8), may be read in full; and a `{` comes after it on the same line. Then the statement is the binding of the pattern `n1 = … = nk` to the function that starts at `( … )`. When `p` is followed by anything else, the statement is not a clause, with one more exception. When the statement cannot be read as a correct expression, or its longest expression is followed by `->`, and a `->` that is not inside brackets comes before the next break or the `}`, the statement is a clause whose pattern is wrong. Then the `{` begins a clause block, and the error is the error of reading that pattern. So `x |> { -y -> 1 }` and `b |> { <<x: Int>> -> 1 }` give an error in the pattern, and not a block with a stray `->`. This test comes before the rule for bindings in the last bullet. So these are blocks:
   - `{ go = (n) -> Int { n + 1 }  go(1) }`
   - `{ go = (n) -> Int ? String ! Log { step(n) }  go(1) }`
 
@@ -263,13 +292,13 @@ RecordUpdate = Name "(" ".." Expr { "," name ":" Expr } [ "," ] ")" .
 - So in a first clause whose pattern is `name = ( … )`, a clause expression that is a function, such as `() { … }` or `(x) -> Int { x }`, would be read as the `->` part of a function and its body. There, such a function is put in a group: `{ p = (a, b) -> { () { log(p) } } }` is a clause block whose one clause gives a function with no parameters. The test above does not take `{ () { log(p) } }` as a type, because a type in `{ }` ends at its `}`, and a function in it has a `{` before that. Later clauses, and first clauses with other patterns, need no group: `hs |> { (name, _) -> (x) { log(name, x) }  _ -> (x) { x } }`.
 - A block whose first statement is a function with a `->` part that is not bound to a name, such as `{ (x) -> Int { x } … }`, is read as a clause block, with the pattern `(x)` and the expression `Int`. Such a function is bound to a name first: `g = (x) -> Int { x }`. A group does not help, because `{ (x) -> Int { x } }` is read in the same way.
 - A `{` followed by `name :` begins a clause block or a block when the pattern `name: Type` is followed by `=`, `->`, `?`, or `|`, as in `{ x: Int -> x }` and `{ x: Int = f()  x }`. When not, as in `{ name: e, … }`, it is kept for records, and is a compile error.
-- In a block, a statement that starts with a pattern and then `=` is a binding. When more than one such pattern may be read, the longest is taken: in `a = (x, y) = e`, the pattern is `a = (x, y)`. A statement that starts with `name ( UpName { , UpName } )` and then `=` or `:` is a binding with type parameters; the parser looks past the `)` to find the `=` or `:`. So `id(A) = …` and `id(A): (A) -> A = …` are bindings, and `send(Stop)` is an expression. A statement that starts with `!` is an environment statement. Every other statement is an expression.
+- In a block, a statement that starts with a pattern and then `=` is a binding. When more than one such pattern may be read, the longest is taken: in `a = (x, y) = e`, the pattern is `a = (x, y)`. A statement that starts with `name ( UpName { , UpName } )` and then `=` or `:` is a binding with type parameters; the parser looks past the `)` to find the `=` or `:`. Such a statement is never read as a binding with a constructor pattern, though `f(A)` could also be read as one (§7.1), and this is the same at the top level (§2.5). So `id(A) = …` and `id(A): (A) -> A = …` are bindings, `wrap(A) = (x: A) { Some(x) }` declares `A`, and `send(Stop)` is an expression. A statement that starts with `!` is an environment statement. Every other statement is an expression.
 
 ### 6.9 Operators (edits)
 
 "The right side of `|>` must be a name, a call, or a function." becomes "The right side of `|>` must be a name, a call, a function, or a clause block."
 
-Three bullets are added after the table:
+Three bullets are added after the bullet "`a |> f` is `f(a)`, …":
 
 > - `|>` is weaker than `+` and stronger than `<>`, comparisons, `&&`, and `||`. So a subject made with those operators is put in a group: `{ a == b } |> { True -> …  False -> … }`.
 > - `e |> { … }`, where the right side is a clause block, is a match (§6.12).
@@ -279,6 +308,7 @@ Three bullets are added after the table:
 
 These sentences change:
 
+- In the list of expressions that give the "not used" warning, "functions" becomes "functions, clause blocks".
 - In the list of expressions that give no "not used" warning, "a `case`" becomes "a match".
 - After "`p = e` is a binding.", this is added: "A binding whose pattern is one name, with or without a type, may declare type variables after the name, as in `twice(A) = (f: (A) -> A, x: A) { f(f(x)) }` and `id(A): (A) -> A = (x) { x }` (§4.7)."
 - "`(a, b) = v` with `v: (Int, Int) | Nil` is a compile error; `case` is used for this" becomes "`(a, b) = v` with `v: (Int, Int) | Nil` is a compile error; a match is used for this".
@@ -312,12 +342,13 @@ A clause block `{ clauses }` is a function of one parameter. When it is called w
 - The parameter of a clause block with one clause, no guard, and no choices has the label of its pattern, as in `(p) { e }` (§6.11): `{ n -> n }` has the label `n`, and `{ Some(u) -> u }` has none. The parameter of any other clause block has no label, also when its one clause has choices, as in `{ v = Ok(_) | v = Error(_) -> v }`.
 - A clause that can never be used gives a compile warning.
 - A clause block is a direct value (§6.10), as every function is. Its guards and clause expressions are its function body: where §2.5, §4.7, §5, and §6.10 speak of the function bodies in a value, they include them. So `loop = { 0 -> Done  n -> loop(n - 1) }` is correct: `loop` is not among its own needs, and as a local binding it may be used in its clause expressions.
+- Where this document speaks of a function expression, a clause block counts as one, unless the text says otherwise. So a clause block whose value is not used gives a compile warning (§6.10), and each time a clause block is worked out, it makes a new value, which is the same only as itself (§11.4).
 
 ### 7.1 Grammar (edits)
 
 These sentences change:
 
-- "In a `case` clause, `p: (Int, Int) -> e` is read as a function type, so a tuple type there is put in `{ }`, or a tuple pattern is used." becomes: "In a clause, `p: (Int, Int) -> e` is read as a function type, so a tuple type there is put in `{ }`, or a tuple pattern is used. In the same way, a `?` after a function type is part of the type, so a function type before a guard is put in `{ }`: `f: { (Int) -> Int } ? ok -> …`."
+- "In a `case` clause, `p: (Int, Int) -> e` is read as a function type, so a tuple type there is put in `{ }`, or a tuple pattern is used." becomes: "In a clause, `p: (Int, Int) -> e` is read as a function type, so a tuple type there is put in `{ }`, or a tuple pattern is used. In the same way, a `?` after a function type is part of the type, so a function type before a guard is put in `{ }`: `f: { (Int) -> Int } ? ok -> …`. In the first clause of a clause block, such a pattern has no `->` after it, so the `{` before it is kept for records (§6.1), and that is the compile error. Its message also says that a tuple type in a clause pattern is put in `{ }`."
 - "In a `case`, `x: T` tests the value." becomes: "In a clause block with more than one clause or with a guard, and in a pattern with choices, `x: T` tests the value. In a clause block with one clause, no guard, and no choices, the pattern is a parameter (§6.12), so `x: T` there is a type annotation."
 - "so in a `case`, `T` may not have a type variable as a member" becomes "so in a test, `T` may not have a type variable as a member".
 
@@ -341,6 +372,10 @@ When a pattern `x = C(…)` matches, `x` is known to be made by `C` where `x` ma
 
 "They must be in the `export` list of their module." becomes "They must be in the exports of their module."
 
+### 11.4 Equality (edits)
+
+In the bullet on functions, "the value made by one evaluation of a function expression" becomes "the value made by one evaluation of a function expression or a clause block". The rest of the section keeps its text.
+
 ### 11.6 Tail calls (full text)
 
 A call in tail position uses no more stack. Tail positions are: the last expression of a function body; the expression of a clause of a clause block that is called as a function, and not in a match, because that expression is the last thing the function works out; the expression of a clause of a match in tail position; the last expression of a block in tail position; and the right side of `&&` or `||` in tail position. An environment statement does not change which calls are in tail position.
@@ -360,8 +395,9 @@ So in `loop = { 0 -> Done  n -> loop(n - 1) }`, the call `loop(n - 1)` uses no m
   - Turn a lowercase variable into an `UpName`: take out each `_` and make the letter after it a capital, and make the first letter a capital. So `a` becomes `A`, `key` becomes `Key`, `e2` becomes `E2`, `key_type` becomes `KeyType`, and `_a` becomes `A`.
   - Declare it on the binding that owned it under the old §4.7 rule. When that binding has a type on its pattern, the declaration goes after the name and before the `:`: `id: (a) -> a = (x) { x }` becomes `id(A): (A) -> A = (x) { x }`. The labels stay as they are, because the annotation is not moved.
   - When the new name is a type that may be used in the module, such as `result` becoming `Result`, or is the same as another new name of the same binding, as `ab` and `a_b` both becoming `AB`, choose another name and report it.
+  - A type variable in a declaration with `@external` had no binding that owned it. Declare it after the name of the declaration, with the variables in the order of their first use in its type: `catch: (body: () -> a ? e ! n) -> Result(a, e) ! n` becomes `catch(A, E, N): (body: () -> A ? E ! N) -> Result(A, E) ! N`. This is needed for `inspect` and `hash` in `lib/i/core.i`, `catch` in `lib/i/fail.i`, and `boundary`, `resume`, and `cancel` in `lib/i/control.i`, and A2 searches for other such declarations.
   - When the binding that owned it has a pattern that is not one name, as in `(wrap, unwrap) = (…, …)`: inside another binding, declare the variable on the nearest binding of one name around it, and report it, because the local binding is then less general. At the top level, split the binding into one binding of one name for each part, when its value is a tuple with one part for each name, and declare the variables on each. When it cannot be split, report it, and leave it for the user to change.
-- **Matches in operator expressions.** The formatter's migration puts in a group (§6.9) every old `case` that is an operand of an operator of level 7 or 8 or of `-` or `-.`, or that has `.f`, `.k`, or a call after it. So `1 + case n { … }` becomes `1 + { n |> { … } }`, and `case x { _ -> 1 }.y` becomes `{ x |> { _ -> 1 } }.y`. It also puts each clause or statement whose pattern starts with `(`, `-`, or `-.` on a new line (§1.7).
+- **Matches in operator expressions.** The formatter's migration puts in a group (§6.9) every old `case` that is an operand of an operator of level 7 or 8 or of `-` or `-.`, or that has `.f`, `.k`, or a call after it. So `1 + case n { … }` becomes `1 + { n |> { … } }`, and `case x { _ -> 1 }.y` becomes `{ x |> { _ -> 1 } }.y`. It also puts the subject `S` of an old `case S { … }` in a group when the top operator of `S` is at level 1 to 5 (`||`, `&&`, `==`, `!=`, a comparison, or `<>`), because `|>` is stronger than these (§6.9): `case S { … }` becomes `{ S } |> { … }`. Without the group, `case times > 1 { … }` in the example `retry` of §9.1 would become `times > (1 |> { … })`, and `case a <> b { … }` would become `a <> (b |> { … })`, which may be correct code with another meaning. This is needed in §9.1, in `std/src/float.i`, and in the tests with `case got == want { … }`. It also puts each clause or statement whose pattern starts with `(`, `-`, or `-.` on a new line (§1.7).
 - **Guards after function types.** When a clause has a guard and its pattern ends in a type whose last part is a function type, the migration puts that function type in `{ }` before it writes `?` (§7.1). So `f: (Int) -> Int if ok -> 1` becomes `f: { (Int) -> Int } ? ok -> 1`, and `x: Int | (Int) -> Int if g -> …` becomes `x: Int | { (Int) -> Int } ? g -> …`. Without this, the `?` would be read as the error part of the function type, and with `! N` in the type, a `?` after it would be a compile error.
 - **First clauses that give a function.** When the first clause of an old `case` has a pattern `name = ( … )` and its expression is a function, the migration puts the function in a group (§6.1): `p = (a, b) -> () { log(p) }` becomes `p = (a, b) -> { () { log(p) } }`.
 - **Bare functions in prose.** An example function in prose that uses type variables and is not bound, such as `(x: a) -> a { x }` in §7.3, has no binding to declare them on. A2 writes it as the value of a binding that declares them: `id(A) = (x: A) -> A { x }`.
@@ -372,7 +408,14 @@ So in `loop = { 0 -> Done  n -> loop(n - 1) }`, the call `loop(n - 1)` uses no m
 - **Syntax error tests with no new form.** Some golden tests of syntax errors are correct code, or a different error, in the new syntax, so A2 removes or replaces them:
   - `crates/ilang-syntax/tests/golden/err_module_path.i`, `import (fail)`, becomes `(fail)`, which is an exports group, and the error becomes "`fail` is exported but not defined". The test moves to the checker. When an exported name that is not defined is the last part of a module path that the package may import, the message says that a module path has a `/`, as in `(i/fail)`.
   - `crates/ilang-syntax/tests/golden/err_case_brace.i`, `f = case x` with `{` on the next line, becomes `f = x |>` and then `{ … }` on the next line, which is correct, because a line that ends in an operator goes on (§1.7). The test is removed.
+  - `crates/ilang-syntax/tests/golden/err_clause_tuple_type.i`, `p |> { p: (Int, Int) -> e }`, now gives the error that `{ name: e }` is kept for records, with the note on tuple types (§7.1). Its `.out` file changes.
+  - `crates/ilang-syntax/tests/golden/err_pattern.i`, `x |> { -y -> 1 }`, and `crates/ilang-syntax/tests/golden/err_segment_type.i`, `b |> { <<x: Int>> -> 1 }`, keep their errors in the pattern, because a first statement that is not a correct expression and has a `->` after it is a clause whose pattern is wrong (§6.1). Their `.out` files are checked again.
+- **Empty imports and exports.** The old syntax allows `import ()` and `export ()`, but an empty group is a compile error in the new syntax (§2.2). The migration removes an empty `import ()` or `export ()`. `crates/ilang-syntax/tests/format/imports_empty.i` is changed to test the error for an empty group. The test in `crates/ilang-lsp/tests/protocol.rs` that changes `export (double)` into `export ()` removes the exports group instead, so that it still tests a module with no exports.
+- **Words that are no longer keywords.** `import`, `export`, `case`, and `if` are now normal names, so the tests and checks that reject them as keywords change:
+  - `crates/ilang-check/tests/projects/package_modules/src/if.i`, which expects E0623, is removed or given another bad name, and `expected.out` changes.
+  - `is_name` in `crates/ilang-package/src/lib.rs` no longer rejects these words, and the message in `crates/ilang-cli/src/commands/package.rs` no longer says "or a keyword". The tests that expect these words to fail, in `crates/ilang-package/tests/manifest.rs` (`name = "case"`) and in `crates/ilang-cli/tests/package_commands.rs` (`import` for `i new`, `case` for `i add`), use other bad names.
+  - The keyword completions in `crates/ilang-check/src/query.rs` (the loop over `case`, `if`, `import`, `export`) and the doc comment that mentions keywords are removed. The tests that expect `case` among the completions, in `query.rs` and in `crates/ilang-lsp/tests/protocol.rs`, change.
 - **What A2 changes.** Every `case`, `if` guard, `import (` and `export (` changes in stream A2, and so does every type variable in i code (see the start of the replacement text), such as `Result(a, e)` in §4.2 and the types in the table of §9.4, but not the notation of §0 in the rules of §4. The places are:
   - the spec, the library, `std`, the `.i` tests and their `.out` files, the README, the `i new` templates, and the editor grammar;
-  - i source in Rust strings and in Markdown files, which the `.i` formatter does not reach. At `dd3771d` these are `crates/ilang-check/tests/{codegen,hir,query,types}.rs`, `crates/ilang-cli/tests/commands.rs`, `crates/ilang-wasm/tests/codegen.rs`, `crates/ilang-lsp/tests/protocol.rs`, `crates/ilang-cli/src/commands/package.rs`, `bindings/javascript/README.md`, `docs/performance.md`, and `editors/vscode/README.md` (for example `import (i/core, c = (not) = i/core)` in `hir.rs`). A2 runs the migration on each such string, and checks again for others with a search for `case `, `import (` and `export (`.
+  - i source in Rust strings and in Markdown files, which the `.i` formatter does not reach. At `dd3771d` these are `crates/ilang-check/tests/{codegen,hir,query,types}.rs`, `crates/ilang-cli/tests/{commands,wasi,package_commands}.rs`, `crates/ilang-wasm/tests/codegen.rs`, `crates/ilang-lsp/tests/protocol.rs`, `crates/ilang-cli/src/commands/package.rs`, `bindings/javascript/README.md`, `docs/performance.md`, and `editors/vscode/README.md` (for example `import (i/core, c = (not) = i/core)` in `hir.rs`). A2 runs the migration on each such string, and checks again for others with a search for `case `, `import (` and `export (`. Some of these strings are `format!` templates, such as the `i new` templates in `crates/ilang-cli/src/commands/package.rs`, where `{{` and `}}` are i braces and `{name}` is a hole. They are not i source as written. A2 changes them by hand, and adds a test that renders each template and parses the result.
   - The tests in `crates/ilang-lsp/tests/protocol.rs` that point at places in the text: the line and column of each place are worked out again from the new text.
