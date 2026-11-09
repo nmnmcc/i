@@ -35,16 +35,95 @@ pub(crate) fn scheme(s: &Solver, t: &Ty, opts: Opts) -> Result<ShownType, ()> {
 /// The shown type of `t`, simplified together with the types in `context`:
 /// a variable that `t` shares with them is kept, as it is in the type
 /// scheme that they are part of, and only `t` is shown.
+///
+/// `context` is the type of a top-level binding (or the types of the names
+/// of its pattern), and a variable of `t` that is a variable of its shown
+/// type scheme has the name it has there. A variable on one side only of
+/// the scheme has no effect, and the scheme shows it as a name of its own:
+/// `t` shows it with that name too. The other variables of `t` have names
+/// that the scheme does not use.
 pub(crate) fn scheme_in(s: &Solver, t: &Ty, context: &[Ty], opts: Opts) -> Result<String, ()> {
+    let mut namer = Namer::new(s);
+    let scheme = match context {
+        [] => None,
+        [b] => scheme_names(s, b),
+        _ => scheme_names(s, &Ty::tuple(context.to_vec())),
+    };
     let mut parts = context.to_vec();
     parts.push(t.clone());
-    let whole = Ty::Con(super::Head::Tuple(parts.len() as u32), parts);
-    match simplify_with(s, &whole, None, opts)? {
-        Ty::Con(_, mut parts) => Ok(Namer::new(s)
-            .show(&parts.pop().ok_or(())?)
-            .text(&s.type_names)),
-        _ => Err(()),
+    let traced = trace(s, &Ty::tuple(parts), opts)?;
+    let (whole, origin) = traced.prepare();
+    let Ty::Con(_, parts) = whole else {
+        return Err(());
+    };
+    let t = parts.last().ok_or(())?;
+    if let Some(scheme) = scheme {
+        namer.taken = scheme.taken;
+        // The variables of `t` that stand for a variable of the scheme take
+        // its name, each name once.
+        let mut order = Vec::new();
+        roles(t, Role::Value, &mut order);
+        let mut used: HashMap<String, V> = HashMap::default();
+        for (x, _) in order {
+            let Some(key) = origin.get(&x).copied().or((x.0 < MARK).then_some(x)) else {
+                continue;
+            };
+            let Some((_, name)) = traced
+                .class(key)
+                .iter()
+                .filter_map(|m| scheme.names.get(m))
+                .min()
+            else {
+                continue;
+            };
+            if used.get(name).is_some_and(|k| *k != key) {
+                continue;
+            }
+            used.insert(name.clone(), key);
+            namer.names.insert(x, name.clone());
+        }
     }
+    namer.assign(t);
+    Ok(namer.tree(t).text(&s.type_names))
+}
+
+/// The names that the shown type scheme of `t` (the type of a top-level
+/// binding, named as [`scheme`] names it) gives to the type variables.
+struct SchemeNames {
+    /// For each variable that a name of the scheme stands for: the place of
+    /// the name in the scheme, and the name.
+    names: HashMap<V, (usize, String)>,
+    /// Every name of the scheme.
+    taken: HashSet<String>,
+}
+
+fn scheme_names(s: &Solver, t: &Ty) -> Option<SchemeNames> {
+    let opts = Opts {
+        mono: true,
+        written: false,
+    };
+    let traced = trace(s, t, opts).ok()?;
+    let (shown, origin) = traced.prepare();
+    let mut namer = Namer::new(s);
+    namer.assign(&shown);
+    let mut order = Vec::new();
+    roles(&shown, Role::Value, &mut order);
+    let mut names = HashMap::default();
+    for (i, (x, _)) in order.iter().enumerate() {
+        let Some(key) = origin.get(x).copied().or((x.0 < MARK).then_some(*x)) else {
+            continue;
+        };
+        let Some(name) = namer.names.get(x) else {
+            continue;
+        };
+        for m in traced.class(key) {
+            names.entry(m).or_insert_with(|| (i, name.clone()));
+        }
+    }
+    Some(SchemeNames {
+        names,
+        taken: namer.taken,
+    })
 }
 
 /// The shown type, as a type, for checks of what it uses.
@@ -60,6 +139,26 @@ pub(crate) fn simplify(s: &Solver, t: &Ty, keep: Option<u32>) -> Result<Ty, ()> 
 }
 
 fn simplify_with(s: &Solver, t: &Ty, keep: Option<u32>, opts: Opts) -> Result<Ty, ()> {
+    simplify_steps(s, t, keep, opts, None)
+}
+
+/// The steps of a simplification, to do them again.
+struct Steps {
+    /// The coalesced type, before the steps.
+    start: Ty,
+    /// Each variable replaced, and what it is replaced by.
+    steps: Vec<(V, Ty)>,
+    /// The variables of each cycle, by the variable that stands for them.
+    members: HashMap<V, Vec<V>>,
+}
+
+fn simplify_steps(
+    s: &Solver,
+    t: &Ty,
+    keep: Option<u32>,
+    opts: Opts,
+    mut record: Option<&mut Steps>,
+) -> Result<Ty, ()> {
     let rep = cycles(s, t, keep);
     let mut members: HashMap<V, Vec<V>> = HashMap::default();
     for (m, r) in &rep {
@@ -84,13 +183,142 @@ fn simplify_with(s: &Solver, t: &Ty, keep: Option<u32>, opts: Opts) -> Result<Ty
         written: opts.written,
     };
     let mut t = n.norm(t);
+    if let Some(r) = record.as_deref_mut() {
+        r.start = t.clone();
+        r.members = std::mem::take(&mut c.members);
+    }
     for _ in 0..64 {
         match n.step(&t) {
-            Some((v, by)) => t = n.norm(replace(&t, v, &by)),
+            Some((v, by)) => {
+                t = n.norm(replace(&t, v, &by));
+                if let Some(r) = record.as_deref_mut() {
+                    r.steps.push((v, by));
+                }
+            }
             None => break,
         }
     }
     Ok(t)
+}
+
+/// A variable that is a mark: the first is `MARK`. A variable on one side
+/// only is replaced by `Top`; a simplification done again with the same
+/// steps replaces it by its mark instead, which counts as `Top`, so that
+/// each `Top` of the result is known to stand for that variable.
+const MARK: u32 = 1 << 31;
+
+fn mark(v: V) -> V {
+    V(MARK + v.0)
+}
+
+/// `Top`, or a mark (which is `Top`).
+fn is_top(t: &Ty) -> bool {
+    match t {
+        Ty::Top => true,
+        Ty::Var(v) => v.0 >= MARK,
+        _ => false,
+    }
+}
+
+/// `a` and `b` are equal when each mark is `Top`.
+fn same_unmarked(a: &Ty, b: &Ty) -> bool {
+    let all = |xs: &[Ty], ys: &[Ty]| {
+        xs.len() == ys.len() && xs.iter().zip(ys).all(|(x, y)| same_unmarked(x, y))
+    };
+    match (a, b) {
+        _ if is_top(a) && is_top(b) => true,
+        (Ty::Con(h, xs), Ty::Con(g, ys)) => h == g && all(xs, ys),
+        (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => all(xs, ys),
+        (Ty::Fn(f), Ty::Fn(g)) => {
+            f.params.len() == g.params.len()
+                && f.params
+                    .iter()
+                    .zip(&g.params)
+                    .all(|(p, q)| p.0 == q.0 && same_unmarked(&p.1, &q.1))
+                && same_unmarked(&f.ret, &g.ret)
+                && same_unmarked(&f.err, &g.err)
+                && same_unmarked(&f.env, &g.env)
+        }
+        (Ty::Diff(x, h), Ty::Diff(y, g)) => same_unmarked(x, y) && all(h, g),
+        (Ty::Both(x, y), Ty::Both(z, w)) => same_unmarked(x, z) && same_unmarked(y, w),
+        _ => a == b,
+    }
+}
+
+/// A simplified type, with what its variables and its `Top`s stand for.
+struct Traced {
+    /// The simplified type, as `simplify_with` gives it.
+    shown: Ty,
+    /// `shown` with the `Top` that each variable on one side only became
+    /// written as its mark, when the steps done again give `shown`.
+    marked: Option<Ty>,
+    /// For each variable of `shown` or mark, the variables that it stands
+    /// for besides itself: those of its cycle, and those replaced by it.
+    classes: HashMap<V, Vec<V>>,
+}
+
+impl Traced {
+    /// The variables that `v` stands for.
+    fn class(&self, v: V) -> Vec<V> {
+        let mut out = vec![v];
+        out.extend(self.classes.get(&v).into_iter().flatten().copied());
+        out
+    }
+
+    /// The shown type as the names are given to it (`Namer::assign`), with
+    /// the variable of each `Top` that stands for a variable on one side
+    /// only.
+    fn prepare(&self) -> (Ty, HashMap<V, V>) {
+        let shown = prepare(&self.shown, &mut HashMap::default());
+        let mut origin = HashMap::default();
+        if let Some(m) = &self.marked
+            && prepare(m, &mut origin) == shown
+        {
+            return (shown, origin);
+        }
+        (shown, HashMap::default())
+    }
+}
+
+fn trace(s: &Solver, t: &Ty, opts: Opts) -> Result<Traced, ()> {
+    let mut r = Steps {
+        start: Ty::Never,
+        steps: Vec::new(),
+        members: HashMap::default(),
+    };
+    let shown = simplify_steps(s, t, None, opts, Some(&mut r))?;
+    let n = Norm {
+        s,
+        keep: None,
+        written: opts.written,
+    };
+    let mut classes = r.members;
+    for (rep, ms) in classes.iter_mut() {
+        ms.retain(|m| m != rep);
+    }
+    let mut u = r.start;
+    for (v, by) in r.steps {
+        let by = match by {
+            Ty::Top => Ty::Var(mark(v)),
+            Ty::Var(w) => {
+                let mut moved = classes.remove(&v).unwrap_or_default();
+                moved.push(v);
+                classes.entry(w).or_default().extend(moved);
+                Ty::Var(w)
+            }
+            by => {
+                classes.remove(&v);
+                by
+            }
+        };
+        u = n.norm(replace(&u, v, &by));
+    }
+    let marked = same_unmarked(&u, &shown).then_some(u);
+    Ok(Traced {
+        shown,
+        marked,
+        classes,
+    })
 }
 
 fn rigid(s: &Solver, keep: Option<u32>, v: V) -> bool {
@@ -379,7 +607,7 @@ impl Coalescer<'_> {
 pub(crate) fn both(t: &Ty) -> Ty {
     match t {
         Ty::Both(a, b) => {
-            if **b == Ty::Top {
+            if is_top(b) {
                 both(a)
             } else {
                 both(b)
@@ -443,6 +671,9 @@ impl Norm<'_> {
                 let (a, b) = (self.norm(*a), self.norm(*b));
                 if a == b {
                     a
+                } else if same_unmarked(&a, &b) {
+                    // Equal but for marks: the side with the marks.
+                    if b == Ty::Top { a } else { b }
                 } else {
                     Ty::Both(Box::new(a), Box::new(b))
                 }
@@ -472,7 +703,7 @@ impl Norm<'_> {
             if m == Ty::Never || out.contains(&m) {
                 continue;
             }
-            if m == Ty::Top {
+            if is_top(&m) {
                 return Ty::Top;
             }
             match m
@@ -503,7 +734,7 @@ impl Norm<'_> {
             .collect();
         if out.iter().any(|m| match m {
             Ty::Diff(a, h) => {
-                **a == Ty::Top
+                is_top(a)
                     && h.iter()
                         .all(|x| x.head().is_some_and(|y| full.contains(&y)))
             }
@@ -524,7 +755,7 @@ impl Norm<'_> {
             Ty::Con(h, args) => {
                 let vs = self.s.variances(*h, args.len());
                 args.iter().zip(vs).all(|(a, v)| match v {
-                    Variance::Co => *a == Ty::Top,
+                    Variance::Co => is_top(a),
                     Variance::Contra => *a == Ty::Never,
                     Variance::Bi => true,
                     Variance::Inv => false,
@@ -532,7 +763,7 @@ impl Norm<'_> {
             }
             Ty::Fn(f) => {
                 f.params.iter().all(|p| p.1 == Ty::Never)
-                    && [&f.ret, &f.err, &f.env].iter().all(|x| **x == Ty::Top)
+                    && [&f.ret, &f.err, &f.env].iter().all(|x| is_top(x))
             }
             _ => false,
         }
@@ -595,7 +826,7 @@ impl Norm<'_> {
         let flat: Vec<Ty> = rest.into_iter().chain(unions).collect();
         let mut out: Vec<Ty> = Vec::new();
         for m in flat {
-            if m == Ty::Top || out.contains(&m) {
+            if is_top(&m) || out.contains(&m) {
                 continue;
             }
             if m == Ty::Never {
@@ -915,11 +1146,15 @@ impl<'s> Namer<'s> {
     }
 
     fn show(mut self, t: &Ty) -> ShownType {
-        // `Top` is a variable that has no effect: each gets its own name.
-        let mut next = u32::MAX;
-        let t = tops(&holes(&both(t)), &mut next);
+        let t = prepare(t, &mut HashMap::default());
+        self.assign(&t);
+        self.tree(&t)
+    }
+
+    /// A name for each variable of `t` (made by [`prepare`]) that has none.
+    fn assign(&mut self, t: &Ty) {
         let mut order = Vec::new();
-        roles(&t, Role::Value, &mut order);
+        roles(t, Role::Value, &mut order);
         // Written names first, then the others.
         for (v, _) in &order {
             if let Some(n) = self.s.vars.get(v.0 as usize).and_then(|s| s.name.clone())
@@ -936,9 +1171,11 @@ impl<'s> Namer<'s> {
             let n = self.fresh(*role);
             self.names.insert(*v, n);
         }
-        let names = self.names;
-        tree(&t, &mut |v| {
-            names.get(&v).cloned().unwrap_or_else(|| "_".into())
+    }
+
+    fn tree(&self, t: &Ty) -> ShownType {
+        tree(t, &mut |v| {
+            self.names.get(&v).cloned().unwrap_or_else(|| "_".into())
         })
     }
 
@@ -970,28 +1207,41 @@ impl<'s> Namer<'s> {
     }
 }
 
-fn tops(t: &Ty, next: &mut u32) -> Ty {
+/// `t` as its variables are named: `Top` is a variable that has no effect,
+/// and each gets its own variable, so its own name. The variable of a mark
+/// (which is `Top`) is in `origin` with the variable that the mark is of.
+fn prepare(t: &Ty, origin: &mut HashMap<V, V>) -> Ty {
+    let mut next = u32::MAX;
+    tops(&holes(&both(t)), &mut next, origin)
+}
+
+fn tops(t: &Ty, next: &mut u32, origin: &mut HashMap<V, V>) -> Ty {
+    let mut go = |x: &Ty| tops(x, next, origin);
     match t {
         Ty::Top => {
             *next -= 1;
             Ty::Var(V(*next))
         }
-        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(|x| tops(x, next)).collect()),
-        Ty::Union(xs) => Ty::Union(xs.iter().map(|x| tops(x, next)).collect()),
-        Ty::Inter(xs) => Ty::Inter(xs.iter().map(|x| tops(x, next)).collect()),
+        Ty::Var(m) if m.0 >= MARK => {
+            *next -= 1;
+            origin.insert(V(*next), V(m.0 - MARK));
+            Ty::Var(V(*next))
+        }
+        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(go).collect()),
+        Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
+        Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f
-                .params
-                .iter()
-                .map(|(l, p)| (l.clone(), tops(p, next)))
-                .collect(),
-            ret: tops(&f.ret, next),
-            err: tops(&f.err, next),
-            env: tops(&f.env, next),
+            params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
+            ret: go(&f.ret),
+            err: go(&f.err),
+            env: go(&f.env),
         })),
         // A part of `H` with no effect is written `_`.
-        Ty::Diff(a, h) => Ty::Diff(Box::new(tops(a, next)), h.clone()),
-        Ty::Both(a, b) => Ty::Both(Box::new(tops(a, next)), Box::new(tops(b, next))),
+        Ty::Diff(a, h) => Ty::Diff(Box::new(go(a)), h.clone()),
+        Ty::Both(a, b) => {
+            let a = go(a);
+            Ty::Both(Box::new(a), Box::new(go(b)))
+        }
         t => t.clone(),
     }
 }
@@ -1106,7 +1356,7 @@ fn outer_vars(t: &Ty, out: &mut HashSet<V>) {
 fn hide(t: &Ty, outside: &HashSet<V>, in_h: bool) -> Ty {
     let go = |x: &Ty| hide(x, outside, in_h);
     match t {
-        Ty::Var(v) if in_h && !outside.contains(v) => Ty::Top,
+        Ty::Var(v) if in_h && (v.0 >= MARK || !outside.contains(v)) => Ty::Top,
         Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(go).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
