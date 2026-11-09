@@ -68,6 +68,9 @@ enum Command {
         opt: u8,
         /// Only run the tests whose name has this text.
         filter: Option<String>,
+        /// Print how long each test takes to run, without the build.
+        #[arg(long)]
+        time: bool,
     },
 }
 
@@ -96,7 +99,8 @@ fn main() -> ExitCode {
             offline,
             opt,
             filter,
-        } => cmd_test(&project, opt, offline, filter.as_deref()),
+            time,
+        } => cmd_test(&project, opt, offline, filter.as_deref(), time),
     };
     match result {
         Ok(code) => code,
@@ -189,6 +193,7 @@ fn cmd_test(
     opt: u8,
     offline: bool,
     filter: Option<&str>,
+    time: bool,
 ) -> anyhow::Result<ExitCode> {
     let Some(b) = built(project, options(opt, true, offline)?)? else {
         return Ok(ExitCode::FAILURE);
@@ -203,19 +208,29 @@ fn cmd_test(
         .collect();
     let mut failed = 0;
     for name in &tests {
+        let start = (std::time::Instant::now(), cpu_seconds());
         let result = run_test(&program, name);
+        let took = if time {
+            let wall = start.0.elapsed().as_secs_f64();
+            match (start.1, cpu_seconds()) {
+                (Some(a), Some(b)) => format!(" ({wall:.3} s, cpu {:.2} s)", b - a),
+                _ => format!(" ({wall:.3} s)"),
+            }
+        } else {
+            String::new()
+        };
         match result {
-            TestResult::Passed => println!("pass {name}"),
+            TestResult::Passed => println!("pass {name}{took}"),
             TestResult::Stopped(stop) => {
                 failed += 1;
-                println!("FAIL {name}");
+                println!("FAIL {name}{took}");
                 for line in stop.to_string().lines() {
                     println!("  {line}");
                 }
             }
             TestResult::Failed(e) => {
                 failed += 1;
-                println!("FAIL {name}");
+                println!("FAIL {name}{took}");
                 println!("  {e:#}");
             }
         }
@@ -226,6 +241,19 @@ fn cmd_test(
     } else {
         ExitCode::FAILURE
     })
+}
+
+/// The processor time of the process so far (user and system), where the
+/// system tells it: on a busy machine it is steadier than the time taken.
+fn cpu_seconds() -> Option<f64> {
+    // Fields 14 and 15 of /proc/self/stat, after the command name in
+    // parentheses, in clock ticks of 1/100 s.
+    let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
+    let rest = &stat[stat.rfind(')')? + 2..];
+    let mut fields = rest.split(' ').skip(11);
+    let user: f64 = fields.next()?.parse().ok()?;
+    let system: f64 = fields.next()?.parse().ok()?;
+    Some((user + system) / 100.0)
 }
 
 /// Parses, resolves, and type checks every module of the package, its

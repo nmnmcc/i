@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Builds the release `i` and runs the benchmarks of `bench/` at `--opt 2`,
+# printing how long each one takes to run (without the build). See
+# docs/performance.md.
+#
+#   scripts/bench            all benchmarks
+#   scripts/bench sort       the benchmarks whose name has `sort`
+#
+# ILANG_GC=copying|drc|null picks the garbage collector (crates/ilang-host).
+set -euo pipefail
+cd "${ILANG_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+cargo build --release -p ilang-cli --quiet
+exec target/release/i test --project bench --opt 2 --time "$@"

@@ -1,0 +1,4 @@
+name = "bench"
+
+[dependencies]
+std = { path = "../std" }
