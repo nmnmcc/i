@@ -969,7 +969,7 @@ A Float is a finite IEEE 754 binary64 number. Results are rounded to the nearest
 - Ints are the same when their numbers are equal. Floats are the same when they are equal by IEEE 754, so `0.0 == -0.0`.
 - Strings are the same when their scalar values are equal. Codepoints are the same when their numbers are equal. Bit arrays are the same when their bits are equal.
 - Tuples, lists, and values of custom types are the same when they have the same constructor and their parts are the same, in order. Values with different type constructors, and tuples of different sizes, are never the same.
-- A function, a boundary, a continuation, and a host reference have no parts that may be looked at, so each is the same only as itself: the value made by one evaluation of a function expression, by one call of `control.boundary` or `control.suspend`, or one reference from the host (§B.4). A top-level function is worked out once (§2.5), so all its uses are the same value. In the same way, a constructor, a built-in function, and a library function are each one value. So two function expressions that are written the same way give values that are not the same.
+- A function, a boundary, a continuation, and a host reference have no parts that may be looked at, so each is the same only as itself: the value made by one evaluation of a function expression, by one call of `control.boundary` or `control.suspend`, or one reference from the host (§B.4). A top-level function is worked out once (§2.5), so all its uses are the same value. In the same way, a constructor, a built-in function, a library function, and each `@external` declaration are each one value; two declarations of one import are two values. So two function expressions that are written the same way give values that are not the same.
 
 ### 11.5 Comparing
 
@@ -1155,7 +1155,7 @@ So for an export, the host makes the parameter buffers with `ilang_alloc`, frees
 
 - **Host exports** (§10.2) have the name written in `[wasm].exports`, for example `app/math.add`, and are encoded as in §B.2.
 - **The program entry and tests** have the name `module path.function name`, no parameters, and no results.
-- A function that is both a host export and the program entry or a test is a compile error, because their export names would be the same.
+- A function that is both a host export and the program entry or a test, or both the program entry and a test, or a function named two times in `[wasm].exports`, is a compile error, because their export names would be the same.
 - **Async entry points** (§10.2) have the parameters above and one result, an `i32` **status**: 0 means done, 1 means waiting. When the status is 1, the program is waiting for exactly one host function that it has started. When that work is done, the host calls the export `ilang_resume:namespace:label` of that function. Its parameters are the results of the function as in §B.2, and its result is a status again. When the status is 0, the host calls the export `ilang_result:name` of the entry point, with no parameters, to get its results as in §B.2.
 - While an async entry point is waiting, the host may only call `ilang_resume:…`, `ilang_alloc`, and `ilang_free`.
 - When the program stops, the export traps after the `panic` import (§B.4). After a trap, the host may not use that instance of the module again; it makes a new instance and calls `ilang_start` on it.
