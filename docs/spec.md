@@ -1072,31 +1072,7 @@ These are normal functions: they are called, given, and compared like any other 
 
 ## Appendix A. Choices
 
-The rules below were chosen without a full discussion. Each one follows Gleam or TypeScript where that agrees with the ideas of i, and says why where it does not. Rules that were settled in discussion are not listed.
-
-1. Members of a union with the same type constructor are put together: `List(Int) | List(String)` is `List(Int | String)`. TypeScript keeps them apart, but principal types in MLsub need this, and it removes two special rules (§4.4).
-2. Types have intersections `&`, as in TypeScript, because principal types need them where values come in, as in `(x: a & Int) -> a` (§3, §4.4).
-3. In a written type, a union with two or more type variables may only be in an output place, an intersection with a type variable only in an input place, and the right side of `-` has no type variable, because inference cannot choose in the other places (§4.4).
-4. Function types with different numbers of parameters cannot be put together. TypeScript lets a function with fewer parameters stand for one with more; in i, as in Gleam, the number of parameters is part of the type (§4.4).
-5. A `case` is typed by places, and coverage is checked with the inferred types. A type test takes every value of its type constructor, because only type constructors are tested at run time (§4.8 rule 11, §7.1).
-6. Service arguments are compared as equal in an environment, not by direction. Without this, a function that needs `Yield(Int)` could be given a `Yield(Never)` (§4.5 rule 4, §9.2).
-7. A name bound by choices `p1 | p2` gets the union of its types, as narrowing does in TypeScript. Gleam needs the types to be the same (§7.2).
-8. In a call, an argument's expected type comes from the arguments before it, and function expressions with untyped parameters are typed last, as TypeScript does for such functions. An annotation's labels win over a function expression's own (§4.8).
-9. With choices and a guard, the choices are tried in order with the guard, as in Gleam (§6.12).
-10. The right side of `&&` or `||` in tail position is a tail position, as in Gleam and Erlang (§11.6).
-11. A constructor pattern with `..` counts as a catch-all at the fields it leaves out (§4.8 rule 11).
-12. Custom types with no constructors are one type constructor for type tests, as all function types are, because host references cannot be told apart at run time (§7.1).
-13. Top-level values are worked out as in Go: always the first binding, in the order of the source, whose needs are done (§2.5).
-14. A stop message always gives the position of the innermost expression, also a call in tail position, and a library call in tail position counts as a tail call (§11.7).
-15. `f(k)` of `suspend` gets the boundary's environment, and final functions during `cancel` get the environment of the place of `cancel` (§9.4).
-16. Each `@external` declaration is a value of its own, so two declarations of one import are not equal (§11.4).
-17. A trailing comma is allowed in every list in brackets, as in Gleam and TypeScript (§2.2, §3, §4.3, §6.1).
-18. A token that runs into a letter, digit, or `_`, as in `12px`, is a compile error, not two tokens (§1.5).
-19. A `?` or `!` that the nearest `->` cannot take is a compile error; `{ }` gives it to an outer arrow (§3).
-20. In a guard, `->` always ends the clause head, and a break inside a type group is a compile error (§1.7, §6.1).
-21. An attribute given two times on one item is a compile error, and a group `{ e }` of a direct value is a direct value (§2.2, §6.10).
-22. Errors, unwinding, and `suspend` use Wasm exception handling, which Chrome, Firefox, Safari, and Wasmtime all have. Frames are saved only while a `suspend` goes out through them, so a normal call allocates nothing (Appendix B.1).
-23. A host value is also not correct when the bits after the end of a bit array are not 0, or when a buffer, also an empty one, is not inside `memory` (Appendix B.2).
+This appendix lists the rules that were chosen without a full discussion, until they are confirmed. Each one says which rule of Gleam or TypeScript it follows, or why it does not. All choices so far have been confirmed, so the list is empty.
 
 ## Appendix B. The binary interface
 
