@@ -29,7 +29,7 @@ fn wat(source: &str) -> String {
         &graph,
         c.program.as_ref().unwrap(),
         c.types.as_ref().unwrap(),
-        Options { tests: false },
+        Options::default(),
     )
     .unwrap()
 }
@@ -40,7 +40,7 @@ fn wasm(source: &str) -> Result<Vec<u8>, Error> {
         &graph,
         c.program.as_ref().unwrap(),
         c.types.as_ref().unwrap(),
-        Options { tests: false },
+        Options::default(),
     )
 }
 

@@ -1,7 +1,7 @@
 //! Host services that come with the host (spec §9.7, §10.1).
 //!
-//! - [`standard`] is what `i run` and `i test` give every program. Today it
-//!   is one service, which a program declares like this:
+//! - [`standard`] is what `i run` and `i test` give every program: the
+//!   standard service of spec §9.7, which a program declares like this:
 //!
 //!   ```text
 //!   @host("i:io/v1")

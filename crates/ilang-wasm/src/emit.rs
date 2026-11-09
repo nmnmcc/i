@@ -492,9 +492,34 @@ pub fn wat(p: &Program) -> String {
              (field (ref null $call)) (field (ref $fn{n})))))"
         );
     }
-    m.push_str(runtime::HOST);
+    let wasi = p.target == Target::Wasi;
+    // A host reference can come into the program only through an import or
+    // an export whose types have one (B.2).
+    let references = p
+        .imports
+        .iter()
+        .map(|x| &x.abi)
+        .chain(p.exports.iter().filter_map(|e| e.abi.as_ref()))
+        .any(|abi| {
+            abi.params
+                .iter()
+                .chain(&abi.errors)
+                .chain([&abi.result])
+                .any(|t| *t == AbiType::Externref)
+        });
+    if wasi {
+        m.push_str(runtime::WASI_HOST);
+        if references {
+            m.push_str(runtime::WASI_REFERENCE_ID_IMPORT);
+        }
+    } else {
+        m.push_str(runtime::HOST);
+    }
     // The imports of B.4, before every definition.
     for (i, x) in p.imports.iter().enumerate() {
+        if x.kind == ImportKind::WasiStdout {
+            continue;
+        }
         let params: Vec<&str> = x
             .abi
             .params
@@ -517,6 +542,27 @@ pub fn wat(p: &Program) -> String {
                 format!(" (param {})", params.join(" "))
             }
         );
+    }
+    if wasi {
+        m.push_str(runtime::WASI_RUNTIME);
+        if !references {
+            m.push_str(runtime::WASI_REFERENCE_ID);
+        }
+        for (i, x) in p.imports.iter().enumerate() {
+            if x.kind == ImportKind::WasiStdout {
+                let _ = writeln!(
+                    m,
+                    "(func $imp{i} (param i32 i32) (call $wasi_line (i32.const 1) (local.get 0) (local.get 1)))"
+                );
+            }
+        }
+        if let Some(entry) = &p.entry {
+            let _ = writeln!(
+                m,
+                "(func (export \"_start\") (call $ilang_start) (call $entry_{}))",
+                export_id(entry)
+            );
+        }
     }
     m.push_str(runtime::wat());
     m.push_str(SUPPORT);
@@ -1461,7 +1507,7 @@ impl<'p> Emitter<'p> {
         let names: Vec<String> = self.p.constructors.iter().map(|m| self.string(m)).collect();
         let _ = writeln!(
             self.out,
-            "(func (export \"ilang_start\")\n\
+            "(func $ilang_start (export \"ilang_start\")\n\
              (call $sites_install (array.new_data $sites $site_data (i32.const 0) (i32.const {}))\n\
              (array.new_fixed $values {} {}))\n\
              (call $constructors_install (array.new_fixed $values {} {}))",
@@ -1524,9 +1570,10 @@ impl<'p> Emitter<'p> {
                 None => {
                     let call = self.call(&e.callee, &[], false, "(global.get $root_env)");
                     let site = e.site.map_or(-1, |s| s as i64);
+                    let id = export_id(&e.name);
                     let _ = writeln!(
                         self.out,
-                        "(func (export \"{name}\") (local $e eqref)\n\
+                        "(func $entry_{id} (export \"{name}\") (local $e eqref)\n\
                          (local.set $e (block $error (result eqref)\n\
                          (block $cancel (result eqref)\n\
                          (drop (try_table (result eqref) (catch $error $error) (catch $cancel $cancel) {call}))\n\
@@ -1887,4 +1934,18 @@ fn leb(out: &mut Vec<u8>, mut n: u64) {
         }
         out.push(byte | 0x80);
     }
+}
+
+/// The WAT id of the function of an entry point or test export: its name,
+/// with every byte that an id may not have written as `_` and its hex.
+fn export_id(name: &str) -> String {
+    let mut id = String::new();
+    for b in name.bytes() {
+        if b.is_ascii_alphanumeric() {
+            id.push(b as char);
+        } else {
+            let _ = write!(id, "_{b:02x}");
+        }
+    }
+    id
 }

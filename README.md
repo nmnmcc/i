@@ -39,6 +39,37 @@ embedder gives its own services with `ilang_host::HostImports` (Rust) or the
 `imports` option of `bindings/javascript/ilang.mjs`. The spec suite gives the
 services of `ilang_host::services::testing`, under `test:` namespaces.
 
+## Run on a stock Wasmtime
+
+`i build` makes a module for hosts of the i binary interface: `i run`, the
+Rust host `ilang_host`, and the JavaScript SDK. To make a WASI preview 1
+command instead, which any WASI host runs with no other step, build with
+`--target wasi` (§B.7 of the spec):
+
+```sh
+i build --project examples/hello --target wasi
+wasmtime run examples/hello/build/hello.wasm
+```
+
+Node runs the same file with `node:wasi`. On this target:
+
+- `print` of the standard service `i:io/v1` writes to the standard output,
+  and a stop writes its message to the standard error and exits with code 1.
+- Every other host service and external function is still an import, encoded
+  as in the spec's Appendix B. Give it with a module linked in, for example
+  `wasmtime run --preload app:clock/v1=clock.wasm app.wasm`. Async host
+  services are blocking calls.
+- The program needs a `@main`. Tests run only with `i test`, because each test
+  needs a new instance.
+- The host chooses how deep the stack may be. Wasmtime allows less than
+  `i run`, so deep recursion that is not in tail position stops earlier; give
+  `wasmtime run -W max-wasm-stack=33554432` for the 32 MiB of `i run`. Running
+  out of stack or memory has no stop message: Wasmtime prints its own error
+  and exits with code 134.
+- The engine needs WebAssembly GC, typed function references, tail calls, and
+  exception handling. Wasmtime turns these on by default from version 47 on
+  (tested with 50), with the Cranelift compiler, not Winch.
+
 ## Develop
 
 Install Nix and Devenv 2.4.0, fetch the Binaryen sources once, then enter the checkout:

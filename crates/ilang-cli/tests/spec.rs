@@ -194,6 +194,7 @@ fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
             tests: true,
             opt,
             offline: false,
+            target: Default::default(),
         },
     ) {
         Ok(b) => b,

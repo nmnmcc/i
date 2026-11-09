@@ -172,6 +172,7 @@ alias = add
                 tests: false,
                 opt,
                 offline: false,
+                target: Default::default(),
             },
         )
         .unwrap();
@@ -291,6 +292,7 @@ bits = (b: Bool) -> Nil ? BitArray {
                 tests: false,
                 opt,
                 offline: false,
+                target: Default::default(),
             },
         )
         .unwrap();
@@ -410,6 +412,7 @@ pure = (n: Int) { n + 1 }
                 tests: false,
                 opt,
                 offline: false,
+                target: Default::default(),
             },
         )
         .unwrap();
@@ -509,6 +512,7 @@ fn async_entry_points_and_needed_services() {
             tests: true,
             opt: Level::O0,
             offline: false,
+            target: Default::default(),
         },
     )
     .unwrap();
@@ -543,6 +547,7 @@ fn the_compiled_fixture_is_current() {
             tests: false,
             opt: Level::O2,
             offline: false,
+            target: Default::default(),
         },
     )
     .unwrap();
@@ -605,6 +610,7 @@ fn an_error_stops_a_test() {
                 tests: true,
                 opt,
                 offline: false,
+                target: Default::default(),
             },
         )
         .unwrap();
@@ -745,6 +751,7 @@ fn incorrect_host_answers_stop_in_the_module() {
             tests: false,
             opt: Level::O0,
             offline: false,
+            target: Default::default(),
         },
     )
     .unwrap();

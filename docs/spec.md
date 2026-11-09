@@ -577,6 +577,8 @@ The unary operators `-` (Int) and `-.` (Float) are stronger than all binary oper
 
 The statements of a block are done in order. The value of a block is the value of its last expression. The last statement may not be a binding or an environment statement. A block with only one expression puts it in a group: `{ a + b } * c`.
 
+An expression statement that is not the last, and whose working out can do nothing but make its value, gives a compile warning: its value is not used. These are literals, names, functions, and tuples, lists, constructor calls, `.f`, `.k`, `-`, and Int, Bool, String, and comparison operators made only of these. A call, `|>`, a `case`, a block, a bit array, and a Float operator, which may stop (§11.3), do not give the warning. So `assert 1 + 1 == 3`, which is the two statements `assert` and `1 + 1 == 3` (§1.7), gives two warnings.
+
 `p = e` is a binding. It works out `e` and matches it with the pattern `p`. The names in `p` may be used from the next statement.
 
 - The type of `e` must be a subtype of the pattern type of `p` (§4.8 rule 10). So `x: Int = e` says that `e` has the type `Int`, and `(a, b) = v` with `v: (Int, Int) | Nil` is a compile error; `case` is used for this.
@@ -912,6 +914,7 @@ Storage { Storage(read: (key: String) -> String ? String) }
 - With `@host("namespace", "async")`, the host does the functions **later**: the program waits at the call, and goes on from the call when the host gives a value or an error. In i code, such a call is a normal call.
 - A host service in the environment of an entry point (§10.2) is given by the host. Every field is the Wasm import with the import module `namespace` and the field label as its name, encoded as in Appendix B.
 - i code may also give a host service with an environment statement, for example to put a fake in its place in a test.
+- The namespace `i:io/v1` is the **standard service**, which every host gives: `@host("i:io/v1") Io { Io(print: (text: String) -> Nil) }`. `print` writes the text and a line feed to the standard output. A program declares it like any host service; a host service with this namespace and other fields is a compile error on the WASI target (§B.7).
 
 ## 10. The host boundary
 
@@ -1084,6 +1087,8 @@ This appendix lists the rules that were chosen without a full discussion, until 
 4. `core.bit_array_concat` is Gleam's `bit_array.concat`, with the same type. Its name has `bit_array_` before it because `concat` in `i/core` joins strings, as Gleam's `string.concat` does. As on Gleam's Erlang target, the parts may be any number of bits (§13).
 5. A `///` comment is the documentation of an item only when nothing but other comments and the item's attributes come between them. A `///` comment in other places, such as inside a function body, before `import`, or at the end of the file, documents nothing and is a normal comment. As in Gleam, it is not an error (§1.2).
 6. A `////` comment is the documentation of the module wherever it is in the file, also after `import` or between items. Gleam does the same. The lines of all such comments, in order, are the documentation (§1.2).
+7. A statement that is not the last and does nothing gives a warning, not an error (§6.10). Gleam also warns about an unused literal or pure value; TypeScript's `noUnusedExpressions` (in ESLint) is an error only when it is turned on. Calls are never warned about, also when their value is not `Nil`, as in Gleam, because a call may have an effect.
+8. The WASI target (§B.7) is a WASI preview 1 command, not a WASI 0.2 component. A command runs with `wasmtime run` and Node's `node:wasi` with no other step, and keeps the values of §B.2, so there is one binary interface. A component would need a second encoding of `Int`, `BitArray`, and errors in WIT. Gleam's JavaScript and Erlang targets are also chosen with `--target`, as here.
 
 ## Appendix B. The binary interface
 
@@ -1174,3 +1179,17 @@ The custom section `ilang.abi` is UTF-8 JSON in this form:
 - `entry` is `null` when the program has no `@main`. `tests` is empty unless tests were compiled.
 - `services` lists every host service function that the entry points need, and `externals` every external function.
 - The host must give every import in `services`, `externals`, and `ilang:host/v1` before it makes an instance of the module. If not, making the instance fails.
+- A module of the WASI target (§B.7) also has `"target": "wasi"`. Other modules have no `target`. A host of this appendix does not run a module with a `target`.
+
+### B.7 The WASI target
+
+`i build --target wasi` makes the module a WASI preview 1 command, which a WASI host such as `wasmtime run` or Node's `node:wasi` runs with no other step. It is the module of §B.1 to §B.6 with these changes:
+
+- It imports `fd_write` and `proc_exit` from `wasi_snapshot_preview1`, and not `panic` from `ilang:host/v1`. The stop message (§11.7) and a line feed are written to file descriptor 2, then the process ends with exit code 1. `reference_id` is imported from `ilang:host/v1` only when a type of an import or export is a custom type with no constructors, because only the host can make such a value.
+- `print` of the standard service `i:io/v1` (§9.7) is not an import: the module writes the text and a line feed to file descriptor 1. A write that fails is given up. The metadata does not list it.
+- Every other host service and external function is an import as in §B.4, so a host that has them, or a module linked in with them, can give them.
+- A function of an async host service is a blocking import, with the results of a function that is not async (§B.2). Nothing is async, and there are no `ilang_resume:…` and `ilang_result:…` exports.
+- It exports `_start`, which calls `ilang_start` and then the program entry. The program must have a `@main`; if not, it is a compile error. When `_start` returns, the exit code is 0.
+- Tests are not compiled: a test needs a new instance (§10.2), and a command runs one entry.
+
+When the program runs out of memory or stack (§11.7), there is no stop message: the host gives its own error. The host also decides how deep the stack may be, so ordinary recursion that is not in tail position may stop earlier than in another host.

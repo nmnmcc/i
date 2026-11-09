@@ -238,6 +238,61 @@ pub const HOST: &str = r#"
 (import "ilang:host/v1" "reference_id" (func $host_reference_id (param externref) (result i64)))
 "#;
 
+/// The imports of the WASI target (B.7), in the place of [`HOST`]. The
+/// definitions that go with them are [`WASI_RUNTIME`].
+pub const WASI_HOST: &str = r#"
+(import "wasi_snapshot_preview1" "fd_write" (func $wasi_fd_write (param i32 i32 i32 i32) (result i32)))
+(import "wasi_snapshot_preview1" "proc_exit" (func $wasi_proc_exit (param i32)))
+"#;
+
+/// On the WASI target, the `reference_id` import of [`HOST`], for a program
+/// that a host reference can come into (B.7).
+pub const WASI_REFERENCE_ID_IMPORT: &str = r#"
+(import "ilang:host/v1" "reference_id" (func $host_reference_id (param externref) (result i64)))
+"#;
+
+/// On the WASI target, `reference_id` for a program that no host reference
+/// can come into: the only reference it can see is null.
+pub const WASI_REFERENCE_ID: &str = r#"
+(func $host_reference_id (param $r externref) (result i64)
+ (if (ref.is_null (local.get $r)) (then (return (i64.const 0))))
+ (unreachable))
+"#;
+
+/// The definitions of the WASI target (B.7): `panic` writes the stop
+/// message and a line feed to the standard error and ends the process with
+/// exit code 1; `$wasi_line` writes a text and a line feed to a file
+/// descriptor. A write that fails is given up, as a write to a closed pipe.
+pub const WASI_RUNTIME: &str = r#"
+(func $wasi_write (param $fd i32) (param $address i32) (param $length i32)
+ (local $io i32) (local $written i32)
+ (local.set $io (call $alloc (i32.const 12)))
+ (block $done
+  (loop $more
+   (br_if $done (i32.eqz (local.get $length)))
+   (i32.store (local.get $io) (local.get $address))
+   (i32.store offset=4 (local.get $io) (local.get $length))
+   (br_if $done (call $wasi_fd_write (local.get $fd) (local.get $io) (i32.const 1)
+    (i32.add (local.get $io) (i32.const 8))))
+   (local.set $written (i32.load offset=8 (local.get $io)))
+   (br_if $done (i32.eqz (local.get $written)))
+   (local.set $address (i32.add (local.get $address) (local.get $written)))
+   (local.set $length (i32.sub (local.get $length) (local.get $written)))
+   (br $more)))
+ (call $free (local.get $io) (i32.const 12)))
+(func $wasi_line (param $fd i32) (param $address i32) (param $length i32)
+ (local $lf i32)
+ (call $wasi_write (local.get $fd) (local.get $address) (local.get $length))
+ (local.set $lf (call $alloc (i32.const 1)))
+ (i32.store8 (local.get $lf) (i32.const 10))
+ (call $wasi_write (local.get $fd) (local.get $lf) (i32.const 1))
+ (call $free (local.get $lf) (i32.const 1)))
+(func $host_panic (param $address i32) (param $length i32)
+ (call $wasi_line (i32.const 2) (local.get $address) (local.get $length))
+ (call $wasi_proc_exit (i32.const 1))
+ (unreachable))
+"#;
+
 /// The first constructor id that the code generator may use.
 pub const FIRST_CONSTRUCTOR: u32 = 16;
 

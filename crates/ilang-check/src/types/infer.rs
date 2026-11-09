@@ -1885,6 +1885,13 @@ impl<'a> Checker<'a> {
                 Stmt::Expr(e) if i + 1 == stmts.len() => return self.infer_k(e, expected),
                 Stmt::Expr(e) => {
                     self.infer(e);
+                    if has_no_effect(e) {
+                        self.warning(
+                            code::VALUE_NOT_USED,
+                            e.span,
+                            "this value is not used, and working it out does nothing",
+                        );
+                    }
                 }
                 Stmt::Env { ty, value, span } => {
                     // `! T = e1` and the rest `r`: `A ? E ! N1 | M - T`.
@@ -2322,5 +2329,44 @@ fn walk_variance(
             err.iter().chain(env).for_each(|x| go(x, v, acc));
         }
         TypeKind::Hole | TypeKind::Error => {}
+    }
+}
+
+/// Whether working out an expression can do nothing but make its value: it
+/// has no call, no `case`, no block, and no operation that may stop (§11.3).
+/// Such an expression is a mistake as a statement that is not the last, as
+/// in `assert 1 + 1 == 3`, which is the two statements `assert` and
+/// `1 + 1 == 3` (§1.7).
+fn has_no_effect(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Int(_)
+        | ExprKind::Float(_)
+        | ExprKind::String(_)
+        | ExprKind::Name(_)
+        | ExprKind::Fn(_) => true,
+        ExprKind::Tuple(items) => items.iter().all(has_no_effect),
+        ExprKind::List { items, rest } => {
+            items.iter().all(has_no_effect) && rest.as_deref().is_none_or(has_no_effect)
+        }
+        ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
+            has_no_effect(target)
+        }
+        ExprKind::Unary { op, expr } => *op == UnOp::Neg && has_no_effect(expr),
+        ExprKind::Binary { op, lhs, rhs } => {
+            !matches!(
+                op,
+                BinOp::Pipe | BinOp::AddFloat | BinOp::SubFloat | BinOp::MulFloat | BinOp::DivFloat
+            ) && has_no_effect(lhs)
+                && has_no_effect(rhs)
+        }
+        ExprKind::Call { callee, args } => {
+            matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_)))
+                && args.iter().all(|a| has_no_effect(&a.value))
+        }
+        ExprKind::BitArray(_)
+        | ExprKind::Block(_)
+        | ExprKind::Case { .. }
+        | ExprKind::RecordUpdate { .. }
+        | ExprKind::Error => false,
     }
 }

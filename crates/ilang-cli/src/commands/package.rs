@@ -849,6 +849,7 @@ fn crate_build(project: &Path) -> Result<Vec<u8>> {
         tests: true,
         opt: ilang_cli::Level::O0,
         offline: false,
+        target: Default::default(),
     };
     match ilang_cli::build(project, options) {
         Ok(b) => Ok(b.wasm),

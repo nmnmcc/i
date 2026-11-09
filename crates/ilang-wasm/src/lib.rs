@@ -22,7 +22,8 @@ use ilang_check::hir;
 use ilang_check::types::Typed;
 use ilang_package::{Diagnostic, PackageGraph};
 
-pub use lower::{Options, code};
+pub use ir::Target;
+pub use lower::{IO, Options, code};
 
 /// Why a program could not be compiled.
 #[derive(Debug)]

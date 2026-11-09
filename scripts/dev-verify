@@ -12,6 +12,7 @@ for level in 0 2; do
   "$CARGO_TARGET_DIR/release/i" test --project std --opt "$level"
   "$CARGO_TARGET_DIR/release/i" test --project examples/hello --opt "$level"
 done
+./scripts/wasi-smoke "$CARGO_TARGET_DIR/release/i"
 npm ci --ignore-scripts
 npm test
 npm run test:browser
