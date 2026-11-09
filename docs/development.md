@@ -119,3 +119,15 @@ change is ready. Differential checks compare the compiler's diagnostics, Wasm,
 and runtime results across both builds. Benchmark reports distinguish Blaze's
 Nix bootstrap and daemon cold start from repeated edits, and distinguish Rust
 developer iteration from compilation of i programs.
+
+## Editor support
+
+`i lsp` runs the language server (`crates/ilang-lsp`) on standard input and
+output. Its answers come from `ilang_check::query`. `editors/vscode` is the
+VS Code extension: its README says how to build it and run its tests
+(`npm test` checks the TextMate grammar against a snapshot of token scopes).
+
+Formatting (`textDocument/formatting`) calls
+`ilang_syntax::format::format_source` only when `ilang-lsp` is built with its
+cargo feature `format`, which is off by default; see
+`crates/ilang-lsp/src/format.rs` for how to switch it on.
