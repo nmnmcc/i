@@ -187,6 +187,40 @@ concat_unaligned_3_test = () {
 }
 
 @test
+concat_empty_list_test = () {
+  assert(bit_array.concat([]) == <<>>)
+  assert(bit_array.concat([<<>>, <<>>]) == <<>>)
+  Nil
+}
+
+@test
+concat_bits_test = () {
+  assert(bit_array.concat([<<1:u1>>, <<2:u2>>, <<255>>]) == <<223, 7:u3>>)
+  assert(bit_array.concat([<<5:u3>>, <<5:u3>>, <<5:u3>>]) == <<5:u3, 5:u3, 5:u3>>)
+  assert(bit_array.bit_size(bit_array.concat([<<0:u5>>, <<0:u5>>, <<0:u5>>])) == 15)
+  Nil
+}
+
+@test
+concat_slices_test = () {
+  case <<170, 85, 255>> {
+    <<_:u3, middle:bits(13), rest:bits>> -> {
+      assert(bit_array.concat([middle, rest, middle]) == <<middle:bits, rest:bits, middle:bits>>)
+      Nil
+    }
+    _ -> panic("no match")
+  }
+}
+
+@test
+concat_long_list_test = () {
+  parts = list.repeat(<<1:u1>>, 10_000)
+  assert(bit_array.bit_size(bit_array.concat(parts)) == 10_000)
+  assert(bit_array.concat(list.repeat(<<255>>, 3)) == <<255, 255, 255>>)
+  Nil
+}
+
+@test
 concat_complex_2_test = () {
   assert(bit_array.concat([<<-20:u6, 2>>, <<3:u4>>, <<7:u3>>, <<-1:u(64)>>])
     == <<176, 8, 255, 255, 255, 255, 255, 255, 255, 255, 31:u5>>)

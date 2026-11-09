@@ -5,8 +5,9 @@
 //// values), not bytes and not graphemes: `"é"` written as `e` and a
 //// combining accent is two codepoints. `byte_size` counts UTF-8 bytes.
 ////
-//// `to_upper`, `to_lower`, and `capitalise` change only the ASCII letters
-//// `a` to `z` and `A` to `Z`; other characters stay as they are. `trim` and
+//// `to_upper`, `to_lower`, and `capitalise` use the simple case mappings of
+//// Unicode (`core.to_upper` and `core.to_lower`): each codepoint changes to
+//// one codepoint, with no locale, so `"ß"` stays `"ß"`. `trim` and
 //// the other trim functions take out the characters of Unicode
 //// Pattern_White_Space: U+0009 to U+000D, U+0020, U+0085, U+200E, U+200F,
 //// U+2028, and U+2029.
@@ -110,17 +111,14 @@ split = (string: String, on: String) -> List(String) {
   case on {
     "" -> to_codepoint_strings(string)
     _ -> {
-      needle = core.codepoints(on)
-      go = (rest, current, acc) {
-        case rest {
-          [] -> list.reverse([from_reversed(current), ..acc])
-          [c, ..cs] -> case strip_prefix(rest, needle) {
-            Some(after) -> go(after, [], [from_reversed(current), ..acc])
-            None -> go(cs, [c, ..current], acc)
-          }
+      n = core.byte_size(on)
+      go = (from, acc) {
+        case core.index_of(string, on, from) {
+          Ok(at) -> go(at + n, [byte_range(string, from, at), ..acc])
+          Error(_) -> list.reverse([byte_range(string, from, core.byte_size(string)), ..acc])
         }
       }
-      go(core.codepoints(string), [], [])
+      go(0, [])
     }
   }
 }
@@ -129,14 +127,12 @@ from_reversed = (codepoints: List(UtfCodepoint)) -> String {
   core.from_codepoints(list.reverse(codepoints))
 }
 
-// The rest of `list` after `prefix`, when `list` starts with `prefix`.
-strip_prefix = (list: List(UtfCodepoint), prefix: List(UtfCodepoint)) -> Option(List(UtfCodepoint)) {
-  case prefix {
-    [] -> Some(list)
-    [p, ..ps] -> case list {
-      [c, ..cs] if c == p -> strip_prefix(cs, ps)
-      _ -> None
-    }
+// The bytes of `string` from byte `start` to byte `end`, which are
+// character boundaries, as `core.index_of` gives them.
+byte_range = (string: String, start: Int, end: Int) -> String {
+  case core.byte_slice(string, start, end - start) {
+    Ok(part) -> part
+    Error(_) -> ""
   }
 }
 
@@ -149,18 +145,12 @@ strip_prefix = (list: List(UtfCodepoint), prefix: List(UtfCodepoint)) -> Option(
 split_once = (string: String, on: String) -> Option((String, String)) {
   case on {
     "" -> None
-    _ -> {
-      needle = core.codepoints(on)
-      go = (rest, current) {
-        case rest {
-          [] -> None
-          [c, ..cs] -> case strip_prefix(rest, needle) {
-            Some(after) -> Some((from_reversed(current), core.from_codepoints(after)))
-            None -> go(cs, [c, ..current])
-          }
-        }
-      }
-      go(core.codepoints(string), [])
+    _ -> case core.index_of(string, on, 0) {
+      Ok(at) -> Some((
+        byte_range(string, 0, at),
+        byte_range(string, at + core.byte_size(on), core.byte_size(string)),
+      ))
+      Error(_) -> None
     }
   }
 }
@@ -219,18 +209,10 @@ ends_with = (string: String, suffix: String) -> Bool {
 /// string.contains(does: "theory", contain: "ory")  // True
 /// ```
 contains = (does: String, contain: String) -> Bool {
-  m = core.byte_size(contain)
-  last = core.byte_size(does) - m
-  go = (i) {
-    case i > last {
-      True -> False
-      False -> case core.byte_slice(does, i, m) == Ok(contain) {
-        True -> True
-        False -> go(i + 1)
-      }
-    }
+  case core.index_of(does, contain, 0) {
+    Ok(_) -> True
+    Error(_) -> False
   }
-  go(0)
 }
 
 /// Puts `with` in the place of every `each` in the string. When `each` is
@@ -316,9 +298,9 @@ pop_codepoint = (string: String) -> Option((String, String)) {
 /// string.crop("The Lone Gleamer", before: "Lone")  // "Lone Gleamer"
 /// ```
 crop = (from: String, before: String) -> String {
-  case split_once(from, before) {
-    Some((_, after)) -> before <> after
-    None -> from
+  case core.index_of(from, before, 0) {
+    Ok(at) -> byte_range(from, at, core.byte_size(from))
+    Error(_) -> from
   }
 }
 
@@ -352,33 +334,25 @@ remove_suffix = (from: String, matching: String) -> String {
   }
 }
 
-map_ascii = (string: String, from: Int, to: Int, shift: Int) -> String {
-  core.from_codepoints(list.map(core.codepoints(string), (c) {
-    n = core.codepoint_to_int(c)
-    case n >= from && n <= to {
-      True -> case core.int_to_codepoint(n + shift) {
-        Ok(d) -> d
-        Error(_) -> c
-      }
-      False -> c
-    }
-  }))
-}
-
-/// The string with the ASCII letters `a` to `z` in upper case. Other
-/// characters, also other letters, stay as they are.
+/// The string with every codepoint in upper case, by the simple uppercase
+/// mapping of Unicode. A codepoint with no such mapping, such as `ß`, stays
+/// as it is.
 ///
 /// ```i
-/// string.to_upper("héllo")  // "HéLLO"
+/// string.to_upper("héllo")  // "HÉLLO"
+/// string.to_upper("straße")  // "STRAßE"
 /// ```
-to_upper = (string: String) -> String { map_ascii(string, 97, 122, -32) }
+to_upper = (string: String) -> String { core.to_upper(string) }
 
-/// The string with the ASCII letters `A` to `Z` in lower case. Other
-/// characters, also other letters, stay as they are.
-to_lower = (string: String) -> String { map_ascii(string, 65, 90, 32) }
+/// The string with every codepoint in lower case, by the simple lowercase
+/// mapping of Unicode.
+///
+/// ```i
+/// string.to_lower("ΑΒΓ")  // "αβγ"
+/// ```
+to_lower = (string: String) -> String { core.to_lower(string) }
 
-/// The first codepoint in upper case and the rest in lower case, for ASCII
-/// letters only.
+/// The first codepoint in upper case and the rest in lower case.
 ///
 /// ```i
 /// string.capitalise("mamouna")  // "Mamouna"

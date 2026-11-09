@@ -63,28 +63,13 @@ byte_size = (bits: BitArray) -> Int { { core.bit_size(bits) + 7 } / 8 }
 /// The bits of `to`, then the bits of `suffix`.
 append = (to: BitArray, suffix: BitArray) -> BitArray { <<to:bits, suffix:bits>> }
 
-/// The bit arrays one after the other. The arrays are put together in
-/// pairs, then the pairs in pairs, and so on, so that a long list takes
-/// O(n log n) steps and not O(n²).
+/// The bit arrays one after the other, made with one copy. Their sizes may
+/// be any number of bits.
 ///
 /// ```i
 /// bit_array.concat([<<1>>, <<2, 3>>])  // <<1, 2, 3>>
 /// ```
-concat = (bit_arrays: List(BitArray)) -> BitArray {
-  case bit_arrays {
-    [] -> <<>>
-    [one] -> one
-    _ -> concat(pairs(bit_arrays, []))
-  }
-}
-
-pairs = (arrays: List(BitArray), acc: List(BitArray)) -> List(BitArray) {
-  case arrays {
-    [] -> reverse(acc)
-    [a] -> reverse([a, ..acc])
-    [a, b, ..rest] -> pairs(rest, [<<a:bits, b:bits>>, ..acc])
-  }
-}
+concat = (bit_arrays: List(BitArray)) -> BitArray { core.bit_array_concat(bit_arrays) }
 
 reverse = (list: List(a)) -> List(a) {
   go = (rest, acc) {

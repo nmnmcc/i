@@ -1982,6 +1982,14 @@ split_long_test = () {
 }
 
 @test
+split_unicode_needle_test = () {
+  assert(string.split("aéébé", on: "é") == ["a", "", "b", ""])
+  assert(string.split("abababc", on: "abc") == ["abab", ""])
+  assert(string.split("aaaa", on: "aa") == ["", "", ""])
+  assert(string.split("日本語", on: "本") == ["日", "語"])
+}
+
+@test
 split_once_more_test = () {
   assert(string.split_once("key=value=x", on: "=") == Some(("key", "value=x")))
   assert(string.split_once("novalue", on: "=") == None)
@@ -2017,6 +2025,24 @@ contains_more_test = () {
 }
 
 @test
+contains_and_crop_test = () {
+  assert(string.contains("aaaaaaab", "aaab"))
+  assert(core.not(string.contains("aaaaaaa", "aaab")))
+  assert(string.contains("𐐨𐐩", "𐐩"))
+  assert(string.crop("héllo wörld", before: "wö") == "wörld")
+  assert(string.crop("aaab", before: "ab") == "ab")
+  assert(string.crop("abc", before: "") == "abc")
+}
+
+@test
+search_long_test = () {
+  text = string.repeat("ab", 50_000) <> "abc"
+  assert(string.contains(text, "abc"))
+  assert(string.split_once(text, "abc") == Some((string.repeat("ab", 50_000), "")))
+  assert(string.replace(string.repeat("x,", 50_000), ",", "") == string.repeat("x", 50_000))
+}
+
+@test
 starts_ends_test = () {
   assert(string.starts_with("héllo", "hé"))
   assert(core.not(string.starts_with("héllo", "e")))
@@ -2038,11 +2064,42 @@ slice_more_test = () {
 }
 
 @test
-case_ascii_test = () {
-  assert(string.to_upper("héllo, wörld 1") == "HéLLO, WöRLD 1")
-  assert(string.to_lower("HÉLLO, WORLD") == "hÉllo, world")
+case_unicode_test = () {
+  assert(string.to_upper("héllo, wörld 1") == "HÉLLO, WÖRLD 1")
+  assert(string.to_lower("HÉLLO, WORLD") == "héllo, world")
   assert(string.capitalise("hELLO") == "Hello")
   assert(string.capitalise("") == "")
+}
+
+@test
+case_greek_and_cyrillic_test = () {
+  assert(string.to_upper("ωμέγα") == "ΩΜΈΓΑ")
+  assert(string.to_lower("ΩΜΈΓΑ") == "ωμέγα")
+  assert(string.to_upper("ς") == "Σ")
+  assert(string.to_upper("привет") == "ПРИВЕТ")
+  assert(string.to_lower("ПРИВЕТ") == "привет")
+  assert(string.capitalise("éCOLE") == "École")
+  assert(string.capitalise("ΑΘΗΝΑ") == "Αθηνα")
+}
+
+@test
+case_one_codepoint_for_one_test = () {
+  // ß has no simple uppercase mapping, so it stays.
+  assert(string.to_upper("straße") == "STRAßE")
+  assert(string.to_lower("ẞ") == "ß")
+  // No locale: dotless ı goes up to I, and I comes down to i.
+  assert(string.to_upper("ı") == "I")
+  assert(string.to_lower("I") == "i")
+  assert(string.to_lower("İ") == "i")
+  assert(string.length(string.to_upper("ßŉǰ")) == 3)
+}
+
+@test
+case_outside_the_basic_plane_test = () {
+  // Deseret.
+  assert(string.to_upper("𐐨𐐩") == "𐐀𐐁")
+  assert(string.to_lower("𐐀𐐁") == "𐐨𐐩")
+  assert(string.to_upper("a😀b") == "A😀B")
 }
 
 @test
