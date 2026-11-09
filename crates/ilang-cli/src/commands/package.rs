@@ -120,8 +120,8 @@ fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
     let files = [
         ("i.toml".to_string(), format!("name = \"{name}\"\n")),
         (".gitignore".to_string(), "/build/\n".to_string()),
-        ("src/main.i".to_string(), main_module(name)),
-        ("test/main_test.i".to_string(), test_module(name)),
+        ("src/main.i".to_string(), formatted(main_module(name))),
+        ("test/main_test.i".to_string(), formatted(test_module(name))),
     ];
     for (file, text) in &files {
         let p = dir.join(file);
@@ -134,6 +134,12 @@ fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
     println!("made the package `{name}` in `{}`", dir.display());
     println!("run it with `i run --project {}`", dir.display());
     Ok(ExitCode::SUCCESS)
+}
+
+/// The source as `i fmt` writes it, so that `i fmt --check` passes on a new
+/// package.
+fn formatted(source: String) -> String {
+    ilang_syntax::format::format(&source).unwrap_or(source)
 }
 
 fn main_module(name: &str) -> String {

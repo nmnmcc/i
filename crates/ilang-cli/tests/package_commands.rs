@@ -667,3 +667,13 @@ fn publish_compares_the_interface() {
     assert!(out.contains("git push origin v2.0.0"), "{out}");
     assert_eq!(tags(&dir), "v1.0.0\nv1.0.1\nv1.1.0\nv2.0.0");
 }
+
+// ---- Regression tests ----
+
+#[test]
+fn new_makes_files_that_are_formatted() {
+    let w = World::new();
+    w.ok(&["new", "demo"]);
+    let project = w.path().join("demo").display().to_string();
+    w.ok(&["fmt", "--check", "--project", &project]);
+}
