@@ -716,6 +716,13 @@ impl<'a> Query<'a> {
         self.fields_of_ctors(&ctors)
     }
 
+    /// The members that may be written after `base.`, where `base` is the
+    /// span of a name in the text of the module (the text need not have
+    /// the dot: it may be the text before the dot was written).
+    pub fn member_completions_of(&self, m: ModuleId, base: Span) -> Vec<Completion> {
+        self.member_completions(m, base)
+    }
+
     /// The members after `base.`.
     fn member_completions(&self, m: ModuleId, base: Span) -> Vec<Completion> {
         let text = self.text(m);

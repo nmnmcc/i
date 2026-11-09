@@ -6,6 +6,8 @@
 //! between the UTF-16 positions of LSP and the byte offsets of the compiler
 //! in [`position`].
 
+mod analysis;
+mod change;
 pub mod format;
 pub mod position;
 mod server;

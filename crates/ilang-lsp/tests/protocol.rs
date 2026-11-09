@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 use std::fs;
 use std::path::Path;
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 struct Client {
     conn: Connection,
@@ -23,10 +23,14 @@ const TIMEOUT: Duration = Duration::from_secs(30);
 
 impl Client {
     fn start() -> Client {
+        Client::with_debounce(Duration::from_millis(20))
+    }
+
+    fn with_debounce(debounce: Duration) -> Client {
         let (server, client) = Connection::memory();
         let handle = std::thread::spawn(move || {
             let options = Options {
-                debounce: Duration::from_millis(20),
+                debounce,
                 offline: true,
             };
             ilang_lsp::run(&server, options).unwrap();
@@ -114,6 +118,19 @@ impl Client {
         };
         let p: lsp::PublishDiagnosticsParams = serde_json::from_value(n.params).unwrap();
         p.diagnostics
+    }
+
+    /// Diagnostics for `uri` have come and have not been read, without
+    /// waiting for any.
+    fn has_diagnostics(&mut self, uri: &str) -> bool {
+        while let Ok(m) = self.conn.receiver.try_recv() {
+            if let Message::Notification(n) = m {
+                self.pending.push(n);
+            }
+        }
+        self.pending.iter().any(|n| {
+            n.method == lsp::notification::PublishDiagnostics::METHOD && n.params["uri"] == uri
+        })
     }
 
     fn open(&mut self, uri: &str, text: &str) {
@@ -515,5 +532,108 @@ fn completion_after_an_expression() {
             .collect();
         assert_eq!(labels, vec!["x", "y"], "after {to}");
     }
+    c.shutdown();
+}
+
+fn labels(r: &Value) -> Vec<&str> {
+    r.as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["label"].as_str().unwrap())
+        .collect()
+}
+
+/// While a package waits to be checked again after a change, hover and go
+/// to definition are answered from the last check where the text around
+/// the position has not changed; elsewhere they wait for a new check,
+/// which starts at once.
+#[test]
+fn answers_from_the_last_check() {
+    let dir = tempfile::tempdir().unwrap();
+    package(dir.path(), &[("src/main.i", MAIN), ("src/util.i", UTIL)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    // Long enough that no check starts by itself during the test.
+    let mut c = Client::with_debounce(Duration::from_secs(600));
+    c.open(&main, MAIN);
+    assert_eq!(c.diagnostics(&main), vec![]);
+    let started = Instant::now();
+    // A line before everything.
+    let edited = format!("\n{MAIN}");
+    c.change(&main, 2, &edited);
+    let (l, ch) = find(&edited, "add(1", 0);
+    let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch + 1));
+    let value = h["contents"]["value"].as_str().unwrap();
+    assert!(value.contains("add: (x: Int, y: Int) -> Int"), "{value}");
+    assert_eq!(h["range"]["start"], json!({ "line": l, "character": ch }));
+    let d = c.request::<lsp::request::GotoDefinition>(position_params(&main, l, ch));
+    let (dl, dch) = find(&edited, "add =", 0);
+    assert_eq!(d["range"]["start"], json!({ "line": dl, "character": dch }));
+    // Answered without a check: none has published problems.
+    assert!(!c.has_diagnostics(&main));
+    assert!(started.elapsed() < Duration::from_secs(300));
+    // New bindings at the end. In the new text, hover waits for a check,
+    // which publishes the new problem.
+    let edited = format!("{edited}extra = add(1, 2)\nbad = nope\n");
+    c.change(&main, 3, &edited);
+    let (l, ch) = find(&edited, "extra", 0);
+    let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch));
+    assert_eq!(h["contents"]["value"], "```i\nextra: Int\n```");
+    let diags = c.diagnostics(&main);
+    assert_eq!(diags.len(), 1, "{diags:?}");
+    assert_eq!(
+        diags[0].range.start,
+        lsp::Position::new(find(&edited, "nope", 0).0, 6)
+    );
+    c.shutdown();
+}
+
+/// Completion after a dot just written is answered at once: from the last
+/// check where it knows the name before the dot, else from a check of the
+/// text with a name after the dot, without waiting for the package to be
+/// checked again.
+#[test]
+fn completion_after_a_dot_just_written() {
+    let dir = tempfile::tempdir().unwrap();
+    let text = format!("{MAIN}\nmake = () -> User {{ User(\"a\", 1) }}\nm = make().name\n");
+    package(dir.path(), &[("src/main.i", &text), ("src/util.i", UTIL)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut c = Client::with_debounce(Duration::from_secs(600));
+    c.open(&main, &text);
+    assert_eq!(c.diagnostics(&main), vec![]);
+    let started = Instant::now();
+    for (version, (from, to)) in [("u.name", "u."), ("make().name", "make().")]
+        .into_iter()
+        .enumerate()
+    {
+        let typing = text.replace(from, to);
+        c.change(&main, version as i32 + 2, &typing);
+        let (l, ch) = find(&typing, to, 0);
+        let r =
+            c.request::<lsp::request::Completion>(position_params(&main, l, ch + to.len() as u32));
+        assert_eq!(labels(&r), vec!["name", "age"], "after {to}");
+    }
+    assert!(!c.has_diagnostics(&main));
+    assert!(started.elapsed() < Duration::from_secs(300));
+    c.shutdown();
+}
+
+/// Changes that come quickly one after the other are checked once.
+#[test]
+fn quick_changes_are_checked_once() {
+    let dir = tempfile::tempdir().unwrap();
+    package(dir.path(), &[("src/main.i", MAIN), ("src/util.i", UTIL)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut c = Client::with_debounce(Duration::from_millis(300));
+    c.open(&main, MAIN);
+    assert_eq!(c.diagnostics(&main), vec![]);
+    for i in 0..10 {
+        let text = format!("{MAIN}{}bad = nope\n", "\n".repeat(i));
+        c.change(&main, i as i32 + 2, &text);
+    }
+    let diags = c.diagnostics(&main);
+    assert_eq!(diags.len(), 1, "{diags:?}");
+    assert_eq!(diags[0].range.start.line, MAIN.lines().count() as u32 + 9);
+    std::thread::sleep(Duration::from_millis(900));
+    assert!(!c.has_diagnostics(&main));
     c.shutdown();
 }
