@@ -131,7 +131,7 @@ Modules in `test/` are only compiled when the tests of their package are run. Th
 
 In a module, the first part of a module path says which package the module is in. It must be one of these:
 
-- `i`, for the five **library modules** (§9, §13), which every compiler gives;
+- `i`, for the five **library modules** (§9, §13), which every compiler gives. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
 - the `name` of the module's own package;
 - a dependency name of the module's own package (§2.6); in a test module, also a dev-dependency name.
 
@@ -153,7 +153,7 @@ A file has at most one `import` and at most one `export`. They come first, `impo
 
 In one module, every top-level name is defined one time only. Two bindings may not bind the same name, two type definitions may not define the same type, and two constructors may not have the same name. A constructor and a top-level binding may not have the same name either, because they are in one space of names (§2.3).
 
-These are the attributes. Any other attribute, or an attribute in another place, is a compile error.
+These are the attributes. Any other attribute, an attribute in another place, or one attribute given two times on one item, is a compile error.
 
 - `@external("module", "function")`: on a declaration (§10.1). The module may not start with `ilang:`, which is kept for the runtime (§B.4).
 - `@host("namespace")` and `@host("namespace", "async")`: on a type definition (§9.7). The namespace may not start with `ilang:`.
@@ -585,7 +585,7 @@ The statements of a block are done in order. The value of a block is the value o
 
 `name = pattern` is itself a pattern (§7.1). So `a = (x, y) = e` binds `e` to `a` and to `(x, y)`.
 
-A **direct value** is an expression that is made without running any code: a function expression; a literal, also with `-` or `-.` before it; a name; or a tuple, a list, or a constructor call whose parts are direct values. When the value of a binding is a direct value, the names of the binding may also be used inside the function bodies in that value. This is the same for every binding, local or top-level. So a local function may call itself, and one tuple binding may make functions that call one another:
+A **direct value** is an expression that is made without running any code: a function expression; a literal, also with `-` or `-.` before it; a name; or a tuple, a list, a constructor call, or a group `{ e }` whose parts are direct values. When the value of a binding is a direct value, the names of the binding may also be used inside the function bodies in that value. This is the same for every binding, local or top-level. So a local function may call itself, and one tuple binding may make functions that call one another:
 
 ```i
 fact = (n) {
