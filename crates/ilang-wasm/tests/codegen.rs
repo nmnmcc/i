@@ -57,15 +57,19 @@ fn tail_calls_are_return_calls() {
         "loop = (n) {\n  case n {\n    0 -> 0\n    _ -> loop(n - 1)\n  }\n}\n\
                     other = (n) { loop(n) + 1 }\n\
                     either = (n) { n == 0 || other(n) == 1 }\n\
-                    @main\nmain = () { either(1) }\n",
+                    right = (n) { n == 0 || right(n - 1) }\n\
+                    @main\nmain = () { (either(1), right(1)) }\n",
     );
     let l = function(&text, "app/main.loop");
     assert!(l.contains("(return_call $f"), "{l}");
     let o = function(&text, "app/main.other");
     assert!(o.contains("(call $f") && !o.contains("return_call"), "{o}");
-    // The right side of `||` is not a tail position (§11.6).
+    // The right side of `||` in tail position is a tail position (§11.6),
+    // but a call inside it is not.
     let e = function(&text, "app/main.either");
     assert!(!e.contains("return_call"), "{e}");
+    let r = function(&text, "app/main.right");
+    assert!(r.contains("(return_call $f"), "{r}");
     // Every frame is left before a tail call (§11.7).
     assert!(l.contains("(call $shadow_leave)\n(return_call"), "{l}");
 }
@@ -129,13 +133,55 @@ fn not_supported_yet() {
         other => panic!("{:?}", other.map(|_| ())),
     };
     let found: Vec<(&str, String)> = codes(
-        "Clock { Clock(now: () -> Int) }\nf = (c ! Clock) { c.now() }\n@main\nmain = () {\n  ! Clock = Clock(() { 1 })\n  f()\n}\n",
+        "import (i/control)\nf = () { control.boundary((b) { 1 }) }\n@main\nmain = () { f() }\n",
     );
-    assert_eq!(found.len(), 2, "{found:?}");
+    assert_eq!(found.len(), 1, "{found:?}");
     assert!(found.iter().all(|(c, _)| *c == "E0701"));
     // Functions that are not used are not compiled.
     let ok = wasm(
-        "Clock { Clock(now: () -> Int) }\nf = (c ! Clock) { c.now() }\n@main\nmain = () { Nil }\n",
+        "import (i/control)\nf = () { control.boundary((b) { 1 }) }\n@main\nmain = () { Nil }\n",
     );
     assert!(ok.is_ok());
+}
+
+#[test]
+fn environments() {
+    let text = wat("Clock { Clock(now: () -> Int) }\n\
+         f = (c ! Clock) { c.now() }\n\
+         g = () {\n  ! Clock = Clock(() { 1 })\n  f()\n}\n\
+         @main\nmain = () { g() }\n");
+    // An environment parameter reads its slot (§9.2); `Assert` is slot 0.
+    let f = function(&text, "app/main.f");
+    assert!(
+        f.contains("(array.get $env (local.get $env) (i32.const 1))"),
+        "{f}"
+    );
+    // An environment statement makes a new environment for the rest of
+    // the block, and the tail call passes it.
+    let g = function(&text, "app/main.g");
+    assert!(
+        g.contains("(call $env_with (local.get $env) (i32.const 1)"),
+        "{g}"
+    );
+    assert!(g.contains("(return_call $f"), "{g}");
+    // The entry point starts with the root environment, and stops for an
+    // error that comes to it.
+    assert!(text.contains("(global.get $root_env)"), "{text}");
+    assert!(text.contains("(call $stop_error"), "{text}");
+}
+
+#[test]
+fn bindings_that_may_fail_report_to_assert() {
+    let text = wat("f = (r) {\n  Ok(v) = r\n  v\n}\n\
+         g = ((a, b)) { a + b }\n\
+         @main\nmain = () { (f(Ok(1)), g((1, 2))) }\n");
+    let f = function(&text, "app/main.f");
+    assert!(
+        f.contains("(array.get $env (local.get $env) (i32.const 0))"),
+        "{f}"
+    );
+    assert!(f.contains("$core_inspect"), "{f}");
+    // A pattern that can not fail has no test.
+    let g = function(&text, "app/main.g");
+    assert!(!g.contains("array.get $env"), "{g}");
 }

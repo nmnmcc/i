@@ -284,6 +284,7 @@ impl Checker<'_> {
             .filter(|i| fields[*i].0.is_none())
             .collect();
         let mut out: Vec<(&Pattern, usize)> = Vec::new();
+        let mut indices = Vec::new();
         for (j, a) in args.iter().enumerate() {
             let field = if j < unlabeled.len() {
                 Some(unlabeled[j])
@@ -310,6 +311,7 @@ impl Checker<'_> {
                     }
                 }
             };
+            indices.push(field.map_or(u32::MAX, |i| i as u32));
             if let Some(i) = field {
                 if out.iter().any(|o| o.1 == i) {
                     self.error(
@@ -322,6 +324,7 @@ impl Checker<'_> {
                 }
             }
         }
+        self.out.pattern_fields.insert((self.module, span), indices);
         if !spread && out.len() < fields.len() && out.len() == args.len() {
             self.error(
                 code::PATTERN_FIELDS,
@@ -345,6 +348,20 @@ impl Checker<'_> {
         let pat = coverage::fit_pat(self.p, q);
         self.useful(&[vec![pat]], &[Pat::Wild(None)], &[Col::of(t.clone())])
             .is_some()
+    }
+
+    /// A member that is a custom type with no constructors (§4.3).
+    fn no_constructors(&self, m: &Ty) -> bool {
+        matches!(m, Ty::Con(Head::Named(TypeRef::Custom(id)), _)
+            if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty()))
+    }
+
+    /// `may_fail` for the pattern of a binding or a parameter, kept for the
+    /// code generator (§6.10, §6.11).
+    pub fn binding_may_fail(&mut self, q: &Pattern, t: &Ty) -> bool {
+        let fails = self.may_fail(q, t);
+        self.out.may_fail.insert((self.module, q.span), fails);
+        fails
     }
 
     /// §7.5: `x = C(…)` in a binding or a parameter makes `x` known to be
@@ -746,8 +763,23 @@ impl Checker<'_> {
                     // Rule 11: the test takes every value of the type
                     // constructors of `T`, so those values must be in `T`:
                     // `B <: T | r - T`.
+                    // §7.1: custom types with no constructors cannot be
+                    // told apart at run time, so for a type test they all
+                    // count as one type constructor: a test of one takes
+                    // the values of all of them.
+                    let mut taken = members.clone();
+                    if members.iter().any(|m| self.no_constructors(m)) {
+                        for (i, t) in self.p.types.iter().enumerate() {
+                            if matches!(&t.body, TypeBody::Custom(cs) if cs.is_empty()) {
+                                let m = Ty::named(TypeRef::Custom(TypeId(i as u32)), Vec::new());
+                                if !taken.contains(&m) {
+                                    taken.push(m);
+                                }
+                            }
+                        }
+                    }
                     let r = self.s.fresh();
-                    let rest = self.s.diff(r, members.clone());
+                    let rest = self.s.diff(r, taken);
                     let mut want = members.clone();
                     want.push(rest);
                     let b = places[at].ty.clone();

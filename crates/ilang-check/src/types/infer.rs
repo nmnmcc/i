@@ -9,7 +9,7 @@
 use super::display;
 use super::known;
 use super::solve::{FailKind, Pol, Solver, builtin_variance};
-use super::{FnTy, Head, Ty, Typed, Variance};
+use super::{FnTy, Head, HostSignature, HostType, Ty, Typed, Variance};
 use crate::code;
 use crate::hir::*;
 use crate::resolve::subst;
@@ -228,7 +228,7 @@ impl<'a> Checker<'a> {
             let (a, k) = self.infer_k(&binding.value, &expected);
             knowns.push(k);
             self.fit(&binding.pattern, &a);
-            if self.may_fail(&binding.pattern, &a) {
+            if self.binding_may_fail(&binding.pattern, &a) {
                 self.add_env(Ty::named(self.b.assert, Vec::new()));
             }
             let (err, env) = self.pop_effects(binding.span);
@@ -411,9 +411,34 @@ impl<'a> Checker<'a> {
                 );
             }
         }
-        let errors_ok = known::members(&f.err).iter().all(|m| {
+        let error_members = known::members(&f.err);
+        let errors_ok = error_members.iter().all(|m| {
             matches!(m, Ty::Con(Head::Named(r), xs) if xs.is_empty() && (*r == self.b.nil || *r == self.b.bool_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
         });
+        // B.2: the signature that the code generator encodes.
+        let params: Option<Vec<HostType>> = f.params.iter().map(|p| self.host_part(&p.1)).collect();
+        let result = self.host_part(&f.ret);
+        let mut errors: Option<Vec<HostType>> = error_members
+            .iter()
+            .filter(|m| **m != Ty::Never)
+            .map(|m| self.host_part(m))
+            .collect();
+        if let Some(es) = &mut errors {
+            es.sort();
+            es.dedup();
+        }
+        if let (Some(params), Some(result), Some(errors), true) =
+            (params, result, errors, errors_ok)
+        {
+            self.out.host_exports.insert(
+                d,
+                HostSignature {
+                    params,
+                    result,
+                    errors,
+                },
+            );
+        }
         if !errors_ok {
             let e = show(self, &f.err);
             self.error(
@@ -424,6 +449,33 @@ impl<'a> Checker<'a> {
                 ),
             );
         }
+    }
+
+    /// The part of a host export signature for a type that the host can
+    /// take (§10.3, B.2).
+    fn host_part(&self, t: &Ty) -> Option<HostType> {
+        Some(match t {
+            Ty::Never => HostType::Never,
+            Ty::Con(Head::Named(TypeRef::Builtin(b)), _) => match b {
+                BuiltinType::Int => HostType::Int,
+                BuiltinType::Float => HostType::Float,
+                BuiltinType::String => HostType::String,
+                BuiltinType::BitArray => HostType::BitArray,
+                _ => return None,
+            },
+            Ty::Con(Head::Named(r @ TypeRef::Custom(id)), _) => {
+                if *r == self.b.nil {
+                    HostType::Nil
+                } else if *r == self.b.bool_ {
+                    HostType::Bool
+                } else if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty()) {
+                    HostType::Opaque(*id)
+                } else {
+                    return None;
+                }
+            }
+            _ => return None,
+        })
     }
 
     /// §10.3: a type that the host can take. `Never` has no values, so it
@@ -1831,7 +1883,7 @@ impl<'a> Checker<'a> {
                     let start = self.s.vars.len();
                     let t = self.param(pattern);
                     self.s.mark_inputs(start);
-                    fails |= self.may_fail(pattern, &t);
+                    fails |= self.binding_may_fail(pattern, &t);
                     let k = match known::top_written(pattern) {
                         Some(ty) => self.kconv(ty, &HashMap::new()),
                         None => expected.get(params.len()).cloned().unwrap_or(Ty::Top),
@@ -1959,7 +2011,7 @@ impl<'a> Checker<'a> {
         let expected = self.binding_expected(b);
         let (a, k) = self.infer_k(&b.value, &expected);
         self.fit(&b.pattern, &a);
-        if self.may_fail(&b.pattern, &a) {
+        if self.binding_may_fail(&b.pattern, &a) {
             self.add_env(Ty::named(self.b.assert, Vec::new()));
         }
         for (v, h) in holders {

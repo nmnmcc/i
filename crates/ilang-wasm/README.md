@@ -14,7 +14,9 @@ interface of Appendix B of the spec.
 - `src/emit.rs` writes WAT text with the runtime, which is assembled, and adds
   the `ilang.abi` custom section.
 
-The code is simple and not optimized: `ilang-binaryen` optimizes it. Effects
-(environments, errors, control, final functions), host services, and external
-functions are not supported yet; the code generator reports them with
-`E0701`.
+The code is simple and not optimized: `ilang-binaryen` optimizes it. The
+environment (§9.2), errors (§9.3), final functions (§9.5), and `Assert` (§9.6)
+are supported: `src/ir.rs` documents how. Control (§9.4), host services, and
+external functions are not supported yet; the code generator reports them with
+`E0701`. Until control comes, `assertion.catch` is an operation of the code
+generator, done with an exception, in place of its i source.

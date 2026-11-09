@@ -14,16 +14,31 @@
 //! A function of n parameters is the Wasm type
 //! `$fn_n = (func (param (ref null $obj) (ref null $env) eqref×n) (result eqref))`.
 //! The first parameter is its closure; its captures are the `$values` array
-//! in field 5 of the closure. The second is the environment, which is null
-//! until environments come (M5). A closure is a `$clo_n`, a subtype of `$obj`
-//! with tag 7, the arity in field 2, and a reference to the code after the
-//! eight `$obj` fields.
+//! in field 5 of the closure. The second is the environment (§9.2). A
+//! closure is a `$clo_n`, a subtype of `$obj` with tag 7, the arity in field
+//! 2, and a reference to the code after the eight `$obj` fields.
 //!
-//! # Later nodes
+//! # The environment (§9.2)
 //!
-//! Effects add statements here, not a new form: getting and pushing services
-//! of the environment, `raise` and catching errors (`try_table`), final
-//! functions on unwinding, and `boundary`, `suspend`, `resume`, and `cancel`.
+//! An environment is a `$env`, a GC array of `eqref` with one slot for each
+//! service type constructor of the program, by its service id. Slot
+//! [`ASSERT_SERVICE`] is `Assert`. Every call passes the environment of the
+//! place of the call: the `$env` parameter of the function, or the local made
+//! by the last environment statement of an enclosing block (`LetEnv`), which
+//! copies the array and sets one slot. Entry points start with the root
+//! environment, which has the `Assert` of the runtime (§9.6).
+//!
+//! # Errors and unwinding (§9.3, §9.5)
+//!
+//! Errors are the Wasm exception `$error (param eqref)`. Unwinding a
+//! computation for an `Assert` failure taken by `assertion.catch` is the
+//! exception `$cancel (param eqref)`, which `control.cancel` will also use.
+//! `fail.catch` takes only `$error`; `resource.ensure` takes both, runs its
+//! final function, and throws the same exception again. No handler takes
+//! anything else, so a stop (a trap) never runs handlers.
+
+/// The service id of `Assert` (§9.6).
+pub const ASSERT_SERVICE: u32 = 0;
 
 use num_bigint::BigInt;
 
@@ -45,6 +60,17 @@ pub enum LocalType {
     Value,
     I64,
     I32,
+    /// An environment, `(ref null $env)`.
+    Env,
+}
+
+/// The environment that a call gets (§9.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Env {
+    /// The environment of the running function.
+    Param,
+    /// A local of type `Env`, made by an environment statement.
+    Local(Local),
 }
 
 /// An operand: it is worked out without any effect, so it may be used more
@@ -110,6 +136,15 @@ pub enum Op {
         name: &'static str,
         arity: u32,
     },
+    /// `fail.raise(e)`: throws `$error`. It never gives a value.
+    Raise,
+    /// `fail.catch(body)`: `Ok` of the value, or `Error` of the error.
+    Catch,
+    /// `resource.ensure(body, with)`.
+    Ensure,
+    /// `assertion.catch(body)`: `Ok` of the value, or `Error` of the first
+    /// `Assert` failure (§9.6).
+    AssertCatch,
 }
 
 impl Op {
@@ -124,7 +159,15 @@ impl Op {
                 | Op::FloatDiv
                 | Op::Panic
                 | Op::Runtime { .. }
+                | Op::Catch
+                | Op::Ensure
+                | Op::AssertCatch
         )
+    }
+
+    /// Whether the operation calls i code, which gets the environment.
+    pub fn needs_env(self) -> bool {
+        matches!(self, Op::Catch | Op::Ensure | Op::AssertCatch)
     }
 }
 
@@ -145,8 +188,13 @@ pub enum Value {
     Call {
         callee: Callee,
         args: Vec<Atom>,
+        env: Env,
     },
     Op(Op, Vec<Atom>),
+    /// An operation that calls i code with this environment.
+    OpEnv(Op, Vec<Atom>, Env),
+    /// The service with this id in the environment (§9.2).
+    Service(Env, u32),
     Closure {
         func: FuncId,
         captures: Vec<Atom>,
@@ -303,6 +351,15 @@ pub enum Stmt {
     TailCall {
         callee: Callee,
         args: Vec<Atom>,
+        env: Env,
+    },
+    /// `dst` is `env` with the service `value` in the slot `service`: an
+    /// environment statement (§6.10, §9.2).
+    LetEnv {
+        dst: Local,
+        env: Env,
+        service: u32,
+        value: Atom,
     },
     Unreachable,
     /// Fills a capture of a closure made by a direct value, once the names of
@@ -374,13 +431,25 @@ impl AbiType {
     }
 }
 
+/// How a host export takes and gives values (B.2).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExportAbi {
+    pub params: Vec<AbiType>,
+    pub result: AbiType,
+    /// The members of the errors, in the canonical order.
+    pub errors: Vec<AbiType>,
+}
+
 /// An export of the module.
 #[derive(Clone, Debug)]
 pub struct Export {
     pub name: String,
     pub callee: Callee,
     /// `None` for the program entry and tests: no parameters and no results.
-    pub abi: Option<(Vec<AbiType>, AbiType)>,
+    pub abi: Option<ExportAbi>,
+    /// For the program entry and tests: the site of the binding, the only
+    /// position of the stop for an error that comes to it (§11.7).
+    pub site: Option<Site>,
 }
 
 /// One position of the site table: module index, line, column.
@@ -399,6 +468,8 @@ pub struct Program {
     pub constants: Vec<FuncId>,
     /// The number of globals for top-level values.
     pub globals: u32,
+    /// The number of service ids, at least 1 for `Assert` (§9.2).
+    pub services: u32,
     /// The code of `ilang_start` after the tables are installed.
     pub start: Option<Func>,
     pub exports: Vec<Export>,

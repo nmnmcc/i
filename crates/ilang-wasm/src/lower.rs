@@ -13,15 +13,22 @@
 //! - Every call, operator, and `<<` of the program source that may stop has a
 //!   site on the shadow stack (§11.7).
 //! - Top-level values are worked out in `ilang_start`, in `order.init` (§2.5).
+//! - Every call passes the environment of its place (§9.2): environment
+//!   parameters read a slot of it, and environment statements make a new one
+//!   for the rest of their block.
+//! - `fail.raise`, `fail.catch`, `resource.ensure`, and `assertion.catch` are
+//!   operations of the code generator (`emit.rs`); `fail.from_result`,
+//!   `fail.map_error`, `resource.acquire`, and `assert` are i code.
+//! - A binding or a parameter whose pattern may fail (the checker decides,
+//!   §7.3) calls `fail` of the `Assert` service when it does not match
+//!   (§6.10, §6.11).
 //!
-//! Effects come later. Environment parameters and statements, the modules
-//! `i/fail`, `i/control`, `i/resource`, and `i/assertion`, `assert`, and
-//! bindings that may fail are reported as not supported yet.
+//! `i/control` (§9.4) comes later and is reported as not supported yet.
 
 use crate::ir::Stmt;
 use crate::ir::{self, *};
 use ilang_check::hir::{self, *};
-use ilang_check::types::{Access, Head, Typed};
+use ilang_check::types::{Access, Head, HostType, Typed};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast::{BinOp, UnOp};
 use ilang_syntax::span::{LineIndex, Span};
@@ -143,6 +150,8 @@ struct Fx {
     pending: Option<HashSet<VarId>>,
     /// Captures to fill once those names are bound.
     patches: Vec<(Local, u32, VarId)>,
+    /// The environment of the place being lowered (§9.2).
+    env: Env,
 }
 
 impl Fx {
@@ -155,6 +164,7 @@ impl Fx {
             labels: 0,
             pending: None,
             patches: Vec::new(),
+            env: Env::Param,
         }
     }
 
@@ -217,38 +227,6 @@ fn ungroup(e: &Expr) -> &Expr {
         },
         _ => e,
     }
-}
-
-/// The label of a part of a constructor pattern (§7.1): the last name in the
-/// chain of `=` at its top.
-fn part_label(p: &Pattern) -> Option<&str> {
-    match &p.kind {
-        PatternKind::Var(b) => Some(&b.name),
-        PatternKind::Typed {
-            binder: Some(b), ..
-        } => Some(&b.name),
-        PatternKind::Named { binder, pattern } => {
-            part_label(pattern).or(Some(binder.name.as_str()))
-        }
-        _ => None,
-    }
-}
-
-/// §7.1: the parts of a constructor pattern and the fields they go to.
-fn match_fields<'p>(labels: &[Option<String>], args: &'p [Pattern]) -> Vec<(&'p Pattern, u32)> {
-    let unlabeled: Vec<usize> = (0..labels.len()).filter(|i| labels[*i].is_none()).collect();
-    let mut out = Vec::new();
-    for (j, a) in args.iter().enumerate() {
-        let field = if j < unlabeled.len() {
-            Some(unlabeled[j])
-        } else {
-            part_label(a).and_then(|l| labels.iter().position(|f| f.as_deref() == Some(l)))
-        };
-        if let Some(i) = field {
-            out.push((a, i as u32));
-        }
-    }
-    out
 }
 
 /// The names that a pattern binds.
@@ -511,6 +489,8 @@ struct Lowerer<'a> {
     site_map: HashMap<SitePos, Site>,
     module_index: HashMap<ModuleId, u32>,
     lines: HashMap<ModuleId, LineIndex<'a>>,
+    /// The service id of each service type constructor (§9.2).
+    services: HashMap<TypeRef, u32>,
     out: ir::Program,
     diags: Vec<Diagnostic>,
 }
@@ -540,12 +520,55 @@ impl<'a> Lowerer<'a> {
             site_map: HashMap::new(),
             module_index: HashMap::new(),
             lines: HashMap::new(),
+            services: HashMap::new(),
             out: ir::Program::default(),
             diags: Vec::new(),
         };
         l.find_packages();
         l.number_types();
+        l.number_services();
         l
+    }
+
+    /// One dense id for each service type constructor of the program:
+    /// `Assert` first, then the types of the environment parameters and
+    /// statements (§9.2).
+    fn number_services(&mut self) {
+        let prelude = self.program.prelude;
+        let assert = self
+            .program
+            .types
+            .iter()
+            .position(|t| Some(t.module) == prelude && t.name == "Assert")
+            .map(|i| TypeRef::Custom(TypeId(i as u32)));
+        let mut all: Vec<TypeRef> = self.typed.services.values().copied().collect();
+        let key = |t: &TypeRef| match t {
+            TypeRef::Custom(id) => (0, id.0),
+            TypeRef::Builtin(b) => (1, *b as u32),
+        };
+        all.sort_by_key(key);
+        all.dedup();
+        if let Some(a) = assert {
+            self.services.insert(a, ASSERT_SERVICE);
+        }
+        let mut next = ASSERT_SERVICE + 1;
+        for t in all {
+            if let std::collections::hash_map::Entry::Vacant(e) = self.services.entry(t) {
+                e.insert(next);
+                next += 1;
+            }
+        }
+        self.out.services = next;
+    }
+
+    /// The service id of the environment parameter or statement at `span`.
+    fn service(&self, module: ModuleId, span: Span) -> u32 {
+        self.typed
+            .services
+            .get(&(module, span))
+            .and_then(|t| self.services.get(t))
+            .copied()
+            .expect("a checked environment parameter or statement has a service")
     }
 
     /// The packages that are compiled: the library, the compiled package,
@@ -713,7 +736,13 @@ impl<'a> Lowerer<'a> {
             fx.module = b.module;
             fx.library = self.is_library(b.module);
             let value = self.expr(&mut fx, &mut out, &tb.binding.value);
-            self.bind(&mut fx, &mut out, &tb.binding.pattern, value);
+            self.bind_checked(
+                &mut fx,
+                &mut out,
+                &tb.binding.pattern,
+                value,
+                tb.binding.span.start,
+            );
             for &d in &tb.defs {
                 if let DefKind::Binding { var, .. } = self.program.def(d).kind {
                     let g = self.global(d);
@@ -759,10 +788,13 @@ impl<'a> Lowerer<'a> {
                 let d = b.defs[0];
                 let name = format!("{}.{}", m.path, program.def(d).name);
                 let callee = self.def_callee(d);
+                let fx = Fx::new(mid, false);
+                let site = self.site(&fx, b.binding.span.start);
                 self.out.exports.push(Export {
                     name: name.clone(),
                     callee,
                     abi: None,
+                    site,
                 });
                 if b.main {
                     entry = Some(name);
@@ -775,7 +807,7 @@ impl<'a> Lowerer<'a> {
         for &d in &program.host_exports {
             let module = program.module(d.module);
             let name = format!("{}.{}", module.path, program.def(d).name);
-            let Some((params, result, errors)) = self.host_signature(d) else {
+            let Some(sig) = self.typed.host_exports.get(&d) else {
                 self.error(
                     d.module,
                     program.def(d).span,
@@ -783,22 +815,18 @@ impl<'a> Lowerer<'a> {
                 );
                 continue;
             };
-            if !errors.is_empty() {
-                self.error(
-                    d.module,
-                    program.def(d).span,
-                    format!(
-                        "the host export `{name}` may give errors, which are not supported yet"
-                    ),
-                );
-                continue;
-            }
+            let abi = ExportAbi {
+                params: sig.params.iter().map(|t| abi_type(*t)).collect(),
+                result: abi_type(sig.result),
+                errors: sig.errors.iter().map(|t| abi_type(*t)).collect(),
+            };
             let callee = self.def_callee(d);
-            exports.push((name.clone(), params.clone(), result));
+            exports.push((name.clone(), abi.clone()));
             self.out.exports.push(Export {
                 name,
                 callee,
-                abi: Some((params, result)),
+                abi: Some(abi),
+                site: None,
             });
         }
         self.out.abi_json = abi_json(entry, &tests, &exports);
@@ -810,44 +838,6 @@ impl<'a> Lowerer<'a> {
         } else {
             Callee::Value(Atom::Global(self.global(d)))
         }
-    }
-
-    /// The types of a host export (B.2), read from its type scheme.
-    fn host_signature(&self, d: DefId) -> Option<(Vec<AbiType>, AbiType, Vec<AbiType>)> {
-        let scheme = self.typed.schemes.get(&d)?;
-        let (module, errors) = ilang_syntax::parse_module(&format!("x: {scheme}"));
-        if !errors.is_empty() {
-            return None;
-        }
-        let item = module.items.first()?;
-        let ilang_syntax::ast::ItemKind::Declaration { ty, .. } = &item.kind else {
-            return None;
-        };
-        let ilang_syntax::ast::TypeKind::Fn {
-            params, ret, err, ..
-        } = &ty.kind
-        else {
-            return None;
-        };
-        let params = params
-            .iter()
-            .map(|p| abi_type(&p.ty))
-            .collect::<Option<Vec<_>>>()?;
-        let result = abi_type(ret)?;
-        let mut errors = Vec::new();
-        if let Some(e) = err {
-            let members: Vec<&ilang_syntax::ast::TypeExpr> = match &e.kind {
-                ilang_syntax::ast::TypeKind::Union(ms) => ms.iter().collect(),
-                _ => vec![&**e],
-            };
-            for m in members {
-                if !matches!(&m.kind, ilang_syntax::ast::TypeKind::Named { name, .. } if name.name == "Never")
-                {
-                    errors.push(abi_type(m)?);
-                }
-            }
-        }
-        Some((params, result, errors))
     }
 
     // ---- Functions ----
@@ -909,7 +899,11 @@ impl<'a> Lowerer<'a> {
     ) -> Func {
         let mut fx = Fx::new(module, self.is_library(module));
         let mut out = Vec::new();
-        let arity = f.params.len() as u32;
+        let arity = f
+            .params
+            .iter()
+            .filter(|p| matches!(p, Param::Pattern { .. }))
+            .count() as u32;
         for _ in 0..arity {
             fx.local(LocalType::Value);
         }
@@ -921,16 +915,25 @@ impl<'a> Lowerer<'a> {
                 site: None,
             });
         }
-        for (i, p) in f.params.iter().enumerate() {
+        // Environment parameters are not parameters of the type (§6.6):
+        // the parameters of the code are the patterns, in order.
+        let mut next = 0;
+        for p in &f.params {
             match p {
                 Param::Pattern { pattern, .. } => {
-                    self.bind(&mut fx, &mut out, pattern, Atom::Local(i as Local))
+                    let v = Atom::Local(next);
+                    next += 1;
+                    self.bind_checked(&mut fx, &mut out, pattern, v, pattern.span.start);
                 }
-                Param::Env { name, .. } => self.error(
-                    module,
-                    name.span,
-                    "environment parameters are not supported yet (§9.2)",
-                ),
+                Param::Env { var, name, .. } => {
+                    let service = self.service(module, name.span);
+                    let l = fx.var(*var);
+                    out.push(Stmt::Let {
+                        dst: l,
+                        value: Value::Service(Env::Param, service),
+                        site: None,
+                    });
+                }
             }
         }
         self.block(&mut fx, &mut out, &f.body, true);
@@ -991,16 +994,23 @@ impl<'a> Lowerer<'a> {
         }
         let def = self.program.def(d);
         match m.path.as_str() {
-            "i/fail" | "i/control" | "i/resource" | "i/assertion" => Some(format!(
-                "`{}.{}` is not supported yet: errors, control, and final functions come later (§9)",
-                m.path.rsplit('/').next().unwrap_or(""),
+            "i/control" => Some(format!(
+                "`control.{}` is not supported yet: control comes later (§9.4)",
                 def.name
             )),
-            _ if def.name == "assert" => {
-                Some("`assert` is not supported yet: it needs the `Assert` service (§9.6)".into())
-            }
             _ => None,
         }
+    }
+
+    /// The library functions written in i that the code generator gives
+    /// itself, until what they use is supported: `assertion.catch` is
+    /// written with `i/control` (§9.6), and is done with an exception here.
+    fn intrinsic(&self, d: DefId) -> Option<(Op, u32)> {
+        let m = self.program.module(d.module);
+        (m.package == self.graph.library
+            && m.path == "i/assertion"
+            && self.program.def(d).name == "catch")
+            .then_some((Op::AssertCatch, 1))
     }
 
     /// The operation of an external function of the library.
@@ -1030,9 +1040,11 @@ impl<'a> Lowerer<'a> {
                 )),
                 None => Err(format!("`core.{function}` is not known")),
             },
-            "ilang:fail" | "ilang:control" | "ilang:resource" => Err(format!(
-                "`{}.{function}` is not supported yet: errors, control, and final functions come later (§9)",
-                module.trim_start_matches("ilang:")
+            "ilang:fail" if function == "raise" => Ok((Op::Raise, arity)),
+            "ilang:fail" if function == "catch" => Ok((Op::Catch, arity)),
+            "ilang:resource" if function == "ensure" => Ok((Op::Ensure, arity)),
+            "ilang:control" => Err(format!(
+                "`control.{function}` is not supported yet: control comes later (§9.4)"
             )),
             _ => Err(format!(
                 "the external function `{module}` `{function}` is not supported yet (§10.1)"
@@ -1052,6 +1064,9 @@ impl<'a> Lowerer<'a> {
                 }
             },
             ValueRef::Def(d) => {
+                if let Some((op, arity)) = self.intrinsic(d) {
+                    return Atom::Func(self.op_func(op, arity));
+                }
                 if let Some(message) = self.unsupported(d) {
                     if !fx.library {
                         self.error(fx.module, e.span, message);
@@ -1205,7 +1220,22 @@ impl<'a> Lowerer<'a> {
         finish(out, tail, a)
     }
 
+    /// A block (§6.10). An environment statement changes the environment
+    /// for the rest of its block only (§9.2).
     fn block(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, b: &Block, tail: bool) -> Option<Atom> {
+        let outer = fx.env;
+        let a = self.statements(fx, out, b, tail);
+        fx.env = outer;
+        a
+    }
+
+    fn statements(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        b: &Block,
+        tail: bool,
+    ) -> Option<Atom> {
         let last = b.stmts.len().saturating_sub(1);
         for (i, s) in b.stmts.iter().enumerate() {
             match s {
@@ -1214,11 +1244,20 @@ impl<'a> Lowerer<'a> {
                     self.expr(fx, out, e);
                 }
                 hir::Stmt::Bind(binding) => self.binding(fx, out, binding),
-                hir::Stmt::Env { span, .. } => self.error(
-                    fx.module,
-                    *span,
-                    "environment statements are not supported yet (§9.2)",
-                ),
+                hir::Stmt::Env { value, span, .. } => {
+                    // The value uses the environment from outside the
+                    // statement (§4.8 rule 9).
+                    let v = self.expr(fx, out, value);
+                    let service = self.service(fx.module, *span);
+                    let dst = fx.local(LocalType::Env);
+                    out.push(Stmt::LetEnv {
+                        dst,
+                        env: fx.env,
+                        service,
+                        value: v,
+                    });
+                    fx.env = Env::Local(dst);
+                }
             }
         }
         // A block always ends with an expression (§6.10).
@@ -1231,7 +1270,7 @@ impl<'a> Lowerer<'a> {
     fn binding(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, b: &Binding) {
         if !b.direct {
             let v = self.expr(fx, out, &b.value);
-            self.bind(fx, out, &b.pattern, v);
+            self.bind_checked(fx, out, &b.pattern, v, b.span.start);
             return;
         }
         let mut vars = HashSet::new();
@@ -1241,7 +1280,7 @@ impl<'a> Lowerer<'a> {
         let v = self.expr(fx, out, &b.value);
         fx.pending = saved;
         let patches = std::mem::replace(&mut fx.patches, saved_patches);
-        self.bind(fx, out, &b.pattern, v);
+        self.bind_checked(fx, out, &b.pattern, v, b.span.start);
         for (closure, index, var) in patches {
             let value = Atom::Local(fx.var(var));
             out.push(Stmt::SetCapture {
@@ -1342,6 +1381,24 @@ impl<'a> Lowerer<'a> {
                 _ => self.call(fx, out, e.span, rhs, Some(lhs), &[], tail),
             };
         }
+        if matches!(op, BinOp::And | BinOp::Or) && tail {
+            // The right side is in tail position (§11.6).
+            let a = self.expr(fx, out, lhs);
+            let mut right = Vec::new();
+            self.lower(fx, &mut right, rhs, true);
+            let short = vec![Stmt::Return(Atom::Bool(op == BinOp::Or))];
+            let (then, otherwise) = if op == BinOp::And {
+                (right, short)
+            } else {
+                (short, right)
+            };
+            out.push(Stmt::If {
+                cond: Cond::True(a),
+                then,
+                otherwise,
+            });
+            return None;
+        }
         if matches!(op, BinOp::And | BinOp::Or) {
             // The right side is only worked out when the left is not enough.
             let a = self.expr(fx, out, lhs);
@@ -1407,6 +1464,9 @@ impl<'a> Lowerer<'a> {
     /// What a callee is, worked out when it is a value.
     fn target(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, callee: &Expr) -> Target {
         match &callee.kind {
+            ExprKind::Name(ValueRef::Def(d)) if self.intrinsic(*d).is_some() => {
+                Target::Op(self.intrinsic(*d).expect("an intrinsic").0)
+            }
             ExprKind::Name(ValueRef::Def(d)) if self.unsupported(*d).is_none() => {
                 match self.program.def(*d).kind {
                     DefKind::External { .. } => match self.external_op(*d) {
@@ -1478,20 +1538,26 @@ impl<'a> Lowerer<'a> {
                 finish(out, tail, a)
             }
             Target::Op(op) => {
-                // Library functions of the runtime never call back into i
-                // code, so they are not tail calls: their position stays on
-                // the shadow stack (§11.7).
+                // Operations of the runtime are not tail calls: their
+                // position stays on the shadow stack (§11.7). Those that
+                // call i code take errors there, or run final functions.
                 let site = self.site(fx, span.start);
-                let v = let_value(fx, out, Value::Op(op, args), site);
+                let value = if op.needs_env() {
+                    Value::OpEnv(op, args, fx.env)
+                } else {
+                    Value::Op(op, args)
+                };
+                let v = let_value(fx, out, value, site);
                 finish(out, tail, v)
             }
             Target::Callee(callee) => {
+                let env = fx.env;
                 if tail {
-                    out.push(Stmt::TailCall { callee, args });
+                    out.push(Stmt::TailCall { callee, args, env });
                     None
                 } else {
                     let site = self.site(fx, span.start);
-                    Some(let_value(fx, out, Value::Call { callee, args }, site))
+                    Some(let_value(fx, out, Value::Call { callee, args, env }, site))
                 }
             }
         }
@@ -1743,7 +1809,7 @@ impl<'a> Lowerer<'a> {
                     CtorRepr::Record { ctor, .. } => Cond::Ctor(v.clone(), ctor),
                 };
                 guard(out, cond, fail);
-                for (arg, i) in match_fields(&info.labels, args) {
+                for (arg, i) in self.fields_of(fx, p, args) {
                     let f = let_value(fx, out, Value::Field(v.clone(), i), None);
                     self.pattern(fx, out, arg, f, fail);
                 }
@@ -2001,8 +2067,120 @@ impl<'a> Lowerer<'a> {
         w
     }
 
-    /// Binds a pattern of a binding or a parameter, which can not fail
-    /// (§6.10, §6.11). A pattern that may fail needs `Assert`.
+    /// The parts of a constructor pattern and the fields they are matched
+    /// to (§7.1), as the checker found them.
+    fn fields_of<'p>(&self, fx: &Fx, p: &Pattern, args: &'p [Pattern]) -> Vec<(&'p Pattern, u32)> {
+        let indices = self
+            .typed
+            .pattern_fields
+            .get(&(fx.module, p.span))
+            .expect("a checked constructor pattern has its fields");
+        args.iter()
+            .zip(indices)
+            .filter(|(_, i)| **i != u32::MAX)
+            .map(|(a, i)| (a, *i))
+            .collect()
+    }
+
+    /// Whether `bind` takes the pattern: it has no test at all, given the
+    /// type of its value.
+    fn plain(&self, p: &Pattern) -> bool {
+        match &p.kind {
+            PatternKind::Var(_) | PatternKind::Discard | PatternKind::Typed { .. } => true,
+            PatternKind::Named { pattern, .. } => self.plain(pattern),
+            PatternKind::Tuple(parts) => parts.iter().all(|x| self.plain(x)),
+            PatternKind::Constructor { ctor, args, .. } => {
+                matches!(&self.program.ty(ctor.ty).body, TypeBody::Custom(cs) if cs.len() == 1)
+                    && args.iter().all(|x| self.plain(x))
+            }
+            PatternKind::List {
+                items,
+                rest: Some(_),
+            } => items.is_empty(),
+            _ => false,
+        }
+    }
+
+    /// Binds the pattern of a binding or a parameter (§6.10, §6.11). When
+    /// it may fail, a value that does not match is reported to `Assert`:
+    /// `a.fail(AssertionFailure(m))`, with the message of §6.10 and the
+    /// position `at` on the shadow stack.
+    fn bind_checked(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom, at: u32) {
+        let fails = self
+            .typed
+            .may_fail
+            .get(&(fx.module, p.span))
+            .copied()
+            .unwrap_or(false);
+        if !fails && self.plain(p) {
+            self.bind(fx, out, p, v);
+            return;
+        }
+        let ok = fx.label();
+        let no = fx.label();
+        let mut matching = Vec::new();
+        self.pattern(fx, &mut matching, p, v.clone(), no);
+        matching.push(Stmt::Break(ok));
+        let mut body = vec![Stmt::Block {
+            label: no,
+            body: matching,
+        }];
+        if fails {
+            let module = self.program.module(fx.module);
+            let text = &self.graph.sources.get(module.source).text;
+            let source = text
+                .get(p.span.start as usize..p.span.end as usize)
+                .unwrap_or("");
+            let prefix = Atom::String(format!("pattern {source} did not match "));
+            let shown = let_value(
+                fx,
+                &mut body,
+                Value::Op(
+                    Op::Runtime {
+                        name: "core_inspect",
+                        arity: 1,
+                    },
+                    vec![v],
+                ),
+                None,
+            );
+            let m = let_value(
+                fx,
+                &mut body,
+                Value::Op(Op::StringAppend, vec![prefix, shown]),
+                None,
+            );
+            let failure = let_value(
+                fx,
+                &mut body,
+                Value::Record {
+                    ctor: 2,
+                    ty: 1,
+                    fields: vec![m],
+                },
+                None,
+            );
+            let a = let_value(fx, &mut body, Value::Service(fx.env, ASSERT_SERVICE), None);
+            let f = let_value(fx, &mut body, Value::Field(a, 0), None);
+            let site = self.site(fx, at);
+            let_value(
+                fx,
+                &mut body,
+                Value::Call {
+                    callee: Callee::Value(f),
+                    args: vec![failure],
+                    env: fx.env,
+                },
+                site,
+            );
+        }
+        // `fail` never gives a value (§9.6); a pattern that can not fail
+        // always matches.
+        body.push(Stmt::Unreachable);
+        out.push(Stmt::Block { label: ok, body });
+    }
+
+    /// Binds a pattern that `plain` takes.
     fn bind(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom) {
         match &p.kind {
             PatternKind::Var(b) => Self::bind_var(fx, out, b, v),
@@ -2022,56 +2200,38 @@ impl<'a> Lowerer<'a> {
                     self.bind(fx, out, part, f);
                 }
             }
-            PatternKind::Constructor { ctor, args, .. }
-                if matches!(&self.program.ty(ctor.ty).body, TypeBody::Custom(cs) if cs.len() == 1) =>
-            {
-                let info = self.ctors[ctor].clone();
-                for (arg, i) in match_fields(&info.labels, args) {
+            PatternKind::Constructor { args, .. } => {
+                for (arg, i) in self.fields_of(fx, p, args) {
                     let f = let_value(fx, out, Value::Field(v.clone(), i), None);
                     self.bind(fx, out, arg, f);
                 }
             }
             PatternKind::List {
-                items,
-                rest: Some(rest),
-            } if items.is_empty() => {
-                if let Some(b) = rest {
-                    Self::bind_var(fx, out, b, v);
-                }
-            }
-            PatternKind::Error(_) => out.push(Stmt::Unreachable),
-            _ => self.error(
-                fx.module,
-                p.span,
-                "this pattern may fail, so the binding needs the `Assert` service, which is not supported yet (§6.10)",
-            ),
+                rest: Some(Some(b)),
+                ..
+            } => Self::bind_var(fx, out, b, v),
+            PatternKind::List { .. } => {}
+            _ => out.push(Stmt::Unreachable),
         }
     }
 }
 
-/// The ABI type of a written type that the host can take (§10.3).
-fn abi_type(t: &ilang_syntax::ast::TypeExpr) -> Option<AbiType> {
-    use ilang_syntax::ast::TypeKind as T;
-    match &t.kind {
-        T::Named { name, args, .. } if args.is_empty() => Some(match name.name.as_str() {
-            "Nil" => AbiType::Nil,
-            "Bool" => AbiType::Bool,
-            "Int" => AbiType::Int,
-            "Float" => AbiType::Float,
-            "String" => AbiType::String,
-            "BitArray" => AbiType::BitArray,
-            _ => AbiType::Externref,
-        }),
-        _ => None,
+/// The ABI type of a type that the host can take (§10.3, B.2). `Never`
+/// has no values, so it is passed as nothing, like `Nil`.
+fn abi_type(t: HostType) -> AbiType {
+    match t {
+        HostType::Nil | HostType::Never => AbiType::Nil,
+        HostType::Bool => AbiType::Bool,
+        HostType::Int => AbiType::Int,
+        HostType::Float => AbiType::Float,
+        HostType::String => AbiType::String,
+        HostType::BitArray => AbiType::BitArray,
+        HostType::Opaque(_) => AbiType::Externref,
     }
 }
 
 /// The `ilang.abi` metadata (B.6).
-fn abi_json(
-    entry: Option<String>,
-    tests: &[String],
-    exports: &[(String, Vec<AbiType>, AbiType)],
-) -> String {
+fn abi_json(entry: Option<String>, tests: &[String], exports: &[(String, ExportAbi)]) -> String {
     let entry = match entry {
         Some(name) => serde_json::json!({ "name": name, "async": false }),
         None => serde_json::Value::Null,
@@ -2081,13 +2241,13 @@ fn abi_json(
         .map(|t| serde_json::json!({ "name": t, "async": false }))
         .collect();
     let mut map = serde_json::Map::new();
-    for (name, params, result) in exports {
+    for (name, abi) in exports {
         map.insert(
             name.clone(),
             serde_json::json!({
-                "params": params.iter().map(|p| p.name()).collect::<Vec<_>>(),
-                "result": result.name(),
-                "errors": [],
+                "params": abi.params.iter().map(|p| p.name()).collect::<Vec<_>>(),
+                "result": abi.result.name(),
+                "errors": abi.errors.iter().map(|p| p.name()).collect::<Vec<_>>(),
                 "async": false,
             }),
         );

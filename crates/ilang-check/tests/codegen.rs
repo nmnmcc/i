@@ -1,15 +1,21 @@
 //! The data that type checking gives to the code generator (`Typed`): field
-//! accesses, the order of arguments, type tests, services, and which
-//! top-level bindings are generalized.
+//! accesses, the order of arguments, type tests, services, which top-level
+//! bindings are generalized, the fields of constructor patterns, which
+//! patterns may fail, and the signatures of host exports.
 
+use ilang_check::hir::DefId;
 use ilang_check::hir::{BuiltinType, ModuleId, TypeRef};
-use ilang_check::types::{Access, Head, Typed};
+use ilang_check::types::{Access, Head, HostSignature, HostType, Typed};
 use ilang_package::PackageGraph;
 use ilang_syntax::span::Span;
 use std::collections::HashMap;
 use std::fs;
 
 const SOURCE: &str = r#"
+import (i/fail)
+
+export (div, Handle)
+
 Cat { Cat(lives: Int, name: String) }
 Dog { Dog(name: String) }
 Clock { Clock(now: () -> Int) }
@@ -32,12 +38,31 @@ env = (c ! Watch) {
   c.now()
 }
 mono = minus(1, 2)
+age = (Cat(name, l = lives)) { l }
+first = (r) {
+  Ok(v) = r
+  v
+}
+pair = ((a, b)) { a }
+Handle {}
+div = (a: Int, h: Handle) {
+  case a {
+    0 -> fail.raise("zero")
+    1 -> fail.raise(a)
+    2 -> fail.raise(Nil)
+    _ -> a
+  }
+}
 "#;
 
 /// The checked program, with the text of each span of the main module.
 fn check() -> (PackageGraph, Typed, ModuleId) {
     let dir = tempfile::tempdir().unwrap();
-    fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    fs::write(
+        dir.path().join("i.toml"),
+        "name = \"app\"\n\n[wasm]\nexports = [\"app/main.div\"]\n",
+    )
+    .unwrap();
     fs::create_dir_all(dir.path().join("src")).unwrap();
     fs::write(dir.path().join("src/main.i"), SOURCE).unwrap();
     let (graph, _) = ilang_package::load(dir.path());
@@ -105,9 +130,33 @@ fn codegen_data() {
         v.sort();
         v.into_iter().map(|x| x.1).collect()
     };
-    // name, second, minus, by_label, piped, tests, env, mono
+    // name, second, minus, by_label, piped, tests, env, mono, age, first,
+    // pair, div
     assert_eq!(
         generalized,
-        vec![true, true, true, false, false, true, true, false]
+        vec![
+            true, true, true, false, false, true, true, false, true, true, true, true
+        ]
+    );
+    // The field of each part of a constructor pattern (§7.1): every field
+    // has a label, so the parts go by label: `name` is field 1 and `lives`
+    // field 0.
+    assert_eq!(
+        by_text(&typed.pattern_fields, m, "Cat(name, l = lives)"),
+        &vec![1, 0]
+    );
+    // Which patterns of bindings and parameters may fail (§7.3).
+    assert_eq!(by_text(&typed.may_fail, m, "Ok(v)"), &true);
+    assert_eq!(by_text(&typed.may_fail, m, "(a, b)"), &false);
+    assert_eq!(by_text(&typed.may_fail, m, "Cat(name, l = lives)"), &false);
+    // A host export, with its errors in the canonical order (B.2).
+    let sigs: Vec<(&DefId, &HostSignature)> = typed.host_exports.iter().collect();
+    assert_eq!(sigs.len(), 1);
+    assert_eq!(sigs[0].1.params[0], HostType::Int);
+    assert!(matches!(sigs[0].1.params[1], HostType::Opaque(_)));
+    assert_eq!(sigs[0].1.result, HostType::Int);
+    assert_eq!(
+        sigs[0].1.errors,
+        vec![HostType::Nil, HostType::Int, HostType::String]
     );
 }

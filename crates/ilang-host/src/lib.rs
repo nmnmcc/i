@@ -9,6 +9,17 @@
 //! Buffers follow B.3: the host makes the buffers of export parameters with
 //! `ilang_alloc` and frees them after the call, and it frees the result
 //! buffers after copying them. For imports, the host makes the result buffers.
+//!
+//! # Stack
+//!
+//! Ordinary recursion that is not in tail position uses the Wasm stack. Wasm
+//! code may use up to [`WASM_STACK`] bytes of it (Wasmtime's
+//! `max_wasm_stack`, 32 MiB). A frame of a small i function takes about 60
+//! bytes, so this is about 500,000 frames of such functions, and fewer of
+//! bigger ones; more traps as "call stack exhausted", which is a stop with
+//! no message (spec §11.7). Every call into the module runs on a
+//! thread of its own with a native stack of [`THREAD_STACK`] bytes, so that
+//! the Wasm stack always fits in it, whatever thread calls the host.
 
 #[cfg(test)]
 mod tests;
@@ -553,6 +564,10 @@ impl Program {
         config.wasm_function_references(true);
         config.wasm_tail_call(true);
         config.wasm_exceptions(true);
+        config.max_wasm_stack(WASM_STACK);
+        // Only checked against `max_wasm_stack`: the host does not use
+        // Wasmtime's async support.
+        config.async_stack_size(THREAD_STACK);
         // Compile independent functions concurrently while preserving the
         // optimized machine code used for long-running guest programs.
         config.parallel_compilation(true);
@@ -1017,14 +1032,34 @@ enum Invoked {
     Failed(anyhow::Error),
 }
 
-/// Call a Wasm function inside the root scope of its arguments.
+/// The most stack, in bytes, that Wasm code may use (see the module
+/// documentation).
+pub const WASM_STACK: usize = 32 << 20;
+
+/// The native stack, in bytes, of the thread that runs Wasm code: the Wasm
+/// stack, and room for the host functions it calls.
+pub const THREAD_STACK: usize = WASM_STACK + (16 << 20);
+
+/// Call a Wasm function inside the root scope of its arguments, on a thread
+/// with a stack of [`THREAD_STACK`] bytes.
 fn invoke_in(
-    context: &mut impl AsContextMut<Data = State>,
+    context: &mut (impl AsContextMut<Data = State> + Send),
     function: Func,
     params: &[Val],
     results: &mut [Val],
 ) -> Invoked {
-    let Err(error) = function.call(&mut *context, params, results) else {
+    let called = std::thread::scope(|scope| {
+        let thread = std::thread::Builder::new()
+            .name("ilang-wasm".into())
+            .stack_size(THREAD_STACK)
+            .spawn_scoped(scope, || function.call(&mut *context, params, results))
+            .expect("a thread for Wasm code");
+        match thread.join() {
+            Ok(called) => called,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+    });
+    let Err(error) = called else {
         return Invoked::Done;
     };
     let error = anyhow::Error::from(error);

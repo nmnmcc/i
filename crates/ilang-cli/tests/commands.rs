@@ -226,3 +226,149 @@ alias = add
         );
     }
 }
+
+#[test]
+fn host_exports_give_errors() {
+    let dir = package(&[
+        (
+            "i.toml",
+            "name = \"app\"\n\n[wasm]\nexports = [\"app/math.divide\", \"app/math.check\", \"app/math.positive\", \"app/math.bits\"]\n",
+        ),
+        (
+            "src/math.i",
+            r#"import (i/fail)
+
+export (divide, check, positive, bits)
+
+// The errors are `String | Int`, given to the host in the canonical
+// order: `Int` is member 1 and `String` member 2 (B.2).
+divide = (a: Int, b: Int) {
+  case b {
+    0 -> fail.raise("division by zero")
+    1 -> fail.raise(a)
+    _ -> a / b
+  }
+}
+
+// `Nil` and `Bool` errors have their own tags.
+check = (n: Int) -> Float ? Bool | Nil {
+  case n {
+    0 -> fail.raise(Nil)
+    1 -> fail.raise(True)
+    _ -> 1.5
+  }
+}
+
+// The `Assert` of a host export stops the program (§9.6).
+positive = (n: Int) {
+  assert(n > 0)
+  n
+}
+
+// A `BitArray` error.
+bits = (b: Bool) -> Nil ? BitArray {
+  case b {
+    True -> fail.raise(<<1, 2>>)
+    False -> Nil
+  }
+}
+"#,
+        ),
+    ]);
+    for opt in [Level::O0, Level::O2] {
+        let built = build(dir.path(), BuildOptions { tests: false, opt }).unwrap();
+        let program = Program::from_bytes(&built.wasm).unwrap();
+        let divide = &program.abi().exports["app/math.divide"];
+        assert_eq!(
+            divide.errors,
+            [ilang_host::AbiType::Int, ilang_host::AbiType::String]
+        );
+        let check = &program.abi().exports["app/math.check"];
+        assert_eq!(
+            check.errors,
+            [ilang_host::AbiType::Nil, ilang_host::AbiType::Bool]
+        );
+        let mut instance = program.instantiate(HostOptions::default()).unwrap();
+        let mut call =
+            |name: &str, args: &[Value]| format!("{:?}", instance.call(name, args).unwrap());
+        let int = |n: i64| Value::Int(n.into());
+        assert_eq!(
+            call("app/math.divide", &[int(7), int(2)]),
+            format!("{:?}", Outcome::Ok(int(3)))
+        );
+        assert_eq!(
+            call("app/math.divide", &[int(7), int(0)]),
+            format!(
+                "{:?}",
+                Outcome::Err(ilang_host::GuestError(Value::String(
+                    "division by zero".into()
+                )))
+            )
+        );
+        assert_eq!(
+            call("app/math.divide", &[int(7), int(1)]),
+            format!("{:?}", Outcome::Err(ilang_host::GuestError(int(7))))
+        );
+        assert_eq!(
+            call("app/math.check", &[int(0)]),
+            format!("{:?}", Outcome::Err(ilang_host::GuestError(Value::Nil)))
+        );
+        assert_eq!(
+            call("app/math.check", &[int(1)]),
+            format!(
+                "{:?}",
+                Outcome::Err(ilang_host::GuestError(Value::Bool(true)))
+            )
+        );
+        assert_eq!(
+            call("app/math.check", &[int(2)]),
+            format!("{:?}", Outcome::Ok(Value::Float(1.5)))
+        );
+        assert_eq!(
+            call("app/math.bits", &[Value::Bool(false)]),
+            format!("{:?}", Outcome::Ok(Value::Nil))
+        );
+        assert_eq!(
+            call("app/math.bits", &[Value::Bool(true)]),
+            format!(
+                "{:?}",
+                Outcome::Err(ilang_host::GuestError(Value::BitArray(
+                    BitArray::new(vec![1, 2], 16).unwrap()
+                )))
+            )
+        );
+        assert_eq!(
+            call("app/math.positive", &[int(3)]),
+            format!("{:?}", Outcome::Ok(int(3)))
+        );
+        match instance.call("app/math.positive", &[int(0)]).unwrap() {
+            Outcome::Stop(stop) => assert_eq!(
+                stop.message.as_deref(),
+                Some("assertion failed: assert\napp/math:26:3")
+            ),
+            other => panic!("{other:?}"),
+        }
+    }
+}
+
+#[test]
+fn an_error_stops_a_test() {
+    let dir = package(&[
+        ("i.toml", "name = \"app\"\n"),
+        (
+            "test/app_test.i",
+            "import (i/fail)\n\nf = (n) { fail.raise(n) }\n\n@test\nraises = () {\n  f(\"oops\")\n  Nil\n}\n",
+        ),
+    ]);
+    for opt in [Level::O0, Level::O2] {
+        let built = build(dir.path(), BuildOptions { tests: true, opt }).unwrap();
+        let program = Program::from_bytes(&built.wasm).unwrap();
+        match ilang_cli::run_test(&program, "app/app_test.raises") {
+            ilang_host::TestResult::Stopped(stop) => assert_eq!(
+                stop.message.as_deref(),
+                Some("error: \"oops\"\napp/app_test:6:1")
+            ),
+            other => panic!("{other:?}"),
+        }
+    }
+}

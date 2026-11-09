@@ -41,6 +41,99 @@ const SUPPORT: &str = r#"
     (else (i32.const 0))))
 "#;
 
+/// Errors, unwinding, and the environment (`ir.rs`). The functions that call
+/// i code save the depth of the shadow stack, and put it back when they take
+/// an exception (`runtime/mod.rs`). No handler takes an exception of another
+/// tag (no `catch_all`), so a stop, which traps, runs no handlers (§9.5).
+const EFFECTS: &str = r#"
+(tag $error (param eqref))
+(tag $cancel (param eqref))
+(global $root_env (mut (ref null $env)) (ref.null $env))
+
+;; `env` with `v` in the slot `id` (§9.2): a new array.
+(func $env_with (param $env (ref null $env)) (param $id i32) (param $v eqref) (result (ref null $env))
+  (local $new (ref $env)) (local $n i32)
+  (local.set $n (array.len (local.get $env)))
+  (local.set $new (array.new_default $env (local.get $n)))
+  (array.copy $env $env (local.get $new) (i32.const 0) (local.get $env) (i32.const 0) (local.get $n))
+  (array.set $env (local.get $new) (local.get $id) (local.get $v))
+  (local.get $new))
+
+;; Calls a computation (§9.1) with the environment.
+(func $call0 (param $f eqref) (param $env (ref null $env)) (result eqref)
+  (call_ref $fn0 (ref.cast (ref $clo0) (local.get $f)) (local.get $env)
+    (struct.get $clo0 8 (ref.cast (ref $clo0) (local.get $f)))))
+
+;; `fail.catch(body)` (§9.3).
+(func $fail_catch (param $body eqref) (param $env (ref null $env)) (result eqref)
+  (local $depth i32) (local $e eqref)
+  (local.set $depth (call $shadow_depth))
+  (local.set $e
+    (block $caught (result eqref)
+      (return (call $result_ok
+        (try_table (result eqref) (catch $error $caught)
+          (call $call0 (local.get $body) (local.get $env)))))))
+  (call $shadow_restore (local.get $depth))
+  (call $result_error (local.get $e)))
+
+;; `resource.ensure(body, with)` (§9.5): `with` runs after `body`, also when
+;; an error or an unwinding goes through, which then goes on.
+(func $resource_ensure (param $body eqref) (param $with eqref) (param $env (ref null $env)) (result eqref)
+  (local $depth i32) (local $v eqref) (local $x exnref)
+  (local.set $depth (call $shadow_depth))
+  (block $unwind (result eqref exnref)
+    (local.set $v
+      (try_table (result eqref) (catch_ref $error $unwind) (catch_ref $cancel $unwind)
+        (call $call0 (local.get $body) (local.get $env))))
+    (drop (call $call0 (local.get $with) (local.get $env)))
+    (return (local.get $v)))
+  (local.set $x)
+  (drop)
+  (call $shadow_restore (local.get $depth))
+  (drop (call $call0 (local.get $with) (local.get $env)))
+  (throw_ref (local.get $x)))
+
+;; `assertion.catch(body)` (§9.6): `body` runs with an `Assert` whose `fail`
+;; unwinds to here with `$cancel`, while this boundary is active. The value
+;; of `$cancel` is the tuple (boundary, failure).
+(func $assertion_catch (param $body eqref) (param $env (ref null $env)) (result eqref)
+  (local $b (ref $boundary)) (local $depth i32) (local $v eqref) (local $p eqref) (local $x exnref)
+  (local.set $b (struct.new $boundary (i32.const 11) (i32.const 0) (i64.const 0) (f64.const 0)
+    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1)))
+  (local.set $depth (call $shadow_depth))
+  (block $unwind (result eqref exnref)
+    (local.set $v
+      (try_table (result eqref) (catch_ref $cancel $unwind)
+        (call $call0 (local.get $body)
+          (call $env_with (local.get $env) (i32.const 0)
+            (call $record (i32.const 3) (i64.const 2) (array.new_fixed $values 1
+              (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0)
+                (ref.null $bytes) (array.new_fixed $values 1 (local.get $b)) (ref.null $limbs)
+                (ref.null $call) (ref.func $assertion_fail))))))))
+    (struct.set $boundary 8 (local.get $b) (i32.const 0))
+    (return (call $result_ok (local.get $v))))
+  (local.set $x)
+  (local.set $p)
+  (struct.set $boundary 8 (local.get $b) (i32.const 0))
+  (if (i32.eqz (ref.eq (call $field (local.get $p) (i32.const 0)) (local.get $b)))
+    (then (throw_ref (local.get $x))))
+  (call $shadow_restore (local.get $depth))
+  (call $result_error (call $field (local.get $p) (i32.const 1))))
+
+(func $assertion_fail (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env)) (param $failure eqref) (result eqref)
+  (local $b (ref $boundary))
+  (local.set $b (ref.cast (ref $boundary) (array.get $values
+    (ref.as_non_null (struct.get $obj 5 (ref.as_non_null (local.get $clo)))) (i32.const 0))))
+  (if (i32.eqz (struct.get $boundary 8 (local.get $b)))
+    (then (call $stop_boundary_inactive) (unreachable)))
+  (throw $cancel (call $tuple (array.new_fixed $values 2 (local.get $b) (local.get $failure)))))
+
+;; The `fail` of the `Assert` of an entry point (§9.6, §11.7).
+(func $entry_assert_fail (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env)) (param $failure eqref) (result eqref)
+  (call $stop_assertion (call $field (local.get $failure) (i32.const 0)))
+  (unreachable))
+"#;
+
 /// The WAT text of the whole module.
 pub fn wat(p: &Program) -> String {
     let mut e = Emitter {
@@ -51,6 +144,7 @@ pub fn wat(p: &Program) -> String {
         out: String::new(),
     };
     e.arities.insert(0);
+    e.arities.insert(1);
     for (i, f) in p.funcs.iter().enumerate() {
         e.func(FuncId(i as u32), f);
     }
@@ -62,6 +156,12 @@ pub fn wat(p: &Program) -> String {
     let mut m = String::from("(module\n");
     m.push_str(runtime::TYPES);
     m.push_str("(type $env (array (mut eqref)))\n");
+    // A boundary (§9.4): field 8 is 1 while it is active.
+    m.push_str(
+        "(type $boundary (sub final $obj (struct (field i32) (field i32) (field i64) (field f64) \
+         (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs)) \
+         (field (ref null $call)) (field (mut i32)))))\n",
+    );
     for n in &e.arities {
         let params = " eqref".repeat(*n as usize);
         let _ = writeln!(
@@ -75,6 +175,7 @@ pub fn wat(p: &Program) -> String {
     m.push_str(runtime::HOST);
     m.push_str(runtime::wat());
     m.push_str(SUPPORT);
+    m.push_str(EFFECTS);
     m.push_str(&e.data);
     for g in 0..p.globals {
         let _ = writeln!(m, "(global $g{g} (mut eqref) (ref.null eq))");
@@ -89,10 +190,10 @@ pub fn wat(p: &Program) -> String {
         );
     }
     m.push_str(&e.out);
-    let declared: Vec<String> = (0..p.funcs.len()).map(|i| format!("$f{i}")).collect();
-    if !declared.is_empty() {
-        let _ = writeln!(m, "(elem declare func {})", declared.join(" "));
-    }
+    let mut declared: Vec<String> = (0..p.funcs.len()).map(|i| format!("$f{i}")).collect();
+    declared.push("$assertion_fail".into());
+    declared.push("$entry_assert_fail".into());
+    let _ = writeln!(m, "(elem declare func {})", declared.join(" "));
     m.push_str(")\n");
     m
 }
@@ -129,7 +230,7 @@ impl Emitter<'_> {
             FuncKind::Runtime { op, arity } => {
                 self.header(&name, *arity, &[]);
                 let args: Vec<String> = (0..*arity).map(|i| format!("(local.get $l{i})")).collect();
-                let body = self.op(*op, &args);
+                let body = self.op(*op, &args, "(local.get $env)");
                 let _ = writeln!(self.out, "{body})");
             }
         }
@@ -150,6 +251,7 @@ impl Emitter<'_> {
                 LocalType::Value => "eqref",
                 LocalType::I64 => "i64",
                 LocalType::I32 => "i32",
+                LocalType::Env => "(ref null $env)",
             };
             let _ = write!(self.out, " (local $l{i} {t})");
         }
@@ -183,6 +285,9 @@ impl Emitter<'_> {
                 if let Value::Op(Op::Panic, args) = value {
                     let a = self.atom(&args[0]);
                     let _ = writeln!(out, "(call $panic {a}) (unreachable)");
+                } else if let Value::Op(Op::Raise, args) = value {
+                    let a = self.atom(&args[0]);
+                    let _ = writeln!(out, "(throw $error {a})");
                 } else {
                     let v = self.value(value);
                     let _ = writeln!(out, "(local.set $l{dst} {v})");
@@ -240,12 +345,25 @@ impl Emitter<'_> {
                 }
                 let _ = writeln!(out, "(return {a})");
             }
-            Stmt::TailCall { callee, args } => {
+            Stmt::TailCall { callee, args, env } => {
                 if frame {
                     out.push_str("(call $shadow_leave)\n");
                 }
-                let call = self.call(callee, args, true, "(local.get $env)");
+                let call = self.call(callee, args, true, &env_text(*env));
                 let _ = writeln!(out, "{call}");
+            }
+            Stmt::LetEnv {
+                dst,
+                env,
+                service,
+                value,
+            } => {
+                let v = self.atom(value);
+                let _ = writeln!(
+                    out,
+                    "(local.set $l{dst} (call $env_with {} (i32.const {service}) {v}))",
+                    env_text(*env)
+                );
             }
             Stmt::Unreachable => out.push_str("(unreachable)\n"),
             Stmt::SetCapture {
@@ -332,7 +450,8 @@ impl Emitter<'_> {
         atoms.iter().map(|a| format!(" {}", self.atom(a))).collect()
     }
 
-    fn op(&mut self, op: Op, args: &[String]) -> String {
+    /// An operation; those that call i code get the environment `env`.
+    fn op(&mut self, op: Op, args: &[String], env: &str) -> String {
         let a = args.first().cloned().unwrap_or_default();
         let b = args.get(1).cloned().unwrap_or_default();
         let compare_int =
@@ -364,6 +483,10 @@ impl Emitter<'_> {
             Op::StringAppend => format!("(call $string_append {a} {b})"),
             Op::Panic => format!("(call $panic {a}) (unreachable)"),
             Op::Runtime { name, .. } => format!("(call ${name} {})", args.join(" ")),
+            Op::Raise => format!("(throw $error {a})"),
+            Op::Catch => format!("(call $fail_catch {a} {env})"),
+            Op::Ensure => format!("(call $resource_ensure {a} {b} {env})"),
+            Op::AssertCatch => format!("(call $assertion_catch {a} {env})"),
         }
     }
 
@@ -373,10 +496,17 @@ impl Emitter<'_> {
             Value::Capture(i) => format!(
                 "(array.get $values (ref.as_non_null (struct.get $obj 5 (ref.as_non_null (local.get $clo)))) (i32.const {i}))"
             ),
-            Value::Call { callee, args } => self.call(callee, args, false, "(local.get $env)"),
+            Value::Call { callee, args, env } => self.call(callee, args, false, &env_text(*env)),
             Value::Op(op, args) => {
                 let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
-                self.op(*op, &args)
+                self.op(*op, &args, "(local.get $env)")
+            }
+            Value::OpEnv(op, args, env) => {
+                let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
+                self.op(*op, &args, &env_text(*env))
+            }
+            Value::Service(env, id) => {
+                format!("(array.get $env {} (i32.const {id}))", env_text(*env))
             }
             Value::Closure { func, captures } => {
                 let n = self.p.funcs[func.0 as usize].arity();
@@ -599,89 +729,211 @@ impl Emitter<'_> {
             names.len(),
             names.join(" ")
         );
+        // The root environment: the `Assert` of the runtime (§9.6), and
+        // no other service yet.
+        let _ = writeln!(
+            self.out,
+            "(global.set $root_env (array.new $env (ref.null eq) (i32.const {})))\n\
+             (array.set $env (ref.as_non_null (global.get $root_env)) (i32.const {ASSERT_SERVICE})\n\
+             (call $record (i32.const 3) (i64.const 2) (array.new_fixed $values 1\n\
+             (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0) (ref.null $bytes)\n\
+             (ref.null $values) (ref.null $limbs) (ref.null $call) (ref.func $entry_assert_fail)))))",
+            self.p.services.max(1)
+        );
         if self.p.start.is_some() {
             self.out
-                .push_str("(drop (call $start (ref.null $obj) (ref.null $env)))\n");
+                .push_str("(drop (call $start (ref.null $obj) (global.get $root_env)))\n");
         }
         self.out.push_str(")\n");
     }
 
+    /// The entry points (B.5). An error that comes to the program entry or a
+    /// test stops the program with only the position of its binding (§11.7);
+    /// one that comes to a host export is given to the host with its tag
+    /// (B.2). An unwinding that comes to an entry point has lost its
+    /// boundary.
     fn exports(&mut self) {
         for e in &self.p.exports {
             let name = e.name.replace('\\', "\\\\").replace('"', "\\\"");
             match &e.abi {
                 None => {
-                    let call = self.call(&e.callee, &[], false, "(ref.null $env)");
-                    let _ = writeln!(self.out, "(func (export \"{name}\") (drop {call}))");
+                    let call = self.call(&e.callee, &[], false, "(global.get $root_env)");
+                    let site = e.site.map_or(-1, |s| s as i64);
+                    let _ = writeln!(
+                        self.out,
+                        "(func (export \"{name}\") (local $e eqref)\n\
+                         (local.set $e (block $error (result eqref)\n\
+                         (block $cancel (result eqref)\n\
+                         (drop (try_table (result eqref) (catch $error $error) (catch $cancel $cancel) {call}))\n\
+                         (return))\n\
+                         (drop) (call $stop_boundary_inactive) (unreachable)))\n\
+                         (call $stop_error (local.get $e) (i32.const {site})) (unreachable))"
+                    );
                 }
-                Some((params, result)) => {
-                    let mut sig = String::new();
-                    let mut converted = Vec::new();
-                    let mut k = 0;
-                    for p in params {
-                        let (types, convert): (&[&str], &str) = match p {
-                            AbiType::Nil => (&[], ""),
-                            AbiType::Bool => (&["i32"], "$abi_bool_in"),
-                            AbiType::Int => (&["i32", "i32", "i32"], "$abi_int_in"),
-                            AbiType::Float => (&["f64"], "$abi_float_in"),
-                            AbiType::String => (&["i32", "i32"], "$abi_string_in"),
-                            AbiType::BitArray => (&["i32", "i32"], "$abi_bits_in"),
-                            AbiType::Externref => (&["externref"], "$abi_ref_in"),
-                        };
-                        if types.is_empty() {
-                            converted.push("(ref.null eq)".to_string());
-                            continue;
-                        }
-                        let mut gets = String::new();
-                        for t in types {
-                            let _ = write!(sig, " (param {t})");
-                            let _ = write!(gets, " (local.get {k})");
-                            k += 1;
-                        }
-                        converted.push(format!("(call {convert}{gets})"));
-                    }
-                    let n = params.len() as u32;
-                    self.arities.insert(n);
-                    let call = match &e.callee {
-                        Callee::Direct(f) => format!(
-                            "(call $f{} (ref.null $obj) (ref.null $env) {})",
-                            f.0,
-                            converted.join(" ")
-                        ),
-                        Callee::Value(a) => {
-                            let a = self.atom(a);
-                            format!(
-                                "(call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) (ref.null $env) {} \
-                                 (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))",
-                                converted.join(" ")
-                            )
-                        }
-                    };
-                    let (results, out) = match result {
-                        AbiType::Nil => ("", format!("(drop {call})")),
-                        AbiType::Bool => (" (result i32)", format!("(call $abi_bool_out {call})")),
-                        AbiType::Int => (
-                            " (result i32 i32 i32)",
-                            format!("(call $abi_int_out {call})"),
-                        ),
-                        AbiType::Float => {
-                            (" (result f64)", format!("(call $abi_float_out {call})"))
-                        }
-                        AbiType::String => (
-                            " (result i32 i32)",
-                            format!("(call $abi_string_out {call})"),
-                        ),
-                        AbiType::BitArray => {
-                            (" (result i32 i32)", format!("(call $abi_bits_out {call})"))
-                        }
-                        AbiType::Externref => {
-                            (" (result externref)", format!("(call $abi_ref_out {call})"))
-                        }
-                    };
-                    let _ = writeln!(self.out, "(func (export \"{name}\"){sig}{results} {out})");
-                }
+                Some(abi) => self.host_export(&name, &e.callee, abi),
             }
         }
+    }
+
+    fn host_export(&mut self, name: &str, callee: &Callee, abi: &ExportAbi) {
+        let mut sig = String::new();
+        let mut converted = Vec::new();
+        let mut k = 0;
+        for p in &abi.params {
+            let (types, convert) = abi_in(*p);
+            if types.is_empty() {
+                converted.push("(ref.null eq)".to_string());
+                continue;
+            }
+            let mut gets = String::new();
+            for t in types {
+                let _ = write!(sig, " (param {t})");
+                let _ = write!(gets, " (local.get {k})");
+                k += 1;
+            }
+            converted.push(format!("(call {convert}{gets})"));
+        }
+        let n = abi.params.len() as u32;
+        self.arities.insert(n);
+        let env = "(global.get $root_env)";
+        let call = match callee {
+            Callee::Direct(f) => format!(
+                "(call $f{} (ref.null $obj) {env} {})",
+                f.0,
+                converted.join(" ")
+            ),
+            Callee::Value(a) => {
+                let a = self.atom(a);
+                format!(
+                    "(call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env} {} \
+                     (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))",
+                    converted.join(" ")
+                )
+            }
+        };
+        if abi.errors.is_empty() {
+            let (types, out) = abi_out(abi.result, &call);
+            let results = result_list(&types);
+            let _ = writeln!(self.out, "(func (export \"{name}\"){sig}{results} {out})");
+            return;
+        }
+        // B.2: the tag, the value, then each member of the errors; the
+        // values that are not used are 0 or null.
+        let parts: Vec<AbiType> = std::iter::once(abi.result)
+            .chain(abi.errors.iter().copied())
+            .collect();
+        let mut all = vec!["i32"];
+        for p in &parts {
+            all.extend(abi_in(*p).0);
+        }
+        let results = result_list(&all);
+        let with = |at: usize, value: &str| -> String {
+            let mut out = String::new();
+            for (i, p) in parts.iter().enumerate() {
+                if i == at {
+                    out.push(' ');
+                    // For `Nil`, the value is dropped: nothing is passed.
+                    out.push_str(&abi_out(*p, value).1);
+                } else {
+                    for t in abi_in(*p).0 {
+                        out.push(' ');
+                        out.push_str(zero(t));
+                    }
+                }
+            }
+            out
+        };
+        // The error is given to the host, and the instance may be used
+        // again: its shadow stack is put back (`runtime/mod.rs`).
+        let mut f = format!(
+            "(func (export \"{name}\"){sig}{results} (local $v eqref) (local $e eqref) (local $depth i32)\n\
+             (local.set $depth (call $shadow_depth))\n\
+             (local.set $e (block $error (result eqref)\n\
+             (block $cancel (result eqref)\n\
+             (local.set $v (try_table (result eqref) (catch $error $error) (catch $cancel $cancel) {call}))\n\
+             (return (i32.const 0){}))\n\
+             (drop) (call $stop_boundary_inactive) (unreachable)))\n\
+             (call $shadow_restore (local.get $depth))\n",
+            with(0, "(local.get $v)")
+        );
+        for (i, m) in abi.errors.iter().enumerate() {
+            let _ = writeln!(
+                f,
+                "(if (i32.eq (call $value_tag (local.get $e)) (i32.const {})) (then (return (i32.const {}){})))",
+                value_tag(*m),
+                i + 1,
+                with(i + 1, "(local.get $e)")
+            );
+        }
+        f.push_str("(unreachable))\n");
+        self.out.push_str(&f);
+    }
+}
+
+/// The Wasm types of a value (B.2) and the function that makes it from
+/// them.
+fn abi_in(t: AbiType) -> (&'static [&'static str], &'static str) {
+    match t {
+        AbiType::Nil => (&[], ""),
+        AbiType::Bool => (&["i32"], "$abi_bool_in"),
+        AbiType::Int => (&["i32", "i32", "i32"], "$abi_int_in"),
+        AbiType::Float => (&["f64"], "$abi_float_in"),
+        AbiType::String => (&["i32", "i32"], "$abi_string_in"),
+        AbiType::BitArray => (&["i32", "i32"], "$abi_bits_in"),
+        AbiType::Externref => (&["externref"], "$abi_ref_in"),
+    }
+}
+
+/// The Wasm types of a value given to the host, and the code that gives
+/// them for the value `v`. For `Nil`, `v` is worked out and dropped.
+fn abi_out(t: AbiType, v: &str) -> (Vec<&'static str>, String) {
+    let types = abi_in(t).0.to_vec();
+    let out = match t {
+        AbiType::Nil => format!("(drop {v})"),
+        AbiType::Bool => format!("(call $abi_bool_out {v})"),
+        AbiType::Int => format!("(call $abi_int_out {v})"),
+        AbiType::Float => format!("(call $abi_float_out {v})"),
+        AbiType::String => format!("(call $abi_string_out {v})"),
+        AbiType::BitArray => format!("(call $abi_bits_out {v})"),
+        AbiType::Externref => format!("(call $abi_ref_out {v})"),
+    };
+    (types, out)
+}
+
+fn result_list(types: &[&str]) -> String {
+    if types.is_empty() {
+        String::new()
+    } else {
+        format!(" (result {})", types.join(" "))
+    }
+}
+
+fn zero(t: &str) -> &'static str {
+    match t {
+        "i32" => "(i32.const 0)",
+        "f64" => "(f64.const 0)",
+        _ => "(ref.null extern)",
+    }
+}
+
+/// The value tag (`runtime/mod.rs`) of the values of an error member that
+/// the host can take (§10.3).
+fn value_tag(t: AbiType) -> u32 {
+    match t {
+        AbiType::Nil => 0,
+        AbiType::Bool => 1,
+        AbiType::Float => 2,
+        AbiType::String => 3,
+        AbiType::Int => 8,
+        AbiType::BitArray => 9,
+        AbiType::Externref => 10,
+    }
+}
+
+fn env_text(e: Env) -> String {
+    match e {
+        Env::Param => "(local.get $env)".into(),
+        Env::Local(l) => format!("(local.get $l{l})"),
     }
 }
 

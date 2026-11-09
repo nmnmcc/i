@@ -169,6 +169,42 @@ pub struct Typed {
     /// Whether each top-level binding was generalized (§4.7): its value is
     /// a direct value, as are the values of its group.
     pub generalized: HashMap<BindingRef, bool>,
+    /// Each constructor pattern `C(p1, …)`, by the span of the pattern: for
+    /// each part, in the order written, the index of the field it is
+    /// matched to (§7.1). A part that matches no field has `u32::MAX`.
+    pub pattern_fields: HashMap<(ModuleId, Span), Vec<u32>>,
+    /// Each pattern of a binding and each parameter pattern, by the span of
+    /// the pattern: whether it may fail for the type of its value (§7.3),
+    /// so that it reports to `Assert` (§6.10, §6.11).
+    pub may_fail: HashMap<(ModuleId, Span), bool>,
+    /// The signature of each host export (§10.2, B.2) whose types the host
+    /// can take.
+    pub host_exports: HashMap<DefId, HostSignature>,
+}
+
+/// A type that the host can take (§10.3), as one part of a host export.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum HostType {
+    Nil,
+    Bool,
+    Int,
+    Float,
+    String,
+    BitArray,
+    /// A custom type with no constructors: an opaque reference.
+    Opaque(crate::hir::TypeId),
+    /// `Never`: no value, so nothing is passed.
+    Never,
+}
+
+/// The types of a host export (B.2): its parameters, its value, and the
+/// members of its errors in the canonical order (`Nil`, `Bool`, `Int`,
+/// `Float`, `String`, `BitArray`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HostSignature {
+    pub params: Vec<HostType>,
+    pub result: HostType,
+    pub errors: Vec<HostType>,
 }
 
 impl Typed {
