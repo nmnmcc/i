@@ -21,7 +21,7 @@ struct Printer {
 
 /// The binding strength of an expression: binary levels 1 to 8 (§6.9), 9 for
 /// unary operators, and 10 for the rest.
-fn level(e: &Expr) -> u8 {
+pub(crate) fn level(e: &Expr) -> u8 {
     match &e.kind {
         ExprKind::Binary { op, .. } => op.level(),
         ExprKind::Unary { .. } => 9,
@@ -58,7 +58,7 @@ fn is_simple(e: &Expr) -> bool {
 
 /// An expression with a function without `->` outside all brackets, which
 /// would end too early after `case` (§1.7).
-fn has_open_fn(e: &Expr) -> bool {
+pub(crate) fn has_open_fn(e: &Expr) -> bool {
     match &e.kind {
         ExprKind::Fn(f) => f.ret.is_none(),
         ExprKind::Binary { lhs, rhs, .. } => has_open_fn(lhs) || has_open_fn(rhs),
@@ -70,7 +70,7 @@ fn has_open_fn(e: &Expr) -> bool {
     }
 }
 
-fn type_prec(t: &TypeExpr) -> u8 {
+pub(crate) fn type_prec(t: &TypeExpr) -> u8 {
     match t.kind {
         TypeKind::Union(_) => 1,
         TypeKind::Inter(_) => 2,
