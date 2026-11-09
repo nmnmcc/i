@@ -64,7 +64,7 @@ fn graph_with_path_dependencies() {
     // The library package.
     let lib = &graph.packages[graph.library];
     assert_eq!(lib.name, "i");
-    assert_eq!(lib.modules.len(), 7);
+    assert_eq!(lib.modules.len(), ilang_package::library::MODULES.len() + 1);
 }
 
 #[test]
