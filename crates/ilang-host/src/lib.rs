@@ -205,6 +205,10 @@ pub struct Abi {
     pub exports: BTreeMap<String, Signature>,
     pub services: BTreeMap<String, BTreeMap<String, Signature>>,
     pub externals: BTreeMap<String, BTreeMap<String, Signature>>,
+    /// `"wasi"` for a module of the WASI target (B.7), which this host does
+    /// not run; absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
 }
 
 impl Default for Abi {
@@ -216,6 +220,7 @@ impl Default for Abi {
             exports: BTreeMap::new(),
             services: BTreeMap::new(),
             externals: BTreeMap::new(),
+            target: None,
         }
     }
 }
@@ -616,6 +621,11 @@ impl Program {
         let embedded = Abi::from_wasm(bytes)?;
         let embedded_abi = embedded.is_some();
         let abi = embedded.unwrap_or_default();
+        if let Some(target) = &abi.target {
+            bail!(
+                "the module was built for the {target} target (B.7); run it with a WASI host such as `wasmtime run`"
+            );
+        }
         let mut config = Config::new();
         config.wasm_gc(true);
         config.wasm_function_references(true);

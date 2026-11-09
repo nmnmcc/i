@@ -5,6 +5,7 @@ use ilang_package::{Diagnostic, PackageGraph};
 use std::path::Path;
 
 pub use ilang_binaryen::Level;
+pub use ilang_wasm::Target;
 
 /// What to build.
 #[derive(Clone, Copy, Debug)]
@@ -15,6 +16,8 @@ pub struct BuildOptions {
     /// Do not use the network to get packages (§2.7); `ILANG_OFFLINE` in
     /// the environment also turns this on.
     pub offline: bool,
+    /// The host to build for (B.7).
+    pub target: ilang_wasm::Target,
 }
 
 /// A module that was built.
@@ -103,6 +106,7 @@ pub fn build(project: &Path, options: BuildOptions) -> Result<Built, BuildError>
         typed,
         ilang_wasm::Options {
             tests: options.tests,
+            target: options.target,
         },
     ) {
         Ok(w) => w,

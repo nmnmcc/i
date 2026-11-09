@@ -5,6 +5,7 @@ mod commands;
 use clap::{Parser, Subcommand};
 use ilang_cli::{BuildOptions, build, level, run_test};
 use ilang_host::{Outcome, Program, TestResult};
+use ilang_wasm::Target;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -43,6 +44,11 @@ enum Command {
         /// The output file; by default `build/<name>.wasm` in the package.
         #[arg(long)]
         out: Option<PathBuf>,
+        /// The host to build for: `ilang` (`i run`, the Rust host, the
+        /// JavaScript SDK) or `wasi` (a WASI command that a stock Wasmtime
+        /// runs with `wasmtime run`).
+        #[arg(long, value_enum, default_value_t = TargetArg::Ilang)]
+        target: TargetArg,
         /// Also print the unoptimized WAT text next to the output.
         #[arg(long, hide = true)]
         wat: bool,
@@ -103,8 +109,9 @@ fn main() -> ExitCode {
             offline,
             opt,
             out,
+            target,
             wat,
-        } => cmd_build(&project, opt, offline, out, wat),
+        } => cmd_build(&project, opt, offline, out, target.into(), wat),
         Command::Run {
             project,
             offline,
@@ -134,12 +141,29 @@ fn main() -> ExitCode {
     }
 }
 
+/// The values of `--target`.
+#[derive(Clone, Copy, clap::ValueEnum)]
+enum TargetArg {
+    Ilang,
+    Wasi,
+}
+
+impl From<TargetArg> for Target {
+    fn from(t: TargetArg) -> Target {
+        match t {
+            TargetArg::Ilang => Target::Ilang,
+            TargetArg::Wasi => Target::Wasi,
+        }
+    }
+}
+
 fn options(opt: u8, tests: bool, offline: bool) -> anyhow::Result<BuildOptions> {
     let opt = level(opt).ok_or_else(|| anyhow::anyhow!("--opt must be 0, 2, or 3"))?;
     Ok(BuildOptions {
         tests,
         opt,
         offline,
+        target: Target::Ilang,
     })
 }
 
@@ -164,9 +188,14 @@ fn cmd_build(
     opt: u8,
     offline: bool,
     out: Option<PathBuf>,
+    target: Target,
     wat: bool,
 ) -> anyhow::Result<ExitCode> {
-    let Some(b) = built(project, options(opt, false, offline)?)? else {
+    let options = BuildOptions {
+        target,
+        ..options(opt, false, offline)?
+    };
+    let Some(b) = built(project, options)? else {
         return Ok(ExitCode::FAILURE);
     };
     let out = out.unwrap_or_else(|| project.join("build").join(format!("{}.wasm", b.name)));
@@ -180,8 +209,15 @@ fn cmd_build(
         let (graph, _) = ilang_cli::load(project, false, offline);
         let checked = ilang_check::check(&graph);
         if let (Some(p), Some(t)) = (&checked.program, &checked.types)
-            && let Ok(text) =
-                ilang_wasm::compile_wat(&graph, p, t, ilang_wasm::Options { tests: false })
+            && let Ok(text) = ilang_wasm::compile_wat(
+                &graph,
+                p,
+                t,
+                ilang_wasm::Options {
+                    tests: false,
+                    target,
+                },
+            )
         {
             std::fs::write(out.with_extension("wat"), text)?;
         }

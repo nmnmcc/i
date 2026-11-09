@@ -683,6 +683,7 @@ dependencies = [
  "num-bigint",
  "tempfile",
  "toml_edit",
+ "wasmtime",
 ]
 
 [[package]]

@@ -639,6 +639,30 @@ pub enum ImportKind {
     /// A function of an async host service: no results; the answer comes
     /// through `ilang_resume:…` (B.5).
     AsyncService,
+    /// `print` of the standard service `i:io/v1` on the WASI target: the
+    /// module defines it, with `fd_write` to the standard output (B.7).
+    WasiStdout,
+}
+
+/// The host a module is made for.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Target {
+    /// A host of the i binary interface (Appendix B), such as `i run`, the
+    /// Rust host, and the JavaScript SDK.
+    #[default]
+    Ilang,
+    /// A WASI preview 1 command, which runs in a stock Wasmtime (B.7).
+    Wasi,
+}
+
+impl Target {
+    /// The name in the metadata (B.6).
+    pub fn name(self) -> &'static str {
+        match self {
+            Target::Ilang => "ilang",
+            Target::Wasi => "wasi",
+        }
+    }
 }
 
 /// A Wasm import of a function of the host (B.4).
@@ -696,4 +720,9 @@ pub struct Program {
     pub imports: Vec<Import>,
     /// The host services of the root environment (§9.7).
     pub host_services: Vec<HostService>,
+    /// The host the module is made for.
+    pub target: Target,
+    /// On the WASI target: the export of the program entry, which `_start`
+    /// calls after `ilang_start` (B.7).
+    pub entry: Option<String>,
 }

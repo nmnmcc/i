@@ -55,11 +55,16 @@ pub mod code {
 /// The first constructor id and type id that the code generator gives.
 const FIRST_ID: u32 = crate::runtime::FIRST_CONSTRUCTOR;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Options {
     /// Compile the tests of the compiled package and its dev-dependencies.
     pub tests: bool,
+    /// The host the module is made for (B.7).
+    pub target: ir::Target,
 }
+
+/// The namespace of the standard service `Io` (§9.7).
+pub const IO: &str = "i:io/v1";
 
 /// How a constructor is represented (`runtime/mod.rs`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -882,7 +887,25 @@ impl<'a> Lowerer<'a> {
         for t in needed {
             self.host_service(t);
         }
-        self.out.abi_json = abi_json(entry, &tests, &exports, &self.out.imports);
+        if self.options.target == ir::Target::Wasi {
+            match &entry {
+                Some((name, _)) => self.out.entry = Some(name.clone()),
+                None => self.diags.push(Diagnostic::error(
+                    code::NOT_SUPPORTED,
+                    None,
+                    Span::default(),
+                    "the WASI target needs a program entry, a `@main` (B.7)",
+                )),
+            }
+        }
+        self.out.target = self.options.target;
+        self.out.abi_json = abi_json(
+            self.options.target,
+            entry,
+            &tests,
+            &exports,
+            &self.out.imports,
+        );
     }
 
     /// Whether an entry point is async: it may call a function of an async
@@ -900,8 +923,14 @@ impl<'a> Lowerer<'a> {
                 .ty(*t)
                 .host
                 .as_ref()
-                .is_some_and(|h| h.is_async)
+                .is_some_and(|h| self.host_is_async(h))
         })
+    }
+
+    /// Whether a host service is async in the module: on the WASI target
+    /// every host function is a blocking call (B.7).
+    fn host_is_async(&self, host: &hir::Host) -> bool {
+        host.is_async && self.options.target == ir::Target::Ilang
     }
 
     /// The body of an async entry point inside its root boundary (B.5): a
@@ -950,8 +979,10 @@ impl<'a> Lowerer<'a> {
         let CtorRepr::Record { ctor, ty } = self.ctors[&CtorRef { ty: t, index: 0 }].repr else {
             return;
         };
-        let kind = if host.is_async {
+        let kind = if self.host_is_async(host) {
             ImportKind::AsyncService
+        } else if host.namespace == IO && self.options.target == ir::Target::Wasi {
+            ImportKind::WasiStdout
         } else {
             ImportKind::Service
         };
@@ -960,7 +991,23 @@ impl<'a> Lowerer<'a> {
             let (Some(label), Some(hf)) = (&f.label, program.host_fns.get(&(t, i as u32))) else {
                 return;
             };
-            match self.import(&host.namespace, &label.name, host_abi(hf), kind) {
+            let abi = host_abi(hf);
+            if kind == ImportKind::WasiStdout
+                && !(label.name == "print"
+                    && abi.params == [AbiType::String]
+                    && abi.result == AbiType::Nil
+                    && abi.errors.is_empty())
+            {
+                self.error(
+                    def.module,
+                    label.span,
+                    format!(
+                        "the standard service `{IO}` has one function, `print: (text: String) -> Nil` (§9.7)"
+                    ),
+                );
+                return;
+            }
+            match self.import(&host.namespace, &label.name, abi, kind) {
                 Ok(import) => {
                     let f = self.import_func(import);
                     self.constants.insert(f);
@@ -1074,7 +1121,7 @@ impl<'a> Lowerer<'a> {
         let mut locals = vec![LocalType::Value; n as usize];
         let mut body = Vec::new();
         match x.kind {
-            ImportKind::External | ImportKind::Service => {
+            ImportKind::External | ImportKind::Service | ImportKind::WasiStdout => {
                 locals.push(LocalType::Value);
                 body.push(Stmt::Let {
                     dst: n,
@@ -2542,6 +2589,7 @@ fn names(ts: &[AbiType]) -> Vec<&'static str> {
 
 /// The `ilang.abi` metadata (B.6).
 fn abi_json(
+    target: ir::Target,
     entry: Option<(String, bool)>,
     tests: &[(String, bool)],
     exports: &[(String, ExportAbi, bool)],
@@ -2571,6 +2619,8 @@ fn abi_json(
     let mut externals = serde_json::Map::new();
     for x in imports {
         let (table, sig) = match x.kind {
+            // The module gives it itself (B.7).
+            ImportKind::WasiStdout => continue,
             ImportKind::External => (
                 &mut externals,
                 serde_json::json!({
@@ -2595,13 +2645,17 @@ fn abi_json(
             m.insert(x.name.clone(), sig);
         }
     }
-    serde_json::json!({
+    let mut abi = serde_json::json!({
         "version": 2,
         "entry": entry,
         "tests": tests,
         "exports": map,
         "services": services,
         "externals": externals,
-    })
-    .to_string()
+    });
+    // Only a module of the WASI target says its target (B.6, B.7).
+    if target == ir::Target::Wasi {
+        abi["target"] = target.name().into();
+    }
+    abi.to_string()
 }
