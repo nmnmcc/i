@@ -79,9 +79,17 @@ Node runs the same file with `node:wasi`. On this target:
 - The runtime imports `fd_write` and `proc_exit` of `wasi_snapshot_preview1`
   itself, so a program may not import them; other WASI functions it may.
 - Every other host service and external function is still an import, encoded
-  as in the spec's Appendix B. Give it with a module linked in, for example
-  `wasmtime run --preload app:clock/v1=clock.wasm app.wasm`. Async host
-  services are blocking calls.
+  as in the spec's Appendix B. Async host services are blocking calls.
+- A module linked in can give an import whose parameters, value, and errors
+  are `Nil`, `Bool`, `Float`, or host references, for example
+  `@host("app:math/v1") Math { Math(cbrt: (x: Float) -> Float) }` with
+  `wasmtime run --preload app:math/v1=math.wasm app.wasm`, where `math.wasm`
+  exports `cbrt` as `(f64) -> f64`. A preloaded module is made before the
+  program, so it cannot reach the program's `memory` or `ilang_alloc`. An
+  import with an `Int`, `String`, or `BitArray` needs a host that defines it
+  with the exports of the instance: a Rust embedder with Wasmtime's `Linker`
+  and `Caller::get_export`, a JavaScript host around `node:wasi`, or a
+  module linked in statically.
 - The program needs a `@main`. Tests run only with `i test`, because each test
   needs a new instance.
 - The host chooses how deep the stack may be. Wasmtime allows less than
