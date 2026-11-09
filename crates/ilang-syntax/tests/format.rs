@@ -3,8 +3,10 @@
 //!
 //! - the output parses without errors, to the same tree (spans aside);
 //! - formatting the output again changes nothing;
-//! - every comment is kept, with the same text, in the same order;
-//! - indentation is tabs, and no line ends in a space or a tab.
+//! - every comment is kept, in the same order, with the same text, but the
+//!   spaces at its end, which are taken away when it is not documentation;
+//! - indentation is tabs, and no line ends in a space or a tab, but in
+//!   documentation.
 
 mod common;
 
@@ -59,6 +61,27 @@ fn comments(src: &str) -> Vec<String> {
     lex(src).comments.into_iter().map(|c| c.text).collect()
 }
 
+/// The text of the comments that the formatter gives: without the spaces at
+/// their ends, but in documentation.
+fn kept_comments(src: &str) -> Vec<String> {
+    let mut out = comments(src);
+    for c in &mut out {
+        if !c.starts_with("///") {
+            c.truncate(c.trim_end().len());
+        }
+    }
+    out
+}
+
+/// The lines (from 0) that end in documentation.
+fn doc_lines(src: &str) -> Vec<usize> {
+    let lines = ilang_syntax::span::LineIndex::new(src);
+    let docs = lex(src).docs;
+    docs.iter()
+        .map(|d| lines.line_col(d.span.start).0 as usize - 1)
+        .collect()
+}
+
 /// The lines (from 0) that go on from a string literal of several lines.
 fn raw_string_lines(src: &str) -> Vec<usize> {
     let lexed = lex(src);
@@ -85,7 +108,7 @@ fn check(src: &str) -> Result<(), String> {
     if common::shape(&module) != common::shape(&again) {
         return Err(format!("the output has another tree:\n{out}"));
     }
-    if comments(src) != comments(&out) {
+    if kept_comments(src) != comments(&out) {
         return Err(format!(
             "the comments changed: {:?} -> {:?}",
             comments(src),
@@ -99,11 +122,13 @@ fn check(src: &str) -> Result<(), String> {
         ));
     }
     let raw = raw_string_lines(&out);
+    let docs = doc_lines(&out);
     for (n, line) in out.lines().enumerate() {
         if raw.contains(&n) {
             continue;
         }
-        if line.ends_with([' ', '\t']) || line.trim_start_matches('\t').starts_with(' ') {
+        let ends_badly = line.ends_with([' ', '\t']) && !docs.contains(&n);
+        if ends_badly || line.trim_start_matches('\t').starts_with(' ') {
             return Err(format!("bad spaces in line {}: {line:?}\n{out}", n + 1));
         }
     }

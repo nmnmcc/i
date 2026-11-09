@@ -13,8 +13,11 @@
 //! items, and the parts of brackets, where a break is a `,`), or where it is
 //! not a break at all (after an operator, `(`, `[`, `{`, `<<`, `->`, `=`, or
 //! before `|>`). Literals are printed as they are written in the source.
-//! Comments are put back where they were: trailing comments at the end of
-//! their line, and other comments on their own lines, in the same order.
+//! Comments are put back where they were, in the same order, and without the
+//! spaces at their ends (but documentation): trailing comments at the end of
+//! their line, a comment in the middle of an expression at the end of the
+//! line it is in, with what comes after it one level in, and other comments
+//! on their own lines.
 
 use crate::ast::*;
 use crate::lexer::{Comment, lex};
@@ -74,6 +77,9 @@ enum Doc {
     Line,
     /// Nothing on one line, or a line end.
     Soft,
+    /// A space, unless the line is empty so far or already ends with a space:
+    /// before a comment that goes on the line of the text before it.
+    Gap,
     /// Always a line end; the group around it is never on one line.
     Hard,
     /// The group around it is never on one line.
@@ -243,7 +249,7 @@ fn fits(next: &Doc, rest: &[(usize, Mode, &Doc)], mut rem: isize, full: bool) ->
             }
             Doc::Hard => return true,
             Doc::Force => {}
-            Doc::Tab(_) => rem -= 1,
+            Doc::Tab(_) | Doc::Gap => rem -= 1,
             Doc::Nest(d) => stack.push((mode, d, full)),
             Doc::Full(d) => stack.push((mode, d, true)),
             Doc::Cat(v) => stack.extend(v.iter().rev().map(|d| (mode, d, full))),
@@ -289,6 +295,13 @@ fn render(doc: &Doc, max: usize) -> String {
                 }
             }
             Doc::Force => {}
+            Doc::Gap => {
+                let last = out.line().parts.last().unwrap();
+                if !last.is_empty() && !last.ends_with([' ', '\t']) {
+                    out.push(" ");
+                    col += 1;
+                }
+            }
             Doc::Tab(kind) => {
                 if mode == Mode::Break {
                     let line = out.line();
@@ -526,10 +539,17 @@ impl<'a> Formatter<'a> {
         self.comments.get(self.next)
     }
 
+    /// The next comment, without the spaces at its end. The text of a `///`
+    /// or `////` comment is documentation, which is kept as it is: in
+    /// Markdown, spaces at the end of a line end the line.
     fn take(&mut self) -> Doc {
         let c = &self.comments[self.next];
         self.next += 1;
-        text(c.text.as_str())
+        if c.text.starts_with("///") {
+            text(c.text.as_str())
+        } else {
+            text(c.text.trim_end())
+        }
     }
 
     /// `label:` and the space after it, where lines of labels are aligned.
@@ -561,6 +581,35 @@ impl<'a> Formatter<'a> {
             out.push(self.hard());
         }
         cat(out)
+    }
+
+    /// The comments before `pos` that were not printed yet, in the middle of
+    /// an expression, a pattern, or a type: the first goes on the line of the
+    /// text before it, after a space, and the others each on its own line. A
+    /// line end must come after them.
+    fn mid_comments(&mut self, pos: u32) -> Option<Doc> {
+        if !self.peek().is_some_and(|c| c.span.start < pos) {
+            return None;
+        }
+        let mut out = vec![Doc::Gap, self.take()];
+        while self.peek().is_some_and(|c| c.span.start < pos) {
+            out.push(self.hard());
+            out.push(self.take());
+        }
+        Some(cat(out))
+    }
+
+    /// The part at `pos` after the comments before it, if there are any: it
+    /// goes on in the next line, one level in.
+    fn continued(&mut self, pos: u32, part: impl FnOnce(&mut Self) -> Doc) -> Doc {
+        match self.mid_comments(pos) {
+            Some(comments) => {
+                let end = self.hard();
+                let part = part(self);
+                cat(vec![comments, nest(cat(vec![end, part]))])
+            }
+            None => part(self),
+        }
     }
 
     /// The comment at the end of the line of a part that ends at `end`, if
@@ -636,7 +685,9 @@ impl<'a> Formatter<'a> {
             out.push(part(self, i));
             prev = end;
             if let Some(t) = self.trailing(end, close) {
-                prev = self.comments[self.next - 1].span.end;
+                // A comment from inside the part is put after it, but the
+                // blank lines after the part are counted from its end.
+                prev = prev.max(self.comments[self.next - 1].span.end);
                 out.push(t);
             }
             after_item = true;
@@ -856,7 +907,10 @@ impl<'a> Formatter<'a> {
         }
         match &item.kind {
             ItemKind::TypeDef(def) => out.push(self.type_def(def, item.span.end)),
-            ItemKind::Binding(b) => out.push(self.binding(b)),
+            ItemKind::Binding(b) => {
+                out.push(self.leading(b.span.start));
+                out.push(self.binding(b));
+            }
             ItemKind::Declaration { name, ty } => {
                 out.push(self.leading(name.span.start));
                 out.push(text(format!("{}: ", name.name)));
@@ -989,13 +1043,13 @@ impl<'a> Formatter<'a> {
 
     /// `e` where an expression of at least level `min` is needed (§6.9).
     fn expr(&mut self, e: &Expr, min: u8) -> Doc {
-        let lead = self.leading(e.span.start);
-        let body = if level(e) < min {
-            cat(vec![text("{ "), self.expr_raw(e), text(" }")])
-        } else {
-            self.expr_raw(e)
-        };
-        cat(vec![lead, body])
+        self.continued(e.span.start, |f| {
+            if level(e) < min {
+                cat(vec![text("{ "), f.expr_raw(e), text(" }")])
+            } else {
+                f.expr_raw(e)
+            }
+        })
     }
 
     fn expr_raw(&mut self, e: &Expr) -> Doc {
@@ -1079,14 +1133,18 @@ impl<'a> Formatter<'a> {
                 cat(vec![head, list])
             }
             ExprKind::Field { target, name } => {
-                cat(vec![self.target(target), text(format!(".{}", name.name))])
+                let target = self.target(target);
+                let field = self.dotted(name.span.start, format!(".{}", name.name));
+                cat(vec![target, field])
             }
             ExprKind::TupleIndex {
                 target, index_span, ..
-            } => cat(vec![
-                self.target(target),
-                text(format!(".{}", self.slice(*index_span))),
-            ]),
+            } => {
+                let target = self.target(target);
+                let index = format!(".{}", self.slice(*index_span));
+                let index = self.dotted(index_span.start, index);
+                cat(vec![target, index])
+            }
             ExprKind::RecordUpdate {
                 constructor,
                 base,
@@ -1143,9 +1201,20 @@ impl<'a> Formatter<'a> {
         let mut tail = Vec::new();
         let last = rest.len();
         for (i, (op, rhs)) in rest.into_iter().enumerate() {
+            // A comment before the operand stays at the end of the line: before
+            // `|>`, which begins the next line, and after other operators.
+            let comments = self.mid_comments(rhs.span.start);
             if op == BinOp::Pipe {
+                if let Some(c) = comments {
+                    tail.push(c);
+                    tail.push(self.force());
+                }
                 tail.push(Doc::Line);
                 tail.push(text("|> "));
+            } else if let Some(c) = comments {
+                tail.push(text(format!(" {}", op.text())));
+                tail.push(c);
+                tail.push(self.hard());
             } else if glued {
                 tail.push(text(format!(" {} ", op.text())));
             } else {
@@ -1153,15 +1222,25 @@ impl<'a> Formatter<'a> {
                 tail.push(Doc::Line);
             }
             match &rhs.kind {
-                ExprKind::Block(b) if i + 1 == last => {
-                    tail.push(self.leading(rhs.span.start));
-                    tail.push(self.block(b, true));
-                }
+                ExprKind::Block(b) if i + 1 == last => tail.push(self.block(b, true)),
                 _ if i + 1 < last => tail.push(Doc::Full(Box::new(self.expr(rhs, lvl + 1)))),
                 _ => tail.push(self.expr(rhs, lvl + 1)),
             }
         }
         group(cat(vec![head, nest(cat(tail))]))
+    }
+
+    /// `.name` or `.k`, whose name is at `pos`. A comment before it stays on
+    /// the line of the target, and the `.` goes on in the next line, which
+    /// is not a break (§1.7).
+    fn dotted(&mut self, pos: u32, part: String) -> Doc {
+        match self.mid_comments(pos) {
+            Some(comments) => {
+                let end = self.hard();
+                nest(cat(vec![comments, end, text(part)]))
+            }
+            None => text(part),
+        }
     }
 
     /// The expression before `.name` or `.k`. An int right before `.` would
@@ -1239,6 +1318,12 @@ impl<'a> Formatter<'a> {
         let first = self.pattern(&c.patterns[0], true);
         let mut more = Vec::new();
         for p in &c.patterns[1..] {
+            // A comment before a choice stays at the end of the line before
+            // its `|`.
+            if let Some(comments) = self.mid_comments(p.span.start) {
+                more.push(comments);
+                more.push(self.force());
+            }
             more.push(Doc::Line);
             more.push(text("| "));
             more.push(self.pattern(p, true));
@@ -1266,9 +1351,12 @@ impl<'a> Formatter<'a> {
     /// `clause` is set for the top of a `case` clause pattern, where `->`
     /// comes after it.
     fn pattern(&mut self, p: &Pattern, clause: bool) -> Doc {
-        let lead = self.leading(p.span.start);
+        self.continued(p.span.start, |f| f.pattern_raw(p, clause))
+    }
+
+    fn pattern_raw(&mut self, p: &Pattern, clause: bool) -> Doc {
         let span = p.span;
-        let body = match &p.kind {
+        match &p.kind {
             PatternKind::Var(n) | PatternKind::Discard(n) => text(n.as_str()),
             PatternKind::Typed { binder, ty } => {
                 let t = if clause && ends_with_tuple(ty) {
@@ -1376,8 +1464,7 @@ impl<'a> Formatter<'a> {
                     },
                 )
             }
-        };
-        cat(vec![lead, body])
+        }
     }
 
     // ---- Types (§3) ----
@@ -1389,14 +1476,15 @@ impl<'a> Formatter<'a> {
     /// `t` where a type of strength `min` is needed. `tail` is set when
     /// nothing that a function type could take comes after it.
     fn ty_in(&mut self, t: &TypeExpr, min: u8, tail: bool) -> Doc {
-        let lead = self.leading(t.span.start);
         let brace = type_braced(t, min) || !tail && ends_with_fn(t);
-        let body = self.ty_raw(t, tail || brace);
-        if brace {
-            cat(vec![lead, text("{ "), body, text(" }")])
-        } else {
-            cat(vec![lead, body])
-        }
+        self.continued(t.span.start, |f| {
+            let body = f.ty_raw(t, tail || brace);
+            if brace {
+                cat(vec![text("{ "), body, text(" }")])
+            } else {
+                body
+            }
+        })
     }
 
     fn types(&mut self, open: u32, close: u32, items: &[TypeExpr]) -> Doc {
