@@ -13,16 +13,15 @@ pub fn wat() -> String {
 
 const WAT: &str = r#"
 (func $core_bit_array_concat (param $list eqref) (result eqref)
-  (local $cursor eqref) (local $fields (ref null $values)) (local $part eqref)
+  (local $cursor eqref) (local $part eqref)
   (local $length i64) (local $at i64) (local $data (ref null $bytes)) (local $count i32)
   (local.set $cursor (local.get $list))
   (block $counted (loop $count
-    (local.set $fields (struct.get $obj 5 (ref.cast (ref $obj) (local.get $cursor))))
-    (br_if $counted (ref.is_null (local.get $fields)))
-    (local.set $part (array.get $values (local.get $fields) (i32.const 0)))
+    (br_if $counted (call $list_is_empty (local.get $cursor)))
+    (local.set $part (call $list_head (local.get $cursor)))
     (local.set $length (i64.add (local.get $length) (call $bits_len64 (local.get $part))))
     (local.set $count (i32.add (local.get $count) (i32.const 1)))
-    (local.set $cursor (array.get $values (local.get $fields) (i32.const 1)))
+    (local.set $cursor (call $list_tail (local.get $cursor)))
     (br $count)))
   (if (i32.eqz (local.get $count)) (then (return (call $bits_empty))))
   ;; One part needs no copy: bit arrays cannot be changed.
@@ -30,12 +29,11 @@ const WAT: &str = r#"
   (local.set $data (call $bits_alloc (local.get $length)))
   (local.set $cursor (local.get $list))
   (block $written (loop $write
-    (local.set $fields (struct.get $obj 5 (ref.cast (ref $obj) (local.get $cursor))))
-    (br_if $written (ref.is_null (local.get $fields)))
-    (local.set $part (array.get $values (local.get $fields) (i32.const 0)))
+    (br_if $written (call $list_is_empty (local.get $cursor)))
+    (local.set $part (call $list_head (local.get $cursor)))
     (call $bits_join_part (ref.as_non_null (local.get $data)) (local.get $at) (local.get $part))
     (local.set $at (i64.add (local.get $at) (call $bits_len64 (local.get $part))))
-    (local.set $cursor (array.get $values (local.get $fields) (i32.const 1)))
+    (local.set $cursor (call $list_tail (local.get $cursor)))
     (br $write)))
   (call $bits_new (ref.as_non_null (local.get $data)) (i32.const 0) (local.get $length)))
 
