@@ -1,0 +1,2104 @@
+//! From the resolved program (HIR) and its types to the intermediate form
+//! of `ir.rs`.
+//!
+//! - Every function expression becomes a function of the intermediate form
+//!   with explicit captures (§6.8). A top-level function is one value (§2.5,
+//!   §11.4): a constant closure, and its known calls are direct.
+//! - Constructors (§6.3) and library functions used as values are functions
+//!   with one constant closure each, so they have one identity (§11.4).
+//! - Evaluation order is that of §6.2, and only the tail positions of §11.6
+//!   become tail calls.
+//! - `case` (§6.12) tests the clauses one after the other, each pattern with
+//!   plain tests (§7.2, §8.4).
+//! - Every call, operator, and `<<` of the program source that may stop has a
+//!   site on the shadow stack (§11.7).
+//! - Top-level values are worked out in `ilang_start`, in `order.init` (§2.5).
+//!
+//! Effects come later. Environment parameters and statements, the modules
+//! `i/fail`, `i/control`, `i/resource`, and `i/assertion`, `assert`, and
+//! bindings that may fail are reported as not supported yet.
+
+use crate::ir::Stmt;
+use crate::ir::{self, *};
+use ilang_check::hir::{self, *};
+use ilang_check::types::{Access, Head, Typed};
+use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
+use ilang_syntax::ast::{BinOp, UnOp};
+use ilang_syntax::span::{LineIndex, Span};
+use num_bigint::BigInt;
+use std::collections::{BTreeSet, HashMap, HashSet};
+
+/// The code of the problems found by the code generator.
+pub mod code {
+    /// A feature that the compiler does not support yet.
+    pub const NOT_SUPPORTED: &str = "E0701";
+}
+
+/// The first constructor id and type id that the code generator gives.
+const FIRST_ID: u32 = crate::runtime::FIRST_CONSTRUCTOR;
+
+#[derive(Clone, Copy, Debug)]
+pub struct Options {
+    /// Compile the tests of the compiled package and its dev-dependencies.
+    pub tests: bool,
+}
+
+/// How a constructor is represented (`runtime/mod.rs`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CtorRepr {
+    Bool(bool),
+    Nil,
+    Record { ctor: u32, ty: u32 },
+}
+
+#[derive(Clone, Debug)]
+struct CtorInfo {
+    repr: CtorRepr,
+    labels: Vec<Option<String>>,
+}
+
+/// How a custom type is tested at run time (§7.1).
+#[derive(Clone, Copy, Debug)]
+enum TypeRepr {
+    Bool,
+    Nil,
+    Record(u32),
+    /// A type with no constructors: its values are host references.
+    Host,
+}
+
+/// What a callee is.
+enum Target {
+    Ctor(CtorRef),
+    Op(Op),
+    Callee(Callee),
+}
+
+/// The library functions whose bodies are in the runtime (§13).
+const CORE: &[&str] = &[
+    "not",
+    "to_float",
+    "truncate",
+    "floor",
+    "ceiling",
+    "sqrt",
+    "float_to_bits",
+    "float_from_bits",
+    "bit_and",
+    "bit_or",
+    "bit_xor",
+    "bit_not",
+    "shift_left",
+    "shift_right",
+    "concat",
+    "byte_size",
+    "byte_slice",
+    "codepoints",
+    "from_codepoints",
+    "codepoint_to_int",
+    "int_to_codepoint",
+    "bit_size",
+    "bit_array_to_string",
+    "inspect",
+    "hash",
+];
+
+const CORE_FUNCS: &[&str] = &[
+    "core_not",
+    "core_to_float",
+    "core_truncate",
+    "core_floor",
+    "core_ceiling",
+    "core_sqrt",
+    "core_float_to_bits",
+    "core_float_from_bits",
+    "core_bit_and",
+    "core_bit_or",
+    "core_bit_xor",
+    "core_bit_not",
+    "core_shift_left",
+    "core_shift_right",
+    "core_concat",
+    "core_byte_size",
+    "core_byte_slice",
+    "core_codepoints",
+    "core_from_codepoints",
+    "core_codepoint_to_int",
+    "core_int_to_codepoint",
+    "core_bit_size",
+    "core_bit_array_to_string",
+    "core_inspect",
+    "core_hash",
+];
+
+/// The state of one function while it is lowered.
+struct Fx {
+    module: ModuleId,
+    /// Code of the library: it has no sites (§11.7).
+    library: bool,
+    locals: Vec<LocalType>,
+    vars: HashMap<VarId, Local>,
+    labels: u32,
+    /// The names of the binding whose direct value is being lowered (§6.10).
+    pending: Option<HashSet<VarId>>,
+    /// Captures to fill once those names are bound.
+    patches: Vec<(Local, u32, VarId)>,
+}
+
+impl Fx {
+    fn new(module: ModuleId, library: bool) -> Fx {
+        Fx {
+            module,
+            library,
+            locals: Vec::new(),
+            vars: HashMap::new(),
+            labels: 0,
+            pending: None,
+            patches: Vec::new(),
+        }
+    }
+
+    fn local(&mut self, t: LocalType) -> Local {
+        self.locals.push(t);
+        self.locals.len() as Local - 1
+    }
+
+    fn label(&mut self) -> Label {
+        self.labels += 1;
+        self.labels - 1
+    }
+
+    fn var(&mut self, v: VarId) -> Local {
+        if let Some(&l) = self.vars.get(&v) {
+            return l;
+        }
+        let l = self.local(LocalType::Value);
+        self.vars.insert(v, l);
+        l
+    }
+}
+
+fn let_value(fx: &mut Fx, out: &mut Vec<Stmt>, value: Value, site: Option<Site>) -> Atom {
+    let dst = fx.local(LocalType::Value);
+    out.push(Stmt::Let { dst, value, site });
+    Atom::Local(dst)
+}
+
+fn let_num(fx: &mut Fx, out: &mut Vec<Stmt>, value: NumValue, site: Option<Site>) -> Num {
+    let dst = fx.local(LocalType::I64);
+    out.push(Stmt::LetNum { dst, value, site });
+    Num::Local(dst)
+}
+
+fn finish(out: &mut Vec<Stmt>, tail: bool, a: Atom) -> Option<Atom> {
+    if tail {
+        out.push(Stmt::Return(a));
+        None
+    } else {
+        Some(a)
+    }
+}
+
+/// `if not cond, leave to fail`.
+fn guard(out: &mut Vec<Stmt>, cond: Cond, fail: Label) {
+    out.push(Stmt::If {
+        cond: Cond::Not(Box::new(cond)),
+        then: vec![Stmt::Break(fail)],
+        otherwise: vec![],
+    });
+}
+
+/// `{ e }` with one expression is `e` (§6.10).
+fn ungroup(e: &Expr) -> &Expr {
+    match &e.kind {
+        ExprKind::Block(b) if b.stmts.len() == 1 => match &b.stmts[0] {
+            hir::Stmt::Expr(inner) => ungroup(inner),
+            _ => e,
+        },
+        _ => e,
+    }
+}
+
+/// The label of a part of a constructor pattern (§7.1): the last name in the
+/// chain of `=` at its top.
+fn part_label(p: &Pattern) -> Option<&str> {
+    match &p.kind {
+        PatternKind::Var(b) => Some(&b.name),
+        PatternKind::Typed {
+            binder: Some(b), ..
+        } => Some(&b.name),
+        PatternKind::Named { binder, pattern } => {
+            part_label(pattern).or(Some(binder.name.as_str()))
+        }
+        _ => None,
+    }
+}
+
+/// §7.1: the parts of a constructor pattern and the fields they go to.
+fn match_fields<'p>(labels: &[Option<String>], args: &'p [Pattern]) -> Vec<(&'p Pattern, u32)> {
+    let unlabeled: Vec<usize> = (0..labels.len()).filter(|i| labels[*i].is_none()).collect();
+    let mut out = Vec::new();
+    for (j, a) in args.iter().enumerate() {
+        let field = if j < unlabeled.len() {
+            Some(unlabeled[j])
+        } else {
+            part_label(a).and_then(|l| labels.iter().position(|f| f.as_deref() == Some(l)))
+        };
+        if let Some(i) = field {
+            out.push((a, i as u32));
+        }
+    }
+    out
+}
+
+/// The names that a pattern binds.
+fn pattern_vars(p: &Pattern, out: &mut HashSet<VarId>) {
+    let mut w = Walk::default();
+    w.pattern(p);
+    out.extend(w.bound);
+}
+
+/// Collects the names used and bound in a part of the program.
+#[derive(Default)]
+struct Walk {
+    used: BTreeSet<VarId>,
+    bound: HashSet<VarId>,
+}
+
+impl Walk {
+    fn expr(&mut self, e: &Expr) {
+        match &e.kind {
+            ExprKind::Name(ValueRef::Local(v)) => {
+                self.used.insert(*v);
+            }
+            ExprKind::Int(_)
+            | ExprKind::Float(_)
+            | ExprKind::String(_)
+            | ExprKind::Name(_)
+            | ExprKind::Error => {}
+            ExprKind::Tuple(items) => items.iter().for_each(|x| self.expr(x)),
+            ExprKind::List { items, rest } => items
+                .iter()
+                .chain(rest.as_deref())
+                .for_each(|x| self.expr(x)),
+            ExprKind::BitArray(segs) => {
+                for s in segs {
+                    self.expr(&s.value);
+                    if let Some(a) = s.format.as_ref().and_then(|f| f.arg.as_deref()) {
+                        self.expr(a);
+                    }
+                }
+            }
+            ExprKind::Block(b) => self.block(b),
+            ExprKind::Fn(f) => self.function(f),
+            ExprKind::Case { subject, clauses } => {
+                self.expr(subject);
+                for c in clauses {
+                    c.patterns.iter().for_each(|p| self.pattern(p));
+                    c.guard.iter().for_each(|g| self.expr(g));
+                    self.expr(&c.body);
+                }
+            }
+            ExprKind::Call { callee, args } => {
+                self.expr(callee);
+                args.iter().for_each(|a| self.expr(&a.value));
+            }
+            ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
+                self.expr(target)
+            }
+            ExprKind::RecordUpdate { base, fields, .. } => {
+                self.expr(base);
+                fields.iter().for_each(|(_, x)| self.expr(x));
+            }
+            ExprKind::Unary { expr, .. } => self.expr(expr),
+            ExprKind::Binary { lhs, rhs, .. } => {
+                self.expr(lhs);
+                self.expr(rhs);
+            }
+        }
+    }
+
+    fn block(&mut self, b: &Block) {
+        for s in &b.stmts {
+            match s {
+                hir::Stmt::Bind(b) => {
+                    self.pattern(&b.pattern);
+                    self.expr(&b.value);
+                }
+                hir::Stmt::Env { value, .. } => self.expr(value),
+                hir::Stmt::Expr(e) => self.expr(e),
+            }
+        }
+    }
+
+    fn function(&mut self, f: &Function) {
+        for p in &f.params {
+            match p {
+                Param::Pattern { pattern, .. } => self.pattern(pattern),
+                Param::Env { var, .. } => {
+                    self.bound.insert(*var);
+                }
+            }
+        }
+        self.block(&f.body);
+    }
+
+    fn binder(&mut self, b: &Binder) {
+        self.bound.insert(b.var);
+    }
+
+    fn pattern(&mut self, p: &Pattern) {
+        match &p.kind {
+            PatternKind::Var(b) => self.binder(b),
+            PatternKind::Typed { binder, .. } => binder.iter().for_each(|b| self.binder(b)),
+            PatternKind::Named { binder, pattern } => {
+                self.binder(binder);
+                self.pattern(pattern);
+            }
+            PatternKind::Prefix { rest, .. } => rest.iter().for_each(|b| self.binder(b)),
+            PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
+                args.iter().for_each(|a| self.pattern(a))
+            }
+            PatternKind::List { items, rest } => {
+                items.iter().for_each(|a| self.pattern(a));
+                if let Some(Some(b)) = rest {
+                    self.binder(b);
+                }
+            }
+            PatternKind::BitArray(segs) => {
+                for s in segs {
+                    self.pattern(&s.value);
+                    if let Some(a) = s.format.as_ref().and_then(|f| f.arg.as_deref()) {
+                        self.expr(a);
+                    }
+                }
+            }
+            PatternKind::Error(parts) => parts.iter().for_each(|a| self.pattern(a)),
+            PatternKind::Discard
+            | PatternKind::Int { .. }
+            | PatternKind::Float { .. }
+            | PatternKind::String(_) => {}
+        }
+    }
+}
+
+/// The names that a function uses from outside it, in a fixed order.
+fn captures_of(f: &Function) -> Vec<VarId> {
+    let mut w = Walk::default();
+    w.function(f);
+    w.used
+        .into_iter()
+        .filter(|v| !w.bound.contains(v))
+        .collect()
+}
+
+/// A bit array format (§8.2).
+enum Fmt<'e> {
+    Int {
+        signed: bool,
+        width: Width<'e>,
+        little: bool,
+    },
+    Float {
+        width: u32,
+        little: bool,
+    },
+    Bits(Option<&'e Expr>),
+    Bytes(Option<&'e Expr>),
+    Utf {
+        encoding: u32,
+        little: bool,
+        codepoint: bool,
+    },
+}
+
+enum Width<'e> {
+    Const(u32),
+    Dyn(&'e Expr),
+}
+
+/// The format of a segment. Formats were checked by the type checker.
+fn format(f: Option<&Format>) -> Option<Fmt<'_>> {
+    let Some(f) = f else {
+        return Some(Fmt::Int {
+            signed: false,
+            width: Width::Const(8),
+            little: false,
+        });
+    };
+    let name = f.name.name.as_str();
+    let arg = f.arg.as_deref();
+    Some(match name {
+        "bits" => Fmt::Bits(arg),
+        "bytes" => Fmt::Bytes(arg),
+        "u" | "i" => Fmt::Int {
+            signed: name == "i",
+            width: Width::Dyn(arg?),
+            little: false,
+        },
+        _ => {
+            let (base, codepoint) = match name.strip_suffix("_codepoint") {
+                Some(b) => (b, true),
+                None => (name, false),
+            };
+            let (body, little) = if let Some(b) = base.strip_suffix("le") {
+                (b, true)
+            } else if let Some(b) = base.strip_suffix("be") {
+                (b, false)
+            } else {
+                (base, false)
+            };
+            if let Some(n) = body.strip_prefix("utf") {
+                Fmt::Utf {
+                    encoding: n.parse().ok()?,
+                    little,
+                    codepoint,
+                }
+            } else if let Some(n) = body.strip_prefix('f') {
+                Fmt::Float {
+                    width: n.parse().ok()?,
+                    little,
+                }
+            } else if let Some(n) = body.strip_prefix('u') {
+                Fmt::Int {
+                    signed: false,
+                    width: Width::Const(n.parse().ok()?),
+                    little,
+                }
+            } else {
+                Fmt::Int {
+                    signed: true,
+                    width: Width::Const(body.strip_prefix('i')?.parse().ok()?),
+                    little,
+                }
+            }
+        }
+    })
+}
+
+/// Lowers a checked program. The program must have no errors.
+pub fn lower(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: Options,
+) -> Result<ir::Program, Vec<Diagnostic>> {
+    let mut l = Lowerer::new(graph, program, typed, options);
+    l.run();
+    if l.diags.is_empty() {
+        Ok(l.out)
+    } else {
+        Err(l.diags)
+    }
+}
+
+struct Lowerer<'a> {
+    graph: &'a PackageGraph,
+    program: &'a hir::Program,
+    typed: &'a Typed,
+    options: Options,
+    packages: HashSet<PackageId>,
+    ctors: HashMap<CtorRef, CtorInfo>,
+    types: HashMap<TypeId, TypeRepr>,
+    /// The top-level bindings whose value is a function, by their name.
+    known: HashMap<DefId, BindingRef>,
+    def_funcs: HashMap<DefId, FuncId>,
+    def_globals: HashMap<DefId, GlobalId>,
+    ctor_funcs: HashMap<CtorRef, FuncId>,
+    op_funcs: HashMap<String, FuncId>,
+    work: Vec<(FuncId, DefId)>,
+    constants: BTreeSet<FuncId>,
+    site_map: HashMap<SitePos, Site>,
+    module_index: HashMap<ModuleId, u32>,
+    lines: HashMap<ModuleId, LineIndex<'a>>,
+    out: ir::Program,
+    diags: Vec<Diagnostic>,
+}
+
+impl<'a> Lowerer<'a> {
+    fn new(
+        graph: &'a PackageGraph,
+        program: &'a hir::Program,
+        typed: &'a Typed,
+        options: Options,
+    ) -> Self {
+        let mut l = Lowerer {
+            graph,
+            program,
+            typed,
+            options,
+            packages: HashSet::new(),
+            ctors: HashMap::new(),
+            types: HashMap::new(),
+            known: HashMap::new(),
+            def_funcs: HashMap::new(),
+            def_globals: HashMap::new(),
+            ctor_funcs: HashMap::new(),
+            op_funcs: HashMap::new(),
+            work: Vec::new(),
+            constants: BTreeSet::new(),
+            site_map: HashMap::new(),
+            module_index: HashMap::new(),
+            lines: HashMap::new(),
+            out: ir::Program::default(),
+            diags: Vec::new(),
+        };
+        l.find_packages();
+        l.number_types();
+        l
+    }
+
+    /// The packages that are compiled: the library, the compiled package,
+    /// and what it uses; its dev-dependencies only with the tests (§2.6).
+    fn find_packages(&mut self) {
+        let g = self.graph;
+        self.packages.insert(g.library);
+        let mut stack: Vec<PackageId> = Vec::new();
+        if let Some(root) = g.root {
+            stack.push(root);
+            if self.options.tests {
+                stack.extend(g.packages[root].dev_dependencies.iter().filter_map(|d| d.1));
+            }
+        }
+        while let Some(p) = stack.pop() {
+            if self.packages.insert(p) {
+                stack.extend(g.packages[p].dependencies.iter().filter_map(|d| d.1));
+            }
+        }
+    }
+
+    fn included(&self, m: ModuleId) -> bool {
+        let module = self.program.module(m);
+        self.packages.contains(&module.package)
+            && (module.kind != ModuleKind::Test || self.options.tests)
+    }
+
+    fn is_library(&self, m: ModuleId) -> bool {
+        self.program.module(m).package == self.graph.library
+    }
+
+    fn number_types(&mut self) {
+        let prelude = self.program.prelude;
+        let mut next_ctor = FIRST_ID;
+        for (i, t) in self.program.types.iter().enumerate() {
+            let id = TypeId(i as u32);
+            let TypeBody::Custom(ctors) = &t.body else {
+                continue;
+            };
+            let special = if Some(t.module) == prelude {
+                match t.name.as_str() {
+                    "Bool" => Some(TypeRepr::Bool),
+                    "Nil" => Some(TypeRepr::Nil),
+                    "Result" => Some(TypeRepr::Record(0)),
+                    "AssertionFailure" => Some(TypeRepr::Record(1)),
+                    "Assert" => Some(TypeRepr::Record(2)),
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            let repr = match special {
+                Some(r) => r,
+                None if ctors.is_empty() => TypeRepr::Host,
+                None => TypeRepr::Record(FIRST_ID + i as u32),
+            };
+            self.types.insert(id, repr);
+            for (j, c) in ctors.iter().enumerate() {
+                let r = CtorRef {
+                    ty: id,
+                    index: j as u32,
+                };
+                let repr = match (special, c.name.as_str()) {
+                    (Some(TypeRepr::Bool), "True") => CtorRepr::Bool(true),
+                    (Some(TypeRepr::Bool), _) => CtorRepr::Bool(false),
+                    (Some(TypeRepr::Nil), _) => CtorRepr::Nil,
+                    (Some(TypeRepr::Record(ty)), name) => CtorRepr::Record {
+                        ctor: match name {
+                            "Ok" => 0,
+                            "Error" => 1,
+                            "AssertionFailure" => 2,
+                            _ => 3,
+                        },
+                        ty,
+                    },
+                    _ => {
+                        let TypeRepr::Record(ty) = repr else {
+                            unreachable!("a type with constructors is a record")
+                        };
+                        self.out.constructors.push(c.name.clone());
+                        next_ctor += 1;
+                        CtorRepr::Record {
+                            ctor: next_ctor - 1,
+                            ty,
+                        }
+                    }
+                };
+                let labels = c
+                    .fields
+                    .iter()
+                    .map(|f| f.label.as_ref().map(|l| l.name.clone()))
+                    .collect();
+                self.ctors.insert(r, CtorInfo { repr, labels });
+            }
+        }
+    }
+
+    fn error(&mut self, module: ModuleId, span: Span, message: impl Into<String>) {
+        let source = self.program.module(module).source;
+        self.diags.push(Diagnostic::error(
+            code::NOT_SUPPORTED,
+            Some(source),
+            span,
+            message,
+        ));
+    }
+
+    fn run(&mut self) {
+        // Top-level functions are known functions with one value.
+        for (mi, m) in self.program.modules.iter().enumerate() {
+            for (bi, b) in m.bindings.iter().enumerate() {
+                let one_name = matches!(
+                    b.binding.pattern.kind,
+                    PatternKind::Var(_)
+                        | PatternKind::Typed {
+                            binder: Some(_),
+                            ..
+                        }
+                );
+                if one_name
+                    && b.defs.len() == 1
+                    && matches!(ungroup(&b.binding.value).kind, ExprKind::Fn(_))
+                {
+                    self.known.insert(
+                        b.defs[0],
+                        BindingRef {
+                            module: ModuleId(mi as u32),
+                            index: bi as u32,
+                        },
+                    );
+                }
+            }
+        }
+        self.start();
+        self.entries();
+        while let Some((id, d)) = self.work.pop() {
+            let b = self.known[&d];
+            let tb = self.program.binding(b);
+            let ExprKind::Fn(f) = &ungroup(&tb.binding.value).kind else {
+                unreachable!()
+            };
+            let name = format!(
+                "{}.{}",
+                self.program.module(d.module).path,
+                self.program.def(d).name
+            );
+            let func = self.function(b.module, f, &[], name);
+            self.out.funcs[id.0 as usize] = FuncKind::Code(func);
+        }
+        self.out.constants = self.constants.iter().copied().collect();
+    }
+
+    /// `ilang_start`: the top-level values, in the order of §2.5.
+    fn start(&mut self) {
+        let mut fx = Fx::new(ModuleId(0), false);
+        let mut out = Vec::new();
+        for &b in &self.program.order.init {
+            if !self.included(b.module) {
+                continue;
+            }
+            let tb = self.program.binding(b);
+            if tb.defs.len() == 1 && self.known.contains_key(&tb.defs[0]) {
+                continue;
+            }
+            fx.module = b.module;
+            fx.library = self.is_library(b.module);
+            let value = self.expr(&mut fx, &mut out, &tb.binding.value);
+            self.bind(&mut fx, &mut out, &tb.binding.pattern, value);
+            for &d in &tb.defs {
+                if let DefKind::Binding { var, .. } = self.program.def(d).kind {
+                    let g = self.global(d);
+                    let l = fx.var(var);
+                    out.push(Stmt::SetGlobal(g, Atom::Local(l)));
+                }
+            }
+        }
+        out.push(Stmt::Return(Atom::Nil));
+        self.out.start = Some(Func {
+            name: "ilang_start".into(),
+            arity: 0,
+            locals: fx.locals,
+            body: out,
+            frame: true,
+        });
+    }
+
+    fn global(&mut self, d: DefId) -> GlobalId {
+        if let Some(&g) = self.def_globals.get(&d) {
+            return g;
+        }
+        let g = GlobalId(self.out.globals);
+        self.out.globals += 1;
+        self.def_globals.insert(d, g);
+        g
+    }
+
+    /// The program entry, the tests, and the host exports (§10.2, B.5).
+    fn entries(&mut self) {
+        let program = self.program;
+        let mut entry = None;
+        let mut tests = Vec::new();
+        for (mi, m) in program.modules.iter().enumerate() {
+            let mid = ModuleId(mi as u32);
+            if Some(m.package) != program.root || !self.included(mid) {
+                continue;
+            }
+            for b in &m.bindings {
+                if !(b.main || b.test) || b.defs.len() != 1 {
+                    continue;
+                }
+                let d = b.defs[0];
+                let name = format!("{}.{}", m.path, program.def(d).name);
+                let callee = self.def_callee(d);
+                self.out.exports.push(Export {
+                    name: name.clone(),
+                    callee,
+                    abi: None,
+                });
+                if b.main {
+                    entry = Some(name);
+                } else {
+                    tests.push(name);
+                }
+            }
+        }
+        let mut exports = Vec::new();
+        for &d in &program.host_exports {
+            let module = program.module(d.module);
+            let name = format!("{}.{}", module.path, program.def(d).name);
+            let Some((params, result, errors)) = self.host_signature(d) else {
+                self.error(
+                    d.module,
+                    program.def(d).span,
+                    format!("the host export `{name}` has a type that the host cannot take"),
+                );
+                continue;
+            };
+            if !errors.is_empty() {
+                self.error(
+                    d.module,
+                    program.def(d).span,
+                    format!(
+                        "the host export `{name}` may give errors, which are not supported yet"
+                    ),
+                );
+                continue;
+            }
+            let callee = self.def_callee(d);
+            exports.push((name.clone(), params.clone(), result));
+            self.out.exports.push(Export {
+                name,
+                callee,
+                abi: Some((params, result)),
+            });
+        }
+        self.out.abi_json = abi_json(entry, &tests, &exports);
+    }
+
+    fn def_callee(&mut self, d: DefId) -> Callee {
+        if self.known.contains_key(&d) {
+            Callee::Direct(self.def_func(d))
+        } else {
+            Callee::Value(Atom::Global(self.global(d)))
+        }
+    }
+
+    /// The types of a host export (B.2), read from its type scheme.
+    fn host_signature(&self, d: DefId) -> Option<(Vec<AbiType>, AbiType, Vec<AbiType>)> {
+        let scheme = self.typed.schemes.get(&d)?;
+        let (module, errors) = ilang_syntax::parse_module(&format!("x: {scheme}"));
+        if !errors.is_empty() {
+            return None;
+        }
+        let item = module.items.first()?;
+        let ilang_syntax::ast::ItemKind::Declaration { ty, .. } = &item.kind else {
+            return None;
+        };
+        let ilang_syntax::ast::TypeKind::Fn {
+            params, ret, err, ..
+        } = &ty.kind
+        else {
+            return None;
+        };
+        let params = params
+            .iter()
+            .map(|p| abi_type(&p.ty))
+            .collect::<Option<Vec<_>>>()?;
+        let result = abi_type(ret)?;
+        let mut errors = Vec::new();
+        if let Some(e) = err {
+            let members: Vec<&ilang_syntax::ast::TypeExpr> = match &e.kind {
+                ilang_syntax::ast::TypeKind::Union(ms) => ms.iter().collect(),
+                _ => vec![&**e],
+            };
+            for m in members {
+                if !matches!(&m.kind, ilang_syntax::ast::TypeKind::Named { name, .. } if name.name == "Never")
+                {
+                    errors.push(abi_type(m)?);
+                }
+            }
+        }
+        Some((params, result, errors))
+    }
+
+    // ---- Functions ----
+
+    fn new_func(&mut self) -> FuncId {
+        self.out.funcs.push(FuncKind::Runtime {
+            op: Op::Panic,
+            arity: 0,
+        });
+        FuncId(self.out.funcs.len() as u32 - 1)
+    }
+
+    fn def_func(&mut self, d: DefId) -> FuncId {
+        if let Some(&f) = self.def_funcs.get(&d) {
+            return f;
+        }
+        let f = self.new_func();
+        self.def_funcs.insert(d, f);
+        self.work.push((f, d));
+        f
+    }
+
+    fn ctor_func(&mut self, c: CtorRef) -> FuncId {
+        if let Some(&f) = self.ctor_funcs.get(&c) {
+            return f;
+        }
+        let info = &self.ctors[&c];
+        let CtorRepr::Record { ctor, ty } = info.repr else {
+            unreachable!("only records have fields")
+        };
+        let arity = info.labels.len() as u32;
+        let f = self.new_func();
+        self.out.funcs[f.0 as usize] = FuncKind::Ctor { ctor, ty, arity };
+        self.ctor_funcs.insert(c, f);
+        self.constants.insert(f);
+        f
+    }
+
+    fn op_func(&mut self, op: Op, arity: u32) -> FuncId {
+        let key = format!("{op:?}");
+        if let Some(&f) = self.op_funcs.get(&key) {
+            return f;
+        }
+        let f = self.new_func();
+        self.out.funcs[f.0 as usize] = FuncKind::Runtime { op, arity };
+        self.op_funcs.insert(key, f);
+        self.constants.insert(f);
+        f
+    }
+
+    /// A function expression with its captures, as a function of the
+    /// intermediate form.
+    fn function(
+        &mut self,
+        module: ModuleId,
+        f: &Function,
+        captures: &[VarId],
+        name: String,
+    ) -> Func {
+        let mut fx = Fx::new(module, self.is_library(module));
+        let mut out = Vec::new();
+        let arity = f.params.len() as u32;
+        for _ in 0..arity {
+            fx.local(LocalType::Value);
+        }
+        for (i, &v) in captures.iter().enumerate() {
+            let l = fx.var(v);
+            out.push(Stmt::Let {
+                dst: l,
+                value: Value::Capture(i as u32),
+                site: None,
+            });
+        }
+        for (i, p) in f.params.iter().enumerate() {
+            match p {
+                Param::Pattern { pattern, .. } => {
+                    self.bind(&mut fx, &mut out, pattern, Atom::Local(i as Local))
+                }
+                Param::Env { name, .. } => self.error(
+                    module,
+                    name.span,
+                    "environment parameters are not supported yet (§9.2)",
+                ),
+            }
+        }
+        self.block(&mut fx, &mut out, &f.body, true);
+        Func {
+            name,
+            arity,
+            locals: fx.locals,
+            body: out,
+            frame: true,
+        }
+    }
+
+    // ---- Sites ----
+
+    /// The site of the expression that starts at `offset` (§11.7). Library
+    /// code is not program source, so it has none.
+    fn site(&mut self, fx: &Fx, offset: u32) -> Option<Site> {
+        if fx.library {
+            return None;
+        }
+        let program = self.program;
+        let graph = self.graph;
+        let module = program.module(fx.module);
+        let index = match self.module_index.get(&fx.module) {
+            Some(&i) => i,
+            None => {
+                let i = self.out.site_modules.len() as u32;
+                // Only path dependencies exist, so no path has the
+                // `location@major ` prefix of §11.7.
+                self.out.site_modules.push(module.path.clone());
+                self.module_index.insert(fx.module, i);
+                i
+            }
+        };
+        let lines = self
+            .lines
+            .entry(fx.module)
+            .or_insert_with(|| LineIndex::new(&graph.sources.get(module.source).text));
+        let (line, column) = lines.line_col(offset);
+        let pos = SitePos {
+            module: index,
+            line,
+            column,
+        };
+        Some(*self.site_map.entry(pos).or_insert_with(|| {
+            self.out.sites.push(pos);
+            self.out.sites.len() as Site - 1
+        }))
+    }
+
+    // ---- Names ----
+
+    /// Why a top-level name of the library cannot be used yet.
+    fn unsupported(&self, d: DefId) -> Option<String> {
+        let m = self.program.module(d.module);
+        if m.package != self.graph.library {
+            return None;
+        }
+        let def = self.program.def(d);
+        match m.path.as_str() {
+            "i/fail" | "i/control" | "i/resource" | "i/assertion" => Some(format!(
+                "`{}.{}` is not supported yet: errors, control, and final functions come later (§9)",
+                m.path.rsplit('/').next().unwrap_or(""),
+                def.name
+            )),
+            _ if def.name == "assert" => {
+                Some("`assert` is not supported yet: it needs the `Assert` service (§9.6)".into())
+            }
+            _ => None,
+        }
+    }
+
+    /// The operation of an external function of the library.
+    fn external_op(&self, d: DefId) -> Result<(Op, u32), String> {
+        let DefKind::External {
+            module,
+            function,
+            ty,
+            ..
+        } = &self.program.def(d).kind
+        else {
+            unreachable!()
+        };
+        let arity = match &ty.kind {
+            TypeKind::Fn { params, .. } => params.len() as u32,
+            _ => 0,
+        };
+        match module.as_str() {
+            "ilang:prelude" if function == "panic" => Ok((Op::Panic, arity)),
+            "ilang:core" => match CORE.iter().position(|n| n == function) {
+                Some(i) => Ok((
+                    Op::Runtime {
+                        name: CORE_FUNCS[i],
+                        arity,
+                    },
+                    arity,
+                )),
+                None => Err(format!("`core.{function}` is not known")),
+            },
+            "ilang:fail" | "ilang:control" | "ilang:resource" => Err(format!(
+                "`{}.{function}` is not supported yet: errors, control, and final functions come later (§9)",
+                module.trim_start_matches("ilang:")
+            )),
+            _ => Err(format!(
+                "the external function `{module}` `{function}` is not supported yet (§10.1)"
+            )),
+        }
+    }
+
+    fn name(&mut self, fx: &mut Fx, e: &Expr, r: ValueRef) -> Atom {
+        match r {
+            ValueRef::Local(v) => match fx.vars.get(&v) {
+                Some(&l) => Atom::Local(l),
+                None => {
+                    // A name of a direct binding, used in a function body
+                    // before it is bound: only closures may do this, and
+                    // they are patched.
+                    Atom::Local(fx.var(v))
+                }
+            },
+            ValueRef::Def(d) => {
+                if let Some(message) = self.unsupported(d) {
+                    if !fx.library {
+                        self.error(fx.module, e.span, message);
+                    }
+                    return Atom::Nil;
+                }
+                match self.program.def(d).kind {
+                    DefKind::External { .. } => match self.external_op(d) {
+                        Ok((op, arity)) => Atom::Func(self.op_func(op, arity)),
+                        Err(message) => {
+                            self.error(fx.module, e.span, message);
+                            Atom::Nil
+                        }
+                    },
+                    DefKind::Binding { .. } => {
+                        if self.known.contains_key(&d) {
+                            let f = self.def_func(d);
+                            self.constants.insert(f);
+                            Atom::Func(f)
+                        } else {
+                            Atom::Global(self.global(d))
+                        }
+                    }
+                }
+            }
+            ValueRef::Ctor(c) => {
+                let info = &self.ctors[&c];
+                match info.repr {
+                    CtorRepr::Bool(b) => Atom::Bool(b),
+                    CtorRepr::Nil => Atom::Nil,
+                    CtorRepr::Record { ctor, ty } if info.labels.is_empty() => {
+                        Atom::Ctor { ctor, ty }
+                    }
+                    CtorRepr::Record { .. } => Atom::Func(self.ctor_func(c)),
+                }
+            }
+        }
+    }
+
+    // ---- Expressions ----
+
+    fn expr(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, e: &Expr) -> Atom {
+        self.lower(fx, out, e, false)
+            .expect("a value that is not in tail position")
+    }
+
+    /// Lowers `e`. In tail position, the statements end the function and
+    /// there is no value.
+    fn lower(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, e: &Expr, tail: bool) -> Option<Atom> {
+        let a = match &e.kind {
+            ExprKind::Int(n) => Atom::Int(BigInt::from(n.clone())),
+            ExprKind::Float(x) => Atom::Float(*x),
+            ExprKind::String(s) => Atom::String(s.clone()),
+            ExprKind::Name(r) => self.name(fx, e, *r),
+            ExprKind::Tuple(items) => {
+                let parts = items.iter().map(|x| self.expr(fx, out, x)).collect();
+                let_value(fx, out, Value::Tuple(parts), None)
+            }
+            ExprKind::List { items, rest } => {
+                let parts: Vec<Atom> = items.iter().map(|x| self.expr(fx, out, x)).collect();
+                let mut list = match rest {
+                    Some(r) => self.expr(fx, out, r),
+                    None => Atom::EmptyList,
+                };
+                for p in parts.into_iter().rev() {
+                    list = let_value(fx, out, Value::Cons(p, list), None);
+                }
+                list
+            }
+            ExprKind::BitArray(segs) => self.bit_array(fx, out, e, segs),
+            ExprKind::Block(b) => return self.block(fx, out, b, tail),
+            ExprKind::Fn(f) => self.closure(fx, out, f),
+            ExprKind::Case { subject, clauses } => {
+                let s = self.expr(fx, out, subject);
+                return self.case(fx, out, s, clauses, tail);
+            }
+            ExprKind::Call { callee, args } => {
+                let args: Vec<&Expr> = args.iter().map(|a| &a.value).collect();
+                return self.call(fx, out, e.span, callee, None, &args, tail);
+            }
+            ExprKind::Field { target, .. } => {
+                let t = self.expr(fx, out, target);
+                match self.typed.access.get(&(fx.module, e.span)) {
+                    Some(Access::Field(list)) => self.field(fx, out, t, list),
+                    Some(Access::Part(k)) => let_value(fx, out, Value::Field(t, *k), None),
+                    None => unreachable!("a checked field has an access"),
+                }
+            }
+            ExprKind::TupleIndex { target, index, .. } => {
+                let t = self.expr(fx, out, target);
+                let k = match self.typed.access.get(&(fx.module, e.span)) {
+                    Some(Access::Part(k)) => *k,
+                    _ => u32::try_from(index).unwrap_or(0),
+                };
+                let_value(fx, out, Value::Field(t, k), None)
+            }
+            ExprKind::RecordUpdate {
+                ctor, base, fields, ..
+            } => {
+                let b = self.expr(fx, out, base);
+                let given: Vec<(String, Atom)> = fields
+                    .iter()
+                    .map(|(name, x)| (name.name.clone(), self.expr(fx, out, x)))
+                    .collect();
+                let info = self.ctors[ctor].clone();
+                let CtorRepr::Record { ctor, ty } = info.repr else {
+                    unreachable!("only records have fields")
+                };
+                let mut parts = Vec::new();
+                for (i, label) in info.labels.iter().enumerate() {
+                    let found = given
+                        .iter()
+                        .find(|(n, _)| Some(n) == label.as_ref())
+                        .map(|(_, a)| a.clone());
+                    parts.push(match found {
+                        Some(a) => a,
+                        None => let_value(fx, out, Value::Field(b.clone(), i as u32), None),
+                    });
+                }
+                let_value(
+                    fx,
+                    out,
+                    Value::Record {
+                        ctor,
+                        ty,
+                        fields: parts,
+                    },
+                    None,
+                )
+            }
+            ExprKind::Unary { op, expr } => match (op, &expr.kind) {
+                (UnOp::Neg, ExprKind::Int(n)) => Atom::Int(-BigInt::from(n.clone())),
+                (UnOp::NegFloat, ExprKind::Float(x)) => Atom::Float(-*x),
+                (UnOp::Neg, _) => {
+                    let a = self.expr(fx, out, expr);
+                    let_value(fx, out, Value::Op(Op::IntNeg, vec![a]), None)
+                }
+                (UnOp::NegFloat, _) => {
+                    let a = self.expr(fx, out, expr);
+                    let_value(fx, out, Value::Op(Op::FloatNeg, vec![a]), None)
+                }
+            },
+            ExprKind::Binary { op, lhs, rhs } => {
+                return self.binary(fx, out, e, *op, lhs, rhs, tail);
+            }
+            ExprKind::Error => {
+                out.push(Stmt::Unreachable);
+                Atom::Nil
+            }
+        };
+        finish(out, tail, a)
+    }
+
+    fn block(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, b: &Block, tail: bool) -> Option<Atom> {
+        let last = b.stmts.len().saturating_sub(1);
+        for (i, s) in b.stmts.iter().enumerate() {
+            match s {
+                hir::Stmt::Expr(e) if i == last => return self.lower(fx, out, e, tail),
+                hir::Stmt::Expr(e) => {
+                    self.expr(fx, out, e);
+                }
+                hir::Stmt::Bind(binding) => self.binding(fx, out, binding),
+                hir::Stmt::Env { span, .. } => self.error(
+                    fx.module,
+                    *span,
+                    "environment statements are not supported yet (§9.2)",
+                ),
+            }
+        }
+        // A block always ends with an expression (§6.10).
+        finish(out, tail, Atom::Nil)
+    }
+
+    /// A binding in a block (§6.10). The names of a direct value may be used
+    /// in the function bodies of the value: those closures are made first and
+    /// their captures are filled when the names are bound.
+    fn binding(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, b: &Binding) {
+        if !b.direct {
+            let v = self.expr(fx, out, &b.value);
+            self.bind(fx, out, &b.pattern, v);
+            return;
+        }
+        let mut vars = HashSet::new();
+        pattern_vars(&b.pattern, &mut vars);
+        let saved = fx.pending.replace(vars);
+        let saved_patches = std::mem::take(&mut fx.patches);
+        let v = self.expr(fx, out, &b.value);
+        fx.pending = saved;
+        let patches = std::mem::replace(&mut fx.patches, saved_patches);
+        self.bind(fx, out, &b.pattern, v);
+        for (closure, index, var) in patches {
+            let value = Atom::Local(fx.var(var));
+            out.push(Stmt::SetCapture {
+                closure,
+                index,
+                value,
+            });
+        }
+    }
+
+    fn closure(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, f: &Function) -> Atom {
+        let captures = captures_of(f);
+        let id = self.new_func();
+        let name = format!("{}:fn{}", self.program.module(fx.module).path, id.0);
+        let func = self.function(fx.module, f, &captures, name);
+        self.out.funcs[id.0 as usize] = FuncKind::Code(func);
+        let mut atoms = Vec::new();
+        let mut later = Vec::new();
+        for (i, v) in captures.iter().enumerate() {
+            if fx.pending.as_ref().is_some_and(|p| p.contains(v)) {
+                atoms.push(Atom::Nil);
+                later.push((i as u32, *v));
+            } else {
+                atoms.push(Atom::Local(fx.var(*v)));
+            }
+        }
+        let dst = fx.local(LocalType::Value);
+        out.push(Stmt::Let {
+            dst,
+            value: Value::Closure {
+                func: id,
+                captures: atoms,
+            },
+            site: None,
+        });
+        for (i, v) in later {
+            fx.patches.push((dst, i, v));
+        }
+        Atom::Local(dst)
+    }
+
+    /// `v.f` (§6.7): the constructor of the value picks the field.
+    fn field(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        t: Atom,
+        list: &[(CtorRef, u32)],
+    ) -> Atom {
+        let first = list[0].1;
+        if list.iter().all(|(_, i)| *i == first) {
+            return let_value(fx, out, Value::Field(t, first), None);
+        }
+        let dst = fx.local(LocalType::Value);
+        let end = fx.label();
+        let mut body = Vec::new();
+        for (k, (c, i)) in list.iter().enumerate() {
+            let read = Stmt::Let {
+                dst,
+                value: Value::Field(t.clone(), *i),
+                site: None,
+            };
+            if k + 1 == list.len() {
+                body.push(read);
+            } else {
+                let CtorRepr::Record { ctor, .. } = self.ctors[c].repr else {
+                    unreachable!("only records have fields")
+                };
+                body.push(Stmt::If {
+                    cond: Cond::Ctor(t.clone(), ctor),
+                    then: vec![read, Stmt::Break(end)],
+                    otherwise: vec![],
+                });
+            }
+        }
+        out.push(Stmt::Block { label: end, body });
+        Atom::Local(dst)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn binary(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        e: &Expr,
+        op: BinOp,
+        lhs: &Expr,
+        rhs: &Expr,
+        tail: bool,
+    ) -> Option<Atom> {
+        if op == BinOp::Pipe {
+            // `a |> f` is `f(a)`, and `a |> f(b)` is `f(a, b)` (§6.9).
+            return match &rhs.kind {
+                ExprKind::Call { callee, args } => {
+                    let args: Vec<&Expr> = args.iter().map(|a| &a.value).collect();
+                    self.call(fx, out, e.span, callee, Some(lhs), &args, tail)
+                }
+                _ => self.call(fx, out, e.span, rhs, Some(lhs), &[], tail),
+            };
+        }
+        if matches!(op, BinOp::And | BinOp::Or) {
+            // The right side is only worked out when the left is not enough.
+            let a = self.expr(fx, out, lhs);
+            let dst = fx.local(LocalType::Value);
+            let mut right = Vec::new();
+            let b = self.expr(fx, &mut right, rhs);
+            right.push(Stmt::Let {
+                dst,
+                value: Value::Atom(b),
+                site: None,
+            });
+            let short = vec![Stmt::Let {
+                dst,
+                value: Value::Atom(Atom::Bool(op == BinOp::Or)),
+                site: None,
+            }];
+            let (then, otherwise) = if op == BinOp::And {
+                (right, short)
+            } else {
+                (short, right)
+            };
+            out.push(Stmt::If {
+                cond: Cond::True(a),
+                then,
+                otherwise,
+            });
+            return finish(out, tail, Atom::Local(dst));
+        }
+        let a = self.expr(fx, out, lhs);
+        let b = self.expr(fx, out, rhs);
+        let o = match op {
+            BinOp::Eq => Op::Equal,
+            BinOp::NotEq => Op::NotEqual,
+            BinOp::Lt => Op::IntLt,
+            BinOp::LtEq => Op::IntLe,
+            BinOp::Gt => Op::IntGt,
+            BinOp::GtEq => Op::IntGe,
+            BinOp::LtFloat => Op::FloatLt,
+            BinOp::LtEqFloat => Op::FloatLe,
+            BinOp::GtFloat => Op::FloatGt,
+            BinOp::GtEqFloat => Op::FloatGe,
+            BinOp::Concat => Op::StringAppend,
+            BinOp::Add => Op::IntAdd,
+            BinOp::Sub => Op::IntSub,
+            BinOp::Mul => Op::IntMul,
+            BinOp::Div => Op::IntDiv,
+            BinOp::Rem => Op::IntRem,
+            BinOp::AddFloat => Op::FloatAdd,
+            BinOp::SubFloat => Op::FloatSub,
+            BinOp::MulFloat => Op::FloatMul,
+            BinOp::DivFloat => Op::FloatDiv,
+            BinOp::And | BinOp::Or | BinOp::Pipe => unreachable!(),
+        };
+        let site = if o.may_stop() {
+            self.site(fx, e.span.start)
+        } else {
+            None
+        };
+        let v = let_value(fx, out, Value::Op(o, vec![a, b]), site);
+        finish(out, tail, v)
+    }
+
+    /// What a callee is, worked out when it is a value.
+    fn target(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, callee: &Expr) -> Target {
+        match &callee.kind {
+            ExprKind::Name(ValueRef::Def(d)) if self.unsupported(*d).is_none() => {
+                match self.program.def(*d).kind {
+                    DefKind::External { .. } => match self.external_op(*d) {
+                        Ok((op, _)) => Target::Op(op),
+                        Err(message) => {
+                            self.error(fx.module, callee.span, message);
+                            Target::Op(Op::Panic)
+                        }
+                    },
+                    DefKind::Binding { .. } if self.known.contains_key(d) => {
+                        Target::Callee(Callee::Direct(self.def_func(*d)))
+                    }
+                    DefKind::Binding { .. } => {
+                        Target::Callee(Callee::Value(Atom::Global(self.global(*d))))
+                    }
+                }
+            }
+            ExprKind::Name(ValueRef::Ctor(c)) => Target::Ctor(*c),
+            _ => Target::Callee(Callee::Value(self.expr(fx, out, callee))),
+        }
+    }
+
+    /// A call (§6.6), or `a |> f(…)` with `a` as `first`. The function is
+    /// worked out first, then the arguments as they are written (§6.2); for
+    /// `|>`, `a` comes before both.
+    #[allow(clippy::too_many_arguments)]
+    fn call(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        span: Span,
+        callee: &Expr,
+        first: Option<&Expr>,
+        args: &[&Expr],
+        tail: bool,
+    ) -> Option<Atom> {
+        let mut written = Vec::new();
+        if let Some(a) = first {
+            written.push(self.expr(fx, out, a));
+        }
+        let target = self.target(fx, out, callee);
+        for a in args {
+            written.push(self.expr(fx, out, a));
+        }
+        let args: Vec<Atom> = match self.typed.args.get(&(fx.module, span)) {
+            Some(order) if order.len() == written.len() => {
+                order.iter().map(|&i| written[i as usize].clone()).collect()
+            }
+            _ => written,
+        };
+        match target {
+            Target::Ctor(c) => {
+                let info = &self.ctors[&c];
+                let a = match info.repr {
+                    CtorRepr::Bool(b) => Atom::Bool(b),
+                    CtorRepr::Nil => Atom::Nil,
+                    CtorRepr::Record { ctor, ty } if args.is_empty() => Atom::Ctor { ctor, ty },
+                    CtorRepr::Record { ctor, ty } => let_value(
+                        fx,
+                        out,
+                        Value::Record {
+                            ctor,
+                            ty,
+                            fields: args,
+                        },
+                        None,
+                    ),
+                };
+                finish(out, tail, a)
+            }
+            Target::Op(op) => {
+                // Library functions of the runtime never call back into i
+                // code, so they are not tail calls: their position stays on
+                // the shadow stack (§11.7).
+                let site = self.site(fx, span.start);
+                let v = let_value(fx, out, Value::Op(op, args), site);
+                finish(out, tail, v)
+            }
+            Target::Callee(callee) => {
+                if tail {
+                    out.push(Stmt::TailCall { callee, args });
+                    None
+                } else {
+                    let site = self.site(fx, span.start);
+                    Some(let_value(fx, out, Value::Call { callee, args }, site))
+                }
+            }
+        }
+    }
+
+    // ---- Bit arrays (§8.3) ----
+
+    fn bit_array(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        e: &Expr,
+        segs: &[Segment<Expr>],
+    ) -> Atom {
+        let mut acc: Option<Atom> = None;
+        for s in segs {
+            let v = self.expr(fx, out, &s.value);
+            let fmt = format(s.format.as_ref());
+            let piece = match fmt {
+                Some(Fmt::Int {
+                    width: Width::Const(n),
+                    little,
+                    ..
+                }) => let_value(
+                    fx,
+                    out,
+                    Value::BitsFromInt {
+                        value: v,
+                        width: Num::Const(n as i64),
+                        little,
+                    },
+                    None,
+                ),
+                Some(Fmt::Int {
+                    width: Width::Dyn(x),
+                    little,
+                    ..
+                }) => {
+                    let n = self.expr(fx, out, x);
+                    let site = self.site(fx, e.span.start);
+                    let w = let_num(fx, out, NumValue::LengthOf(n, 1), site);
+                    let_value(
+                        fx,
+                        out,
+                        Value::BitsFromInt {
+                            value: v,
+                            width: w,
+                            little,
+                        },
+                        None,
+                    )
+                }
+                Some(Fmt::Float { width, little }) => {
+                    let site = self.site(fx, e.span.start);
+                    let_value(
+                        fx,
+                        out,
+                        Value::BitsFromFloat {
+                            value: v,
+                            width,
+                            little,
+                        },
+                        site,
+                    )
+                }
+                Some(Fmt::Bits(None)) => v,
+                Some(Fmt::Bits(Some(x))) | Some(Fmt::Bytes(Some(x))) => {
+                    let unit = if matches!(fmt, Some(Fmt::Bits(_))) {
+                        1
+                    } else {
+                        8
+                    };
+                    let n = self.expr(fx, out, x);
+                    let site = self.site(fx, e.span.start);
+                    let w = let_num(fx, out, NumValue::LengthOf(n, unit), site);
+                    let_value(fx, out, Value::BitsTake(v, w), site)
+                }
+                Some(Fmt::Bytes(None)) => {
+                    let site = self.site(fx, e.span.start);
+                    let_value(fx, out, Value::BitsWhole(v), site)
+                }
+                Some(Fmt::Utf {
+                    encoding,
+                    little,
+                    codepoint,
+                }) => let_value(
+                    fx,
+                    out,
+                    Value::BitsFromUtf {
+                        value: v,
+                        encoding,
+                        little,
+                        codepoint,
+                    },
+                    None,
+                ),
+                None => {
+                    out.push(Stmt::Unreachable);
+                    v
+                }
+            };
+            acc = Some(match acc {
+                None => piece,
+                Some(a) => let_value(fx, out, Value::BitsConcat(a, piece), None),
+            });
+        }
+        match acc {
+            // A single `bits` segment is a new value only in name: bit
+            // arrays cannot be changed.
+            Some(a) => a,
+            None => let_value(fx, out, Value::BitsEmpty, None),
+        }
+    }
+
+    // ---- case (§6.12) ----
+
+    fn case(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        s: Atom,
+        clauses: &[Clause],
+        tail: bool,
+    ) -> Option<Atom> {
+        let end = fx.label();
+        let dst = if tail {
+            None
+        } else {
+            Some(fx.local(LocalType::Value))
+        };
+        let mut body = Vec::new();
+        for c in clauses {
+            let next = fx.label();
+            let mut cb = Vec::new();
+            if let [p] = c.patterns.as_slice() {
+                self.pattern(fx, &mut cb, p, s.clone(), next);
+                if let Some(g) = &c.guard {
+                    let g = self.expr(fx, &mut cb, g);
+                    guard(&mut cb, Cond::True(g), next);
+                }
+            } else {
+                // The choices are tried in order, each with the guard, as
+                // if each were a clause of its own (as in Gleam). The body
+                // is shared.
+                let matched = fx.label();
+                let mut mb = Vec::new();
+                for p in &c.patterns {
+                    let no = fx.label();
+                    let mut pb = Vec::new();
+                    self.pattern(fx, &mut pb, p, s.clone(), no);
+                    if let Some(g) = &c.guard {
+                        let g = self.expr(fx, &mut pb, g);
+                        guard(&mut pb, Cond::True(g), no);
+                    }
+                    pb.push(Stmt::Break(matched));
+                    mb.push(Stmt::Block {
+                        label: no,
+                        body: pb,
+                    });
+                }
+                mb.push(Stmt::Break(next));
+                cb.push(Stmt::Block {
+                    label: matched,
+                    body: mb,
+                });
+            }
+            if let Some(a) = self.lower(fx, &mut cb, &c.body, tail) {
+                cb.push(Stmt::Let {
+                    dst: dst.expect("a value"),
+                    value: Value::Atom(a),
+                    site: None,
+                });
+                cb.push(Stmt::Break(end));
+            }
+            body.push(Stmt::Block {
+                label: next,
+                body: cb,
+            });
+        }
+        // The clauses cover every value (§7.4).
+        body.push(Stmt::Unreachable);
+        out.push(Stmt::Block { label: end, body });
+        dst.map(Atom::Local)
+    }
+
+    // ---- Patterns (§7) ----
+
+    fn bind_var(fx: &mut Fx, out: &mut Vec<Stmt>, b: &Binder, v: Atom) {
+        let l = fx.var(b.var);
+        out.push(Stmt::Let {
+            dst: l,
+            value: Value::Atom(v),
+            site: None,
+        });
+    }
+
+    /// Matches `v` with the pattern of a `case` clause, and leaves to `fail`
+    /// when it does not match (§7.2).
+    fn pattern(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom, fail: Label) {
+        match &p.kind {
+            PatternKind::Var(b) => Self::bind_var(fx, out, b, v),
+            PatternKind::Discard => {}
+            PatternKind::Typed { binder, .. } => {
+                if let Some(heads) = self.typed.type_tests.get(&(fx.module, p.span)) {
+                    let cond = heads
+                        .iter()
+                        .map(|h| self.head_cond(v.clone(), *h))
+                        .reduce(|a, b| Cond::Or(Box::new(a), Box::new(b)))
+                        .unwrap_or(Cond::Tag(v.clone(), u32::MAX));
+                    guard(out, cond, fail);
+                }
+                if let Some(b) = binder {
+                    Self::bind_var(fx, out, b, v);
+                }
+            }
+            PatternKind::Named { binder, pattern } => {
+                Self::bind_var(fx, out, binder, v.clone());
+                self.pattern(fx, out, pattern, v, fail);
+            }
+            PatternKind::Int { negative, value } => {
+                let mut n = BigInt::from(value.clone());
+                if *negative {
+                    n = -n;
+                }
+                guard(out, Cond::IsInt(v, n), fail);
+            }
+            PatternKind::Float { negative, value } => {
+                let x = if *negative { -*value } else { *value };
+                guard(out, Cond::IsFloat(v, x), fail);
+            }
+            PatternKind::String(s) => guard(out, Cond::IsString(v, s.clone()), fail),
+            PatternKind::Prefix { prefix, rest } => {
+                guard(out, Cond::Tag(v.clone(), 3), fail);
+                guard(
+                    out,
+                    Cond::StartsWith(v.clone(), Atom::String(prefix.clone())),
+                    fail,
+                );
+                if let Some(b) = rest {
+                    let r = let_value(fx, out, Value::StringSuffix(v, prefix.len() as u32), None);
+                    Self::bind_var(fx, out, b, r);
+                }
+            }
+            PatternKind::Constructor { ctor, args, .. } => {
+                let info = self.ctors[ctor].clone();
+                let cond = match info.repr {
+                    CtorRepr::Bool(b) => Cond::Bool(v.clone(), b),
+                    CtorRepr::Nil => Cond::Tag(v.clone(), 0),
+                    CtorRepr::Record { ctor, .. } => Cond::Ctor(v.clone(), ctor),
+                };
+                guard(out, cond, fail);
+                for (arg, i) in match_fields(&info.labels, args) {
+                    let f = let_value(fx, out, Value::Field(v.clone(), i), None);
+                    self.pattern(fx, out, arg, f, fail);
+                }
+            }
+            PatternKind::Tuple(parts) => {
+                guard(out, Cond::Tuple(v.clone(), parts.len() as u32), fail);
+                for (i, part) in parts.iter().enumerate() {
+                    let f = let_value(fx, out, Value::Field(v.clone(), i as u32), None);
+                    self.pattern(fx, out, part, f, fail);
+                }
+            }
+            PatternKind::List { items, rest } => {
+                guard(out, Cond::Tag(v.clone(), 6), fail);
+                let mut cur = v;
+                for item in items {
+                    guard(out, Cond::Not(Box::new(Cond::Empty(cur.clone()))), fail);
+                    let h = let_value(fx, out, Value::ListHead(cur.clone()), None);
+                    self.pattern(fx, out, item, h, fail);
+                    cur = let_value(fx, out, Value::ListTail(cur), None);
+                }
+                match rest {
+                    None => guard(out, Cond::Empty(cur), fail),
+                    Some(Some(b)) => Self::bind_var(fx, out, b, cur),
+                    Some(None) => {}
+                }
+            }
+            PatternKind::BitArray(segs) => self.bits_pattern(fx, out, v, segs, fail),
+            PatternKind::Error(_) => out.push(Stmt::Unreachable),
+        }
+    }
+
+    /// The test of a type test `x: T` for one member of `T` (§7.1).
+    fn head_cond(&self, v: Atom, h: Head) -> Cond {
+        match h {
+            Head::Tuple(n) => Cond::Tuple(v, n),
+            Head::Fn => Cond::Tag(v, 7),
+            Head::Named(TypeRef::Builtin(b)) => Cond::Tag(
+                v,
+                match b {
+                    BuiltinType::Int => 8,
+                    BuiltinType::Float => 2,
+                    BuiltinType::String => 3,
+                    BuiltinType::List => 6,
+                    BuiltinType::BitArray => 9,
+                    BuiltinType::UtfCodepoint => 13,
+                    BuiltinType::Boundary => 11,
+                    BuiltinType::Continuation => 12,
+                    BuiltinType::Never => u32::MAX,
+                },
+            ),
+            Head::Named(TypeRef::Custom(t)) => match self.types.get(&t) {
+                Some(TypeRepr::Bool) => Cond::Tag(v, 1),
+                Some(TypeRepr::Nil) => Cond::Tag(v, 0),
+                Some(TypeRepr::Record(id)) => Cond::Type(v, *id),
+                Some(TypeRepr::Host) => Cond::Tag(v, 10),
+                None => match &self.program.ty(t).body {
+                    TypeBody::Alias(Type {
+                        kind: TypeKind::Named { ty, .. },
+                        ..
+                    }) => self.head_cond(v, Head::Named(*ty)),
+                    _ => Cond::Tag(v, u32::MAX),
+                },
+            },
+        }
+    }
+
+    /// §8.4: the segments are matched from the start, and all the bits must
+    /// be used.
+    fn bits_pattern(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        v: Atom,
+        segs: &[Segment<Pattern>],
+        fail: Label,
+    ) {
+        guard(out, Cond::Tag(v.clone(), 9), fail);
+        let total = let_num(fx, out, NumValue::BitsLength(v.clone()), None);
+        let mut pos = Num::Const(0);
+        for s in segs {
+            let fmt = format(s.format.as_ref());
+            match fmt {
+                Some(Fmt::Int {
+                    signed,
+                    width,
+                    little,
+                }) => {
+                    let w = match width {
+                        Width::Const(n) => Num::Const(n as i64),
+                        Width::Dyn(x) => self.pattern_width(fx, out, x, 1, fail),
+                    };
+                    guard(out, Cond::BitsHas(v.clone(), pos.clone(), w.clone()), fail);
+                    let x = let_value(
+                        fx,
+                        out,
+                        Value::BitsReadInt {
+                            bits: v.clone(),
+                            start: pos.clone(),
+                            width: w.clone(),
+                            signed,
+                            little,
+                        },
+                        None,
+                    );
+                    self.pattern(fx, out, &s.value, x, fail);
+                    pos = let_num(fx, out, NumValue::Add(pos, w), None);
+                }
+                Some(Fmt::Float { width, little }) => {
+                    guard(
+                        out,
+                        Cond::BitsFloat {
+                            bits: v.clone(),
+                            start: pos.clone(),
+                            width,
+                            little,
+                        },
+                        fail,
+                    );
+                    let x = let_value(
+                        fx,
+                        out,
+                        Value::BitsReadFloat {
+                            bits: v.clone(),
+                            start: pos.clone(),
+                            width,
+                            little,
+                        },
+                        None,
+                    );
+                    self.pattern(fx, out, &s.value, x, fail);
+                    pos = let_num(fx, out, NumValue::Add(pos, Num::Const(width as i64)), None);
+                }
+                Some(Fmt::Bits(None)) | Some(Fmt::Bytes(None)) => {
+                    let rest = let_num(fx, out, NumValue::Sub(total.clone(), pos.clone()), None);
+                    if matches!(fmt, Some(Fmt::Bytes(None))) {
+                        guard(out, Cond::Whole(rest.clone()), fail);
+                    }
+                    let x = let_value(
+                        fx,
+                        out,
+                        Value::BitsSlice {
+                            bits: v.clone(),
+                            start: pos.clone(),
+                            length: rest,
+                        },
+                        None,
+                    );
+                    self.pattern(fx, out, &s.value, x, fail);
+                    pos = total.clone();
+                }
+                Some(Fmt::Bits(Some(n))) | Some(Fmt::Bytes(Some(n))) => {
+                    let unit = if matches!(fmt, Some(Fmt::Bits(_))) {
+                        1
+                    } else {
+                        8
+                    };
+                    let w = self.pattern_width(fx, out, n, unit, fail);
+                    guard(out, Cond::BitsHas(v.clone(), pos.clone(), w.clone()), fail);
+                    let x = let_value(
+                        fx,
+                        out,
+                        Value::BitsSlice {
+                            bits: v.clone(),
+                            start: pos.clone(),
+                            length: w.clone(),
+                        },
+                        None,
+                    );
+                    self.pattern(fx, out, &s.value, x, fail);
+                    pos = let_num(fx, out, NumValue::Add(pos, w), None);
+                }
+                Some(Fmt::Utf {
+                    encoding,
+                    little,
+                    codepoint: false,
+                }) => {
+                    let PatternKind::String(text) = &s.value.kind else {
+                        self.error(
+                            fx.module,
+                            s.value.span,
+                            "a string format in a pattern needs a string literal (§8.4)",
+                        );
+                        continue;
+                    };
+                    let lit = let_value(
+                        fx,
+                        out,
+                        Value::BitsFromUtf {
+                            value: Atom::String(text.clone()),
+                            encoding,
+                            little,
+                            codepoint: false,
+                        },
+                        None,
+                    );
+                    let w = let_num(fx, out, NumValue::BitsLength(lit.clone()), None);
+                    guard(out, Cond::BitsHas(v.clone(), pos.clone(), w.clone()), fail);
+                    let x = let_value(
+                        fx,
+                        out,
+                        Value::BitsSlice {
+                            bits: v.clone(),
+                            start: pos.clone(),
+                            length: w.clone(),
+                        },
+                        None,
+                    );
+                    guard(out, Cond::BitsEqual(x, lit), fail);
+                    pos = let_num(fx, out, NumValue::Add(pos, w), None);
+                }
+                Some(Fmt::Utf {
+                    encoding,
+                    little,
+                    codepoint: true,
+                }) => {
+                    let cp = fx.local(LocalType::Value);
+                    let width = fx.local(LocalType::I64);
+                    let ok = fx.local(LocalType::I32);
+                    out.push(Stmt::ReadUtf {
+                        codepoint: cp,
+                        width,
+                        ok,
+                        bits: v.clone(),
+                        start: pos.clone(),
+                        encoding,
+                        little,
+                    });
+                    guard(out, Cond::I32(ok), fail);
+                    self.pattern(fx, out, &s.value, Atom::Local(cp), fail);
+                    pos = let_num(fx, out, NumValue::Add(pos, Num::Local(width)), None);
+                }
+                None => out.push(Stmt::Unreachable),
+            }
+        }
+        guard(out, Cond::NumEq(pos, total), fail);
+    }
+
+    /// The width of a segment of a pattern with a length; a length that is
+    /// negative does not match.
+    fn pattern_width(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        n: &Expr,
+        unit: u32,
+        fail: Label,
+    ) -> Num {
+        let n = self.expr(fx, out, n);
+        let w = let_num(fx, out, NumValue::WidthOf(n, unit), None);
+        guard(
+            out,
+            Cond::Not(Box::new(Cond::NumLt(w.clone(), Num::Const(0)))),
+            fail,
+        );
+        w
+    }
+
+    /// Binds a pattern of a binding or a parameter, which can not fail
+    /// (§6.10, §6.11). A pattern that may fail needs `Assert`.
+    fn bind(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom) {
+        match &p.kind {
+            PatternKind::Var(b) => Self::bind_var(fx, out, b, v),
+            PatternKind::Discard => {}
+            PatternKind::Typed { binder, .. } => {
+                if let Some(b) = binder {
+                    Self::bind_var(fx, out, b, v);
+                }
+            }
+            PatternKind::Named { binder, pattern } => {
+                Self::bind_var(fx, out, binder, v.clone());
+                self.bind(fx, out, pattern, v);
+            }
+            PatternKind::Tuple(parts) => {
+                for (i, part) in parts.iter().enumerate() {
+                    let f = let_value(fx, out, Value::Field(v.clone(), i as u32), None);
+                    self.bind(fx, out, part, f);
+                }
+            }
+            PatternKind::Constructor { ctor, args, .. }
+                if matches!(&self.program.ty(ctor.ty).body, TypeBody::Custom(cs) if cs.len() == 1) =>
+            {
+                let info = self.ctors[ctor].clone();
+                for (arg, i) in match_fields(&info.labels, args) {
+                    let f = let_value(fx, out, Value::Field(v.clone(), i), None);
+                    self.bind(fx, out, arg, f);
+                }
+            }
+            PatternKind::List {
+                items,
+                rest: Some(rest),
+            } if items.is_empty() => {
+                if let Some(b) = rest {
+                    Self::bind_var(fx, out, b, v);
+                }
+            }
+            PatternKind::Error(_) => out.push(Stmt::Unreachable),
+            _ => self.error(
+                fx.module,
+                p.span,
+                "this pattern may fail, so the binding needs the `Assert` service, which is not supported yet (§6.10)",
+            ),
+        }
+    }
+}
+
+/// The ABI type of a written type that the host can take (§10.3).
+fn abi_type(t: &ilang_syntax::ast::TypeExpr) -> Option<AbiType> {
+    use ilang_syntax::ast::TypeKind as T;
+    match &t.kind {
+        T::Named { name, args, .. } if args.is_empty() => Some(match name.name.as_str() {
+            "Nil" => AbiType::Nil,
+            "Bool" => AbiType::Bool,
+            "Int" => AbiType::Int,
+            "Float" => AbiType::Float,
+            "String" => AbiType::String,
+            "BitArray" => AbiType::BitArray,
+            _ => AbiType::Externref,
+        }),
+        _ => None,
+    }
+}
+
+/// The `ilang.abi` metadata (B.6).
+fn abi_json(
+    entry: Option<String>,
+    tests: &[String],
+    exports: &[(String, Vec<AbiType>, AbiType)],
+) -> String {
+    let entry = match entry {
+        Some(name) => serde_json::json!({ "name": name, "async": false }),
+        None => serde_json::Value::Null,
+    };
+    let tests: Vec<serde_json::Value> = tests
+        .iter()
+        .map(|t| serde_json::json!({ "name": t, "async": false }))
+        .collect();
+    let mut map = serde_json::Map::new();
+    for (name, params, result) in exports {
+        map.insert(
+            name.clone(),
+            serde_json::json!({
+                "params": params.iter().map(|p| p.name()).collect::<Vec<_>>(),
+                "result": result.name(),
+                "errors": [],
+                "async": false,
+            }),
+        );
+    }
+    serde_json::json!({
+        "version": 2,
+        "entry": entry,
+        "tests": tests,
+        "exports": map,
+        "services": {},
+        "externals": {},
+    })
+    .to_string()
+}

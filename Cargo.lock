@@ -648,8 +648,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "ilang-binaryen",
  "ilang-check",
+ "ilang-host",
  "ilang-package",
+ "ilang-wasm",
+ "num-bigint",
  "tempfile",
 ]
 
@@ -687,6 +691,9 @@ dependencies = [
 name = "ilang-wasm"
 version = "0.1.0"
 dependencies = [
+ "ilang-check",
+ "ilang-package",
+ "ilang-syntax",
  "num-bigint",
  "num-traits",
  "serde_json",

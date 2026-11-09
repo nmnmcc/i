@@ -5,6 +5,10 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
+[lib]
+name = "ilang_cli"
+path = "src/lib.rs"
+
 [[bin]]
 name = "i"
 path = "src/main.rs"
@@ -14,6 +18,15 @@ anyhow.workspace = true
 clap.workspace = true
 ilang-package.workspace = true
 ilang-check.workspace = true
+ilang-wasm.workspace = true
+ilang-binaryen.workspace = true
+ilang-host.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+num-bigint.workspace = true
+
+[[test]]
+name = "spec"
+path = "tests/spec.rs"
+harness = false

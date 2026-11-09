@@ -31,6 +31,7 @@ ilang-package = { path = "crates/ilang-package" }
 ilang-check = { path = "crates/ilang-check" }
 ilang-wasm = { path = "crates/ilang-wasm" }
 ilang-host = { path = "crates/ilang-host" }
+ilang-binaryen = { path = "crates/ilang-binaryen" }
 
 [profile.dev]
 debug = 1

@@ -1,0 +1,3 @@
+# spec: 2.5, 2.1
+# expect: pass
+name = "app"

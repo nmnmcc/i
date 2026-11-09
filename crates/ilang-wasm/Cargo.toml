@@ -5,11 +5,14 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-
-[dev-dependencies]
+ilang-check.workspace = true
+ilang-package.workspace = true
+ilang-syntax.workspace = true
+num-bigint.workspace = true
+serde_json.workspace = true
 wasmparser.workspace = true
 wat = "=1.262.0"
-num-bigint.workspace = true
+
+[dev-dependencies]
 num-traits.workspace = true
-serde_json.workspace = true
 tempfile.workspace = true

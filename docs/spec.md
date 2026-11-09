@@ -513,7 +513,7 @@ Clause    = Pattern { "|" Pattern } [ "if" Expr ] "->" Expr .
 i is strict. Expressions are worked out from left to right:
 
 - In a call, first the function, then the arguments from left to right as they are written (also when they have labels), then the call.
-- The parts of tuples, lists, constructor arguments, and bit arrays are done from left to right.
+- The parts of tuples, lists, constructor arguments, and bit arrays are done from left to right. In a record update `C(..v, f: e, …)`, `v` is done first, then the fields as they are written.
 - In a binary operation, first the left side, then the right side. `&&` and `||` do not do the right side when the left side is enough.
 - `a |> f(b)` does `a` first, and then the rest in the order of `f(a, b)`.
 
@@ -610,7 +610,7 @@ A parameter is a pattern (§7), the same as the left side of a binding, but its 
 
 ### 6.12 case
 
-`case e { clauses }` works out `e`. Then it takes the first clause whose pattern matches and whose guard, if there is one, is `True`, and works out the expression of that clause. A guard is any expression of type `Bool`. It is worked out only after its pattern has matched, and it may use the names of the pattern.
+`case e { clauses }` works out `e`. Then it takes the first clause whose pattern matches and whose guard, if there is one, is `True`, and works out the expression of that clause. A guard is any expression of type `Bool`. It is worked out only after its pattern has matched, and it may use the names of the pattern. When the pattern has choices `p1 | p2`, the choices are tried in order: the clause is taken with the first choice that matches and whose guard is `True`.
 
 - The clauses must cover every possible value of the type of `e` (§7.4). If not, it is a compile error.
 - The type of the `case` is a type of every clause expression, for example their union.
@@ -641,7 +641,7 @@ Rest       = ".." [ name | discard ] .
   - A call of `C` may still give the fields with labels by position (§6.6), but a pattern takes them only by label. A call puts values in, where the order is clear; a pattern takes them out and names them, and the names are the labels. TypeScript does the same: `new User("bob", 3)` and `const { name, age } = user`.
 - The type after `:` goes as far to the right as it can, as every type does (§3). So `x: Int | String` tests for a union, and `f: (Int) -> Int = e` needs no brackets. In a `case` clause, `p: (Int, Int) -> e` is read as a function type, so a tuple type there is put in `{ }`, or a tuple pattern is used. A `|` after a type is part of the type, so a type test is written after the other choices: `True | _: Int`.
 
-`x: T` is one thing in every place where it may be written (in a bit array segment, `:` begins a format instead, §8.1). It matches the values of the type `T`, and `x` gets the type `T`. In a binding or a parameter, every value that comes there is in `T` (§4.8 rules 4 and 10), so `x: Int = e` and `(x: Int) { … }` are type annotations. In a `case`, `x: T` tests the value. Only type constructors are tested at run time, so in a `case`, `T` may not have a type variable as a member.
+`x: T` is one thing in every place where it may be written (in a bit array segment, `:` begins a format instead, §8.1). It matches the values of the type `T`, and `x` gets the type `T`. In a binding or a parameter, every value that comes there is in `T` (§4.8 rules 4 and 10), so `x: Int = e` and `(x: Int) { … }` are type annotations. In a `case`, `x: T` tests the value. Only type constructors are tested at run time, so in a `case`, `T` may not have a type variable as a member. Custom types with no constructors cannot be told apart at run time, so for a type test they all count as one type constructor, as all function types do.
 
 ### 7.2 What patterns match
 
@@ -977,7 +977,7 @@ A Float is a finite IEEE 754 binary64 number. Results are rounded to the nearest
 
 ### 11.6 Tail calls
 
-A call in tail position uses no more stack. Tail positions are: the last expression of a function body; the expression of a clause of a `case` in tail position; and the last expression of a block in tail position. An environment statement does not change which calls are in tail position.
+A call in tail position uses no more stack. Tail positions are: the last expression of a function body; the expression of a clause of a `case` in tail position; the last expression of a block in tail position; and the right side of `&&` or `||` in tail position. An environment statement does not change which calls are in tail position.
 
 ### 11.7 Stops
 
