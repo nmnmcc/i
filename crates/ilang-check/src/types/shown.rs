@@ -238,3 +238,38 @@ struct Names<'a> {
     var: &'a mut dyn FnMut(&str) -> String,
     limit: Option<usize>,
 }
+
+impl ShownType {
+    /// Nominal identities in the complete tree, including function inputs.
+    pub fn type_refs(&self, out: &mut Vec<TypeRef>) {
+        match self {
+            ShownType::Named(ty, ts) => {
+                out.push(*ty);
+                for t in ts {
+                    t.type_refs(out);
+                }
+            }
+            ShownType::Tuple(ts) | ShownType::Union(ts) | ShownType::Inter(ts) => {
+                for t in ts {
+                    t.type_refs(out);
+                }
+            }
+            ShownType::Fn(f) => {
+                for (_, t) in &f.params {
+                    t.type_refs(out);
+                }
+                f.ret.type_refs(out);
+                for t in f.err.iter().chain(&f.env) {
+                    t.type_refs(out);
+                }
+            }
+            ShownType::Diff(t, ts) => {
+                t.type_refs(out);
+                for t in ts {
+                    t.type_refs(out);
+                }
+            }
+            ShownType::Lit(_) | ShownType::Var(_) | ShownType::Hole | ShownType::Never => {}
+        }
+    }
+}

@@ -1,0 +1,3 @@
+# spec: 4.3, 4.7
+# expect: pass
+name = "spec"

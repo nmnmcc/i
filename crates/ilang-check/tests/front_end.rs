@@ -164,7 +164,7 @@ fn kept_form_messages_are_independent_checks() {
         ("f(A) = (x: A(Int)) { x }", "E0230", "takes no arguments"),
         ("f(A, A) = 1", "E0226", "declared more than once"),
         ("f(Int) = 1", "E0231", "name of a type"),
-        ("f(A) = (x: a) { x }", "E0237", "type of a value"),
+        ("f(A) = (x: a) { x }", "E0201", "not defined"),
         (
             "f = (x: Missing) { x }",
             "E0202",
@@ -173,12 +173,8 @@ fn kept_form_messages_are_independent_checks() {
         ("T { T(Missing) }", "E0202", "declare it in the head"),
         ("Box(Int) { Box(Int) }", "E0231", "name of a type"),
         ("Box(a, B) { Box }", "E0232", "an `UpName`"),
-        ("Schema(Int) = Int", "E0233", "kept for alias patterns"),
-        (
-            "f = (x: p.name) { x }",
-            "E0229",
-            "kept for the type of a value",
-        ),
+        ("Schema(Int) = Int", "E0231", "name of a type"),
+        ("f = (x: p.name) { x }", "E0201", "not defined"),
         ("f = (x: m(Int)) { x }", "E0234", "kept for macros"),
         ("@main()\nf = () { Nil }", "E0302", "written with no `( )`"),
         ("@a.main\nf = () { Nil }", "E0301", "kept for macros"),
