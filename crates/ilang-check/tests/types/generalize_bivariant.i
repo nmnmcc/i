@@ -1,4 +1,4 @@
-// §4.5 rule 6: a has no input or output occurrence after following fields.
+// §4.5 rule 6: A has no input or output occurrence after following fields.
 // It is used only in the recursive type argument.
 Phantom(A) {
 	Phantom(next: () -> Phantom(A))

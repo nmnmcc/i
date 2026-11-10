@@ -19,7 +19,7 @@ users = [User("bob", 3)]
 through_id = users |> map(id) |> map((v) { v.age })
 
 // The variable of the constructor `Box` matches nothing, but `b` gets
-// `Box(c)` as a whole, so `.item` is known.
+// `Box(C)` as a whole, so `.item` is known.
 Box(A) {
 	Box(item: A)
 }

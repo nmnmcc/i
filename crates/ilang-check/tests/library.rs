@@ -175,7 +175,7 @@ fn library_names() {
 }
 
 /// The labels of the parameters in the spec tables, for example
-/// `control.suspend: (b: …, f: (k: …) -> …) -> a`.
+/// `control.suspend: (b: …, f: (k: …) -> …) -> A`.
 #[test]
 fn library_labels() {
     let (_, program, _) = common::check_files(&[]);

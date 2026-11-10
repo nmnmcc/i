@@ -1,7 +1,7 @@
 //// Sets: collections of values with no two the same, which may not be
 //// changed.
 ////
-//// A `Set(a)` is a `Dict(a, Nil)` (see `std/dict`): members are compared
+//// A `Set(A)` is a `Dict(A, Nil)` (see `std/dict`): members are compared
 //// with `==` and found by their `core.hash`, so any value may be a member.
 //// `insert`, `delete`, and `contains` take O(log n) steps. Two sets with the
 //// same members are `==`. The order of `to_list` and `fold` is not fixed.

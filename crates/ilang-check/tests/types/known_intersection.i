@@ -1,5 +1,5 @@
 // §4.8: when `P` is an intersection, each of its members is matched with
-// `K`. `inc` has the type `(x: a & Int) -> a`, so `inc(5)` has the known
+// `K`. `inc` has the type `(x: A & Int) -> A`, so `inc(5)` has the known
 // type `Int`.
 inc = (x) {
 	x + 1

@@ -731,7 +731,7 @@ impl Checker<'_> {
                     self.error(
                         code::CASE_TYPE_VAR,
                         ty.span,
-                        "in a `case`, `x: T` tests the type constructor, so `T` may not have a type variable as a member (§7.1)",
+                        "in a test, `x: T` tests the type constructor, so `T` may not have a type variable as a member (§7.1)",
                     );
                     Pat::Wild(None)
                 } else {

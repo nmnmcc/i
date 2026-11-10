@@ -13,7 +13,7 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-// A clause of a `case` in tail position.
+// A clause of a match in tail position.
 count = (n, acc) {
 	n |> {
 		0 -> acc

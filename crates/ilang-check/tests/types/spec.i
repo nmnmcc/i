@@ -102,7 +102,7 @@ inc = (x) {
 	x
 }
 
-// type: (x: a & Int) -> a
+// type: (x: A & Int) -> A
 
 // §6.5
 mixed = [1, "a"]

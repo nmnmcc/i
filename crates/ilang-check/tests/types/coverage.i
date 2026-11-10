@@ -1,4 +1,4 @@
-// §7.4: the clauses of a `case` must cover every value of the type of the
+// §7.4: the clauses of a match must cover every value of the type of the
 // subject. A missing pattern is shown.
 Shape {
 	Circle(radius: Float)

@@ -1,4 +1,4 @@
-// Rule 11: case by places.
+// Rule 11: matches by places.
 // No catch-all: the value must be one the patterns take.
 digit = (x) {
 	x |> {

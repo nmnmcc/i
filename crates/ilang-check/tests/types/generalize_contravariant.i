@@ -1,4 +1,4 @@
-// §4.5 rule 6: a goes in the other direction in Sink(a).
+// §4.5 rule 6: A goes in the other direction in Sink(A).
 Sink(A) {
 	Sink(put: (A) -> Nil)
 }

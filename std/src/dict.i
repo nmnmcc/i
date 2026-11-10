@@ -324,7 +324,7 @@ remove_entry(K, V) = (
 /// when the key is there and `None` when not.
 ///
 /// ```i
-/// increment = (x) { case x { Some(n) -> n + 1  None -> 0 } }
+/// increment = (x) { x |> { Some(n) -> n + 1  None -> 0 } }
 /// dict.upsert(counts, in: "a", with: increment)
 /// ```
 upsert(K, V, E, N) = (

@@ -1,4 +1,4 @@
-// §4.5 rules 4 and 6: n goes in and comes out, so it does not change.
+// §4.5 rules 4 and 6: N goes in and comes out, so it does not change.
 // §4.7: simplification must preserve the principal type of this factory.
 Stream(A, E, N) {
 	Stream(() -> Step(A, E, N) ? E ! N, (N) -> Nil)

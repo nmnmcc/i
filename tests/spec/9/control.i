@@ -309,7 +309,7 @@ deep_generators = () {
 	check(show(sum(numbers(1, 100000), 0)), "5000050000")
 }
 
-// Suspends in the clauses of `case`, in guards, and on the right of `&&`:
+// Suspends in the clauses of a match, in guards, and on the right of `&&`:
 // the rest of the function goes on after each of them.
 @test
 in_branches = () {

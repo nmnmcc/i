@@ -5,7 +5,7 @@
 //!   which a program imports like this:
 //!
 //!   ```text
-//!   import ((Io) = i/io)
+//!   ((Io) = i/io)
 //!   ```
 //!
 //!   `print` writes the text and a line feed. Another embedder gives it like

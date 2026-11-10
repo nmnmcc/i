@@ -1,4 +1,4 @@
-// §4.5 rule 6: a appears in an input and an output, so it does not change.
+// §4.5 rule 6: A appears in an input and an output, so it does not change.
 Cell(A) {
 	Cell(run: (A) -> A)
 }

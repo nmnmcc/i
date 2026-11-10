@@ -38,7 +38,7 @@ annotated: (User) -> String = (u) { u.name }
 // The body of a function with a written `->` part.
 getter = () -> (User) -> String { (u) { u.name } }
 
-// The last expression of a block, and the clause expressions of a `case`.
+// The last expression of a block, and the clause expressions of a match.
 in_block: (User) -> Int = {
 	n = 1
 	(u) { u.age + n }

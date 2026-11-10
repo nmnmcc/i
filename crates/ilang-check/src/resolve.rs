@@ -2918,7 +2918,7 @@ impl<'a> Resolver<'a> {
                     problem = Some((
                         code::WASM_EXPORT_UNKNOWN,
                         format!(
-                            "the host export `{}.{}` is not a function in the `export` list of a module `{}`",
+                            "the host export `{}.{}` is not a function in the exports of a module `{}`",
                             e.module, e.function, e.module
                         ),
                     ))

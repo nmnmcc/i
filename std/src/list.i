@@ -1,4 +1,4 @@
-//// Functions for `List(a)`, the built-in type of lists that may not be
+//// Functions for `List(A)`, the built-in type of lists that may not be
 //// changed.
 ////
 //// Every function that walks a whole list is tail-recursive (§11.6), so it
@@ -8,7 +8,7 @@
 ////
 //// Functions that may find nothing give an `Option` (`first`, `find`,
 //// `at`, …). Functions that take a function as an argument have the errors
-//// and the environment of that function (`? e ! n`), so the argument may
+//// and the environment of that function (`? E ! N`), so the argument may
 //// itself raise errors or need services.
 
 (
@@ -516,7 +516,7 @@ try_fold(A, Acc, F, E, N) = (
 ///
 /// ```i
 /// list.fold_until([1, 2, 3, 4], from: 0, with: (acc, x) {
-///   case x < 3 { True -> list.Continue(acc + x)  False -> list.Stop(acc) }
+///   { x < 3 } |> { True -> list.Continue(acc + x)  False -> list.Stop(acc) }
 /// })  // 3
 /// ```
 fold_until(A, Acc, E, N) = (

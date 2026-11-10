@@ -362,7 +362,7 @@ These types may be used in every module:
 | `Int` | Whole numbers of any size |
 | `Float` | Finite IEEE 754 binary64 numbers |
 | `String` | Lists of Unicode scalar values, kept as UTF-8 |
-| `List(a)` | Lists that may not be changed |
+| `List(A)` | Lists that may not be changed |
 | `BitArray` | Lists of bits; the number of bits may be any number |
 | `UtfCodepoint` | One Unicode scalar value |
 | `Never` | No values |
@@ -372,7 +372,7 @@ These built-in types are normal custom types (§4.3) with these definitions:
 ```i
 Bool { True False }
 Nil { Nil }
-Result(a, e) { Ok(a) Error(e) }
+Result(A, E) { Ok(A) Error(E) }
 ```
 
 The types `Assert` and `AssertionFailure` are in §9.6. The types `Boundary` and `Continuation` are in §9.4.
@@ -758,7 +758,7 @@ Rest       = ".." [ name | discard ] .
 
 ### 7.3 Patterns that may fail
 
-A pattern **can not fail** for a type `T` when it matches every value of `T`. Other patterns **may fail**. A catch-all can not fail for any type, and `x: U` can not fail for a type `T` with `T <: U`, so `(x: a) -> a { x }` needs no `Assert`. A value of a type variable may be any value, so a pattern that tests more than its type, such as a literal or a constructor, may fail for it.
+A pattern **can not fail** for a type `T` when it matches every value of `T`. Other patterns **may fail**. A catch-all can not fail for any type, and `x: U` can not fail for a type `T` with `T <: U`, so `id(A) = (x: A) -> A { x }` needs no `Assert`. A value of a type variable may be any value, so a pattern that tests more than its type, such as a literal or a constructor, may fail for it.
 
 ### 7.4 Covering every value
 
@@ -836,10 +836,10 @@ i has no special effect definitions. Effects are made from normal things: functi
 A function with no parameters, `() -> A ? E ! N`, is a **computation** that has not been done yet. It is the same idea as an `Effect<A, E, R>` value in Effect-TS. It may be stored, given to other functions, and put together with other computations. Calling it does it. Retrying, time limits, and running at the same time are normal functions:
 
 ```i
-retry = (times: Int, body: () -> a ? e ! n) -> a ? e ! n {
-  case fail.catch(body) {
+retry(A, E, N) = (times: Int, body: () -> A ? E ! N) -> A ? E ! N {
+  fail.catch(body) |> {
     Ok(value) -> value
-    Error(error) -> case times > 1 {
+    Error(error) -> { times > 1 } |> {
       True -> retry(times - 1, body)
       False -> fail.raise(error)
     }
@@ -882,17 +882,17 @@ The `E` part of a function type is the set of errors the function may give. An e
 
 | Function | Type | What it does |
 |---|---|---|
-| `fail.raise` | `(error: e) -> Never ? e` | Ends the computation with `error` |
-| `fail.catch` | `(body: () -> a ? e ! n) -> Result(a, e) ! n` | Changes every error into `Error(…)` |
-| `fail.from_result` | `(result: Result(a, e)) -> a ? e` | Gives the error `x` for `Error(x)` |
-| `fail.map_error` | `(body: () -> a ? e ! n, with: (e) -> e2 ! n) -> a ? e2 ! n` | Changes the errors |
+| `fail.raise` | `(error: E) -> Never ? E` | Ends the computation with `error` |
+| `fail.catch` | `(body: () -> A ? E ! N) -> Result(A, E) ! N` | Changes every error into `Error(…)` |
+| `fail.from_result` | `(result: Result(A, E)) -> A ? E` | Gives the error `x` for `Error(x)` |
+| `fail.map_error` | `(body: () -> A ? E ! N, with: (E) -> E2 ! N) -> A ? E2 ! N` | Changes the errors |
 
 ```i
 load = (id) { parse_user(http_get(id)) }
 // inferred: (id: String) -> User ? HttpError | ParseError ! Http
 
 safe = (id) {
-  case fail.catch(() { load(id) }) {
+  fail.catch(() { load(id) }) |> {
     Ok(user) -> user
     Error(_: ParseError) -> default_user
     Error(other) -> fail.raise(other)        // other: HttpError
@@ -911,10 +911,10 @@ The module `i/control` has one operation to pause a computation and go on with i
 
 | Function | Type |
 |---|---|
-| `control.boundary` | `(body: (b: Boundary(r, e, n)) -> r ? e ! n) -> r ? e ! n` |
-| `control.suspend` | `(b: Boundary(r, e, n), f: (k: Continuation(a, r, e, n)) -> r ? e ! n) -> a` |
-| `control.resume` | `(k: Continuation(a, r, e, n), value: a) -> r ? e ! n` |
-| `control.cancel` | `(k: Continuation(a, r, e, n)) -> Nil ! n` |
+| `control.boundary` | `(body: (b: Boundary(R, E, N)) -> R ? E ! N) -> R ? E ! N` |
+| `control.suspend` | `(b: Boundary(R, E, N), f: (k: Continuation(A, R, E, N)) -> R ? E ! N) -> A` |
+| `control.resume` | `(k: Continuation(A, R, E, N), value: A) -> R ? E ! N` |
+| `control.cancel` | `(k: Continuation(A, R, E, N)) -> Nil ! N` |
 
 `Boundary` and `Continuation` are built-in types. They are not custom types: their values are made only by `control.boundary` and `control.suspend`, and the host cannot take them (§10.3).
 
@@ -928,11 +928,11 @@ The module `i/control` has one operation to pause a computation and go on with i
 Generators, async code, and schedulers are libraries made from services and this operation. For example, a generator:
 
 ```i
-Yield(a) { Yield(emit: (value: a) -> Nil) }
+Yield(A) { Yield(emit: (value: A) -> Nil) }
 
-collect = (body: () -> Nil ! Yield(a) | n) -> List(a) ! n {
+collect(A, N) = (body: () -> Nil ! Yield(A) | N) -> List(A) ! N {
   control.boundary((b) {
-    ! Yield(a) = Yield((x) { control.suspend(b, (k) { [x, ..control.resume(k, Nil)] }) })
+    ! Yield(A) = Yield((x) { control.suspend(b, (k) { [x, ..control.resume(k, Nil)] }) })
     body()
     []
   })
@@ -947,8 +947,8 @@ The module `i/resource` puts final functions in place:
 
 | Function | Type | What it does |
 |---|---|---|
-| `resource.ensure` | `(body: () -> a ? e ! n, with: () -> Nil ! n) -> a ? e ! n` | Runs `with` after `body`, whether `body` ends normally, ends with an error, or is unwound |
-| `resource.acquire` | `(open: () -> r ? e ! n, release: (r) -> Nil ! n, use: (r) -> a ? e ! n) -> a ? e ! n` | After `open` is done, runs `release` when `use` ends or is unwound |
+| `resource.ensure` | `(body: () -> A ? E ! N, with: () -> Nil ! N) -> A ? E ! N` | Runs `with` after `body`, whether `body` ends normally, ends with an error, or is unwound |
+| `resource.acquire` | `(open: () -> R ? E ! N, release: (R) -> Nil ! N, use: (R) -> A ? E ! N) -> A ? E ! N` | After `open` is done, runs `release` when `use` ends or is unwound |
 
 A final function may not give errors. When the program stops (§11.7), final functions are not run.
 
@@ -965,7 +965,7 @@ An `Assert` service is where failures are reported. Its `fail` never gives back 
 
 ```i
 assert = (c: Bool, a ! Assert) {
-  case c {
+  c |> {
     True -> Nil
     False -> a.fail(AssertionFailure("assert"))
   }
@@ -1007,7 +1007,7 @@ Storage { Storage(read: (key: String) -> String ? String) }
 - With `@host("namespace", "async")`, the host does the functions **later**: the program waits at the call, and goes on from the call when the host gives a value or an error. In i code, such a call is a normal call.
 - A host service in the environment of an entry point (§10.2) is given by the host. Every field is the Wasm import with the import module `namespace` and the field label as its name, encoded as in Appendix B.
 - i code may also give a host service with an environment statement, for example to put a fake in its place in a test.
-- The library module `i/io` declares and exports the **standard service**: `@host("i:io/v1") Io { Io(print: (text: String) -> Nil) }`. `print` writes the text and a line feed to the standard output. A program that prints imports it, for example `import ((Io) = i/io)`, and takes it from the environment of an entry point like any host service. `i run` and `i test` give it to every program, and on the WASI target the module gives it itself (§B.7). Any other host, such as an embedder or the JavaScript SDK, gives it like any other host service, or the program cannot run there. A host service declared in another module with the namespace `i:io/v1` is a normal host service, and the rule above about namespaces and labels is true for it as for any other: with a field `print`, it is a compile error.
+- The library module `i/io` declares and exports the **standard service**: `@host("i:io/v1") Io { Io(print: (text: String) -> Nil) }`. `print` writes the text and a line feed to the standard output. A program that prints imports it, for example `((Io) = i/io)`, and takes it from the environment of an entry point like any host service. `i run` and `i test` give it to every program, and on the WASI target the module gives it itself (§B.7). Any other host, such as an embedder or the JavaScript SDK, gives it like any other host service, or the program cannot run there. A host service declared in another module with the namespace `i:io/v1` is a normal host service, and the rule above about namespaces and labels is true for it as for any other: with a field `print`, it is a compile error.
 
 ## 10. The host boundary
 

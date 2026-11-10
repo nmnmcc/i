@@ -18,7 +18,7 @@ warned = (x: Int, y: Float) {
 	Nil
 }
 
-// A call, `|>`, `case`, a block, a bit array, and a Float operator, which
+// A call, `|>`, a match, a block, a bit array, and a Float operator, which
 // may stop (§11.3), are not warned about.
 not_warned = (x: Int, y: Float) {
 	f(x)

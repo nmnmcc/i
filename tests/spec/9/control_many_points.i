@@ -12,8 +12,8 @@ check = (got: String, want: String) {
 	}
 }
 
-// Many calls that may suspend, in the clauses of `case`s with guards and
-// in nested `case`s. A program that suspends at each of them and resumes at
+// Many calls that may suspend, in the clauses of matches with guards and
+// in nested matches. A program that suspends at each of them and resumes at
 // once gives the same values as one that does not suspend.
 f = (s: (Int) -> Int, x: Int) {
 	a0 = x
