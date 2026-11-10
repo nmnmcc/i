@@ -82,9 +82,21 @@ pub fn compile(
 /// and the opaque values on every call. The `Built` value binds the grant plan
 /// to the exact compiled artifact.
 pub fn invoke(built: &Built, export: &str, arguments: &[Syntax]) -> Result<Syntax> {
+    invoke_with_templates(built, export, arguments, std::sync::Arc::from([]))
+}
+
+/// Invoke with this compiled program's source-located quote templates. The
+/// table belongs to this fresh instance and is never shared with another run.
+pub fn invoke_with_templates(
+    built: &Built,
+    export: &str,
+    arguments: &[Syntax],
+    templates: std::sync::Arc<[Syntax]>,
+) -> Result<Syntax> {
     let program = built.host_program().context("load macro program")?;
     let mut imports = ilang_host::HostImports::default();
-    ilang_host::syntax::install(&mut imports).context("install syntax service")?;
+    ilang_host::syntax::install_with_templates(&mut imports, templates)
+        .context("install syntax service")?;
     imports.grant_package(&built.binding_plan, &built.trusted_package);
     let mut instance = program
         .instantiate(ilang_host::HostOptions::new(imports))

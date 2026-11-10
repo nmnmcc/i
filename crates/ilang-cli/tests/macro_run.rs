@@ -79,3 +79,38 @@ fn compiler_export_is_checked_and_executed_with_syntax_services() {
         ilang_cli::macro_run::invoke(&built, "app/main.identity", &[value.clone()]).unwrap();
     assert!(result.identical(&value));
 }
+
+#[test]
+fn expression_quote_is_compiled_and_keeps_unquote_identity() {
+    use ilang_syntax::lisp::syntax::Node;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(= quoted (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(f ~x)))\n").unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (mut parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let mut templates = Vec::new();
+    for (id, module) in parsed.iter_mut().enumerate() {
+        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+            &mut module.ast,
+            id as u32,
+            &mut templates,
+        );
+    }
+    let built = ilang_cli::macro_run::compile(&graph, &parsed, &[("app/main", "quoted")]).unwrap();
+    let original = input();
+    let result = ilang_cli::macro_run::invoke_with_templates(
+        &built,
+        "app/main.quoted",
+        &[original.clone()],
+        templates.into(),
+    )
+    .unwrap();
+    let Node::Round(items) = result.node() else {
+        panic!("quote did not return a round datum")
+    };
+    assert_eq!(result.show(), "(f (f x))");
+    assert!(items[1].identical(&original));
+}
