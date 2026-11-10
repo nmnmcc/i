@@ -1,7 +1,9 @@
 # Numeric lowering without temporary boxes
 
-Status: proposed compiler work, not a language extension. Only this note is
-committed. Measurements and probes are under this lane's ignored
+Status: compiler design with coordinator decisions recorded in §9, not a
+language extension. Independent review permits N0 and conservative N1 after
+checker coordination; the transitive inlining gate below is required before N2.
+Only this note is committed. Measurements and probes are under this lane's ignored
 `target/numeric/`. Baseline compiler:
 `94789e6141d9d2213d3b909b07bcbac9bbcdb02d`. All repository code locations below
 refer to that revision. Binaryen locations refer to submodule
@@ -256,6 +258,18 @@ split for capture before Binaryen runs (`control.rs:273–304`); later resolving
 a call does not rerun i's control analysis. These measured survivors motivate
 earlier lowering; Binaryen does have useful GC optimizations.
 
+The independent review linked a scratch driver against the pinned Binaryen
+with the compiler's O2 settings (`/tmp/review-num/opt.cpp:10–16`). Its local
+visibility probe constructs a Float box, reads it for multiplication, checks
+finiteness, then constructs and reads a second box
+(`/tmp/review-num/box-visible.wat:3–9`). Default optimization removes both boxes
+and retains the multiplication and finite check
+(`/tmp/review-num/box-visible-o2.wat:4–17`). This is the review's observation,
+confirmed by reading those inputs/outputs; it does not prove a cross-function
+representation rewrite. N0 must first try emission that makes construction and
+consumption visible together, then measure on the real kernels before adding
+custom optimization passes (§7).
+
 ### 2.4 Controls and gain estimates
 
 Hand-written scalar.wat keeps each Float operation and a finite check, uses
@@ -326,7 +340,11 @@ Typed has exported scheme trees, field access and type-test maps, but no full
 expression-type map; local solver data is optional editor output
 (`crates/ilang-check/src/types/mod.rs:148–210`, `types/infer.rs:194–227`). Add a
 small code-generation fact table computed from final solved types and recorded
-expression/parameter handles. It must not force generalization, instantiate a
+expression/parameter handles. Coordinate this export with T1 and T2, separately
+from lowering work: freeze facts only after their completed inference lifecycle,
+including completion, fixation, generalization and deferred checks. Do not
+snapshot an intermediate solver state or freeze types earlier to help lowering
+(`types-joint.md` §2.3 and §3). It must not force generalization, instantiate a
 binding again, add a bound, or change displayed types. Validate facts against
 the solver before discarding it. Operators can supply result facts directly;
 a consumer's desired type alone does not prove every incoming value has that
@@ -415,13 +433,29 @@ signatures remain unchanged (R7); scalar locals and arguments are independent
 of this conservative result rule.
 
 Inline known nonrecursive small helpers in numeric-eligible regions, initially
-at most 32 source IR statements and 2x per-caller growth. Inline before capture
-splitting and recompute may-suspend afterward. Initially exclude bodies with
-suspend/catch/ensure/unknown calls. Copy operation origins and logical call-site
-chains. Preserve argument evaluation once, in written order, before the body
+at most 32 source IR statements and 2x per-caller growth. Before any inlining,
+compute the **transitive may-suspend set** to a fixed point over the candidate
+call graph, including workers. A function in that set is never inlined. Known
+calls propagate suspension, including tail calls; unknown calls and suspending
+operations are conservative seeds, as in `control.rs:245–304`. A body-local
+search for suspend/catch/ensure/unknown calls is not sufficient: a helper can
+call another known function that suspends. Keep the direct catch/ensure/unknown
+call exclusions too. An inline expansion must not bypass the pre-inlining
+exclusion by reconsidering a previously excluded function later in the pass.
+
+Inline before capture splitting and keep the may-suspend recomputation after
+inlining too. Copy operation origins and logical call-site chains. Preserve
+argument evaluation once, in written order, before the body
 (`lower.rs:1933–1959`), failing patterns, function identity and environments.
 This applies equally to user helpers. Leave Binaryen's global inline limit at
 20 rather than forcing large runtime functions inline.
+
+The current capture path saves one shadow slot per physical frame and restores
+that one slot (`emit/control.rs:625–646,686–719,834–888`). Eager logical site
+writes and post-inlining liveness cannot preserve additional logical frames
+inside a captured inline expansion. A design for captured logical frame chains
+is deferred. The three-function resumed-stop acceptance case in §8 checks this
+restriction at O0, O2 and O3.
 
 ### R4. An Int is machine-local only while exact; leaving the region uses ordinary Int
 
@@ -598,8 +632,9 @@ caller site, tail flag and callee operation site. Fewer native calls cannot
 mean fewer language calls. Current shadow protocol: `runtime/mod.rs:72–100`;
 tail emission: `emit/mod.rs:390–401`.
 
-Later, a separate gate may defer these writes across a straight numeric stretch
-to the failure branch. Its compile-time origin stack must reconstruct exactly
+The coordinator defers cold stop-stack reconstruction; it is not part of N0–N5.
+A later design and separate gate may defer these writes across a straight numeric
+stretch to the failure branch. Its compile-time origin stack must reconstruct exactly
 the same slots before stop_float. Flush before unknown calls, possible errors,
 suspension, final-function handlers or other observable stops; preserve tail
 sites. Start with leaf stretches, never defer across control effects. A proved
@@ -619,12 +654,14 @@ Ordered pipeline:
 
 1. Ordinary inference; freeze conservative facts (R1).
 2. Existing ANF lowering, retaining facts and source origins.
-3. Known-code analysis, bounded worker cloning and helper inlining (R3).
+3. Known-code analysis and bounded worker cloning; compute the transitive
+   may-suspend set before any helper inlining and exclude every member (R3).
 4. Aggregate replacement and immutable projection commoning (R5/R8).
 5. Recompute may-suspend; solve tail-result conventions; select representations;
    insert conversions, guarded Int regions and checks (R2/R4/R7).
 6. Range proof/check removal (R6); verify representation, dominance, sites and
-   tail conventions; optionally R9 cold trace paths after their separate gate.
+   tail conventions. Cold trace paths and captured logical frame chains are
+   deferred, not part of this pipeline.
 7. Extended control splitting, emission, validation, unchanged Binaryen O2/O3,
    validation again.
 
@@ -681,21 +718,40 @@ specified stops, not identical time/resource consumption.
 
 ## 7. Implementation order, files and gates
 
-Order by gain per risk. Each stage has its own report and review. Shared lower.rs
-edits are **serialized** after the coordinator's active T1/T3, R2 and JP/host
-work. Region numbers identify baseline seams, not ownership of the whole file.
+Order by gain per risk. Each stage has its own report and review. The coordinator
+approved one combined checker/IR/control track, serialized after the current
+owners T1, T2 and R2. Coordinate its two shared areas separately:
+
+- **Checker facts:** types/mod.rs, types/infer.rs and expression-fact collection
+  follow T1 and T2's completed inference lifecycle, including their completion,
+  fixation and deferred-check work (`types-joint.md` §2.3 and §3). Freeze the
+  fact table only after that lifecycle finishes; do not insert an early snapshot.
+- **Lowering and host seams:** serialize lower.rs and adapter edits with R2 and
+  JP. Coordinate T3 field-shape integration separately when those shapes are
+  supported; it does not replace T1/T2 checker coordination.
+
+Region numbers identify baseline seams, not ownership of the whole file.
 Here `types/` is under `crates/ilang-check/src/`; new numeric modules are under
 `crates/ilang-wasm/src/numeric/`.
 
 | Step | Work/payoff | Files and regions to reserve |
 |---|---|---|
-| N0 | freeze kernels/counters, adversarial cases, representation verifier | new bench/test/numeric_test.i, bench driver, ilang-wasm/tests/numeric_lowering.rs, spec/control/host tests |
-| N1 | R1/R2 scalar Float locals, checks/constants; first local box removal | types/mod.rs:148–200; types/infer.rs:155–228 plus expression fact collection; new numeric modules; ir.rs:113–208,257–285,497–508; lower.rs:58–64,499–504,1352–1405,1549–1660,1802–1900; emit/mod.rs:284–295,482–554,1075–1081; conditional runtime helper at values.rs:52–59; CLI lib.rs:146–162, main.rs:214–228 |
+| N0 | first try emission that exposes construction/consumption to default Binaryen; measure before custom passes; freeze kernels/counters and adversarial/verifier cases | new bench/test/numeric_test.i, bench driver, ilang-wasm/tests/numeric_lowering.rs, spec/control/host tests |
+| N1 | R1/R2 scalar Float locals, checks/constants; first local box removal | after T1/T2: types/mod.rs:148–200; types/infer.rs:155–228 plus expression fact collection; new numeric modules; ir.rs:113–208,257–285,497–508; lower.rs:58–64,499–504,1352–1405,1549–1660,1802–1900; emit/mod.rs:284–295,482–554,1075–1081; conditional runtime helper at values.rs:52–59; CLI lib.rs:146–162, main.rs:214–228 |
 | N2 | R3 workers/inlining, R7 scalar capture, R9 logical sites; largest combined Float gain | lower.rs:1294–1405,1732–1758,1903–2015; ir.rs:249–275,499–552; control.rs:41–155,239–305,495–619 and use walkers; emit/mod.rs:300–460,554–599; emit/control.rs:625–888; new call-graph/worker modules |
 | N3 | R5 pairs/records, R8 projection commoning | new aggregate/commoning modules; field origins at lower.rs:1763–1798,1955–1977; emit/mod.rs:572–599; coordinate T3 shapes, no global layout change |
 | N4 | R4 guarded small Int regions and reduced numeric/Bool tests | new integer/range modules; ir.rs:163–185; emit/mod.rs:512–540; reuse runtime/bigint.rs:87–132,220–268,304–315,408–435 |
-| N5 | R6 finite proofs; optional R9 cold trace paths after exact trace tests | new float-range module and check/site IR; emit/mod.rs:321–401; runtime/stops.rs:1–204 only if shared cold trace support is necessary; lazy trampoline algorithms unchanged |
+| N5 | R6 finite proofs; cold stop-stack reconstruction deferred | new float-range module and check/site IR; emit/mod.rs:321–401; no change to lazy trampoline algorithms or captured logical frame storage |
 | N6 | tune measured survivors; targeted Binaryen CSE experiment if justified | ilang-binaryen/src/lib.rs:106–112 only with separate WAT/performance gate; recommend no default pipeline change |
+
+N0 first tests “emit so that Binaryen can see it”: place temporary Float
+construction and consumption together, retaining finite checks, using the
+unchanged default Binaryen pipeline. Measure time, allocation count and hot WAT
+on all six real kernels against the existing baseline before introducing any
+custom optimization pass. Keep the simplest emission change that meets the
+gates; custom passes must address measured residual work. The independent
+visibility probe in §2.3 establishes a local opportunity, not sufficient support
+for cross-call worker conventions or capture rewriting.
 
 N1 must either include R7 save/restore or conservatively leave all values live
 across suspension boxed until N2. No intermediate stage may emit unsavable F64
@@ -711,9 +767,12 @@ Update calling-convention comments when implemented (`ir.rs:9–19`,
 Acceptance gates:
 
 1. **Behavior:** full scripts/dev-verify green through cache/heavy, plus syntax
-   check, at each landable stage. Numeric/control/ABI probes run at O0/O2 on
-   native, JS and WASI where supported. Check exact bits, finite-stop reason
-   and complete source stack, errors, finals/cancellation, one-shot use,
+   check, at each landable stage. Numeric/control/ABI probes run at O0/O2/O3 on
+   native, JS and WASI where supported. Keep O0 as the differential oracle and
+   test equal results, effects, specified stops and complete stop traces at all
+   three levels, including the transitive-suspension acceptance program in §8.
+   Normative expectations still govern; do not bless a shared pre-existing bug
+   merely because levels agree. Check exact bits, errors, finals/cancellation, one-shot use,
    environments and deep tail calls. Std-3's independent rounding corpus
    stays bit-equal, including subnormal/huge/hard cases.
 2. **WAT:** every O0 program stays byte-equal, numeric or not. At O2, zero
@@ -920,23 +979,94 @@ as the executed dead-overflow probe, with spacing changed only.
 These are two self-review passes of the corrected design, not independent
 reviewer approvals or tests of an implemented optimization.
 
-## 9. Coordinator questions and recommendations
+### Independent review correction: transitively suspending inlinees
 
-1. **Checker facts, numeric IR and control emission in one serialized track?**
-   Recommend yes, after active lower.rs owners. A Float-local-only change
-   without safe capture handling cannot land. Coordinate host adapters with
-   R2/JP instead of taking their whole region.
-2. **Enable new lowering at O2/O3 only first?** Recommend yes; retain byte-equal
-   O0 as a behavioral oracle and zero-transformation O2 equality as a gate.
-3. **Four workers, 2x eligible IR growth, four-field aggregates?** Recommend yes
-   as internal tuning limits with dump diagnostics, never source restrictions.
-4. **Staged compiler speed gates distinct from Float-library release?** Recommend
-   yes; preserve correct rounding and both separate Std-3 performance gates.
-5. **Cold stop-stack reconstruction immediately?** Recommend after workers and
-   exact-trace tests pass, only if profiles justify it; keep eager logical
-   site actions until then.
-6. **Typed list/closure/frame layouts or unrestricted i64 Int next?** Recommend
-   defer. Immediate gains do not require new heap visitors or a control ABI.
+The independent review in `.rd/cache/gpt/report-review-num.md` found one major
+inlining/capture gap and one checker-ownership omission after the self-checks
+above. R3 now excludes the full transitive may-suspend set before inlining;
+R1/§7/§9 coordinate final checker facts with T1/T2. The earlier self-checks did
+not establish the stronger inlining rule.
+
+**Acceptance test before N2:** create a project with `name = "trace"` and put
+exactly this source in `src/main.i`. Preserve its lines and single-space body
+indentation so the expected columns below remain exact. This is the review's
+three-function program (`/tmp/review-num/trace/src/main.i:1–18`):
+
+```i
+(i/control)
+g = (b, x: Float) -> Float {
+ y = control.suspend(b, (k) { control.resume(k, 1.0) })
+ x *. x +. y
+}
+f = (b, x: Float) -> Float {
+ y = g(b, x)
+ y +. 0.25
+}
+h = (b, x: Float) -> Float {
+ y = f(b, x)
+ y +. 0.5
+}
+@main
+main = () {
+ control.boundary((b) { h(b, 1.0e308) })
+ Nil
+}
+```
+
+At each of O0, O2 and O3, `i run` must exit with status 1, write no stdout, and
+write exactly this stderr, including the final newline:
+
+```text
+float: result is not finite
+trace/main:4:2
+trace/main:7:6
+trace/main:11:6
+trace/main:16:2
+```
+
+The value x is live through suspension in g. Both f and h belong to the
+transitive may-suspend set, although neither body contains a direct suspend.
+The initial i inliner must not inline f into h or any other member of that set;
+check its eligibility/IR dump as well as the O0/O2/O3 output. After resume, the
+failed multiplication must retain both pending caller positions (R3/R7/R9;
+spec §9.4 and §11.7). One saved physical-frame slot cannot encode the extra
+logical frame that the earlier eligibility rule would permit. Keep the
+post-inlining recomputation, but do not treat it as a substitute for the
+pre-inlining exclusion. Captured logical frame chains require a later design.
+
+The reviewer ran this baseline program at all three levels. This lane also
+copied it under `target/numeric/review-trace/` and checked the exact exit status,
+stdout and stderr at all three levels after these note corrections. That tests
+the acceptance fixture on the existing compiler; it does not claim that the
+future inliner has passed its gate.
+
+## 9. Coordinator decisions
+
+These answers are binding for the implementation track, replacing the original
+open questions and recommendations.
+
+1. **One combined checker/IR/control track: approved**, serialized after current
+   owners T1, T2 and R2. Coordinate checker fact export in types/mod.rs, infer.rs
+   and expression facts with T1/T2, separately from lower.rs/host coordination
+   with R2/JP (§7). Freeze facts after the completed inference lifecycle.
+2. **O2/O3 first: approved.** Keep O0 as the differential oracle and add a test
+   that results and complete stop traces agree at O0/O2/O3; normative expected
+   behavior remains required. Retain the byte-equality gates in §7.
+3. **Budgets are internal heuristics.** Four workers, bounded growth and small
+   aggregates are initial tuning choices. Fallback never changes source
+   acceptance or principal inference.
+4. **Separate performance gates: approved.** Compiler kernels and the Float
+   library have separate gates; correct rounding and both Std-3 performance
+   requirements remain unchanged.
+5. **Cold stop-stack reconstruction: deferred.** Keep eager logical site actions.
+   Captured logical frame chains are also deferred; R3's pre-inlining transitive
+   may-suspend exclusion is mandatory before N2.
+6. **Typed heaps and unrestricted i64 Int: deferred.** No new heap visitors or
+   control ABI are needed for the immediate work.
+
+Independent review permits N0 and conservative N1 after checker coordination.
+N0 must first expose construction and consumption to the existing Binaryen
+pipeline and measure, before deciding that a custom pass is needed.
 
 Not verified here: implementation speed/build-size targets, dev-verify after
 compiler changes, T3 record integration, later R2 task/portability code,
