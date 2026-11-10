@@ -122,6 +122,10 @@ def import_reviews(args):
             else:
                 key = str(p)
                 module = 'src/main.i'
+                spec_copy = re.fullmatch(r'tests_spec_[0-9.]+_(.+)\.i', p.name)
+                if spec_copy and b'// spec:' in data:
+                    # Keep the existing spec runner's package/module convention.
+                    module = 'test/' + spec_copy[1] + '.i'
             project = projects.setdefault(key, {'origin': key, 'review': review.name, 'files': {}, 'origins': [], 'source': source_for(review.name)})
             if context:
                 project['context'] = str(context)
@@ -135,7 +139,7 @@ def import_reviews(args):
             elif context:
                 project['files']['i.toml'] = (context / 'i.toml').read_text()
             else:
-                project['files']['i.toml'] = 'name = "app"\n'
+                project['files']['i.toml'] = 'name = "spec"\n' if module.startswith('test/') else 'name = "app"\n'
             index['programs'].append(entry)
     # Keep a complete mirrored package tree so relative cross-package paths survive.
     locations = {}
@@ -550,6 +554,53 @@ def snapshot_tools(args):
     print(f'preserved {added} additional snapshot drivers/source variants; third-party Binaryen sources excluded')
 
 
+def integrity(args):
+    """Check original payload fingerprints without depending on /tmp surviving."""
+    if os.environ.get('UPDATE') != '1':
+        raise SystemExit('integrity requires UPDATE=1')
+    inventory = json.loads((CORPUS / 'inventory.json').read_text())
+    cases = {case['id']: case for case in select(args)}
+    payloads, maintained = {}, {}
+    counts = collections.Counter()
+    failures = []
+    for entry in inventory['programs']:
+        if 'case' in entry:
+            identifier = entry['case']
+            if identifier not in payloads:
+                case = cases[identifier]
+                fingerprints = set()
+                for logical in case['files']:
+                    path = ROOT / case['project'] / case.get('stored', {}).get(logical, logical)
+                    data = path.read_bytes()
+                    fingerprints.add(sha(data))
+                    if data.startswith(b'// old-syntax-check: '):
+                        fingerprints.add(sha(data.split(b'\n', 1)[1]))
+                payloads[identifier] = fingerprints
+            matches = entry['sha256'] in payloads[identifier]
+            counts['preserved'] += 1
+        elif 'historical_snapshot' in entry:
+            matches = sha((ROOT / entry['historical_snapshot']).read_bytes()) == entry['sha256']
+            counts['mapped'] += 1
+        else:
+            path = entry['existing'][0]
+            if path not in maintained:
+                data = subprocess.check_output(['git', 'show', inventory['compiler_base'] + ':' + path], cwd=ROOT)
+                maintained[path] = sha(data)
+            matches = maintained[path] == entry['sha256']
+            counts['mapped'] += 1
+        if not matches:
+            failures.append(entry['origin'])
+    for entry in inventory['tools']:
+        counts['tools'] += 1
+        if sha((ROOT / entry['path']).read_bytes()) != entry['sha256']:
+            failures.append(entry['origin'])
+    dump(CORPUS / 'integrity.json', {'counts': dict(counts), 'failures': failures,
+         'source': 'Original inventory fingerprints and recorded import revision; only the generated parser metadata prefix is excluded.'})
+    print(f'Integrity: {dict(counts)}, {len(failures)} failures')
+    if failures:
+        raise SystemExit(1)
+
+
 def audit_w520(args):
     if os.environ.get('UPDATE') != '1':
         raise SystemExit('audit-w520 requires UPDATE=1')
@@ -605,6 +656,8 @@ def main():
     snap.add_argument('--filter', default='')
     audit = sub.add_parser('audit-w520')
     audit.add_argument('--filter', default='')
+    audit = sub.add_parser('integrity')
+    audit.add_argument('--filter', default='')
     salvage = sub.add_parser('snapshot-tools')
     salvage.add_argument('--source', default='/tmp')
     args = parser.parse_args()
@@ -620,6 +673,8 @@ def main():
         snapshot(args)
     elif args.mode == 'audit-w520':
         audit_w520(args)
+    elif args.mode == 'integrity':
+        integrity(args)
     elif args.mode == 'snapshot-tools':
         snapshot_tools(args)
     else:

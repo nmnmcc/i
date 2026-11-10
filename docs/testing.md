@@ -88,6 +88,8 @@ commit. `UPDATE=1 scripts/review-corpus import` reimports review sources;
 requirements independently before accepting a new output. Historical tools
 are preserved unchanged and are not executed: some refer to other lanes or
 compiler mutations. Reimporting is a recovery tool, not part of normal CI.
+`UPDATE=1 scripts/review-corpus integrity` verifies every preserved source/tool
+fingerprint and every link to the recorded maintained revision without `/tmp`.
 
 Measure checker workloads separately from the runtime `scripts/bench`:
 

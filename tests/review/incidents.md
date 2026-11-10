@@ -54,6 +54,11 @@ The following unsuccessful checks and recovery steps are retained:
   Accepted packages now receive a temporary ordinary Nil test so startup is
   exercised. The original source still supplies the shown-type baseline.
   `verify-startup.log` is the full gate for this stronger runner.
+- The first integrity probe assumed every standalone snapshot used src/main.i.
+  Copied spec inputs correctly use test/<name>.i and the spec package identity.
+  The importer now reproduces that convention. The permanent integrity command
+  checks all original payload hashes, independent of their module location;
+  `integrity.json` reports no missing or changed payloads.
 
 Interpretation checks are separate from implementation checks. The T1 model
 reproduces all 180 original coverage decisions (`model-audit.json`). Generated
