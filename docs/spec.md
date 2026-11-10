@@ -246,6 +246,8 @@ An item that starts with `name ( UpName { , UpName } )` and then `=` or `:` is a
 
 An item that is a call, `m(args)` or `a.m(args)`, and has no `=` or `:` after its `)`, is not a binding. It is kept for macros (§2.2).
 
+An attribute cannot have an empty argument list, and an item macro call cannot have an attribute before it.
+
 An item `name [ TypeParams ] : Type` with no `=` after the type is a declaration, whatever its attributes. A declaration requires `@external` or `@js`, or expansion by a macro (§2.2). A `@js` declaration has the closed opaque type and foreign link semantics of §10.1. It is initialized once during start only if retained by the target link pass; ordinary bindings retain this section's initialization rules.
 
 A top-level binding has the same rules as a binding in a block (§6.10). Only these things are different, and they come from its place:
@@ -916,6 +918,8 @@ Selecting a field of a nominal value requires the same constructor visibility as
 ### 6.8 Functions
 
 `(p1, …, pn) -> A ? E ! N { body }` is a function value. It may use local names from outside. The `->` part may be left out; then the value type, errors, and environment are inferred. When the `->` part is written, it is the type of the function after its parameters, so a missing `?` or `!` in it means `Never` (§3), and `! N` must have the types of the environment parameters, and `Assert` when a parameter may fail (§4.8 rule 4). The body is a block, and the value of the block is the value that the function gives back.
+
+A function's written result hole `_` cannot be enclosed in a type group.
 
 ### 6.9 Operators
 

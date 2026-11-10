@@ -154,6 +154,29 @@ fn result_type(d: &Datum) -> Result<RetType> {
         env: None,
     })
 }
+pub(super) fn check_function_result(d: &Datum) -> Result<()> {
+    let value = match round(d) {
+        Some([h, inner, _]) if symbol(h, "!") || symbol(h, "^") => {
+            return check_function_result(inner);
+        }
+        _ => d,
+    };
+    if let K::Curly(xs) = &value.kind
+        && xs.len() == 1
+    {
+        let mut inner = &xs[0];
+        while let K::Curly(xs) = &inner.kind {
+            if xs.len() != 1 {
+                break;
+            }
+            inner = &xs[0];
+        }
+        if matches!(&inner.kind, K::Discard(s) if s == "_") {
+            return Err(bad(value, "an ungrouped function result hole"));
+        }
+    }
+    Ok(())
+}
 
 fn binder(d: &Datum) -> Result<Binder> {
     match &d.kind {
@@ -424,6 +447,7 @@ pub fn parse_expression(d: &Datum) -> Result<Expr> {
                         Ok(Param::Pattern(parse_pattern(p)?))
                     })
                     .collect::<Result<_>>()?;
+                check_function_result(ret)?;
                 let ret = if matches!(&ret.kind, K::Discard(s) if s == "_") {
                     None
                 } else {
@@ -532,6 +556,12 @@ fn clause(d: &Datum) -> Result<Clause> {
     };
     let patterns = match round(p) {
         Some([h, ps @ ..]) if symbol(h, "|") && ps.len() >= 2 => {
+            if ps[..ps.len() - 1]
+                .iter()
+                .any(super::to_source::ends_in_type_test)
+            {
+                return Err(bad(p, "a clause choice ending in a type test"));
+            }
             ps.iter().map(parse_pattern).collect::<Result<_>>()?
         }
         _ => vec![parse_pattern(p)?],

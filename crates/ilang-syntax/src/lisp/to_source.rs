@@ -20,7 +20,10 @@ pub(super) fn show_as(d: &Datum, position: super::syntax::Position) -> Result<St
         Constructor => constructor(d),
         Field => field_type(d),
         Type => typ(d),
-        FunctionResult => return_type(d),
+        FunctionResult => {
+            super::to_ast::check_function_result(d)?;
+            return_type(d)
+        }
         Parameter => parameter(d),
         Expression => checked_expression(d),
         Statement => statement(d),
@@ -424,6 +427,7 @@ fn expr(d: &Datum) -> Result<String> {
                 }
             }
             [h, params, result, body] if symbol(h, "->") => {
+                super::to_ast::check_function_result(result)?;
                 let ps = round(params).ok_or_else(|| bad(params, "function parameters"))?;
                 let ret = if matches!(&result.kind, K::Discard(s) if s == "_") {
                     String::new()
@@ -584,7 +588,12 @@ fn clause_head(p: &Datum) -> Result<String> {
         _ => (p, None),
     };
     let patterns = match round(p) {
-        Some([h, ps @ ..]) if symbol(h, "|") && ps.len() >= 2 => joined(ps, pattern, " | ")?,
+        Some([h, ps @ ..]) if symbol(h, "|") && ps.len() >= 2 => {
+            if ps[..ps.len() - 1].iter().any(ends_in_type_test) {
+                return Err(bad(p, "a normal-surface clause head"));
+            }
+            joined(ps, pattern, " | ")?
+        }
         _ => pattern(p)?,
     };
     Ok(format!(
@@ -595,6 +604,13 @@ fn clause_head(p: &Datum) -> Result<String> {
             .transpose()?
             .unwrap_or_default(),
     ))
+}
+pub(super) fn ends_in_type_test(d: &Datum) -> bool {
+    match round(d) {
+        Some([h, _, _]) if symbol(h, ":") => true,
+        Some([h, _, p]) if symbol(h, "=") => ends_in_type_test(p),
+        _ => false,
+    }
 }
 fn pattern(d: &Datum) -> Result<String> {
     if let Some(s) = atom(d) {

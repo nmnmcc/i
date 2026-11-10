@@ -67,6 +67,23 @@ fn invalid_datums_do_not_make_core_items() {
 }
 
 #[test]
+fn both_surfaces_reject_unrepresentable_attribute_and_result_forms() {
+    for source in ["@m() x = 1", "@m call(1)", "f = () -> { _ } { 1 }"] {
+        assert!(!ilang_syntax::parse_module(source).1.is_empty(), "{source}");
+    }
+    for source in ["(@ (m) (= x 1))", "(@ m (call 1))", "(= f (-> () {_} {1}))"] {
+        let doc = parse(source).unwrap();
+        assert!(ilang_syntax::lisp::parse_module(&doc).is_err(), "{source}");
+    }
+}
+
+#[test]
+fn a_nonfinal_clause_choice_cannot_end_in_a_type_test() {
+    let doc = parse("(= f { (-> (| (= a (: b Int)) Unit) 1) })").unwrap();
+    assert!(ilang_syntax::lisp::parse_module(&doc).is_err());
+}
+
+#[test]
 fn direct_decode_accepts_expression_function_bodies() {
     let source = "(= plus_one (-> (x) _ (+ x 1)))";
     let document = parse(source).unwrap();
@@ -153,6 +170,16 @@ fn comments_remain_with_repeated_statements() {
     assert!(out.contains("// first\n(log 1)"), "{out}");
     assert!(out.contains("// second\n(log 1)"), "{out}");
     assert!(out.find("// first").unwrap() < out.find("// second").unwrap());
+}
+
+#[test]
+fn comments_survive_a_group_that_disappears() {
+    let source = "f = () {\n  {\n    // inner\n    1\n  }\n}\n";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let (out, lost) = ilang_syntax::lisp::print_with_comments(source, &module);
+    assert!(lost.is_empty(), "{lost:?}");
+    assert!(out.contains("// inner\n1"), "{out}");
 }
 
 #[test]

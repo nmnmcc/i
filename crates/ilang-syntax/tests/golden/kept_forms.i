@@ -6,5 +6,5 @@ f(x)
 a.m(x)
 @a.m(1)
 annotated = 1
-@main()
+// Empty attribute arguments are tested in empty_attribute.i.
 entry = () { Nil }

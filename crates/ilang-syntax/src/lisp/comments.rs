@@ -27,9 +27,12 @@ pub(super) fn transfer(
         .collect();
     let mut positions = Vec::with_capacity(candidates.len());
     let mut cursor = 0;
-    let mut previous = None;
+    let mut previous: Option<(Span, &str)> = None;
     for (span, text) in &candidates {
-        if previous.is_some_and(|start| span.start > start) && cursor < output.len() {
+        if previous.is_some_and(|(old, old_text)| {
+            span.start > old.start && !(span.end <= old.end && old_text == text.as_str())
+        }) && cursor < output.len()
+        {
             cursor += output[cursor..]
                 .chars()
                 .next()
@@ -42,7 +45,7 @@ pub(super) fn transfer(
             .find(|pos| starts.contains(pos));
         if let Some(pos) = position {
             cursor = pos;
-            previous = Some(span.start);
+            previous = Some((*span, text));
         }
         positions.push(position);
     }
