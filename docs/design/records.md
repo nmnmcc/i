@@ -2,7 +2,7 @@
 
 Status: draft for review (study S3 of the redesign plan). When it is accepted at gate G3, track T3 puts the spec text of part 12 into `docs/spec.md` and makes the changes of parts 14 to 16. T3 starts after A1 (the new parser) and T1 (literal types) have landed, and after T2 has merged. Code citations are re-anchored to merged redesign c2f41b7 (merge 669dbbb); the historical execution report explicitly identifies its original revision. Existing implementation descriptions below are proposals where they describe Rec/Without, which are not landed.
 
-Resolution at lane/note-rec: **section 20 is the substitution-stability amendment**. It supersedes the old common-field union, routing and empty-record claims wherever repeated in this note. R1–R4 revise its proof, place and resource rules. All code anchors, including the earlier implementation plan, are re-derived against the merged sources; §20.6 is the current hand-off.
+Resolution at lane/note-rec: **section 20 is the substitution-stability amendment**. It supersedes the old common-field union, routing and empty-record claims wherever repeated in this note. R1–R4 revise its proof, place and resource rules. Section 21 reconciles that contract with the implementation study: it selects Elixir’s lazy BDD and map algorithms, with explicit adaptations for i. All code anchors, including the earlier implementation plan, are re-derived against the merged sources; §20.6 is the current hand-off.
 
 The examples use the new syntax of `docs/design/syntax.md`.
 
@@ -196,7 +196,7 @@ The arms go into `constrain_in` (`solve.rs:335`) in this order. Arms that exist 
 
 **U4 (uses).** A closed record union is legal in every type position. An operation is valid when it is valid on every alternative; its result is the union of their results. Open record unions are not banned by place or number of alternatives. The restriction is exactly U3: an inclusion needing alternative-specific bounds must already be entailed by the ordinary constraints. Variable storage against the whole target and conjunction from left unions remain ordinary inference; choosing bounds to fit a right alternative does not. Existing restrictions on unions of ordinary variable members and on intersections with variable members remain. Check the actual obligations again after substitution/completion, not a record-alternative count.
 
-**U6 (compact exact types and resources).** Keep shared union, intersection and forgetting nodes. Demand only the portion required by an operation; §20.3a defines order, representation, interfaces and the 65,536-state budget. Exhaustion reports `type too large to check here`, with a source place and an annotation suggestion. It is a resource limit, never a typing rule, failed subtype proof, widening, or permission to publish a partial alias.
+**U6 (compact exact types and resources).** Keep shared union, intersection and forgetting nodes. Demand only the portion required by an operation; §20.3a defines order, interfaces and the 65,536-state budget. Section 21 specifies the Elixir-derived lazy BDD kernel and map emptiness/projection algorithms behind those demands. Exhaustion reports `type too large to check here`, with a source place and an annotation suggestion. It is a resource limit, never a typing rule, failed subtype proof, widening, or permission to publish a partial alias.
 
 **U5 (known summaries).** Only known-type analysis may use common guaranteed fields with unioned field types. Normalize away provably empty alternatives first. An unknown record alternative contributes no guaranteed fields. Preserve non-record alternatives outside this summary. Never use the summary as the inferred type, a permanent alias, a subtype target, or package identity. This is the conservative view required by joint J2. Form a safe upper union of each common field: merge scalar sets exactly; retain identical types and exact record alternatives; keep distinct concrete heads as a union. If unequal same-head nominal/function forms cannot be combined without equality constraints or loss of alternatives, use Top for that field. Never pick an invariant argument or invoke the mutating solver to construct a known summary.
 
@@ -808,8 +808,9 @@ The example line becomes: "So `(u) { u.name }` has the type `(u: { name: A }) ->
 > - `{ fs } | { gs }` contains exactly the records in either operand. It is not replaced by the common fields. Thus `{ a: Int, b: Int } | { a: String }` does not contain `{ a: 1 }`, even though `{ a: Int | String }` does. Empty alternatives are removed and identical alternatives are deduplicated. Union and intersection are kept in a compact exact form with shared subexpressions. Distributivity and `{ a: X | Y, r } = { a: X, r } | { a: Y, r }` are set equalities, not instructions to expand every alternative when constructing a type.
 > - A closed union of records is an ordinary type in every position. An operation is valid when it is valid on every alternative, and its result is the union of those results. Thus reading `r.a` from `{ a: 1 } | { a: "x" }` gives `1 | "x"`; a missing required field on any inhabited alternative is an error. Open record unions may also be written in any place, subject to the existing restrictions on ordinary variable members. The restriction is on choosing bounds, as follows, not on the number of record alternatives.
 > - When checking inclusion against several record alternatives, prove it without creating variable bounds. Use ordinary structural subtyping beneath fields, including tuple parts, declared nominal variance, function types and literal sets. First try structural inclusion and existing bounds, then exact coverage by splitting relevant source field unions and target-tested field sets, one label at a time in label order. Scalar partitions include their residual sets. Every source case must be covered by the complete target union. Equivalent closed annotations have equal acceptance when checking finishes. A fresh variable's established upper bounds can prove an inclusion from it; its established lower bounds can prove an inclusion into it. A lower bound is not an upper bound. Unresolved obligations are retried after ordinary group constraints finish and before generalization or permanent alias completion; the proof never fixes a variable, creates a trial bound, or assumes a recursive goal. Whole-union variable storage and left-union conjunction remain ordinary inference. An obligation that still needs alternative-specific bounds is a compile error explaining the missing proof or bound choice; the checker never picks an alternative by order. A single record target uses ordinary constraints. Known summaries are not subtype targets.
-> - Keep record union, intersection and forgetting expressions shared and exact. Construction, substitution, completion, display and interface serialization must not expand products of alternatives. Field operations demand only relevant fields and any emptiness facts needed to justify them; inclusion and equality demand only their relevant uncovered cases. Equality and subtyping concern denoted sets, not graph or text identity. Full display and interfaces may encode a versioned type graph with a root, ordered nodes, scoped variable identities and child references; decoding it preserves the exact type. Inline full types still parse back as source. This graph form is an interface artifact, not new source syntax; shortened diagnostic text is never the interface type.
-> - Demanded checking has a resource limit of 65,536 distinct proof, partition and visitor states per operation, including recursive suboperations; charge split outcomes before allocating them. This is a resource limit, not a typing rule. Exhaustion reports “type too large to check here”, at the operation requiring the work, with a suggested local annotation or source simplification. It never widens a type, reports a false subtype mismatch, or publishes a partial alias. Equal types can take different work to check, so one spelling may exhaust the limit; successful checks cannot give them different meanings. The detailed demand order and accounting are records U6 (§20.3a).
+> - Keep record union, intersection and forgetting expressions shared and exact. Construction, substitution, completion, display and interface serialization must not expand products of alternatives. Field operations demand only relevant fields and any emptiness facts needed to justify them; inclusion and equality demand only their relevant uncovered cases. Equality and subtyping concern denoted sets, not graph or text identity. Full display and interfaces may encode a versioned type graph with a root, ordered nodes, scoped variable identities, child references and retained scheme bounds and ordinary obligations; decoding it preserves the exact type. Unresolved union-proof obligations are not exported. Inline full types still parse back as source. This graph form is an interface artifact, not new source syntax; shortened diagnostic text is never the interface type.
+> - Demanded checking has a resource limit of 65,536 distinct proof, Boolean-apply, partition, projection and visitor states per operation, including recursive suboperations; charge split outcomes before allocating them. This is a resource limit, not a typing rule. Exhaustion reports “type too large to check here”, at the operation requiring the work, with a suggested local annotation or source simplification. It never widens a type, reports a false subtype mismatch, or publishes a partial alias. Equal types can take different work to check, so one spelling may exhaust the limit; successful checks cannot give them different meanings. The detailed demand order and accounting are records U6 (§20.3a and §21).
+> - An emptiness or inclusion check distinguishes a proved result, an unresolved proof, and resource exhaustion. An unresolved or exhausted check is never evidence of an empty set or a failed inclusion. Internal Boolean difference used to check record coverage does not change written type difference. Substitution and simplification preserve shared variables in invariant arguments and all retained ordinary constraints. Unresolved union-proof obligations are discharged or diagnosed before generalization or permanent alias publication.
 > - In a type test or a clause, a record type that is taken (§4.8 rule 12) is `{..}`.
 > - A record type is a type constructor for §4.7: a type may not have itself inside it through a field or through the base of a spread. So `last = (r) { r.next |> { Nil -> r.v  n -> last(n) } }` is a compile error. Recursive data, such as a chain or a tree, is a custom type: `Node(A) { Node(v: A, next: Node(A) | Nil) }`. A function that sets a field in a loop, such as `build = (r, n) { n |> { 0 -> r  _ -> build(record.put(r, "a", n), n - 1) } }`, needs a written type for its parameter: `build = (r: {..}, n: Int) -> {..} { … }`. The same holds for the accumulator of a fold whose callback uses a spread or `record.put` on it: `list.fold(xs, { n: 0, total: 0 }, (acc, x) { { ..acc, n: acc.n + 1 } })` is a compile error, and `(acc: { n: Int, total: Int }, x)` or the full literal `{ n: acc.n + 1, total: acc.total }` is correct. A loop cannot keep the other fields as a type variable: with a written type that is not a type variable, they are only the fields of that type.
 > - A type test `x: { … }` in a clause takes every record (§4.8 rule 11). So `x: { a: Int }` on a value of type `{ a: Int } | { a: String }` is a compile error.
@@ -1369,6 +1370,9 @@ snapshot identity:
    emptiness fallback for the conservative Without rules in §4.4.
    Non-record leaves retain spec §4.5's relation. An unresolved open cell is
    Unknown. No unknown cell is counted as empty. U6 limits all these steps.
+   Section 21.3 supplies the implementation: Elixir’s Boolean difference and
+   lazy map-line emptiness, with its field/rest negative-elimination algorithm
+   for projection. Do not implement this paragraph as eager DNF conversion.
 
 The whole proof returns Proven, Refuted (a closed uncovered case), Unknown
 (open constraints not entailed), or ResourceLimit. Only Proven accepts an
@@ -1468,8 +1472,9 @@ outside the model. The required order and J7 tests remain implementation gates.
 
 ### 20.3a Compact exact representation and resource limits (R3)
 
-Use immutable shared nodes with stable handles for Rec, Union, Inter and
-Without. Record fields and leaves point to handles too. Hash keys compare
+Use Elixir’s lazy BDD kernel for demanded record Boolean operations, with
+immutable shared suspensions for operations not yet demanded (§21). Rec,
+Union, Inter and Without retain stable handles. Record fields and leaves point to handles too. Hash keys compare
 handles, not recursively unfolded trees. Preserve the graph made by source
 operations; local sorting/deduplication, N2 and guarded E4 may simplify it.
 Do not flatten through a shared child by copying its descendants. A recursive
@@ -1483,15 +1488,16 @@ variable identity and invariant occurrences through these shared nodes (J7).
 | Construct a union/intersection, infer branches, substitute, complete an alias, compare node identity | Visit existing reachable nodes once per environment; no alternative product. Combining two plain Rec nodes may combine their explicit fields. Completion must not run a DNF conversion as an extra step. |
 | Read a field or prove a common requirement | Follow unions in conjunction, intersect relevant field requirements, preserve result unions as shared nodes. Inspect only that field and any requirements needed to prove a source branch empty. A proof of Records uses domain facts without enumerating shapes. |
 | Put/remove/forget | Build Without and field-intersection nodes; E2 may expose individual union operands only on demand. For an intersection base keep one existential witness; never forget conjuncts separately. |
-| Inclusion/equality and written-union checking | Try §20.3's structural proofs first. Otherwise enumerate only uncovered cells relevant to this goal, lazily, memoizing shared subgoals. Equality is both inclusions, not a string or graph comparison. Stop a refuted inclusion at its first witnessed uncovered cell. |
+| Inclusion/equality and written-union checking | Try §20.3's structural proofs first. Otherwise use the lazy BDD map-emptiness algorithm in §21.3 for the uncovered set, memoizing shared subgoals. Equality is both inclusions, not a string or graph comparison. Stop a refuted inclusion at its first witnessed uncovered cell. |
 | Type tests, coverage, known summaries | Collect heads once per reachable node and verify relevant subtype obligations separately. Field facts are conservative U5 summaries. Never expand unrelated field combinations to collect the Record head. |
 | Full display, package/API identity and interface writing | Traverse the graph, not its alternative expansion. No semantic widening to shorten text. See the encoding below. |
 
 A full type may be larger than a source expression when expanded. Full output
 therefore uses an exact **graph bundle** when inline source would duplicate
 shared nodes: a version, root handle, topologically numbered node table,
-ordered child references, scoped type/label parameter identities, variance
-and nominal references. A diagnostic may abbreviate it and link the full
+ordered child references, scoped type/label parameter identities, variance,
+nominal references and the scheme’s retained bound/obligation metadata.
+Unsolved U3 obligations cannot be exported (§21.4). A diagnostic may abbreviate it and link the full
 bundle; it must not pretend the abbreviation is the type. The bundle is a
 type artifact with an exact decoder, not new i syntax. Small types still print
 ordinary source. Closed bundles may optionally be rendered as topologically
@@ -1515,7 +1521,7 @@ shared repeated states count once within the demand. Include the snapshot,
 polarity, label environment and retained cell predicates in the state key.
 Do not reset the budget at recursive calls or per alternative. A cell split
 with k outcomes charges k before allocating them, so even the attempt is
-bounded. Use an iterative visitor, not an unbounded native stack. Construction
+bounded. Charge Boolean apply states and projection states too. Use an iterative visitor, not an unbounded native stack. Construction
 and ordinary graph output are linear graph traversals, not split demands;
 ordinary compiler memory limits still apply. A cache hit must account for its
 recorded logical work if necessary to keep the local budget deterministic.
@@ -1593,7 +1599,8 @@ The table distinguishes changed sets from changed shown forms or verdicts.
 | `wrap_union`, `pair`, covariant nominal/function fields | Now accepted by structural inclusion and field splitting; equivalent closed annotations have equal verdicts (R1). |
 | `Schema(Row)` followed by `(r: Row) { r.a }` | Now accepted, returns `1 \| "x"` (R2); the alias remains exact. |
 | Closed `forward`, `spread_union_input.i`, open union declarations with unused inputs | Now accepted; calls and bodies must satisfy U3, not a record-count place rule. |
-| Fresh-label branch family and Fan(A) | Same sets, compact graphs instead of mandatory exponential output. Fan(Never) is one record; U6 can stop a demanded expensive proof with a resource diagnostic. |
+| Fresh-label branch family and Fan(A) | Same sets, suspended exact operations instead of mandatory exponential output; demanded proofs use the Elixir-derived kernel (§21). Fan(Never) is one record; U6 can stop a demanded expensive proof with a resource diagnostic. |
+| Prior-art reconciliation (§21), including wrap_union, pair, choose, Schema(Row) and all J1–J8 examples | No accepted result changes from 39233dd. The proof algorithm, cache contract, invariant-sharing gate and reference-first implementation map become concrete. |
 | E4 test removing a from `{ a: A, b: Int }` (§15.2) | Retain Without. A = Never gives Never; A = Int gives `{ b: Int }`. This is the already approved J8 change. |
 | Original closed and generic Gone witnesses | Never on both paths; `(x: Gone({..})) { x \|> {} }` has an impossible input and is valid (spec rule 11). |
 
@@ -1671,7 +1678,8 @@ No claim that exact unions alone implement that stronger use is made.
 The revision merges redesign c2f41b7 as 669dbbb before editing. Its T2 text
 is the combined specification. The record changes are installed in spec
 §4.4 and §4.9.3; §4.5 rule 9 and §4.9.2's N2/guarded forgetting stay.
-Section 12 mirrors §4.9.3 verbatim. Joint section 6 overrides earlier J4/J5
+The later merge of redesign 1a8fee2 adds only prior-art notes; these compiler
+anchors are unchanged. Section 12 mirrors §4.9.3 verbatim. Joint section 6 overrides earlier J4/J5
 place lists and later E0518 test expectations without changing those sections.
 
 All code anchors in this note were re-derived against this merged revision.
@@ -1702,7 +1710,7 @@ does not roll back successful bounds. It cannot implement U3 by speculative
 calls. The pure helper must return Proven/Refuted/Unknown/ResourceLimit;
 resource failure is never cached as a negative semantic answer.
 
-Exact spec sentence hand-off, by section:
+Exact spec sentence hand-off, by section (supplement with §21.6’s reference-first algorithm map):
 
 - §4.4: “A record union is not restricted by its number of alternatives or
   its place.” Keep the adjacent existing ordinary-variable restrictions.
@@ -1919,3 +1927,431 @@ package compatibility are specified but not implemented. No Rust compiler
 record-program, warmed-checker timing, runtime, or WAT result is claimed.
 The semantic commutation argument still covers arbitrary finite trees of the
 record fragment; model bounds and resource limits do not replace that argument.
+
+
+## 21. Prior-art reconciliation: algorithms before implementation
+
+This section refines U1–U6 and the hand-off in §20.6; it changes no set
+meaning or example verdict from 39233dd. N2, J8/E4 and U5 remain unchanged.
+The criteria are exact sets and substitution first, no guessed bounds,
+sharing under all variances, bounded demanded work, and a small implementation
+based on code that already solves the relevant problem.
+
+### 21.1 Sources read and alternatives
+
+The prior-art study was read in full from `lane/note-pa-types`,
+`docs/design/prior-art-types.md`. At this revision’s initial merge attempt,
+local `redesign` was still c2f41b7 and the merge was already up to date.
+A later update to redesign 1a8fee2 was merged; it adds the numeric and
+concurrency studies, without changing compiler code. The type study remains
+on lane/note-pa-types at 3beae77; it and `.rd/ref/INDEX.md` are absent from
+that merged snapshot. The available `manifest.tsv`
+and the actual checkouts below supplied the source inventory. This provenance
+must not be mistaken for a claim that a missing file was read from redesign.
+
+All reference paths below are relative to `/home/agent/Programming/i/.rd/ref/`.
+These are source readings, not measurements of those compilers:
+
+| Reference and revision | Code read; conclusion |
+|---|---|
+| Elixir `dedb0f2aaf8085cbb5b3f90200ac3af5d392af70` | `elixir/lib/elixir/lib/module/types/descr.ex`: descriptor/map conventions (:1–75, :3055–3098); `subtype_static?` (:1031), `empty_difference_subtype?` (:1040), `equal?` (:1074); `map_union/intersection/difference` (:3236–3244); `map_bdd_empty?` (:3499), `map_line_empty?` (:4846), `map_line_meet_empty?` (:4868); `map_split_key_line` (:3608), `map_remove_negative` (:3668); `bdd_union` (:6420), `bdd_difference` (:6512), `bdd_intersection` (:6706), `bdd_negation` (:6863). Adopt the lazy Boolean kernel and map theory, with the differences below. |
+| MLstruct `478d6a56154eee82aac8fe0db0fdf0bcfc5ea27e` | `mlstruct/shared/src/main/scala/mlscript/TyperHelpers.scala`, `recordIntersection` (:63), `recordUnion` (:66), `SimpleType.\|` (:254–271): record union keeps common fields, which is exactly the algebra i cannot use. `NormalForms.scala`, `DNF.&` (:386), `CNF.\|` (:468) take products. Keep field intersection and variable-aware simplification; do not use these normal forms for U6. This is the source-level counterpart of §20.4’s MLstruct paper comparison. |
+| MLscript `54bd6ded28979dd209dddb207f0e94a3a007db2e` | `mlscript/hkmc2/shared/src/main/scala/hkmc2/invalml/NormalForm.scala`, `inter` (:152–158), `union` (:160), `dnf` (:176–190): the newer path still multiplies conjunction lists. `TypeSimplifier.scala`, `simplifyStructure` (:25), `simplifyBounds` (:46), `subst` (:176–214) retain per-variable traversal/substitution maps. This is useful sharing evidence, not a compact-map implementation or a principality proof for i. |
+| TypeScript 7 Go `89d5d5b2849a0db0957065889ca58536fa6d2e4a` | `typescript-go/internal/checker/checker.go`, `getUnionTypeEx` (:25751), `getUnionTypeWorker` (:25776), `getUnionTypeFromSortedList` (:25859), `removeSubtypes` (:26057–26147): flatten/reduce/intern member lists and cache by identities and reduction options. `relater.go`, `unionOrIntersectionRelatedTo` (:2882), `typeRelatedToSomeType` (:3004), `typeRelatedToDiscriminatedType` (:4021–4131): try a whole alternative, then discriminant combinations. Keep these cheap proof paths and cache discipline, not flat expansion as the representation. |
+| tsrs `86de03ae428a956686af29177b50f0fdf4aee059` | `tsrs/crates/tsrs_checker/src/unioncache.rs` (:1–110, :265–410): input handles, reduction/alias keys, purity tests, cache-off/shadow checks and no caching of error results. `checker_13.rs`, `remove_subtypes_inner` (:583–630, :665–751): memoized reduction and member-reset epochs. `relater_2.rs` (:3080–3160): the same discriminant-combination limit. `tsrs/docs/CHECKER.md` (:242–390) describes stable handles, relation results and caches; `tsrs/notes/data-structure-review.md` (:172–220), `data-structure-followups.md` (:85–119), `data-structure-redesigns.md` (:14–33, :65–74) document measured changes and rejected broad cache/container rewrites. Adopt stable handles and measured cache changes, not their arena pointer/lifetime machinery wholesale. |
+| GHC `19ff36f2aede0ca2e554016ff22c71e73aa9803b` | `ghc/compiler/GHC/Tc/Gen/Bind.hs`, `tcPolyCheck` (:570–615), `tcPolyInfer` (:723–800); `GHC/Tc/Solver.hs`, `simplifyInfer` (:944–990), `emitResidualConstraints` (:1030–1070); `GHC/Tc/Solver/Solve.hs`, `solveWanteds` (:81–150, :384–450). Retain residual obligations and their ownership; retry after solving, never silently discard them. `GHC/HsToCore/Pmc/Check.hs`, `throttle` (:98–118, :288–323) returns approximation status separately from models. Adopt the distinction, not approximation as a subtype answer. |
+
+Three implementation designs were compared before choosing:
+
+| Candidate | Choice and retained idea |
+|---|---|
+| The earlier generic expression graph plus a new cell solver | Compact construction is useful, but “enumerate relevant cells” leaves the hard algorithm unspecified. Retain only suspensions, shared handles and the codec. Replace the proposed proof internals with the reference algorithm. |
+| MLstruct/MLscript normal forms or TypeScript/tsrs flat reduced unions | Mature inference/cache code, but eager products violate the scale gate; MLstruct’s common-field union also changes sets. Keep sharing-aware renaming, cheap alternative proofs and successful-result caches. |
+| Elixir’s lazy BDD and theory-aware map emptiness | Choose. It has exact union/intersection/difference, lazy positive/negative traversal, field absence and correlated projection. Add i’s suspensions, finite demand budget, open-variable result and invariant scheme discipline. |
+
+Thus the representation is **Elixir’s lazy BDD for the record domain, plus
+shared suspended operations where i must retain an open or undemanded type**.
+It is not a new record algebra. No reference read here supplies i’s entire
+combination of principal inference, nonrecursive records, label substitution,
+existential Without and T2 completion. Those adaptations are stated below.
+
+### 21.2 Representation, sharing and demand
+
+An evaluated record Boolean node has Elixir’s meaning
+`(p & C) | U | (not p & D)`, with top and bottom terminals. A predicate p is
+an immutable open record product, with sorted labels and field type handles.
+The U branch avoids distributing unions into every path. `not` and Boolean
+difference here are internal predicates relative to the record domain;
+they do not change i’s written head difference. Field presence is separate
+from its value type. A required field is `(T, false)`; an unconstrained field
+is `(Top, true)`, following Elixir’s map convention (:45–75). These optional
+predicates are internal, not new source optional-field syntax.
+
+Use interned handles and shallow keys for both decisions and suspended
+Union/Inter/Without applications. Cache hashes of children rather than
+recursively hashing unfolded trees (`bdd_compute_hash`, :6401). Hash equality
+never substitutes for key equality. Maintain a total predicate order inside
+an arena; cached size/hash plus a stable handle tie-break suffices. Elixir’s
+order favors smaller refinements (`bdd_compare`, :6897, ordering comments
+:6370–6385). The order affects size, not sets. Import and substitution rebuild
+through Boolean operations when a demanded decision’s predicates change;
+do not copy its old ordering with renamed leaves. `bdd_map` (:6905) alone
+is not a safe substitution algorithm for i. The model reverses atom order
+and checks all assignments.
+
+A source union/intersection allocates a shared suspension, with only local
+exact identities, N1/N2 and guarded E4 run immediately. A demanded proof
+forces only reachable predicates needed by that proof, memoizing Boolean
+apply on `(operation, child handles)`. This separates storage from Boolean
+apply: running apply eagerly for every source constructor is not required
+by Elixir’s set equations and would violate R3 for adversarial orders.
+For i this extra suspension layer is required by open Without and the Fan
+construction/substitution gate, not claimed to exist in Elixir unchanged.
+
+Adopt `bdd_union`, `bdd_intersection`, `bdd_difference` and `bdd_negation`
+as the kernel’s starting algorithms. `bdd_remove` (:6467) is an absorption
+optimization inside union, **not semantic subtraction**. The intersection
+heuristic at :6759–6771 explicitly warns that repeatedly carrying a common
+union may cause exponential growth; preserve the simplifications, measure
+changes and retain U6. A lazy BDD is not a polynomial-size guarantee. Exact
+leaf subsumption and fusion of a single differing field are optional cheap
+optimizations (`opt_map_union`, :7183–7218); common-field approximation is
+never one. Inferred unions with invariant field arguments are not joined.
+
+The demand table in §20.3a remains binding:
+
+- Storage, source substitution, graph display/serialization, record-domain
+  collection and alias completion do not force Boolean alternatives.
+- A failed cheap inclusion proof demands `source \ target` emptiness. Mutual
+  inclusion checks equality. Force only predicates of that goal.
+- A field access first proves absence impossible, then projects the value of
+  that one field. Updates/forgetting retain a suspension until a consumer
+  needs its fields or inclusion. Projection demands only the removed/read
+  labels and the constraints necessary to decide their shared witness.
+- Known summaries stay separate and conservative under U5. A summary cannot
+  justify a forced proof or replace an exact stored graph.
+
+The full graph bundle stores suspension/record nodes, scalar sets, scoped
+variables, nominal identities and the enclosing scheme’s retained bounds
+and ordinary obligations. It need not serialize proof-cache BDDs: they are
+rebuildable. It must never print a BDD complement as written i head subtraction.
+If evaluated nodes are serialized, tag the internal Boolean form explicitly
+and preserve its domain; decoding reinterns nodes and reinstates the local
+order. No normal-form expansion is part of display, interface hashing, or
+completion. Equal graph bytes are a fast identity check; unequal bytes say
+nothing about set equality. §20.3a’s versioning and alpha-renaming apply.
+
+Charge each new apply pair, map-line state, projection state and field-theory
+subgoal to the same 65,536-state demand budget, alongside existing U3 states.
+A state includes its retained positive/negative predicates and bound epoch.
+Do not restart the budget per field, branch, cache miss or projection step.
+Only a finished semantic result enters the semantic cache. Unknown is
+snapshot-scoped; ResourceLimit is not Empty or Refuted and is never cached as
+either. Preserve the original diagnostic span when retrying. tsrs’s error
+cache exclusion and reset epoch are the precedents, not an excuse to omit
+i’s bound/label environment from the key. Cache-off and shadow-result tests
+are required; a cache may change work, never the denotation or a completed
+verdict. This model does not claim deterministic logical-work accounting
+across warm/cold caches; that remains the compiler gate from §20.3a.
+
+GHC’s `throttle` returns old models plus Approximate; that can make its warning
+analysis less precise. i’s subtype check cannot use an approximation to
+accept. On U6 exhaustion it stops with `type too large to check here`, the
+operation’s span and an annotation/source-simplification hint. The budget
+may prevent one of two equivalent spellings from finishing; it cannot make
+two successful checks assign different sets. Fan’s 4,096-to-1 size witness
+therefore still satisfies semantic commutation.
+
+### 21.3 Empty sets, coverage and existential forgetting
+
+Take the static Elixir relation: S fits T when `S \ T` is empty
+(`subtype_static?`, :1031; `empty_difference_subtype?`, :1040). This is the
+fallback after §20.3’s cheap structural and bound proofs. Use `map_bdd_empty?`
+(:3499–3518), not `map_bdd_to_dnf_remove_empty` (:3461), as the traversal:
+
+1. Carry a positive product P and a list of excluded products N. Bottom is
+   empty. At a decision inspect D with p added to N, C with P intersected
+   with p, and U with P/N unchanged, short-circuiting on an inhabited case.
+   A required empty field makes a positive path empty before descent.
+2. At top decide the line `P \ union(N)` with `map_line_empty?` and
+   `map_line_meet_empty?` (:4846–4971). With no exclusions, test all required
+   field sets for inhabitance. A free field has an absent case too.
+3. For one excluded record Q, walk its tested labels in deterministic label
+   order. Partition by the *first* field differing from Q: earlier fields
+   meet Q, that field takes `P[f] \ Q[f]`, and later fields keep P’s sets.
+   Test each nonempty residual product against the remaining exclusions.
+   The all-meeting remainder lies in Q and is removed. If a meet is empty,
+   no later first-difference case is possible. Keep residuals as shared
+   states; do not allocate the cross product up front.
+4. Field operations include absence and present-value predicates. For scalar
+   sets they use T1’s finite/cofinite operations; product and nested record
+   fields recurse on the same relation. The existing closed tuple, nominal,
+   function and environment structural checks remain §20.3’s leaf proofs.
+   They are not replaced by arbitrary nominal or function Boolean identities.
+   Unknown field facts cannot supply a closed counterexample witness.
+
+The returned emptiness result is Empty, Inhabited (with a witnessed uncovered
+cell), Unknown, or ResourceLimit. U3 maps the first two to Proven/Refuted.
+An active variable goal is Unknown. Do not copy Elixir’s recursive `seen`
+shortcut (`map_empty?`, :4818–4833) as a proof that an unresolved inference
+variable is empty. A closed leaf theory not implemented sufficiently to
+decide a cell must likewise return Unknown internally, never Refuted or Empty;
+report an unsupported proof, not an open-variable bound choice. This is an
+implementation gap, not permission to weaken the closed annotation contract.
+T3 must supply the leaf checks demanded by R1; completeness for arbitrary Boolean
+function types is still not claimed. All closed equivalent-annotation gates
+in §20.6 remain required; a representation-specific failure is a bug.
+
+This supplies exact case splitting even when a scalar union was merged into
+one ValueSet: split by the target predicates, not only Union nodes. Soundness
+follows from the decision equation and the disjoint first-difference
+partition; each finite line is empty exactly when all its residual products
+are empty, provided the field theory answers exactly. The same argument
+proves completeness of this traversal for the finite flat-record fragment.
+It does not prove decidability of arbitrary nested leaf theories.
+
+For a closed forgetting demand use Elixir’s field/rest decomposition
+(`map_split_key_line`, :3608–3633; `map_remove_negative`, :3668–3690).
+Treat each line as pairs `(field-presence/value, rest)` and subtract negative
+pairs with the exact equation
+`(F × R) \ (G × S) = ((F \ G) × R) | ((F & G) × (R \ S))`.
+Stream the surviving pairs. Forgetting projects an inhabited F away and
+keeps R, with the forgotten label unconstrained in the output; reading
+projects R away and keeps the present F values after proving absence
+impossible. Repeat for the finite requested label set, preserving the same
+line witness. Elixir’s optional projection shortcuts (:3643–3663) may avoid
+splitting when an existential witness is already proved. Do not import its
+list-producing DNF update path (:4113–4139) wholesale: use the same equations
+with a shared state worklist and U6 accounting.
+
+This preserves correlations, unlike `W(S & T) = W(S) & W(T)`. Open Without
+stays suspended unless an E-rule or the pure bound proof establishes what
+is needed. No open field is declared inhabited from a missing lower bound.
+The BDD equations, line partition and pair projection all preserve sets;
+therefore they are extra semantic identities in §20.2’s substitution proof,
+not a new approximation. Substitution can change the predicate order and
+which cells are empty; rebuilding and exact predicates keep their denotation.
+
+### 21.4 Annotation checking and retained constraints
+
+Keep TypeScript’s cheap whole-alternative proof and the every-source-member
+rule (`unionOrIntersectionRelatedTo`, :2882; `typeRelatedToSomeType`, :3004).
+Adopt Elixir’s static difference-emptiness fallback instead of stopping when
+no whole alternative fits. TypeScript’s discriminant path enumerates a
+product but returns False when its product exceeds 25 (`relater.go`,
+`typeRelatedToDiscriminatedType`, :4021–4044; tsrs `relater_2.rs`:3080–3110).
+i must use ResourceLimit if its own budget is exhausted, not copy that False
+as a semantic result. This accepts wrap_union, pair and scalar residual
+coverage with no union-alternative bounds; closed Schema(Row) and `.a`
+still use U4 in every position. No new expected results change in §20.5.
+
+Adopt GHC’s residual-constraint lifecycle, not Haskell’s class system or its
+skolemization rules. `tcPolyInfer` captures constraints, solves the group,
+then emits retained residual constraints (`Bind.hs`:723–800;
+`Solver.hs`:1030–1070). In i a U3 obligation owns its source/target handles,
+variable/label scope, origin spans and snapshot epoch. It stays on the group
+worklist through ordinary propagation and T2 completion constraints. Retry
+when those constraints change; discharge or diagnose it before the owning
+group is generalized or an alias is published. Do not mistake “no bounds
+added by U3” for “no obligation remains”. Ordinary retained service/effect
+constraints must survive scheme rebuilding and serialization even when not
+visible in a shown result; this is the prior-art study’s F1/F2 warning.
+
+There is no new qualified-type syntax or disjunctive constraint quantifier.
+An unresolved U3 obligation is not silently exported with a generic scheme.
+The current no-choice inference boundary and choose table in §20.3 remain:
+lower-only R2 does not imply an upper bound; a single-target update annotation
+establishes a sufficient upper bound; inferred choose has no new right-union
+obligation. GHC’s discussion explicitly warns that inference with richer
+constraints need not yield a principal type (`Solver.hs`:867–900); importing
+its solver is not a proof of principality for i. Retaining only pure entailed
+union checks adds no alternative selection to i’s ordinary constraints.
+
+Differences from what those implementations accept are deliberate:
+
+| Case | Why i differs; what the i user writes |
+|---|---|
+| A dynamically typed field used where Int is required | TypeScript’s assignable relation admits source `any` (`relater.go`:260–263); Elixir’s `compatible?` admits a purely dynamic source on nonempty overlap (:1103–1128). These are not static set inclusions. i has no corresponding gradual type; even `(r: { a: Int \| String }) -> Int { r.a }` is rejected because the field may be a String. A written `_` would be an inference hole (§3), not a way to spell dynamic. Supply `{ a: Int }` or perform an allowed value test before the use. No implicit cast or new gradual type. |
+| A residual qualified constraint carried into a polymorphic result | GHC can retain qualified predicates through `emitResidualConstraints`; i has no general qualified/disjunctive type form. A still-unproved choose_written or select call gets §20.3’s diagnostic. Write the single-target intermediate annotation or keep the result inferred. This compares constraint mechanisms, not a claim that the same i program was run in GHC. |
+| A missing field accepted only through a dynamic map assumption | Elixir’s dynamic path can return a dynamic optional result (`map_fetch_key`:3559–3567), whereas its static path rejects an optional key (:3544–3551). i follows the static requirement. For `{ a: 1 } \| { b: 2 }`, supply a in both branches or use an ordinary nominal sum and cases before reading a. |
+
+On the shared closed, static record fragment i does not deliberately impose
+a stricter annotation rule than these references. The new negative-map model
+tests whole-target coverage, not a vacuous “fits one arm” approximation. No
+claim is made about all TypeScript assignability, gradual Elixir programs or
+Haskell constraint languages being expressible as i programs.
+
+### 21.5 Invariant sharing is a semantic requirement
+
+MLstruct’s `TypeSimplifier.scala` records invariant occurrences while
+analyzing (:317–380), shares equal lower/upper field transforms (:582–600),
+and does not inline a variable used invariantly (:614–652).
+`ConstraintSolver.scala`, `freshenAbove` (:549–607), uses one variable map
+for the whole type, inserting a fresh variable before traversing its bounds.
+The newer MLscript simplifier also has one `transformed` map (`subst`,
+:176–214); its explicit unfinished cases are not evidence of a stronger
+completeness theorem. Take the identity discipline, not unproved rewrites.
+
+J7 already requires this. In the merged i source, Coalescer builds Both for
+invariant nominal arguments (`crates/ilang-check/src/types/display.rs`:
+561–579), occurrence walking visits both polarities (:1063–1073), and
+`infer.rs::rebuild` (:2355–2375) has one variable-renaming map. T3’s new
+record/Without/decision/suspension visitors must preserve those properties.
+
+Use one instantiation map for a whole scheme and its retained constraints,
+not one per union branch, field or polarity. A traversal memo key includes
+polarity and bound scope where these affect the result; the variable identity
+map is shared across those visits. An invariant argument is traversed in both
+directions even if its rendered Both children are equal. Never use a bound
+snapshot or U5’s summary as the replacement for that shared variable. Only
+an equality valid under every substitution may remove an occurrence (for
+example an already empty required record); it cannot remove a separate
+scheme obligation attached to that variable.
+
+The attack type has a record containing an invariant Cell(A) in one branch
+and a record containing `(A) -> A` in another. With Cell from J7, its source
+shape is:
+
+```i
+shared(A) = (c: Cell(A), f: (A) -> A, flag: Bool) {
+  flag |> { True -> { cell: c }  False -> { use: f } }
+}
+```
+
+All occurrences of A must refer to the same binder in one scheme instance. Freshening the branches
+separately would produce independent variables and lose their relation.
+The model asserts one identity across the invariant argument, parameter and
+result; T3 must additionally run the actual J7/T-F/K1 regressions and inspect
+retained constraints, not just compare printed names. Without({ a: A }, {a})
+inside an invariant wrapper must retain A until the witness guard permits
+its removal. No BDD or cache pass may reinterpret it as `{..}` early.
+
+### 21.6 Reference-first T3 hand-off and replacement sentences
+
+This table supplements every record algorithm in §20.6. It identifies the
+first implementation to read; unrelated syntax/runtime work keeps the
+existing local-code hand-off. Reference citations use §21.1’s pinned roots.
+
+| Algorithm T3 must implement | Read first | i-specific contract / gate |
+|---|---|---|
+| Record Boolean representation, union/intersection/difference and apply cache | Elixir `descr.ex`, `bdd_node_new` (:6396), `bdd_union` (:6420), `bdd_difference` (:6512), `bdd_intersection` (:6706), `bdd_negation` (:6863) | U1/U2/U6; interned handles, suspensions, internal domain complement; no common-field join. Truth-assignment and cache-off gates. |
+| Record product merge, N2 and empty paths | Elixir `descr.ex`, `map_literal_intersection` (:3248), `init_map_line_empty?` (:4835) | Required empty field means Never. Optional absence is internal. N1 label collision tests still apply. |
+| Closed record inclusion/equality and U3 field splitting | Elixir `descr.ex`, `subtype_static?` (:1031), `map_bdd_empty?` (:3499), `map_line_meet_empty?` (:4868) | Exact uncovered-set emptiness; first-difference partitions; structural field relation; 133,120 finite-model inclusion checks. No unknown-as-empty. |
+| Forgetting, field read, put/remove projection | Elixir `descr.ex`, `map_split_key_line` (:3608), `map_remove_negative` (:3668), `map_update_named_key` (:4113) | E0–E5/U4; stream pairs, retain one witness, retain open Without. 16,384 negative-map projection checks and common-witness negative control. |
+| Cheap union relation paths and cache invalidation | TS Go `relater.go`, `unionOrIntersectionRelatedTo` (:2882), `typeRelatedToSomeType` (:3004); tsrs `unioncache.rs` (:265–410), `checker_13.rs::remove_subtypes_inner` (:665–751) | Cache only pure completed results, scope by bound epoch/labels, preserve failures’ spans; retry after budget exhaustion and after ordinary bound changes. |
+| Deferred annotation obligations and completion barrier | GHC `Tc/Gen/Bind.hs::tcPolyInfer` (:723–800), `Tc/Solver.hs::emitResidualConstraints` (:1030–1070) | U3 read-only worklist; no publication/generalization with unresolved U3; ordinary retained constraints not erased. Test choose variants and snapshot equality on failure. |
+| Substitution, instantiation and invariant simplification | MLstruct `ConstraintSolver.scala::freshenAbove` (:549); `TypeSimplifier.scala` (:317–380, :582–652); MLscript `TypeSimplifier.scala::subst` (:176) | J7; one variable map, polarity-aware memo; reorder changed BDD predicates through apply. Run invariant alias/read and weak-variable tests as well as atom-reordering probes. |
+| Known-field summaries | MLstruct `TyperHelpers.scala::recordUnion` (:66), used only as a warning about approximation; Elixir `map_dnf_fetch_static` (:3597) for exact projection comparison | U5 only. No invariant equality, no alias publication from a summary. Keep existing J2 tests. |
+| Resource accounting and diagnostics | GHC `HsToCore/Pmc/Check.hs::throttle` (:98); TS Go `checker.go::removeSubtypes` (:26057–26147) | U6, distinct resource result; GHC approximation and TS’s discriminant False are not i subtype verdicts. Charge BDD apply and projection too. |
+| Graph display, scheme/interface serialization | tsrs `docs/CHECKER.md` (:242–390) for stable handles; MLstruct `freshenAbove` for binder identity | No reference here supplies i’s exact wire format. Implement the existing versioned graph contract with scope/bound metadata; no expanded DNF, no loss of invariant sharing. Round-trip and package tests required. |
+
+Normative replacement text, in addition to the existing R1–R4 sentences:
+
+- **Spec §4.9.3, after the resource paragraph:** “An emptiness or inclusion
+  check distinguishes a proved result, an unresolved proof, and resource
+  exhaustion. An unresolved or exhausted check is never evidence of an empty
+  set or a failed inclusion. Internal Boolean difference used to check record
+  coverage does not change written type difference. Substitution and
+  simplification preserve shared variables in invariant arguments and all
+  retained ordinary constraints. Unresolved union-proof obligations are
+  discharged or diagnosed before generalization or permanent alias publication.”
+- **Spec §4.9.3, full-output sentence:** include retained scheme bounds and
+  ordinary obligations with scoped parameter identities. No U3 residual can
+  escape by serialization. Small source output and full bundles still have
+  the exact round-trip contract.
+- **Joint §6:** point to §21’s algorithms and invariant-sharing contract;
+  J1–J8 and the §20.5 change table retain their existing outcomes. No edit
+  outside joint §6 is required.
+
+The BDD is an implementation choice specified here, not a new surface type
+constructor. No spec sentence mandates a particular arena layout or atom
+order. Type meaning stays set-based; principality is still protected by not
+creating union-alternative bounds. The record core, not a privileged schema
+library, supplies every feature.
+
+### 21.7 Model evidence, attacks and remaining limits
+
+`tests/t3-record-bdd.py` is an executable transcription of the decision and
+map equations, with open-map products over three scalar representatives and
+absence. It is deliberately separate from the old graph model’s finite-set
+coverage shortcut. Its Boolean constructor has the ternary C/U/D shape and
+memoized union/intersection/difference (:46–110); it omits optional Elixir
+absorption and leaf-fusion optimizations. Its projection streams positive
+residual products after negative elimination (:131–178). The four-result
+wrapper is :180–184, finite oracles are :196–296, sharing is :299–315 and
+the scale probes are :318–338. It is not the production iterative
+worklist, full field theory or interface codec.
+
+The successful run reports:
+
+- **38,400** Boolean operation-pair checks with caches on/off, each against
+  eight independent truth assignments; **16** reordered-atom assignments;
+  **15** symbolic-predicate substitutions including empty and compound
+  replacements, compared by mutual inclusion against fresh construction.
+- **133,120** record inclusions against an independent finite-value oracle,
+  including target unions that cover a source only collectively.
+- **16,384** negative-map projections against that oracle, including all four
+  removal sets on two labels; zero disagreements. Missing fields include an
+  absence representative; absence is not the empty field type.
+- Separate resource-failure retries ending both Proven and Refuted, an
+  unresolved-field Unknown, the common-witness counterexample, and invariant
+  identity shared across three variance positions.
+- The existing 20-step suspension gates: branch **137 nodes / 3,487 bytes**,
+  about **0.0014 s**; open Fan **81 nodes / 2,091 bytes**, about **0.0009 s**,
+  including Fan(Never) and codec round trips. A demanded closed 20-step Fan
+  additionally has **40 reachable BDD nodes**, about **0.0006 s** for
+  construction, record-domain proof and a nonemptiness demand. This uses a
+  favorable paired predicate order, not a bound for every order.
+
+The original eager and compact substitution models are rerun unchanged;
+their counts and old-rule negative controls remain §20.7’s. No acceptance
+result or example type changes from 39233dd. The new tests replace missing
+algorithm evidence, not the original 4,994,560-case commutation gate.
+
+**Attacks and repairs before the final passes.** A direct leaf-map of an
+ordered BDD can invalidate its ordering after substitution: require apply
+rebuilding and test a reversed predicate order. Using `bdd_remove` as set
+subtraction would be wrong: name absorption separately from difference.
+Copying Elixir’s list-producing map fetch/update would restore eager growth:
+stream the same equations under the budget. Treating a missing field as an
+empty value would lose uncovered records: carry absence explicitly. Forgetting
+separate conjuncts would invent a witness: eliminate negatives before field
+projection. Copying recursive seen-as-empty or TypeScript’s 25-case False
+would turn incomplete work into a semantic answer: use Unknown/ResourceLimit.
+A per-branch freshening map would break the invariant attack: use one scheme
+map, including retained constraints. An initial rejection example incorrectly
+used `_` as a dynamic type; the source audit caught that it is an inference
+hole. The final example uses the closed `Int | String` field instead. These are resolved design hazards, not
+claims that the reference systems are unsound under their own contracts.
+
+**Pass one, sets.** Rechecked the decision equation, positive-path pruning,
+first-difference coverage, all negative-map projections, absence, Gone,
+correlation and common-witness attacks against independent oracles. The
+Boolean cache-off run and reordered-atom run agree. No new serious failure
+in the modelled fragment.
+
+**Pass two, implementation and sources.** Rechecked that source construction,
+substitution, T2 completion and interface output can remain suspended; that
+budget failure publishes nothing; that every added algorithm has a reference
+and an i-specific boundary; and that invariant identities and ordinary
+residual constraints cannot disappear through a display rewrite. Compared
+§4.9.3, joint §6, U1–U6 and §20’s accepted/rejected examples. No new serious
+conflict found within the specified contracts. These are source/design
+checks; T3’s compiler integration and performance have not been run.
+
+Remaining unproved: full-checker principality; completeness for arbitrary
+Boolean function/nominal leaf theories; complete projection with open label
+parameters; correspondence of a Rust port to these equations; deterministic
+work accounting across all cache paths; complete scheme/wire-format round
+trips including effects; and warmed Rust scale performance. The finite model
+checks neither Elixir binaries nor TypeScript/GHC inference. It does not
+establish that all leaf invariance obligations are preserved by a future
+compiler implementation. The semantic record commutation argument in §20.2
+is unchanged and extends to the exact Boolean/projection equations above.
+
+Coordinator recommendations: use Elixir’s kernel plus demand suspensions as
+the T3 base; require the reference-first table and all three models before
+compiler implementation; retain the no-choice U3 boundary rather than add
+qualified disjunctive constraints in T3. The existing questions about resource
+diagnostic allocation, graph-format ownership and heterogeneous traversal
+remain §20.8’s, with the same recommendations. None requires a library rule.
