@@ -64,6 +64,8 @@ i/random.follow : (h: State, bits: List(Int)) -> State
 i/random.derive_path : (g: Generator, path: List(Int)) -> Generator
 i/random.at_path : (g: Generator, path: List(Int)) -> Generator ? RandomError
 i/syntax.definition : (of: Syntax) -> Syntax ? SyntaxError ! Definitions
+i/syntax.raw_note : (String) -> Nil
+i/syntax._diagnostics : () -> Diagnostics
 i/syntax.raw_metadata_new : () -> ItemMetadata
 i/syntax.raw_metadata_push : (ItemMetadata, String, String) -> ItemMetadata
 i/syntax.raw_items_add : (Syntax, Syntax, ItemMetadata, Syntax) -> ItemResult
