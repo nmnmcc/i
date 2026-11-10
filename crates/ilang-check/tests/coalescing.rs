@@ -142,6 +142,35 @@ main(N) = () { local: () -> Nil ! N = () { use() } local() }";
             graph.sources.render_all(&checked.diags)
         );
     }
+    // §9.2 compares service arguments equally even when S is covariant.
+    // Supplying S(Dependency) does not supply its callback's Dependency.
+    let dependency = "S(N) { S(() -> Nil ! N) }
+Dependency { Dependency }
+read = (d ! Dependency) { Nil }
+use(N) = (s ! S(N)) { S(f) = s f() }
+apply(N) = () { local: () -> Nil ! N = () { use() } local() }
+@main
+main = () { ! S(Dependency) = S(() { read() }) apply() }";
+    entry(dependency);
+    let supplied = dependency.replace(
+        "! S(Dependency)",
+        "! Dependency = Dependency\n! S(Dependency)",
+    );
+    let (graph, _, _) = common::check_files(&[("src/main.i", &supplied)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.is_empty(),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    let program = checked.program.unwrap();
+    assert!(
+        checked
+            .types
+            .unwrap()
+            .lines(&program, common::module(&program, "app/main"))
+            .contains(&"app/main.main : () -> Nil".to_string())
+    );
 }
 
 #[test]

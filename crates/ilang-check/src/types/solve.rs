@@ -272,10 +272,19 @@ impl Solver {
                     self.constrain_in(l, m, env);
                 }
             }
-            (Ty::Var(_), Ty::Var(v)) if env && self.level_of(l) <= self.var(*v).level => {
+            (Ty::Var(_), Ty::Var(v)) if env => {
                 // Collect requirements in the receiving row. An upper
                 // bound on its member can lead back through a service's
                 // invariant argument: n <: row, S(n) <: row is finite.
+                // Do this across levels too, after copying the member to
+                // the receiver's level; do not make its upper bound the
+                // whole receiving row.
+                let level = self.var(*v).level;
+                if self.level_of(l) > level {
+                    let l2 = self.extrude(l, Pol::Pos, level, true, &mut HashMap::default());
+                    self.constrain_in(&l2, r, true);
+                    return;
+                }
                 self.add_bound(*v, l.clone(), true, env);
                 for ub in self.var(*v).upper.clone() {
                     self.constrain_in(l, &ub, env);
@@ -295,12 +304,12 @@ impl Solver {
             }
             (Ty::Var(v), _) => {
                 let level = self.var(*v).level;
-                let r2 = self.extrude(r, Pol::Neg, level, &mut HashMap::default());
+                let r2 = self.extrude(r, Pol::Neg, level, env, &mut HashMap::default());
                 self.constrain_in(l, &r2, env);
             }
             (_, Ty::Var(v)) => {
                 let level = self.var(*v).level;
-                let l2 = self.extrude(l, Pol::Pos, level, &mut HashMap::default());
+                let l2 = self.extrude(l, Pol::Pos, level, env, &mut HashMap::default());
                 self.constrain_in(&l2, r, env);
             }
             (Ty::Inter(ms), _) => {
@@ -596,25 +605,32 @@ impl Solver {
 
     /// Copies the variables of `t` that are deeper than `level` to that
     /// level, with bounds that link them to the originals (Simple-sub).
-    fn extrude(&mut self, t: &Ty, pol: Pol, level: u32, cache: &mut HashMap<(V, Pol), V>) -> Ty {
+    fn extrude(
+        &mut self,
+        t: &Ty,
+        pol: Pol,
+        level: u32,
+        env: bool,
+        cache: &mut HashMap<(V, Pol, bool), V>,
+    ) -> Ty {
         if self.level_of(t) <= level {
             return t.clone();
         }
         match t {
             Ty::Var(v) => {
-                if let Some(nv) = cache.get(&(*v, pol)) {
+                if let Some(nv) = cache.get(&(*v, pol, env)) {
                     return Ty::Var(*nv);
                 }
                 let nv = self.fresh_at(level);
                 self.vars[nv.0 as usize].input = self.var(*v).input;
-                cache.insert((*v, pol), nv);
+                cache.insert((*v, pol, env), nv);
                 if pol != Pol::Neg {
                     self.var_mut(*v).upper.push(Ty::Var(nv));
                     self.var_mut(nv).from.push(*v);
                     let lower = self.var(*v).lower.clone();
                     let lower = lower
                         .iter()
-                        .map(|b| self.extrude(b, Pol::Pos, level, cache))
+                        .map(|b| self.extrude(b, Pol::Pos, level, env, cache))
                         .collect();
                     self.set_lower(nv, lower);
                 }
@@ -625,13 +641,39 @@ impl Solver {
                     let upper = upper
                         .iter()
                         .filter(|b| **b != Ty::Var(nv))
-                        .map(|b| self.extrude(b, Pol::Neg, level, cache))
+                        .map(|b| self.extrude(b, Pol::Neg, level, env, cache))
                         .collect();
                     self.set_upper(nv, upper);
                 }
                 Ty::Var(nv)
             }
-            _ => self.map_children(t, pol, &mut |s, x, p| s.extrude(x, p, level, cache)),
+            Ty::Con(h, args) if env => {
+                // §4.5 rule 4: service arguments stay equal across levels,
+                // independently of their ordinary value variance. Inside
+                // an argument, ordinary type rules apply again.
+                Ty::Con(
+                    *h,
+                    args.iter()
+                        .map(|a| self.extrude(a, Pol::Both, level, false, cache))
+                        .collect(),
+                )
+            }
+            Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+                params: f
+                    .params
+                    .iter()
+                    .map(|(label, p)| {
+                        (
+                            label.clone(),
+                            self.extrude(p, pol.flip(), level, false, cache),
+                        )
+                    })
+                    .collect(),
+                ret: self.extrude(&f.ret, pol, level, false, cache),
+                err: self.extrude(&f.err, pol, level, false, cache),
+                env: self.extrude(&f.env, pol, level, true, cache),
+            })),
+            _ => self.map_children(t, pol, &mut |s, x, p| s.extrude(x, p, level, env, cache)),
         }
     }
 
