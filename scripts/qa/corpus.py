@@ -425,6 +425,9 @@ def report(args):
         if 'E0520' in check['stderr']:
             saved['transitions'] = ['W520: E0520 becomes a warning; review this observed rejection when W520 lands']
             dump(p, saved)
+        elif 'W0503' in check['stderr']:
+            saved['transitions'] = ['W520 applied: E0520 -> W0503; docs/spec.md §6.9 requires Bool, no widening or new narrowing fact']
+            dump(p, saved)
         counts[review]['accepted' if check['exit'] == 0 else 'rejected' if check['exit'] == 1 else 'timeout_or_crash'] += 1
         if 'E0520' in check['stderr']:
             counts[review]['W520_transition'] += 1
@@ -456,6 +459,40 @@ def snapshot(args):
     print(f'preserved {len(observations)} observations as {args.label}')
 
 
+def audit_w520(args):
+    if os.environ.get('UPDATE') != '1':
+        raise SystemExit('audit-w520 requires UPDATE=1')
+    baseline = json.loads((CORPUS / 'baselines/pre-w520.json').read_text())['observations']
+    changes, censored, failures = [], [], []
+    location = r'(?m)^(.+\.i):(\d+):(\d+): (?:error|warning)\[%s\]:'
+    for case in select(args):
+        path = ROOT / case['project'] / 'expected.json'
+        saved = json.loads(path.read_text())
+        old, new = baseline[case['id']]['outcome'], saved['outcome']
+        before = re.findall(location % 'E0520', old['check']['stderr'])
+        after = re.findall(location % 'W0503', new['check']['stderr'])
+        if before:
+            unchanged_types = old['check']['stdout'] == new['check']['stdout']
+            excerpts = []
+            for name, line, col in before:
+                logical = name.removeprefix('<project>/')
+                source = ROOT / case['project'] / case.get('stored', {}).get(logical, logical)
+                text = source.read_text().splitlines()[int(line) - 1] if source.is_file() else 'dependency source: ' + name
+                excerpts.append({'path': name, 'line': int(line), 'column': int(col), 'source': text})
+            changes.append({'case': case['id'], 'old_exit': old['check']['exit'], 'new_exit': new['check']['exit'], 'old_locations': before, 'new_locations': after, 'shown_types_unchanged': unchanged_types, 'source_excerpts': excerpts})
+            if before != after or not unchanged_types:
+                failures.append(case['id'] + ': W520 changed locations or shown types')
+        elif old != new:
+            if any(value['exit'] == 'timeout' for value in [*old.values(), *new.values()]):
+                censored.append(case['id'])
+            else:
+                failures.append(case['id'] + ': unrelated full outcome changed')
+    dump(CORPUS / 'w520-audit.json', {'source': 'docs/spec.md §6.9: the compiler gives warning W0503, showing both types; the comparison is well defined and has type Bool; literal types are not widened; the warning adds no narrowing fact', 'changes': changes, 'censored_changes': censored, 'failures': failures})
+    print(f'W520: {len(changes)} marked cases, {len(censored)} censored changes, {len(failures)} unexplained changes')
+    if failures:
+        raise SystemExit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(__doc__)
     sub = parser.add_subparsers(dest='mode', required=True)
@@ -472,6 +509,8 @@ def main():
     snap = sub.add_parser('snapshot')
     snap.add_argument('--label', required=True)
     snap.add_argument('--filter', default='')
+    audit = sub.add_parser('audit-w520')
+    audit.add_argument('--filter', default='')
     args = parser.parse_args()
     if args.mode == 'import':
         import_reviews(args)
@@ -482,6 +521,8 @@ def main():
         register_parses(args)
     elif args.mode == 'snapshot':
         snapshot(args)
+    elif args.mode == 'audit-w520':
+        audit_w520(args)
     else:
         report(args)
 

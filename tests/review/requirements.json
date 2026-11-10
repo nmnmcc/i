@@ -103,8 +103,10 @@
     {
       "diagnostic": "E0520",
       "track": "W520",
-      "source": "ledger 2026-11-11: E0520 becomes a warning",
-      "policy": "Every observation mentioning E0520 is a marked baseline transition, not a required rejection. Regenerate only after checking the warning and acceptance against the rule."
+      "source": "docs/spec.md §6.9: the compiler gives warning W0503, showing both types; the comparison is well defined and has type Bool",
+      "policy": "Pre-W520 observations are retained in baselines/pre-w520.json. The active baseline uses W0503; audit-w520 verifies every marked location and shown type.",
+      "diagnostic_after": "W0503",
+      "landed": "82375c02ae8e3db2dff0e758007f81822c22608d"
     }
   ]
 }

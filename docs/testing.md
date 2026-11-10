@@ -54,8 +54,10 @@ These model checks do not validate an implemented record or float extension.
 Captured outputs are observations, not semantic oracles. In particular,
 agreement between O0 and O2 can preserve a shared checker defect. Requirements
 are separate from `expected.json`, with source sentences, and known failures
-must be promoted when their required result is achieved. E0520 observations
-are marked for W520's error-to-warning transition. Future record cases remain
+must be promoted when their required result is achieved. The pre-W520 E0520
+observations are retained in `baselines/pre-w520.json`; the active baseline
+uses W0503. `UPDATE=1 scripts/review-corpus audit-w520` checks every marked
+location and shown type against spec §6.9. Future record cases remain
 held for T3 rather than becoming passing parser-error tests.
 
 Some review criteria predate §2.6.2's source/target split: they call for E0522
