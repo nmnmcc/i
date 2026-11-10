@@ -243,7 +243,7 @@ pub(crate) fn boundary_type(
                 }
                 a
             }
-            _ => return None,
+            TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => return None,
         })
     }
     let mut s = solve::Solver::new(HashMap::new(), Vec::new());

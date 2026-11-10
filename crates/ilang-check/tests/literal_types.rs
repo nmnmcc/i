@@ -402,21 +402,21 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
         "{\"a\" | \"b\"} - \"b\"",
         "String & \"a\"",
     ] {
-        let (ds, _) = check(&format!(
-            "Part = {ty}\nAlias = Part\n@external(\"app\", \"write\")\nwrite: (Alias) -> Nil\n"
-        ));
+        let (ds, _) = check(&"Part = BoundaryType\nAlias = Part\n@external(\"app\", \"write\")\nwrite: (Alias) -> Nil\n".replace("BoundaryType", ty));
         assert!(ds.is_empty(), "{ty}: {ds:?}");
-        let (ds, _) = check(&format!(
-            "Part = {ty}\n@external(\"app\", \"read\")\nread: () -> Part\n"
-        ));
+        let (ds, _) = check(
+            &"Part = BoundaryType\n@external(\"app\", \"read\")\nread: () -> Part\n"
+                .replace("BoundaryType", ty),
+        );
         assert_eq!(
             ds.iter().map(|d| d.0.as_str()).collect::<Vec<_>>(),
             ["E0318"],
             "{ty}: {ds:?}"
         );
-        let (ds, _) = check(&format!(
-            "Part = {ty}\n@host(\"app\")\nSvc {{ Svc(get: () -> Part) }}\n"
-        ));
+        let (ds, _) = check(
+            &"Part = BoundaryType\n@host(\"app\")\nSvc { Svc(get: () -> Part) }\n"
+                .replace("BoundaryType", ty),
+        );
         assert_eq!(
             ds.iter().map(|d| d.0.as_str()).collect::<Vec<_>>(),
             ["E0320"],
@@ -432,21 +432,21 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
         "{String - \"a\"} | \"a\"",
         "String | \"error\"",
     ] {
-        let (ds, _) = check(&format!(
-            "Whole = {ty}\n@external(\"app\", \"read\")\nread: () -> Whole\n@host(\"app\")\nSvc {{ Svc(get: () -> Whole ? Whole | Nil) }}\n"
-        ));
+        let (ds, _) = check(&"Whole = BoundaryType\n@external(\"app\", \"read\")\nread: () -> Whole\n@host(\"app\")\nSvc { Svc(get: () -> Whole ? Whole | Nil) }\n".replace("BoundaryType", ty));
         assert!(ds.is_empty(), "{ty}: {ds:?}");
     }
     for env in ["Never", "Int - Int", "String - String"] {
-        let (ds, _) = check(&format!(
-            "@host(\"app\")\nSvc {{ Svc(get: () -> String ! {env}) }}\n"
-        ));
+        let (ds, _) = check(
+            &"@host(\"app\")\nSvc { Svc(get: () -> String ! BoundaryType) }\n"
+                .replace("BoundaryType", env),
+        );
         assert!(ds.is_empty(), "{env}: {ds:?}");
     }
     for empty in ["1 - 1", "Int & String"] {
-        let (ds, _) = check(&format!(
-            "Empty = {empty}\n@external(\"app\", \"write\")\nwrite: (Empty) -> Nil\n"
-        ));
+        let (ds, _) = check(
+            &"Empty = BoundaryType\n@external(\"app\", \"write\")\nwrite: (Empty) -> Nil\n"
+                .replace("BoundaryType", empty),
+        );
         assert_eq!(
             ds.iter().map(|d| d.0.as_str()).collect::<Vec<_>>(),
             ["E0318"],
@@ -459,9 +459,10 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
         "{{Int - 0} | 0} | String | \"error\"",
         "Int - Int",
     ] {
-        let (ds, _) = check(&format!(
-            "Errors = {err}\n@host(\"app\")\nSvc {{ Svc(get: () -> String ? Errors) }}\n"
-        ));
+        let (ds, _) = check(
+            &"Errors = BoundaryType\n@host(\"app\")\nSvc { Svc(get: () -> String ? Errors) }\n"
+                .replace("BoundaryType", err),
+        );
         assert!(ds.is_empty(), "{err}: {ds:?}");
     }
     for err in [
@@ -469,9 +470,10 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
         "String | 1",
         "{String - \"error\"} | \"other\"",
     ] {
-        let (ds, _) = check(&format!(
-            "@host(\"app\")\nSvc {{ Svc(get: () -> String ? {err}) }}\n"
-        ));
+        let (ds, _) = check(
+            &"@host(\"app\")\nSvc { Svc(get: () -> String ? BoundaryType) }\n"
+                .replace("BoundaryType", err),
+        );
         assert_eq!(
             ds.iter().map(|d| d.0.as_str()).collect::<Vec<_>>(),
             ["E0320"],

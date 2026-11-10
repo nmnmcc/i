@@ -28,7 +28,7 @@ is checked as incoming. An empty normalized row has no error slots;
 whole scalar members have one slot per head in B.2 canonical order.
 Restricted incoming members still give E0318/E0320. The no-environment
 check also recognizes normalized Never rather than only its named form.
-Spec §11.7 explicitly identifies no environment with `! Never`.
+Spec §11.7 explicitly identifies no environment with `! Never`. The converter matches every current HIR type variant explicitly so later tracks must extend it for their own new forms.
 
 All four exact review sources are in the checker regression test
 `host_boundaries_depend_on_scalar_sets_not_written_forms`. Independent
@@ -105,4 +105,4 @@ using §4.4's set identity. A spec import initially used `std/fail` where
 the standalone spec harness provides `i/fail`; corrected. The runtime
 repair fixture initially used unsupported unary `!`; its assertions now
 compare the runtime Bool with False. Its list-map case also needed a package fixture with an explicit std dependency; `i/list` is not a library module. No compiler check or test was
-weakened. No check was interrupted; no global environment settings changed.
+weakened. The first old-syntax run also rejected eight Rust format templates before substitution; the templates now contain valid type-name placeholders and use string substitution, with no scanner exceptions added. Its next run parsed 1,330 snippets with exact expected diagnostics and the same 17 other-track futures. No check was interrupted; no global environment settings changed.
