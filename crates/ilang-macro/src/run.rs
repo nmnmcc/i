@@ -161,3 +161,49 @@ pub fn invoke_with_templates(
         ilang_host::Outcome::Stop(stop) => Err(stop.into()),
     }
 }
+
+/// The observable completion of one fresh compiler instance. Definition
+/// deferral, compiler failures, and a macro's SyntaxError retain their Syntax
+/// positions and cannot be caught by the guest.
+#[derive(Debug)]
+pub enum RunOutcome {
+    Returned(Syntax),
+    Aborted(ilang_host::syntax::DefinitionAbort),
+    Stopped(ilang_host::Stop),
+}
+
+/// Execute a compiler entry with per-run definition state and templates.
+pub fn invoke_with_context(
+    built: &MacroProgram,
+    export: &str,
+    arguments: &[Syntax],
+    templates: std::sync::Arc<[Syntax]>,
+    context: std::sync::Arc<ilang_host::syntax::DefinitionContext>,
+) -> Result<RunOutcome> {
+    let program = built.host_program().context("load macro program")?;
+    let mut imports = ilang_host::HostImports::default();
+    ilang_host::syntax::install_with_context(&mut imports, templates, Some(context.clone()))
+        .context("install compiler services")?;
+    imports.grant_package(&built.binding_plan, &built.trusted_package);
+    let result = (|| {
+        let mut instance = program.instantiate(ilang_host::HostOptions::new(imports))?;
+        let values = arguments
+            .iter()
+            .cloned()
+            .map(ilang_host::syntax::encode)
+            .collect::<Vec<_>>();
+        instance.call(export, &values)
+    })();
+    if let Some(abort) = context.take_abort() {
+        return Ok(RunOutcome::Aborted(abort));
+    }
+    match result.context("run compiler export")? {
+        ilang_host::Outcome::Ok(value) => Ok(RunOutcome::Returned(
+            ilang_host::syntax::decode(&value)
+                .cloned()
+                .context("compiler export returned a value other than Syntax")?,
+        )),
+        ilang_host::Outcome::Err(error) => bail!("compiler wrapper leaked an error: {error:?}"),
+        ilang_host::Outcome::Stop(stop) => Ok(RunOutcome::Stopped(stop)),
+    }
+}
