@@ -203,3 +203,11 @@ not a pre-fix measurement. One additional Rust regression build failed because
 its boxed test future omitted Send; corrected the test type without weakening an
 assertion. Existing tests and all new paired controls pass. Full post-merge
 verification follows this checkpoint.
+
+The final cancellation audit also found that JS Set membership used the callback
+itself as its key, so two registrations of the same callback could collapse or
+one detach could remove both. Registrations now have independent tokens; "BG
+review audit: repeated cancellation callbacks remain independent registrations"
+checks two remaining registrations both execute. Rust work cells already have
+independent identities (the paired two-work cancellation test checks both).
+The 16 JS review tests pass after this change.

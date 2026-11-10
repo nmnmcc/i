@@ -232,3 +232,17 @@ test("BG review audit: argument getters cannot bypass the final gate into an exp
   assert.throws(() => guest.call("bits", [bits]), /ended/);
   assert.equal(counter(guest, 12), 0);
 });
+
+test("BG review audit: repeated cancellation callbacks remain independent registrations", async () => {
+  const host = new ResourceHost();
+  const context = host.context();
+  let calls = 0;
+  const cancel = () => { calls++; };
+  const detach = context.ownRequest(cancel);
+  context.ownRequest(cancel);
+  detach();
+  context.ownRequest(cancel);
+  await context.teardown();
+  assert.equal(calls, 2);
+  assert.deepEqual(host.takeCleanupErrors(), []);
+});

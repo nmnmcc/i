@@ -79,8 +79,9 @@ export class ResourceContext {
   /** Context cancellation authority independent of a Wasm instance. */
   ownRequest(cancel) {
     if (!this.#live) { this.#attempt("cancel", cancel); throw new ResourceError("closed"); }
-    this.#requests.add(cancel);
-    return () => this.#requests.delete(cancel);
+    const request = { cancel };
+    this.#requests.add(request);
+    return () => this.#requests.delete(request);
   }
   /** Track independent creation/supervision before starting OS work. */
   cleanupJob() {
@@ -157,7 +158,7 @@ export class ResourceContext {
     const receipts = [...this.#closing.values()].map(({ receipt }) => receipt).concat([...this.#jobs]);
     // Publish the join before callbacks, including reentrant teardown calls.
     this.#teardown = Promise.all(receipts).then(() => {});
-    for (const cancel of requests) this.#attempt("cancel", cancel);
+    for (const { cancel } of requests) this.#attempt("cancel", cancel);
     for (const entry of work) this.#finishClose(entry);
     return this.#teardown;
   }
