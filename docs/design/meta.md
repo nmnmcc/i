@@ -368,7 +368,7 @@ A **macro call** is written in one of these ways, in both surfaces. `m` is a nam
 - Before a **type definition**, the macro cannot change the item. The type definition stays in the module as it is written, and the result of the macro, an item or a `Curly` of zero or more items, is added after it. So a type definition that is written is always the definition of its type.
 - Before a **binding or a declaration**, the result, an item or a `Curly` of zero or more items, takes the place of the item. To keep the item, the macro puts it in its result.
 - The item is given to the macro with the attributes that are written after the macro. The item always goes to the last parameter, also when another argument has a label.
-- A built-in attribute before a macro, as in `@test @m f = …`, is a compile error; write it after the macro, so that it is a part of the item. An attribute whose name is one of the built-in attributes (`external`, `host`, `main`, `test`, `deprecated`, `macro`) is that attribute; a macro with such a name is used with its module name.
+- A built-in attribute before a macro, as in `@test @m f = …`, is a compile error; write it after the macro, so that it is a part of the item. An attribute whose name is one of the built-in attributes (`external`, `js`, `host`, `main`, `test`, `deprecated`, `macro`) is that attribute; a macro with such a name is used with its module name.
 - With more than one macro before an item, the first is expanded first, and it gets the item with the other macros still on it.
 - The rule of spec §2.2 that an attribute is not given two times is for built-in attributes only.
 - The documentation comment of the item stays on the type definition, or goes to the first item of the result that defines the same name.
@@ -376,7 +376,7 @@ A **macro call** is written in one of these ways, in both surfaces. `m` is a nam
 **Limits on what a result may have.**
 
 - Imports and exports cannot be in a result.
-- The attributes `@external`, `@host`, `@main`, and `@test` may be in a result only when the attribute came from the code of the caller (it has no marks, §5). So a macro of a package that the program depends on cannot add a host import or an entry point that the caller did not write.
+- The attributes `@external`, `@js`, `@host`, `@main`, and `@test` may be in a result only when the attribute came from the code of the caller (it has no marks, §5). So a macro of a package that the program depends on cannot add a host import or an entry point that the caller did not write.
 - A `Curly` directly inside the `Curly` of a result of items is a compile error.
 
 ### 4.4 Expanding
