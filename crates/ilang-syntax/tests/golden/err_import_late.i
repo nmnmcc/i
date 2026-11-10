@@ -1,3 +1,3 @@
 a = 1
-import (i/fail)
+(i/fail)
 b = 2

@@ -71,6 +71,14 @@ fn check_goldens(old: bool) {
         "tests/golden"
     });
     let update = std::env::var_os("UPDATE").is_some();
+    // Removing a parser input also removes its derived output on regeneration.
+    for entry in fs::read_dir(&dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|e| e == "out") && !path.with_extension("i").exists() {
+            assert!(update, "orphan golden output: {}", path.display());
+            fs::remove_file(path).unwrap();
+        }
+    }
     let mut paths: Vec<_> = fs::read_dir(&dir)
         .unwrap()
         .map(|e| e.unwrap().path())

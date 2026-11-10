@@ -2,26 +2,26 @@ T1 = A | B & C - D - E
 T2 = { A | B } & C
 T3 = A - { B - C }
 T4 = { (A) -> B } | C
-T5 = (a) -> { (b) -> c } ! E
+T5 = (A) -> { (B) -> C } ! E
 T6 = (A) -> B | C
 T7 = (Int, String)
 T8 = ()
 T9 = (Int)
-T10 = m.T(_, a)
+T10 = m.T(_, A)
 T11 = List(List(Int))
 T12 = (A) -> (B) -> C ? E ! N
 T13 = (A) -> { (B) -> C ? E } ! N
 T14 = { A - B } - C
-T15 = (body: () -> a ? e ! n) -> Result(a, e) ! n
+T15 = (body: () -> A ? E ! N) -> Result(A, E) ! N
 T16 = { A | B } | C
 T17 = A & { (B) -> C } & D
 T18 = (in: String, each: String) -> String
 Opaque {}
-Pair(a, b) {
-  Pair(first: a, second: b)
+Pair(A, B) {
+  Pair(first: A, second: B)
 }
 Shape { Circle(Float) Rect(w: Float, h: Float) Dot }
-Gen(a) { Yield(emit: (value: a) -> Nil) }
+Gen(A) { Yield(emit: (value: A) -> Nil) }
 
 @external("m", "f")
-f: (a: Int, b) -> Int | String ? E ! N
+f(B): (a: Int, B) -> Int | String ? E ! N

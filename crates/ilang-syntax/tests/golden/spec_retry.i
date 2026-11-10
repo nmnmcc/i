@@ -1,7 +1,7 @@
-retry = (times: Int, body: () -> a ? e ! n) -> a ? e ! n {
-  case fail.catch(body) {
+retry(A, E, N) = (times: Int, body: () -> A ? E ! N) -> A ? E ! N {
+   fail.catch(body) |> {
     Ok(value) -> value
-    Error(error) -> case times > 1 {
+    Error(error) ->  { times > 1 } |> {
       True -> retry(times - 1, body)
       False -> fail.raise(error)
     }

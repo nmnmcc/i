@@ -1,11 +1,11 @@
 //// The module.
 //// Second line.
-import (
+ (
   i/fail
   decode = json/decode
   opt = (Option, Some) = std/option
   (a, B) = x/y/z,
 )
-export (main, User(..), Thing)
+ (main, User(..), Thing)
 
 main = () { Nil }

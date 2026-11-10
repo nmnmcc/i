@@ -1,4 +1,2 @@
-f(x)
+1
 Some(x) = y
-@external("m", "f")
-g = 1

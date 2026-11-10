@@ -220,6 +220,7 @@ fn format_golden() {
             panic!("{}: {msg}", path.display());
         }
         let actual = format(&src).unwrap();
+        assert_ne!(src, actual, "{} must exercise formatting", path.display());
         let out = path.with_extension("out");
         if update {
             fs::write(&out, &actual).unwrap();
