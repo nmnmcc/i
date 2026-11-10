@@ -1,0 +1,37 @@
+{
+  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
+  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 10.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 1,
+      "stdout": "app/main.use : (x: T(S(Never) | S(Dep))) -> T(S(Never) | S(Dep))\napp/main.main : () -> Nil\n",
+      "stderr": "src/main.i:15:7: error[E0515]: `Never` and `Dep` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n1 error\n"
+    },
+    "run0": {
+      "command": [
+        "run",
+        "--opt",
+        "0"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:15:7: error[E0515]: `Never` and `Dep` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n1 error\n"
+    },
+    "run2": {
+      "command": [
+        "run",
+        "--opt",
+        "2"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:15:7: error[E0515]: `Never` and `Dep` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n1 error\n"
+    }
+  }
+}

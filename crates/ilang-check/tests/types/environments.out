@@ -1,4 +1,4 @@
-collect : (body: () -> Nil ! Yield(A) | N) -> List(A) ! N
+collect : (body: () -> Nil ! N | Yield(A)) -> List(A) ! N
 numbers : () -> List(Int)
 inferred : () -> List("s")
 run_never : (body: () -> Nil ! Yield(Never)) -> 1
@@ -12,7 +12,7 @@ next_int : () -> Int ! Source(Int)
 next_string : () -> String ! Source(String)
 both_sources : () -> String ! Source(Int) | Source(String)
 both_fns : List(() -> Nil ! Yield(Never))
-written : () -> Nil ! Yield(Int) | Source(Int)
+written : () -> Nil ! Source(Int) | Yield(Int)
 emit_any : () -> Nil ! Yield(Int | String)
 given_narrow : () -> Nil
 given_same : () -> Nil

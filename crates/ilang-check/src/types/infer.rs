@@ -8,7 +8,7 @@
 
 use super::display;
 use super::known;
-use super::solve::{FailKind, Pol, Solver, builtin_variance};
+use super::solve::{FailKind, Mode, Pol, Solver, builtin_variance};
 use super::{FnTy, Head, HostSignature, HostType, Ty, Typed, Variance};
 use crate::code;
 use crate::hir::*;
@@ -121,6 +121,7 @@ pub(crate) struct Checker<'a> {
     /// With `keep_locals`: for each `v.f`, by its span, the constructors
     /// that may have made `v` (`LocalTypes::field_ctors`).
     field_ctors: HashMap<(ModuleId, Span), Vec<CtorRef>>,
+    coalescing_failed: bool,
     function_depth: usize,
     group_level: Option<u32>,
     pending_failures: Vec<PendingFailure>,
@@ -141,10 +142,12 @@ impl<'a> Checker<'a> {
             nil: find("Nil"),
             assert: find("Assert"),
         };
+        let mut solver = Solver::new(variances(p), Vec::new());
+        solver.row_params = row_parameters(p);
         Checker {
             p,
             sources,
-            s: Solver::new(variances(p), Vec::new()),
+            s: solver,
             diags: Vec::new(),
             module: ModuleId(0),
             locals: HashMap::new(),
@@ -166,6 +169,7 @@ impl<'a> Checker<'a> {
             cases: Vec::new(),
             keep_locals: false,
             field_ctors: HashMap::new(),
+            coalescing_failed: false,
             function_depth: 0,
             group_level: None,
             pending_failures: Vec::new(),
@@ -224,6 +228,7 @@ impl<'a> Checker<'a> {
             }
             self.complete_ready_reads();
         }
+        self.report_coalescing(Span::default());
         self.entry_points();
         // The shown type schemes (§4.7).
         let mut typed = std::mem::take(&mut self.out);
@@ -235,15 +240,17 @@ impl<'a> Checker<'a> {
                     module: ModuleId(mi as u32),
                     index: di as u32,
                 };
-                let Some(scheme) = self.defs.get(&id) else {
+                let Some(scheme) = self.defs.get(&id).cloned() else {
+                    self.s.coalescing_failed.set(true);
+                    self.report_coalescing(d.span);
                     continue;
                 };
                 let opts = display::Opts {
                     mono: true,
                     written: matches!(d.kind, DefKind::External { .. }),
                 };
-                // A type with itself inside it has been reported by the
-                // occurs check, and is not shown.
+                // A partial result may omit a recursive scheme only after
+                // the failure has been diagnosed.
                 if let Ok(shown) = display::scheme(&self.s, &scheme.ty, opts) {
                     if let super::ShownType::Fn(f) = &shown
                         && f.params.is_empty()
@@ -258,20 +265,48 @@ impl<'a> Checker<'a> {
                     if d.exported || opts.written {
                         typed.scheme_types.insert(id, shown);
                     }
+                } else {
+                    self.report_coalescing(d.span);
                 }
-                self.exported_type(d, &scheme.ty.clone(), opts);
+                self.exported_type(d, &scheme.ty, opts);
             }
         }
         if !self.recovery && !self.diags.iter().any(Diagnostic::is_error) {
             self.diags.extend(crate::unused::check(p, &test_shaped));
         }
         if self.keep_locals {
+            // Query fallbacks are only recovery for a diagnosed program.
+            // Check both sides, also for unused local values, before the
+            // immutable query snapshot leaves the checker.
+            for scheme in self.locals.values() {
+                let both = Ty::Both(Box::new(scheme.ty.clone()), Box::new(scheme.ty.clone()));
+                let _ = display::shown(&self.s, &both, display::Opts::default());
+                let _ = display::shown(
+                    &self.s,
+                    &both,
+                    display::Opts {
+                        mono: true,
+                        written: false,
+                    },
+                );
+            }
+            self.report_coalescing(Span::default());
             typed.locals = Some(std::sync::Arc::new(super::LocalTypes {
+                diagnosed: self.diags.iter().any(Diagnostic::is_error),
                 types: self.locals.into_iter().map(|(v, s)| (v, s.ty)).collect(),
                 known: self.kvars,
                 fields: self.field_ctors,
                 s: std::sync::Mutex::new(self.s),
             }));
+        }
+        typed.diagnosed = self.diags.iter().any(Diagnostic::is_error);
+        if self.coalescing_failed {
+            typed.coalescing_errors = self
+                .diags
+                .iter()
+                .filter(|d| d.is_error())
+                .cloned()
+                .collect();
         }
         (typed, self.diags)
     }
@@ -397,12 +432,12 @@ impl<'a> Checker<'a> {
             }
         }
         self.group_level = None;
-        for (d, _, t, _) in types {
+        for (d, _, t, span) in types {
             self.set_module(d.module);
             let scheme = if direct {
                 Scheme {
                     level: 0,
-                    ty: self.generalize(&t, 0),
+                    ty: self.generalize(&t, 0, span),
                 }
             } else {
                 Scheme::mono(t)
@@ -436,6 +471,11 @@ impl<'a> Checker<'a> {
         // §7.4: coverage, with the types of the group.
         for c in std::mem::take(&mut self.cases) {
             self.check_case(c);
+        }
+        if self.s.coalescing_failed.get() {
+            let b = group[0];
+            self.set_module(b.module);
+            self.report_coalescing(p.binding(b).binding.span);
         }
         self.finish_reads(group);
     }
@@ -474,6 +514,7 @@ impl<'a> Checker<'a> {
             written: false,
         };
         let Ok(t) = display::shown(&self.s, &scheme.ty, opts) else {
+            self.report_coalescing(span);
             return;
         };
         let show = |c: &Self, t: &Ty| display::show_known(&c.s, t);
@@ -677,6 +718,7 @@ impl<'a> Checker<'a> {
             return;
         }
         let Ok(shown) = display::shown(&self.s, t, opts) else {
+            self.report_coalescing(d.span);
             return;
         };
         let mut found = Vec::new();
@@ -846,6 +888,22 @@ impl<'a> Checker<'a> {
                 "this type has itself inside it, through a type variable (§4.7)",
             );
         }
+        self.report_coalescing(span);
+    }
+
+    /// Unknown-type and partial-scheme fallbacks are only recovery after
+    /// a diagnostic. A successful checker result must never contain one.
+    fn report_coalescing(&mut self, span: Span) {
+        if self.s.coalescing_failed.replace(false) {
+            self.coalescing_failed = true;
+            if !self.diags.iter().any(Diagnostic::is_error) {
+                self.error(
+                    code::TYPE_OCCURS,
+                    span,
+                    "this type has itself inside it, through a type variable (§4.7)",
+                );
+            }
+        }
     }
 
     fn position(&self, span: Span) -> String {
@@ -958,6 +1016,7 @@ impl<'a> Checker<'a> {
     // ---- Effects ----
 
     fn add_err(&mut self, t: Ty) {
+        self.s.mark_mode(&t, Mode::Row);
         if t != Ty::Never
             && let Some(e) = self.effects.last_mut()
         {
@@ -966,6 +1025,7 @@ impl<'a> Checker<'a> {
     }
 
     pub fn add_env(&mut self, t: Ty) {
+        self.s.mark_row(&t);
         if t != Ty::Never
             && let Some(e) = self.effects.last_mut()
         {
@@ -976,7 +1036,8 @@ impl<'a> Checker<'a> {
     /// The errors and the environment of an entry of the effect stack.
     fn pop_effects(&mut self, span: Span) -> (Ty, Ty) {
         let e = self.effects.pop().unwrap_or_default();
-        let err = self.union(e.err, span);
+        let err = self.s.union_mode(e.err, Mode::Row);
+        self.flush(span, None);
         let env = self.env_union(e.env, span);
         (err, env)
     }
@@ -987,39 +1048,57 @@ impl<'a> Checker<'a> {
     /// type variable is the variable of its binding. `local` gives the type
     /// parameters of a definition.
     pub fn conv(&mut self, t: &Type, local: &HashMap<TyVarId, Ty>) -> Ty {
-        match &t.kind {
+        self.conv_mode(t, local, Mode::Value)
+    }
+
+    fn conv_mode(&mut self, t: &Type, local: &HashMap<TyVarId, Ty>, mode: Mode) -> Ty {
+        let result = match &t.kind {
             TypeKind::Lit(v) => Ty::literal(v),
             TypeKind::Named { ty, args } => {
                 if let TypeRef::Custom(id) = ty
                     && let TypeBody::Alias(body) = &self.p.ty(*id).body
                 {
                     if self.reads.templates.contains_key(id) || value_dependent(self.p, body) {
-                        let args = args.iter().map(|a| self.conv(a, local)).collect();
-                        return self.instantiate_alias(*id, args);
+                        let modes = self.s.rows(Head::Named(*ty), args.len());
+                        let args = args
+                            .iter()
+                            .zip(modes)
+                            .map(|(a, row)| self.conv_mode(a, local, row))
+                            .collect();
+                        return self.instantiate_alias(*id, args, mode);
                     }
                     if self.alias_depth > 64 {
                         return self.s.fresh();
                     }
                     let params = self.p.ty(*id).params.clone();
                     let mut map = HashMap::new();
-                    for ((_, tv), a) in params.iter().zip(args) {
-                        let a = self.conv(a, local);
+                    let modes = self.s.rows(Head::Named(*ty), args.len());
+                    for (((_, tv), a), row) in params.iter().zip(args).zip(modes) {
+                        let a = self.conv_mode(a, local, row);
                         map.insert(*tv, a);
                     }
                     self.alias_depth += 1;
-                    let r = self.conv(body, &map);
+                    let r = self.conv_mode(body, &map, mode);
                     self.alias_depth -= 1;
                     return r;
                 }
                 if *ty == TypeRef::Builtin(BuiltinType::Never) {
                     return Ty::Never;
                 }
-                let args = args.iter().map(|a| self.conv(a, local)).collect();
+                let modes = self.s.rows(Head::Named(*ty), args.len());
+                let args = args
+                    .iter()
+                    .zip(modes)
+                    .map(|(a, row)| self.conv_mode(a, local, row))
+                    .collect();
                 Ty::named(*ty, args)
             }
             TypeKind::Var(tv) => {
-                if let Some(t) = local.get(tv).or_else(|| self.tyvars.get(tv)) {
-                    return t.clone();
+                if let Some(t) = local.get(tv).or_else(|| self.tyvars.get(tv)).cloned() {
+                    if mode != Mode::Value {
+                        self.s.mark_mode(&t, mode);
+                    }
+                    return t;
                 }
                 let v = self.s.fresh_input();
                 if let Ty::Var(x) = v {
@@ -1048,8 +1127,12 @@ impl<'a> Checker<'a> {
                     })
                     .collect();
                 let ret = self.conv(ret, local);
-                let err = err.as_ref().map_or(Ty::Never, |e| self.conv(e, local));
-                let env = env.as_ref().map_or(Ty::Never, |e| self.conv(e, local));
+                let err = err
+                    .as_ref()
+                    .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Row));
+                let env = env
+                    .as_ref()
+                    .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Env));
                 Ty::Fn(Box::new(FnTy {
                     params,
                     ret,
@@ -1058,19 +1141,21 @@ impl<'a> Checker<'a> {
                 }))
             }
             TypeKind::Union(ts) => {
-                let ms = ts.iter().map(|a| self.conv(a, local)).collect();
-                self.union(ms, t.span)
+                let ms = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
+                let r = self.s.union_mode(ms, mode);
+                self.flush(t.span, None);
+                r
             }
             TypeKind::Inter(ts) => {
-                let ms = ts.iter().map(|a| self.conv(a, local)).collect();
-                let r = self.s.inter(ms);
+                let ms = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
+                let r = self.s.normalize_mode(Ty::Inter(ms), mode);
                 self.flush(t.span, None);
                 r
             }
             TypeKind::Diff(ts) => {
-                let mut a = self.conv(&ts[0], local);
+                let mut a = self.conv_mode(&ts[0], local, mode);
                 for part in &ts[1..] {
-                    let h = self.conv(part, local);
+                    let h = self.conv_mode(part, local, mode);
                     let mut members = Vec::new();
                     super::solve::flatten_union(std::slice::from_ref(&h), &mut members);
                     if members
@@ -1084,12 +1169,16 @@ impl<'a> Checker<'a> {
                         );
                         continue;
                     }
-                    a = self.s.diff(a, members);
+                    a = self.s.normalize_mode(Ty::Diff(Box::new(a), members), mode);
                     self.flush(t.span, None);
                 }
                 a
             }
+        };
+        if mode != Mode::Value {
+            self.s.mark_mode(&result, mode);
         }
+        result
     }
 
     /// `t` with the aliases at its top expanded (§4.3).
@@ -1175,8 +1264,15 @@ impl<'a> Checker<'a> {
     }
 
     pub fn fresh_args(&mut self, t: TypeId) -> Vec<Ty> {
-        (0..self.p.ty(t).params.len())
-            .map(|_| self.s.fresh())
+        self.s
+            .rows(Head::Named(TypeRef::Custom(t)), self.p.ty(t).params.len())
+            .map(|row| {
+                let a = self.s.fresh();
+                if row != Mode::Value {
+                    self.s.mark_mode(&a, row);
+                }
+                a
+            })
             .collect()
     }
 
@@ -2094,7 +2190,7 @@ impl<'a> Checker<'a> {
                 Stmt::Env { ty, value, span } => {
                     // `! T = e1` and the rest `r`: `A ? E ! N1 | M - T`.
                     self.check_places(ty, Pol::Pos, 0);
-                    let t = self.conv(ty, &HashMap::new());
+                    let t = self.conv_mode(ty, &HashMap::new(), Mode::Env);
                     if let Some(super::Head::Named(r)) = t.head() {
                         self.out.services.insert((self.module, *span), r);
                     }
@@ -2153,7 +2249,7 @@ impl<'a> Checker<'a> {
                 }
                 Param::Env { var, name, ty } => {
                     self.check_places(ty, Pol::Pos, 0);
-                    let t = self.conv(ty, &HashMap::new());
+                    let t = self.conv_mode(ty, &HashMap::new(), Mode::Env);
                     if let Some(super::Head::Named(r)) = t.head() {
                         self.out.services.insert((self.module, name.span), r);
                     }
@@ -2182,11 +2278,11 @@ impl<'a> Checker<'a> {
             let err = r
                 .err
                 .as_ref()
-                .map_or(Ty::Never, |t| self.conv(t, &HashMap::new()));
+                .map_or(Ty::Never, |t| self.conv_mode(t, &HashMap::new(), Mode::Row));
             let env = r
                 .env
                 .as_ref()
-                .map_or(Ty::Never, |t| self.conv(t, &HashMap::new()));
+                .map_or(Ty::Never, |t| self.conv_mode(t, &HashMap::new(), Mode::Env));
             (value, err, env)
         });
         // §4.8: the body of a function with a written `->` part has that
@@ -2215,7 +2311,8 @@ impl<'a> Checker<'a> {
                 let espan = written.err.as_ref().map_or(wspan, |t| t.span);
                 let nspan = written.env.as_ref().map_or(wspan, |t| t.span);
                 self.sub2(&a, &value, body_span, wspan);
-                self.sub2(&err, &rerr, f.body.span, espan);
+                self.s.constrain_row(&err, &rerr);
+                self.flush(f.body.span, Some(espan));
                 self.sub_env(&env, &renv, f.body.span, Some(nspan));
                 for t in &env_tys {
                     self.sub_env(t, &renv, nspan, None);
@@ -2286,7 +2383,7 @@ impl<'a> Checker<'a> {
             let level = self.s.level;
             for v in &binders {
                 if let Some(s) = self.locals.get(v).cloned() {
-                    let ty = self.generalize(&s.ty, level);
+                    let ty = self.generalize(&s.ty, level, b.pattern.span);
                     // §4.8: a generalized name has its type scheme, with the
                     // parts of the known type of its value for the
                     // variables that are not generalized.
@@ -2297,6 +2394,7 @@ impl<'a> Checker<'a> {
                 }
             }
         }
+        self.report_coalescing(b.pattern.span);
     }
 
     /// A fitted failure is decided in its own frame after holder linking.
@@ -2344,13 +2442,20 @@ impl<'a> Checker<'a> {
     /// form (§4.7): the bounds of its variables are coalesced and simplified
     /// once, so that each use copies only the simplified type. Variables at
     /// `level` or below are not generalized and are kept as they are.
-    fn generalize(&mut self, t: &Ty, level: u32) -> Ty {
+    fn generalize(&mut self, t: &Ty, level: u32, span: Span) -> Ty {
         let simple = match display::simplify(&self.s, t, Some(level)) {
             Ok(simple) => simple,
-            // Reported by the occurs check of the binding.
-            Err(()) => return t.clone(),
+            Err(()) => {
+                self.report_coalescing(span);
+                return t.clone();
+            }
         };
-        if has_both(&simple) {
+        for service in self.s.hidden_handlers(&simple, level) {
+            self.error(code::ENV_FORMS, span, format!(
+                "the type hides the environment statement's obligation for `{}`: every instance must use the same service form (§4.8 rule 9, §9.2)",
+                display::show(&self.s, &service)));
+        }
+        if has_both(&simple) || self.s.has_obligations(t) {
             // An argument that does not change, with different bounds as
             // an output and as an input: keep the bounds.
             return t.clone();
@@ -2381,6 +2486,7 @@ impl<'a> Checker<'a> {
                 let n = self.s.fresh_at(level + 1);
                 self.s.vars[n.0 as usize].name =
                     self.s.vars.get(v.0 as usize).and_then(|x| x.name.clone());
+                self.s.vars[n.0 as usize].row = self.s.vars[v.0 as usize].row;
                 map.insert(*v, Ty::Var(n));
                 Ty::Var(n)
             }
@@ -2475,6 +2581,103 @@ fn host_builtin(b: BuiltinType) -> bool {
         b,
         BuiltinType::Int | BuiltinType::Float | BuiltinType::String | BuiltinType::BitArray
     )
+}
+
+/// A parameter used as an environment or error row stays a row through
+/// other constructors and aliases (§4.5). The finite mode table grows
+/// to a fixed point, independently of declaration order.
+fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
+    fn walk(
+        t: &Type,
+        row: Mode,
+        params: &[(String, TyVarId)],
+        acc: &mut [Mode],
+        table: &HashMap<TypeId, Vec<Mode>>,
+    ) {
+        match &t.kind {
+            TypeKind::Var(v) if row != Mode::Value => {
+                if let Some(i) = params.iter().position(|x| x.1 == *v) {
+                    acc[i] = acc[i].max(row);
+                }
+            }
+            TypeKind::Named { ty, args } => {
+                let modes = match ty {
+                    TypeRef::Custom(id) => table[id].clone(),
+                    TypeRef::Builtin(BuiltinType::Continuation) => {
+                        vec![Mode::Value, Mode::Value, Mode::Row, Mode::Env]
+                    }
+                    TypeRef::Builtin(BuiltinType::Boundary) => {
+                        vec![Mode::Value, Mode::Row, Mode::Env]
+                    }
+                    _ => vec![Mode::Value; args.len()],
+                };
+                for (a, mode) in args.iter().zip(modes) {
+                    walk(a, mode, params, acc, table);
+                }
+            }
+            TypeKind::Fn {
+                params: ps,
+                ret,
+                err,
+                env,
+            } => {
+                for x in ps {
+                    walk(&x.ty, Mode::Value, params, acc, table);
+                }
+                walk(ret, Mode::Value, params, acc, table);
+                if let Some(x) = err {
+                    walk(x, Mode::Row, params, acc, table);
+                }
+                if let Some(x) = env {
+                    walk(x, Mode::Env, params, acc, table);
+                }
+            }
+            TypeKind::Tuple(ts) => {
+                for x in ts {
+                    walk(x, Mode::Value, params, acc, table);
+                }
+            }
+            TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
+                for x in ts {
+                    walk(x, row, params, acc, table);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut table: HashMap<_, _> = p
+        .types
+        .iter()
+        .enumerate()
+        .map(|(i, t)| (TypeId(i as u32), vec![Mode::Value; t.params.len()]))
+        .collect();
+    loop {
+        let mut changed = false;
+        for (i, t) in p.types.iter().enumerate() {
+            if t.params.is_empty() {
+                continue;
+            }
+            let id = TypeId(i as u32);
+            let mut acc = table[&id].clone();
+            match &t.body {
+                TypeBody::Custom(cs) => {
+                    for c in cs {
+                        for f in &c.fields {
+                            walk(&f.ty, Mode::Value, &t.params, &mut acc, &table);
+                        }
+                    }
+                }
+                TypeBody::Alias(body) => walk(body, Mode::Value, &t.params, &mut acc, &table),
+            }
+            if acc != table[&id] {
+                table.insert(id, acc);
+                changed = true;
+            }
+        }
+        if !changed {
+            return table;
+        }
+    }
 }
 
 /// §4.5 rules 6 and 7: the variance of every parameter of every custom
