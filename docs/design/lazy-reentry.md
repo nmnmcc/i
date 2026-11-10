@@ -70,19 +70,25 @@ Kinds 0 and 1 are the **code records**; they are the only ones with a slot. The 
 
 **D8. An error or a cancel walks the pending records one at a time.** It does not jump over code records through a chain. *Reason:* the walk is a tight loop with no call for kinds 0 and 1. It costs what the unwind of the same frames costs today. A chain of handlers would add fields and a second splice for no gain on the paths the goal is about.
 
-**D9. The CI check is a fuel count, and the pass rule is a wall-clock ratio measured by the coordinator.** `control_lazy.rs` runs the bench program in the `wasmtime` CLI with fuel, as `tests/runtime_values.rs` already runs `wasmtime`, and compares the extra fuel of one more round at depth 1000 and at depth 10. *Reason (review):* a wall-clock test in CI is noisy. Fuel is exact, and needs no new dependency: `ilang-host` is not added as a dev-dependency.
+**D9. The CI check is a fuel count, and the pass rule is a wall-clock ratio measured by the coordinator.** `control_lazy.rs` runs the bench program in the `wasmtime` CLI with fuel, as `tests/runtime_values.rs` already runs `wasmtime`, and compares the extra fuel of one more round at depth 1000 and at depth 10. *Reason (review):* a wall-clock test in CI is noisy. Fuel is exact, and needs no new dependency: `ilang-host` is not added as a dev-dependency, and neither is `ilang-binaryen`. So `control_lazy.rs` compiles only at `--opt 0`: `ilang_wasm::compile` takes `lower::Options { tests, target }`, which has no optimization level, and `--opt 2` is `ilang_binaryen::optimize`, which only `ilang-cli` calls. The runs that also need `--opt 2` go in `crates/ilang-cli/tests/wasi.rs` (D17).
 
 **D10. The bench resumes from a flat loop outside the boundary.** `f` returns the continuation in a value, and a tail-recursive driver resumes it. *Reason (review):* if `f` called `resume` itself, each round would run one boundary deeper, and the bench would measure nesting, not resume. The eager baseline would also hold about 10^6 frames at depth 1000 and might overflow.
 
 **D11. The checks of the list invariants are always on.** Each node has a state field. The trampoline traps (`unreachable`) if it takes a node that was taken before, or meets a delimiter that is not the first record. *Reason:* a mistake in the list code would run a frame twice or lose one silently. The check costs one field read and one write per record. If the coordinator's measurement shows a cost, the checks move behind `cfg!(debug_assertions)` of the compiler (open question 3).
 
-**D12. No change to `docs/spec.md`.** The spec states no costs, and every rule it states holds (section 7). The spec also gives no fixed stack size and no fixed heap size, so the point at which "There is no more memory or stack" happens may move, for the stack and for memory (section 7, path M); that is the only behaviour that can differ.
+**D12. No change to `docs/spec.md`.** The spec states no costs, and every program gives what eager gives at `dcb19df` (section 7). Where eager already breaks a rule of the spec, lazy breaks it in the same way, and B does not fix it (D16, section 7a). The spec also gives no fixed stack size and no fixed heap size, so the point at which "There is no more memory or stack" happens may move, for the stack and for memory (section 7, path M); that is the only behaviour that can differ.
 
 **D13. An error or a cancel that leaves the trampoline leaves the shadow stack that eager left.** In eager, an exception goes through code frames without touching `$sp`, and only a handler that takes it restores the depth. If nothing in the list takes it, it reaches the code outside with `$sp` still covering the slots of every frame it went through. A full-trace `$stop` further out (for example `$stop_boundary_inactive` in `$entry_*` or `$async_run`, reached by a `$cancel` that nobody takes) prints those slots. So the trampoline does not restore `d` when it catches an error or a cancel. It notes `$sp` and the first record still pending at that moment, restores `d` only just before it calls a record in mode 1 or 2 (as the eager handler of that record did), and, when it reaches the end of the list in mode 1 or 2, it puts the slots of the code records it went past back in their eager places (`$shadow_insert`, section 5.6) before it throws. *Reason (review):* restoring `d` at once and leaving the trampoline with `$sp = d` drops those slots, and `$control_unpend` cannot add them back, because the trampoline has left `$pend` before the stop runs. Keeping the trampoline in `$pend` on the way out is not possible: no code runs while an exception goes out.
 
 **D14. `$shadow_insert` makes room for all its slots at once.** It counts the n slots it puts in, and if `$sp + n` is more than the length of `$shadow`, it makes one new array of length max(2 × length, `$sp + n`), as `$control_unpend` makes one of length `$sp + n` (section 5.6). *Reason (review):* `$shadow_enter` grows the array by one doubling, which is enough for one push. Under lazy re-entry the array only grows to the depth that was really entered (`d` plus the frames entered since the resume), but the pending list can hold any number of code records, because each re-suspend splices the old pending records after the new ones. So n can be many times the length of the array, and one doubling would leave `array.copy` out of bounds, which traps. Eager pushed the same slots one at a time with `$shadow_enter`, which doubles as often as needed.
 
-**D15. A trace that the spec does not state is checked in `control_lazy.rs`, not in `tests/spec`.** The only place where the shadow stack is seen after an error or a cancel has left a trampoline is a full-trace stop reached by a `$cancel` that nobody takes: a resumed part of a cancel unwind (a final function that suspended during `cancel(k)` and was resumed after `cancel(k)` was captured away) throws `$cancel k` again, it goes out of `resume`, and `$entry_*` stops with `control: boundary is not active` and the full trace. That is what the compiler does at `dcb19df`, but the spec does not say it: §11.7 gives that reason only for "`control.suspend` with a boundary that is not active", and §9.4 rules 3 and 4 do not say what such a cancel does when it reaches its boundary. A case in `tests/spec` would make that output a rule that another compiler must follow. So the checks of D13 and P4 are run tests 12 and 13 of 13.2, with the output of eager at the bench commit written into the test. *Reason (review):* D12 (no spec change); the conformance suite checks only rules that the spec states. Open question 5 asks whether the spec should state this case.
+**D15. A trace that the spec does not state is checked in `control_lazy.rs`, not in `tests/spec`.** The only place where the shadow stack is seen after an error or a cancel has left a trampoline is a full-trace stop reached by a `$cancel` that nobody takes: a resumed part of a cancel unwind (a final function that suspended during `cancel(k)` and was resumed after `cancel(k)` was captured away) throws `$cancel k` again, it goes out of `resume`, and `$entry_*` stops with `control: boundary is not active` and the full trace. That is what the compiler does at `dcb19df`, but the spec does not say it: §11.7 gives that reason only for "`control.suspend` with a boundary that is not active", and §9.4 rules 3 and 4 do not say what such a cancel does when it reaches its boundary. A case in `tests/spec` would make that output a rule that another compiler must follow. So the checks of D13 and P4 are run tests 12, 13 and 15 of 13.2, with the output of eager at the bench commit written into the test. The same holds for a cancel unwind whose final function suspends to an inner boundary and whose value then goes on into the cancelled code (run test 16): eager does that at `dcb19df`, but §9.4 rule 4 says only that `cancel(k)` unwinds and gives Nil. *Reason (review):* D12 (no spec change); the conformance suite checks only rules that the spec states. Open question 5 asks whether the spec should state these cases.
+
+**D16. Environment statements before a tail call stay as eager has them.** §11.6 says an environment statement does not change tail positions. So when a function runs `! S = v` and then makes a tail call, its frame is gone, and no record carries that statement. The record of the callee has `point.env = Env::Param`, so at resume it is given the environment of the place of `resume`, not one with `S = v`. §9.4 rule 3 asks for `S = v` there. Eager at `dcb19df` gives the same wrong value (section 7a). B keeps it, because B changes no behaviour, and run test 14 checks that lazy gives what eager gives. *Reason (review):* a fix changes what programs compute, so it is a separate change with its own spec case. Section 7a says how it fits the record layout of B, and open question 6 asks for it.
+
+**D17. The run tests use the WASI target.** `control_lazy.rs` compiles its run programs with `Target::Wasi` (B.7). The module then imports only `fd_write` and `proc_exit`, which the `wasmtime` CLI gives, and `$host_panic` writes the whole stop text to the standard error and exits with code 1. So the test reads the stop text from the child's standard error, with no stub module and no driver. The runs at `--opt 2` of tests 12 to 16 are cases in `crates/ilang-cli/tests/wasi.rs`, which builds with `ilang_cli::build` at any level and runs the command in its own `wasmtime` with the standard error captured. *Reason (review):* on `Target::Ilang` the module defines its own memory, and a stub `panic` linked with `--preload` is made before it, so it cannot read the message bytes. `wasi.rs` already has the engine, the build at every level and the capture, so it needs no new dependency either.
+
+**D18. The host seam test checks call shapes, not whole bodies.** Test 3 checks that every call of `$boundary_run` passes null `rest`, `cancel` and `frame`, and that `$host_resume_k` ends in `return_call $control_resume` with the continuation it took from `$host_k`, `(ref.null eq)` and `(global.get $root_env)`. It does not compare whole function bodies with a copy. *Reason (review):* lane C changes the body of `$host_resume_k` (host-concurrency.md: it deletes the line that sets `$host_pending`), and B and C land in either order, so a copy taken at `dcb19df` fails on correct code. The shapes are what B relies on.
 
 ## 4. Data
 
@@ -322,7 +328,7 @@ The trampoline catches only `$error`, `$cancel` and `$capture`. It has no `catch
 
 ### 5.7 Entry points
 
-- `$boundary_core(b, env, body, sub (ref null $sub), v, mode)` is today's `$boundary_run`. The only change is the call inside the `try_table`: `body` null gives `call $tramp_run(sub, env, v, mode)`, and otherwise `call $call1(body, b, env)`. `mode` is passed on as it is: when a cancel goes through a pending inner boundary, `$boundary_reenter` calls `$boundary_core(b, env, null, sub, k, 2)`, and the inner trampoline starts in mode 2, so the final functions inside run while `b` is active, and `b` is switched off when the cancel leaves it, as eager did (spec case `control_lazy_cancel_inner_boundary`, 13.3).
+- `$boundary_core(b, env, body, sub (ref null $sub), v, mode)` is today's `$boundary_run`. The only change is the call inside the `try_table`: `body` null gives `call $tramp_run(sub, env, v, mode)`, and otherwise `call $call1(body, b, env)`. `mode` is passed on as it is: when a cancel goes through a pending inner boundary, `$boundary_reenter` calls `$boundary_core(b, env, null, sub, k, 2)`, and the inner trampoline starts in mode 2, so the final functions inside run while `b` is active, and `b` is switched off when the cancel leaves it, as eager did (spec case `control_lazy_cancel_inner_boundary`, 13.3, and run test 16 of 13.2).
   - Its own capture builds `$cont(…, used 0, b, sub)` with `sub` made from `c` as in 5.4.
   - A capture for another boundary is packed (5.4).
   - The rules for the active flag and the shadow depth are those of today.
@@ -410,7 +416,7 @@ We compare a lazy run with the eager run of the same program at `dcb19df`. A laz
 
 **Lemma Env.** In eager, record i is given `given(i) = F_{i+1}(given(i+1))`, and the outermost one is given the environment of `resume` or `cancel`. `F_i` is the identity unless record i has kind 1. For kind 1, `F_i` applies the environment statements on the chain from the function's environment to `point.env`, which is `env_text(point.env)` built by `$env_with` from `env_text(link.from)`. `$env_apply` with `point.delta()` gives the same array contents. Arrays of the environment have no identity that i code can see.
 
-Walk W visits the kind-1 records outermost first and stores `given` on each. For any other record, `given` is `cur`, which is reset at each kind-1 record. This holds when the trampoline skips records in mode 1 or 2 too, because it updates `nm` and `cur` before the skip. This is the one step that matters in mode 1 and 2: a pending `resource.ensure` record inside a pending kind-1 frame must give its final function `cur` (the kind-1 frame's environment), not the environment of the cancel or of the resume. Inside a delimiter, the base is the environment the delimiter is given, as in eager `$boundary_reenter`. So §9.4 rules 3 and 4 hold for resume and cancel. The existing cases do not check the mode 1 and 2 path (`control.i` `environment` and `deep` only resume and have no ensure, and `control_cancel_final` has no environment statement), so the new spec case `control_lazy_env_unwind` (13.3) does.
+Walk W visits the kind-1 records outermost first and stores `given` on each. For any other record, `given` is `cur`, which is reset at each kind-1 record. This holds when the trampoline skips records in mode 1 or 2 too, because it updates `nm` and `cur` before the skip. This is the one step that matters in mode 1 and 2: a pending `resource.ensure` record inside a pending kind-1 frame must give its final function `cur` (the kind-1 frame's environment), not the environment of the cancel or of the resume. Inside a delimiter, the base is the environment the delimiter is given, as in eager `$boundary_reenter`. So each record gets the environment that eager gives it, for resume and for cancel. This proves "the same as eager", not "§9.4 rules 3 and 4 hold": an environment statement in a frame that was left by a tail call is lost in both (section 7a). The existing cases do not check the mode 1 and 2 path (`control.i` `environment` and `deep` only resume and have no ensure, and `control_cancel_final` has no environment statement), so the new spec case `control_lazy_env_unwind` (13.3) does.
 
 **Lemma Active.** Eager sets the flag of each inner boundary to 1 when it re-enters it, at resume or cancel time, before any inner code runs. Descent does the same, by the same code. Each boundary is switched off by the same code as today (`$boundary_core` is `$boundary_run`), on a normal end, an error, a cancel and a capture.
 
@@ -423,7 +429,7 @@ Each path:
   - a final record is skipped, as `$final_reenter` let both through;
   - a delimiter runs `$boundary_core` or `$cancel_core`, which switch off or take, as before.
 
-  If no record takes it, the trampoline puts the slots back (D13), pops and throws it. The shadow stack is then eager's (P4), so a full-trace stop further out, such as `$stop_boundary_inactive` in `$entry_*` or `$async_run` for a `$cancel` that nobody takes, prints the same lines. Run tests 12 `cancel_out_trace` and 13 `cancel_out_two_trampolines` of 13.2 check this (D15); test 13 has frames still live above `d` and two trampolines that insert in turn. `$shadow_insert` makes room for any number of slots (D14), so it cannot trap here where eager did not; spec case `control_lazy_long_pending` (13.3) runs it with far more pending slots than the array holds.
+  If no record takes it, the trampoline puts the slots back (D13), pops and throws it. The shadow stack is then eager's (P4), so a full-trace stop further out, such as `$stop_boundary_inactive` in `$entry_*` or `$async_run` for a `$cancel` that nobody takes, prints the same lines. Run tests 12 `cancel_out_trace` and 13 `cancel_out_two_trampolines` of 13.2 check this (D15); test 13 has frames still live above `d` and two trampolines that insert in turn. The other half of the rule, that the trampoline restores `d` just before a call in mode 1 or 2, is checked by the spec case `stop_lazy_after_catch` (13.3, mode 1) and run test 15 (mode 2). `$shadow_insert` makes room for any number of slots (D14), so it cannot trap here where eager did not; spec case `control_lazy_long_pending` (13.3) runs it with far more pending slots than the array holds.
 - **(K) `cancel`.** It starts the trampoline in mode 2 with nothing running, with `from` the first record and `top = d`. Eager re-entered the outer frames first, but they had no effects apart from shadow pushes and handlers that a cancel passes. Whatever takes the cancel restores its depth, in both. If nothing in the list takes it, the trampoline puts the slots back, which are the pushes eager made.
 - **(C) A capture from X.** In eager, each handler it goes through adds its record, a boundary is switched off and adds `$boundary_reenter`, and the boundary of the capture restores its depth and does `f(k)` in its place. In lazy:
   - The pending code and handler records of the trampoline are spliced in their order. By (d) that is the order eager would add them.
@@ -432,9 +438,27 @@ Each path:
 - **(R) Resume, suspend, resume.** By O1, the second continuation owns the new records followed by the old pending ones. A second resume runs them as a first resume would. The spec case `control_lazy_resuspend` checks every frame once.
 - **(S) A final function that suspends during a cancel.** `$ensure_final` adds `$final_reenter`. The trampoline splices, and `$cancel_core` packs with `$cancel_reenter`. A later resume re-enters the cancel by descent. `$final_reenter` in mode 0 calls `$ensure_end(2, k)`, which throws `$cancel k`. The trampoline passes it outward to the end of the inner list, and `$cancel_core` takes it because it is `k`. This is `cancel_runs_final_functions` in `control.i`.
 - **(H) The host.** See section 9.
+- **(T) A frame that was left by a tail call.** Its environment statements are on no record, in eager and in lazy, so both give its callee the same environment (section 7a).
 - **(M) Running out of stack or memory.** This is the one stop whose place may move, for the Wasm stack and for the heap.
   - Memory: each paused frame now uses more heap. At `dcb19df` a captured frame is a `$frame` with 2 fields and a `$flist` with 2 fields, and the slot is one entry of the saved values. After B it is a `$frame` with 5 fields and a `$flist` with 5 fields, and a kind-1 frame also has its delta array. A trampoline adds one `$tramp` per live resume, and `$shadow_insert` or a stop may build a larger shadow array. So a program that keeps very many paused continuations (for example 10^6 generators in a list, each paused under 10 frames) and is just under the heap limit today may stop with "There is no more memory or stack" after B. The reverse can happen too: a resume no longer re-captures every frame, so a program that resumes and suspends often makes less garbage. The spec gives no fixed heap size (§11.7), so both are allowed.
   - Stack: a deep resume now uses less Wasm stack: eager made N frames and N `try_table`s at once, lazy makes one record frame at a time. But each level of nested resume holds one more frame than before (`$tramp_run`, with its `try_table` and about 10 locals): `$boundary_core` + `$tramp_run` + the record frame, where eager held `$boundary_run` + the `$r` chain. So a program that recursively resumes inside resumes (an in-order tree walk where each level resumes inside the previous resume) and is just under the stack limit today may stop with "There is no more memory or stack" after B, and a program that stopped there today may now finish. The spec gives no fixed stack size (§11.7), so both are allowed. Tests 10 and 11 of 13.2 pin how much this moves.
+
+## 7a. A known gap: environment statements before a tail call
+
+§11.6 says an environment statement does not change tail positions. So this function makes a tail call, and its frame is gone before `g` runs:
+
+```i
+h_tail = (b) {
+  ! Name = Name("in")
+  g(b)
+}
+```
+
+If `g` suspends and the computation is resumed from a place where `Name` is "resumer", §9.4 rule 3 asks `g` to see "in": the statement is inside the paused part. Eager at `dcb19df` gives "resumer". It records only `point.env` back to `Env::Param` of each captured frame, `g`'s point has `point.env = Env::Param`, and the frame of `h_tail`, which ran the statement, has no record. The outermost record is given the environment of `resume`. The same happens on `cancel` to a final function reached through such a frame (rule 4). A frame that is kept (a call that is not a tail call) is right, in eager and in lazy.
+
+B keeps this: lazy gives the same wrong value, by lemma Env, and run test 14 checks that. B does not fix it, because a fix changes what programs compute (D12, D16).
+
+The record layout of B can hold the fix. Field 4 of a `$frame` is a `$values` of pairs `[service, value]`, and walk W applies it with `$env_apply` whether it was made by the compiler or at run time. A fix would make the delta of a tail call reach the callee's record at run time: the tail call under an environment statement passes the pairs of its statements (on top of any it was given itself) to the callee, and the callee's record keeps them in field 4 with kind 1. Each such tail call costs one array, and a loop of tail calls must replace the pairs, not add to them, so that §11.6 still holds. That change is in the code made for a tail call and in `record()`, not in the trampoline. Open question 6 asks for it.
 
 ## 8. Tail calls
 
@@ -500,7 +524,7 @@ CI checks a stricter, exact number instead (D9): with fuel, the extra fuel of on
 
 | Section | Change |
 |---|---|
-| §9.4 rules 1 to 5 | none (lemmas Env and Active, paths V, E, C, R) |
+| §9.4 rules 1 to 5 | none: lazy gives what eager gives (lemmas Env and Active, paths V, E, C, R, T); eager's gap of section 7a stays |
 | §9.5 | none: final functions run innermost first; a stop runs no handler (no `catch_all`) |
 | §9.7, Appendix B.4 to B.6 | none (section 9) |
 | §11.6 | none (section 8) |
@@ -572,7 +596,7 @@ Nothing else may change. In particular these must be byte for byte the same afte
 
 `wat_expect.added` (files on one side only): the new programs of B, that is `bench/test/control_test.i` and the spec cases of 13.3, if the WAT dump covers those folders. B removes no program.
 
-If lane C lands first, its known `EFFECTS` change is already in the baseline, and B's shared patch is made on top of it. `$host_boundary` and `$host_resume_k` must not change (section 9).
+If lane C lands first, its known `EFFECTS` change is already in the baseline, and B's shared patch is made on top of it. B's diff does not touch `$host_boundary` and `$host_resume_k` (section 9): the baseline for them is the `host.rs` text at the base B rebases onto, not the text at `dcb19df`, because lane C changes `$host_resume_k`.
 
 ## 12. Files to change
 
@@ -593,10 +617,11 @@ If lane C lands first, its known `EFFECTS` change is already in the baseline, an
 | new `bench/test/control_test.i` | | section 13 |
 | new `crates/ilang-wasm/tests/control_lazy.rs` | | section 13 |
 | new spec cases in `tests/spec/9`, `tests/spec/9.7`, `tests/spec/11` | | section 13 |
+| `crates/ilang-cli/tests/wasi.rs` | new cases at the end | the `--opt 2` runs of run tests 12 to 16 (D17) |
 
 `emit/host.rs`, `lower.rs` and `Cargo.toml` do not change.
 
-Outside B's list in the plan: `runtime/stops.rs`, `runtime/mod.rs`, `emit/mod.rs`, the new spec cases, and `compiled.wasm`. They need the coordinator's consent (open question 1). The stops.rs change is one global and three lines. The runtime/mod.rs change is one type and one doc bullet.
+Outside B's list in the plan: `runtime/stops.rs`, `runtime/mod.rs`, `emit/mod.rs`, the new spec cases, the new cases in `ilang-cli/tests/wasi.rs`, and `compiled.wasm`. They need the coordinator's consent (open question 1). The stops.rs change is one global and three lines. The runtime/mod.rs change is one type and one doc bullet.
 
 ## 13. Tests
 
@@ -684,17 +709,17 @@ Before it is committed, it must check under A1+A2: the imports group, the `|>` c
 
 ### 13.2 `crates/ilang-wasm/tests/control_lazy.rs`
 
-It uses `ilang_wasm::compile_wat` and `compile` as `tests/codegen.rs` does, `wasmparser` to validate, and the `wasmtime` CLI as `tests/runtime_values.rs` does (`WASMTIME`, default `wasmtime`). It needs no new dependency.
+It uses `ilang_wasm::compile_wat` and `compile` as `tests/codegen.rs` does, `wasmparser` to validate, and the `wasmtime` CLI as `tests/runtime_values.rs` does (`WASMTIME`, default `wasmtime`). It needs no new dependency. It compiles only at `--opt 0`, because `ilang_wasm::compile` has no optimization level (D9).
 
 Shape tests (no engine):
 
 1. `reentry_rebuilds_one_frame`: no `$r…` function contains `try_table`, `call_ref` or `$reenter_next`; each ends in `return_call $s…`; `$reenter_next` is gone; `$control_resume` reaches `$boundary_core`, and `$boundary_core` reaches `$tramp_run`.
 2. `record_kinds`: a plain point has kind 0 and a null delta; a point under `! S = v` has kind 1 and a delta of `(ref.i31 (i32.const S)) …`; two nested statements give two pairs, outermost first; the slot is `(local.get $slot)` in field 2. The runtime records have kinds 4 (catch), 2 (ensure), 5 (final) and 3 (boundary, cancel), and `$tramp_run` holds the masks `0x1C` and `0x0C`.
-3. `host_seam_kept`: the texts of `$host_boundary` and `$host_resume_k` equal a copy taken at `dcb19df`. If lane C changes them, C updates the copy, and the scope review checks the seam. Every call of `$boundary_run` passes `(ref.null $flist)`, `(ref.null eq)` for `cancel` and `(ref.null $frame)`. `$boundary_run` holds the null checks and one `return_call $boundary_core`.
+3. `host_seam_kept` (D18): it checks call shapes only, never whole function bodies, so it holds whichever of B and C lands first. Every call of `$boundary_run` passes `(ref.null $flist)` for `rest`, `(ref.null eq)` for `cancel` and `(ref.null $frame)` for `frame`. `$host_resume_k` ends in `(return_call $control_resume (local.get $k) (ref.null eq) (global.get $root_env))`, where `$k` was read from `$host_k`. `$boundary_run` holds the null checks and one `return_call $boundary_core`. The scope review checks that B's diff does not touch `host.rs`.
 4. `runtime_alone_validates`: `runtime::wat()` with `runtime::TYPES` and no control text still validates (the hook has a null default).
 5. `modules_validate`: programs that use every control operation, `fail.catch`, `resource.ensure` and environment statements validate at `--opt 0`. `--opt 2` is covered by the spec suite.
 
-Run tests (wasmtime CLI). The test writes a small module of stub imports and a driver module that calls the program's start and main exports, and links them with `--preload`. It reads the imports of the compiled module with `wasmparser` and fails with a clear message if one has no stub. The export names are those of the ABI at the bench commit; lane C may change them in ABI v3, so the test takes them from the compiler's metadata where it can.
+Run tests (wasmtime CLI, D17). Each program is compiled with `Target::Wasi` (B.7) and run as a command: `wasmtime run` calls `_start`, which calls `ilang_start` and then the entry. The module imports only `fd_write` and `proc_exit`, which the CLI gives, so there is no stub module and no driver, and the test does not depend on the export names of the ABI, which lane C may change. A stop writes its whole text to the standard error and exits with code 1, so the test reads the stop text from there. The test checks with `wasmparser` that the module imports nothing else, and fails with a clear message if it does.
 
 **Stack sizes in the run tests.** `ilang-host` (and so the spec runner) can use a Wasm stack of 32 MiB only because it runs each call on a thread of its own with a native stack of `THREAD_STACK` bytes. The `wasmtime` CLI runs Wasm on the main thread of its process, whose native stack is usually 8 MiB. If `-W max-wasm-stack` is larger than the native stack, a deep run can hit the native guard page first, and the process dies with a signal instead of a Wasm trap. So every run test that goes deep:
 
@@ -715,12 +740,13 @@ The test prints S and the native stack it used.
 9. `counted_frames`: a resume where 3 inner frames return, so outer frames are re-entered; then a suspend, a resume, and at the end a cancel. Each frame counts itself, and every count is 1.
 10. `nested_resume_stack`: a recursive generator composition at `--opt 0`: an in-order walk of a tree of depth L, where each level resumes the generator of the level below inside its own resume. The test runs it with a fixed S (at most half the native stack, as above) and bisects the largest L that finishes. It asserts L_lazy ≥ 0.8 × L_eager, where L_eager is a constant measured on the eager compiler at the bench commit, with the same S (section 14, step 2). On eager code this passes, because L is then L_eager.
 11. `deep_resume_in_recursion`: pause at depth 50,000 and resume from inside a 50,000-deep recursion, with a fixed S11 (at most half the native stack). It asserts that the run finishes. Eager holds about 100,000 frames at once here (the 50,000 `$r` frames rebuilt at resume, on top of the recursion), and lazy about 50,000 plus `$boundary_core`, `$tramp_run` and one record frame at a time. S11 must lie between the two sizes, or the test shows nothing. Step 2 sets S11 to 1.5 times the smallest stack in which the 50,000-deep recursion alone finishes (bisected on eager, with no paused computation), checks that eager stops with S11 with a clean trap (if eager finishes, it lowers the factor to 1.2, then 1.1), and writes S11 into the test as a constant. So this test fails on eager code by design, and stays ignored until the lazy commit (section 14). Tests 10 and 11 together pin how far the "no more stack" point moves (section 7, path M).
-12. `cancel_out_trace` (D13, P4, D15): a `$cancel` goes out of a trampoline at the end of its list and reaches the entry, which stops with `control: boundary is not active` and the full trace. The test compiles each part at `--opt 0` and `--opt 2`, runs it, and compares the whole stop text with a constant: the text that eager prints at the bench commit (section 14, step 2). It is not a spec case (D15). The continuations are kept in nominal types: `suspend(b, (k) { k })` would give `r = Continuation(a, r, e, n)`, a type that holds itself through a type variable, which §4.7 makes a compile error. The source, in the new syntax (its types are checked at step 2, as the bench's are):
+12. `cancel_out_trace` (D13, P4, D15): a `$cancel` goes out of a trampoline at the end of its list and reaches the entry, which stops with `control: boundary is not active` and the full trace. The test compiles each part at `--opt 0`, runs it, and compares the whole stop text (from the standard error, D17) with a constant: the text that eager prints at the bench commit (section 14, step 2). The same parts at `--opt 2` are cases in `ilang-cli/tests/wasi.rs`, with eager's `--opt 2` text. It is not a spec case (D15). The continuations are kept in nominal types: `suspend(b, (k) { k })` would give `r = Continuation(a, r, e, n)`, a type that holds itself through a type variable, which §4.7 makes a compile error. The source, in the new syntax (its types are checked at step 2, as the bench's are):
 
     ```i
     (
       i/control
       i/core
+      i/fail
       i/resource
     )
 
@@ -751,6 +777,10 @@ The test prints S and the native stack it used.
 
     @main
     main = () {
+      // The paused computation needs `Out` where it starts and where k2 is
+      // resumed (§10.2). This one is never called: the cancel runs under the
+      // `Out` given in `b0` (§9.4 rule 4).
+      ! Out = Out((k2) { Nil })
       k = control.boundary((b) {
         control.boundary((b2) { g(b, b2) })
         Done
@@ -771,11 +801,12 @@ The test prints S and the native stack it used.
     }
     ```
 
-    `cancel(k)` re-enters `b2` by descent and runs the final function in mode 2. It suspends to `b2`, so `k2` holds [the rest of the final function, the final record of `k` (kind 5, mode 2), g's record]. `put` suspends to `b0`, which gives `Handed(k2)`; the continuation `rest` is never used, so its final functions are not run (§9.4 rule 6). `resume(k2, Nil)` then runs the final record, which throws `$cancel k`; nothing in k2 takes it, the trampoline skips g's record and inserts its slot at `d` with `$sp == d`, and the entry stops. The trace lists g's site, then the resume site in main, as eager prints it. A second part puts a `fail.catch` around the `resource.ensure` in `g` (`x = fail.catch(() { … })`, then a match on `x`), so a pending kind-4 record lies between the final record and g's record and the cancel skips it.
+    Every computation that `put` runs in needs `Out` (§9.4: `b2` is a `Boundary(Int, _, Out)`, so `k2` has `Out` as its last argument, and so do `b` and `k`). §10.2 lets an entry point need only host services and `Assert`, so `main` gives a placeholder `Out` first; without it the program does not compile (E0522). `b0` gives the `Out` that hands `k2` out, and the cancel runs under it. `cancel(k)` re-enters `b2` by descent and runs the final function in mode 2. It suspends to `b2`, so `k2` holds [the rest of the final function, the final record of `k` (kind 5, mode 2), g's record]. `put` suspends to `b0`, which gives `Handed(k2)`; the continuation `rest` is never used, so its final functions are not run (§9.4 rule 6). `resume(k2, Nil)` then runs the final record, which throws `$cancel k`; nothing in k2 takes it, the trampoline skips g's record and inserts its slot at `d` with `$sp == d`, and the entry stops. The trace lists g's site, then the resume site in main, as eager prints it. A second part puts a `fail.catch` around the `resource.ensure` in `g` (`x = fail.catch(() { … })`, then a match on `x`), so a pending kind-4 record lies between the final record and g's record and the cancel skips it; this is why the imports have `i/fail`. A check of the old-syntax form of this program on the eager compiler (with the placeholder `Out`) stops with `control: boundary is not active` and two sites, one in `g` and the resume in main, as expected.
 13. `cancel_out_two_trampolines` (D13, P4): the same `$cancel k`, but `resume(k2, Nil)` is called from frames that a lazy resume of a third continuation `k3` re-entered, while `k3` still has a pending outer frame. So `$shadow[d .. top)` is not empty when the second trampoline inserts, and two trampolines insert in turn. To the source of test 12 it adds:
 
     ```i
-    Third { Third(Continuation(Nil, Third, Never, Never))  Over }
+    // `h` resumes k2, which needs `Out`, so k3 needs it too.
+    Third { Third(Continuation(Nil, Third, Never, Out))  Over }
 
     keep = { Over -> Over  t -> t }
 
@@ -792,7 +823,7 @@ The test prints S and the native stack it used.
     o1 = (b3, k2) { keep(h(b3, k2)) }
     ```
 
-    and main, after it has `k2`, does:
+    and main, after it has `k2`, does the following, under the placeholder `Out` of test 12, which `resume(k3, Nil)` needs:
 
     ```i
       k3 = control.boundary((b3) { o1(b3, k2) }) |> {
@@ -803,6 +834,9 @@ The test prints S and the native stack it used.
     ```
 
     The resume of `k3` re-enters only `h`; `o1` stays pending in T(k3). `h` calls `inner`, which resumes `k2`. The `$cancel k` leaves T(k2) after it inserts g's slot at d2, goes through the frames of `inner` and `h` (which have no handler, so their slots stay), and T(k3) catches it with `top = $sp > d3` and `from` at o1's record. At the end of its list, T(k3) inserts the slots of its pending code records (o1's, and the one of the body of `b3` if that call is not a tail call) at d3, under the slots of `h`, `inner` and g. Eager prints g, inner, h, o1, then main's sites, in that order. An implementation that puts the slots at `$sp` instead of at `d` prints o1 before g and fails this test, and test 12 alone would not see it (there `$sp == d`).
+14. `env_tail_call_as_eager` (D16, section 7a): the program of section 7a as `@main`, resumed where `Name` is "resumer", which panics with the name `g` sees. It compares the stop text with eager's, which names "resumer". A second part does the same on `cancel`, with a `resource.ensure` in `g` whose final function panics with the name. These values break §9.4 rules 3 and 4, so they are not spec cases; the test only checks that B changes nothing. When the gap of section 7a is fixed, the expected texts change to "in", and the two parts become spec cases.
+15. `cancel_out_restores_before_mode2` (D13, P3): the restore of `d` just before a call in mode 2. Test 13 with `o1 = (b3, k2) { keep(resource.ensure(() { h(b3, k2) }, () { panic("final") })) }`: the ensure record of `k3` is pending outside `h`. The `$cancel k` that leaves T(k2) reaches T(k3) with `$sp` above `d3` (the slots of `h`, `inner` and g). T(k3) skips any code record before the ensure record (the call of `h` in the ensure's body is a tail call, so there may be none), restores `d3` and calls the ensure record in mode 2, and the final function stops. Eager's `$ensure_run` restored its depth, so its trace has no line of `h`, `inner` or `g`. An implementation that leaves out `$shadow_restore(d)` before the call prints those three stale lines. The stop text is compared with eager's.
+16. `cancel_suspends_to_inner_boundary` (D15): moved here from the spec case `control_lazy_cancel_inner_boundary`. During `cancel(k)`, a final function suspends to `inner`, a boundary that was paused inside `k`. It must succeed, so `inner` is active during the unwind (eager re-entered it). Its `f(k')` gives a value as the value of the `control.boundary` call of `inner`, and the code after it in the body of `outer` runs on inside the cancel; `$cancel_core` then drops the value it ends with and `cancel(k)` gives Nil. That is what eager does at `dcb19df`, but §9.4 rule 4 does not say that a cancel may go back to ordinary code, or what happens to its value, so it is checked here with eager's output, not in `tests/spec` (open question 5). The program records what runs in a text that it prints, and the test compares it with eager's.
 
 ### 13.3 New spec cases
 
@@ -868,7 +902,7 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
   check(r, "final, c")
   ```
 
-  A second part has a final function that suspends to `inner`; it must succeed (so `inner` is active during the unwind), and the value goes on into the outer frame as in eager. A third part checks after the cancel that a suspend to `inner` stops with `control: boundary is not active`.
+  A second part checks after the cancel that a suspend to `inner` stops with `control: boundary is not active` (§11.7 gives that reason for a suspend to a boundary that is not active). A final function that suspends to `inner` during the cancel is not a spec case: the spec does not say what then happens to the cancelled code, so it is run test 16 of 13.2 (D15).
 - `tests/spec/9/control_lazy_long_pending.i`: `$shadow_insert` with far more slots than `$shadow` holds (D14). The pending list grows with each re-suspend while `$sp` stays low:
 
   ```i
@@ -919,6 +953,36 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
 
   After the resume of `k`, the error is caught in the trampoline (handler E, mode 1), which calls the ensure record in mode 1. The final function suspends while `top` and `from` are set. The C handler must splice from `node`, the record after the ensure, and leave the mode-1 state behind. The resume of `k2` re-enters `b` by descent; its trampoline runs `$final_reenter` with mode 1, which throws `$error 1` through `$ensure_end` to the pending `fail.catch` record (kind 4). A stale mode or a wrong saved `r` in the final record would give another value.
 - `tests/spec/9/control_lazy_skip.i`: a cancel through a pending `fail.catch` (kind 4, skipped in mode 2), and an error and a cancel through a pending final record (kind 5, skipped in both), each with frames around them whose final functions record their names when they run, as in the note at the top of this section. The recorded text must be the same as eager's.
+- `tests/spec/11/stop_lazy_after_catch.i`: the restore of `d` just before a call in mode 1 (D13, P3). Every other stop case stops in mode 0, and the other cases that call a record in mode 1 or 2 either start with `$sp == d` or check only values. Here the error reaches the trampoline with `$sp = d + 1`:
+
+  ```i
+  Paused { Paused(Continuation(Nil, Paused, Never, Never)) }
+
+  inner = (b) {
+    control.suspend(b, (k) { Paused(k) })
+    fail.raise(1)
+  }
+
+  // Not in tail position, so mid's record is pending and skipped.
+  mid = (b) {
+    x = inner(b)
+    x + 1
+  }
+
+  outer = (b) {
+    check(show(fail.catch(() { mid(b) })), "Error(1)")
+    panic("after")
+  }
+
+  @test
+  stop_after_catch = () {
+    control.boundary((b) { outer(b) }) |> {
+      Paused(k) -> control.resume(k, Nil)
+    }
+  }
+  ```
+
+  The resume re-enters only `inner`, whose slot is pushed at `d`. Its error reaches the trampoline with `$sp = d + 1`; the trampoline skips mid's record, restores `d` and calls the catch record in mode 1, then calls outer's record, which pushes its slot at `d` and panics. The `at:` list is outer's site, the body of the boundary, the resume, then the test. Without the restore, outer's slot lands at `d + 1` and the list has a stale line of `inner`. The mode-2 form of this check needs a cancel that leaves a trampoline, which the spec does not state, so it is run test 15 of 13.2.
 - `tests/spec/11/stop_lazy_pending.i`: a panic after a resume at depth 3. The `at:` list is innermost, the 3 pending frames, the place of resume, then main. It is exactly what eager prints at `dcb19df`.
 - `tests/spec/11/stop_lazy_nested.i`: a stop inside a resume that runs inside a resumed computation, with pending frames in both trampolines (P2).
 - `tests/spec/11/stop_lazy_descent.i`: a stop inside a re-entered inner boundary, with two trampolines at the same depth.
@@ -945,7 +1009,7 @@ All of `tests/spec/9` and `tests/spec/11` at O0 and O2 pass unchanged, in partic
    - 7 `deep_resume`: about 10^8 eager re-entries and as many capture rethrows, far over a CI time budget;
    - 11 `deep_resume_in_recursion`: S11 is chosen so that eager stops (13.2).
 
-   Tests 4, 5, 8, 9, 10, 12 and 13 pass on eager code and stay on (the expected texts of 12 and 13 are eager's). The coordinator measures the eager baseline at this commit; the expected `at:` lists and values of 13.3, the stop texts of tests 12 and 13, L_eager of test 10 and S11 of test 11 are taken here. The new spec cases of 13.3 pass on eager code too, since their expected output is eager's.
+   Tests 4, 5, 8, 9, 10 and 12 to 16 pass on eager code and stay on (the expected texts of 12 to 16 are eager's). Test 3 checks only call shapes (D18), but `$control_resume` and `$boundary_core` have their eager form here, so it is ignored as said above. The `--opt 2` cases of 12 to 16 in `ilang-cli/tests/wasi.rs` are committed at the same time, also with eager's texts. The coordinator measures the eager baseline at this commit; the expected `at:` lists and values of 13.3, the stop texts of tests 12 to 16 at `--opt 0` and `--opt 2`, L_eager of test 10 and S11 of test 11 are taken here. The new spec cases of 13.3 pass on eager code too, since their expected output is eager's.
 3. Rebase the implementation onto that commit. In the conflict on `control_lazy.rs`, B keeps step 2's file (new syntax) and drops the old-syntax copy of step 1, then turns the ignored tests on. After this step no old-syntax i source of B is left in a Rust string, and B runs `$C/tools/old-syntax-check` on the branch before it lands.
 4. Rebuild `tests/browser/fixtures/compiled.wasm` if B lands after C. If C lands after B, C rebuilds it.
 5. B-RF: the coordinator measures again; `tests/spec/9` and `tests/spec/11` pass at O0 and O2; the scope review checks that `emit/host.rs` has no diff.
@@ -954,7 +1018,7 @@ All of `tests/spec/9` and `tests/spec/11` at O0 and O2 pass unchanged, in partic
 
 - **List mutation.** O1 and invariant D are new. A slip would run a frame twice or lose one. The mitigations are the state check (D11), the delimiter check, the run test that counts frames, and the re-suspend, inner-boundary, cancel, skip and environment-unwind spec cases at O0 and O2.
 - **Files outside B's list.** `runtime/stops.rs`, `runtime/mod.rs` and `emit/mod.rs` change a little, and `compiled.wasm` is lane C's file.
-- **Exact traces.** These rest on P2, P3, P4 and S0. P4 depends on the trampoline noting `top` and `from` at every catch and restoring `d` only before a call, and on `$shadow_insert` putting the slots at `d` with room for all of them (D14). Run tests 12 and 13 of 13.2 and the spec case `control_lazy_long_pending` check this. A future frameless function with a point would break them, which is why `point()` asserts S0.
+- **Exact traces.** These rest on P2, P3, P4 and S0. P4 depends on the trampoline noting `top` and `from` at every catch and restoring `d` only before a call, and on `$shadow_insert` putting the slots at `d` with room for all of them (D14). Run tests 12, 13 and 15 of 13.2, the spec cases `stop_lazy_after_catch` and `control_lazy_long_pending` check this. A future frameless function with a point would break them, which is why `point()` asserts S0.
 - **State after a trap.** `$pend` is stale after a trap, as `$sp` is. The spec forbids reusing the instance (Appendix B.5), so only an internal harness could see it. The reset rule is written down for such harnesses (section 5.9).
 - **The shim.** If stream C starts to pass a non-null `rest`, `cancel` or `frame` to `$boundary_run`, the shim traps. The trap is loud, but it is a run-time failure.
 - **Delimiters cost O(D).** Code that resumes inside many nested boundaries keeps a linear cost. The threshold does not cover it, and performance.md says so.
@@ -970,8 +1034,9 @@ All of `tests/spec/9` and `tests/spec/11` at O0 and O2 pass unchanged, in partic
 
 ## 16. Open questions
 
-1. **Scope.** Does the coordinator agree to these changes outside B's file list: `runtime/stops.rs` (one global and the call in `$stop`), `runtime/mod.rs` (one type and the protocol bullet), `emit/mod.rs` (one `DECLARED` name), the new spec cases in `tests/spec/9`, `tests/spec/9.7` and `tests/spec/11`, and the rebuilt `tests/browser/fixtures/compiled.wasm` (lane C's)?
+1. **Scope.** Does the coordinator agree to these changes outside B's file list: `runtime/stops.rs` (one global and the call in `$stop`), `runtime/mod.rs` (one type and the protocol bullet), `emit/mod.rs` (one `DECLARED` name), the new spec cases in `tests/spec/9`, `tests/spec/9.7` and `tests/spec/11`, the new `--opt 2` cases in `crates/ilang-cli/tests/wasi.rs` (D17), and the rebuilt `tests/browser/fixtures/compiled.wasm` (lane C's)?
 2. **D4.** Is O(D) for resumes inside nested boundaries accepted? The alternative, cutting the pending list at a boundary that a suspend names, makes resume O(1 + E) but adds a new path that the existing boundary code does not cover.
 3. **D11.** Should the list checks stay on in release builds? They cost one read and one write per record. The coordinator's measurement decides.
 4. **Fuel.** If the pinned `wasmtime` CLI cannot run fuel with GC and exceptions, the fallback is a wall-clock check in `control_lazy.rs`: the minimum of 5 runs, a ratio of at most 2.0, and `#[ignore]` by default. Is that acceptable?
-5. **A cancel that leaves a resumed part of a cancel unwind.** The spec does not say what happens when a final function suspends during `cancel(k)`, the continuation of that suspend is resumed after `cancel(k)` was captured away, and the `$cancel` of `k` reaches the boundary of the resume. Today it stops with `control: boundary is not active` and a full trace. B keeps that, and checks it only in `control_lazy.rs` (D15). Should a later spec change add a sentence to §9.4 rule 4 or §11.7 for it? That is outside B, which changes no spec text.
+5. **A cancel that leaves a resumed part of a cancel unwind.** The spec does not say what happens when a final function suspends during `cancel(k)`, the continuation of that suspend is resumed after `cancel(k)` was captured away, and the `$cancel` of `k` reaches the boundary of the resume. Today it stops with `control: boundary is not active` and a full trace. B keeps that, and checks it only in `control_lazy.rs` (D15). The same goes for a final function that suspends to an inner boundary during `cancel(k)`: today the value of that boundary goes on into the cancelled code, which then runs normally until `$cancel_core` drops the value it ends with (run test 16). Should a later spec change add sentences to §9.4 rule 4 or §11.7 for these cases? That is outside B, which changes no spec text.
+6. **Environment statements before a tail call (section 7a).** Eager and lazy both lose an environment statement of a frame that was left by a tail call, against §9.4 rules 3 and 4. B keeps that (D16) and checks only that it does not change (run test 14). Should a later change fix it, as section 7a sketches (the tail call passes its pairs, the callee's record keeps them in field 4), with a spec case like the program of section 7a?
