@@ -474,3 +474,164 @@ fn expression_macro_requiring_items_is_rejected_before_execution() {
         "{error:?}"
     );
 }
+
+#[test]
+fn expansion_preserves_sharing_between_output_and_item_request() {
+    use ilang_host::syntax::{DefinitionReply, ItemRequest};
+    use ilang_macro::session::{Expanded, Session};
+    use ilang_syntax::lisp::expansion::{MacroArgument, MacroDefinition};
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, keep)\n(@ macro (= keep (-> (x (! it (. syntax Items))) _ { ((. it expose) x) x })))\n").unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty());
+    let source = parsed
+        .iter()
+        .find(|m| m.path == "app/macros")
+        .unwrap()
+        .source;
+    let mut parsed = ilang_macro::prepare::import_closure(&graph, &parsed, source).unwrap();
+    let prepared = ilang_macro::prepare::prepare(&graph, &mut parsed).unwrap();
+    let (path, name) = ilang_macro::prepare::add_wrapper(
+        &mut graph,
+        &mut parsed,
+        &prepared.bindings[0],
+        ilang_macro::prepare::MacroPosition::Item,
+    );
+    let built = ilang_macro::run::compile(&graph, &parsed, &[(&path, &name)]).unwrap();
+    let argument = Syntax::from_datum(
+        &parse("public").unwrap()[0],
+        &Scope {
+            module: 7,
+            marks: BTreeSet::new(),
+        },
+    );
+    let definition = MacroDefinition {
+        item: 0,
+        name: "keep".into(),
+        parameters: vec!["x".into()],
+    };
+    let mut session = Session::default();
+    let expanded = session
+        .run(
+            &definition,
+            &[MacroArgument {
+                label: None,
+                syntax: argument.clone(),
+            }],
+            None,
+            &argument,
+            ilang_macro::prepare::MacroPosition::Item,
+            &built,
+            &format!("{path}.{name}"),
+            prepared.templates.into(),
+            Arc::new(|at| DefinitionReply::CompileError {
+                message: "unexpected query".into(),
+                at: at.clone(),
+            }),
+            |_, syntax| {
+                Ok(Expanded {
+                    syntax,
+                    transactions: Vec::new(),
+                })
+            },
+        )
+        .unwrap();
+    assert_eq!(expanded.syntax.scope(), argument.scope());
+    let [transaction] = expanded.transactions.as_slice() else {
+        panic!("missing transaction")
+    };
+    assert!(
+        matches!(transaction.requests.as_slice(), [ItemRequest::Expose { name }] if name.identical(&expanded.syntax))
+    );
+}
+
+#[test]
+fn separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged() {
+    use ilang_host::syntax::DefinitionReply;
+    use ilang_macro::session::{Expanded, Session};
+    use ilang_syntax::lisp::{
+        expansion::{MacroArgument, MacroDefinition},
+        syntax::Node,
+    };
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/macros.is"),
+        "(, (= syntax (/ i syntax)))\n(, wrap)\n(@ macro (= wrap (-> (x) _ `(wrapped ~x))))\n",
+    )
+    .unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty());
+    let source = parsed
+        .iter()
+        .find(|m| m.path == "app/macros")
+        .unwrap()
+        .source;
+    let mut parsed = ilang_macro::prepare::import_closure(&graph, &parsed, source).unwrap();
+    let prepared = ilang_macro::prepare::prepare(&graph, &mut parsed).unwrap();
+    let (path, name) = ilang_macro::prepare::add_wrapper(
+        &mut graph,
+        &mut parsed,
+        &prepared.bindings[0],
+        ilang_macro::prepare::MacroPosition::Expression,
+    );
+    let built = ilang_macro::run::compile(&graph, &parsed, &[(&path, &name)]).unwrap();
+    let definition = MacroDefinition {
+        item: 0,
+        name: "wrap".into(),
+        parameters: vec!["x".into()],
+    };
+    let argument = input();
+    let templates: Arc<[Syntax]> = prepared.templates.into();
+    let resolver: Arc<ilang_macro::session::DefinitionResolver> =
+        Arc::new(|at| DefinitionReply::CompileError {
+            message: "unexpected query".into(),
+            at: at.clone(),
+        });
+    let mut session = Session::default();
+    let mut run = || {
+        session
+            .run(
+                &definition,
+                &[MacroArgument {
+                    label: None,
+                    syntax: argument.clone(),
+                }],
+                None,
+                &argument,
+                ilang_macro::prepare::MacroPosition::Expression,
+                &built,
+                &format!("{path}.{name}"),
+                templates.clone(),
+                resolver.clone(),
+                |_, syntax| {
+                    Ok(Expanded {
+                        syntax,
+                        transactions: Vec::new(),
+                    })
+                },
+            )
+            .unwrap()
+            .syntax
+    };
+    let a = run();
+    let b = run();
+    assert!(a.same_code(&b));
+    assert_ne!(a.scope().marks, b.scope().marks);
+    let (Node::Round(a), Node::Round(b)) = (a.node(), b.node()) else {
+        panic!("macro must return a round datum")
+    };
+    assert_eq!(a[1].scope(), argument.scope());
+    assert_eq!(b[1].scope(), argument.scope());
+    assert_eq!(a[0].scope().marks.len(), 1);
+    assert_eq!(b[0].scope().marks.len(), 1);
+}
