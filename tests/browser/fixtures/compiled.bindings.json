@@ -1,0 +1,219 @@
+{
+  "artifact_digest": "sha256-aa389a5b76feb3fa67c6d361a061313cf2eede79ff66e87b8dbb646d06527a1f",
+  "declarations": [
+    {
+      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "module": "app/app",
+      "module_digest": "sha256-272c7cfba07b02b216b6c7675ca028a013162bbcc529ff4b38a2ec3b22c59871",
+      "declaration": "hypot",
+      "namespace": "app:math/v1",
+      "name": "hypot",
+      "kind": "external",
+      "signature": {
+        "params": [
+          "float",
+          "float"
+        ],
+        "result": "float",
+        "errors": [],
+        "async": false
+      }
+    },
+    {
+      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "module": "app/opaque",
+      "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
+      "declaration": "get_a",
+      "namespace": "app:opaque/v1",
+      "name": "get",
+      "kind": "external",
+      "signature": {
+        "params": [],
+        "result": "externref",
+        "errors": [],
+        "async": false
+      }
+    },
+    {
+      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "module": "app/opaque",
+      "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
+      "declaration": "get_b",
+      "namespace": "app:opaque/v1",
+      "name": "get",
+      "kind": "external",
+      "signature": {
+        "params": [],
+        "result": "externref",
+        "errors": [],
+        "async": false
+      }
+    },
+    {
+      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "module": "app/opaque",
+      "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
+      "declaration": "echo_a",
+      "namespace": "app:opaque/v1",
+      "name": "echo",
+      "kind": "external",
+      "signature": {
+        "params": [
+          "externref"
+        ],
+        "result": "externref",
+        "errors": [],
+        "async": false
+      }
+    },
+    {
+      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "module": "app/opaque",
+      "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
+      "declaration": "echo_b",
+      "namespace": "app:opaque/v1",
+      "name": "echo",
+      "kind": "external",
+      "signature": {
+        "params": [
+          "externref"
+        ],
+        "result": "externref",
+        "errors": [],
+        "async": false
+      }
+    },
+    {
+      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "module": "app/app",
+      "module_digest": "sha256-272c7cfba07b02b216b6c7675ca028a013162bbcc529ff4b38a2ec3b22c59871",
+      "declaration": "Console.print",
+      "namespace": "app:console/v1",
+      "name": "print",
+      "kind": "service",
+      "signature": {
+        "params": [
+          "string"
+        ],
+        "result": "nil",
+        "errors": [],
+        "async": false
+      }
+    },
+    {
+      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "module": "app/app",
+      "module_digest": "sha256-272c7cfba07b02b216b6c7675ca028a013162bbcc529ff4b38a2ec3b22c59871",
+      "declaration": "Storage.read",
+      "namespace": "app:storage/v1",
+      "name": "read",
+      "kind": "service",
+      "signature": {
+        "params": [
+          "string"
+        ],
+        "result": "string",
+        "errors": [
+          "string"
+        ],
+        "async": false
+      }
+    },
+    {
+      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "module": "app/app",
+      "module_digest": "sha256-272c7cfba07b02b216b6c7675ca028a013162bbcc529ff4b38a2ec3b22c59871",
+      "declaration": "Clock.later",
+      "namespace": "app:clock/v1",
+      "name": "later",
+      "kind": "service",
+      "signature": {
+        "params": [
+          "float"
+        ],
+        "result": "float",
+        "errors": [
+          "string"
+        ],
+        "async": true
+      }
+    },
+    {
+      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "module": "app/app",
+      "module_digest": "sha256-272c7cfba07b02b216b6c7675ca028a013162bbcc529ff4b38a2ec3b22c59871",
+      "declaration": "Clock.tick",
+      "namespace": "app:clock/v1",
+      "name": "tick",
+      "kind": "service",
+      "signature": {
+        "params": [
+          "int"
+        ],
+        "result": "int",
+        "errors": [],
+        "async": true
+      }
+    },
+    {
+      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "module": "app/opaque",
+      "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
+      "declaration": "SyncA.get_a",
+      "namespace": "app:opaque-sync/v1",
+      "name": "get_a",
+      "kind": "service",
+      "signature": {
+        "params": [],
+        "result": "externref",
+        "errors": [],
+        "async": false
+      }
+    },
+    {
+      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "module": "app/opaque",
+      "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
+      "declaration": "SyncB.get_b",
+      "namespace": "app:opaque-sync/v1",
+      "name": "get_b",
+      "kind": "service",
+      "signature": {
+        "params": [],
+        "result": "externref",
+        "errors": [],
+        "async": false
+      }
+    },
+    {
+      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "module": "app/opaque",
+      "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
+      "declaration": "AsyncA.get_a",
+      "namespace": "app:opaque-async/v1",
+      "name": "get_a",
+      "kind": "service",
+      "signature": {
+        "params": [],
+        "result": "externref",
+        "errors": [],
+        "async": true
+      }
+    },
+    {
+      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "module": "app/opaque",
+      "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
+      "declaration": "AsyncB.get_b",
+      "namespace": "app:opaque-async/v1",
+      "name": "get_b",
+      "kind": "service",
+      "signature": {
+        "params": [],
+        "result": "externref",
+        "errors": [],
+        "async": true
+      }
+    }
+  ]
+}
