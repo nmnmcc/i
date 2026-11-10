@@ -1,0 +1,6 @@
+spec/control_lazy_inner_boundary.check : (got: String, want: String) -> Nil
+spec/control_lazy_inner_boundary.show : (x: A) -> String
+spec/control_lazy_inner_boundary.wait : (n: Int, f: () -> String ? E ! N) -> String ? E ! N
+spec/control_lazy_inner_boundary.steps : (outer: Boundary(String, A, B), inner: Boundary(String, C, D)) -> String
+spec/control_lazy_inner_boundary.inner_boundary_after_resuspend : () -> Nil
+spec/control_lazy_inner_boundary.inner_then_outer : () -> Nil

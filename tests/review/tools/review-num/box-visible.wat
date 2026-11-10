@@ -1,0 +1,10 @@
+(module
+ (type $box (struct (field f64)))
+ (func (export "visible") (param $x f64) (result f64)
+  (local $a (ref null $box)) (local $b (ref null $box)) (local $v f64)
+  (local.set $a (struct.new $box (local.get $x)))
+  (local.set $v (f64.mul (struct.get $box 0 (local.get $a)) (f64.const 0.5)))
+  (if (i32.eqz (f64.le (f64.abs (local.get $v)) (f64.const 0x1.fffffffffffffp+1023))) (then unreachable))
+  (local.set $b (struct.new $box (local.get $v)))
+  (struct.get $box 0 (local.get $b)))
+)

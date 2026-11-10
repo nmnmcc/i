@@ -1,0 +1,2 @@
+spec/stop_not_whole.make : (n: Int) -> BitArray
+spec/stop_not_whole.main : () -> Nil

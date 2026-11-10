@@ -1,0 +1,6 @@
+{
+  "result": "intentional always-accept compiler was rejected; failure was persisted and reduced to two clauses",
+  "classification": "harness negative control, not a compiler defect",
+  "minimality": "1-minimal under clause deletion (at least two clauses)",
+  "source": "domain: (\"a\" | \"ab\" | \"b\" | \"c\" | \"\", Bool) = (\"a\", True)\nInput = domain\npass = (x: Input) -> Input { x }\nf = (x: Input) { x |> {\n(\"a\" <> _, _) -> 0\n(_: String - \"ab\" - \"b\", False) -> 1\n} }\n"
+}

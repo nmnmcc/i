@@ -1,0 +1,2 @@
+probe/main.use : (s: S(A)) -> Nil ! A
+probe/main.example : () -> Nil

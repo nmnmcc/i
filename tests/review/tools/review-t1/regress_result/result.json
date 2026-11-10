@@ -1,0 +1,12 @@
+[
+  {
+    "cmd": [
+      "check",
+      "--types"
+    ],
+    "exit": 1,
+    "seconds": 0.17427943204529583,
+    "stdout": "probe/main.status : () -> \"ok\"\nprobe/main.f : () -> Bool\n",
+    "stderr": "src/main.i:2:10: error[E0520]: both sides are constants, `\"ok\"` and `\"error\"`, so `==` is always `False` (\u00a76.9). To compare two constants when the program runs, pass them as parameters.\n1 error\n"
+  }
+]

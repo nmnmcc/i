@@ -1,0 +1,20 @@
+outer = (xs: List(Int), f: (Int) -> Int ? e ! n) -> List(Int) ? e ! n {
+  helper = (rest, acc) { case rest { [] -> list.reverse(acc)  [x, ..more] -> helper(more, [f(x), ..acc]) } }
+  helper(xs, [])
+}
+
+curried = (a) { (b) { (c) { a + b + c } } }
+
+long_signature = (first_parameter: Int, second_parameter: String, third: Bool) -> Result(Int, String) {
+  Ok(first_parameter)
+}
+
+with_env = (log ! Logger, x) -> Int ! Logger { x }
+
+calls = () {
+  each(items, (item) { print(item) })
+  fold(items, 0, (acc, item) {
+    next = acc + item
+    next * 2
+  })
+}

@@ -1,0 +1,6 @@
+{
+  "name": "mixed_install_12",
+  "code": 1,
+  "time": 0.015680467011407018,
+  "out": "src/main.i:8:1: error[E0305]: `@test` may only be in a module under `test/`\n1 error\n"
+}

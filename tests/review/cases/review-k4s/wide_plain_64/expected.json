@@ -1,0 +1,37 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 0,
+      "stdout": "app/main.u0 : () -> Nil ! S0(Int)\napp/main.u1 : () -> Nil ! S1(Int)\napp/main.u2 : () -> Nil ! S2(Int)\napp/main.u3 : () -> Nil ! S3(Int)\napp/main.u4 : () -> Nil ! S4(Int)\napp/main.u5 : () -> Nil ! S5(Int)\napp/main.u6 : () -> Nil ! S6(Int)\napp/main.u7 : () -> Nil ! S7(Int)\napp/main.u8 : () -> Nil ! S8(Int)\napp/main.u9 : () -> Nil ! S9(Int)\napp/main.u10 : () -> Nil ! S10(Int)\napp/main.u11 : () -> Nil ! S11(Int)\napp/main.u12 : () -> Nil ! S12(Int)\napp/main.u13 : () -> Nil ! S13(Int)\napp/main.u14 : () -> Nil ! S14(Int)\napp/main.u15 : () -> Nil ! S15(Int)\napp/main.u16 : () -> Nil ! S16(Int)\napp/main.u17 : () -> Nil ! S17(Int)\napp/main.u18 : () -> Nil ! S18(Int)\napp/main.u19 : () -> Nil ! S19(Int)\napp/main.u20 : () -> Nil ! S20(Int)\napp/main.u21 : () -> Nil ! S21(Int)\napp/main.u22 : () -> Nil ! S22(Int)\napp/main.u23 : () -> Nil ! S23(Int)\napp/main.u24 : () -> Nil ! S24(Int)\napp/main.u25 : () -> Nil ! S25(Int)\napp/main.u26 : () -> Nil ! S26(Int)\napp/main.u27 : () -> Nil ! S27(Int)\napp/main.u28 : () -> Nil ! S28(Int)\napp/main.u29 : () -> Nil ! S29(Int)\napp/main.u30 : () -> Nil ! S30(Int)\napp/main.u31 : () -> Nil ! S31(Int)\napp/main.u32 : () -> Nil ! S32(Int)\napp/main.u33 : () -> Nil ! S33(Int)\napp/main.u34 : () -> Nil ! S34(Int)\napp/main.u35 : () -> Nil ! S35(Int)\napp/main.u36 : () -> Nil ! S36(Int)\napp/main.u37 : () -> Nil ! S37(Int)\napp/main.u38 : () -> Nil ! S38(Int)\napp/main.u39 : () -> Nil ! S39(Int)\napp/main.u40 : () -> Nil ! S40(Int)\napp/main.u41 : () -> Nil ! S41(Int)\napp/main.u42 : () -> Nil ! S42(Int)\napp/main.u43 : () -> Nil ! S43(Int)\napp/main.u44 : () -> Nil ! S44(Int)\napp/main.u45 : () -> Nil ! S45(Int)\napp/main.u46 : () -> Nil ! S46(Int)\napp/main.u47 : () -> Nil ! S47(Int)\napp/main.u48 : () -> Nil ! S48(Int)\napp/main.u49 : () -> Nil ! S49(Int)\napp/main.u50 : () -> Nil ! S50(Int)\napp/main.u51 : () -> Nil ! S51(Int)\napp/main.u52 : () -> Nil ! S52(Int)\napp/main.u53 : () -> Nil ! S53(Int)\napp/main.u54 : () -> Nil ! S54(Int)\napp/main.u55 : () -> Nil ! S55(Int)\napp/main.u56 : () -> Nil ! S56(Int)\napp/main.u57 : () -> Nil ! S57(Int)\napp/main.u58 : () -> Nil ! S58(Int)\napp/main.u59 : () -> Nil ! S59(Int)\napp/main.u60 : () -> Nil ! S60(Int)\napp/main.u61 : () -> Nil ! S61(Int)\napp/main.u62 : () -> Nil ! S62(Int)\napp/main.u63 : () -> Nil ! S63(Int)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.wide : () -> Nil ! S0(Int) | S1(Int) | S2(Int) | S3(Int) | S4(Int) | S5(Int) | S6(Int) | S7(Int) | S8(Int) | S9(Int) | S10(Int) | S11(Int) | S12(Int) | S13(Int) | S14(Int) | S15(Int) | S16(Int) | S17(Int) | S18(Int) | S19(Int) | S20(Int) | S21(Int) | S22(Int) | S23(Int) | S24(Int) | S25(Int) | S26(Int) | S27(Int) | S28(Int) | S29(Int) | S30(Int) | S31(Int) | S32(Int) | S33(Int) | S34(Int) | S35(Int) | S36(Int) | S37(Int) | S38(Int) | S39(Int) | S40(Int) | S41(Int) | S42(Int) | S43(Int) | S44(Int) | S45(Int) | S46(Int) | S47(Int) | S48(Int) | S49(Int) | S50(Int) | S51(Int) | S52(Int) | S53(Int) | S54(Int) | S55(Int) | S56(Int) | S57(Int) | S58(Int) | S59(Int) | S60(Int) | S61(Int) | S62(Int) | S63(Int)\n",
+      "stderr": ""
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": ""
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": ""
+    }
+  }
+}

@@ -1,0 +1,1 @@
+spec/ensure_not_on_stop.main : () -> Never

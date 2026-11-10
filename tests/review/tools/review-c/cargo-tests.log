@@ -1,0 +1,364 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 13.2ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 15.3ms
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running unittests src/lib.rs (target/debug/deps/ilang_cli-a7214b852863ec6b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/i-e7cd140c155c269c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/check.rs (target/debug/deps/check-8965e3a60c2c8747)
+
+running 2 tests
+test check_types ... ok
+test check_reports_type_errors ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/commands.rs (target/debug/deps/commands-d2cc2826a9257074)
+
+running 14 tests
+test build_reports_errors ... ok
+test async_entry_points_and_needed_services ... ok
+test incorrect_host_answers_stop_in_the_module ... ok
+test test_runs_each_test ... ok
+test the_compiled_fixture_is_current ... ok
+test build_writes_the_module ... ok
+test run_prints_the_stop_message ... ok
+test run_gives_the_standard_services ... ok
+test run_the_example ... ok
+test host_exports ... ok
+test host_exports_give_errors ... ok
+test an_error_stops_a_test ... ok
+test located_packages ... ok
+test host_exports_with_services_and_async ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+
+     Running tests/fmt.rs (target/debug/deps/fmt-a056ee8aeaaf8cdf)
+
+running 4 tests
+test files_with_errors_are_left_as_they_are ... ok
+test paths_are_files_or_directories ... ok
+test formats_src_and_test ... ok
+test check_lists_files_that_would_change ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/lsp.rs (target/debug/deps/lsp-4e490d3ab8e42256)
+
+running 1 test
+test initialize_and_exit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/package_commands.rs (target/debug/deps/package_commands-0bc75f871ffccdb1)
+
+running 24 tests
+test new_makes_files_that_are_formatted ... ok
+test add_a_path_dependency ... ok
+test new_with_a_path_and_bad_names ... ok
+test publish_needs_a_clean_tree_and_passing_tests ... ok
+test publish_sees_the_standard_service_of_i_io ... ok
+test add_puts_i_toml_back_when_loading_fails ... ok
+test publish_tags_a_first_version ... ok
+test publish_sees_what_the_host_must_give ... ok
+test new_makes_a_package_that_checks_runs_and_tests ... ok
+test add_checks_the_names ... ok
+test add_takes_the_newest_tag_and_keeps_comments ... ok
+test add_and_update_keep_crlf_line_ends ... ok
+test add_over_a_dependency_written_as_a_table_keeps_its_comments ... ok
+test deps_lists_the_packages_and_their_permissions ... ok
+test publish_sees_a_new_major_version_of_a_dependency ... ok
+test publish_sees_what_the_host_must_give_though_it_is_not_exported ... ok
+test a_failed_add_or_update_leaves_i_toml_and_i_lock_as_they_were ... ok
+test remove_takes_the_entry_and_the_lock_line_out ... ok
+test update_and_add_keep_the_comments_of_an_entry ... ok
+test publish_compares_types_by_what_they_are_not_by_their_names ... ok
+test publish_tells_apart_types_that_are_shown_alike ... ok
+test two_new_packages_work_together ... ok
+test update_raises_within_the_major_version_and_shows_new_permissions ... ok
+test publish_compares_the_interface ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.51s
+
+     Running tests/spec.rs (target/debug/deps/spec-be83483453fdb42b)
+ok   1.1/binding_text_cr.i
+ok   1.1/binding_text_crlf.i
+ok   10.1/externals.i
+ok   10.2/entries.i
+ok   10.2/export_never_param
+ok   10.2/export_never_value
+ok   10.2/export_twice
+ok   10.2/main_and_test.i
+ok   10.2/test_stops.i
+ok   11/deep_recursion.i
+ok   11/equality.i
+ok   11/equality_externals.i
+ok   11/float_arithmetic.i
+ok   11/float_not_finite.i
+ok   11/int_arithmetic.i
+ok   11/positions.i
+ok   11/stop_tail_assert.i
+ok   11/stop_tail_async_service.i
+ok   11/stop_tail_catch.i
+ok   11/stop_tail_ensure.i
+ok   11/stop_tail_library.i
+ok   11/stop_tail_resume.i
+ok   11/stop_tail_service.i
+ok   11/tail_calls.i
+ok   11/text_form.i
+ok   13/bit_array_concat.i
+ok   13/case_mapping.i
+ok   13/core.i
+ok   13/index_of.i
+ok   13/long_values.i
+ok   13/stop_float_from_bits.i
+ok   13/stop_sqrt.i
+ok   13/stop_to_float.i
+ok   2.5/modules
+ok   2.5/order.i
+ok   2.5/order_go.i
+ok   2.5/stop_in_start.i
+ok   4.8/spread_catch_all.i
+ok   6.10/unused_value.i
+ok   6/blocks.i
+ok   6/choices_guard.i
+ok   6/closures.i
+ok   6/data.i
+ok   6/evaluation_order.i
+ok   6/evaluation_order_callee.i
+ok   6/evaluation_order_pipe.i
+ok   6/labelled_calls.i
+ok   6/recursion.i
+ok   6/short_circuit.i
+ok   6/strings.i
+ok   6/tail_and_or.i
+ok   7/empty_types.i
+ok   7/empty_types_one.i
+ok   7/never_used.i
+ok   7/not_covered.i
+ok   7/patterns.i
+ok   8/build.i
+ok   8/match.i
+ok   8/stop_float.i
+ok   8/stop_negative.i
+ok   8/stop_not_whole.i
+ok   8/stop_short.i
+ok   8/stop_short_huge.i
+ok   8/stop_short_huge_bytes.i
+ok   9.7/async_error_main.i
+ok   9.7/async_services.i
+ok   9.7/fake_service.i
+ok   9.7/host_error_main.i
+ok   9.7/host_errors_type.i
+ok   9.7/host_services.i
+ok   9.7/host_type.i
+ok   9.7/host_value_async_stop.i
+ok   9.7/host_value_bits.i
+ok   9.7/host_value_stop.i
+ok   9/acquire_release.i
+ok   9/assert.i
+ok   9/assert_main.i
+ok   9/binding_fails.i
+ok   9/boundary_inactive.i
+ok   9/control.i
+ok   9/control_cancel_final.i
+ok   9/control_cancel_inner_first.i
+ok   9/control_cancel_then_resume.i
+ok   9/control_dropped.i
+ok   9/control_inactive_after.i
+ok   9/control_inactive_paused.i
+ok   9/control_many_points.i
+ok   9/control_stop_after_resume.i
+ok   9/control_used_twice.i
+ok   9/ensure.i
+ok   9/ensure_assertion.i
+ok   9/ensure_error.i
+ok   9/ensure_error_main.i
+ok   9/ensure_inner_first.i
+ok   9/ensure_normal.i
+ok   9/ensure_not_on_stop.i
+ok   9/ensure_outer_after.i
+ok   9/environment.i
+ok   9/error_main.i
+ok   9/errors.i
+ok   9/own_assert.i
+ok   9/parameter_fails.i
+
+spec: 102 of 102 cases passed at --opt 0 and --opt 2
+     Running tests/wasi.rs (target/debug/deps/wasi-7c6d6aa7f2b2180f)
+
+running 11 tests
+test needs_an_entry ... ok
+test an_import_that_does_not_agree_with_the_library_is_told_in_the_program ... ok
+test only_wasi_modules_name_their_target ... ok
+test the_standard_service_is_the_one_of_i_io ... ok
+test the_wasi_imports_of_the_runtime_are_refused ... ok
+test host_references_keep_the_reference_id_import ... ok
+test hello_needs_only_wasi ... ok
+test other_services_stay_imports_of_the_binary_interface ... ok
+test async_services_are_blocking_calls ... ok
+test long_output_survives_short_writes ... ok
+test stops_write_the_message_and_exit_with_1 ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s
+
+     Running tests/wat_dump.rs (target/debug/deps/wat_dump-019e7d4a02dc27f6)
+
+running 1 test
+test wat_dump ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/ilang_host-7b904a9409bf5456)
+
+running 48 tests
+test tests::a_stop_in_ilang_start_is_reported_and_the_start_is_required ... ok
+test tests::block_on_gives_services_tokio_io ... ok
+test tests::async_exports_wait_for_host_functions ... ok
+test tests::a_stop_drops_outstanding_requests ... ok
+test tests::a_host_failure_drops_the_others ... ok
+test tests::a_wrong_resume_traps ... ok
+test tests::bad_statuses_are_faults ... ok
+test tests::a_stop_gives_its_message_and_the_instance_is_unusable ... ok
+test tests::a_sync_service_may_block_on_its_own_thread ... ok
+test tests::a_finished_program_does_not_wait_for_blocking_work ... ok
+test tests::a_nested_store_in_the_allocator_gets_its_own_thread ... ok
+test tests::exports_of_the_wrong_type_are_faults ... ok
+test tests::every_return_from_wait_drops_the_requests ... ok
+test tests::a_sync_call_may_not_start_requests ... ok
+test tests::engine_features_include_gc_tail_calls_and_exceptions ... ok
+test tests::dropping_a_waiting_call_makes_the_instance_unusable ... ok
+test tests::duplicate_or_negative_id_traps ... ok
+test tests::allocation_traps_preserve_stops_and_the_first_failure ... ok
+test tests::block_on_works_inside_a_tokio_runtime ... ok
+test tests::entry_and_tests_run_by_name_each_test_in_a_new_instance ... ok
+test tests::errors_use_the_tag_and_the_canonical_order ... ok
+test tests::metadata_that_does_not_follow_b6_is_refused ... ok
+test tests::old_and_new_versions_are_refused ... ok
+test tests::externals_and_service_errors_round_trip_without_leaks ... ok
+test tests::references_keep_identity_across_collection_and_support_null ... ok
+test tests::leftovers_are_dropped_at_status_zero ... ok
+test tests::a_failing_host_function_traps_and_keeps_its_error ... ok
+test tests::self_waking_work::ready_polls_self_waking_work_once_per_call ... ok
+test tests::self_waking_work::next_lets_a_timer_fire_while_other_work_spins ... ok
+test tests::run_entry_uses_one_thread ... ok
+test tests::futures_are_send ... ok
+test tests::identical_host_arcs_get_identical_ids_even_with_separate_externrefs ... ok
+test tests::metadata_is_read_from_the_custom_section ... ok
+test tests::start_runs_once_before_anything_and_may_call_imports ... ok
+test tests::status_one_with_nothing_outstanding_is_a_fault ... ok
+test tests::status_two_gives_ready_answers ... ok
+test tests::host_services_and_externals_use_the_same_encoding ... ok
+test tests::incorrect_guest_values_are_errors_of_the_module ... ok
+test tests::values_round_trip_and_every_buffer_is_freed ... ok
+test tests::a_nested_store_gets_its_own_thread ... ok
+test tests::incorrect_host_values_stop_the_program ... ok
+test tests::deep_recursion_after_a_resume_stops_like_a_sync_call ... ok
+test tests::cancel_drops_one_request ... ok
+test tests::countdown_requests_match_the_observed_answer_order ... ok
+test tests::cancel_and_reuse_with_a_finished_answer ... ok
+test tests::requests_from_ilang_continue ... ok
+test tests::timers_answer_through_the_reactor ... ok
+test tests::many_requests_complete_out_of_order ... ok
+
+test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+
+     Running unittests src/lib.rs (target/debug/deps/ilang_wasm-c8bab32b79e2bdae)
+
+running 25 tests
+test emit::host::tests::effects_keep_only_short_comments ... ok
+test runtime::values::inspect::float_format::tests::reference_follows_the_examples_of_the_specification ... ok
+test control::tests::numbers_and_environments_are_kept ... ok
+test runtime::tests::equality_is_structural_with_identity_for_functions_and_references ... ok
+test runtime::tests::runtime_with_host_imports_is_valid_wasm ... ok
+test runtime::bitarrays::tests::half_precision_rounding_and_utf_match_failures ... ok
+test runtime::text_tests::bit_array_concat_joins_parts_of_any_length ... ok
+test runtime::values::inspect::float_format::tests::shortest_formatter_matches_fixed_values ... ok
+test runtime::text_tests::case_mapping_of_strings ... ok
+test runtime::tests::core_operations_follow_the_specification ... ok
+test runtime::bitarrays::tests::bit_views_concatenate_and_preserve_unicode_strings ... ok
+test runtime::tests::stop_messages_list_the_reason_and_the_shadow_stack ... ok
+test runtime::tests::host_boundary_values_round_trip_and_reject_incorrect_values ... ok
+test runtime::values::inspect::tests::all_value_presentations_match ... ok
+test runtime::text_tests::index_of_finds_bytes_at_character_boundaries ... ok
+test runtime::values::inspect::tests::deep_list_heads_do_not_use_the_call_stack ... ok
+test runtime::values::inspect::tests::deep_middle_record_fields_preserve_pending_siblings ... ok
+test runtime::values::inspect::tests::deep_first_record_fields_do_not_use_the_call_stack ... ok
+test runtime::values::inspect::tests::long_lists_are_inspected_without_recursive_traversal ... ok
+test runtime::values::inspect::tests::deep_tuple_fields_do_not_use_the_call_stack ... ok
+test runtime::values::inspect::float_format::tests::formatter_rejects_non_finite_values ... ok
+test runtime::bitarrays::tests::integer_segments_preserve_width_endianness_and_sign ... ok
+test runtime::text_tests::case_tables_give_every_simple_mapping_of_unicode_data ... ok
+test runtime::text_tests::index_of_agrees_with_a_plain_search ... ok
+test runtime::values::inspect::float_format::tests::shortest_formatter_matches_the_reference_on_many_floats ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.83s
+
+     Running tests/bigint_arithmetic.rs (target/debug/deps/bigint_arithmetic-2c86b5029111c02c)
+
+running 2 tests
+test integer_runtime_validates ... ok
+test arithmetic_bits_and_conversions_match_javascript_bigint ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/bigint_conversions.rs (target/debug/deps/bigint_conversions-0de30ac728da467b)
+
+running 3 tests
+test integer_parsing_rejects_invalid_input_without_truncating ... ok
+test integer_float_rounding_truncation_and_base_round_trips ... ok
+test conversions_trap_for_nonfinite_float_and_out_of_range_bit_patterns ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/codegen.rs (target/debug/deps/codegen-5b77304b950181ff)
+
+running 8 tests
+test bindings_that_may_fail_report_to_assert ... ok
+test closures_capture_what_they_use ... ok
+test tail_calls_are_return_calls ... ok
+test environments ... ok
+test metadata ... ok
+test calls_that_may_suspend_are_split ... ok
+test externals_are_imports ... ok
+test segments_grow_linearly ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/runtime_values.rs (target/debug/deps/runtime_values-d3f6cdb71369fc39)
+
+running 1 test
+test deep_values_and_memory_boundaries_match_the_runtime_oracle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s
+
+   Doc-tests ilang_cli
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ilang_host
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ilang_wasm
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

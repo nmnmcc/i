@@ -1,0 +1,9 @@
+pass review/numeric.zeros
+pass review/numeric.rounding
+pass review/numeric.integers
+pass review/numeric.lazy_two_resumes
+pass review/numeric.identity_and_capture
+pass review/numeric.tail_million
+pass review/numeric.retained_environment
+pass review/numeric.cancel_final_values
+8 passed, 0 failed

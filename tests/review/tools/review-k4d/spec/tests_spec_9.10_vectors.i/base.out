@@ -1,0 +1,24 @@
+spec/vectors.advance : (g: random.Generator, n: Int) -> random.Generator
+spec/vectors.words_0 : () -> Nil ! Assert
+spec/vectors.words_1 : () -> Nil ! Assert
+spec/vectors.words_2 : () -> Nil ! Assert
+spec/vectors.words_3 : () -> Nil ! Assert
+spec/vectors.words_4 : () -> Nil ! Assert
+spec/vectors.words_5 : () -> Nil ! Assert
+spec/vectors.words_6 : () -> Nil ! Assert
+spec/vectors.tree_s1 : () -> Nil ! Assert
+spec/vectors.tree_s2 : () -> Nil ! Assert
+spec/vectors.tree_p1 : () -> Nil ? random.RandomError ! Assert
+spec/vectors.tree_p2 : () -> Nil ? random.RandomError ! Assert
+spec/vectors.tree_p3 : () -> Nil ? random.RandomError ! Assert
+spec/vectors.tree_mixed : () -> Nil ? random.RandomError ! Assert
+spec/vectors.tree_drawn : () -> Nil ! Assert
+spec/vectors.tree_large : () -> Nil ? random.RandomError ! Assert
+spec/vectors.bounded_0 : () -> Nil ? random.RandomError ! Assert
+spec/vectors.bounded_1 : () -> Nil ? random.RandomError ! Assert
+spec/vectors.bounded_2 : () -> Nil ? random.RandomError ! Assert
+spec/vectors.bounded_3 : () -> Nil ? random.RandomError ! Assert
+spec/vectors.bounded_4 : () -> Nil ? random.RandomError ! Assert
+spec/vectors.bounded_5 : () -> Nil ? random.RandomError ! Assert
+spec/vectors.bounded_6 : () -> Nil ? random.RandomError ! Assert
+spec/vectors.bounded_7 : () -> Nil ? random.RandomError ! Assert

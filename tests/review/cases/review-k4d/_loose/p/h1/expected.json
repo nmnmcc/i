@@ -1,0 +1,17 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 1,
+      "stdout": "app/main.get : () -> Int ! Dep\napp/main.use : () -> Int ! N | S(N)\napp/main.c1 : () -> Int ! S(Dep)\napp/main.c2 : () -> Int ! S(Dep)\napp/main.c3 : () -> () -> Int ! S(Dep)\napp/main.c4 : () -> Int ! S(Dep)\napp/main.c5 : () -> Int ! S(Dep)\napp/main.c6 : (h: () -> Int ! Dep | S(Dep)) -> () -> Int ! S(Dep)\napp/main.c7 : (h: () -> Int ! Dep | S(Dep), k: (() -> Int ! S(Dep)) -> Int) -> Int\n",
+      "stderr": "src/main.i:8:25: error[E0515]: `_` and `Dep` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 8:18 needs it)\nsrc/main.i:9:1: error[E0515]: `_` and `Dep` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:11:3: error[E0515]: `_` and `Dep` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:14:25: error[E0501]: `Dep` is not a subtype of `S(Dep)` (the type at 14:18 needs it)\nsrc/main.i:15:35: error[E0501]: `Dep` is not a subtype of `S(Dep)` (the type at 15:28 needs it)\nsrc/main.i:19:60: error[E0501]: `Dep` is not a subtype of `S(Dep)` (the type at 19:39 needs it)\nsrc/main.i:20:72: error[E0501]: `Dep` is not a subtype of `S(Dep)` (the type at 20:70 needs it)\n7 errors\n"
+    }
+  }
+}

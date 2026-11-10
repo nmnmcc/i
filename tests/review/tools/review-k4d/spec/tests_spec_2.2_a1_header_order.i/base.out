@@ -1,0 +1,2 @@
+test/a1_header_order.i:5:1: error[E0115]: the imports come before the exports
+1 error

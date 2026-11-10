@@ -1,0 +1,6 @@
+examples/hello 0 0 0.05
+examples/hello 2 0 0.23
+std 0 0 56.23
+std 2 0 48.2
+bench 0 0 10.54
+bench 2 0 8.25

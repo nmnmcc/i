@@ -1,0 +1,3 @@
+spec/empty_types_one.kind : (h: Window | Int) -> String
+spec/empty_types_one.both : (h: Window | Socket | Int) -> String
+spec/empty_types_one.t : () -> Nil

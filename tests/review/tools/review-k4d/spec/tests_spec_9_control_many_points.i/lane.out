@@ -1,0 +1,5 @@
+spec/control_many_points.check : (got: String, want: String) -> Nil
+spec/control_many_points.f : (s: (Int) -> Int, x: Int) -> List(Int)
+spec/control_many_points.suspending : (x: Int) -> List(Int)
+spec/control_many_points.plain : (x: Int) -> List(Int)
+spec/control_many_points.many_points : () -> Nil

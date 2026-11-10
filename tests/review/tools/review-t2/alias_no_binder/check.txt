@@ -1,0 +1,2 @@
+src/main.i:4:5: error[E0224]: alias pattern has the wrong number of arguments
+1 error

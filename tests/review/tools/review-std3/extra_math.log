@@ -1,0 +1,38 @@
+PASS 59
+[
+  {
+    "fn": "sin midpoint search",
+    "x": "0x1.38e17aa7782acp+664",
+    "bits": 13829780307735569557,
+    "p": 128,
+    "distance_ulp": 8.589339079752224e-05
+  },
+  {
+    "fn": "sin midpoint search",
+    "x": "0x1.632c1c37771edp+887",
+    "bits": 13830310347950238987,
+    "p": 128,
+    "distance_ulp": 0.0001012398000444859
+  },
+  {
+    "fn": "sin midpoint search",
+    "x": "0x1.3f9db6072ebe5p+898",
+    "bits": 4606426570109625355,
+    "p": 128,
+    "distance_ulp": 0.00011795556639427101
+  },
+  {
+    "fn": "sin midpoint search",
+    "x": "0x1.32a67c9220f98p+542",
+    "bits": 4586574006860834146,
+    "p": 128,
+    "distance_ulp": 0.00022742064233073067
+  },
+  {
+    "fn": "sin midpoint search",
+    "x": "0x1.b23a321f88473p+395",
+    "bits": 4601699756151792152,
+    "p": 128,
+    "distance_ulp": 0.0002950209802066636
+  }
+]

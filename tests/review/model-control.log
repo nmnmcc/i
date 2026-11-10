@@ -1,0 +1,74 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 17.9ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 17.2ms
+model t3-forgetting-conflict.py: 1
+{
+  "compiler": "ba22c507a174a93b495dd33b66f4500c76daf309",
+  "binary_sha256": "af95f7a3a2da74aaef965dd33a5fa467726d4c96c2f20f491a98e69cb2162968",
+  "seed": 412,
+  "count": 1,
+  "mode": "long",
+  "counts": {
+    "attempted": 4,
+    "rejected-by-model": 2,
+    "permutations": 8,
+    "annotation-removals": 3,
+    "accepted": 2
+  },
+  "failures": [],
+  "report_only": [
+    {
+      "property": "remove source annotation before permanent read",
+      "source": "docs/spec.md \u00a74.7: Write a wider annotation at the source when needed.",
+      "exits": [
+        0,
+        1
+      ],
+      "classification": "permitted difference; report only",
+      "outcomes": [
+        {
+          "command": [
+            "check",
+            "--types"
+          ],
+          "exit": 0,
+          "stdout": "generated/main.value : Int\ngenerated/main.x : Int\n",
+          "stderr": ""
+        },
+        {
+          "command": [
+            "check",
+            "--types"
+          ],
+          "exit": 1,
+          "stdout": "generated/main.value : 1\ngenerated/main.x : 1\n",
+          "stderr": "src/main.i:3:1: error[E0501]: `2` is not a subtype of `1`\n1 error\n"
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "coverage": "docs/spec.md \u00a77.4: A clause with a guard is not counted.",
+    "runtime": "docs/spec.md \u00a76.12: it takes the first clause whose pattern matches the value and whose guard, if there is one, is True",
+    "literal": "docs/spec.md \u00a74.2: Values are never changed, so a literal type is never made wider",
+    "value": "docs/spec.md \u00a72.5: It only orders type inference",
+    "annotation": "docs/spec.md \u00a74.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance."
+  },
+  "models": [
+    {
+      "model": "tools/record-models/t3-forgetting-conflict.py",
+      "source_sha256": "b0d673584b4b85d71505e7dda72d8948c61e69f92c9a480cc478ed5f61d18a34",
+      "python": "/nix/store/xahxrjs30p3mw0a42bqg9ikgkikskw8m-python3-3.14.8/bin/python3",
+      "exit": 1,
+      "stdout": "Closed source: Gone = { ..{ a: Never } | { b: Never }, -a }\nJoin first: common labels = {} ; empty record present = True\nE2 then E1: empty record present = False\nCanonical generic source: Gone(A) = { ..{ a: Never } | { ..A, b: Never }, -a }\nNormalize, then A = {..}: ('never',)\nA = {..}, then normalize: ('rec', ())\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/home/agent/Programming/i/.rd/note-pa-arch/tests/review/tools/record-models/t3-forgetting-conflict.py\", line 144, in <module>\n    main()\n    ~~~~^^\n  File \"/home/agent/Programming/i/.rd/note-pa-arch/tests/review/tools/record-models/t3-forgetting-conflict.py\", line 133, in main\n    assert normalize_first == substitute_first, (\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: joint \u00a76 requires substitution stability, but records \u00a74.3 E1/E2 and \u00a74.5 give Never versus {..}; the union before E2 is canonical\n",
+      "classification": "independent model; not compiler implementation validation",
+      "expected_exit": 1,
+      "requirement": "Historical witness: its main asserts substitution stability under the old common-label join and must fail with the documented joint \u00a76 conflict.",
+      "matched": true
+    }
+  ]
+}

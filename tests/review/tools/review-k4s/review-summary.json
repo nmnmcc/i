@@ -1,0 +1,28 @@
+{
+  "verdict": "Do not merge: one P1 soundness regression",
+  "finding": {
+    "source": "soundness/src/main.i",
+    "expected": "E0522: entry point requires unprovided non-host S(N) and open N",
+    "check_exit": 0,
+    "opt0": "exit 1: trap: wasm trap: cast failure",
+    "opt2": "exit 1: trap: wasm trap: cast failure",
+    "baseline": "E0505",
+    "remove_only_new_reflexive_union_shortcut": "main scheme is shown as () -> Nil ! N | S(N), and E0522 is reported",
+    "remove_local_annotation": "E0522"
+  },
+  "validation": {
+    "checker_tests": 53,
+    "runtime_tests_per_optimization": 5,
+    "runtime_optimizations": [
+      0,
+      2
+    ],
+    "annotation_variants": 516,
+    "random_mutual_order_cases": 200,
+    "chain_1024_seconds": 0.502,
+    "genuine_recursive_probes": "E0505; no separately demonstrated newly accepted genuinely recursive type",
+    "principal_narrowing": "No separate counterexample found; local annotation changes acceptance in soundness reproducer",
+    "tracked_files_edited": false
+  },
+  "performance_notes": "Same checker sources/dependencies/build profile except solve.rs. Same loaded std graph. 30 interleaved measurements per version in std-final-timings.json. Generic wide 512 completed in optimized harness at 11.7\u201318.0 seconds; plain wide 1024 hit 45-second cutoff on both versions. Generic before timings reject with E0505 and cannot be compared as equivalent successful work."
+}

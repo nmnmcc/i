@@ -1,0 +1,2 @@
+spec/boundary_inactive.get : () -> Assert ! Assert
+spec/boundary_inactive.main : () -> Nil

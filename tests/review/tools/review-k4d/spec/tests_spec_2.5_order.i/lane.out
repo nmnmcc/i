@@ -1,0 +1,11 @@
+spec/order.check : (got: String, want: String) -> Nil
+spec/order.total : Int
+spec/order.double : (n: Int) -> Int
+spec/order.offset : Int
+spec/order.base : Int
+spec/order.table : List((n: Int) -> Int)
+spec/order.later : Int
+spec/order.first : Int
+spec/order.second : String
+spec/order.apply_all : (fs: List((A) -> B ? E ! N), x: A) -> List(B) ? E ! N
+spec/order.values : () -> Nil

@@ -1,0 +1,3 @@
+name = "probe"
+[wasm]
+exports = ["probe/main.same"]

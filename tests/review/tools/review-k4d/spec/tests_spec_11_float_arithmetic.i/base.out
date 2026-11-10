@@ -1,0 +1,4 @@
+spec/float_arithmetic.check : (got: String, want: String) -> Nil
+spec/float_arithmetic.show : (x: A) -> String
+spec/float_arithmetic.operations : () -> Nil
+spec/float_arithmetic.compare : () -> Nil

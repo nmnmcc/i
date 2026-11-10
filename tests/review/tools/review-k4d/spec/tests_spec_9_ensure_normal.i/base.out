@@ -1,0 +1,2 @@
+spec/ensure_normal.final : () -> Never
+spec/ensure_normal.main : () -> Int

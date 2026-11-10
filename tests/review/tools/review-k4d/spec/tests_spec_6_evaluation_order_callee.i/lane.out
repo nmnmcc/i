@@ -1,0 +1,2 @@
+spec/evaluation_order_callee.pick : (n: Int) -> (Int) -> Int
+spec/evaluation_order_callee.main : () -> Nil

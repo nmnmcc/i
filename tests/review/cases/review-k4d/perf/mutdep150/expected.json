@@ -1,0 +1,37 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 0,
+      "stdout": "app/main.use : () -> Int ! N | S(N)\napp/main.get : () -> Int ! Dep\napp/main.m0 : (k: Int) -> Int ! Dep\napp/main.m1 : (k: Int) -> Int ! Dep\napp/main.m2 : (k: Int) -> Int ! Dep\napp/main.m3 : (k: Int) -> Int ! Dep\napp/main.m4 : (k: Int) -> Int ! Dep\napp/main.m5 : (k: Int) -> Int ! Dep\napp/main.m6 : (k: Int) -> Int ! Dep\napp/main.m7 : (k: Int) -> Int ! Dep\napp/main.m8 : (k: Int) -> Int ! Dep\napp/main.m9 : (k: Int) -> Int ! Dep\napp/main.m10 : (k: Int) -> Int ! Dep\napp/main.m11 : (k: Int) -> Int ! Dep\napp/main.m12 : (k: Int) -> Int ! Dep\napp/main.m13 : (k: Int) -> Int ! Dep\napp/main.m14 : (k: Int) -> Int ! Dep\napp/main.m15 : (k: Int) -> Int ! Dep\napp/main.m16 : (k: Int) -> Int ! Dep\napp/main.m17 : (k: Int) -> Int ! Dep\napp/main.m18 : (k: Int) -> Int ! Dep\napp/main.m19 : (k: Int) -> Int ! Dep\napp/main.m20 : (k: Int) -> Int ! Dep\napp/main.m21 : (k: Int) -> Int ! Dep\napp/main.m22 : (k: Int) -> Int ! Dep\napp/main.m23 : (k: Int) -> Int ! Dep\napp/main.m24 : (k: Int) -> Int ! Dep\napp/main.m25 : (k: Int) -> Int ! Dep\napp/main.m26 : (k: Int) -> Int ! Dep\napp/main.m27 : (k: Int) -> Int ! Dep\napp/main.m28 : (k: Int) -> Int ! Dep\napp/main.m29 : (k: Int) -> Int ! Dep\napp/main.m30 : (k: Int) -> Int ! Dep\napp/main.m31 : (k: Int) -> Int ! Dep\napp/main.m32 : (k: Int) -> Int ! Dep\napp/main.m33 : (k: Int) -> Int ! Dep\napp/main.m34 : (k: Int) -> Int ! Dep\napp/main.m35 : (k: Int) -> Int ! Dep\napp/main.m36 : (k: Int) -> Int ! Dep\napp/main.m37 : (k: Int) -> Int ! Dep\napp/main.m38 : (k: Int) -> Int ! Dep\napp/main.m39 : (k: Int) -> Int ! Dep\napp/main.m40 : (k: Int) -> Int ! Dep\napp/main.m41 : (k: Int) -> Int ! Dep\napp/main.m42 : (k: Int) -> Int ! Dep\napp/main.m43 : (k: Int) -> Int ! Dep\napp/main.m44 : (k: Int) -> Int ! Dep\napp/main.m45 : (k: Int) -> Int ! Dep\napp/main.m46 : (k: Int) -> Int ! Dep\napp/main.m47 : (k: Int) -> Int ! Dep\napp/main.m48 : (k: Int) -> Int ! Dep\napp/main.m49 : (k: Int) -> Int ! Dep\napp/main.m50 : (k: Int) -> Int ! Dep\napp/main.m51 : (k: Int) -> Int ! Dep\napp/main.m52 : (k: Int) -> Int ! Dep\napp/main.m53 : (k: Int) -> Int ! Dep\napp/main.m54 : (k: Int) -> Int ! Dep\napp/main.m55 : (k: Int) -> Int ! Dep\napp/main.m56 : (k: Int) -> Int ! Dep\napp/main.m57 : (k: Int) -> Int ! Dep\napp/main.m58 : (k: Int) -> Int ! Dep\napp/main.m59 : (k: Int) -> Int ! Dep\napp/main.m60 : (k: Int) -> Int ! Dep\napp/main.m61 : (k: Int) -> Int ! Dep\napp/main.m62 : (k: Int) -> Int ! Dep\napp/main.m63 : (k: Int) -> Int ! Dep\napp/main.m64 : (k: Int) -> Int ! Dep\napp/main.m65 : (k: Int) -> Int ! Dep\napp/main.m66 : (k: Int) -> Int ! Dep\napp/main.m67 : (k: Int) -> Int ! Dep\napp/main.m68 : (k: Int) -> Int ! Dep\napp/main.m69 : (k: Int) -> Int ! Dep\napp/main.m70 : (k: Int) -> Int ! Dep\napp/main.m71 : (k: Int) -> Int ! Dep\napp/main.m72 : (k: Int) -> Int ! Dep\napp/main.m73 : (k: Int) -> Int ! Dep\napp/main.m74 : (k: Int) -> Int ! Dep\napp/main.m75 : (k: Int) -> Int ! Dep\napp/main.m76 : (k: Int) -> Int ! Dep\napp/main.m77 : (k: Int) -> Int ! Dep\napp/main.m78 : (k: Int) -> Int ! Dep\napp/main.m79 : (k: Int) -> Int ! Dep\napp/main.m80 : (k: Int) -> Int ! Dep\napp/main.m81 : (k: Int) -> Int ! Dep\napp/main.m82 : (k: Int) -> Int ! Dep\napp/main.m83 : (k: Int) -> Int ! Dep\napp/main.m84 : (k: Int) -> Int ! Dep\napp/main.m85 : (k: Int) -> Int ! Dep\napp/main.m86 : (k: Int) -> Int ! Dep\napp/main.m87 : (k: Int) -> Int ! Dep\napp/main.m88 : (k: Int) -> Int ! Dep\napp/main.m89 : (k: Int) -> Int ! Dep\napp/main.m90 : (k: Int) -> Int ! Dep\napp/main.m91 : (k: Int) -> Int ! Dep\napp/main.m92 : (k: Int) -> Int ! Dep\napp/main.m93 : (k: Int) -> Int ! Dep\napp/main.m94 : (k: Int) -> Int ! Dep\napp/main.m95 : (k: Int) -> Int ! Dep\napp/main.m96 : (k: Int) -> Int ! Dep\napp/main.m97 : (k: Int) -> Int ! Dep\napp/main.m98 : (k: Int) -> Int ! Dep\napp/main.m99 : (k: Int) -> Int ! Dep\napp/main.m100 : (k: Int) -> Int ! Dep\napp/main.m101 : (k: Int) -> Int ! Dep\napp/main.m102 : (k: Int) -> Int ! Dep\napp/main.m103 : (k: Int) -> Int ! Dep\napp/main.m104 : (k: Int) -> Int ! Dep\napp/main.m105 : (k: Int) -> Int ! Dep\napp/main.m106 : (k: Int) -> Int ! Dep\napp/main.m107 : (k: Int) -> Int ! Dep\napp/main.m108 : (k: Int) -> Int ! Dep\napp/main.m109 : (k: Int) -> Int ! Dep\napp/main.m110 : (k: Int) -> Int ! Dep\napp/main.m111 : (k: Int) -> Int ! Dep\napp/main.m112 : (k: Int) -> Int ! Dep\napp/main.m113 : (k: Int) -> Int ! Dep\napp/main.m114 : (k: Int) -> Int ! Dep\napp/main.m115 : (k: Int) -> Int ! Dep\napp/main.m116 : (k: Int) -> Int ! Dep\napp/main.m117 : (k: Int) -> Int ! Dep\napp/main.m118 : (k: Int) -> Int ! Dep\napp/main.m119 : (k: Int) -> Int ! Dep\napp/main.m120 : (k: Int) -> Int ! Dep\napp/main.m121 : (k: Int) -> Int ! Dep\napp/main.m122 : (k: Int) -> Int ! Dep\napp/main.m123 : (k: Int) -> Int ! Dep\napp/main.m124 : (k: Int) -> Int ! Dep\napp/main.m125 : (k: Int) -> Int ! Dep\napp/main.m126 : (k: Int) -> Int ! Dep\napp/main.m127 : (k: Int) -> Int ! Dep\napp/main.m128 : (k: Int) -> Int ! Dep\napp/main.m129 : (k: Int) -> Int ! Dep\napp/main.m130 : (k: Int) -> Int ! Dep\napp/main.m131 : (k: Int) -> Int ! Dep\napp/main.m132 : (k: Int) -> Int ! Dep\napp/main.m133 : (k: Int) -> Int ! Dep\napp/main.m134 : (k: Int) -> Int ! Dep\napp/main.m135 : (k: Int) -> Int ! Dep\napp/main.m136 : (k: Int) -> Int ! Dep\napp/main.m137 : (k: Int) -> Int ! Dep\napp/main.m138 : (k: Int) -> Int ! Dep\napp/main.m139 : (k: Int) -> Int ! Dep\napp/main.m140 : (k: Int) -> Int ! Dep\napp/main.m141 : (k: Int) -> Int ! Dep\napp/main.m142 : (k: Int) -> Int ! Dep\napp/main.m143 : (k: Int) -> Int ! Dep\napp/main.m144 : (k: Int) -> Int ! Dep\napp/main.m145 : (k: Int) -> Int ! Dep\napp/main.m146 : (k: Int) -> Int ! Dep\napp/main.m147 : (k: Int) -> Int ! Dep\napp/main.m148 : (k: Int) -> Int ! Dep\napp/main.m149 : (k: Int) -> Int ! Dep\n",
+      "stderr": ""
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": ""
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": ""
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 0,
+      "stdout": "lib/api.last : \"v99\"\nlib/api.identity : (m: \"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | \"v10\" | \"v11\" | \"v12\" | \"v13\" | \"v14\" | \"v15\" | \"v16\" | \"v17\" | \"v18\" | \"v99\") -> \"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | \"v10\" | \"v11\" | \"v12\" | \"v13\" | \"v14\" | \"v15\" | \"v16\" | \"v17\" | \"v18\" | \"v99\"\n",
+      "stderr": ""
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass lib/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": ""
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass lib/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": ""
+    }
+  }
+}
