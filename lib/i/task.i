@@ -93,6 +93,12 @@ ScheduleError {
 StepAnswer {
 	Proceed(Keyed)
 	CancelStep(() -> Never)
+	ForwardStep(
+		ForeignNotice
+		Keyed
+		Bool
+		(ForeignNotice, Keyed, Bool) -> Keyed
+	)
 }
 
 Completion {
@@ -122,8 +128,9 @@ Runner {
 		context:  request.Root
 		policy:   Policy
 		allocate: () -> List(Int)
-		wait:     (request.Root, List(Ticket)) -> RunControl
-		poll:     (Key(Nil), List(Ticket)) -> RunControl
+		active:   (Key(Nil), Active) -> RunControl
+		wait:     (Key(Nil), request.Root, List(Ticket)) -> RunControl
+		poll:     (Key(Nil), List(Ticket), Bool) -> RunControl
 		forget:   (Key(Nil)) -> Nil
 	)
 }
@@ -168,13 +175,18 @@ Frame {
 	Frame(
 		scope:     Maybe(Address)
 		abort:     () -> Never
-		immune:    List(Int)
+		interrupt: () -> Never
+		relay:     (ForeignNotice, Keyed, Bool) -> Keyed
+		foreign:   List(Hop)
+		immune:    List(Cause)
 		unwinding: Maybe(Int)
+		deferred:  Bool
+		cause:     Maybe(Cause)
 	)
 }
 
 Cause {
-	Cause(scope: Maybe(Address), epoch: Int)
+	Cause(run: Key(Nil), scope: Maybe(Address), epoch: Int)
 }
 
 Outcome {
@@ -204,9 +216,14 @@ TaskState {
 		portable_record: Bool
 		chain:           List(Address)
 		frames:          List(Frame)
-		immune:          List(Int)
+		immune:          List(Cause)
 		spawn:           Int
 		handles:         Int
+		nested:          List(Nest)
+		driver:          Maybe(Key(Nil))
+		foreign:         List(ForeignGuard)
+		messages:        List(ForeignNotice)
+		cancelled_by:    Maybe(Cause)
 		status:          Status
 		outcome:         Outcome
 		clean:           Bool
@@ -219,7 +236,10 @@ ScopeState {
 		address:      Address
 		body:         List(Int)
 		chain:        List(Address)
-		immune:       List(Int)
+		immune:       List(Cause)
+		cleanup:      Bool
+		foreign:      List(Hop)
+		token:        Key(Nil)
 		children:     List(List(Int))
 		mark:         BodyMark
 		errors:       List((List(Int), Keyed))
@@ -261,6 +281,15 @@ Registration {
 	Registration(id: Int, task: List(Int), leaves: List(Leaf))
 }
 
+Nest {
+	Nest(
+		id:       Key(Nil)
+		anchor:   Maybe(Address)
+		active:   Active
+		notified: List(Cause)
+	)
+}
+
 Forward {
 	Forward(id: Key(Nil), tickets: List(Ticket))
 }
@@ -290,13 +319,23 @@ State {
 }
 
 Command {
-	Register(Maybe(Address), () -> Never)
+	Register(
+		Maybe(Address)
+		() -> Never
+		() -> Never
+		(ForeignNotice, Keyed, Bool) -> Keyed
+	)
+	ExternalCancel
+	Relay(ForeignNotice, Keyed, Bool)
+	FinishScope(ScopeInfo)
 	NewScope(Witness, Mode)
 	EndScope(ScopeInfo, Completion)
 	Spawn(ScopeInfo, Start)
 	NextRun
 	Yield
 	Wait(List(Ticket))
+	NestedActive(Key(Nil), Active)
+	NestedWait(Key(Nil), List(Ticket))
 	ForwardWait(Key(Nil), List(Ticket))
 	ForgetWait(Key(Nil))
 	NewChannel(Witness)
@@ -316,6 +355,7 @@ RunReply {
 RunControl {
 	ContinueRun
 	ParentCancel(() -> Never)
+	ForwardRun(ForeignNotice)
 }
 
 ScopeResult(A) {
@@ -366,6 +406,11 @@ answer = (reply: StepAnswer) {
 	reply |> {
 		Proceed(v)         -> v
 		CancelStep(cancel) -> cancel()
+		ForwardStep(notice, value, discard, relay) -> relay(
+			notice
+			value
+			discard
+		)
 	}
 }
 
@@ -487,6 +532,11 @@ guarded = (
 				control.cancel(k)
 				Abandoned
 			})
+		}, () {
+			ask(own, ExternalCancel)
+			panic("task: cancellation returned")
+		}, (notice: ForeignNotice, value: Keyed, discard: Bool) {
+			ask(own, Relay(notice, value, discard))
 		}))
 		body()
 	})
@@ -568,7 +618,7 @@ observe_change: (root: Key(Nil)) -> Request(Nil)
 @external("ilang:request", "has_work")
 has_work: (ticket: Ticket) -> Bool
 
-wait_root = (root: request.Root, tickets: List(Ticket)) {
+wait_root = (_run: Key(Nil), root: request.Root, tickets: List(Ticket)) {
 	{ request.count_root(root) > 0 } |> {
 		False -> request.wait_any(tickets)
 		True -> {
@@ -582,10 +632,10 @@ wait_root = (root: request.Root, tickets: List(Ticket)) {
 	ContinueRun
 }
 
-root_poll = (_run: Key(Nil), tickets: List(Ticket)) {
-	tickets |> {
-		[] -> Nil
-		_  -> request.poll()
+root_poll = (_run: Key(Nil), tickets: List(Ticket), runnable: Bool) {
+	{ runnable && core.not(tickets == []) } |> {
+		False -> Nil
+		True  -> request.poll()
 	}
 	ContinueRun
 }
@@ -600,6 +650,7 @@ initial = (root: request.Root) -> Runner {
 		root
 		Fifo
 		root_allocate
+		root_active
 		wait_root
 		root_poll
 		root_forget
@@ -608,8 +659,9 @@ initial = (root: request.Root) -> Runner {
 
 run_control = (reply: StepAnswer) {
 	reply |> {
-		Proceed(_)        -> ContinueRun
-		CancelStep(abort) -> ParentCancel(abort)
+		Proceed(_)                   -> ContinueRun
+		CancelStep(abort)            -> ParentCancel(abort)
+		ForwardStep(notice, _, _, _) -> ForwardRun(notice)
 	}
 }
 
@@ -634,19 +686,25 @@ make_scheduler = (
 				upstream.context
 				policy
 				() { read(path_key, answer(route(NextRun))) }
-				(root: request.Root, tickets: List(Ticket)) {
+				(id: Key(Nil), active: Active) {
+					run_control(route(NestedActive(id, active)))
+				}
+				(id: Key(Nil), root: request.Root, tickets: List(Ticket)) {
 					{ request.count_root(root) > 0 } |> {
-						False -> run_control(route(Wait(tickets)))
+						False -> run_control(route(NestedWait(id, tickets)))
 						True -> {
 							changed = observe_change(root.key)
 							resource.ensure(
 								() {
 									run_control(
 										route(
-											Wait([
-												request.ticket(changed)
-												..tickets
-											])
+											NestedWait(
+												id
+												[
+													request.ticket(changed)
+													..tickets
+												]
+											)
 										)
 									)
 								}
@@ -655,7 +713,7 @@ make_scheduler = (
 						}
 					}
 				}
-				(id: Key(Nil), tickets: List(Ticket)) {
+				(id: Key(Nil), tickets: List(Ticket), _runnable: Bool) {
 					run_control(route(ForwardWait(id, tickets)))
 				}
 				(id: Key(Nil)) {
@@ -721,12 +779,12 @@ first_path = (a: List(Int), b: List(Int)) -> Bool {
 	}
 }
 
-active_epochs = (frames: List(Frame)) -> List(Int) {
+active_epochs = (frames: List(Frame)) -> List(Cause) {
 	frames |> {
 		[] -> []
-		[f, ..rest] -> f.unwinding |> {
+		[f, ..rest] -> f.cause |> {
 			Absent     -> active_epochs(rest)
-			Present(e) -> [e, ..active_epochs(rest)]
+			Present(c) -> [c, ..active_epochs(rest)]
 		}
 	}
 }
@@ -738,10 +796,17 @@ frame_plan = (frames: List(Frame), cause: Cause) -> Maybe(CancelPlan) {
 		[] -> Absent
 		[f, ..rest] -> f.unwinding |> {
 			Present(_) -> Absent
-			Absent -> { contains(f.immune, cause.epoch) } |> {
+			Absent -> { contains(f.immune, cause) } |> {
 				False -> Present(
 					CancelPlan(
-						[Frame(..f, unwinding: Present(cause.epoch)), ..rest]
+						[
+							Frame(
+								..f
+								unwinding: Present(cause.epoch)
+								cause:     Present(cause)
+							)
+							..rest
+						]
 						f.abort
 					)
 				)
@@ -762,12 +827,25 @@ cause_for_chain = (
 	chain: List(Address)
 ) -> Maybe(Cause) {
 	chain |> {
-		[] -> s.cancellation
+		[] -> {
+			t.cancelled_by |> {
+				Present(c) -> Present(c)
+				Absent     -> s.cancellation
+			}
+		} |> {
+			Absent -> Absent
+			Present(c) -> { cause_allowed(s, t, c) } |> {
+				True  -> Present(c)
+				False -> Absent
+			}
+		}
 		[id, ..rest] -> {
 			scope = find_scope(s.scopes, id)
 			scope.cancellation |> {
 				Absent -> cause_for_chain(s, t, rest)
-				Present(c) -> { contains(t.immune, c.epoch) } |> {
+				Present(c) -> {
+					contains(t.immune, c) || core.not(cause_allowed(s, t, c))
+				} |> {
 					True -> cause_for_chain(s, t, rest)
 					False -> frame_plan(t.frames, c) |> {
 						Present(_) -> Present(c)
@@ -811,7 +889,7 @@ reply = (
 }
 
 accept_cancel = (s: State, t: TaskState, c: Cause) -> State {
-	{ contains(t.immune, c.epoch) } |> {
+	{ contains(t.immune, c) || core.not(cause_allowed(s, t, c)) } |> {
 		True -> s
 		False -> t.status |> {
 			Dormant(_) -> {
@@ -830,9 +908,11 @@ accept_cancel = (s: State, t: TaskState, c: Cause) -> State {
 			_ -> frame_plan(t.frames, c) |> {
 				Absent -> s
 				Present(plan) -> {
-					terminal = c.scope |> {
-						Absent      -> True
-						Present(id) -> contains(t.base, id)
+					terminal = c.run != s.run || {
+						c.scope |> {
+							Absent      -> True
+							Present(id) -> contains(t.base, id)
+						}
 					}
 					outcome = t.outcome |> {
 						Pending -> { terminal } |> {
@@ -841,39 +921,66 @@ accept_cancel = (s: State, t: TaskState, c: Cause) -> State {
 						}
 						_ -> t.outcome
 					}
-					updated = TaskState(
-						..t
-						frames:  plan.frames
-						outcome: outcome
-					)
-					step = CancelStep(plan.abort)
-					status = t.status |> {
-						Runnable(k, _)
-							| WaitingTicket(k, _)
-							| WaitingScope(k, _)
-							| WaitingEvent(k, _)
-							| WaitingDrain(k) -> Runnable(k, step)
-						_ -> panic("task: invalid cancellation state")
+					deferred = affected_nests(t, plan.frames) |> {
+						[] -> False
+						_  -> True
 					}
-					next = remove_registration(
-						set_task(s, TaskState(..updated, status: status))
-						t.path
-					)
-					queue(
-						State(..next, waiting: without(next.waiting, t.path))
-						t.path
-					)
+					frames = list_map(plan.frames, (f: Frame) {
+						f.cause |> {
+							Present(cause) ? cause == c -> Frame(
+								..f
+								deferred: deferred
+							)
+							_ -> f
+						}
+					})
+					updated = TaskState(..t, frames: frames, outcome: outcome)
+					saved = set_task(s, updated)
+					{ deferred } |> {
+						False -> plan.frames |> {
+							[] -> panic("task: missing cancellation delimiter")
+							[frame, .._] -> frame.foreign |> {
+								[] -> cancel_response(
+									saved
+									updated
+									plan.abort
+								)
+								hops -> forward_response(
+									saved
+									updated
+									BeginForeign(
+										hops
+										scope_token(saved, frame.scope)
+										plan.abort
+										c
+									)
+								)
+							}
+						}
+						True -> t.driver |> {
+							Present(id) -> notify_nested(saved, updated, id)
+							Absent -> nested_abort(
+								affected_nests(t, plan.frames)
+							) |> {
+								Absent -> saved
+								Present(abort) -> cancel_response(
+									saved
+									updated
+									abort
+								)
+							}
+						}
+					}
 				}
 			}
 		}
 	}
 }
 
-propagate_tasks = (s: State, paths: List(List(Int))) -> State {
-	paths |> {
+propagate_tasks = (s: State, rows: List(TaskState)) -> State {
+	rows |> {
 		[] -> s
-		[p, ..rest] -> {
-			t = find_task(s.tasks, p)
+		[t, ..rest] -> {
 			next = cause_for_chain(s, t, t.chain) |> {
 				Absent     -> s
 				Present(c) -> accept_cancel(s, t, c)
@@ -883,9 +990,7 @@ propagate_tasks = (s: State, paths: List(List(Int))) -> State {
 	}
 }
 
-propagate = (s: State) {
-	propagate_tasks(s, list_map(s.tasks, (t: TaskState) { t.path }))
-}
+propagate = (s: State) { propagate_tasks(s, s.tasks) }
 
 cancel_scope = (s: State, id: Address) -> State {
 	scope = find_scope(s.scopes, id)
@@ -897,7 +1002,7 @@ cancel_scope = (s: State, id: Address) -> State {
 				State(..s, epoch: epoch)
 				ScopeState(
 					..scope
-					cancellation: Present(Cause(Present(id), epoch))
+					cancellation: Present(Cause(s.run, Present(id), epoch))
 				)
 			)
 		}
@@ -910,7 +1015,7 @@ cancel_run = (s: State) -> State {
 		Absent -> State(
 			..s
 			epoch:        s.epoch + 1
-			cancellation: Present(Cause(Absent, s.epoch + 1))
+			cancellation: Present(Cause(s.run, Absent, s.epoch + 1))
 		)
 	}
 }
@@ -1194,8 +1299,11 @@ scopes_of = (s: State, task_path: List(Int)) {
 refresh_clean = (s: State) {
 	State(..s, tasks: list_map(s.tasks, (t: TaskState) {
 		t.status |> {
-			Ended -> TaskState(..t, clean: core.not(scopes_of(s, t.path)))
-			_     -> t
+			Ended ? core.not(t.clean) -> TaskState(
+				..t
+				clean: core.not(scopes_of(s, t.path))
+			)
+			_ -> t
 		}
 	}))
 }
@@ -1238,7 +1346,7 @@ retire_scope = (s: State, scope: ScopeState) -> State {
 			row.owner != scope.address
 		})
 		tasks: filter(s.tasks, (t: TaskState) {
-			core.not(contains(scope.children, t.path))
+			t.parent != Present(scope.address)
 		})
 	)
 	body = find_task(next.tasks, scope.body)
@@ -1248,15 +1356,12 @@ retire_scope = (s: State, scope: ScopeState) -> State {
 				next
 				TaskState(
 					..body
-					status: Runnable(
-						k
-						Proceed(key.wrap(scope_reply_key, scope_reply(scope)))
-					)
+					status: Runnable(k, scope_end_reply(next, body, scope))
 				)
 			)
 			body.path
 		)
-		_ -> next
+		_ -> queue_scope_end(next, body, scope)
 	}
 }
 
@@ -1268,10 +1373,13 @@ retire_scopes = (s: State, rows: List(ScopeState)) -> State {
 				BodyOpen -> False
 				_        -> True
 			}
-			children_done = core.not(any(scope.children, (p: List(Int)) {
-				core.not(find_task(s.tasks, p).clean)
-			}))
-			{ closed && children_done } |> {
+			can_retire = { closed } |> {
+				False -> False
+				True -> core.not(any(s.tasks, (t: TaskState) {
+					t.parent == Present(scope.address) && core.not(t.clean)
+				}))
+			}
+			{ can_retire } |> {
 				False -> retire_scopes(s, rest)
 				True -> {
 					next = refresh_clean(retire_scope(s, scope))
@@ -1283,7 +1391,7 @@ retire_scopes = (s: State, rows: List(ScopeState)) -> State {
 }
 
 maintain = (s: State) -> State {
-	cancelled = propagate(s)
+	cancelled = propagate(pump_messages(propagate(s)))
 	tickets = wake_tickets(cancelled, cancelled.waiting)
 	events = recheck_events(tickets, tickets.registrations)
 	retire_scopes(refresh_clean(events), events.scopes)
@@ -1358,10 +1466,41 @@ do_command = (
 	command: Command
 ) -> State {
 	command |> {
-		Register(owner, abort) -> {
-			frame = Frame(owner, abort, exemptions(t), Absent)
-			set_task(s, TaskState(..t, frames: [frame, ..t.frames]))
+		Register(owner, abort, interrupt, relay) -> {
+			foreign = t.nested |> {
+				[]         -> []
+				[row, .._] -> row.active.hops
+			}
+			frame = Frame(
+				owner
+				abort
+				interrupt
+				relay
+				foreign
+				exemptions(t)
+				Absent
+				False
+				Absent
+			)
+			next = set_task(s, TaskState(..t, frames: [frame, ..t.frames]))
+			owner |> {
+				Absent -> next
+				Present(id) -> {
+					scope = find_scope(next.scopes, id)
+					set_scope(next, ScopeState(..scope, foreign: foreign))
+				}
+			}
 		}
+		ExternalCancel -> cancel_run(s)
+		Relay(notice, value, discard) -> relay_notice(
+			s
+			t
+			k
+			notice
+			value
+			discard
+		)
+		FinishScope(info) -> finish_scope(s, t, k, info)
 		NextRun -> {
 			index = t.spawn + 1
 			child_path = append(t.path, [index])
@@ -1394,6 +1533,11 @@ do_command = (
 				immune
 				0
 				0
+				[]
+				Absent
+				[]
+				[]
+				Absent
 				status
 				outcome
 				clean
@@ -1429,6 +1573,16 @@ do_command = (
 				t.path
 				chain
 				exemptions(t)
+				cleanup_chain(s, t.chain) ||
+					foreign_active(t) ||
+					any(t.frames, (f: Frame) {
+						f.unwinding |> {
+							Present(_) -> True
+							Absent     -> False
+						}
+					})
+				[]
+				key.new()
 				[]
 				BodyOpen
 				[]
@@ -1473,12 +1627,12 @@ do_command = (
 				ScopeState(..scope, mark: mark, errors: errors)
 			)
 			mark |> {
-				BodyError -> cancel_scope(next, id)
-				_         -> next
+				BodyError | BodyCancelled -> cancel_scope(next, id)
+				_                         -> next
 			}
 		}
 		Yield -> queue(State(..s, current: Absent), t.path)
-		Wait(tickets) -> {
+		Wait(tickets) | NestedWait(_, tickets) -> {
 			{ any(tickets, request.settled) } |> {
 				True -> queue(State(..s, current: Absent), t.path)
 				False -> {
@@ -1494,6 +1648,7 @@ do_command = (
 				}
 			}
 		}
+		NestedActive(_, _) -> s
 		ForwardWait(id, tickets) -> {
 			next = State(
 				..s
@@ -1502,9 +1657,15 @@ do_command = (
 			)
 			queue(next, t.path)
 		}
-		ForgetWait(id) -> State(
-			..s
-			forwards: filter(s.forwards, (row: Forward) { row.id != id })
+		ForgetWait(id) -> set_task(
+			State(..s, forwards: filter(s.forwards, (row: Forward) {
+				row.id != id
+			}))
+			TaskState(
+				..t
+				nested: filter(t.nested, (row: Nest) { row.id != id })
+				driver: Absent
+			)
 		)
 		NewChannel(witness) -> {
 			id = new_address(t)
@@ -1569,10 +1730,20 @@ on_command = (
 ) {
 	t = find_task(s.tasks, task_path)
 	prevalidate(s, t, command)
-	prepared = reply(s, task_path, k, Proceed(unit()), False)
+	prepared = register_driver(
+		reply(s, task_path, k, Proceed(unit()), False)
+		task_path
+		command
+	)
 	incoming = find_task(prepared.tasks, task_path)
-	command |> {
-		Register(..) | Spawn(..) | EndScope(..) -> propagate(
+	next = command |> {
+		Register(..)
+			| Spawn(..)
+			| EndScope(..)
+			| ForgetWait(..)
+			| ExternalCancel
+			| Relay(..)
+			| FinishScope(..) -> propagate(
 			do_command(prepared, incoming, k, command)
 		)
 		_ -> {
@@ -1584,6 +1755,7 @@ on_command = (
 			}
 		}
 	}
+	deliver_deferred(next, task_path, command)
 }
 
 observe_completion = (s: State, t: TaskState, completion: Completion) -> State {
@@ -1591,7 +1763,7 @@ observe_completion = (s: State, t: TaskState, completion: Completion) -> State {
 		Pending -> completion |> {
 			Succeeded(value) -> Success(value)
 			Failed(value, _) -> Failure(value)
-			Abandoned        -> Cancelled(Cause(Absent, s.epoch))
+			Abandoned        -> Cancelled(Cause(s.run, Absent, s.epoch))
 		}
 		_ -> t.outcome
 	}
@@ -1678,7 +1850,8 @@ interests = (s: State) {
 
 apply_run_control = (s: State, result: RunControl) {
 	result |> {
-		ContinueRun -> s
+		ContinueRun        -> s
+		ForwardRun(notice) -> post_notice(s, notice)
 		ParentCancel(abort) -> cancel_run(
 			State(..s, outer_cancel: Present(abort))
 		)
@@ -1744,39 +1917,61 @@ loop = (state: State) -> RunReply {
 					}
 					polled = s.current |> {
 						Present(_) -> s
-						Absent -> { s.scripted } |> {
-							True -> s
-							False -> apply_run_control(
-								s
-								runner.poll(s.run, work)
-							)
-						}
+						Absent -> apply_run_control(
+							s
+							runner.poll(s.run, work, core.not(s.ready == []))
+						)
 					}
+
 					prepared = choose_turn(
 						maintain(choose_turn(maintain(polled)))
 					)
 					prepared.current |> {
 						Present(p) -> {
 							t = find_task(prepared.tasks, p)
-							running = set_task(
-								State(
-									..prepared
-									current: Absent
-									ready:   without(prepared.ready, p)
-								)
-								TaskState(..t, status: Running)
-							)
-							turn(running, t) |> {
-								Switched(path, command, k) -> loop(
-									on_command(running, path, command, k)
-								)
-								Finished(path, completion) -> loop(
-									observe_completion(
-										running
-										find_task(running.tasks, path)
-										completion
+							runner.active(
+								prepared.run
+								effective_active(prepared, t)
+							) |> {
+								ParentCancel(abort) -> loop(
+									cancel_run(
+										State(
+											..prepared
+											outer_cancel: Present(abort)
+										)
 									)
 								)
+								ForwardRun(notice) -> loop(
+									post_notice(prepared, notice)
+								)
+								ContinueRun -> {
+
+									running = set_task(
+										State(
+											..prepared
+											current: Absent
+											ready:   without(prepared.ready, p)
+										)
+										TaskState(..t, status: Running)
+									)
+									turn(running, t) |> {
+										Switched(path, command, k) -> loop(
+											on_command(
+												running
+												path
+												command
+												k
+											)
+										)
+										Finished(path, completion) -> loop(
+											observe_completion(
+												running
+												find_task(running.tasks, path)
+												completion
+											)
+										)
+									}
+								}
 							}
 						}
 						Absent -> {
@@ -1802,6 +1997,7 @@ loop = (state: State) -> RunReply {
 												apply_run_control(
 													prepared
 													runner.wait(
+														prepared.run
 														prepared.root
 														tickets
 													)
@@ -1842,23 +2038,28 @@ scope_call_body(A, E, N) = (
 			}
 		}
 	})
-	completed = guarded(own, Present(read(address_key, info.id)), () {
-		kept(Nil)
-	})
-	mark = completed |> {
-		Succeeded(_) -> Succeeded(unit())
-		other        -> other
-	}
-	read(scope_reply_key, ask(own, EndScope(info, mark))) |> {
-		ScopeError(error)  -> fail.raise(read(errors, error))
-		ScopeWinner(value) -> WinnerValue(value)
-		ScopeOk -> completed |> {
-			Succeeded(value) -> BodyValue(
-				fail.from_result(read(results, value))
-			)
-			_ -> panic("task: missing scope result")
+	resource.ensure(() {
+		completed = guarded(own, Present(read(address_key, info.id)), () {
+			kept(Nil)
+		})
+		mark = completed |> {
+			Succeeded(_) -> Succeeded(unit())
+			other        -> other
 		}
-	}
+		read(scope_reply_key, ask(own, EndScope(info, mark))) |> {
+			ScopeError(error)  -> fail.raise(read(errors, error))
+			ScopeWinner(value) -> WinnerValue(value)
+			ScopeOk -> completed |> {
+				Succeeded(value) -> BodyValue(
+					fail.from_result(read(results, value))
+				)
+				_ -> panic("task: missing scope result")
+			}
+		}
+	}, () {
+		ask(own, FinishScope(info))
+		Nil
+	})
 }
 
 scope(A, E, N) = (
@@ -2137,6 +2338,11 @@ execute_body(A, E, N) = (
 				[]
 				0
 				0
+				[]
+				Absent
+				[]
+				[]
+				Absent
 				Dormant(start)
 				Pending
 				False
@@ -2242,4 +2448,665 @@ execute(A, E, N) = (
 sync(A, E, N) = (e: Event(A, E, N), own ! Scheduler) -> A ? E ! N | Scheduler {
 	kept = control.keep_env((_: Nil) { sync_body(e, own) })
 	retain(kept(Nil))
+}
+
+root_active = (_run: Key(Nil), _active: Active) { ContinueRun }
+
+cleanup_chain = (s: State, chain: List(Address)) -> Bool {
+	any(chain, (id: Address) { find_scope(s.scopes, id).cleanup })
+}
+
+cause_allowed = (s: State, t: TaskState, cause: Cause) -> Bool {
+	scopes_ok = core.not(any(t.chain, (id: Address) {
+		scope = find_scope(s.scopes, id)
+		scope.cleanup && {
+			cause.run != s.run || {
+				cause.scope |> {
+					Absent -> True
+					Present(source) -> core.not(
+						contains(find_scope(s.scopes, source).chain, id)
+					)
+				}
+			}
+		}
+	}))
+	guards_ok = core.not(any(t.foreign, (guard: ForeignGuard) {
+		cause.run != s.run || {
+			cause.scope |> {
+				Absent -> True
+				Present(source) -> guard.anchor |> {
+					Absent -> False
+					Present(anchor) -> source == anchor ||
+						core.not(
+							contains(find_scope(s.scopes, source).chain, anchor)
+						)
+				}
+			}
+		}
+	}))
+	scopes_ok && guards_ok
+}
+
+frame_abort = (frames: List(Frame)) -> Maybe(() -> Never) {
+	frames |> {
+		[] -> Absent
+		[f, .._] -> f.unwinding |> {
+			Absent     -> Present(f.interrupt)
+			Present(_) -> Absent
+		}
+	}
+}
+
+effective_active = (s: State, t: TaskState) -> Active {
+	relay = t.frames |> {
+		[]           -> empty_relay
+		[frame, .._] -> frame.relay
+	}
+	hop = Hop(
+		s.run
+		key.wrap(path_key, t.path)
+		frame_owner(t.frames)
+		frame_epoch(t.frames)
+		list_map(t.foreign, (guard: ForeignGuard) { guard.token })
+	)
+	own = { cleanup_chain(s, t.chain) || foreign_active(t) } |> {
+		True  -> Absent
+		False -> frame_abort(t.frames)
+	}
+	t.nested |> {
+		[] -> Active([hop], own, relay)
+		[row, .._] -> {
+			abort = own |> {
+				Absent     -> Absent
+				Present(_) -> nested_abort(t.nested)
+			}
+			Active([hop, ..row.active.hops], abort, relay)
+		}
+	}
+}
+
+put_nest = (
+	rows: List(Nest)
+	id: Key(Nil)
+	anchor: Maybe(Address)
+	active: Active
+) -> List(Nest) {
+	old = filter(rows, (row: Nest) { row.id == id })
+	notified = old |> {
+		[]         -> []
+		[row, .._] -> row.notified
+	}
+	parent = old |> {
+		[]         -> anchor
+		[row, .._] -> row.anchor
+	}
+	[Nest(id, parent, active, notified), ..filter(rows, (row: Nest) {
+		row.id != id
+	})]
+}
+
+register_driver = (s: State, task_path: List(Int), command: Command) -> State {
+	t = find_task(s.tasks, task_path)
+	(nested, driver) = command |> {
+		NestedActive(id, active) -> (
+			put_nest(t.nested, id, frame_owner(t.frames), active)
+			Present(id)
+		)
+		ForwardWait(id, _) | NestedWait(id, _) -> {
+			rows = { any(t.nested, (row: Nest) { row.id == id }) } |> {
+				True -> t.nested
+				False -> put_nest(
+					t.nested
+					id
+					frame_owner(t.frames)
+					empty_active
+				)
+			}
+			(rows, Present(id))
+		}
+		ForgetWait(id) -> (list_map(t.nested, (row: Nest) {
+			{ row.id == id } |> {
+				True  -> Nest(..row, active: Active(..row.active, abort: Absent))
+				False -> row
+			}
+		}), Absent)
+		_ -> (t.nested, Absent)
+	}
+	set_task(s, TaskState(..t, nested: nested, driver: driver))
+}
+
+pending_frame = (frames: List(Frame)) -> Maybe(Frame) {
+	frames |> {
+		[] -> Absent
+		[f, .._] -> { f.deferred } |> {
+			True  -> Present(f)
+			False -> Absent
+		}
+	}
+}
+
+older_shield = (rows: List(Nest), id: Key(Nil)) -> Bool {
+	rows |> {
+		[] -> False
+		[row, ..rest] -> { row.id == id } |> {
+			False -> older_shield(rest, id)
+			True -> any(rest, (older: Nest) {
+				older.active.abort |> {
+					Absent     -> True
+					Present(_) -> False
+				}
+			})
+		}
+	}
+}
+
+cancel_response = (s: State, t: TaskState, abort: () -> Never) -> State {
+	status = t.status |> {
+		Runnable(k, _)
+			| WaitingTicket(k, _)
+			| WaitingScope(k, _)
+			| WaitingEvent(k, _)
+			| WaitingDrain(k) -> Runnable(k, CancelStep(abort))
+		_ -> panic("task: invalid cancellation response")
+	}
+	next = remove_registration(
+		set_task(s, TaskState(..t, status: status))
+		t.path
+	)
+	queue(State(..next, waiting: without(next.waiting, t.path)), t.path)
+}
+
+notify_nested = (s: State, t: TaskState, id: Key(Nil)) -> State {
+	pending_frame(t.frames) |> {
+		Absent -> s
+		Present(frame) -> frame.cause |> {
+			Absent -> panic("task: invalid deferred cancellation")
+			Present(cause) -> {
+				rows = affected_nests(t, t.frames)
+				relevant = any(rows, (row: Nest) { row.id == id })
+				notified = any(rows, (row: Nest) {
+					row.id == id && contains(row.notified, cause)
+				})
+				{
+					core.not(relevant) || notified || older_shield(rows, id)
+				} |> {
+					True -> s
+					False -> {
+						nested = list_map(t.nested, (row: Nest) {
+							{ row.id == id } |> {
+								True -> Nest(
+									..row
+									notified: [cause, ..row.notified]
+								)
+								False -> row
+							}
+						})
+						cancel_response(
+							s
+							TaskState(..t, nested: nested)
+							frame.abort
+						)
+					}
+				}
+			}
+		}
+	}
+}
+
+deliver_deferred = (s: State, path: List(Int), command: Command) -> State {
+	t = find_task(s.tasks, path)
+	{ cancellation_reply(t) } |> {
+		True -> s
+		False -> t.driver |> {
+			Present(id) -> notify_nested(s, t, id)
+			Absent -> pending_frame(t.frames) |> {
+				Absent -> s
+				Present(frame) -> affected_nests(t, t.frames) |> {
+					[] -> {
+						frames = t.frames |> {
+							[]          -> []
+							[f, ..rest] -> [Frame(..f, deferred: False), ..rest]
+						}
+						frame.foreign |> {
+							[] -> cancel_response(
+								s
+								TaskState(..t, frames: frames)
+								frame.abort
+							)
+							hops -> frame.cause |> {
+								Absent -> panic("task: missing deferred cause")
+								Present(cause) -> forward_response(
+									s
+									TaskState(..t, frames: frames)
+									BeginForeign(
+										hops
+										scope_token(s, frame.scope)
+										frame.abort
+										cause
+									)
+								)
+							}
+						}
+					}
+					[first, .._] -> command |> {
+						ForgetWait(_) -> {
+							any(affected_nests(t, t.frames), (row: Nest) {
+								row.active.abort |> {
+									Absent     -> True
+									Present(_) -> False
+								}
+							})
+						} |> {
+							True -> s
+							False -> first.active.abort |> {
+								Absent         -> s
+								Present(abort) -> cancel_response(s, t, abort)
+							}
+						}
+						_ -> s
+					}
+				}
+			}
+		}
+	}
+}
+
+frame_owner = (frames: List(Frame)) -> Maybe(Address) {
+	frames |> {
+		[]       -> Absent
+		[f, .._] -> f.scope
+	}
+}
+
+anchor_within = (
+	frames: List(Frame)
+	anchor: Maybe(Address)
+	target: Maybe(Address)
+) -> Bool {
+	frames |> {
+		[] -> False
+		[f, ..rest] -> { f.scope == anchor } |> {
+			True -> True
+			False -> { f.scope == target } |> {
+				True  -> False
+				False -> anchor_within(rest, anchor, target)
+			}
+		}
+	}
+}
+
+affected_nests = (t: TaskState, frames: List(Frame)) -> List(Nest) {
+	frames |> {
+		[] -> []
+		[f, .._] -> filter(t.nested, (row: Nest) {
+			anchor_within(t.frames, row.anchor, f.scope)
+		})
+	}
+}
+
+nested_abort = (rows: List(Nest)) -> Maybe(() -> Never) {
+	rows |> {
+		[] -> Absent
+		[first, .._] -> {
+			any(rows, (row: Nest) {
+				row.active.abort |> {
+					Absent     -> True
+					Present(_) -> False
+				}
+			})
+		} |> {
+			True  -> Absent
+			False -> first.active.abort
+		}
+	}
+}
+
+Hop {
+	Hop(
+		run:     Key(Nil)
+		task:    Keyed
+		anchor:  Maybe(Address)
+		epoch:   Maybe(Cause)
+		foreign: List(Key(Nil))
+	)
+}
+
+Active {
+	Active(
+		hops:  List(Hop)
+		abort: Maybe(() -> Never)
+		relay: (ForeignNotice, Keyed, Bool) -> Keyed
+	)
+}
+
+ForeignGuard {
+	ForeignGuard(token: Key(Nil), anchor: Maybe(Address))
+}
+
+ForeignNotice {
+	BeginForeign(List(Hop), Key(Nil), () -> Never, Cause)
+	EndForeign(List(Hop), Key(Nil))
+}
+
+empty_relay = (_notice: ForeignNotice, _value: Keyed, _discard: Bool) -> Keyed {
+	panic("task: missing foreign relay")
+}
+
+empty_active = Active([], Absent, empty_relay)
+
+foreign_active = (t: TaskState) {
+	t.foreign |> {
+		[] -> False
+		_  -> True
+	}
+}
+
+frame_epoch = (frames: List(Frame)) -> Maybe(Cause) {
+	frames |> {
+		[]       -> Absent
+		[f, .._] -> f.cause
+	}
+}
+
+scope_token = (s: State, owner: Maybe(Address)) -> Key(Nil) {
+	owner |> {
+		Absent      -> panic("task: foreign root delimiter")
+		Present(id) -> find_scope(s.scopes, id).token
+	}
+}
+
+notice_with = (notice: ForeignNotice, hops: List(Hop)) -> ForeignNotice {
+	notice |> {
+		BeginForeign(_, token, abort, cause) -> BeginForeign(
+			hops
+			token
+			abort
+			cause
+		)
+		EndForeign(_, token) -> EndForeign(hops, token)
+	}
+}
+
+current_relay = (t: TaskState) -> (ForeignNotice, Keyed, Bool) -> Keyed {
+	t.driver |> {
+		Present(id) -> {
+			rows = filter(t.nested, (row: Nest) { row.id == id })
+			rows |> {
+				[]         -> empty_relay
+				[row, .._] -> row.active.relay
+			}
+		}
+		Absent -> t.nested |> {
+			[]         -> empty_relay
+			[row, .._] -> row.active.relay
+		}
+	}
+}
+
+forward_response = (s: State, t: TaskState, notice: ForeignNotice) -> State {
+	relay = current_relay(t)
+	status = t.status |> {
+		Runnable(k, Proceed(value)) -> Runnable(
+			k
+			ForwardStep(notice, value, False, relay)
+		)
+		WaitingTicket(k, _)
+			| WaitingScope(k, _)
+			| WaitingEvent(k, _)
+			| WaitingDrain(k) -> {
+			discard = t.driver |> {
+				Absent     -> True
+				Present(_) -> False
+			}
+			Runnable(k, ForwardStep(notice, unit(), discard, relay))
+		}
+		_ -> t.status
+	}
+	next = remove_registration(
+		set_task(s, TaskState(..t, status: status))
+		t.path
+	)
+	queue(State(..next, waiting: without(next.waiting, t.path)), t.path)
+}
+
+scope_end_reply = (s: State, t: TaskState, scope: ScopeState) -> StepAnswer {
+	value = key.wrap(scope_reply_key, scope_reply(scope))
+	scope.foreign |> {
+		[] -> Proceed(value)
+		hops -> ForwardStep(
+			EndForeign(hops, scope.token)
+			value
+			False
+			current_relay(t)
+		)
+	}
+}
+
+queue_scope_end = (s: State, t: TaskState, scope: ScopeState) -> State {
+	scope.foreign |> {
+		[] -> s
+		hops -> set_task(
+			s
+			TaskState(
+				..t
+				messages: append(t.messages, [EndForeign(hops, scope.token)])
+			)
+		)
+	}
+}
+
+finish_scope = (
+	s: State
+	t: TaskState
+	k: Continuation(StepAnswer, Turn, Never, Never)
+	info: ScopeInfo
+) -> State {
+	id = read(address_key, info.id)
+	alive = any(s.scopes, (scope: ScopeState) { scope.address == id })
+	{ alive } |> {
+		False -> reply(s, t.path, k, Proceed(unit()), False)
+		True -> {
+			scope = find_scope(s.scopes, id)
+			(frames, chain) = scope.mark |> {
+				BodyOpen -> (end_frame(t.frames, id), without(t.chain, id))
+				_        -> (t.frames, t.chain)
+			}
+			body = TaskState(
+				..t
+				frames: frames
+				chain:  chain
+				status: WaitingScope(k, id)
+			)
+			closed = ScopeState(..scope, mark: BodyCancelled)
+			cancel_scope(
+				set_scope(set_task(State(..s, current: Absent), body), closed)
+				id
+			)
+		}
+	}
+}
+
+anchor_epoch = (
+	frames: List(Frame)
+	anchor: Maybe(Address)
+) -> Maybe(Maybe(Cause)) {
+	frames |> {
+		[] -> Absent
+		[frame, ..rest] -> { frame.scope == anchor } |> {
+			True  -> Present(frame.cause)
+			False -> anchor_epoch(rest, anchor)
+		}
+	}
+}
+
+unwinding_above = (frames: List(Frame), anchor: Maybe(Address)) -> Bool {
+	frames |> {
+		[] -> False
+		[frame, ..rest] -> { frame.scope == anchor } |> {
+			True -> False
+			False -> frame.unwinding |> {
+				Present(_) -> True
+				Absent     -> unwinding_above(rest, anchor)
+			}
+		}
+	}
+}
+
+notice_ready = (t: TaskState, hop: Hop) -> Bool {
+	core.not(unwinding_above(t.frames, hop.anchor))
+}
+
+notice_live = (t: TaskState, hop: Hop) -> Bool {
+	epoch_ok = anchor_epoch(t.frames, hop.anchor) |> {
+		Absent         -> False
+		Present(epoch) -> epoch == hop.epoch
+	}
+	tokens_ok = core.not(any(t.foreign, (guard: ForeignGuard) {
+		core.not(contains(hop.foreign, guard.token))
+	}))
+	epoch_ok && tokens_ok
+}
+
+post_notice = (s: State, notice: ForeignNotice) -> State {
+	notice_hops(notice) |> {
+		[] -> s
+		[hop, .._] -> {
+			check_run(s.run, hop.run)
+			path = read(path_key, hop.task)
+			alive = any(s.tasks, (t: TaskState) { t.path == path })
+			{ alive } |> {
+				False -> s
+				True -> {
+					t = find_task(s.tasks, path)
+					set_task(
+						s
+						TaskState(..t, messages: append(t.messages, [notice]))
+					)
+				}
+			}
+		}
+	}
+}
+
+apply_notice = (s: State, t: TaskState, notice: ForeignNotice) -> State {
+	notice_hops(notice) |> {
+		[] -> s
+		[hop, ..rest] -> rest |> {
+			[] -> notice |> {
+				BeginForeign(_, token, abort, _) -> { notice_live(t, hop) } |> {
+					False -> s
+					True -> {
+						guards = [ForeignGuard(token, hop.anchor), ..t.foreign]
+						cancel_response(
+							s
+							TaskState(..t, foreign: guards)
+							abort
+						)
+					}
+				}
+				EndForeign(_, token) -> set_task(
+					s
+					TaskState(
+						..t
+						foreign: filter(t.foreign, (guard: ForeignGuard) {
+							guard.token != token
+						})
+					)
+				)
+			}
+			_ -> forward_response(s, t, notice_with(notice, rest))
+		}
+	}
+}
+
+pump_task_messages = (s: State, path: List(Int)) -> State {
+	t = find_task(s.tasks, path)
+	t.messages |> {
+		[] -> s
+		[notice, ..rest] -> {
+			responsive = t.status |> {
+				Runnable(_, Proceed(_)) -> True
+				WaitingTicket(_, _)
+					| WaitingScope(_, _)
+					| WaitingEvent(_, _)
+					| WaitingDrain(_) -> t.driver |> {
+					Present(_)        -> True
+					Absent -> notice |> {
+						BeginForeign(..) -> True
+						EndForeign(..)   -> False
+					}
+				}
+				_ -> False
+			}
+			ready = notice |> {
+				EndForeign(..) -> True
+				BeginForeign(hops, _, _, _) -> hops |> {
+					[hop] -> notice_ready(t, hop)
+					_     -> True
+				}
+			}
+			{ responsive && ready } |> {
+				False -> s
+				True -> {
+					updated = TaskState(..t, messages: rest)
+					apply_notice(set_task(s, updated), updated, notice)
+				}
+			}
+		}
+	}
+}
+
+pump_rows = (s: State, rows: List(TaskState)) -> State {
+	rows |> {
+		[] -> s
+		[t, ..rest] -> t.messages |> {
+			[] -> pump_rows(s, rest)
+			_  -> pump_rows(pump_task_messages(s, t.path), rest)
+		}
+	}
+}
+
+pump_messages = (s: State) { pump_rows(s, s.tasks) }
+
+relay_notice = (
+	s: State
+	t: TaskState
+	k: Continuation(StepAnswer, Turn, Never, Never)
+	notice: ForeignNotice
+	value: Keyed
+	discard: Bool
+) -> State {
+	base = reply(s, t.path, k, Proceed(value), False)
+	next = pump_messages(post_notice(base, notice))
+	current = find_task(next.tasks, t.path)
+	current.status |> {
+		Runnable(continuation, ForwardStep(rest, answer, prior_discard, relay)) -> set_task(
+			next
+			TaskState(
+				..current
+				status: Runnable(
+					continuation
+					ForwardStep(rest, answer, discard || prior_discard, relay)
+				)
+			)
+		)
+		Runnable(_, CancelStep(_)) -> next
+		_ -> { discard } |> {
+			True -> notice |> {
+				BeginForeign(_, _, _, cause) -> set_task(
+					next
+					TaskState(..current, cancelled_by: Present(cause))
+				)
+				EndForeign(..) -> reply(next, t.path, k, Proceed(value), True)
+			}
+			False -> reply(next, t.path, k, Proceed(value), True)
+		}
+	}
+}
+
+notice_hops = (notice: ForeignNotice) -> List(Hop) {
+	notice |> {
+		BeginForeign(hops, _, _, _) -> hops
+		EndForeign(hops, _)         -> hops
+	}
 }
