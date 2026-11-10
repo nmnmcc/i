@@ -1143,3 +1143,10 @@ and O2. One non-quiet debug-compiler scale run passed at 128, 256, 1,000 and
 4.60 and 4.22 seconds respectively including startup. Shared capture depths
 28 and 60 took 1.55 and 1.56 seconds. These are single samples under concurrent
 load, not quiet-window measurements; raw output is in target/r2-scale-current.
+
+The full spec suite passed 348/348 cases at O0 and O2; the 9.9 subset passed
+78/78, and all 38 imported review-r2 observations and requirements passed.
+A subsequent full dev-verify passed the Rust tests up through the spec suite,
+then was interrupted (exit 130) during value_type_performance to free capacity
+for integration's corpus run. It did not reach the i and browser phases and is
+not a completed gate. The integration gate must run on the merged source.
