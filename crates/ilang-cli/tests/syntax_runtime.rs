@@ -325,3 +325,71 @@ exercise = () {
         );
     }
 }
+
+#[test]
+fn compiler_quote_patterns_capture_nested_nodes_and_splices() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("test")).unwrap();
+    std::fs::write(
+        dir.path().join("test/main.i"),
+        r#"
+(syntax = i/syntax)
+@test
+exercise = () {
+  pattern = syntax._template(0)
+  input = syntax._template(1)
+  matched = syntax._match(pattern, input)
+  assert(syntax._match_ok(matched))
+  assert(syntax.show(syntax._match_one(matched, 0)) == "x")
+  syntax._match_many(matched, 1).{
+    [a, b] -> {
+      assert(syntax.show(a) == "y")
+      assert(syntax.show(b) == "z")
+    }
+    _ -> panic("wrong splice captures")
+  }
+  failed = syntax._match(pattern, syntax._template(2))
+  assert(syntax._match_ok(failed) == False)
+  Nil
+}
+"#,
+    )
+    .unwrap();
+    let parsed = parse("`(f (g ~a) ~..rest) (f (g x) y z) (h x)").unwrap();
+    let scope = Scope {
+        module: 9,
+        marks: BTreeSet::new(),
+    };
+    let templates: std::sync::Arc<[Syntax]> = parsed
+        .iter()
+        .map(|d| Syntax::from_datum(d, &scope))
+        .collect::<Vec<_>>()
+        .into();
+    for opt in [ilang_cli::Level::O0, ilang_cli::Level::O2] {
+        let built = ilang_cli::build(
+            dir.path(),
+            ilang_cli::BuildOptions {
+                tests: true,
+                opt,
+                offline: true,
+                target: ilang_cli::Target::Ilang,
+            },
+        )
+        .unwrap();
+        let mut options = ilang_cli::standard_options();
+        ilang_host::syntax::install_with_templates(&mut options.imports, templates.clone())
+            .unwrap();
+        options
+            .imports
+            .grant_package(&built.binding_plan, &built.trusted_package);
+        let result = built
+            .host_program()
+            .unwrap()
+            .run_test_with("app/main.exercise", options);
+        assert!(
+            matches!(result, ilang_host::TestResult::Passed),
+            "{result:?}"
+        );
+    }
+}
