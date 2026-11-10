@@ -15,7 +15,7 @@ use crate::hir::{BuiltinType, TypeId, TypeRef};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::collections::HashMap as StdHashMap;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct VarState {
     pub level: u32,
     pub lower: Vec<Ty>,
@@ -50,7 +50,7 @@ pub(crate) enum FailKind {
     Ambiguous,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Failure {
     pub kind: FailKind,
     pub lhs: Ty,
@@ -84,7 +84,7 @@ impl Pol {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Solver {
     /// Allocation ownership observed during a demanded source group.
     pub observation: Option<(usize, HashSet<V>, std::cell::RefCell<HashSet<V>>)>,
@@ -624,6 +624,7 @@ impl Solver {
     /// Copies the variables of `t` that are deeper than `level` to that
     /// level, with bounds that link them to the originals (Simple-sub).
     fn extrude(&mut self, t: &Ty, pol: Pol, level: u32, cache: &mut HashMap<(V, Pol), V>) -> Ty {
+        self.observe_type(t);
         if self.level_of(t) <= level {
             return t.clone();
         }

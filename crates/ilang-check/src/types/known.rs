@@ -104,23 +104,16 @@ impl Checker<'_> {
     }
 
     fn kconv_in(&self, t: &Type, local: &HashMap<TyVarId, Ty>, depth: u32) -> Ty {
-        if depth > 64 {
+        if depth as usize > self.p.types.len() + 1 {
             return Ty::Top;
         }
         let go = |x: &Type| self.kconv_in(x, local, depth);
         match &t.kind {
             TypeKind::Named { ty, args } => {
                 if let TypeRef::Custom(id) = ty
-                    && let Some(alias) = self.reads.aliases.get(id)
+                    && let Some(None) = self.reads.aliases.get(id)
                 {
-                    return match alias {
-                        Some(a) => {
-                            let args = args.iter().map(|t| self.kconv_in(t, local, depth + 1));
-                            let map = a.formals.iter().copied().zip(args).collect();
-                            super::value_types::replace_vars(&a.ty, &map)
-                        }
-                        None => Ty::Top,
-                    };
+                    return Ty::Top;
                 }
 
                 let args: Vec<Ty> = args.iter().map(go).collect();

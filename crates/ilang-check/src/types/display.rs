@@ -1279,7 +1279,7 @@ fn roles(t: &Ty, role: Role, out: &mut Vec<(V, Role)>) {
 
 /// The tree of a shown type: `Both` is its side that is shown, `Top` is
 /// `_`, and each variable has the name that `name` gives it.
-fn tree(t: &Ty, name: &mut dyn FnMut(V) -> String) -> ShownType {
+pub(crate) fn tree(t: &Ty, name: &mut dyn FnMut(V) -> String) -> ShownType {
     let all = |xs: &[Ty], name: &mut dyn FnMut(V) -> String| -> Vec<ShownType> {
         xs.iter().map(|x| tree(x, name)).collect()
     };

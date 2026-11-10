@@ -54,6 +54,10 @@ pub struct BindingRef {
 
 #[derive(Clone, Debug, Default)]
 pub struct Program {
+    /// Reads in invalid dependency components, before query recovery.
+    pub failed_reads: std::collections::HashSet<OfId>,
+    /// Expression SCC members invalidated by a type-dependency cycle.
+    pub failed_type_groups: std::collections::HashSet<BindingRef>,
     /// Written value reads and structural extraction items (§4.3, §4.7).
     pub of_sites: Vec<OfSite>,
     pub alias_patterns: Vec<AliasPattern>,
@@ -560,6 +564,7 @@ pub struct OfSite {
 }
 #[derive(Clone, Debug)]
 pub struct AliasPattern {
+    pub head_span: Span,
     pub module: ModuleId,
     pub span: Span,
     pub source: Type,

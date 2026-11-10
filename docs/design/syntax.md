@@ -9,9 +9,9 @@ Status: draft for review (stream A0 of the redesign plan). When it is accepted, 
 - `case` is gone. A **clause block** `{ p1 -> e1  p2 -> e2 }` is a function of one parameter, and `e |> { … }` matches `e`.
 - A guard is written with `?`: `n ? n > 0 -> "positive"`.
 - A type variable is an `UpName`, and it is declared after the name of its binding: `map(A, B) = …`. Type parameters of type definitions are `UpName`s too.
-- A lowercase name in a type is kept for "the type of a value" (stream T2). Until then it is a compile error.
+- A lowercase name in a type reads the type of a value; see `docs/spec.md` §3 and §4.7 (T2). Calls in types remain reserved for macros.
 - `{ name: e, … }` is kept for records (stream T3).
-- The left side of an alias that is not a list of type parameters, as in `Schema(User, _) = user`, is kept for alias patterns (streams S6 and T2). Until then it is a compile error with a message.
+- Alias patterns, as in `Schema(User, _) = user`, use the written-RHS classification and scope rules in `docs/spec.md` §4.3 (T2). The earlier replacement text below records the syntax migration; T2 supersedes its temporary reservation.
 - The forms of macros in `docs/design/meta.md` are kept: `@m` and `@m(args)` before an item, a top-level item that is a call, a declaration with no `@external`, and a call `m(…)` in a type. Until the macro streams, each is a compile error with a message.
 
 Decisions taken with the user:

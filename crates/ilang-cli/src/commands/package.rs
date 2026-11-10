@@ -1365,6 +1365,27 @@ impl<'a> TypeShow<'a> {
 
     fn completed_head(&self, body: &ShownType) -> String {
         let head = self.head_prefix();
+        let ordered;
+        let body = if self.canonical {
+            ordered = canonical_alias_order(body, &|t| {
+                t.text_with(
+                    &mut |ty| match ty {
+                        TypeRef::Builtin(b) => b.name().to_string(),
+                        TypeRef::Custom(id) => self.names[id.0 as usize].clone(),
+                    },
+                    &mut |v| {
+                        self.def
+                            .params
+                            .iter()
+                            .position(|(n, _)| n == v)
+                            .map_or_else(|| v.to_string(), |i| self.param(i))
+                    },
+                )
+            });
+            &ordered
+        } else {
+            body
+        };
         let text = body.text_with(
             &mut |ty| match ty {
                 TypeRef::Builtin(b) => b.name().to_string(),
@@ -1549,5 +1570,97 @@ mod syntax_templates {
         for source in [super::main_module("example"), super::test_module("example")] {
             assert!(ilang_syntax::parse_module(&source).1.is_empty(), "{source}");
         }
+    }
+}
+
+/// Sort commutative alias members after formal identities have been assigned.
+fn canonical_alias_order(t: &ShownType, key: &dyn Fn(&ShownType) -> String) -> ShownType {
+    use ilang_check::types::ShownFn;
+    match t {
+        ShownType::Union(ts) | ShownType::Inter(ts) => {
+            let union = matches!(t, ShownType::Union(_));
+            let mut parts = Vec::new();
+            for t in ts {
+                let t = canonical_alias_order(t, key);
+                match t {
+                    ShownType::Union(inner) if union => parts.extend(inner),
+                    ShownType::Inter(inner) if !union => parts.extend(inner),
+                    _ => parts.push(t),
+                }
+            }
+            parts.sort_by_key(key);
+            if union {
+                ShownType::Union(parts)
+            } else {
+                ShownType::Inter(parts)
+            }
+        }
+        ShownType::Named(ty, ts) => ShownType::Named(
+            *ty,
+            ts.iter().map(|t| canonical_alias_order(t, key)).collect(),
+        ),
+        ShownType::Tuple(ts) => {
+            ShownType::Tuple(ts.iter().map(|t| canonical_alias_order(t, key)).collect())
+        }
+        ShownType::Fn(f) => ShownType::Fn(Box::new(ShownFn {
+            params: f
+                .params
+                .iter()
+                .map(|(n, t)| (n.clone(), canonical_alias_order(t, key)))
+                .collect(),
+            ret: canonical_alias_order(&f.ret, key),
+            err: f.err.as_ref().map(|t| canonical_alias_order(t, key)),
+            env: f.env.as_ref().map(|t| canonical_alias_order(t, key)),
+        })),
+        ShownType::Diff(t, ts) => ShownType::Diff(
+            Box::new(canonical_alias_order(t, key)),
+            ts.iter().map(|t| canonical_alias_order(t, key)).collect(),
+        ),
+        ShownType::Var(_) | ShownType::Hole | ShownType::Never => t.clone(),
+    }
+}
+
+#[cfg(test)]
+mod value_type_interfaces {
+    use super::*;
+    use std::fs;
+    fn canonical(source: &str) -> BTreeMap<String, String> {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        fs::write(dir.path().join("src/api.i"), source).unwrap();
+        interface_of(dir.path(), false)
+            .unwrap()
+            .unwrap()
+            .into_iter()
+            .map(|(key, entry)| (key, entry.canonical))
+            .collect()
+    }
+    #[test]
+    fn exported_alias_uses_completed_body_not_private_source_spelling() {
+        // X3: private renames are stable, changed closed public types differ.
+        let a = canonical("(A)\nprivate: Int = 1\nA = private");
+        assert_eq!(a, canonical("(A)\nother: Int = 1\nA = other"));
+        assert_ne!(a, canonical("(A)\nprivate: String = \"a\"\nA = private"));
+        assert!(a["type api.A"].ends_with("= Int"));
+    }
+    #[test]
+    fn completed_alias_keeps_formal_positions() {
+        // X3: alpha-renaming cannot reorder formal parameter identities.
+        let a = canonical("(Pair)\nport: Int = 1\nPair(A,B) = (B,A,port)");
+        assert_eq!(
+            a,
+            canonical("(Pair)\nother: Int = 2\nPair(X,Y) = (Y,X,other)")
+        );
+        assert_ne!(
+            a,
+            canonical("(Pair)\nport: Int = 1\nPair(A,B) = (A,B,port)")
+        );
+    }
+    #[test]
+    fn commutative_alias_members_keep_canonical_formal_identity() {
+        let a = canonical("(T)\nport: Int = 1\nT(A,B) = (B,A,Int | String,port)");
+        let b = canonical("(T)\nvalue: Int = 2\nT(X,Y) = (Y,X,String | Int,value)");
+        assert_eq!(a, b);
     }
 }

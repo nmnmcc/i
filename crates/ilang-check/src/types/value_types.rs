@@ -10,6 +10,8 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug)]
 pub(super) enum Read {
+    /// A successful projection operation has no reusable source type.
+    Projected,
     Ready(Ty),
     Failed,
 }
@@ -19,18 +21,14 @@ pub(super) struct Fixed {
     pub module: ModuleId,
     pub span: Span,
 }
-#[derive(Clone, Debug)]
-pub(super) struct Alias {
-    pub ty: Ty,
-    pub formals: Vec<V>,
-}
 #[derive(Default)]
 pub(super) struct Reads {
     pub sites: HashMap<OfId, Read>,
     pub fixed: HashMap<V, Fixed>,
-    pub aliases: HashMap<TypeId, Option<Alias>>,
+    pub aliases: HashMap<TypeId, Option<()>>,
     pub completed: HashMap<DefId, Result<Ty, &'static str>>,
     pub patterns: HashSet<ProjectionId>,
+    pub sources: HashSet<DefId>,
     pub boundary: usize,
     pub error_start: usize,
 }
@@ -362,7 +360,25 @@ impl Checker<'_> {
         if self.p.of_sites.is_empty() {
             return;
         }
+        self.reads.sources = self
+            .p
+            .of_sites
+            .iter()
+            .filter_map(|s| {
+                if let ValueRef::Def(d) = s.value {
+                    Some(d)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for site in &self.p.failed_reads {
+            self.reads.sites.insert(*site, Read::Failed);
+        }
         for (id, scheme) in &self.defs {
+            if !self.reads.sources.contains(id) {
+                continue;
+            }
             self.reads.completed.insert(
                 *id,
                 completed(&scheme.ty, &self.s, &self.reads.fixed, scheme.level),
@@ -379,7 +395,15 @@ impl Checker<'_> {
             ValueRef::Def(d) => self.defs.get(&d),
             ValueRef::Ctor(_) => None,
         };
-        scheme.map_or(Ty::Top, |s| shape(&s.ty, &self.reads.fixed))
+        scheme.map_or(Ty::Top, |scheme| {
+            let principal = if scheme.level == u32::MAX {
+                scheme.ty.clone()
+            } else {
+                super::display::simplify(&self.s, &scheme.ty, Some(scheme.level))
+                    .unwrap_or_else(|()| scheme.ty.clone())
+            };
+            shape(&principal, &self.reads.fixed)
+        })
     }
 
     pub(super) fn read_annotation(&mut self, value: ValueRef, site: OfId) -> Ty {
@@ -387,6 +411,8 @@ impl Checker<'_> {
             return match read {
                 Read::Ready(t) => t.clone(),
                 Read::Failed => Ty::Never,
+                Read::Projected if self.recovery => Ty::Never,
+                Read::Projected => panic!("projection source read as an annotation"),
             };
         }
         let scheme = match value {
@@ -401,14 +427,14 @@ impl Checker<'_> {
             }
             return Ty::Never;
         };
-        if let ValueRef::Def(d) = value {
-            if self.reads.completed.contains_key(&d) {
-                match fixed_scheme(&scheme.ty, &self.s, &self.reads.fixed, scheme.level) {
-                    Ok(t) => scheme.ty = t,
-                    Err(c) => {
-                        self.read_error(site, c);
-                        return Ty::Never;
-                    }
+        if let ValueRef::Def(d) = value
+            && self.reads.completed.contains_key(&d)
+        {
+            match fixed_scheme(&scheme.ty, &self.s, &self.reads.fixed, scheme.level) {
+                Ok(t) => scheme.ty = t,
+                Err(c) => {
+                    self.read_error(site, c);
+                    return Ty::Never;
                 }
             }
         }
@@ -419,13 +445,25 @@ impl Checker<'_> {
         let info = &self.p.of_sites[site.0 as usize];
         let mut message =
             "the value-derived type is still open after source completion".to_string();
-        if let ValueRef::Def(d) = info.value {
+        if c == code::TYPE_PATTERN_MISMATCH {
+            message = "the source type does not match the alias pattern head or constant part"
+                .to_string();
+        } else if c == code::TYPE_PATTERN_FORM {
+            message = "the alias pattern cannot be projected through this type form".to_string();
+        } else if c == code::VALUE_TYPE_OPEN {
+            message = "a permanent alias cannot contain a generalized variable or an unknown type"
+                .to_string();
+        } else if let ValueRef::Def(d) = info.value {
             let name = &self.p.def(d).name;
             let aliases = self
                 .p
                 .types
                 .iter()
-                .filter(|a| a.module == d.module)
+                .enumerate()
+                .filter(|(i, a)| {
+                    a.module == d.module && self.out.alias_types.contains_key(&TypeId(*i as u32))
+                })
+                .map(|(_, a)| a)
                 .filter(|a| {
                     let TypeBody::Alias(t) = &a.body else {
                         return false;
@@ -495,6 +533,40 @@ impl Checker<'_> {
             .iter()
             .flat_map(|b| self.p.binding(*b).defs.iter().copied())
             .collect::<HashSet<_>>();
+        if !defs.iter().any(|d| self.reads.sources.contains(d)) {
+            return;
+        }
+        if failed {
+            for (i, site) in self.p.of_sites.iter().enumerate() {
+                if matches!(site.value,ValueRef::Def(d) if defs.contains(&d)) {
+                    self.reads.sites.insert(OfId(i as u32), Read::Failed);
+                }
+            }
+            for d in &defs {
+                self.reads
+                    .completed
+                    .insert(*d, Err(code::VALUE_TYPE_NOT_FIXED));
+            }
+            self.complete_ready_reads();
+            return;
+        }
+        let completion_start = self.diags.len();
+        let has_demands=self.p.of_sites.iter().any(|site|site.permanent && matches!(site.value,ValueRef::Def(d) if d.module==site.module && defs.contains(&d)));
+        if !has_demands {
+            for d in defs {
+                if !self.reads.sources.contains(&d) {
+                    continue;
+                }
+                if let Some(scheme) = self.defs.get(&d) {
+                    self.reads.completed.insert(
+                        d,
+                        completed(&scheme.ty, &self.s, &self.reads.fixed, scheme.level),
+                    );
+                }
+            }
+            self.complete_ready_reads();
+            return;
+        }
         let snapshot = self.s.clone();
         let fixed = self.reads.fixed.clone();
         let mut equations = HashMap::new();
@@ -504,6 +576,12 @@ impl Checker<'_> {
         for (i, pattern) in self.p.alias_patterns.iter().enumerate() {
             let pid = ProjectionId(i as u32);
             if self.reads.patterns.contains(&pid) {
+                continue;
+            }
+            if let TypeKind::Of { site, .. } = pattern.source.kind
+                && matches!(self.reads.sites.get(&site), Some(Read::Failed))
+            {
+                self.fail_pattern(pid);
                 continue;
             }
             let TypeKind::Of {
@@ -602,38 +680,12 @@ impl Checker<'_> {
                 }
             }
         }
-        let mut trial = snapshot.clone();
-        trial.observation = Some((
-            self.reads.boundary,
-            fixed.keys().copied().collect(),
-            Default::default(),
-        ));
-        for (v, t) in &equations {
-            trial.constrain(&Ty::Var(*v), t);
-            trial.constrain(t, &Ty::Var(*v));
-        }
-        for (v, t) in &shapes {
-            trial.constrain(&Ty::Var(*v), t);
-        }
-        let roots = equations
-            .keys()
-            .chain(shapes.iter().map(|(v, _)| v))
-            .copied()
-            .collect();
-        let occurs = trial.occurs(roots);
-        let touched_earlier = trial
-            .observation
-            .take()
-            .is_some_and(|(_, _, seen)| !seen.borrow().is_empty());
-        if !trial.failures.is_empty() || occurs || touched_earlier {
-            for (site, _) in results {
-                self.read_error(site, code::VALUE_TYPE_NOT_FIXED);
-            }
-            for (pid, _, site) in patterns {
-                self.read_error(site, code::VALUE_TYPE_NOT_FIXED);
-                self.fail_pattern(pid);
-            }
+        let trial = if self.diags[completion_start..].iter().any(|d| d.is_error()) {
+            None
         } else {
+            checked_batch(&snapshot, &equations, &shapes, self.reads.boundary, &fixed)
+        };
+        if let Some(trial) = trial {
             self.s = trial;
             for (site, t) in results {
                 self.reads.sites.insert(site, Read::Ready(t));
@@ -648,7 +700,7 @@ impl Checker<'_> {
                         self.reads.sites.insert(site, Read::Ready(t));
                     }
                 }
-                self.reads.sites.insert(site, Read::Ready(Ty::Never));
+                self.reads.sites.insert(site, Read::Projected);
                 self.reads.patterns.insert(pid);
             }
             if let Some((module, span)) = provenance {
@@ -664,8 +716,19 @@ impl Checker<'_> {
                     self.reads.fixed.insert(v, Fixed { ty, module, span });
                 }
             }
+        } else {
+            for (site, _) in results {
+                self.read_error(site, code::VALUE_TYPE_NOT_FIXED);
+            }
+            for (pid, _, site) in patterns {
+                self.read_error(site, code::VALUE_TYPE_NOT_FIXED);
+                self.fail_pattern(pid);
+            }
         }
         for d in defs {
+            if !self.reads.sources.contains(&d) {
+                continue;
+            }
             if let Some(scheme) = self.defs.get(&d) {
                 let t = completed(&scheme.ty, &self.s, &self.reads.fixed, scheme.level);
                 self.reads.completed.insert(d, t);
@@ -692,9 +755,13 @@ impl Checker<'_> {
             return;
         }
         // Imported reads are observations of completed closed definitions.
+        let active_module = self.module;
         for (i, info) in self.p.of_sites.iter().enumerate() {
             let site = OfId(i as u32);
-            if !info.permanent || info.projection.is_some() || self.reads.sites.contains_key(&site)
+            if info.module != active_module
+                || !info.permanent
+                || info.projection.is_some()
+                || self.reads.sites.contains_key(&site)
             {
                 continue;
             }
@@ -713,7 +780,13 @@ impl Checker<'_> {
         }
         for (i, pattern) in self.p.alias_patterns.iter().enumerate() {
             let pid = ProjectionId(i as u32);
-            if self.reads.patterns.contains(&pid) {
+            if pattern.module != active_module || self.reads.patterns.contains(&pid) {
+                continue;
+            }
+            if let TypeKind::Of { site, .. } = pattern.source.kind
+                && matches!(self.reads.sites.get(&site), Some(Read::Failed))
+            {
+                self.fail_pattern(pid);
                 continue;
             }
             let TypeKind::Of {
@@ -769,6 +842,7 @@ impl Checker<'_> {
             }
         }
         self.assemble_aliases();
+        self.set_module(active_module);
     }
 
     fn match_type_pattern(
@@ -891,6 +965,63 @@ impl Checker<'_> {
                     .map(|t| self.closed_written(t, map, seen))
                     .collect::<Result<_, _>>()?,
             )),
+            TypeKind::Fn {
+                params,
+                ret,
+                err,
+                env,
+            } => Ok(Ty::Fn(Box::new(FnTy {
+                params: params
+                    .iter()
+                    .map(|p| {
+                        Ok((
+                            p.label.as_ref().map(|n| n.name.clone()),
+                            self.closed_written(&p.ty, map, seen)?,
+                        ))
+                    })
+                    .collect::<Result<_, &'static str>>()?,
+                ret: self.closed_written(ret, map, seen)?,
+                err: err
+                    .as_ref()
+                    .map_or(Ok(Ty::Never), |t| self.closed_written(t, map, seen))?,
+                env: env
+                    .as_ref()
+                    .map_or(Ok(Ty::Never), |t| self.closed_written(t, map, seen))?,
+            }))),
+            TypeKind::Union(ts) | TypeKind::Inter(ts) => {
+                let parts = ts
+                    .iter()
+                    .map(|t| self.closed_written(t, map, seen))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let mut scratch = Solver::new(self.s.variance.clone(), self.s.type_names.clone());
+                let t = if matches!(t.kind, TypeKind::Union(_)) {
+                    scratch.union(parts)
+                } else {
+                    scratch.inter(parts)
+                };
+                if scratch.failures.is_empty() && !contains_var(&t) {
+                    Ok(t)
+                } else {
+                    Err(code::TYPE_PATTERN_FORM)
+                }
+            }
+            TypeKind::Diff(ts) => {
+                let mut parts = ts
+                    .iter()
+                    .map(|t| self.closed_written(t, map, seen))
+                    .collect::<Result<Vec<_>, _>>()?;
+                if parts.is_empty() {
+                    return Err(code::TYPE_PATTERN_FORM);
+                }
+                let first = parts.remove(0);
+                let mut scratch = Solver::new(self.s.variance.clone(), self.s.type_names.clone());
+                let t = scratch.diff(first, parts);
+                if scratch.failures.is_empty() && !contains_var(&t) {
+                    Ok(t)
+                } else {
+                    Err(code::TYPE_PATTERN_FORM)
+                }
+            }
             _ => Err(code::TYPE_PATTERN_FORM),
         }
     }
@@ -901,6 +1032,19 @@ fn expand_pattern(
     map: &HashMap<TyVarId, TypePattern>,
     used: &mut HashSet<TyVarId>,
 ) -> Result<TypePattern, &'static str> {
+    let mut variable = false;
+    let mut unavailable = false;
+    walk_type(t, &mut |t| match t.kind {
+        TypeKind::Var(_) => variable = true,
+        TypeKind::Hole | TypeKind::Of { .. } | TypeKind::Error => unavailable = true,
+        _ => {}
+    });
+    if unavailable {
+        return Err(code::TYPE_PATTERN_FORM);
+    }
+    if !variable {
+        return Ok(TypePattern::Exact(t.clone()));
+    }
     match &t.kind {
         TypeKind::Var(v) => {
             if !used.insert(*v) {
@@ -1035,23 +1179,15 @@ impl Checker<'_> {
                     continue;
                 }
                 self.set_module(def.module);
-                let mut formals = Vec::new();
-                let mut map = HashMap::new();
-                for (_, v) in &def.params {
-                    let fresh = self.s.fresh_at(1);
-                    formals.push(fresh);
-                    map.insert(*v, Ty::Var(fresh));
-                }
-                let ty = self.conv(body, &map);
-                let names = formals
+                let map = def
+                    .params
                     .iter()
-                    .copied()
-                    .zip(def.params.iter().map(|(name, _)| name.clone()))
+                    .map(|(n, v)| (*v, ShownType::Var(n.clone())))
                     .collect();
-                if let Some(shown) = exact_shown(&ty, &names) {
+                if let Some(shown) = self.alias_shown(body, &map, &mut HashSet::new()) {
                     if def.exported {
                         let mut private = Vec::new();
-                        self.check_alias_hidden(&ty, def.module, &mut private);
+                        self.shown_hidden(&shown, def.module, &mut private);
                         for name in private {
                             self.error(
                                 code::EXPORT_HIDDEN_TYPE,
@@ -1064,7 +1200,7 @@ impl Checker<'_> {
                         }
                     }
                     self.out.alias_types.insert(id, shown);
-                    self.reads.aliases.insert(id, Some(Alias { ty, formals }));
+                    self.reads.aliases.insert(id, Some(()));
                 } else {
                     self.error(
                         code::VALUE_TYPE_NOT_FIXED,
@@ -1080,54 +1216,134 @@ impl Checker<'_> {
         }
     }
 
-    fn check_alias_hidden(&self, t: &Ty, module: ModuleId, out: &mut Vec<String>) {
-        match t {
-            Ty::Con(h, ts) => {
-                if let Head::Named(TypeRef::Custom(id)) = h {
-                    let def = self.p.ty(*id);
-                    if def.module == module && !def.exported && !out.contains(&def.name) {
-                        out.push(def.name.clone());
-                    }
-                }
-                for t in ts {
-                    self.check_alias_hidden(t, module, out);
+    fn shown_hidden(&self, t: &ShownType, module: ModuleId, out: &mut Vec<String>) {
+        let mut refs = Vec::new();
+        t.type_refs(&mut refs);
+        for ty in refs {
+            if let TypeRef::Custom(id) = ty {
+                let def = self.p.ty(id);
+                if def.module == module && !def.exported && !out.contains(&def.name) {
+                    out.push(def.name.clone());
                 }
             }
-            Ty::Fn(f) => {
-                for (_, t) in &f.params {
-                    self.check_alias_hidden(t, module, out);
-                }
-                for t in [&f.ret, &f.err, &f.env] {
-                    self.check_alias_hidden(t, module, out);
-                }
-            }
-            Ty::Union(ts) | Ty::Inter(ts) => {
-                for t in ts {
-                    self.check_alias_hidden(t, module, out);
-                }
-            }
-            Ty::Diff(t, ts) => {
-                self.check_alias_hidden(t, module, out);
-                for t in ts {
-                    self.check_alias_hidden(t, module, out);
-                }
-            }
-            Ty::Both(a, b) => {
-                self.check_alias_hidden(a, module, out);
-                self.check_alias_hidden(b, module, out);
-            }
-            Ty::Var(_) | Ty::Top | Ty::Never => {}
         }
     }
 
+    fn alias_shown(
+        &self,
+        t: &Type,
+        map: &HashMap<TyVarId, ShownType>,
+        seen: &mut HashSet<TypeId>,
+    ) -> Option<ShownType> {
+        Some(match &t.kind {
+            TypeKind::Of { site, .. } => {
+                let Read::Ready(t) = self.reads.sites.get(site)? else {
+                    return None;
+                };
+                if contains_var(t) {
+                    return None;
+                }
+                super::display::tree(t, &mut |_| unreachable!("closed read contains a variable"))
+            }
+            TypeKind::Var(v) => map.get(v)?.clone(),
+            TypeKind::Hole => ShownType::Hole,
+            TypeKind::Error => return None,
+            TypeKind::Named { ty, args } => {
+                let args = args
+                    .iter()
+                    .map(|t| self.alias_shown(t, map, seen))
+                    .collect::<Option<Vec<_>>>()?;
+                if let TypeRef::Custom(id) = ty
+                    && let TypeBody::Alias(body) = &self.p.ty(*id).body
+                {
+                    if !seen.insert(*id) {
+                        return None;
+                    }
+                    let map = self
+                        .p
+                        .ty(*id)
+                        .params
+                        .iter()
+                        .map(|(_, v)| *v)
+                        .zip(args)
+                        .collect();
+                    let shown = self.alias_shown(body, &map, seen);
+                    seen.remove(id);
+                    return shown;
+                }
+                if *ty == TypeRef::Builtin(BuiltinType::Never) {
+                    ShownType::Never
+                } else {
+                    ShownType::Named(*ty, args)
+                }
+            }
+            TypeKind::Tuple(ts) => ShownType::Tuple(
+                ts.iter()
+                    .map(|t| self.alias_shown(t, map, seen))
+                    .collect::<Option<_>>()?,
+            ),
+            TypeKind::Union(ts) => ShownType::Union(
+                ts.iter()
+                    .map(|t| self.alias_shown(t, map, seen))
+                    .collect::<Option<_>>()?,
+            ),
+            TypeKind::Inter(ts) => ShownType::Inter(
+                ts.iter()
+                    .map(|t| self.alias_shown(t, map, seen))
+                    .collect::<Option<_>>()?,
+            ),
+            TypeKind::Diff(ts) => {
+                let mut iter = ts.iter();
+                let first = self.alias_shown(iter.next()?, map, seen)?;
+                ShownType::Diff(
+                    Box::new(first),
+                    iter.map(|t| self.alias_shown(t, map, seen))
+                        .collect::<Option<_>>()?,
+                )
+            }
+            TypeKind::Fn {
+                params,
+                ret,
+                err,
+                env,
+            } => ShownType::Fn(Box::new(ShownFn {
+                params: params
+                    .iter()
+                    .map(|p| {
+                        Some((
+                            p.label.as_ref().map(|n| n.name.clone()),
+                            self.alias_shown(&p.ty, map, seen)?,
+                        ))
+                    })
+                    .collect::<Option<_>>()?,
+                ret: self.alias_shown(ret, map, seen)?,
+                err: match err {
+                    Some(t) => Some(self.alias_shown(t, map, seen)?),
+                    None => None,
+                },
+                env: match env {
+                    Some(t) => Some(self.alias_shown(t, map, seen)?),
+                    None => None,
+                },
+            })),
+        })
+    }
+
     pub(super) fn instantiate_alias(&mut self, id: TypeId, args: Vec<Ty>) -> Ty {
-        let Some(Some(alias)) = self.reads.aliases.get(&id).cloned() else {
+        if !matches!(self.reads.aliases.get(&id), Some(Some(()))) {
             if !self.recovery && !self.reads.aliases.contains_key(&id) {
                 panic!("pending value-dependent alias {id:?}");
             }
             return Ty::Never;
+        }
+        let def = self.p.ty(id);
+        let TypeBody::Alias(body) = &def.body else {
+            unreachable!()
         };
-        replace_vars(&alias.ty, &alias.formals.into_iter().zip(args).collect())
+        let map = def.params.iter().map(|(_, v)| *v).zip(args).collect();
+        // Only written formals and holes are instantiated here. Every Of
+        // reads its immutable completed site result, never its source again.
+        self.conv(body, &map)
     }
 }
 
@@ -1159,59 +1375,6 @@ pub(super) fn replace_vars(t: &Ty, map: &HashMap<V, Ty>) -> Ty {
     }
 }
 
-fn exact_shown(t: &Ty, formals: &HashMap<V, String>) -> Option<ShownType> {
-    Some(match t {
-        Ty::Var(v) => ShownType::Var(formals.get(v)?.clone()),
-        Ty::Con(Head::Named(ty), ts) => ShownType::Named(
-            *ty,
-            ts.iter()
-                .map(|t| exact_shown(t, formals))
-                .collect::<Option<_>>()?,
-        ),
-        Ty::Con(Head::Tuple(_), ts) => ShownType::Tuple(
-            ts.iter()
-                .map(|t| exact_shown(t, formals))
-                .collect::<Option<_>>()?,
-        ),
-        Ty::Con(Head::Fn, _) | Ty::Both(_, _) | Ty::Top => return None,
-        Ty::Fn(f) => ShownType::Fn(Box::new(ShownFn {
-            params: f
-                .params
-                .iter()
-                .map(|(n, t)| Some((n.clone(), exact_shown(t, formals)?)))
-                .collect::<Option<_>>()?,
-            ret: exact_shown(&f.ret, formals)?,
-            err: if f.err == Ty::Never {
-                None
-            } else {
-                Some(exact_shown(&f.err, formals)?)
-            },
-            env: if f.env == Ty::Never {
-                None
-            } else {
-                Some(exact_shown(&f.env, formals)?)
-            },
-        })),
-        Ty::Never => ShownType::Never,
-        Ty::Union(ts) => ShownType::Union(
-            ts.iter()
-                .map(|t| exact_shown(t, formals))
-                .collect::<Option<_>>()?,
-        ),
-        Ty::Inter(ts) => ShownType::Inter(
-            ts.iter()
-                .map(|t| exact_shown(t, formals))
-                .collect::<Option<_>>()?,
-        ),
-        Ty::Diff(t, ts) => ShownType::Diff(
-            Box::new(exact_shown(t, formals)?),
-            ts.iter()
-                .map(|t| exact_shown(t, formals))
-                .collect::<Option<_>>()?,
-        ),
-    })
-}
-
 impl Checker<'_> {
     /// Whole-annotation checking precedes instantiation and never reads a live
     /// variable bound (K2). Only the stored principal structural scheme counts.
@@ -1232,9 +1395,15 @@ impl Checker<'_> {
                         ValueRef::Def(d) => c.defs.get(d),
                         ValueRef::Ctor(_) => None,
                     };
-                    s.map_or(Ty::Top, |s| {
+                    s.map_or(Ty::Top, |scheme| {
+                        let principal = if scheme.level == u32::MAX {
+                            scheme.ty.clone()
+                        } else {
+                            super::display::simplify(&c.s, &scheme.ty, Some(scheme.level))
+                                .unwrap_or_else(|()| scheme.ty.clone())
+                        };
                         replace_vars(
-                            &s.ty,
+                            &principal,
                             &c.reads
                                 .fixed
                                 .iter()
@@ -1247,7 +1416,8 @@ impl Checker<'_> {
                     .get(v)
                     .or_else(|| c.tyvars.get(v))
                     .cloned()
-                    .unwrap_or(Ty::Top),
+                    // Pure place identities do not allocate solver variables.
+                    .unwrap_or(Ty::Var(V(u32::MAX - v.0))),
                 TypeKind::Named { ty, args } => {
                     let args = args
                         .iter()
@@ -1344,5 +1514,224 @@ impl Checker<'_> {
         if invalid(&self.s, &expanded, pol) {
             self.error(code::TYPE_PLACE,t.span,"the whole expanded value-type annotation has a variable union or intersection in an illegal place (§4.4)");
         }
+    }
+}
+
+/// The only mutation boundary for permanent reads. Cloning every Solver field
+/// makes rollback include caches, reverse edges, levels, observations and errors.
+fn checked_batch(
+    snapshot: &Solver,
+    equations: &HashMap<V, Ty>,
+    shapes: &[(V, Ty)],
+    boundary: usize,
+    fixed: &HashMap<V, Fixed>,
+) -> Option<Solver> {
+    let mut trial = snapshot.clone();
+    trial.observation = Some((
+        boundary,
+        fixed.keys().copied().collect(),
+        Default::default(),
+    ));
+    for (v, t) in equations {
+        trial.constrain(&Ty::Var(*v), t);
+        trial.constrain(t, &Ty::Var(*v));
+    }
+    for (v, t) in shapes {
+        trial.constrain(&Ty::Var(*v), t);
+    }
+    let roots = equations
+        .keys()
+        .chain(shapes.iter().map(|(v, _)| v))
+        .copied()
+        .collect();
+    let occurs = trial.occurs(roots);
+    let earlier = trial
+        .observation
+        .take()
+        .is_some_and(|(_, _, seen)| !seen.borrow().is_empty());
+    (trial.failures.is_empty() && !occurs && !earlier).then_some(trial)
+}
+
+impl Checker<'_> {
+    pub(super) fn fixed_reached(&self, l: &Ty, r: &Ty) -> Vec<V> {
+        fn collect(t: &Ty, out: &mut Vec<V>) {
+            match t {
+                Ty::Var(v) => out.push(*v),
+                Ty::Con(_, ts) | Ty::Union(ts) | Ty::Inter(ts) => {
+                    for t in ts {
+                        collect(t, out);
+                    }
+                }
+                Ty::Fn(f) => {
+                    for (_, t) in &f.params {
+                        collect(t, out);
+                    }
+                    for t in [&f.ret, &f.err, &f.env] {
+                        collect(t, out);
+                    }
+                }
+                Ty::Diff(t, ts) => {
+                    collect(t, out);
+                    for t in ts {
+                        collect(t, out);
+                    }
+                }
+                Ty::Both(a, b) => {
+                    collect(a, out);
+                    collect(b, out);
+                }
+                Ty::Top | Ty::Never => {}
+            }
+        }
+        if self.reads.fixed.is_empty() {
+            return Vec::new();
+        }
+        let mut stack = Vec::new();
+        collect(l, &mut stack);
+        collect(r, &mut stack);
+        let mut seen = HashSet::new();
+        let mut found = Vec::new();
+        while let Some(v) = stack.pop() {
+            if !seen.insert(v) {
+                continue;
+            }
+            if self.reads.fixed.contains_key(&v) {
+                found.push(v);
+            }
+            let st = &self.s.vars[v.0 as usize];
+            for t in st.lower.iter().chain(&st.upper) {
+                collect(t, &mut stack);
+            }
+            stack.extend(st.from.iter().chain(&st.into).copied());
+        }
+        found.sort();
+        found
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn solver() -> Solver {
+        Solver::new(HashMap::new(), Vec::new())
+    }
+    fn int() -> Ty {
+        Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new())
+    }
+    fn string() -> Ty {
+        Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new())
+    }
+    #[test]
+    fn closure_follows_reverse_edges_and_collapses_pure_cycles() {
+        // R4.1: the only concrete predecessor is visible through `from`.
+        let mut s = solver();
+        let v = s.fresh_at(0);
+        let w = s.fresh_at(0);
+        s.constrain(&int(), &Ty::Var(v));
+        s.constrain(&Ty::Var(v), &Ty::Var(w));
+        let fixed = HashMap::new();
+        let mut c = Closure::new(&s, &fixed, 0, u32::MAX, false);
+        assert_eq!(c.close(&Ty::Var(w)), Ok(int()));
+        s.constrain(&Ty::Var(w), &Ty::Var(v));
+        let mut c = Closure::new(&s, &fixed, 0, u32::MAX, false);
+        assert_eq!(c.close(&Ty::Var(w)), Ok(int()));
+        let mut empty = solver();
+        let a = empty.fresh_at(0);
+        let b = empty.fresh_at(0);
+        empty.constrain(&Ty::Var(a), &Ty::Var(b));
+        empty.constrain(&Ty::Var(b), &Ty::Var(a));
+        let mut c = Closure::new(&empty, &fixed, 0, u32::MAX, false);
+        assert_eq!(c.close(&Ty::Var(a)), Err(code::VALUE_TYPE_NOT_FIXED));
+    }
+    #[test]
+    fn closure_does_not_equate_a_predecessor_with_its_wider_successor() {
+        // R5: v <: w is retained, and never becomes w <: v.
+        let mut s = solver();
+        let v = s.fresh_at(0);
+        let w = s.fresh_at(0);
+        s.constrain(&int(), &Ty::Var(v));
+        s.constrain(&Ty::Var(v), &Ty::Var(w));
+        s.constrain(&string(), &Ty::Var(w));
+        let fixed = HashMap::new();
+        let mut c = Closure::new(&s, &fixed, 0, u32::MAX, false);
+        let t = c.close(&Ty::Var(w)).unwrap();
+        assert!(matches!(t, Ty::Union(_)));
+        assert_eq!(c.equations[&v], int());
+        let mut trial = checked_batch(&s, &HashMap::from([(v, int())]), &[], 0, &fixed).unwrap();
+        trial.constrain(&string(), &Ty::Var(w));
+        assert!(trial.failures.is_empty());
+        trial.constrain(&string(), &Ty::Var(v));
+        assert!(!trial.failures.is_empty());
+    }
+    #[test]
+    fn failed_trial_restores_every_solver_field() {
+        // R4 rollback includes reverse links/caches and trial extrusion.
+        let mut s = solver();
+        let v = s.fresh_at(0);
+        let w = s.fresh_at(1);
+        s.constrain(&Ty::Var(v), &int());
+        s.constrain(&Ty::Var(w), &Ty::Var(v));
+        let before = s.clone();
+        let trial = checked_batch(&s, &HashMap::from([(v, string())]), &[], 0, &HashMap::new());
+        assert!(trial.is_none());
+        assert_eq!(s, before);
+        assert!(checked_batch(&s, &HashMap::from([(v, int())]), &[], 0, &HashMap::new()).is_some());
+    }
+    #[test]
+    fn closure_rejects_structural_cycles_and_earlier_unfixed_parts() {
+        let mut s = solver();
+        let v = s.fresh_at(0);
+        s.constrain(
+            &Ty::named(TypeRef::Builtin(BuiltinType::List), vec![Ty::Var(v)]),
+            &Ty::Var(v),
+        );
+        let fixed = HashMap::new();
+        let mut c = Closure::new(&s, &fixed, 0, u32::MAX, false);
+        assert_eq!(c.close(&Ty::Var(v)), Err(code::VALUE_TYPE_NOT_FIXED));
+        let mut s = solver();
+        let old = s.fresh_at(0);
+        s.constrain(&int(), &Ty::Var(old));
+        let mut c = Closure::new(&s, &fixed, s.vars.len(), u32::MAX, false);
+        assert_eq!(c.close(&Ty::Var(old)), Err(code::VALUE_TYPE_NOT_FIXED));
+    }
+    #[test]
+    fn shape_checks_keep_skipped_identities_and_observe_earlier_links() {
+        // P4: traversing a weak tuple checks its original skeleton. A skip
+        // keeps the very same argument, even when it aliases a demanded part.
+        let mut s = solver();
+        let root = s.fresh_at(0);
+        let part = s.fresh_at(0);
+        let skeleton = Ty::Con(Head::Tuple(2), vec![Ty::Var(part), Ty::Var(part)]);
+        s.constrain(&skeleton, &Ty::Var(root));
+        s.constrain(&int(), &Ty::Var(part));
+        let fixed = HashMap::new();
+        let mut c = Closure::new(&s, &fixed, 0, u32::MAX, false);
+        assert_eq!(c.expose(&Ty::Var(root)), Ok(skeleton.clone()));
+        assert_eq!(c.close(&Ty::Var(part)), Ok(int()));
+        let mut trial = checked_batch(&s, &c.equations, &c.shapes, 0, &fixed).unwrap();
+        trial.constrain(&string(), &Ty::Var(part));
+        assert!(!trial.failures.is_empty());
+        let mut trial = checked_batch(&s, &c.equations, &c.shapes, 0, &fixed).unwrap();
+        trial.constrain(&int(), &Ty::Var(root));
+        assert!(!trial.failures.is_empty());
+
+        // R3/R5: an old variable reached only through a function environment
+        // is observed during trial propagation; failed trials change nothing.
+        let mut s = solver();
+        let old = s.fresh_at(0);
+        let boundary = s.vars.len();
+        let current = s.fresh_at(1);
+        let fun = Ty::Fn(Box::new(FnTy {
+            params: vec![],
+            ret: int(),
+            err: Ty::Never,
+            env: Ty::Var(old),
+        }));
+        s.constrain(&Ty::Var(current), &fun);
+        let before = s.clone();
+        assert!(
+            checked_batch(&s, &HashMap::from([(current, fun)]), &[], boundary, &fixed).is_none()
+        );
+        assert_eq!(before, s);
     }
 }

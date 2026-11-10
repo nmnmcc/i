@@ -359,6 +359,7 @@ impl<'a> Resolver<'a> {
                         self.collect_pattern_binders(m, part, &attrs, &mut binders);
                     }
                     self.p.alias_patterns.push(AliasPattern {
+                        head_span: def.name.span,
                         module: m,
                         span: item.span,
                         source: Type {
@@ -958,6 +959,15 @@ impl<'a> Resolver<'a> {
 
     fn put_type(&mut self, scope: &mut Scope, name: &str, span: Span, t: TypeId) {
         match scope.types.get(name) {
+            Some((TypeRef::Custom(id), false))
+                if self.p.alias_patterns.iter().any(|p| p.binders.contains(id)) =>
+            {
+                self.error(
+                    code::TYPE_PATTERN_BINDER_IS_TYPE,
+                    self.p.ty(*id).span,
+                    format!("the new alias `{name}` conflicts with an imported type"),
+                );
+            }
             Some((_, false)) => self.error(
                 code::IMPORT_IS_TOP_LEVEL,
                 span,
@@ -1184,6 +1194,26 @@ impl<'a> Resolver<'a> {
     }
 
     fn early_types(&mut self) {
+        for i in 0..self.p.alias_patterns.len() {
+            let pattern = self.p.alias_patterns[i].clone();
+            if !self.projectable_pattern(&pattern.pattern, &mut HashSet::new()) {
+                self.cur = pattern.module;
+                self.error(code::TYPE_PATTERN_FORM,pattern.head_span,"an alias-pattern head must expand to one named type or tuple; each formal occurs at most once and only through named arguments or tuple parts");
+                self.p.alias_patterns[i].pattern = TypePattern::Error;
+                for id in pattern.binders {
+                    if let TypeBody::Alias(Type {
+                        kind: TypeKind::Of { site, .. },
+                        ..
+                    }) = self.p.ty(id).body
+                    {
+                        self.p.failed_reads.insert(site);
+                    }
+                }
+                if let TypeKind::Of { site, .. } = pattern.source.kind {
+                    self.p.failed_reads.insert(site);
+                }
+            }
+        }
         let mut checks = Vec::new();
         for def in &self.p.types {
             if let TypeBody::Custom(ctors) = &def.body {
@@ -1204,16 +1234,69 @@ impl<'a> Resolver<'a> {
                 "a value-dependent type is not allowed in a constructor field or host type",
             );
         }
+        let host_aliases = self
+            .p
+            .types
+            .iter()
+            .filter_map(|d| match &d.body {
+                TypeBody::Alias(t) if d.host.is_some() => Some((d.module, t.clone())),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        for (m, t) in host_aliases {
+            self.cur = m;
+            self.reject_value_type(&t, "a host declaration");
+        }
         for (mi, parsed) in self.parsed.iter().enumerate() {
             self.cur = ModuleId(mi as u32);
             for (item, slot) in parsed.ast.items.iter().zip(self.slots[mi].clone()) {
                 if let (ast::ItemKind::TypeDef(def), Slot::Type(id)) = (&item.kind, slot)
                     && self.p.ty(id).host.is_some()
+                    && !matches!(&self.p.ty(id).body, TypeBody::Alias(t) if value_dependent(&self.p,t))
                     && !matches!(&self.p.ty(id).body,TypeBody::Custom(cs) if cs.iter().flat_map(|c|&c.fields).any(|f|value_dependent(&self.p,&f.ty)))
                 {
                     self.host_form(def);
                 }
             }
+        }
+    }
+
+    fn projectable_pattern(&self, pattern: &TypePattern, seen: &mut HashSet<TypeId>) -> bool {
+        match pattern {
+            TypePattern::Bind(_) | TypePattern::Skip | TypePattern::Error => true,
+            TypePattern::Exact(t) => !value_dependent(&self.p, t),
+            TypePattern::Tuple(parts) => parts.iter().all(|p| self.projectable_pattern(p, seen)),
+            TypePattern::Named(TypeRef::Custom(id), parts)
+                if matches!(self.p.ty(*id).body, TypeBody::Alias(_)) =>
+            {
+                if self.circular.contains(id) {
+                    return true;
+                }
+                if !seen.insert(*id) {
+                    return false;
+                }
+                let def = self.p.ty(*id);
+                let TypeBody::Alias(body) = &def.body else {
+                    unreachable!()
+                };
+                if value_dependent(&self.p, body) {
+                    return false;
+                }
+                let map = def
+                    .params
+                    .iter()
+                    .map(|(_, v)| *v)
+                    .zip(parts.iter().cloned())
+                    .collect();
+                let expanded = projectable_body(body, &map, &mut HashSet::new());
+                let valid = expanded.is_some_and(|p| {
+                    matches!(p, TypePattern::Named(..) | TypePattern::Tuple(_))
+                        && self.projectable_pattern(&p, seen)
+                });
+                seen.remove(id);
+                valid
+            }
+            TypePattern::Named(_, parts) => parts.iter().all(|p| self.projectable_pattern(p, seen)),
         }
     }
 
@@ -1465,7 +1548,16 @@ impl<'a> Resolver<'a> {
     ) -> TypeKind {
         let pending = |n: &str| self.pending.iter().rev().any(|p| p.contains(n));
         if let Some(m) = module {
-            if pending(&m.name) {
+            if pending(&m.name)
+                || self.reserved.iter().rev().any(|(depth, names)| {
+                    names.contains(&m.name)
+                        && !self
+                            .locals
+                            .iter()
+                            .skip(*depth)
+                            .any(|f| f.names.contains_key(&m.name))
+                })
+            {
                 self.error(
                     code::NOT_A_MODULE,
                     m.span,
@@ -1728,17 +1820,26 @@ impl<'a> Resolver<'a> {
         cur
     }
 
+    /// Shared early-context gate. It follows alias provenance, even when a
+    /// completed alias would have an otherwise permitted host/service shape.
+    fn reject_value_type(&mut self, t: &Type, context: &str) -> bool {
+        if !value_dependent(&self.p, t) {
+            return false;
+        }
+        self.error(
+            code::VALUE_TYPE_PLACE,
+            t.span,
+            format!("a value-dependent type is not allowed in {context}"),
+        );
+        true
+    }
+
     /// §9.2: the type of an environment parameter or statement is one named
     /// type: not a type variable alone, a union, or `Never`. An alias is
     /// expanded with its arguments. Gives back the type constructor, or
     /// `None` when there is none or a problem has been reported.
     fn env_type(&mut self, t: &Type) -> Option<TypeRef> {
-        if value_dependent(&self.p, t) {
-            self.error(
-                code::VALUE_TYPE_PLACE,
-                t.span,
-                "a value-dependent type is not allowed in a service/environment type",
-            );
+        if self.reject_value_type(t, "a service/environment type") {
             return None;
         }
         let head = match &self.expand(t).kind {
@@ -1900,12 +2001,7 @@ impl<'a> Resolver<'a> {
     /// parameters and value are types that the host can take (§10.3), with
     /// no errors and no environment.
     fn external_type(&mut self, t: &Type) {
-        if value_dependent(&self.p, t) {
-            self.error(
-                code::VALUE_TYPE_PLACE,
-                t.span,
-                "a value-dependent type is not allowed in an external declaration",
-            );
+        if self.reject_value_type(t, "an external declaration") {
             return;
         }
         let TypeKind::Fn {
@@ -3262,5 +3358,51 @@ fn pattern_type_ids(p: &TypePattern, out: &mut Vec<TypeId>) {
         }
         TypePattern::Exact(t) => named_types(t, out),
         TypePattern::Bind(_) | TypePattern::Skip | TypePattern::Error => {}
+    }
+}
+
+fn projectable_body(
+    t: &Type,
+    map: &HashMap<TyVarId, TypePattern>,
+    used: &mut HashSet<TyVarId>,
+) -> Option<TypePattern> {
+    let mut variable = false;
+    let mut invalid = false;
+    walk_type(t, &mut |t| match t.kind {
+        TypeKind::Var(_) => variable = true,
+        TypeKind::Hole | TypeKind::Error | TypeKind::Of { .. } => invalid = true,
+        _ => {}
+    });
+    if invalid {
+        return None;
+    }
+    if !variable {
+        return Some(TypePattern::Exact(t.clone()));
+    }
+    match &t.kind {
+        TypeKind::Var(v) => {
+            if !used.insert(*v) {
+                return None;
+            }
+            map.get(v).cloned()
+        }
+        TypeKind::Named { ty, args } => Some(TypePattern::Named(
+            *ty,
+            args.iter()
+                .map(|t| projectable_body(t, map, used))
+                .collect::<Option<_>>()?,
+        )),
+        TypeKind::Tuple(ts) => Some(TypePattern::Tuple(
+            ts.iter()
+                .map(|t| projectable_body(t, map, used))
+                .collect::<Option<_>>()?,
+        )),
+        TypeKind::Fn { .. }
+        | TypeKind::Union(_)
+        | TypeKind::Inter(_)
+        | TypeKind::Diff(_)
+        | TypeKind::Hole
+        | TypeKind::Error
+        | TypeKind::Of { .. } => None,
     }
 }

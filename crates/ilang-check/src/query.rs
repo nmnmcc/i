@@ -600,6 +600,15 @@ impl<'a> Query<'a> {
             w.pattern(&b.binding.pattern);
             w.expr(&b.binding.value);
         }
+        for pattern in &p.alias_patterns {
+            if pattern.module != m {
+                continue;
+            }
+            if let TypePattern::Named(head, _) = pattern.pattern {
+                w.occ.push((pattern.head_span, Target::Type(head)));
+            }
+            w.ty(&pattern.source);
+        }
         for (i, d) in module.defs.iter().enumerate() {
             let id = DefId {
                 module: m,

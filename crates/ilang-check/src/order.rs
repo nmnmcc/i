@@ -281,7 +281,7 @@ pub fn module_order(program: &Program) -> Vec<ModuleId> {
 /// Value-type edges order already computed expression SCCs. They never
 /// change SCC membership, runtime needs, or initialization (§2.5, §4.7).
 fn type_order(
-    p: &Program,
+    p: &mut Program,
     groups: Vec<Vec<BindingRef>>,
     diags: &mut Vec<Diagnostic>,
     reverse: bool,
@@ -328,7 +328,7 @@ fn type_order(
             });
         }
     }
-    if !has_reads {
+    if !has_reads && !reverse {
         return groups;
     }
     let mut bad = BTreeSet::new();
@@ -379,6 +379,26 @@ fn type_order(
                         format!("the type of {source} is needed to type {reader}, but the dependencies form a circle ({chain}); write the type instead")));
                 }
             }
+        }
+    }
+    for i in &bad {
+        p.failed_type_groups.extend(groups[*i].iter().copied());
+    }
+    for (i, site) in p.of_sites.iter().enumerate() {
+        let ValueRef::Def(d) = site.value else {
+            continue;
+        };
+        let DefKind::Binding { binding, .. } = p.def(d).kind else {
+            continue;
+        };
+        if owners
+            .get(&BindingRef {
+                module: d.module,
+                index: binding,
+            })
+            .is_some_and(|i| bad.contains(i))
+        {
+            p.failed_reads.insert(OfId(i as u32));
         }
     }
     let mut done = BTreeSet::new();

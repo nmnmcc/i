@@ -45,11 +45,9 @@ pub mod code {
     pub const TYPE_PARAM_TWICE: &str = "E0226";
     pub const EXPORT_HIDDEN_TYPE: &str = "E0227";
     pub const ENV_PARAMS_SAME: &str = "E0228";
-    pub const TYPE_OF_VALUE_RESERVED: &str = "E0229";
     pub const TYPE_VAR_ARGS: &str = "E0230";
     pub const TYPE_VAR_IS_TYPE: &str = "E0231";
     pub const TYPE_PARAM_FORM: &str = "E0232";
-    pub const ALIAS_PATTERN_RESERVED: &str = "E0233";
     pub const MACRO_RESERVED: &str = "E0234";
     // E0229, E0233 and E0237 were temporary value-type reservations.
     pub const VALUE_TYPE_CIRCLE: &str = "E0530";
