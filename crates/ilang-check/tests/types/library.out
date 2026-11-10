@@ -12,6 +12,44 @@ i/control.keep_env : (f: (x: A) -> B ? E ! N) -> { (x: A) -> B ? E } ! N
 i/resource.ensure : (body: () -> A ? E ! N, with: () -> Nil ! N) -> A ? E ! N
 i/resource.acquire : (open: () -> A ? E ! N, release: (A) -> Nil ! N, use: (A) -> B ? E ! N) -> B ? E ! N
 i/assertion.catch : (body: () -> A ? E ! N) -> Result(A, AssertionFailure) ? E ! N - Assert
+i/request.new_root : (parent: Key(Nil)) -> Key(Nil)
+i/request.end_root : (root: Key(Nil)) -> Nil
+i/request.new_owner : (root: Key(Nil)) -> Key(Nil)
+i/request.end_owner : (owner: Key(Nil)) -> Nil
+i/request.group_count : (owner: Key(Nil)) -> Int
+i/request.root_count : (root: Key(Nil)) -> Int
+i/request.cancel_group : (owner: Key(Nil)) -> Nil
+i/request.cancel_root : (root: Key(Nil)) -> Nil
+i/request.observe_owner : (owner: Key(Nil)) -> Request(Nil)
+i/request.observe_root : (root: Key(Nil)) -> Request(Nil)
+i/request.open_root : () -> Root ! Root
+i/request.close_root : (root: Root) -> Nil
+i/request.open_owner : () -> Owner ! Root
+i/request.close_owner : (owner: Owner) -> Nil
+i/request.count : (owner: Owner) -> Int
+i/request.count_root : (root: Root) -> Int
+i/request.settled_owner : (owner: Owner) -> Bool
+i/request.settled_root : (root: Root) -> Bool
+i/request.cancel_all : (owner: Owner) -> Nil
+i/request.cancel_all_root : (root: Root) -> Nil
+i/request.retain : (value: A) -> A
+i/request.within : (body: () -> A ? E ! N) -> A ? E ! Root | N - Owner
+i/request.wait_none : (owner: Owner) -> Nil ! Await
+i/request.wait_none_root : (root: Root) -> Nil ! Await
+i/request.ready : (value: A) -> Request(A)
+i/request.ticket : (r: Request(A)) -> Ticket
+i/request.read_state : (r: Request(A)) -> Result(A, Int)
+i/request.take : (r: Request(A)) -> A
+i/request.settled : (r: Ticket) -> Bool
+i/request.cancel : (r: Ticket) -> Nil
+i/request.state : (r: Request(A)) -> RequestState(A)
+i/request.await : (r: Request(A)) -> A ! Await
+i/request.await_owned : (r: Request(A)) -> A ! Await
+i/request.wait_any : (rs: List(Ticket)) -> Nil
+i/request.poll : () -> Nil
+i/request.entry_root : () -> Key(Nil)
+i/request.entry_end : () -> Nil
+i/request.entry : (body: () -> A ? E ! N) -> A ? E ! N - Await - Owner - Root
 i/key.new : () -> Key(A)
 i/key.wrap : (k: Key(A), value: A) -> Keyed
 i/key.read : (k: Key(A), value: Keyed) -> Result(A, Nil)
