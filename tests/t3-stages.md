@@ -281,3 +281,39 @@ BDD map model and proves both field-constrained repairs. It exits 0. This
 is a substitute interpretation check, not a compiler acceptance test and
 not an assignment of a diagnostic number. No production record compiler
 behavior has been chosen against the contradictory pass requirement.
+
+## Stage 2: merged verification and stop
+
+Checkpoint e2d5129 was merged with redesign 82375c0 in b6d2926. The merge
+was mechanical; no conflicts were resolved by changing either track's rules.
+W520's imported golden changes keep their upstream generation commit and
+per-line rule audit in tests/w520.md. T3 produced no golden changes.
+
+On the merged tree:
+
+- `heavy direnv exec /home/agent/Programming/i env
+  ILANG_BROWSER_PORT=4181 ./scripts/dev-verify`: exit 0. Formatting, Clippy
+  with warnings denied, workspace tests, all 241 existing spec cases at
+  O0/O2, the five Boolean kernel tests, the label-order runtime test,
+  1,465 std tests, two example tests and 12 bench tests at both levels,
+  WASI smoke, SDK tests and all 51 browser tests passed.
+- `direnv exec /home/agent/Programming/i ./scripts/old-syntax-check`:
+  exit 0, 1,630 snippets parsed with exact expected errors, 25 T3 future
+  entries. The no-T3-future-entry criterion is not met.
+- `direnv exec /home/agent/Programming/i python3
+  tests/t3-head-test-conflict.py`: exit 0. Both broad-input interpretations
+  are Refuted and both field-constrained repairs are Proven. The conflict
+  survives the merge; W520 does not change head-test typing.
+- `git diff --check`: passed. No failed or interrupted cargo/gate checks;
+  no persistent environment change; no interrupted worker work on entry.
+
+Stop: the contradictory required pass fixture above still needs a source
+decision. No frontend syntax, production record graph/solver, field theory,
+query/formatter/interface integration, runtime records or i/record library
+has been installed by stage 2. The complete frontend/model differential
+tests, principal-type and declaration-order probes, soundness runs, all
+deliberate-rejection diagnostics, wrap_union/pair/schema/codec runs, real
+checker branch-growth/Fan timings, 1/10/100/1,000-field measurements, std
++10% comparison and final merged-baseline WAT comparison remain required.
+The 898-file export above is only a pre-W520 baseline capture. Model/kernel
+timings are not substitutes for the real-checker or runtime scale gates.
