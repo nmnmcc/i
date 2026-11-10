@@ -1,11 +1,9 @@
 # Design: metaprogramming with two surfaces
 
-Status: revised design, 2026-11-11. This retains the reviewed rules from
-lane/note-meta at 44021cc, merged with redesign at 2d1cfc560. It is not an
-implemented feature. The new collection contract (§4.5) and the conservative
-typed-result correction (§7.3) need coordinator acceptance. §11 names the
-remaining gates; “review closed” here means every available finding has a
-disposition, not that the unimplemented machinery has passed runtime tests.
+Status: implementation design, 2026-11-11. This retains the rules from
+lane/note-meta at 44021cc, aligned with redesign and the user's SYN2 decisions.
+The collection contract (§4.5) and conservative typed-result rule (§7.3) are
+the implementation choices; their behavior is verified by implementation tests.
 
 Sources, in order: spec.md; syntax.md as amended by the user's confirmed SYN2
 decisions; literal-types.md, value-types.md, types-joint.md, records.md at the
@@ -103,8 +101,7 @@ arrow. They print postfix matches, including a grouped numeric/binary subject:
 `show_as` returns `SyntaxError`. Conversion never invents a binding, since
 that can capture a name and change evaluation or generalization.
 
-M1 must reserve unsupported macro/quote forms with explicit errors until M2.
-The normal-parser restrictions on an attribute with empty arguments, an
+M1 parses quote forms for the M2 expansion phase. The normal-parser restrictions on an attribute with empty arguments, an
 attribute on an item macro call, and a grouped function-result hole are M1
 changes (§2.3), not claims that today's parser already rejects them.
 
@@ -272,7 +269,7 @@ In the tables, `e` is an expression, `arg` a call argument (`e`, or `(: x e)` wi
 
 ```i
 fact = (n) {
-  n | {
+  n.{
     0 -> 1
     _ -> n * fact(n - 1)
   }
@@ -281,7 +278,7 @@ fact = (n) {
 
 ```lisp
 (= fact (-> (n) _
-  (| n {
+  (. n {
     (-> 0 1)
     (-> _ (* n (fact (- n 1)))) })))
 ```
