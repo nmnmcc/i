@@ -621,24 +621,21 @@ fn spec_corpus_reverse_order_and_recovery() {
 #[test]
 fn alias_exports_preserve_constructor_privacy() {
     // X1: Alias(..) is the same alias export as Alias, not constructor access.
-    for exports in ["(Public)", "(Public(..))"] {
+    for exports in ["(Secret, Public)", "(Secret, Public(..))"] {
         let lib = [
             exports,
-            "\nSecret { Secret(Int) }\nvalue: Int = 1\nPublic = value",
+            "\nSecret { Hidden(Int) }\nvalue: Secret = Hidden(1)\nPublic = value",
         ]
         .concat();
         let (_, c) = checked(&[
             ("src/lib.i", &lib),
-            (
-                "src/main.i",
-                "((Public) = app/lib)\nf = (n: Public) { n + 1 }",
-            ),
+            ("src/main.i", "((Public) = app/lib)\nf = (n: Public) { n }"),
         ]);
         assert!(!c.diags.iter().any(Diagnostic::is_error), "{:?}", c.diags);
-        assert_eq!(alias(&c, "Public"), "Int");
+        assert_eq!(alias(&c, "Public"), "Secret");
         let (_, c) = checked(&[
             ("src/lib.i", &lib),
-            ("src/main.i", "((Public) = app/lib)\nx = lib.Secret(1)"),
+            ("src/main.i", "((Public) = app/lib)\nx = lib.Hidden(1)"),
         ]);
         assert!(
             c.diags.iter().any(|d| d.code == code::NOT_EXPORTED),
