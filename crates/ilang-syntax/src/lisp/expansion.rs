@@ -139,3 +139,63 @@ pub fn definitions(
         Err(errors)
     }
 }
+
+/// An unevaluated syntax argument, with its optional written call label.
+#[derive(Clone, Debug)]
+pub struct MacroArgument {
+    pub label: Option<String>,
+    pub syntax: Syntax,
+}
+
+impl MacroDefinition {
+    /// Match call arguments to parameters (§6.6). For an attribute call,
+    /// `item` is placed in the last parameter independently of labels.
+    pub fn arguments(
+        &self,
+        arguments: &[MacroArgument],
+        item: Option<Syntax>,
+        call: &Syntax,
+    ) -> Result<Vec<Syntax>, SyntaxError> {
+        let error = |message: &str| SyntaxError {
+            message: message.into(),
+            span: call.span(),
+        };
+        let expected = self.parameters.len();
+        if arguments.len() + usize::from(item.is_some()) != expected {
+            return Err(error(
+                "the number of macro arguments does not match its parameters",
+            ));
+        }
+        let mut slots = vec![None; expected];
+        if let Some(item) = item {
+            slots[expected - 1] = Some(item);
+        }
+        let mut positional = 0;
+        let mut labeled = false;
+        for argument in arguments {
+            let index = if let Some(label) = &argument.label {
+                labeled = true;
+                self.parameters
+                    .iter()
+                    .position(|name| name == label)
+                    .ok_or_else(|| error("a macro argument label does not match a parameter"))?
+            } else {
+                if labeled {
+                    return Err(error(
+                        "positional macro arguments must precede labeled arguments",
+                    ));
+                }
+                let index = positional;
+                positional += 1;
+                index
+            };
+            if slots[index].replace(argument.syntax.clone()).is_some() {
+                return Err(error("a macro parameter receives more than one argument"));
+            }
+        }
+        Ok(slots
+            .into_iter()
+            .map(|slot| slot.expect("macro argument count and labels fill every slot"))
+            .collect())
+    }
+}

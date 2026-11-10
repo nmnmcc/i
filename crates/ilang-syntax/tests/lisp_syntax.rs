@@ -354,3 +354,56 @@ fn macro_declarations_have_a_lisp_binding_and_named_parameters() {
         assert!(definitions(&module, true).is_err(), "{source}");
     }
 }
+
+#[test]
+fn macro_arguments_match_labels_and_attribute_items() {
+    use ilang_syntax::lisp::expansion::{MacroArgument, MacroDefinition};
+    let m = MacroDefinition {
+        item: 0,
+        name: "m".into(),
+        parameters: vec!["first".into(), "second".into(), "item".into()],
+    };
+    let argument = |label: Option<&str>, text: &str| MacroArgument {
+        label: label.map(str::to_string),
+        syntax: root(text),
+    };
+    let call = root("call");
+    let supplied = [argument(Some("second"), "b"), argument(Some("first"), "a")];
+    let ordered = m.arguments(&supplied, Some(root("body")), &call).unwrap();
+    assert_eq!(
+        ordered.iter().map(|s| s.show()).collect::<Vec<_>>(),
+        ["a", "b", "body"]
+    );
+    assert!(
+        m.arguments(
+            &[argument(Some("first"), "a"), argument(None, "b")],
+            Some(root("body")),
+            &call
+        )
+        .is_err()
+    );
+    assert!(
+        m.arguments(
+            &[argument(None, "a"), argument(Some("first"), "b")],
+            Some(root("body")),
+            &call
+        )
+        .is_err()
+    );
+    assert!(
+        m.arguments(
+            &[argument(None, "a"), argument(Some("item"), "b")],
+            Some(root("body")),
+            &call
+        )
+        .is_err()
+    );
+    assert!(
+        m.arguments(
+            &[argument(None, "a"), argument(Some("unknown"), "b")],
+            Some(root("body")),
+            &call
+        )
+        .is_err()
+    );
+}
