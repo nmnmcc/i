@@ -855,7 +855,7 @@ fn cached_templates_preserve_hole_sharing_and_deferred_constraints() {
 
 #[test]
 fn nested_pattern_heads_have_hover_and_definition_targets() {
-    let src = "Pair(A,B)=(A,B)\nBox(A){Box(A)}\nv=(Box(1),\"s\")\nPair(Box(Item),_)=v\nx:Item=2";
+    let src = "Pair(A,B)=(A,B)\nBox(A){Box(A)}\nv=(Box(1),\"s\")\nPair(Box(Item),_)=v\nx:Item=1";
     let (g, c) = good(src);
     let p = c.program.as_ref().unwrap();
     let m = common::module(p, "app/main");
@@ -885,10 +885,11 @@ fn nested_pattern_heads_have_hover_and_definition_targets() {
 
 #[test]
 fn annotation_demands_fix_weak_sources_and_keep_generalized_instances() {
-    good("id=(x){x}\nv=id(1)\nx:v=2");
+    good("id=(x){x}\nv=id(1)\nx:v=1");
+    good("id=(x){x}\nv:Int=id(1)\nx:v=2");
     bad("id=(x){x}\nv=id(1)\nx:v=\"s\"", code::TYPE_MISMATCH);
     good("id=(x){x}\nx:id=(n:Int){n}\ny:id=(s:String){s}");
-    recovery_order_invariant(&[("src/main.i", "id=(x){x}\nv=id(1)\nx:v=2")]);
+    recovery_order_invariant(&[("src/main.i", "id=(x){x}\nv=id(1)\nx:v=1")]);
 }
 
 #[test]

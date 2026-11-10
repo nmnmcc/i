@@ -23,11 +23,13 @@ mod coverage;
 mod display;
 mod infer;
 mod known;
+mod lits;
 mod pattern;
 mod shown;
 mod solve;
 mod value_types;
 
+pub use lits::{LitValue, TestValues};
 pub use shown::{ShownFn, ShownType};
 
 use crate::hir::{BindingRef, CtorRef, DefId, ModuleId, Program, TypeRef};
@@ -48,13 +50,20 @@ pub enum Head {
     Fn,
 }
 
+/// A runtime type test, including the values of an Int or String member.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TestMember {
+    pub head: Head,
+    pub values: TestValues,
+}
+
 /// A type in inference. `Top` is only made when a type is shown: it is a
 /// type variable that has no effect, in an input place.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Ty {
     Var(V),
     /// A named type or a tuple, with its arguments or parts.
-    Con(Head, Vec<Ty>),
+    Con(Head, lits::ValueSet, Vec<Ty>),
     Fn(Box<FnTy>),
     Union(Vec<Ty>),
     Inter(Vec<Ty>),
@@ -67,6 +76,10 @@ pub(crate) enum Ty {
     Both(Box<Ty>, Box<Ty>),
 }
 
+// The baseline Ty is 40 bytes on 64-bit targets. The set adds at most 8.
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<Ty>() <= 48);
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct FnTy {
     /// Labels have no effect on subtyping (§4.6).
@@ -77,20 +90,64 @@ pub(crate) struct FnTy {
 }
 
 impl Ty {
+    pub fn literal(v: &LitValue) -> Ty {
+        let (b, text) = match v {
+            LitValue::Int(n) => (crate::hir::BuiltinType::Int, n.to_string()),
+            LitValue::Str(s) => (crate::hir::BuiltinType::String, s.clone()),
+        };
+        Ty::lit(b, lits::ValueSet::only([text.into()]).unwrap())
+    }
+
+    pub fn lit(b: crate::hir::BuiltinType, values: lits::ValueSet) -> Ty {
+        debug_assert!(matches!(
+            b,
+            crate::hir::BuiltinType::Int | crate::hir::BuiltinType::String
+        ));
+        Ty::Con(Head::Named(TypeRef::Builtin(b)), values, Vec::new())
+    }
+
+    pub fn values(&self) -> &lits::ValueSet {
+        match self {
+            Ty::Con(_, values, _) => values,
+            _ => &lits::ValueSet::ALL,
+        }
+    }
+
+    /// Only these argumentless heads have a scalar value-set algebra.
+    pub fn scalar(&self) -> Option<crate::hir::BuiltinType> {
+        match self {
+            Ty::Con(Head::Named(TypeRef::Builtin(b)), _, args)
+                if args.is_empty()
+                    && matches!(
+                        b,
+                        crate::hir::BuiltinType::Int | crate::hir::BuiltinType::String
+                    ) =>
+            {
+                Some(*b)
+            }
+            _ => None,
+        }
+    }
+
+    /// Replace a scalar's set, keeping empty distinct from All (§4.2).
+    pub fn with_values(&self, values: Option<lits::ValueSet>) -> Ty {
+        let b = self.scalar().expect("only Int and String have value sets");
+        values.map_or(Ty::Never, |values| Ty::lit(b, values))
+    }
     pub fn head(&self) -> Option<Head> {
         match self {
-            Ty::Con(h, _) => Some(*h),
+            Ty::Con(h, _, _) => Some(*h),
             Ty::Fn(_) => Some(Head::Fn),
             _ => None,
         }
     }
 
     pub fn named(t: TypeRef, args: Vec<Ty>) -> Ty {
-        Ty::Con(Head::Named(t), args)
+        Ty::Con(Head::Named(t), lits::ValueSet::ALL, args)
     }
 
     pub fn tuple(parts: Vec<Ty>) -> Ty {
-        Ty::Con(Head::Tuple(parts.len() as u32), parts)
+        Ty::Con(Head::Tuple(parts.len() as u32), lits::ValueSet::ALL, parts)
     }
 
     /// A type variable, or a difference of one: a member that a value of
@@ -101,6 +158,146 @@ impl Ty {
             Ty::Diff(a, _) => a.is_varlike(),
             _ => false,
         }
+    }
+}
+
+/// Normalize a closed written host type with the same algebra as inference.
+/// Structural members may disappear during scalar intersection or difference;
+/// their presence in the source must not decide scalar ABI admissibility.
+pub(crate) fn boundary_type(
+    t: &crate::hir::Type,
+    p: &Program,
+    expand: &impl Fn(&crate::hir::Type) -> crate::hir::Type,
+) -> Option<Ty> {
+    fn convert(
+        s: &mut solve::Solver,
+        t: &crate::hir::Type,
+        p: &Program,
+        expand: &impl Fn(&crate::hir::Type) -> crate::hir::Type,
+    ) -> Option<Ty> {
+        use crate::hir::{BuiltinType, TypeKind};
+        let t = expand(t);
+        Some(match &t.kind {
+            TypeKind::Lit(v) => Ty::literal(v),
+            TypeKind::Named { ty, args } => {
+                if *ty == TypeRef::Builtin(BuiltinType::Never) {
+                    Ty::Never
+                } else {
+                    if matches!(ty, TypeRef::Custom(_)) && !args.is_empty() && s.variance.is_empty()
+                    {
+                        s.variance = infer::variances(p);
+                    }
+                    Ty::named(
+                        *ty,
+                        args.iter()
+                            .map(|t| convert(s, t, p, expand))
+                            .collect::<Option<_>>()?,
+                    )
+                }
+            }
+            TypeKind::Tuple(ts) => Ty::tuple(
+                ts.iter()
+                    .map(|t| convert(s, t, p, expand))
+                    .collect::<Option<_>>()?,
+            ),
+            TypeKind::Fn {
+                params,
+                ret,
+                err,
+                env,
+            } => Ty::Fn(Box::new(FnTy {
+                params: params
+                    .iter()
+                    .map(|part| {
+                        Some((
+                            part.label.as_ref().map(|l| l.name.clone()),
+                            convert(s, &part.ty, p, expand)?,
+                        ))
+                    })
+                    .collect::<Option<_>>()?,
+                ret: convert(s, ret, p, expand)?,
+                err: match err {
+                    Some(t) => convert(s, t, p, expand)?,
+                    None => Ty::Never,
+                },
+                env: match env {
+                    Some(t) => convert(s, t, p, expand)?,
+                    None => Ty::Never,
+                },
+            })),
+            TypeKind::Union(ts) | TypeKind::Inter(ts) => {
+                let ms = ts
+                    .iter()
+                    .map(|t| convert(s, t, p, expand))
+                    .collect::<Option<Vec<_>>>()?;
+                if matches!(t.kind, TypeKind::Union(_)) {
+                    s.union(ms)
+                } else {
+                    s.inter(ms)
+                }
+            }
+            TypeKind::Diff(ts) => {
+                let mut parts = ts.iter();
+                let mut a = convert(s, parts.next()?, p, expand)?;
+                for part in parts {
+                    let h = convert(s, part, p, expand)?;
+                    a = s.diff(a, vec![h]);
+                }
+                a
+            }
+            TypeKind::Of { .. } | TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {
+                return None;
+            }
+        })
+    }
+    let mut s = solve::Solver::new(HashMap::new(), Vec::new());
+    let t = convert(&mut s, t, p, expand)?;
+    s.failures.is_empty().then_some(t)
+}
+
+#[cfg(test)]
+mod literal_representation_tests {
+    use super::{
+        Head, Ty,
+        lits::ValueSet,
+        solve::{Pol, Solver},
+    };
+    use crate::hir::{BuiltinType, TypeRef};
+    use std::sync::Arc;
+
+    #[test]
+    fn scalar_sets_survive_child_mapping() {
+        // literal-types §4: "No helper rebuilds a Con with a default set."
+        let set = ValueSet::except([Arc::from("a")]);
+        let literal = Ty::lit(BuiltinType::String, set.clone());
+        let mut solver = Solver::new(Default::default(), Vec::new());
+        assert_eq!(literal.values(), &set);
+        let mapped = solver.map_children(&literal, Pol::Pos, &mut |_, _, _| {
+            panic!("a literal has no children")
+        });
+        assert_eq!(mapped, literal);
+        let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![literal.clone()]);
+        assert_eq!(
+            solver.map_children(&list, Pol::Pos, &mut |_, t, _| t.clone()),
+            list
+        );
+        assert_eq!(Ty::tuple(vec![literal]).values(), &ValueSet::ALL);
+        assert_eq!(solver.fresh().values(), &ValueSet::ALL);
+        assert_eq!(
+            mapped.head(),
+            Some(Head::Named(TypeRef::Builtin(BuiltinType::String)))
+        );
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic]
+    fn only_int_and_string_carry_sets() {
+        // literal-types decision 3: Float has no literal types.
+        Ty::lit(
+            BuiltinType::Float,
+            ValueSet::only([Arc::from("1")]).unwrap(),
+        );
     }
 }
 
@@ -153,6 +350,8 @@ pub struct Typed {
     /// The type scheme of each top-level name, simplified and shown in the
     /// syntax of §3 (§4.7).
     pub schemes: HashMap<DefId, String>,
+    /// Human-facing text; full scheme trees and interfaces stay exact.
+    pub scheme_hovers: HashMap<DefId, String>,
     /// The type scheme of each exported top-level name and of each
     /// declaration (§10.1), whether exported or not: the type of
     /// `schemes`, simplified and named in the same way, as a tree whose
@@ -176,7 +375,7 @@ pub struct Typed {
     /// Each type test `x: T` or `_: T` in a `case` clause pattern, by the
     /// span of the `Typed` pattern: the type constructors of the members of
     /// `T`, which are tested at run time (§7.1).
-    pub type_tests: HashMap<(ModuleId, Span), Vec<Head>>,
+    pub type_tests: HashMap<(ModuleId, Span), Vec<TestMember>>,
     /// The type constructor of the service of each environment parameter,
     /// by the span of its name, and of each environment statement, by the
     /// span of the statement (§9.2). Aliases are expanded.

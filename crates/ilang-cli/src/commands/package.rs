@@ -1438,6 +1438,7 @@ impl<'a> TypeShow<'a> {
         };
         match &t.kind {
             TypeKind::Of { .. } => panic!("unresolved value type in a package interface"),
+            TypeKind::Lit(v) => v.text(),
             TypeKind::Named { ty, args } => {
                 let name = match ty {
                     TypeRef::Builtin(b) => b.name().to_string(),
@@ -1616,7 +1617,7 @@ fn canonical_alias_order(t: &ShownType, key: &dyn Fn(&ShownType) -> String) -> S
             Box::new(canonical_alias_order(t, key)),
             ts.iter().map(|t| canonical_alias_order(t, key)).collect(),
         ),
-        ShownType::Var(_) | ShownType::Hole | ShownType::Never => t.clone(),
+        ShownType::Lit(_) | ShownType::Var(_) | ShownType::Hole | ShownType::Never => t.clone(),
     }
 }
 
@@ -1656,6 +1657,23 @@ mod value_type_interfaces {
             a,
             canonical("(Pair)\nport: Int = 1\nPair(A,B) = (A,B,port)")
         );
+    }
+    #[test]
+    fn completed_literal_aliases_have_full_canonical_identity() {
+        // Joint §4: literal spelling and private source spelling are not identity.
+        let a = canonical("(A)\nv=0x10\nA=v");
+        assert_eq!(a, canonical("(A)\nrenamed=16\nA=renamed"));
+        assert_ne!(a, canonical("(A)\nv=17\nA=v"));
+        assert_eq!(
+            canonical("(A)\nv=\"\\u{61}\"\nA=v"),
+            canonical("(A)\nv=\"a\"\nA=v")
+        );
+        // This is deliberately beyond the limited hover's first ten members.
+        let source = "(A)\nv: 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19=0\nA=v";
+        let a = canonical(source);
+        assert_ne!(a, canonical(&source.replace("18|19=0", "18|20=0")));
+        assert!(!a["type api.A"].contains('…'));
+        assert!(a["type api.A"].contains("19"));
     }
     #[test]
     fn commutative_alias_members_keep_canonical_formal_identity() {

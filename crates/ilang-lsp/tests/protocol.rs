@@ -483,7 +483,7 @@ fn a_new_document() {
         "{diags:?}"
     );
     let h = c.request::<lsp::request::HoverRequest>(position_params(&new, 0, 0));
-    assert_eq!(h["contents"]["value"], "```i\ny: Int\n```");
+    assert_eq!(h["contents"]["value"], "```i\ny: 2\n```");
     // Fixed: the problems are cleared.
     c.change(&new, 2, "y = 2\nz = y + 1\n");
     assert_eq!(c.diagnostics(&new), vec![]);
@@ -685,12 +685,12 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(hover("one"), "one: (x: A) -> Int");
+    assert_eq!(hover("one"), "one: (x: A) -> 1");
     assert_eq!(hover("x) {\n  y = x"), "x: A");
     assert_eq!(hover("y = x"), "y: A");
     assert_eq!(
         hover("drop2"),
-        "drop2: (x: A, g: (Int) -> B ? E ! N, h: C) -> B ? E ! N"
+        "drop2: (x: A, g: (1) -> B ? E ! N, h: C) -> B ? E ! N"
     );
     assert_eq!(hover("x, g, h"), "x: A");
     assert_eq!(hover("h) {"), "h: C");
@@ -707,7 +707,9 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
 #[test]
 fn t2_nested_pattern_heads_support_hover_and_definition_in_recovery() {
     // X4: every pattern head targets its existing type, at every depth.
-    let source = include_str!("../../ilang-check/tests/value_type_review/nested/src/main.i");
+    let source = include_str!("../../ilang-check/tests/value_type_review/nested/src/main.i")
+        .replace("x: Item = 2", "x: Item = 1");
+    let source = source.as_str();
     let dir = tempfile::tempdir().unwrap();
     package(dir.path(), &[("src/main.i", source)]);
     let main = file_uri(&dir.path().join("src/main.i"));

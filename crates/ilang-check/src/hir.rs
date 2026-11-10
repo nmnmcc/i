@@ -282,6 +282,7 @@ pub struct Type {
 
 #[derive(Clone, Debug)]
 pub enum TypeKind {
+    Lit(crate::types::LitValue),
     Of {
         value: ValueRef,
         site: OfId,
@@ -613,7 +614,11 @@ pub fn walk_type(t: &Type, f: &mut impl FnMut(&Type)) {
                 walk_type(t, f);
             }
         }
-        TypeKind::Of { .. } | TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
+        TypeKind::Lit(_)
+        | TypeKind::Of { .. }
+        | TypeKind::Var(_)
+        | TypeKind::Hole
+        | TypeKind::Error => {}
     }
 }
 

@@ -1,6 +1,6 @@
-g : (y: A) -> A | Int
-f : (x: A) -> A | Int
-h : (z: A) -> A | Int
+g : (y: A) -> A | 0
+f : (x: A) -> A | 0
+h : (z: A) -> A | 0
 w : String
 f1 : (x: Int) -> Int
 g1 : (y: Int) -> Int
@@ -8,6 +8,6 @@ boom : () -> String
 f2 : (x: Int) -> Int
 g2 : (y: Int) -> Int
 boom2 : () -> Int
-12:1: error[E0501]: `Int` is not a subtype of `String`
+12:1: error[E0501]: `5` is not a subtype of `String`
 23:13: error[E0501]: `Int` is not a subtype of `String`
-33:17: error[E0501]: `String` is not a subtype of `Int` (the type at 33:14 needs it)
+33:17: error[E0501]: `"s"` is not a subtype of `Int` (the type at 33:14 needs it)

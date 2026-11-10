@@ -8,6 +8,8 @@ use crate::hir::TypeRef;
 /// [`ShownType::text`] writes it in the syntax of §3.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ShownType {
+    /// The canonical source text of an Int or String literal.
+    Lit(String),
     /// A built-in or custom type, with its arguments.
     Named(TypeRef, Vec<ShownType>),
     /// `(A, B)`.
@@ -56,6 +58,33 @@ impl ShownType {
         )
     }
 
+    /// Human text may abbreviate a scalar set; exact text never does.
+    pub fn text_limited(&self, type_names: &[String], limit: usize) -> String {
+        self.text_mode(type_names, Some(limit))
+    }
+
+    fn text_mode(&self, type_names: &[String], limit: Option<usize>) -> String {
+        let mut ty = |r| match r {
+            TypeRef::Builtin(b) => b.name().to_string(),
+            TypeRef::Custom(id) => type_names
+                .get(id.0 as usize)
+                .cloned()
+                .unwrap_or_else(|| format!("T{}", id.0)),
+        };
+        let mut var = |v: &str| v.to_string();
+        let mut out = String::new();
+        self.write(
+            0,
+            &mut out,
+            &mut Names {
+                ty: &mut ty,
+                var: &mut var,
+                limit,
+            },
+        );
+        out
+    }
+
     /// The text in the syntax of §3, with each named type named by `ty`
     /// and each type variable by `var`. Both are called in the order of
     /// the text, so `var` may number the variables by where they first
@@ -66,7 +95,15 @@ impl ShownType {
         var: &mut dyn FnMut(&str) -> String,
     ) -> String {
         let mut out = String::new();
-        self.write(0, &mut out, &mut Names { ty, var });
+        self.write(
+            0,
+            &mut out,
+            &mut Names {
+                ty,
+                var,
+                limit: None,
+            },
+        );
         out
     }
 
@@ -85,14 +122,40 @@ impl ShownType {
             }
         };
         let list = |xs: &[ShownType], sep: &str, p: u8, out: &mut String, n: &mut Names| {
-            for (i, x) in xs.iter().enumerate() {
-                if i > 0 {
+            let mut seen = [0usize; 2];
+            let counts = [false, true].map(|string| {
+                xs.iter()
+                    .filter(|x| matches!(x, ShownType::Lit(s) if s.starts_with('"') == string))
+                    .count()
+            });
+            let mut written = 0;
+            for x in xs {
+                let kind = match x {
+                    ShownType::Lit(s) => Some(usize::from(s.starts_with('"'))),
+                    _ => None,
+                };
+                if let Some(k) = kind {
+                    seen[k] += 1;
+                    if n.limit.is_some_and(|limit| counts[k] > limit) && seen[k] > 10 {
+                        if seen[k] == 11 {
+                            if written > 0 {
+                                out.push_str(sep);
+                            }
+                            out.push_str(&format!("… ({} more)", counts[k] - 10));
+                            written += 1;
+                        }
+                        continue;
+                    }
+                }
+                if written > 0 {
                     out.push_str(sep);
                 }
                 x.write(p, out, n);
+                written += 1;
             }
         };
         match self {
+            ShownType::Lit(s) => out.push_str(s),
             ShownType::Var(v) => out.push_str(&(n.var)(v)),
             ShownType::Never => out.push_str("Never"),
             ShownType::Hole => out.push('_'),
@@ -159,9 +222,9 @@ impl ShownType {
                 // Only the type constructors of `H` matter (§4.4).
                 open(out, 2);
                 a.write(2, out, n);
-                for m in h {
+                if !h.is_empty() {
                     out.push_str(" - ");
-                    m.write(3, out, n);
+                    list(h, " - ", 3, out, n);
                 }
                 close(out, 2);
             }
@@ -173,6 +236,7 @@ impl ShownType {
 struct Names<'a> {
     ty: &'a mut dyn FnMut(TypeRef) -> String,
     var: &'a mut dyn FnMut(&str) -> String,
+    limit: Option<usize>,
 }
 
 impl ShownType {
@@ -205,7 +269,7 @@ impl ShownType {
                     t.type_refs(out);
                 }
             }
-            ShownType::Var(_) | ShownType::Hole | ShownType::Never => {}
+            ShownType::Lit(_) | ShownType::Var(_) | ShownType::Hole | ShownType::Never => {}
         }
     }
 }

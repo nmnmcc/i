@@ -58,7 +58,6 @@ pub mod code {
     pub const TYPE_PATTERN_MISMATCH: &str = "E0535";
     pub const VALUE_TYPE_OWN_SCOPE: &str = "E0536";
     pub const TYPE_PATTERN_BINDER_IS_TYPE: &str = "E0537";
-    pub const CHOICES_ONE_CLAUSE: &str = "E0235";
     // Attributes and entry points.
     pub const UNKNOWN_ATTRIBUTE: &str = "E0301";
     pub const ATTRIBUTE_ARGS: &str = "E0302";

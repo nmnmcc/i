@@ -1628,31 +1628,10 @@ impl<'a> Formatter<'a> {
                     None => text(name.name.as_str()),
                 };
                 let open = self.tok_after(name.span.end).span.start;
-                let spans: Vec<_> = args
-                    .iter()
-                    .map(|a| {
-                        let span = match a {
-                            TypeArg::Type(t) => t.span,
-                            TypeArg::Int(_, s) | TypeArg::String(_, s) => *s,
-                        };
-                        (span.start, span.end)
-                    })
-                    .collect();
-                let list =
-                    self.seq(
-                        "(",
-                        ")",
-                        open,
-                        t.span.end - 1,
-                        &spans,
-                        false,
-                        |f, i| match &args[i] {
-                            TypeArg::Type(t) => f.ty(t),
-                            TypeArg::Int(_, s) | TypeArg::String(_, s) => text(f.slice(*s)),
-                        },
-                    );
+                let list = self.types(open, t.span.end - 1, args);
                 return cat(vec![head, list]);
             }
+            TypeKind::Lit(v) => return text(v.text()),
             TypeKind::Hole => return text("_"),
             TypeKind::Tuple(items) => return self.types(t.span.start, t.span.end - 1, items),
             TypeKind::Fn {

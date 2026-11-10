@@ -39,7 +39,7 @@
 use crate::ir::Stmt;
 use crate::ir::{self, *};
 use ilang_check::hir::{self, *};
-use ilang_check::types::{Access, Head, HostType, Typed};
+use ilang_check::types::{Access, Head, HostType, LitValue, TestMember, TestValues, Typed};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast::{BinOp, UnOp};
 use ilang_syntax::span::{LineIndex, Span};
@@ -2190,6 +2190,25 @@ impl<'a> Lowerer<'a> {
                 body: cb,
             });
         }
+        if let [c] = clauses
+            && c.guard.is_none()
+        {
+            let span = c
+                .patterns
+                .first()
+                .unwrap()
+                .span
+                .to(c.patterns.last().unwrap().span);
+            if self
+                .typed
+                .may_fail
+                .get(&(fx.module, span))
+                .copied()
+                .unwrap_or(false)
+            {
+                self.assert_failure(fx, &mut body, span, s, span.start);
+            }
+        }
         // The clauses cover every value (§7.4).
         body.push(Stmt::Unreachable);
         out.push(Stmt::Block { label: end, body });
@@ -2217,7 +2236,7 @@ impl<'a> Lowerer<'a> {
                 if let Some(heads) = self.typed.type_tests.get(&(fx.module, p.span)) {
                     let cond = heads
                         .iter()
-                        .map(|h| self.head_cond(v.clone(), *h))
+                        .map(|m| self.test_cond(v.clone(), m))
                         .reduce(|a, b| Cond::Or(Box::new(a), Box::new(b)))
                         .unwrap_or(Cond::Tag(v.clone(), u32::MAX));
                     guard(out, cond, fail);
@@ -2295,6 +2314,29 @@ impl<'a> Lowerer<'a> {
     }
 
     /// The test of a type test `x: T` for one member of `T` (§7.1).
+    fn test_cond(&self, v: Atom, member: &TestMember) -> Cond {
+        let values = match &member.values {
+            TestValues::All => return self.head_cond(v, member.head),
+            TestValues::Only(values) | TestValues::Except(values) => values,
+        };
+        let equal = values
+            .iter()
+            .map(|value| match value {
+                LitValue::Int(n) => Cond::IsInt(v.clone(), n.clone()),
+                LitValue::Str(s) => Cond::IsString(v.clone(), s.clone()),
+            })
+            .reduce(|a, b| Cond::Or(Box::new(a), Box::new(b)))
+            .unwrap_or(Cond::Tag(v.clone(), u32::MAX));
+        match &member.values {
+            TestValues::Only(_) => equal,
+            TestValues::Except(_) => Cond::And(
+                Box::new(self.head_cond(v, member.head)),
+                Box::new(Cond::Not(Box::new(equal))),
+            ),
+            TestValues::All => unreachable!(),
+        }
+    }
+
     fn head_cond(&self, v: Atom, h: Head) -> Cond {
         match h {
             Head::Tuple(n) => Cond::Tuple(v, n),
@@ -2579,60 +2621,65 @@ impl<'a> Lowerer<'a> {
             body: matching,
         }];
         if fails {
-            let module = self.program.module(fx.module);
-            let text = &self.graph.sources.get(module.source).text;
-            let source = text
-                .get(p.span.start as usize..p.span.end as usize)
-                .unwrap_or("");
-            // §1.1: `\r\n` and `\r` are the same as `\n`.
-            let source = source.replace("\r\n", "\n").replace('\r', "\n");
-            let prefix = Atom::String(format!("pattern {source} did not match "));
-            let shown = let_value(
-                fx,
-                &mut body,
-                Value::Op(
-                    Op::Runtime {
-                        name: "core_inspect",
-                        arity: 1,
-                    },
-                    vec![v],
-                ),
-                None,
-            );
-            let m = let_value(
-                fx,
-                &mut body,
-                Value::Op(Op::StringAppend, vec![prefix, shown]),
-                None,
-            );
-            let failure = let_value(
-                fx,
-                &mut body,
-                Value::Record {
-                    ctor: 2,
-                    ty: 1,
-                    fields: vec![m],
-                },
-                None,
-            );
-            let a = let_value(fx, &mut body, Value::Service(fx.env, ASSERT_SERVICE), None);
-            let f = let_value(fx, &mut body, Value::Field(a, 0), None);
-            let site = self.site(fx, at);
-            let_value(
-                fx,
-                &mut body,
-                Value::Call {
-                    callee: Callee::Value(f),
-                    args: vec![failure],
-                    env: fx.env,
-                },
-                site,
-            );
+            self.assert_failure(fx, &mut body, p.span, v, at);
         }
         // `fail` never gives a value (§9.6); a pattern that can not fail
         // always matches.
         body.push(Stmt::Unreachable);
         out.push(Stmt::Block { label: ok, body });
+    }
+
+    /// Shared failure path of fitted patterns, including one-clause choices.
+    fn assert_failure(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, span: Span, v: Atom, at: u32) {
+        let module = self.program.module(fx.module);
+        let text = &self.graph.sources.get(module.source).text;
+        let source = text
+            .get(span.start as usize..span.end as usize)
+            .unwrap_or("");
+        // §1.1: `\r\n` and `\r` are the same as `\n`.
+        let source = source.replace("\r\n", "\n").replace('\r', "\n");
+        let prefix = Atom::String(format!("pattern {source} did not match "));
+        let shown = let_value(
+            fx,
+            out,
+            Value::Op(
+                Op::Runtime {
+                    name: "core_inspect",
+                    arity: 1,
+                },
+                vec![v],
+            ),
+            None,
+        );
+        let m = let_value(
+            fx,
+            out,
+            Value::Op(Op::StringAppend, vec![prefix, shown]),
+            None,
+        );
+        let failure = let_value(
+            fx,
+            out,
+            Value::Record {
+                ctor: 2,
+                ty: 1,
+                fields: vec![m],
+            },
+            None,
+        );
+        let a = let_value(fx, out, Value::Service(fx.env, ASSERT_SERVICE), None);
+        let f = let_value(fx, out, Value::Field(a, 0), None);
+        let site = self.site(fx, at);
+        let_value(
+            fx,
+            out,
+            Value::Call {
+                callee: Callee::Value(f),
+                args: vec![failure],
+                env: fx.env,
+            },
+            site,
+        );
     }
 
     /// Binds a pattern that `plain` takes.

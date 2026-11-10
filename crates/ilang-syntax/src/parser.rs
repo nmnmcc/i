@@ -1728,9 +1728,59 @@ impl Parser<'_> {
         })
     }
 
+    /// Only integer atoms and brace groups can follow a literal type's minus.
+    fn type_int_part(&mut self) -> PResult<num_bigint::BigUint> {
+        match self.kind().clone() {
+            T::Int(n) => {
+                self.bump();
+                Ok(n)
+            }
+            T::LBrace => {
+                self.bump();
+                let n = self.nested(Self::type_int_part)?;
+                if self.tok().brk {
+                    return Err(Diagnostic::new(
+                        Code::TypeGroupBreak,
+                        self.tok().span,
+                        "a line break directly inside a `{ }` that groups a type is a compile error",
+                    ));
+                }
+                self.expect(&T::RBrace)?;
+                Ok(n)
+            }
+            T::Float(_) => Err(Diagnostic::new(
+                Code::Unexpected,
+                self.tok().span,
+                "Float has no literal types",
+            )),
+            _ => self.error("an integer literal after `-` in a type"),
+        }
+    }
+
     fn type_prim(&mut self) -> PResult<TypeExpr> {
         let start = self.start();
         let kind = match self.kind().clone() {
+            T::Int(n) => {
+                self.bump();
+                TypeKind::Lit(LitValue::Int(n.into()))
+            }
+            T::Str(s) => {
+                self.bump();
+                TypeKind::Lit(LitValue::Str(s))
+            }
+            T::Minus => {
+                self.bump();
+                TypeKind::Lit(LitValue::Int(-num_bigint::BigInt::from(
+                    self.type_int_part()?,
+                )))
+            }
+            T::Float(_) => {
+                return Err(Diagnostic::new(
+                    Code::Unexpected,
+                    self.tok().span,
+                    "Float has no literal types",
+                ));
+            }
             T::LParen => {
                 let is_fn = self.close[self.pos]
                     .is_some_and(|c| self.toks[c as usize + 1].kind == T::Arrow);
@@ -1785,13 +1835,7 @@ impl Parser<'_> {
                 let name = self.name()?;
                 if self.at_joined(&T::LParen) {
                     self.bump();
-                    let args = self.seq(T::RParen, true, |p| {
-                        Ok(match p.kind().clone() {
-                            T::Int(v) => TypeArg::Int(v, p.bump()),
-                            T::Str(s) => TypeArg::String(s, p.bump()),
-                            _ => TypeArg::Type(p.ty()?),
-                        })
-                    })?;
+                    let args = self.seq(T::RParen, true, Self::ty)?;
                     TypeKind::Call { module, name, args }
                 } else {
                     TypeKind::ValueOf { module, name }

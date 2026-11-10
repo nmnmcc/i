@@ -26,7 +26,7 @@ ctor_fn : () -> Bool
 ctor_value : () -> Bool
 fn_written : () -> Bool
 fn_body : () -> Bool
-own : (n: Int) -> Int
+own : (n: Int) -> 0
 group_a : (n: Int) -> Int
 group_b : (m: Int) -> Int
 own_local : () -> (n: Int) -> Int
@@ -54,61 +54,61 @@ pattern_named : (b: Box(String)) -> Bool
 pattern_annotation : (x: Int) -> Bool
 pattern_list : (xs: List(String)) -> Bool
 pattern_case_part : (b: Box(Int | String)) -> Bool
-pattern_narrowed : (x: Int | String | Nil) -> Int
+pattern_narrowed : (x: Int | String | Nil) -> 0 | 1 | 2
 not_general : () -> Bool
 untyped_field : (u: A) -> Never
 option_name : (opt: Option(User)) -> String
 annotated : (x: Int) -> Int
 annotated_call : Int
-18:16: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
-20:18: error[E0520]: the two sides have the known types `Float` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-22:17: error[E0520]: the two sides have the known types `BitArray` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-24:19: error[E0520]: the two sides have the known types `(Int, _)` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-26:17: error[E0520]: the two sides have the known types `List(Int | String)` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-28:26: error[E0520]: the two sides have the known types `List(_)` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-30:18: error[E0520]: the two sides have the known types `List(Never)` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-33:19: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
-35:20: error[E0520]: the two sides have the known types `Bool` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-37:22: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-39:16: error[E0520]: the two sides have the known types `Float` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-41:16: error[E0520]: the two sides have the known types `Float` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-45:2: error[E0520]: the two sides have the known types `Int | String` and `Float`, which are disjoint, so the result would always be the same (§6.9)
-63:26: error[E0520]: the two sides have the known types `Box(String)` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-65:27: error[E0520]: the two sides have the known types `User` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-68:29: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-72:26: error[E0520]: the two sides have the known types `User` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-78:23: error[E0520]: the two sides have the known types `(message: String) -> Never` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-80:22: error[E0520]: the two sides have the known types `(Bool) -> Bool` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-82:19: error[E0520]: the two sides have the known types `(x: a) -> a` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-86:2: error[E0520]: the two sides have the known types `(x: Int) -> Int` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-90:16: error[E0520]: the two sides have the known types `(value: a) -> Box(a)` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-92:19: error[E0520]: the two sides have the known types `Nil` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-96:19: error[E0520]: the two sides have the known types `(x: Int) -> String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-98:16: error[E0520]: the two sides have the known types `(x: Int, y: _) -> Int ? _ ! _` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-105:4: error[E0520]: the two sides have the known types `(n: Int) -> _ ? _ ! _` and `Int`, which are disjoint, so the result would always be the same (§6.9)
+18:16: error[E0520]: both sides are constants, `1` and `"a"`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
+20:18: error[E0520]: the two sides have the known types `Float` and `1`, which are disjoint, so the result would always be the same (§6.9)
+22:17: error[E0520]: the two sides have the known types `BitArray` and `1`, which are disjoint, so the result would always be the same (§6.9)
+24:19: error[E0520]: the two sides have the known types `(1, _)` and `1`, which are disjoint, so the result would always be the same (§6.9)
+26:17: error[E0520]: the two sides have the known types `List(1 | "a")` and `1`, which are disjoint, so the result would always be the same (§6.9)
+28:26: error[E0520]: the two sides have the known types `List(_)` and `1`, which are disjoint, so the result would always be the same (§6.9)
+30:18: error[E0520]: the two sides have the known types `List(Never)` and `1`, which are disjoint, so the result would always be the same (§6.9)
+33:19: error[E0520]: the two sides have the known types `Int` and `"s"`, which are disjoint, so the result would always be the same (§6.9)
+35:20: error[E0520]: the two sides have the known types `Bool` and `1`, which are disjoint, so the result would always be the same (§6.9)
+37:22: error[E0520]: the two sides have the known types `String` and `1`, which are disjoint, so the result would always be the same (§6.9)
+39:16: error[E0520]: the two sides have the known types `Float` and `1`, which are disjoint, so the result would always be the same (§6.9)
+41:16: error[E0520]: the two sides have the known types `Float` and `1`, which are disjoint, so the result would always be the same (§6.9)
+45:2: error[E0520]: the two sides have the known types `1 | "a"` and `Float`, which are disjoint, so the result would always be the same (§6.9)
+63:26: error[E0520]: the two sides have the known types `Box("a")` and `1`, which are disjoint, so the result would always be the same (§6.9)
+65:27: error[E0520]: the two sides have the known types `User` and `1`, which are disjoint, so the result would always be the same (§6.9)
+68:29: error[E0520]: the two sides have the known types `String` and `1`, which are disjoint, so the result would always be the same (§6.9)
+72:26: error[E0520]: the two sides have the known types `User` and `1`, which are disjoint, so the result would always be the same (§6.9)
+78:23: error[E0520]: the two sides have the known types `(message: String) -> Never` and `1`, which are disjoint, so the result would always be the same (§6.9)
+80:22: error[E0520]: the two sides have the known types `(Bool) -> Bool` and `1`, which are disjoint, so the result would always be the same (§6.9)
+82:19: error[E0520]: the two sides have the known types `(x: a) -> a` and `1`, which are disjoint, so the result would always be the same (§6.9)
+86:2: error[E0520]: the two sides have the known types `(x: Int) -> Int` and `1`, which are disjoint, so the result would always be the same (§6.9)
+90:16: error[E0520]: the two sides have the known types `(value: a) -> Box(a)` and `1`, which are disjoint, so the result would always be the same (§6.9)
+92:19: error[E0520]: the two sides have the known types `Nil` and `1`, which are disjoint, so the result would always be the same (§6.9)
+96:19: error[E0520]: the two sides have the known types `(x: Int) -> String` and `1`, which are disjoint, so the result would always be the same (§6.9)
+98:16: error[E0520]: the two sides have the known types `(x: Int, y: _) -> Int ? _ ! _` and `1`, which are disjoint, so the result would always be the same (§6.9)
+105:4: error[E0520]: the two sides have the known types `(n: Int) -> _ ? _ ! _` and `1`, which are disjoint, so the result would always be the same (§6.9)
 105:4: warning[W0502]: this value is not used, and working it out does nothing
-112:2: error[E0520]: the two sides have the known types `(m: _) -> _ ? _ ! _` and `Int`, which are disjoint, so the result would always be the same (§6.9)
+112:2: error[E0520]: the two sides have the known types `(m: _) -> _ ? _ ! _` and `1`, which are disjoint, so the result would always be the same (§6.9)
 112:2: warning[W0502]: this value is not used, and working it out does nothing
-120:3: error[E0520]: the two sides have the known types `(n: Int) -> _` and `Int`, which are disjoint, so the result would always be the same (§6.9)
+120:3: error[E0520]: the two sides have the known types `(n: Int) -> _` and `1`, which are disjoint, so the result would always be the same (§6.9)
 120:3: warning[W0502]: this value is not used, and working it out does nothing
-127:13: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
-131:18: error[E0520]: the two sides have the known types `Box(Int)` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-142:32: error[E0520]: the two sides have the known types `User` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-153:18: error[E0520]: the two sides have the known types `Int | String` and `Float`, which are disjoint, so the result would always be the same (§6.9)
-164:31: error[E0520]: the two sides have the known types `User` and `Int`, which are disjoint, so the result would always be the same (§6.9)
+127:13: error[E0520]: both sides are constants, `1` and `"a"`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
+131:18: error[E0520]: the two sides have the known types `Box(1)` and `1`, which are disjoint, so the result would always be the same (§6.9)
+142:32: error[E0520]: the two sides have the known types `User` and `1`, which are disjoint, so the result would always be the same (§6.9)
+153:18: error[E0520]: the two sides have the known types `1 | "a"` and `Float`, which are disjoint, so the result would always be the same (§6.9)
+164:31: error[E0520]: the two sides have the known types `User` and `1`, which are disjoint, so the result would always be the same (§6.9)
 167:2: warning[W0502]: this value is not used, and working it out does nothing
-171:19: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
-174:21: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-176:36: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-178:29: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-182:2: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
-191:2: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-196:2: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-201:2: error[E0520]: the two sides have the known types `Box(String)` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-206:2: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
-211:18: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-211:28: error[E0520]: the two sides have the known types `List(String)` and `Int`, which are disjoint, so the result would always be the same (§6.9)
+171:19: error[E0520]: both sides are constants, `1` and `"a"`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
+174:21: error[E0520]: the two sides have the known types `String` and `1`, which are disjoint, so the result would always be the same (§6.9)
+176:36: error[E0520]: the two sides have the known types `String` and `1`, which are disjoint, so the result would always be the same (§6.9)
+178:29: error[E0520]: the two sides have the known types `String` and `1`, which are disjoint, so the result would always be the same (§6.9)
+182:2: error[E0520]: both sides are constants, `1` and `"a"`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
+191:2: error[E0520]: the two sides have the known types `String` and `1`, which are disjoint, so the result would always be the same (§6.9)
+196:2: error[E0520]: the two sides have the known types `String` and `1`, which are disjoint, so the result would always be the same (§6.9)
+201:2: error[E0520]: the two sides have the known types `Box(String)` and `1`, which are disjoint, so the result would always be the same (§6.9)
+206:2: error[E0520]: the two sides have the known types `Int` and `"a"`, which are disjoint, so the result would always be the same (§6.9)
+211:18: error[E0520]: the two sides have the known types `String` and `1`, which are disjoint, so the result would always be the same (§6.9)
+211:28: error[E0520]: the two sides have the known types `List(String)` and `1`, which are disjoint, so the result would always be the same (§6.9)
 218:24: error[E0520]: the two sides have the known types `Int | String` and `Float`, which are disjoint, so the result would always be the same (§6.9)
 227:14: error[E0520]: the two sides have the known types `Int | String` and `Nil`, which are disjoint, so the result would always be the same (§6.9)
-237:2: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
+237:2: error[E0520]: both sides are constants, `1` and `"a"`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
 247:25: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`

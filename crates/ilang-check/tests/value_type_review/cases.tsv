@@ -1,4 +1,4 @@
-alias_constant_nested	
+alias_constant_nested	E0535
 alias_no_binder	E0224
 alias_repeated_nested	E0532
 batch_recovery	E0501,E0533
@@ -10,12 +10,12 @@ earlier_constraints	E0534
 early_external	E0531
 early_field	E0531
 exact_bad	E0535
-exact_good	
+exact_good	E0535
 extra_union	E0535
 fix_location	E0501
 fixed_later	E0501
 fixed_reordered	E0501
-foreign_alias	
+foreign_alias	E0501
 foreign_closed	
 foreign_open	E0533
 foreign_weak	E0534
@@ -26,9 +26,9 @@ local_alias_escape	E0534
 mismatch	E0535
 mutual_ok	
 mutual_type	E0530
-nested	
+nested	E0501
 no_library_rule	
-partial	
+partial	E0501
 pending	E0536
 pkg_app	
 pkg_client	
@@ -45,12 +45,12 @@ same_type_explicit
 schema	
 shadow	
 shadow_reserved	
-shared_skip	
+shared_skip	E0501
 unfilled	E0534
 union_annotated	
 union_samehead	
-union_samehead_alias_only	
+union_samehead_alias_only	E0501
 union_samehead_direct	
-weak_alias	
-weak_anno	
+weak_alias	E0501
+weak_anno	E0501
 whole_ref_normalize	

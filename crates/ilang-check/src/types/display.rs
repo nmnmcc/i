@@ -54,7 +54,7 @@ pub(crate) fn scheme_in(s: &Solver, t: &Ty, context: &[Ty], opts: Opts) -> Resul
     parts.push(t.clone());
     let traced = trace(s, &Ty::tuple(parts), opts)?;
     let (whole, origin) = traced.prepare();
-    let Ty::Con(_, parts) = whole else {
+    let Ty::Con(_, _, parts) = whole else {
         return Err(());
     };
     let t = parts.last().ok_or(())?;
@@ -85,7 +85,7 @@ pub(crate) fn scheme_in(s: &Solver, t: &Ty, context: &[Ty], opts: Opts) -> Resul
         }
     }
     namer.assign(t);
-    Ok(namer.tree(t).text(&s.type_names))
+    Ok(namer.tree(t).text_limited(&s.type_names, 12))
 }
 
 /// The names that the shown type scheme of `t` (the type of a top-level
@@ -228,7 +228,7 @@ fn same_unmarked(a: &Ty, b: &Ty) -> bool {
     };
     match (a, b) {
         _ if is_top(a) && is_top(b) => true,
-        (Ty::Con(h, xs), Ty::Con(g, ys)) => h == g && all(xs, ys),
+        (Ty::Con(h, a, xs), Ty::Con(g, b, ys)) => h == g && a == b && all(xs, ys),
         (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => all(xs, ys),
         (Ty::Fn(f), Ty::Fn(g)) => {
             f.params.len() == g.params.len()
@@ -411,7 +411,9 @@ fn cycles(s: &Solver, t: &Ty, keep: Option<u32>) -> HashMap<V, V> {
 fn ty_vars(t: &Ty, out: &mut Vec<V>) {
     match t {
         Ty::Var(v) => out.push(*v),
-        Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| ty_vars(x, out)),
+        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+            xs.iter().for_each(|x| ty_vars(x, out))
+        }
         Ty::Fn(f) => {
             f.params.iter().for_each(|p| ty_vars(&p.1, out));
             [&f.ret, &f.err, &f.env]
@@ -556,7 +558,7 @@ impl Coalescer<'_> {
                     Ty::Inter(parts)
                 }
             }
-            Ty::Con(h, args) => {
+            Ty::Con(h, values, args) => {
                 let vs = self.s.variances(*h, args.len());
                 let args = args
                     .iter()
@@ -574,7 +576,7 @@ impl Coalescer<'_> {
                         ),
                     })
                     .collect();
-                Ty::Con(*h, args)
+                Ty::Con(*h, values.clone(), args)
             }
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
                 params: f
@@ -614,7 +616,7 @@ pub(crate) fn both(t: &Ty) -> Ty {
                 both(b)
             }
         }
-        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(both).collect()),
+        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(both).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(both).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(both).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
@@ -654,7 +656,11 @@ impl Norm<'_> {
             Ty::Diff(a, h) => {
                 self.diff(self.norm(*a), h.into_iter().map(|m| self.norm(m)).collect())
             }
-            Ty::Con(h, args) => Ty::Con(h, args.into_iter().map(|a| self.norm(a)).collect()),
+            Ty::Con(h, values, args) => Ty::Con(
+                h,
+                values.clone(),
+                args.into_iter().map(|a| self.norm(a)).collect(),
+            ),
             Ty::Fn(f) => {
                 let f = *f;
                 Ty::Fn(Box::new(FnTy {
@@ -699,6 +705,9 @@ impl Norm<'_> {
     fn union_in(&self, ms: Vec<Ty>, env: bool) -> Ty {
         let mut flat = Vec::new();
         super::solve::flatten_union(&ms, &mut flat);
+        if !env {
+            flat = super::solve::join_literals(flat);
+        }
         let mut out: Vec<Ty> = Vec::new();
         for m in flat {
             if m == Ty::Never || out.contains(&m) {
@@ -728,16 +737,14 @@ impl Norm<'_> {
         });
         // `T | r - T`, where `r` has no effect and `T` has every value of
         // its type constructor, is every value.
-        let full: HashSet<Head> = out
-            .iter()
-            .filter(|m| self.full(m))
-            .filter_map(Ty::head)
-            .collect();
         if out.iter().any(|m| match m {
             Ty::Diff(a, h) => {
                 is_top(a)
-                    && h.iter()
-                        .all(|x| x.head().is_some_and(|y| full.contains(&y)))
+                    && h.iter().all(|x| {
+                        out.iter().any(|u| {
+                            u.head() == x.head() && self.full(u) && x.values().subset(u.values())
+                        })
+                    })
             }
             _ => false,
         }) {
@@ -753,7 +760,7 @@ impl Norm<'_> {
     /// `t` has every value of its type constructor.
     fn full(&self, t: &Ty) -> bool {
         match t {
-            Ty::Con(h, args) => {
+            Ty::Con(h, _, args) => {
                 let vs = self.s.variances(*h, args.len());
                 args.iter().zip(vs).all(|(a, v)| match v {
                     Variance::Co => is_top(a),
@@ -838,6 +845,9 @@ impl Norm<'_> {
                     Some(i) if out[i].head() == Some(h) => {
                         let old = std::mem::replace(&mut out[i], Ty::Never);
                         out[i] = self.merge(old, m, false);
+                        if out[i] == Ty::Never {
+                            return Ty::Never;
+                        }
                     }
                     Some(_) => return Ty::Never,
                     None => out.push(m),
@@ -868,6 +878,18 @@ impl Norm<'_> {
         match a {
             Ty::Never => Ty::Never,
             Ty::Union(ms) => self.union(ms.into_iter().map(|m| self.diff(m, hs.clone())).collect()),
+            Ty::Con(..) if a.scalar().is_some() => {
+                let sets: Vec<_> = hs
+                    .iter()
+                    .filter(|m| m.head() == a.head())
+                    .map(|m| m.values().clone())
+                    .collect();
+                if sets.is_empty() {
+                    a
+                } else {
+                    a.with_values(a.values().minus(&super::lits::ValueSet::join_all(&sets)))
+                }
+            }
             Ty::Con(..) | Ty::Fn(_) => {
                 if hs.iter().any(|m| m.head() == a.head()) {
                     Ty::Never
@@ -898,10 +920,19 @@ impl Norm<'_> {
             (Variance::Inv, _) => x,
         };
         match (a, b) {
-            (Ty::Con(h, xs), Ty::Con(_, ys)) if xs.len() == ys.len() => {
+            (Ty::Con(h, values, xs), Ty::Con(_, other, ys)) if xs.len() == ys.len() => {
+                let values = if union {
+                    values.union(&other)
+                } else {
+                    let Some(values) = values.meet(&other) else {
+                        return Ty::Never;
+                    };
+                    values
+                };
                 let vs = self.s.variances(h, xs.len());
                 Ty::Con(
                     h,
+                    values,
                     xs.into_iter()
                         .zip(ys)
                         .zip(vs)
@@ -1000,10 +1031,12 @@ impl Norm<'_> {
     fn walk(&self, t: &Ty, pos: bool, occ: &mut HashMap<V, Occ>, order: &mut Vec<V>, env: bool) {
         // Only a union in an output place and an intersection in an input
         // place say that a variable comes with the other members.
-        let (group, together): (Vec<Ty>, bool) = match t {
-            Ty::Union(ms) => (ms.clone(), pos),
-            Ty::Inter(ms) => (ms.clone(), !pos),
-            _ => (vec![t.clone()], true),
+        // This walk only reads the group. Cloning the enclosing tree at
+        // each recursive step costs quadratic work on nested types.
+        let (group, together): (&[Ty], bool) = match t {
+            Ty::Union(ms) => (ms, pos),
+            Ty::Inter(ms) => (ms, !pos),
+            _ => (std::slice::from_ref(t), true),
         };
         for (i, m) in group.iter().enumerate() {
             match m {
@@ -1027,7 +1060,7 @@ impl Norm<'_> {
                     Ty::Var(v) => record(occ, order, *v, pos, Vec::new()),
                     a => self.walk(a, pos, occ, order, env),
                 },
-                Ty::Con(h, args) => {
+                Ty::Con(h, _, args) => {
                     let vs = self.s.variances(*h, args.len());
                     for (a, v) in args.iter().zip(vs) {
                         match v {
@@ -1084,7 +1117,7 @@ fn mentions(t: &Ty, v: V) -> bool {
 fn visit(t: &Ty, f: &mut dyn FnMut(&Ty)) {
     f(t);
     match t {
-        Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| visit(x, f)),
+        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| visit(x, f)),
         Ty::Fn(g) => {
             g.params.iter().for_each(|p| visit(&p.1, f));
             [&g.ret, &g.err, &g.env]
@@ -1108,7 +1141,7 @@ fn replace(t: &Ty, v: V, by: &Ty) -> Ty {
     let r = |x: &Ty| replace(x, v, by);
     match t {
         Ty::Var(x) if *x == v => by.clone(),
-        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(r).collect()),
+        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(r).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(r).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(r).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
@@ -1229,7 +1262,7 @@ fn tops(t: &Ty, next: &mut u32, origin: &mut HashMap<V, V>) -> Ty {
             origin.insert(V(*next), V(m.0 - MARK));
             Ty::Var(V(*next))
         }
-        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(go).collect()),
+        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
@@ -1262,7 +1295,7 @@ fn roles(t: &Ty, role: Role, out: &mut Vec<(V, Role)>) {
             roles(a, role, out);
             h.iter().for_each(|x| roles(x, Role::Value, out));
         }
-        Ty::Con(_, xs) => xs.iter().for_each(|x| roles(x, Role::Value, out)),
+        Ty::Con(_, _, xs) => xs.iter().for_each(|x| roles(x, Role::Value, out)),
         Ty::Fn(f) => {
             f.params.iter().for_each(|p| roles(&p.1, Role::Value, out));
             roles(&f.ret, Role::Value, out);
@@ -1291,8 +1324,37 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
         Ty::Var(v) => name(*v),
         Ty::Never => ShownType::Never,
         Ty::Top => ShownType::Hole,
-        Ty::Con(Head::Named(r), args) => ShownType::Named(*r, all(args, name)),
-        Ty::Con(_, parts) => ShownType::Tuple(all(parts, name)),
+        Ty::Con(Head::Named(r), values, _) if !values.is_all() => {
+            let mut items: Vec<_> = values.items().map(|v| v.to_string()).collect();
+            if *r == crate::hir::TypeRef::Builtin(crate::hir::BuiltinType::Int) {
+                items.sort_by_cached_key(|v| {
+                    v.parse::<num_bigint::BigInt>().expect("canonical integer")
+                });
+            }
+            let items: Vec<_> = items
+                .into_iter()
+                .map(|v| {
+                    ShownType::Lit(
+                        if *r == crate::hir::TypeRef::Builtin(crate::hir::BuiltinType::String) {
+                            ilang_syntax::print::string_literal(&v)
+                        } else {
+                            v
+                        },
+                    )
+                })
+                .collect();
+            if values.is_finite() {
+                if items.len() == 1 {
+                    items.into_iter().next().unwrap()
+                } else {
+                    ShownType::Union(items)
+                }
+            } else {
+                ShownType::Diff(Box::new(ShownType::Named(*r, Vec::new())), items)
+            }
+        }
+        Ty::Con(Head::Named(r), _, args) => ShownType::Named(*r, all(args, name)),
+        Ty::Con(_, _, parts) => ShownType::Tuple(all(parts, name)),
         Ty::Fn(f) => {
             let params = f
                 .params
@@ -1309,9 +1371,9 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
                 env,
             }))
         }
-        Ty::Union(ms) => ShownType::Union(all(ms, name)),
+        Ty::Union(ms) => ShownType::Union(flat_shown(all(ms, name))),
         Ty::Inter(ms) => ShownType::Inter(all(ms, name)),
-        Ty::Diff(a, h) => ShownType::Diff(Box::new(tree_with(a, name)), all(h, name)),
+        Ty::Diff(a, h) => ShownType::Diff(Box::new(tree_with(a, name)), flat_shown(all(h, name))),
         Ty::Both(a, b) => {
             if **a == Ty::Never {
                 tree_with(b, name)
@@ -1324,7 +1386,7 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
 
 /// The text of a type (§3), with the names of the custom types `tn`.
 fn render(t: &Ty, name: &mut dyn FnMut(V) -> String, tn: &[String]) -> String {
-    tree(t, name).text(tn)
+    tree(t, name).text_limited(tn, 12)
 }
 
 /// `t` with the variables of `H` in each difference that are nowhere else
@@ -1341,7 +1403,7 @@ fn outer_vars(t: &Ty, out: &mut HashSet<V>) {
         Ty::Var(v) => {
             out.insert(*v);
         }
-        Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
             xs.iter().for_each(|x| outer_vars(x, out))
         }
         Ty::Fn(f) => {
@@ -1363,7 +1425,7 @@ fn hide(t: &Ty, outside: &HashSet<V>, in_h: bool) -> Ty {
     let go = |x: &Ty| hide(x, outside, in_h);
     match t {
         Ty::Var(v) if in_h && (v.0 >= MARK || !outside.contains(v)) => Ty::Top,
-        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(go).collect()),
+        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
@@ -1420,7 +1482,7 @@ fn not_general(s: &Solver, t: &Ty, level: u32) -> Ty {
     let go = |x: &Ty| not_general(s, x, level);
     match t {
         Ty::Var(v) if s.vars.get(v.0 as usize).is_none_or(|x| x.level <= level) => Ty::Top,
-        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(go).collect()),
+        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
@@ -1486,4 +1548,65 @@ pub(crate) fn show_known(s: &Solver, t: &Ty) -> String {
         },
         &s.type_names,
     )
+}
+
+fn flat_shown(ts: Vec<ShownType>) -> Vec<ShownType> {
+    ts.into_iter()
+        .flat_map(|t| match t {
+            ShownType::Union(ms) => ms,
+            t => vec![t],
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod literal_display_tests {
+    use super::super::lits::ValueSet;
+    use super::*;
+    use crate::hir::{BuiltinType, TypeRef};
+    use std::sync::Arc;
+    fn lit(b: BuiltinType, xs: &[&str]) -> Ty {
+        Ty::lit(b, ValueSet::only(xs.iter().map(|s| Arc::from(*s))).unwrap())
+    }
+    #[test]
+    fn set_normalization_and_full_text() {
+        // literal-types §5.7: subset-based Top, exact differences and number ordering.
+        let s = Solver::new(Default::default(), Vec::new());
+        let a = lit(BuiltinType::String, &["a"]);
+        assert_eq!(
+            known_union(
+                &s,
+                vec![a.clone(), Ty::Diff(Box::new(Ty::Top), vec![a.clone()])]
+            ),
+            Ty::Top
+        );
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+        assert_ne!(
+            known_union(
+                &s,
+                vec![a.clone(), Ty::Diff(Box::new(Ty::Top), vec![string.clone()])]
+            ),
+            Ty::Top
+        );
+        let t = known_diff(&s, string, vec![lit(BuiltinType::String, &["b", "a"])]);
+        assert_eq!(
+            scheme(&s, &t, Opts::default()).unwrap().text(&[]),
+            "String - \"a\" - \"b\""
+        );
+        let t = lit(BuiltinType::Int, &["10", "-2", "1"]);
+        assert_eq!(
+            scheme(&s, &t, Opts::default()).unwrap().text(&[]),
+            "-2 | 1 | 10"
+        );
+        assert_eq!(
+            known_inter(&s, vec![a, lit(BuiltinType::String, &["b"])]),
+            Ty::Never
+        );
+        let xs: Vec<_> = (0..40).map(|i| Arc::from(format!("v{i:02}"))).collect();
+        let t = Ty::lit(BuiltinType::String, ValueSet::only(xs).unwrap());
+        let tree = scheme(&s, &t, Opts::default()).unwrap();
+        assert_eq!(tree.text(&[]).matches('|').count(), 39);
+        assert!(tree.text_limited(&[], 12).ends_with("… (30 more)"));
+        assert!(!tree.text(&[]).contains('…'));
+    }
 }

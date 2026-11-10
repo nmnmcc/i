@@ -190,8 +190,9 @@ impl<'a> Closure<'a> {
             }
             Ty::Top => Err(code::VALUE_TYPE_OPEN),
             Ty::Never => Ok(Ty::Never),
-            Ty::Con(h, args) => Ok(Ty::Con(
+            Ty::Con(h, values, args) => Ok(Ty::Con(
                 *h,
+                values.clone(),
                 args.iter()
                     .map(|t| self.close(t))
                     .collect::<Result<_, _>>()?,
@@ -237,8 +238,9 @@ impl<'a> Closure<'a> {
         Ok(match t {
             Ty::Var(v) if self.s.vars[v.0 as usize].level > self.level => t.clone(),
             Ty::Var(_) => self.close(t)?,
-            Ty::Con(h, ts) => Ty::Con(
+            Ty::Con(h, values, ts) => Ty::Con(
                 *h,
+                values.clone(),
                 ts.iter()
                     .map(|t| self.annotation(t))
                     .collect::<Result<_, _>>()?,
@@ -353,7 +355,7 @@ impl<'a> Closure<'a> {
 fn contains_var(t: &Ty) -> bool {
     match t {
         Ty::Var(_) | Ty::Top => true,
-        Ty::Con(_, ts) | Ty::Union(ts) | Ty::Inter(ts) => ts.iter().any(contains_var),
+        Ty::Con(_, _, ts) | Ty::Union(ts) | Ty::Inter(ts) => ts.iter().any(contains_var),
         Ty::Fn(f) => {
             f.params.iter().any(|(_, t)| contains_var(t))
                 || [&f.ret, &f.err, &f.env].into_iter().any(contains_var)
@@ -379,7 +381,11 @@ fn closed_equal(s: &Solver, a: &Ty, b: &Ty) -> bool {
 fn shape(t: &Ty, fixed: &HashMap<V, Fixed>) -> Ty {
     match t {
         Ty::Var(v) => fixed.get(v).map_or(Ty::Top, |f| f.ty.clone()),
-        Ty::Con(h, ts) => Ty::Con(*h, ts.iter().map(|t| shape(t, fixed)).collect()),
+        Ty::Con(h, values, ts) => Ty::Con(
+            *h,
+            values.clone(),
+            ts.iter().map(|t| shape(t, fixed)).collect(),
+        ),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
             params: f
                 .params
@@ -423,7 +429,7 @@ fn completed(
     let t = completed_in(t, s, fixed, level)?;
     // Closed algebraic parts produced by a merged skeleton are normalized too.
     match &t {
-        Ty::Con(_, ts) if ts.is_empty() => Ok(t),
+        Ty::Con(_, _, ts) if ts.is_empty() => Ok(t),
         Ty::Never => Ok(t),
         _ => normalize_closed(s, t),
     }
@@ -442,8 +448,9 @@ fn completed_in(
             code::VALUE_TYPE_NOT_FIXED
         }),
         Ty::Var(v) => Ok(fixed[v].ty.clone()),
-        Ty::Con(h, ts) => Ok(Ty::Con(
+        Ty::Con(h, values, ts) => Ok(Ty::Con(
             *h,
+            values.clone(),
             ts.iter()
                 .map(|t| completed_in(t, s, fixed, level))
                 .collect::<Result<_, _>>()?,
@@ -1125,7 +1132,9 @@ impl Checker<'_> {
                     let expected = self.closed_written(t, &HashMap::new(), &mut HashSet::new())?;
                     let got = c.expose(source)?;
                     match (&expected, &got) {
-                        (Ty::Con(h, xs), Ty::Con(k, ys)) if h == k && xs.len() == ys.len() => {
+                        (Ty::Con(h, _, xs), Ty::Con(k, _, ys))
+                            if h == k && xs.len() == ys.len() =>
+                        {
                             let mut result = Ok(());
                             for (x, y) in xs.iter().zip(ys) {
                                 if !closed_equal(c.s, x, &c.close(y)?) {
@@ -1145,7 +1154,7 @@ impl Checker<'_> {
             }
             TypePattern::Named(head, args) => {
                 let t = c.expose(source)?;
-                let Ty::Con(Head::Named(got), parts) = t else {
+                let Ty::Con(Head::Named(got), _, parts) = t else {
                     return Err(code::TYPE_PATTERN_MISMATCH);
                 };
                 if *head != got || args.len() != parts.len() {
@@ -1158,7 +1167,7 @@ impl Checker<'_> {
             }
             TypePattern::Tuple(args) => {
                 let t = c.expose(source)?;
-                let Ty::Con(Head::Tuple(n), parts) = t else {
+                let Ty::Con(Head::Tuple(n), _, parts) = t else {
                     return Err(code::TYPE_PATTERN_MISMATCH);
                 };
                 if n as usize != args.len() {
@@ -1179,6 +1188,7 @@ impl Checker<'_> {
         seen: &mut HashSet<TypeId>,
     ) -> Result<Ty, &'static str> {
         match &t.kind {
+            TypeKind::Lit(v) => Ok(Ty::literal(v)),
             TypeKind::Var(v) => map.get(v).cloned().ok_or(code::TYPE_PATTERN_FORM),
             TypeKind::Named { ty, args } => {
                 let parts = args
@@ -1337,8 +1347,9 @@ fn fixed_scheme(
             .get(v)
             .map(|f| f.ty.clone())
             .ok_or(code::VALUE_TYPE_NOT_FIXED),
-        Ty::Con(h, ts) => Ok(Ty::Con(
+        Ty::Con(h, values, ts) => Ok(Ty::Con(
             *h,
+            values.clone(),
             ts.iter()
                 .map(|t| fixed_scheme(t, s, fixed, level))
                 .collect::<Result<_, _>>()?,
@@ -1395,7 +1406,11 @@ impl Checker<'_> {
 pub(super) fn replace_vars(t: &Ty, map: &HashMap<V, Ty>) -> Ty {
     match t {
         Ty::Var(v) => map.get(v).cloned().unwrap_or_else(|| t.clone()),
-        Ty::Con(h, ts) => Ty::Con(*h, ts.iter().map(|t| replace_vars(t, map)).collect()),
+        Ty::Con(h, values, ts) => Ty::Con(
+            *h,
+            values.clone(),
+            ts.iter().map(|t| replace_vars(t, map)).collect(),
+        ),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
             params: f
                 .params
@@ -1457,6 +1472,7 @@ impl Checker<'_> {
                         )
                     })
                 }
+                TypeKind::Lit(v) => Ty::literal(v),
                 TypeKind::Var(v) => map
                     .get(v)
                     .or_else(|| c.tyvars.get(v))
@@ -1541,7 +1557,7 @@ impl Checker<'_> {
                     (pol != Pol::Neg && ts.iter().any(|t| matches!(t, Ty::Var(_))))
                         || ts.iter().any(|t| invalid(s, t, pol))
                 }
-                Ty::Con(h, ts) => ts
+                Ty::Con(h, _, ts) => ts
                     .iter()
                     .zip(s.variances(*h, ts.len()))
                     .any(|(t, v)| invalid(s, t, pol.by(v))),
@@ -1612,7 +1628,7 @@ impl Checker<'_> {
         fn collect(t: &Ty, out: &mut Vec<V>) {
             match t {
                 Ty::Var(v) => out.push(*v),
-                Ty::Con(_, ts) | Ty::Union(ts) | Ty::Inter(ts) => {
+                Ty::Con(_, _, ts) | Ty::Union(ts) | Ty::Inter(ts) => {
                     for t in ts {
                         collect(t, out);
                     }
@@ -1719,6 +1735,43 @@ mod tests {
         assert!(!trial.failures.is_empty());
     }
     #[test]
+    fn failed_literal_trial_restores_fused_bounds_and_ownership() {
+        // Joint J4: T1's fused scalar bounds belong to the entire T2 trial.
+        let mut s = solver();
+        let v = s.fresh_at(0);
+        let one = Ty::literal(&super::super::LitValue::Int(1.into()));
+        let two = Ty::literal(&super::super::LitValue::Int(2.into()));
+        s.constrain(&one, &Ty::Var(v));
+        s.constrain(&two, &Ty::Var(v));
+        assert_eq!(s.vars[v.0 as usize].lower.len(), 1);
+        let before = s.clone();
+        assert!(
+            checked_batch(
+                &s,
+                &HashMap::from([(v, one.clone())]),
+                &[],
+                0,
+                &HashMap::new()
+            )
+            .is_none()
+        );
+        assert_eq!(s, before);
+        let both = s.union(vec![one, two]);
+        let before = s.clone();
+        assert!(
+            checked_batch(
+                &s,
+                &HashMap::from([(v, both.clone())]),
+                &[],
+                s.vars.len(),
+                &HashMap::new()
+            )
+            .is_none()
+        );
+        assert_eq!(s, before);
+        assert!(checked_batch(&s, &HashMap::from([(v, both)]), &[], 0, &HashMap::new()).is_some());
+    }
+    #[test]
     fn failed_trial_restores_every_solver_field() {
         // R4 rollback includes reverse links/caches and trial extrusion.
         let mut s = solver();
@@ -1767,7 +1820,7 @@ mod tests {
         let before = s.clone();
         let mut c = Closure::new(&s, &fixed, 0, u32::MAX, false);
         let exposed = c.expose(&Ty::Var(root)).unwrap();
-        let Ty::Con(Head::Tuple(2), parts) = exposed else {
+        let Ty::Con(Head::Tuple(2), _, parts) = exposed else {
             panic!("tuple required")
         };
         for part in &parts {
@@ -1794,7 +1847,7 @@ mod tests {
         let mut s = solver();
         let root = s.fresh_at(0);
         let part = s.fresh_at(0);
-        let skeleton = Ty::Con(Head::Tuple(2), vec![Ty::Var(part), Ty::Var(part)]);
+        let skeleton = Ty::tuple(vec![Ty::Var(part), Ty::Var(part)]);
         s.constrain(&skeleton, &Ty::Var(root));
         s.constrain(&int(), &Ty::Var(part));
         let fixed = HashMap::new();

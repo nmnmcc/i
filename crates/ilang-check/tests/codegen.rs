@@ -5,7 +5,7 @@
 
 use ilang_check::hir::DefId;
 use ilang_check::hir::{BuiltinType, ModuleId, TypeRef};
-use ilang_check::types::{Access, Head, HostSignature, HostType, Typed};
+use ilang_check::types::{Access, Head, HostSignature, HostType, TestMember, TestValues, Typed};
 use ilang_package::PackageGraph;
 use ilang_syntax::span::Span;
 use std::collections::HashMap;
@@ -104,16 +104,28 @@ fn codegen_data() {
     assert_eq!(by_text(&typed.args, m, "minus(b: 1, a: 2)"), &vec![1, 0]);
     assert_eq!(by_text(&typed.args, m, "5 |> minus(b: 1)"), &vec![0, 1]);
     assert_eq!(by_text(&typed.args, m, "minus(1, 2)"), &vec![0, 1]);
-    // The heads of each type test.
+    // Whole-head tests have All values (types-joint §2.2).
     let int = Head::Named(TypeRef::Builtin(BuiltinType::Int));
     let string = Head::Named(TypeRef::Builtin(BuiltinType::String));
     assert_eq!(
         by_text(&typed.type_tests, m, "_: Int | String"),
-        &vec![int, string]
+        &vec![
+            TestMember {
+                head: int,
+                values: TestValues::All
+            },
+            TestMember {
+                head: string,
+                values: TestValues::All
+            },
+        ]
     );
     assert_eq!(
         by_text(&typed.type_tests, m, "_: { (Int, Int) }"),
-        &vec![Head::Tuple(2)]
+        &vec![TestMember {
+            head: Head::Tuple(2),
+            values: TestValues::All
+        }]
     );
     // Services, through an alias.
     let clock = *by_text(&typed.services, m, "c");

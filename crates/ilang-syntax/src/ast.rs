@@ -2,7 +2,7 @@
 //! are kept as blocks; type groups `{ T }` leave no node.
 
 use crate::span::Span;
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Ident {
@@ -406,6 +406,7 @@ pub struct FnParamType {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypeKind {
+    Lit(LitValue),
     Named {
         module: Option<Ident>,
         name: Ident,
@@ -439,10 +440,21 @@ pub enum TypeKind {
     Diff(Vec<TypeExpr>),
 }
 
-/// An argument of a `TypeCall` (§3).
-#[derive(Clone, Debug, PartialEq)]
-pub enum TypeArg {
-    Type(TypeExpr),
-    Int(BigUint, Span),
-    String(String, Span),
+/// A type-call argument is a type, including a literal type (§3).
+pub type TypeArg = TypeExpr;
+
+/// Canonical integer or decoded string value, shared by written and tested types.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum LitValue {
+    Int(BigInt),
+    Str(String),
+}
+
+impl LitValue {
+    pub fn text(&self) -> String {
+        match self {
+            Self::Int(n) => n.to_string(),
+            Self::Str(s) => crate::print::string_literal(s),
+        }
+    }
 }

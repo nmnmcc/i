@@ -25,7 +25,11 @@ impl Template {
 pub(super) fn map_vars(t: &Ty, f: &mut impl FnMut(V) -> Ty) -> Ty {
     match t {
         Ty::Var(v) => f(*v),
-        Ty::Con(h, ts) => Ty::Con(*h, ts.iter().map(|t| map_vars(t, f)).collect()),
+        Ty::Con(h, values, ts) => Ty::Con(
+            *h,
+            values.clone(),
+            ts.iter().map(|t| map_vars(t, f)).collect(),
+        ),
         Ty::Fn(g) => Ty::Fn(Box::new(FnTy {
             params: g
                 .params
@@ -145,6 +149,7 @@ impl Checker<'_> {
     fn template(&self, t: &Type, params: &HashMap<TyVarId, Ty>, slots: &mut usize) -> Option<Ty> {
         let mut go = |t: &Type| self.template(t, params, slots);
         Some(match &t.kind {
+            TypeKind::Lit(v) => Ty::literal(v),
             TypeKind::Var(v) => params.get(v)?.clone(),
             TypeKind::Hole => {
                 let v = V(*slots as u32);
@@ -218,7 +223,7 @@ impl Checker<'_> {
     fn normalize_known_alias(&self, t: &Ty) -> Ty {
         let go = |t: &Ty| self.normalize_known_alias(t);
         match t {
-            Ty::Con(h, ts) => Ty::Con(*h, ts.iter().map(go).collect()),
+            Ty::Con(h, values, ts) => Ty::Con(*h, values.clone(), ts.iter().map(go).collect()),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
                 params: f.params.iter().map(|(n, t)| (n.clone(), go(t))).collect(),
                 ret: go(&f.ret),
@@ -259,7 +264,7 @@ pub(super) fn normalize(s: &mut super::solve::Solver, t: &Ty) -> Ty {
             let ts = ts.iter().map(&mut go).collect();
             s.diff(t, ts)
         }
-        Ty::Con(h, ts) => Ty::Con(*h, ts.iter().map(&mut go).collect()),
+        Ty::Con(h, values, ts) => Ty::Con(*h, values.clone(), ts.iter().map(&mut go).collect()),
         Ty::Fn(g) => Ty::Fn(Box::new(FnTy {
             params: g.params.iter().map(|(n, t)| (n.clone(), go(t))).collect(),
             ret: go(&g.ret),

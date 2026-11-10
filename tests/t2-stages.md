@@ -354,3 +354,75 @@ No new unresolved implementation issue or source conflict remains. T1 is not
 in redesign at this baseline; its shared-region integration and literal-specific
 checks remain the already assigned follow-up, per the instruction not to wait
 for T1. Record builders and macro expansion remain T3/M4 scope.
+
+## Combined T1 and T2 integration
+
+The integration starts from clean 638aac1. All committed work is retained.
+T1 landed at 490af9728fa9da1811013babdcc70e90f0e06418. Conflict resolution keeps
+its literal sets, coverage, narrowing and deferred Assert checks, and T2's
+value references, alias patterns, completion, fixation and query metadata.
+Every T2 Con reconstruction copies the existing ValueSet; none substitutes All.
+T1's scalar bound fusion calls T2's mutation observation before changing a
+bound. The trial clones every Solver field, including the test-only bound
+counter. Lit is an immutable leaf in the T2 visitors and alias templates.
+
+### Joint interpretation and test matrix
+
+| Contract and source sentence | Evidence |
+| --- | --- |
+| Joint §2.2: “No reconstruction defaults an existing Con’s set to All.” | `j1_value_reads_and_patterns_preserve_exact_literal_sets`: direct value annotations, nominal/tuple extraction, same-head unions, negative/cofinite sets and literal constructor fields. `closed_substitution_survives_cached_literal_algebra` covers dependent generic aliases. |
+| J1: “Of reads inferred schemes/monotypes, never a narrower flow fact.” | `j1_j2_flow_facts_do_not_become_value_reads_through_access_or_calls`, the existing fitted/list-map T2 runtime checks, and the new nominal/tuple runtime access case. |
+| J1: “Rule 12 narrows the new catch-all’s inferred type.” | `j1_j5_new_narrowed_binders_have_literal_types_original_subjects_do_not` checks the positive T-C scalar case's exact hover and a literal result read; the original subject still accepts String. The corresponding runtime test runs both branches. |
+| J2: “The inferred field/tuple result comes from those same bound forms ... while its known result comes separately from the original known facts.” | Nominal/tuple access after a fitted literal permits q:p="b"; an actual sink accepting GET/POST rejects DELETE. Generic callback inference with a local value annotation is also checked. |
+| J3: “Lower arguments in written evaluation order, using args only to place their results.” | `joint_literal_order.i` and `joint_literal_pipe_order.i` stop at the first written/pipe argument at O0/O2, with Of annotations on the callee's parameters. Label-generic key handling remains T3. |
+| J4: “A failed source group publishes Failed.” “Trial all fixation and demanded-shape constraints together.” | Existing normal/reverse recovery families, `j4_literal_fixation_orders_completion_and_rejects_later_widening`, and `failed_literal_trial_restores_fused_bounds_and_ownership`. The latter proves rollback after scalar fusion and observes an earlier unfixed variable. |
+| J5: “A type test of a closed T2 alias expands first ... of ... literal types it makes String/Only.” | `j5_completed_literal_aliases_produce_exact_runtime_tests` checks the structured test table and incomplete coverage; the cross-package runtime test checks both accepted strings, another string, and small/boxed Int values. T1's full coverage/narrowing regressions are retained. |
+| J6: “T2’s context check precedes host/service shape checks.” | `j6_early_context_provenance_wins_over_literal_boundary_checks`: aliases of literal values still give E0531 in early contexts; an ordinary scheme with an existing environment remains readable. T1's directional and normalized-set host-boundary tests are retained. |
+| J7: “T2 must instantiate the preserved scheme ... never generalize a weak variable by reading it.” | `j7_invariant_scheme_reads_keep_fresh_instances_and_weak_sharing`; permanent make aliases fail E0533; unequal invariant forms fail. K1's existing invariant, service, contra/bivariant and stream corpus regressions run in the full gate. |
+| Joint §4: “Full type tree/text ... No truncation, private value spelling, solver id, provenance, or fixation site in type identity.” | `completed_literal_aliases_have_full_canonical_identity` checks private renames, canonical numeric/decoded string spelling, and a changed twentieth literal. `value_type_literals` derives a nominal type with literal fields in a dependency package and consumes it through an exported completed alias. |
+
+J8's exact forgetting, the record portions of J1-J7, rigid labels and T-A/D/E/H/I
+record programs remain T3's explicitly assigned implementation gate; no record
+syntax, label semantics or Without rewrite is introduced here. Their future
+syntax entries stay owned by T3. Their shared T1/T2 prerequisites are covered
+by exact closed substitution, retained ValueSets, transaction rollback and the
+existing scalar Codec/R7 cross-package cases.
+
+### T1 changes to earlier T2 examples
+
+T1 decision 4 says “No widening”; spec §4.7 says “Literal types are never
+widened.” Thus id(1) now yields 1. The annotation-demand ruling still fixes it
+exactly as Read=v does: x:v=1 passes, x:v=2 fails; an explicit v:Int permits 2.
+The earlier pre-T1 example was Int-based and is superseded by the requested
+combined literal semantics. This is not an exception to annotation fixation.
+
+The 56 review source projects remain unchanged. Nine manifest expectations
+now reflect the same no-widening rule: alias_constant_nested and exact_good
+get E0535 because their constant Int subtree is unequal to 1 (P4 exact-subtree
+equality); foreign_alias, nested, partial, shared_skip,
+union_samehead_alias_only, weak_alias and weak_anno get E0501 for an out-of-set
+value. The nested query acceptance fixture uses 1 instead of 2; its retained
+review source still tests the original rejected program. Explicit Int-bound
+normalization tests retain Item=Int. New literal tests require the narrower
+results and reject incompatible values.
+
+### Integration development checks
+
+The first compile found four remaining exhaustive visitor/Con-shape sites;
+all were completed without fallback semantics. The first focused T2 run found
+the expected pre-literal assumptions above. New probes first omitted a std
+dependency and treated one unguarded clause as an exhaustive match; the former
+now uses an ordinary local callback combinator, and the latter uses a guarded
+match. An invented negative probe tried to reject widening a current-group
+weak catch-all variable through a monomorphic annotation. R1 shares that weak
+monotype, so that rejection was not required: the retained positive T-C test
+asserts the requested exact type before additional widening constraints, and
+an explicitly literal result supplies the negative test. No weak local is
+frozen to make the probe pass.
+
+A CLI test invocation with --lib selected zero package-interface tests; it was
+not counted as verification. The corrected --bin i invocation runs all four
+interface tests. The first syntax-data merge restored two entries deliberately
+removed by T1; a three-way merge now preserves both tracks' deletions and exact
+diagnostics. No syntax check exemption was added. All these checks have passing
+focused reruns; full-gate results are recorded below when complete.
