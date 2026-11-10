@@ -73,6 +73,7 @@
 //! collector or size, to measure them.
 
 mod requests;
+pub mod resources;
 mod run;
 pub mod services;
 #[cfg(test)]
