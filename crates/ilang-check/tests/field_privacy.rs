@@ -36,10 +36,10 @@ fn private_fields_cannot_be_selected_through_other_names_or_values() {
             ("src/facade.i", FACADE),
             ("src/main.i", source),
         ]);
-        // Once the inner selection fails, `.0` has no known target type
-        // (§4.8 rule 13). Keep that existing follow-on diagnostic too.
-        let expected: &[&str] = if source.contains("v.parts.0") {
-            &["E0204", "E0506"]
+        // Retaining the ordinary field type avoids cascading errors on
+        // `.parts.0`. A missing label still fails §4.8 rule 13 too.
+        let expected: &[&str] = if source.contains("v.missing") {
+            &["E0204", "E0512"]
         } else {
             &["E0204"]
         };
