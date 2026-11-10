@@ -64,9 +64,38 @@ Stage gate:
 - `scripts/old-syntax-check`: exact diagnostics must remain green with the
   explicitly pending T1 host example.
 
+## Stage 2: pure literal algebra
+
+`types/lits.rs` implements ValueSet, canonical integer text, and the public
+LitValue/TestValues forms. It is compiled only for tests until the field
+stage connects it to production types. This keeps the stage behavior
+unchanged without suppressing compiler warnings.
+
+The persistent B-tree uses path copying for unequal-size operations and
+a sorted merge plus linear bulk construction for comparable-size sets.
+Its cached hash is a wrapping sum of deterministic per-item hashes.
+Equality checks contents after hashes; a hash collision cannot equate
+different sets. These choices implement literal-types §4's sentences
+“adding or removing one item is O(log n)” and “when the two sets are about
+the same size, one sorted merge, O(n + m), is used instead.”
+
+Interpretation checks cite literal-types §4's algebra table and §10's
+exhaustive model. Four listed values plus an outside value represent the
+infinite domain. Empty operation results are distinct from All. Tests
+also check canonical form/equal hashes, decoded Unicode, large sets,
+B-tree ordering/occupancy/depth, and preservation of earlier snapshots.
+
+Stage gate:
+
+- `cargo test -p ilang-check --lib --locked types::lits`: 5 passed.
+- `cargo test -p ilang-check -p ilang-cli --test spec --test types --test query --lib --locked`:
+  16 query tests, 5 type tests (including K1 fixtures), and 139 spec cases
+  at both O0 and O2 passed, with no golden regeneration.
+- `cargo clippy -p ilang-check --all-targets --locked -- -D warnings`: passed.
+
 ## Remaining stages
 
-The literal algebra, Con field, solver/display/coverage rules, deferred
+The Con field, solver/display/coverage rules, deferred
 Assert fix, literal inference, written types/narrowing, fitted choices,
 performance scripts, and final soundness review are not enabled by stage 1.
 Future entries must be removed when their syntax actually parses, never

@@ -22,6 +22,9 @@ mod coverage;
 mod display;
 mod infer;
 mod known;
+// Stage 2 tests the pure algebra before stage 3 adds it to solver types.
+#[cfg(test)]
+mod lits;
 mod pattern;
 mod shown;
 mod solve;
