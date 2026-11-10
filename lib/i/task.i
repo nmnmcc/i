@@ -616,7 +616,7 @@ tree_find(A) = (tree: TaskTree(A), wanted: Int) -> Maybe(A) {
 	}
 }
 
-// Sixteen slots per immutable page. Two record caches handle the running
+// Four slots per immutable page. Two record caches handle the running
 // task and its peer without copying table paths; two page caches amortize
 // persistent-index updates across sequential task ids.
 TaskPage(A) {
@@ -626,41 +626,11 @@ TaskPage(A) {
 		p1:    Maybe(A)
 		p2:    Maybe(A)
 		p3:    Maybe(A)
-		p4:    Maybe(A)
-		p5:    Maybe(A)
-		p6:    Maybe(A)
-		p7:    Maybe(A)
-		p8:    Maybe(A)
-		p9:    Maybe(A)
-		p10:   Maybe(A)
-		p11:   Maybe(A)
-		p12:   Maybe(A)
-		p13:   Maybe(A)
-		p14:   Maybe(A)
-		p15:   Maybe(A)
 	)
 }
 
 empty_page(A) = () -> TaskPage(A) {
-	TaskPage(
-		0
-		Absent
-		Absent
-		Absent
-		Absent
-		Absent
-		Absent
-		Absent
-		Absent
-		Absent
-		Absent
-		Absent
-		Absent
-		Absent
-		Absent
-		Absent
-		Absent
-	)
+	TaskPage(0, Absent, Absent, Absent, Absent)
 }
 
 PageCache(A) {
@@ -685,22 +655,10 @@ empty_store(A) = () -> TaskStore(A) {
 
 page_get(A) = (page: TaskPage(A), slot: Int) -> Maybe(A) {
 	slot |> {
-		0  -> page.p0
-		1  -> page.p1
-		2  -> page.p2
-		3  -> page.p3
-		4  -> page.p4
-		5  -> page.p5
-		6  -> page.p6
-		7  -> page.p7
-		8  -> page.p8
-		9  -> page.p9
-		10 -> page.p10
-		11 -> page.p11
-		12 -> page.p12
-		13 -> page.p13
-		14 -> page.p14
-		_  -> page.p15
+		0 -> page.p0
+		1 -> page.p1
+		2 -> page.p2
+		_ -> page.p3
 	}
 }
 
@@ -715,22 +673,10 @@ page_put(A) = (page: TaskPage(A), slot: Int, value: Maybe(A)) -> TaskPage(A) {
 	}
 	count = page.count + new - old
 	slot |> {
-		0  -> TaskPage(..page, p0: value, count: count)
-		1  -> TaskPage(..page, p1: value, count: count)
-		2  -> TaskPage(..page, p2: value, count: count)
-		3  -> TaskPage(..page, p3: value, count: count)
-		4  -> TaskPage(..page, p4: value, count: count)
-		5  -> TaskPage(..page, p5: value, count: count)
-		6  -> TaskPage(..page, p6: value, count: count)
-		7  -> TaskPage(..page, p7: value, count: count)
-		8  -> TaskPage(..page, p8: value, count: count)
-		9  -> TaskPage(..page, p9: value, count: count)
-		10 -> TaskPage(..page, p10: value, count: count)
-		11 -> TaskPage(..page, p11: value, count: count)
-		12 -> TaskPage(..page, p12: value, count: count)
-		13 -> TaskPage(..page, p13: value, count: count)
-		14 -> TaskPage(..page, p14: value, count: count)
-		_  -> TaskPage(..page, p15: value, count: count)
+		0 -> TaskPage(..page, p0: value, count: count)
+		1 -> TaskPage(..page, p1: value, count: count)
+		2 -> TaskPage(..page, p2: value, count: count)
+		_ -> TaskPage(..page, p3: value, count: count)
 	}
 }
 
@@ -765,8 +711,8 @@ write_slot(A) = (
 	id: Int
 	value: Maybe(A)
 ) -> TaskStore(A) {
-	number = id / 16
-	slot = id % 16
+	number = id / 4
+	slot = id % 4
 	store.first |> {
 		Present(c) ? c.id == number -> TaskStore(
 			..store
@@ -802,7 +748,7 @@ store_find(A) = (store: TaskStore(A), id: Int) -> Maybe(A) {
 		True -> store.focus
 		False -> { store.spare_id == id } |> {
 			True  -> store.spare
-			False -> page_get(page_find(store, id / 16), id % 16)
+			False -> page_get(page_find(store, id / 4), id % 4)
 		}
 	}
 }
