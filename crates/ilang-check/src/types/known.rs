@@ -110,6 +110,19 @@ impl Checker<'_> {
         let go = |x: &Type| self.kconv_in(x, local, depth);
         match &t.kind {
             TypeKind::Named { ty, args } => {
+                if let TypeRef::Custom(id) = ty
+                    && let Some(alias) = self.reads.aliases.get(id)
+                {
+                    return match alias {
+                        Some(a) => {
+                            let args = args.iter().map(|t| self.kconv_in(t, local, depth + 1));
+                            let map = a.formals.iter().copied().zip(args).collect();
+                            super::value_types::replace_vars(&a.ty, &map)
+                        }
+                        None => Ty::Top,
+                    };
+                }
+
                 let args: Vec<Ty> = args.iter().map(go).collect();
                 if let TypeRef::Custom(id) = ty
                     && let TypeBody::Alias(body) = &self.p.ty(*id).body
@@ -134,6 +147,7 @@ impl Checker<'_> {
                 .or_else(|| self.tyvars.get(tv))
                 .cloned()
                 .unwrap_or(Ty::Top),
+            TypeKind::Of { value, site, .. } => self.read_shape(*value, *site),
             TypeKind::Hole | TypeKind::Error => Ty::Top,
             TypeKind::Tuple(ts) => Ty::tuple(ts.iter().map(go).collect()),
             TypeKind::Fn {

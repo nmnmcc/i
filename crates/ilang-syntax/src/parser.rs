@@ -778,8 +778,25 @@ impl Parser<'_> {
             }
         }
         if self.eat(&T::Eq) {
-            let body = TypeBody::Alias(self.ty()?);
+            let source = self.ty()?;
+            let alias_pattern = (!params.is_empty() || !head.is_empty())
+                && matches!(source.kind, TypeKind::ValueOf { .. });
+            if alias_pattern && head.is_empty() {
+                head = params
+                    .drain(..)
+                    .map(|name| TypeExpr {
+                        span: name.span,
+                        kind: TypeKind::Named {
+                            module: None,
+                            name,
+                            args: Vec::new(),
+                        },
+                    })
+                    .collect();
+            }
+            let body = TypeBody::Alias(source);
             return Ok(TypeDef {
+                alias_pattern,
                 name,
                 params,
                 head,
@@ -825,6 +842,7 @@ impl Parser<'_> {
         })?;
         let body = TypeBody::Custom(constructors);
         Ok(TypeDef {
+            alias_pattern: false,
             name,
             params,
             head,

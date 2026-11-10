@@ -77,7 +77,9 @@ pub(crate) struct Checker<'a> {
     /// The module whose code is being typed, for the place of problems.
     pub module: ModuleId,
     pub locals: HashMap<VarId, Scheme>,
-    defs: HashMap<DefId, Scheme>,
+    pub(super) defs: HashMap<DefId, Scheme>,
+    pub(super) reads: super::value_types::Reads,
+    pub(super) recovery: bool,
     /// The solver variable of each type variable written in an annotation.
     pub tyvars: HashMap<TyVarId, Ty>,
     /// The type written at the top of the pattern that binds a name: its
@@ -133,6 +135,8 @@ impl<'a> Checker<'a> {
             module: ModuleId(0),
             locals: HashMap::new(),
             defs: HashMap::new(),
+            reads: super::value_types::Reads::default(),
+            recovery: false,
             tyvars: HashMap::new(),
             written: HashMap::new(),
             kvars: HashMap::new(),
@@ -186,8 +190,19 @@ impl<'a> Checker<'a> {
             }
         }
         // Groups, in the order of their uses (§4.7).
-        for group in &p.order.groups {
-            self.group(group);
+        self.initialize_reads();
+        for module in crate::order::module_order(p) {
+            self.set_module(module);
+            self.complete_ready_reads();
+            for group in p
+                .order
+                .groups
+                .iter()
+                .filter(|g| g.first().is_some_and(|b| b.module == module))
+            {
+                self.group(group);
+            }
+            self.complete_ready_reads();
         }
         self.entry_points();
         // The shown type schemes (§4.7).
@@ -231,6 +246,7 @@ impl<'a> Checker<'a> {
     /// One group of top-level bindings (§4.7): typed together, then
     /// generalized together when every value is a direct value.
     fn group(&mut self, group: &[BindingRef]) {
+        self.begin_reads(group);
         let p = self.p;
         let direct = group.iter().all(|b| p.binding(*b).binding.direct);
         self.s.level = u32::from(direct);
@@ -352,6 +368,7 @@ impl<'a> Checker<'a> {
         for c in std::mem::take(&mut self.cases) {
             self.check_case(c);
         }
+        self.finish_reads(group);
     }
 
     /// §10.2: the entry points of the compiled package: the program entry,
@@ -570,7 +587,12 @@ impl<'a> Checker<'a> {
         let DefKind::Binding { var, .. } = d.kind else {
             return;
         };
-        if !d.exported || self.written.contains_key(&var) {
+        if !d.exported
+            || self
+                .written
+                .get(&var)
+                .is_some_and(|t| !value_dependent(self.p, t))
+        {
             return;
         }
         let Ok(shown) = display::shown(&self.s, t, opts) else {
@@ -600,7 +622,11 @@ impl<'a> Checker<'a> {
     /// §4.4: in a written type, a union with two or more type variables as
     /// members may only be in an output place, and an intersection with a
     /// type variable only in an input place. `pol` is the place of `t`.
-    fn check_places(&mut self, t: &Type, pol: Pol, depth: u32) {
+    pub(super) fn check_places(&mut self, t: &Type, pol: Pol, depth: u32) {
+        if depth == 0 && value_dependent(self.p, t) {
+            self.check_value_places(t, pol);
+            return;
+        }
         if depth > 64 {
             return;
         }
@@ -683,7 +709,7 @@ impl<'a> Checker<'a> {
                     }
                 }
             }
-            TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
+            TypeKind::Of { .. } | TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
         }
     }
 
@@ -795,6 +821,14 @@ impl<'a> Checker<'a> {
         if let Some(o) = other {
             message.push_str(&format!(" (the type at {} needs it)", self.position(o)));
         }
+        for fixed in self.reads.fixed.values() {
+            let module = self.p.module(fixed.module);
+            message.push_str(&format!(
+                " (this type was fixed here: {}:{}..{})",
+                module.path, fixed.span.start, fixed.span.end
+            ));
+            break;
+        }
         self.error(code, span, message);
     }
 
@@ -855,6 +889,10 @@ impl<'a> Checker<'a> {
                 if let TypeRef::Custom(id) = ty
                     && let TypeBody::Alias(body) = &self.p.ty(*id).body
                 {
+                    if value_dependent(self.p, body) {
+                        let args = args.iter().map(|a| self.conv(a, local)).collect();
+                        return self.instantiate_alias(*id, args);
+                    }
                     if self.alias_depth > 64 {
                         return self.s.fresh();
                     }
@@ -887,6 +925,7 @@ impl<'a> Checker<'a> {
                 self.tyvars.insert(*tv, v.clone());
                 v
             }
+            TypeKind::Of { value, site, .. } => self.read_annotation(*value, *site),
             TypeKind::Hole | TypeKind::Error => self.s.fresh_input(),
             TypeKind::Tuple(ts) => Ty::tuple(ts.iter().map(|a| self.conv(a, local)).collect()),
             TypeKind::Fn {
@@ -997,7 +1036,7 @@ impl<'a> Checker<'a> {
 
     // ---- Names and constructors ----
 
-    fn instantiate(&mut self, s: &Scheme) -> Ty {
+    pub(super) fn instantiate(&mut self, s: &Scheme) -> Ty {
         if s.level == u32::MAX {
             return s.ty.clone();
         }
@@ -2328,7 +2367,7 @@ fn walk_variance(
             go(ret, v, acc);
             err.iter().chain(env).for_each(|x| go(x, v, acc));
         }
-        TypeKind::Hole | TypeKind::Error => {}
+        TypeKind::Of { .. } | TypeKind::Hole | TypeKind::Error => {}
     }
 }
 

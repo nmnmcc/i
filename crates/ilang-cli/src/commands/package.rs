@@ -1184,8 +1184,14 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
             out.insert(
                 format!("type {path}.{}", def.name),
                 Entry {
-                    shown: shown.head(),
-                    canonical: canonical.head(),
+                    shown: match typed.alias_types.get(&t) {
+                        Some(body) => shown.completed_head(body),
+                        None => shown.head(),
+                    },
+                    canonical: match typed.alias_types.get(&t) {
+                        Some(body) => canonical.completed_head(body),
+                        None => canonical.head(),
+                    },
                 },
             );
             if (def.constructors_exported || def.host.is_some())
@@ -1332,7 +1338,7 @@ impl<'a> TypeShow<'a> {
     }
 
     /// `@host("ns") Name(A, B)`, or `Name(A) = Type` for an alias.
-    fn head(&self) -> String {
+    fn head_prefix(&self) -> String {
         let mut s = String::new();
         if let Some(h) = &self.def.host {
             if h.is_async {
@@ -1346,10 +1352,33 @@ impl<'a> TypeShow<'a> {
             let ps: Vec<String> = (0..self.def.params.len()).map(|i| self.param(i)).collect();
             s.push_str(&format!("({})", ps.join(", ")));
         }
+        s
+    }
+
+    fn head(&self) -> String {
+        let mut s = self.head_prefix();
         if let TypeBody::Alias(t) = &self.def.body {
             s.push_str(&format!(" = {}", self.ty(t, 0)));
         }
         s
+    }
+
+    fn completed_head(&self, body: &ShownType) -> String {
+        let head = self.head_prefix();
+        let text = body.text_with(
+            &mut |ty| match ty {
+                TypeRef::Builtin(b) => b.name().to_string(),
+                TypeRef::Custom(id) => self.names[id.0 as usize].clone(),
+            },
+            &mut |name| {
+                self.def
+                    .params
+                    .iter()
+                    .position(|(n, _)| n == name)
+                    .map_or_else(|| name.to_string(), |i| self.param(i))
+            },
+        );
+        format!("{head} = {text}")
     }
 
     /// `C(label: Type, Type)`.
@@ -1387,6 +1416,7 @@ impl<'a> TypeShow<'a> {
                 .join(sep)
         };
         match &t.kind {
+            TypeKind::Of { .. } => panic!("unresolved value type in a package interface"),
             TypeKind::Named { ty, args } => {
                 let name = match ty {
                     TypeRef::Builtin(b) => b.name().to_string(),

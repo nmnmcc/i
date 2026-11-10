@@ -51,7 +51,15 @@ pub mod code {
     pub const TYPE_PARAM_FORM: &str = "E0232";
     pub const ALIAS_PATTERN_RESERVED: &str = "E0233";
     pub const MACRO_RESERVED: &str = "E0234";
-    pub const LOWERCASE_TYPE_RESERVED: &str = "E0237";
+    // E0229, E0233 and E0237 were temporary value-type reservations.
+    pub const VALUE_TYPE_CIRCLE: &str = "E0530";
+    pub const VALUE_TYPE_PLACE: &str = "E0531";
+    pub const TYPE_PATTERN_FORM: &str = "E0532";
+    pub const VALUE_TYPE_OPEN: &str = "E0533";
+    pub const VALUE_TYPE_NOT_FIXED: &str = "E0534";
+    pub const TYPE_PATTERN_MISMATCH: &str = "E0535";
+    pub const VALUE_TYPE_OWN_SCOPE: &str = "E0536";
+    pub const TYPE_PATTERN_BINDER_IS_TYPE: &str = "E0537";
     pub const CHOICES_ONE_CLAUSE: &str = "E0235";
     // Attributes and entry points.
     pub const UNKNOWN_ATTRIBUTE: &str = "E0301";

@@ -84,7 +84,10 @@ impl Pol {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct Solver {
+    /// Allocation ownership observed during a demanded source group.
+    pub observation: Option<(usize, HashSet<V>, std::cell::RefCell<HashSet<V>>)>,
     pub vars: Vec<VarState>,
     /// The level of new variables: one more than the level of the binding
     /// whose value is being typed, for a binding that is generalized.
@@ -107,6 +110,7 @@ pub(crate) struct Solver {
 impl Solver {
     pub fn new(variance: StdHashMap<TypeId, Vec<Variance>>, type_names: Vec<String>) -> Solver {
         Solver {
+            observation: None,
             vars: Vec::new(),
             level: 0,
             cache: HashSet::default(),
@@ -116,6 +120,45 @@ impl Solver {
             variance,
             failures: Vec::new(),
             type_names,
+        }
+    }
+
+    fn observe(&self, v: V) {
+        if let Some((boundary, fixed, seen)) = &self.observation
+            && (v.0 as usize) < *boundary
+            && !fixed.contains(&v)
+        {
+            seen.borrow_mut().insert(v);
+        }
+    }
+
+    fn observe_type(&self, t: &Ty) {
+        match t {
+            Ty::Var(v) => self.observe(*v),
+            Ty::Con(_, ts) | Ty::Union(ts) | Ty::Inter(ts) => {
+                for t in ts {
+                    self.observe_type(t);
+                }
+            }
+            Ty::Fn(f) => {
+                for (_, t) in &f.params {
+                    self.observe_type(t);
+                }
+                for t in [&f.ret, &f.err, &f.env] {
+                    self.observe_type(t);
+                }
+            }
+            Ty::Diff(t, ts) => {
+                self.observe_type(t);
+                for t in ts {
+                    self.observe_type(t);
+                }
+            }
+            Ty::Both(a, b) => {
+                self.observe_type(a);
+                self.observe_type(b);
+            }
+            Ty::Never | Ty::Top => {}
         }
     }
 
@@ -243,6 +286,10 @@ impl Solver {
     /// through the bounds of variables, but not into type arguments: those
     /// are compared as normal types.
     fn constrain_in(&mut self, l: &Ty, r: &Ty, env: bool) {
+        if l != r {
+            self.observe_type(l);
+            self.observe_type(r);
+        }
         if l == r || matches!(l, Ty::Never) || matches!(r, Ty::Top) {
             return;
         }
@@ -383,6 +430,7 @@ impl Solver {
     /// calls, would make a number of constraints that grows with the
     /// square of their number.
     fn add_bound(&mut self, v: V, t: Ty, lower: bool, env: bool) {
+        self.observe(v);
         self.touched.push(v);
         let level = self.var(v).level;
         // The variables whose bounds now have `t` too, and their bounds.
@@ -430,6 +478,7 @@ impl Solver {
                 continue;
             }
             seen.push(x);
+            self.observe(x);
             let st = self.var(x);
             let (bounds, back) = if lower {
                 (&st.lower, &st.from)

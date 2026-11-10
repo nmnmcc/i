@@ -40,6 +40,8 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
         ty_frames: Vec::new(),
         ty_def: None,
         circular: HashSet::new(),
+        pending: Vec::new(),
+        reserved: Vec::new(),
     };
     r.create_modules();
     for m in 0..parsed.len() {
@@ -54,12 +56,14 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
         r.type_defs(ModuleId(m as u32));
     }
     r.alias_circles();
+    r.early_types();
     for m in 0..parsed.len() {
         r.values(ModuleId(m as u32));
     }
     for m in 0..parsed.len() {
         r.exported_types(ModuleId(m as u32));
     }
+    r.environment_reads();
     r.program_rules();
     (r.p, r.diags)
 }
@@ -88,6 +92,7 @@ struct Scope {
 #[derive(Clone, Copy)]
 enum Slot {
     Type(TypeId),
+    Pattern(ProjectionId),
     Binding(u32),
     Decl(u32),
     None,
@@ -150,6 +155,8 @@ struct Resolver<'a> {
     /// The aliases in a circle (§4.3); the circle has been reported, and
     /// they are not expanded.
     circular: HashSet<TypeId>,
+    pending: Vec<HashSet<String>>,
+    reserved: Vec<(usize, HashSet<String>)>,
 }
 
 fn is_upper(name: &str) -> bool {
@@ -345,6 +352,24 @@ impl<'a> Resolver<'a> {
         for item in &ast.items {
             let attrs = self.attributes(item);
             let slot = match &item.kind {
+                ast::ItemKind::TypeDef(def) if def.alias_pattern => {
+                    let pid = ProjectionId(self.p.alias_patterns.len() as u32);
+                    let mut binders = Vec::new();
+                    for part in &def.head {
+                        self.collect_pattern_binders(m, part, &attrs, &mut binders);
+                    }
+                    self.p.alias_patterns.push(AliasPattern {
+                        module: m,
+                        span: item.span,
+                        source: Type {
+                            kind: TypeKind::Error,
+                            span: item.span,
+                        },
+                        pattern: TypePattern::Error,
+                        binders,
+                    });
+                    Slot::Pattern(pid)
+                }
                 ast::ItemKind::TypeDef(def) => Slot::Type(self.collect_type(m, def, &attrs)),
                 ast::ItemKind::Binding(b) => {
                     let index = self.p.module(m).bindings.len() as u32;
@@ -427,6 +452,40 @@ impl<'a> Resolver<'a> {
             self.slots[m.0 as usize].push(slot);
         }
         self.exports(m, &ast.exports);
+    }
+
+    fn collect_pattern_binders(
+        &mut self,
+        m: ModuleId,
+        t: &ast::TypeExpr,
+        attrs: &Attrs,
+        out: &mut Vec<TypeId>,
+    ) {
+        match &t.kind {
+            ast::TypeKind::Named {
+                module: None,
+                name,
+                args,
+            } if args.is_empty() => {
+                let def = ast::TypeDef {
+                    alias_pattern: false,
+                    name: name.clone(),
+                    params: Vec::new(),
+                    head: Vec::new(),
+                    body: ast::TypeBody::Alias(ast::TypeExpr {
+                        kind: ast::TypeKind::Hole,
+                        span: t.span,
+                    }),
+                };
+                out.push(self.collect_type(m, &def, attrs));
+            }
+            ast::TypeKind::Named { args, .. } | ast::TypeKind::Tuple(args) => {
+                for t in args {
+                    self.collect_pattern_binders(m, t, attrs, out);
+                }
+            }
+            _ => {}
+        }
     }
 
     fn collect_type(&mut self, m: ModuleId, def: &ast::TypeDef, attrs: &Attrs) -> TypeId {
@@ -1041,17 +1100,19 @@ impl<'a> Resolver<'a> {
         let parsed = self.parsed;
         let ast = &parsed[m.0 as usize].ast;
         for (item, slot) in ast.items.iter().zip(self.slots[m.0 as usize].clone()) {
+            if let (ast::ItemKind::TypeDef(def), Slot::Pattern(pid)) = (&item.kind, slot) {
+                self.resolve_alias_pattern(def, pid);
+                continue;
+            }
             let (ast::ItemKind::TypeDef(def), Slot::Type(id)) = (&item.kind, slot) else {
                 continue;
             };
             // §4.3: read a reserved head in full, but do not resolve its body.
-            let alias = matches!(def.body, ast::TypeBody::Alias(_));
             if !def.head.is_empty() {
                 self.error(
-                    if alias { code::ALIAS_PATTERN_RESERVED } else { code::TYPE_PARAM_FORM },
+                    code::TYPE_PARAM_FORM,
                     def.head[0].span,
-                    if alias { "the left side of an alias that is not a list of type parameters is kept for alias patterns" }
-                    else { "a type parameter is an `UpName` with no module name and no arguments" },
+                    "a type parameter is an `UpName` with no module name and no arguments",
                 );
                 if def
                     .head
@@ -1067,10 +1128,9 @@ impl<'a> Resolver<'a> {
                 if is_upper(&param.name) && self.unqualified_type(&param.name).is_some() {
                     clashes = true;
                     self.error(
-                        if alias { code::ALIAS_PATTERN_RESERVED } else { code::TYPE_VAR_IS_TYPE },
+                        code::TYPE_VAR_IS_TYPE,
                         param.span,
-                        if alias { "the left side of an alias that is not a list of type parameters is kept for alias patterns" }
-                        else { "a type parameter may not have the name of a type" },
+                        "a type parameter may not have the name of a type",
                     );
                 }
             }
@@ -1120,9 +1180,74 @@ impl<'a> Resolver<'a> {
                     );
                 }
             }
-            if self.p.ty(id).host.is_some() {
-                self.host_form(def);
+        }
+    }
+
+    fn early_types(&mut self) {
+        let mut checks = Vec::new();
+        for def in &self.p.types {
+            if let TypeBody::Custom(ctors) = &def.body {
+                for c in ctors {
+                    for f in &c.fields {
+                        if value_dependent(&self.p, &f.ty) {
+                            checks.push((def.module, f.ty.span));
+                        }
+                    }
+                }
             }
+        }
+        for (m, span) in checks {
+            self.cur = m;
+            self.error(
+                code::VALUE_TYPE_PLACE,
+                span,
+                "a value-dependent type is not allowed in a constructor field or host type",
+            );
+        }
+        for (mi, parsed) in self.parsed.iter().enumerate() {
+            self.cur = ModuleId(mi as u32);
+            for (item, slot) in parsed.ast.items.iter().zip(self.slots[mi].clone()) {
+                if let (ast::ItemKind::TypeDef(def), Slot::Type(id)) = (&item.kind, slot)
+                    && self.p.ty(id).host.is_some()
+                    && !matches!(&self.p.ty(id).body,TypeBody::Custom(cs) if cs.iter().flat_map(|c|&c.fields).any(|f|value_dependent(&self.p,&f.ty)))
+                {
+                    self.host_form(def);
+                }
+            }
+        }
+    }
+
+    fn environment_reads(&mut self) {
+        let mut errors = Vec::new();
+        let mut visit = |module, t: &Type| {
+            walk_type(t, &mut |t| {
+                if let TypeKind::Fn { env: Some(env), .. } = &t.kind
+                    && value_dependent(&self.p, env)
+                {
+                    errors.push((module, env.span));
+                }
+            });
+        };
+        for def in &self.p.types {
+            if let TypeBody::Alias(t) = &def.body {
+                visit(def.module, t);
+            }
+        }
+        for (i, m) in self.p.modules.iter().enumerate() {
+            let module = ModuleId(i as u32);
+            for b in &m.bindings {
+                binding_types(&b.binding, &mut |t| visit(module, t));
+            }
+        }
+        errors.sort_by_key(|(m, s)| (m.0, s.start, s.end));
+        errors.dedup();
+        for (m, span) in errors {
+            self.cur = m;
+            self.error(
+                code::VALUE_TYPE_PLACE,
+                span,
+                "a value-dependent type is not allowed inside an environment type",
+            );
         }
     }
 
@@ -1156,6 +1281,13 @@ impl<'a> Resolver<'a> {
             if let TypeBody::Alias(body) = &t.body {
                 let mut used = Vec::new();
                 named_types(body, &mut used);
+                if let TypeKind::Of {
+                    projection: Some(pid),
+                    ..
+                } = body.kind
+                {
+                    pattern_type_ids(&self.p.alias_patterns[pid.0 as usize].pattern, &mut used);
+                }
                 for u in used {
                     if matches!(self.p.ty(u).body, TypeBody::Alias(_)) {
                         g.add_edge(nodes[i], nodes[u.0 as usize], ());
@@ -1300,6 +1432,167 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    fn new_of(
+        &mut self,
+        value: ValueRef,
+        span: Span,
+        permanent: bool,
+        projection: Option<ProjectionId>,
+    ) -> Type {
+        let site = OfId(self.p.of_sites.len() as u32);
+        self.p.of_sites.push(OfSite {
+            module: self.cur,
+            span,
+            value,
+            permanent,
+            projection,
+        });
+        Type {
+            kind: TypeKind::Of {
+                value,
+                site,
+                projection,
+            },
+            span,
+        }
+    }
+
+    fn value_type(
+        &mut self,
+        module: Option<&ast::Ident>,
+        name: &ast::Ident,
+        span: Span,
+    ) -> TypeKind {
+        let pending = |n: &str| self.pending.iter().rev().any(|p| p.contains(n));
+        if let Some(m) = module {
+            if pending(&m.name) {
+                self.error(
+                    code::NOT_A_MODULE,
+                    m.span,
+                    format!("`{}` is a pending value, not a module", m.name),
+                );
+                return TypeKind::Error;
+            }
+        } else {
+            let reserved = self.reserved.iter().rev().any(|(depth, names)| {
+                names.contains(&name.name)
+                    && !self
+                        .locals
+                        .iter()
+                        .skip(*depth)
+                        .any(|f| f.names.contains_key(&name.name))
+            });
+            if pending(&name.name) || reserved {
+                self.error(code::VALUE_TYPE_OWN_SCOPE, span,
+                    format!("the type of `{}` cannot be read in its own pattern, function header, or binding value, even if an outer name exists", name.name));
+                return TypeKind::Error;
+            }
+        }
+        match self.name(module, name) {
+            ExprKind::Name(value @ (ValueRef::Local(_) | ValueRef::Def(_))) => {
+                self.new_of(value, span, self.ty_def.is_some(), None).kind
+            }
+            _ => TypeKind::Error,
+        }
+    }
+
+    fn resolve_alias_pattern(&mut self, def: &ast::TypeDef, pid: ProjectionId) {
+        let ids = self.p.alias_patterns[pid.0 as usize].binders.clone();
+        for id in &ids {
+            let name = self.p.ty(*id).name.clone();
+            let conflict = self.scopes[self.cur.0 as usize]
+                .types
+                .get(&name)
+                .is_some_and(|(_, imported)| *imported)
+                || self.builtin_types.contains_key(&name);
+            if conflict {
+                self.error(
+                    code::TYPE_PATTERN_BINDER_IS_TYPE,
+                    self.p.ty(*id).span,
+                    format!("the new alias `{name}` conflicts with an imported or built-in type"),
+                );
+            }
+        }
+        let ast::TypeBody::Alias(source) = &def.body else {
+            unreachable!()
+        };
+        let source = self.ty(source);
+        let TypeKind::Of { value, site, .. } = source.kind else {
+            return;
+        };
+        self.p.of_sites[site.0 as usize].permanent = true;
+        self.p.of_sites[site.0 as usize].projection = Some(pid);
+        let mut parts = Vec::new();
+        for t in &def.head {
+            parts.push(self.type_pattern(t, &ids));
+        }
+        let head = self.lookup_type(None, &def.name);
+        let pattern = match head {
+            Some(ty) if self.arity(ty) == parts.len() => TypePattern::Named(ty, parts),
+            Some(_) => {
+                self.error(
+                    code::TYPE_ARITY,
+                    def.name.span,
+                    "alias pattern head has the wrong number of arguments",
+                );
+                TypePattern::Error
+            }
+            None => TypePattern::Error,
+        };
+        for id in &ids {
+            let span = self.p.ty(*id).span;
+            let t = self.new_of(value, span, true, Some(pid));
+            self.p.types[id.0 as usize].body = TypeBody::Alias(t);
+        }
+        let slot = &mut self.p.alias_patterns[pid.0 as usize];
+        slot.source = source;
+        slot.pattern = pattern;
+    }
+
+    fn type_pattern(&mut self, t: &ast::TypeExpr, ids: &[TypeId]) -> TypePattern {
+        match &t.kind {
+            ast::TypeKind::Hole => TypePattern::Skip,
+            ast::TypeKind::Named {
+                module: None,
+                name,
+                args,
+            } if args.is_empty() => ids
+                .iter()
+                .copied()
+                .find(|id| self.p.ty(*id).span == name.span)
+                .map_or(TypePattern::Error, TypePattern::Bind),
+            ast::TypeKind::Named { module, name, args } => {
+                let parts = args
+                    .iter()
+                    .map(|t| self.type_pattern(t, ids))
+                    .collect::<Vec<_>>();
+                match self.lookup_type(module.as_ref(), name) {
+                    Some(ty) if self.arity(ty) == parts.len() => TypePattern::Named(ty, parts),
+                    Some(_) => {
+                        self.error(
+                            code::TYPE_ARITY,
+                            t.span,
+                            "alias pattern has the wrong number of arguments",
+                        );
+                        TypePattern::Error
+                    }
+                    None => TypePattern::Error,
+                }
+            }
+            ast::TypeKind::Tuple(ts) => {
+                TypePattern::Tuple(ts.iter().map(|t| self.type_pattern(t, ids)).collect())
+            }
+            _ => {
+                self.error(
+                    code::TYPE_PATTERN_FORM,
+                    t.span,
+                    "a type pattern is a binder, `_`, a named type, or a tuple",
+                );
+                TypePattern::Error
+            }
+        }
+    }
+
     fn ty(&mut self, t: &ast::TypeExpr) -> Type {
         use ast::TypeKind as T;
         let kind = match &t.kind {
@@ -1368,14 +1661,7 @@ impl<'a> Resolver<'a> {
                     None => TypeKind::Error,
                 }
             }
-            T::ValueOf { module, .. } => {
-                self.error(
-                    if module.is_some() { code::TYPE_OF_VALUE_RESERVED } else { code::LOWERCASE_TYPE_RESERVED },
-                    t.span,
-                    "a lowercase name in a type is kept for the type of a value; declare a type variable as an UpName, as in `f(A) = …`",
-                );
-                TypeKind::Error
-            }
+            T::ValueOf { module, name } => self.value_type(module.as_ref(), name, t.span),
             T::Call { .. } => {
                 self.error(
                     code::MACRO_RESERVED,
@@ -1447,6 +1733,14 @@ impl<'a> Resolver<'a> {
     /// expanded with its arguments. Gives back the type constructor, or
     /// `None` when there is none or a problem has been reported.
     fn env_type(&mut self, t: &Type) -> Option<TypeRef> {
+        if value_dependent(&self.p, t) {
+            self.error(
+                code::VALUE_TYPE_PLACE,
+                t.span,
+                "a value-dependent type is not allowed in a service/environment type",
+            );
+            return None;
+        }
         let head = match &self.expand(t).kind {
             TypeKind::Error => return None,
             // An alias in a circle; the circle has been reported.
@@ -1486,6 +1780,9 @@ impl<'a> Resolver<'a> {
             let module = def.module;
             let fields: Vec<FieldDef> = ctor.fields.clone();
             for (i, f) in fields.iter().enumerate() {
+                if value_dependent(&self.p, &f.ty) {
+                    continue;
+                }
                 if !matches!(f.ty.kind, TypeKind::Fn { .. }) {
                     continue;
                 }
@@ -1603,6 +1900,14 @@ impl<'a> Resolver<'a> {
     /// parameters and value are types that the host can take (§10.3), with
     /// no errors and no environment.
     fn external_type(&mut self, t: &Type) {
+        if value_dependent(&self.p, t) {
+            self.error(
+                code::VALUE_TYPE_PLACE,
+                t.span,
+                "a value-dependent type is not allowed in an external declaration",
+            );
+            return;
+        }
         let TypeKind::Fn {
             params,
             ret,
@@ -1790,7 +2095,12 @@ impl<'a> Resolver<'a> {
         let ty_vars = self.push_declared_frame(&b.type_params);
         let direct = self.is_direct(&b.value);
         let mut binders = Vec::new();
+        let mut names = Vec::new();
+        ast_binders(&b.pattern, &mut names);
+        let names: HashSet<String> = names.into_iter().map(|(n, _)| n).collect();
+        self.pending.push(names.clone());
         let pattern = self.pattern(&b.pattern, &mut binders, None);
+        self.pending.pop();
         let value = if direct && !top {
             // §6.10: the names may be used inside the function bodies of a
             // direct value.
@@ -1798,11 +2108,16 @@ impl<'a> Resolver<'a> {
                 names: binders.iter().map(|b| (b.name.clone(), b.var)).collect(),
                 fn_only: Some(self.fn_depth),
             });
+            self.reserved.push((self.locals.len(), names.clone()));
             let v = self.expr(&b.value);
+            self.reserved.pop();
             self.locals.pop();
             v
         } else {
-            self.expr(&b.value)
+            self.reserved.push((self.locals.len(), names));
+            let value = self.expr(&b.value);
+            self.reserved.pop();
+            value
         };
         self.ty_frames.pop();
         let binding = Binding {
@@ -2258,6 +2573,15 @@ impl<'a> Resolver<'a> {
         let mut env_heads: Vec<TypeRef> = Vec::new();
         let mut all: Vec<Binder> = Vec::new();
         let mut labels: Vec<String> = Vec::new();
+        let mut pending = Vec::new();
+        for p in &f.params {
+            match p {
+                ast::Param::Pattern(p) => ast_binders(p, &mut pending),
+                ast::Param::Env { name, .. } => pending.push((name.name.clone(), name.span)),
+            }
+        }
+        self.pending
+            .push(pending.into_iter().map(|(n, _)| n).collect());
         for p in &f.params {
             match p {
                 ast::Param::Pattern(pat) => {
@@ -2315,6 +2639,17 @@ impl<'a> Resolver<'a> {
             err: r.err.as_ref().map(|t| self.ty(t)),
             env: r.env.as_ref().map(|t| self.ty(t)),
         });
+        if let Some(ret) = &ret
+            && let Some(env) = &ret.env
+            && value_dependent(&self.p, env)
+        {
+            self.error(
+                code::VALUE_TYPE_PLACE,
+                env.span,
+                "a value-dependent type is not allowed inside an environment type",
+            );
+        }
+        self.pending.pop();
         self.fn_depth += 1;
         self.locals.push(Frame {
             names: all.into_iter().map(|b| (b.name, b.var)).collect(),
@@ -2344,6 +2679,12 @@ impl<'a> Resolver<'a> {
     fn clause(&mut self, c: &ast::Clause) -> Clause {
         let mut first: Vec<Binder> = Vec::new();
         let mut patterns = Vec::new();
+        let mut pending = Vec::new();
+        for p in &c.patterns {
+            ast_binders(p, &mut pending);
+        }
+        self.pending
+            .push(pending.into_iter().map(|(n, _)| n).collect());
         for (i, p) in c.patterns.iter().enumerate() {
             if i == 0 {
                 patterns.push(self.pattern(p, &mut first, None));
@@ -2371,6 +2712,7 @@ impl<'a> Resolver<'a> {
                 );
             }
         }
+        self.pending.pop();
         self.locals.push(Frame {
             names: first.into_iter().map(|b| (b.name, b.var)).collect(),
             fn_only: None,
@@ -2563,6 +2905,9 @@ impl<'a> Resolver<'a> {
             top_annotations(&b.binding.pattern, &exported_vars, &mut checks);
         }
         for (what, t) in checks {
+            if value_dependent(&self.p, &t) {
+                continue;
+            }
             let mut found = Vec::new();
             self.hidden_types(m, &t, None, &mut HashSet::new(), &mut found);
             for (span, name) in found {
@@ -2771,7 +3116,7 @@ fn named_types(t: &Type, out: &mut Vec<TypeId>) {
             named_types(ret, out);
             err.iter().chain(env).for_each(|a| named_types(a, out));
         }
-        TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
+        TypeKind::Of { .. } | TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
     }
 }
 
@@ -2797,7 +3142,7 @@ fn for_each_child(t: &Type, f: &mut dyn FnMut(&Type)) {
             f(ret);
             err.iter().chain(env).for_each(|a| f(a));
         }
-        TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
+        TypeKind::Of { .. } | TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
     }
 }
 
@@ -2848,6 +3193,15 @@ pub(crate) fn subst(t: &Type, map: &HashMap<TyVarId, &Type>) -> Type {
             err: err.as_ref().map(|e| Box::new(subst(e, map))),
             env: env.as_ref().map(|e| Box::new(subst(e, map))),
         },
+        TypeKind::Of {
+            value,
+            site,
+            projection,
+        } => TypeKind::Of {
+            value: *value,
+            site: *site,
+            projection: *projection,
+        },
         TypeKind::Hole => TypeKind::Hole,
         TypeKind::Error => TypeKind::Error,
     };
@@ -2888,5 +3242,25 @@ fn top_annotations(p: &Pattern, exported: &HashMap<VarId, String>, out: &mut Vec
             .iter()
             .for_each(|s| top_annotations(&s.value, exported, out)),
         _ => {}
+    }
+}
+
+fn pattern_type_ids(p: &TypePattern, out: &mut Vec<TypeId>) {
+    match p {
+        TypePattern::Named(ty, parts) => {
+            if let TypeRef::Custom(id) = ty {
+                out.push(*id);
+            }
+            for p in parts {
+                pattern_type_ids(p, out);
+            }
+        }
+        TypePattern::Tuple(parts) => {
+            for p in parts {
+                pattern_type_ids(p, out);
+            }
+        }
+        TypePattern::Exact(t) => named_types(t, out),
+        TypePattern::Bind(_) | TypePattern::Skip | TypePattern::Error => {}
     }
 }

@@ -248,6 +248,7 @@ pub fn order(program: &mut Program, diags: &mut Vec<Diagnostic>) {
             });
         }
     }
+    groups = type_order(program, groups, diags, false);
     program.order = Order { groups, init };
 }
 
@@ -275,4 +276,153 @@ pub fn module_order(program: &Program) -> Vec<ModuleId> {
         out.extend(ms.into_iter().map(ModuleId));
     }
     out
+}
+
+/// Value-type edges order already computed expression SCCs. They never
+/// change SCC membership, runtime needs, or initialization (§2.5, §4.7).
+fn type_order(
+    p: &Program,
+    groups: Vec<Vec<BindingRef>>,
+    diags: &mut Vec<Diagnostic>,
+    reverse: bool,
+) -> Vec<Vec<BindingRef>> {
+    let mut owners = std::collections::HashMap::new();
+    for (i, group) in groups.iter().enumerate() {
+        for b in group {
+            owners.insert(*b, i);
+        }
+    }
+    let mut graph = petgraph::graph::DiGraph::<usize, Option<OfId>>::new();
+    let nodes = (0..groups.len())
+        .map(|i| graph.add_node(i))
+        .collect::<Vec<_>>();
+    let mut has_reads = false;
+    for (i, group) in groups.iter().enumerate() {
+        for b in group {
+            for (index, _) in uses(p, b.module, &p.binding(*b).binding) {
+                if let Some(&j) = owners.get(&BindingRef {
+                    module: b.module,
+                    index,
+                }) && i != j
+                {
+                    graph.update_edge(nodes[i], nodes[j], None);
+                }
+            }
+            binding_types(&p.binding(*b).binding, &mut |t| {
+                let mut sources = Vec::new();
+                type_sources(p, t, &mut BTreeSet::new(), &mut sources);
+                for (site, source) in sources {
+                    let ValueRef::Def(d) = source else { continue };
+                    let DefKind::Binding { binding, .. } = p.def(d).kind else {
+                        continue;
+                    };
+                    let Some(&j) = owners.get(&BindingRef {
+                        module: d.module,
+                        index: binding,
+                    }) else {
+                        continue;
+                    };
+                    has_reads = true;
+                    graph.add_edge(nodes[i], nodes[j], Some(site));
+                }
+            });
+        }
+    }
+    if !has_reads {
+        return groups;
+    }
+    let mut bad = BTreeSet::new();
+    for scc in petgraph::algo::tarjan_scc(&graph) {
+        let members = scc
+            .iter()
+            .copied()
+            .collect::<std::collections::HashSet<_>>();
+        let cyclic = scc.len() > 1 || scc.iter().any(|n| graph.contains_edge(*n, *n));
+        if !cyclic {
+            continue;
+        }
+        for n in &scc {
+            bad.insert(graph[*n]);
+        }
+        for n in &scc {
+            for edge in graph.edges(*n) {
+                use petgraph::visit::EdgeRef;
+                if !members.contains(&edge.target()) {
+                    continue;
+                }
+                if let Some(site) = edge.weight() {
+                    let info = &p.of_sites[site.0 as usize];
+                    let from = groups[graph[*n]][0];
+                    let reader = p
+                        .binding(from)
+                        .defs
+                        .first()
+                        .map(|d| p.def(*d).name.as_str())
+                        .unwrap_or("this binding");
+                    let source = match info.value {
+                        ValueRef::Def(d) => p.def(d).name.as_str(),
+                        _ => "this value",
+                    };
+                    let chain = scc
+                        .iter()
+                        .map(|n| {
+                            groups[graph[*n]]
+                                .iter()
+                                .flat_map(|b| &p.binding(*b).defs)
+                                .map(|d| p.def(*d).name.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" -> ");
+                    diags.push(Diagnostic::error(code::VALUE_TYPE_CIRCLE,Some(p.module(info.module).source),info.span,
+                        format!("the type of {source} is needed to type {reader}, but the dependencies form a circle ({chain}); write the type instead")));
+                }
+            }
+        }
+    }
+    let mut done = BTreeSet::new();
+    let mut out = Vec::new();
+    while done.len() < groups.len() {
+        let ready = (0..groups.len())
+            .filter(|i| {
+                !done.contains(i)
+                    && (bad.contains(i)
+                        || graph.neighbors(nodes[*i]).all(|n| done.contains(&graph[n])))
+            })
+            .collect::<Vec<_>>();
+        let next = if reverse { ready.last() } else { ready.first() }
+            .copied()
+            .unwrap_or_else(|| (0..groups.len()).find(|i| !done.contains(i)).unwrap());
+        done.insert(next);
+        out.push(groups[next].clone());
+    }
+    out
+}
+
+/// Resolved value references reached through a written type and its aliases.
+pub(crate) fn type_sources(
+    p: &Program,
+    t: &Type,
+    seen: &mut BTreeSet<TypeId>,
+    out: &mut Vec<(OfId, ValueRef)>,
+) {
+    walk_type(t, &mut |t| match &t.kind {
+        TypeKind::Of { site, value, .. } => out.push((*site, *value)),
+        TypeKind::Named {
+            ty: TypeRef::Custom(id),
+            ..
+        } if seen.insert(*id) => {
+            if let TypeBody::Alias(body) = &p.ty(*id).body {
+                type_sources(p, body, seen, out);
+            }
+        }
+        _ => {}
+    });
+}
+
+/// Test entry point for independent-group order invariance.
+pub fn reverse_type_ties(p: &mut Program) {
+    let groups = std::mem::take(&mut p.order.groups);
+    p.order.groups = type_order(p, groups, &mut Vec::new(), true);
 }

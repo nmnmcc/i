@@ -83,6 +83,8 @@ pub enum ItemKind {
 /// and `params` is then empty.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeDef {
+    /// Frozen from the written RHS before expansion (§4.3).
+    pub alias_pattern: bool,
     pub name: Ident,
     pub params: Vec<Ident>,
     pub head: Vec<TypeExpr>,

@@ -58,7 +58,7 @@ fields!(ImportItem { alias, names, path, span } skip {});
 fields!(ExportItem { name, span } skip { constructors });
 fields!(Item { doc, attributes, kind, span } skip {});
 fields!(Attribute { module, name, args, call, span } skip {});
-fields!(TypeDef { name, params, head, body } skip {});
+fields!(TypeDef { name, params, head, body } skip { alias_pattern });
 fields!(Constructor { name, fields, span } skip {});
 fields!(Field { label, ty, span } skip {});
 fields!(Binding { pattern, value, span, type_params } skip {});
