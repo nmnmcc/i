@@ -597,6 +597,17 @@ impl<'a> Lowerer<'a> {
             }
         }
         self.out.services = next;
+        self.out.request_owner = self
+            .program
+            .types
+            .iter()
+            .enumerate()
+            .find(|(_, t)| t.name == "Owner" && self.program.module(t.module).path == "i/request")
+            .and_then(|(i, _)| {
+                self.services
+                    .get(&TypeRef::Custom(TypeId(i as u32)))
+                    .copied()
+            });
     }
 
     /// The service id of the environment parameter or statement at `span`.
@@ -843,7 +854,7 @@ impl<'a> Lowerer<'a> {
                 }
                 let d = b.defs[0];
                 let name = format!("{}.{}", m.path, program.def(d).name);
-                let callee = self.def_callee(d);
+                let callee = self.entry_callee(d, 0);
                 let fx = Fx::new(mid, false);
                 let site = self.site(&fx, b.binding.span.start);
                 let is_async = self.entry_async(d, &mut needed);
@@ -879,7 +890,7 @@ impl<'a> Lowerer<'a> {
                 result: abi_type(sig.result),
                 errors: sig.errors.iter().map(|t| abi_type(*t)).collect(),
             };
-            let callee = self.def_callee(d);
+            let callee = self.entry_callee(d, abi.params.len() as u32);
             let is_async = self.entry_async(d, &mut needed);
             let async_body = is_async.then(|| self.async_body(&callee, abi.params.len() as u32));
             exports.push((name.clone(), abi.clone(), is_async));
@@ -913,6 +924,69 @@ impl<'a> Lowerer<'a> {
             &exports,
             &self.out.imports,
         );
+    }
+
+    fn entry_callee(&mut self, d: DefId, n: u32) -> Callee {
+        let callee = self.def_callee(d);
+        let needs = self.typed.entry_services.get(&d).is_some_and(|ts| {
+            ts.iter().any(|id| {
+                let t = self.program.ty(*id);
+                t.host.as_ref().is_some_and(|h| h.is_async)
+                    || (self.program.module(t.module).path == "i/request"
+                        && matches!(t.name.as_str(), "Root" | "Owner" | "Await"))
+            })
+        });
+        if !needs {
+            return callee;
+        }
+        let thunk = self.new_func();
+        let mut thunk_body = Vec::new();
+        for i in 0..n {
+            thunk_body.push(Stmt::Let {
+                dst: i,
+                value: Value::Capture(i),
+                site: None,
+            });
+        }
+        thunk_body.push(Stmt::TailCall {
+            callee,
+            args: (0..n).map(Atom::Local).collect(),
+            env: Env::Param,
+            site: None,
+        });
+        self.out.funcs[thunk.0 as usize] = FuncKind::Code(Func {
+            name: "request entry body".into(),
+            arity: 0,
+            locals: vec![LocalType::Value; n as usize],
+            body: thunk_body,
+            frame: true,
+        });
+        let wrapper = self.new_func();
+        let entry = self.library_callee("i/request", "entry");
+        self.out.funcs[wrapper.0 as usize] = FuncKind::Code(Func {
+            name: "request entry".into(),
+            arity: n,
+            locals: vec![LocalType::Value; n as usize + 1],
+            body: vec![
+                Stmt::Let {
+                    dst: n,
+                    value: Value::Closure {
+                        func: thunk,
+                        captures: (0..n).map(Atom::Local).collect(),
+                        patched: false,
+                    },
+                    site: None,
+                },
+                Stmt::TailCall {
+                    callee: entry,
+                    args: vec![Atom::Local(n)],
+                    env: Env::Param,
+                    site: None,
+                },
+            ],
+            frame: true,
+        });
+        Callee::Direct(wrapper)
     }
 
     /// Whether an entry point is async: it may call a function of an async
@@ -1002,6 +1076,10 @@ impl<'a> Lowerer<'a> {
             let site = (def.module, label.span);
             match self.import(&host.namespace, &label.name, abi, kind, site) {
                 Ok(import) => {
+                    self.out.imports[import as usize].request = host.is_request;
+                    self.out.imports[import as usize].request_result = hf.request_result
+                        || (host.is_async && !host.is_request && !hf.errors.is_empty());
+                    self.out.imports[import as usize].awaited = host.is_async;
                     let f = self.import_func(import);
                     self.constants.insert(f);
                     fields.push(f);
@@ -1121,6 +1199,9 @@ impl<'a> Lowerer<'a> {
             name: name.to_string(),
             abi,
             kind,
+            request: false,
+            request_result: false,
+            awaited: false,
         });
         self.import_sites.push(site);
         Ok(self.out.imports.len() as ImportId - 1)
@@ -1139,60 +1220,114 @@ impl<'a> Lowerer<'a> {
     }
 
     /// A new function that calls an import, as `import_func`.
+    fn library_callee(&mut self, path: &str, name: &str) -> Callee {
+        let (module, m) = self
+            .program
+            .modules
+            .iter()
+            .enumerate()
+            .find(|(_, m)| m.path == path)
+            .expect("runtime module is registered");
+        let index = m
+            .defs
+            .iter()
+            .position(|d| d.name == name)
+            .expect("runtime binding exists");
+        self.def_callee(DefId {
+            module: ModuleId(module as u32),
+            index: index as u32,
+        })
+    }
+
     fn make_import_func(&mut self, import: ImportId) -> FuncId {
         let x = self.out.imports[import as usize].clone();
         let n = x.abi.params.len() as u32;
         let args: Vec<Atom> = (0..n).map(Atom::Local).collect();
         let mut locals = vec![LocalType::Value; n as usize];
         let mut body = Vec::new();
-        match x.kind {
-            ImportKind::External | ImportKind::Service | ImportKind::WasiStdout => {
-                locals.push(LocalType::Value);
-                body.push(Stmt::Let {
-                    dst: n,
-                    value: Value::HostCall { import, args },
-                    site: None,
-                });
-                body.push(Stmt::Return(Atom::Local(n)));
-            }
-            ImportKind::AsyncService => {
-                let wait = self.op_func(
+        let mut fresh = || {
+            let id = locals.len() as u32;
+            locals.push(LocalType::Value);
+            id
+        };
+        let asynchronous = x.kind == ImportKind::AsyncService;
+        if x.awaited && !asynchronous {
+            let owner = fresh();
+            let checked = fresh();
+            body.push(Stmt::Let {
+                dst: owner,
+                value: Value::Service(
+                    Env::Param,
+                    self.out.request_owner.expect("request Owner is registered"),
+                ),
+                site: None,
+            });
+            body.push(Stmt::Let {
+                dst: checked,
+                value: Value::Op(
                     Op::Runtime {
-                        name: "host_wait",
+                        name: "request_check_owner",
                         arity: 1,
                     },
-                    1,
-                );
-                locals.extend([LocalType::Value; 4]);
+                    vec![Atom::Local(owner)],
+                ),
+                site: None,
+            });
+        }
+        let value = fresh();
+        body.push(Stmt::Let {
+            dst: value,
+            value: if asynchronous {
+                Value::HostStart { import, args }
+            } else {
+                Value::HostCall { import, args }
+            },
+            site: None,
+        });
+        let mut result = value;
+        if x.awaited && !asynchronous {
+            result = fresh();
+            body.push(Stmt::Let {
+                dst: result,
+                value: Value::Op(
+                    Op::Runtime {
+                        name: "request_ready",
+                        arity: 1,
+                    },
+                    vec![Atom::Local(value)],
+                ),
+                site: None,
+            });
+        }
+        if x.awaited && !x.request {
+            let answer = fresh();
+            let awaiter = self.library_callee("i/request", "await_owned");
+            body.push(Stmt::Let {
+                dst: answer,
+                value: Value::Call {
+                    callee: awaiter,
+                    args: vec![Atom::Local(result)],
+                    env: Env::Param,
+                },
+                site: None,
+            });
+            result = answer;
+            if x.request_result {
+                let unwrapped = fresh();
+                let from_result = self.library_callee("i/fail", "from_result");
                 body.push(Stmt::Let {
-                    dst: n,
-                    value: Value::HostStart { import, args },
+                    dst: unwrapped,
+                    value: Value::Call {
+                        callee: from_result,
+                        args: vec![Atom::Local(result)],
+                        env: Env::Param,
+                    },
                     site: None,
                 });
-                body.push(Stmt::Let {
-                    dst: n + 1,
-                    value: Value::Op(
-                        Op::Runtime {
-                            name: "host_root_boundary",
-                            arity: 0,
-                        },
-                        vec![],
-                    ),
-                    site: None,
-                });
-                body.push(Stmt::Let {
-                    dst: n + 2,
-                    value: Value::Op(Op::Suspend, vec![Atom::Local(n + 1), Atom::Func(wait)]),
-                    site: None,
-                });
-                body.push(Stmt::Let {
-                    dst: n + 3,
-                    value: Value::HostReply(import),
-                    site: None,
-                });
-                body.push(Stmt::Return(Atom::Local(n + 3)));
+                result = unwrapped;
             }
         }
+        body.push(Stmt::Return(Atom::Local(result)));
         let f = self.new_func();
         self.out.funcs[f.0 as usize] = FuncKind::Code(Func {
             name: format!("import {} {}", x.module, x.name),
@@ -1389,6 +1524,39 @@ impl<'a> Lowerer<'a> {
                 )),
                 None => Err(format!("`core.{function}` is not known")),
             },
+            "ilang:request" => {
+                let op = match function.as_str() {
+                    "wait_any" => Op::WaitRequests,
+                    "poll" => Op::PollRequests,
+                    _ => Op::Runtime {
+                        name: match function.as_str() {
+                            "open_root" => "request_open_root",
+                            "close_root" => "request_close_root",
+                            "open_owner" => "request_open_owner",
+                            "close_owner" => "request_close_owner",
+                            "count" => "request_count",
+                            "count_root" => "request_count_root",
+                            "cancel_all" => "request_cancel_all",
+                            "cancel_all_root" => "request_cancel_all_root",
+                            "observe_owner" => "request_observe_owner",
+                            "observe_root" => "request_observe_root",
+                            "observe_change" => "request_observe_change",
+                            "has_work" => "request_has_work",
+                            "ready" => "request_ready",
+                            "ticket" => "request_ticket",
+                            "state" => "request_state",
+                            "take" => "request_take",
+                            "settled" => "request_settled",
+                            "cancel" => "request_cancel",
+                            "entry_root" => "request_entry_root",
+                            "entry_end" => "request_entry_end",
+                            _ => return Err(format!("`request.{function}` is not known")),
+                        },
+                        arity,
+                    },
+                };
+                Ok((op, arity))
+            }
             "ilang:key" => match function.as_str() {
                 "new" => Ok((
                     Op::Runtime {
@@ -2251,6 +2419,8 @@ impl<'a> Lowerer<'a> {
                     BuiltinType::Continuation => 12,
                     BuiltinType::Key => 15,
                     BuiltinType::Keyed => 16,
+                    BuiltinType::Request => 17,
+                    BuiltinType::Ticket => 18,
                     BuiltinType::Never => u32::MAX,
                 },
             ),

@@ -138,3 +138,106 @@ The source-based key/retention/portability/protocol checks establish the new
 primitive contracts separately from the regenerated library interface golden.
 The implementation and its generated interface form the two commits of this
 checkpoint; the checkpoint head is the final regeneration commit.
+
+## Stage 3: requests, groups and ABI adapters
+
+The request layer now implements all public functions in runtime.md §5.1 and
+§5.4. Root and Owner remain ordinary portable key-bearing i service values.
+Request and Ticket are built-ins, with covariant Request answers. The private
+slot table has a free list and a fresh generation identity per cell. Ready
+cells leave the table and groups; scratch answer/start references are cleared.
+
+A request-mode host field returns its cell immediately. Ordinary async fields
+have Await | Owner added before inference, then call ordinary i await_owned
+and from_result. Namespace spelling never selects a task or IO implementation.
+The wire stays ABI v3. Request(Result(A,Never)) still receives Ok(A).
+
+Group zero/change observers are local Request(Nil) cells with no host id and
+no group membership. Check/subscription and each start/answer/cancel notification
+are indivisible on this one worker. Notifications implement the private revision
+observation without exporting a producer-ticket enumeration. Their progress
+predicate queries the actual target's producer count, never the observation.
+
+The entry wrapper calls ordinary i request.entry only from inferred request
+needs. Completed fakes remain synchronous. Root wait/poll retain one host_k;
+status and async-live are separate. Continue checks both. WASI returns completed
+cells after its blocking imports and checks Owner liveness before the import.
+Root poll on WASI is a no-op.
+
+Interpretation checks (independent of generated expectations):
+
+- ready/cancel_ready/take_twice/empty_wait/no_active_entry follow §5.1's exact
+  state transitions and panic sentences. Identity is independent of state;
+  Ticket aliases share their underlying request and cannot read an answer.
+- fake_owned follows D5: "Await/Owner/Root alone ... do not turn an entry async"
+  and §5.1's closed-group zero/readiness rules. Root/Owner are portable values.
+- raw/raw_cancel/groups follow §5.1: "A Ready cell has left its group and
+  belongs to its handle"; "open_owner uses that Root, not ... Owner"; and
+  "cancel_all cancels the Waiting members ... not subsequent starts or detached
+  Ready values". Tests cover independent roots, group-close isolation, zero
+  observers, reusing slots and cancelling old aliases.
+- ownership follows §5.4: "request.await itself remains a borrowed wait" and
+  await_owned's ensure/cancel definition. Cancelling an ordinary control waiter
+  leaves the borrowed producer Waiting and makes the owned producer Cancelled.
+- result_never follows §5.3's explicit Ok(A) rule even for an empty error list.
+- covariance, ticket_not_answer, request_boundary, request_host_shape and
+  async_field_environment follow D2 and §5.2's exact type and boundary rules.
+- Source traces follow spec §11.7 and §5.3: decode/validation must precede root
+  resume. Each host cell saves the initiating call's full trace, including lazy
+  frames, and validates against that trace before delivery. The old async
+  host-error positions pass unchanged. This is implementation evidence for
+  existing trace requirements, not a newly generated position oracle.
+- Root suspension/re-entry stays in emit/control.rs. The host side still calls
+  control only through host_boundary and host_resume_k. The request wait record
+  is a runtime record that handles normal return only (kind 5), not a generated
+  code record. The existing shape test now also checks that record explicitly.
+
+Public interface: every public request function's inferred scheme matches the
+§5.1 table (including within's Root | N - Owner) and §5.4's owning helper. The
+new private intrinsic/entry helpers in library.out are not exported. No public
+producer-ticket enumeration or new ABI export/import protocol was added.
+
+Validation:
+
+- `cargo test -p ilang-cli --test spec --locked`: 190/190 cases at O0/O2,
+  including all 20 request cases and all 12 legacy host-service cases.
+- `cargo test -p ilang-cli --test wasi --locked`: 17/17, blocking async behavior
+  preserved.
+- `cargo test -p ilang-wasm --test control_lazy --locked`: initially 16/17;
+  corrected runtime record classification passes the focused record_kinds
+  check and the subsequent full gate.
+- Full heavy-wrapped `ILANG_BROWSER_PORT=4183 ./scripts/dev-verify`: exit 0
+  (`target/r2-stage3-verify2.log`), including 46 Node and 33 browser tests using
+  the regenerated compiled fixture.
+- `scripts/old-syntax-check`: 1,127 extracted blocks, exact diagnostics, 19
+  unchanged future-track entries; exit 0.
+- Generated files came only from `UPDATE=1 cargo test -p ilang-check --test
+  types --locked` and `./scripts/build-abi-fixture.sh`, through heavy. Their
+  checkpoint commit follows the implementation commit.
+
+Failed intermediate checks, corrected:
+
+- Initial request cases rejected open_root/open_owner's explicit return types
+  without their required !Root annotation (spec §6.8: omitted ! means Never).
+  A direct Request/Ticket comparison also correctly triggered E0520; the
+  identity-law case uses generic equality, preserving §6.9's disjoint-type rule.
+- Legacy host tests found the explicit Later-only continuation annotation and
+  missing async validation trace. The annotation now includes the service
+  expansion required by D3; the original trace expectation was preserved.
+- A runtime wait record initially used the code-record kind/name prefix. The
+  shape check caught its missing code slot. It now uses runtime kind 5, and
+  the check covers it without loosening existing assertions.
+- The first full gate rejected the environment layout assertion: Clock's
+  private slot moved from 1 to 4 because Await, Root and Owner are now registered
+  before it. The representation check remains exact at 4. This numeric layout
+  check is not evidence for a language rule; spec environment execution cases
+  independently check the lookup behavior.
+- Preliminary standalone WAT shape checks caught an extra parenthesis and a
+  non-defaultable local crossing branches. An early substitute used the eager
+  1df2fe0 frame signature with lazy re-entry code; switching the substitute to
+  the current generated module fixed that mismatch. The real compile/spec and
+  host/control seam tests above supersede those preliminary checks.
+
+The lane still needs the i scheduler, full scope/cancellation/event laws,
+Rust/JS stress fixtures, WAT audit, performance measurements and final merge.
+The scratch scheduler draft in target/r2-task.i is not an implementation claim.

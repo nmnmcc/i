@@ -52,6 +52,8 @@
 //! | 13 | UtfCodepoint | field 1: the scalar value |
 //! | 15 | Key | identity value; no parts |
 //! | 16 | Keyed | field 5: key, value |
+//! | 17 | Request | identity cell with private mutable completion state |
+//! | 18 | Ticket | field 5: the underlying request cell |
 //!
 //! Code outside `values.rs` goes through lists only with `$list_is_empty`,
 //! `$list_head` and `$list_tail`. A list cell is a lean `$cons`, one small

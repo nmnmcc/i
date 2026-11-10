@@ -641,6 +641,40 @@ pub(super) const EFFECTS: &str = r#"
   (call $capture_pack (local.get $c) (local.get $x) (ref.func $keep_reenter) (local.get $kept))
   unreachable)
 
+;; Request waits use the same one-root capture and re-entry machinery.
+(func $request_handoff (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env))
+    (param $k eqref) (result eqref)
+  (call $host_wait (local.get $k)))
+(func $request_pause (param $status i32) (param $env (ref null $env)) (result eqref)
+  (if (i32.eqz (global.get $async_live)) (then (call $request_fail (i32.const 4)) unreachable))
+  (if (i32.and (i32.eq (local.get $status) (i32.const 1)) (i32.eqz (global.get $req_total)))
+    (then unreachable))
+  (global.set $host_pending_status (local.get $status))
+  (return_call $control_suspend (call $host_root_boundary)
+    (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0)
+      (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)
+      (ref.func $request_handoff))))
+(func $request_wait_loop (param $tickets eqref) (param $env (ref null $env)) (result eqref)
+  (if (call $request_any_settled (local.get $tickets)) (then (return (ref.null eq))))
+  (block $captured (result (ref $cap) exnref)
+    (drop (try_table (result eqref) (catch_ref $capture $captured)
+      (call $request_pause (i32.const 1) (local.get $env))))
+    (return_call $request_wait_loop (local.get $tickets) (local.get $env)))
+  (call $capture_rethrow
+    (struct.new $frame (ref.func $wait_requests_reenter)
+      (array.new_fixed $values 1 (local.get $tickets)) (i32.const -1) (i32.const 5) (ref.null $values)))
+  unreachable)
+(func $wait_requests_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env))
+    (param $value eqref) (param $mode i32) (result eqref)
+  (return_call $request_wait_loop
+    (array.get $values (ref.as_non_null (struct.get $frame 1 (local.get $frame))) (i32.const 0))
+    (local.get $env)))
+(func $request_wait_any (param $tickets eqref) (param $env (ref null $env)) (result eqref)
+  (if (call $list_is_empty (local.get $tickets)) (then (call $request_fail (i32.const 3)) unreachable))
+  (return_call $request_wait_loop (call $request_unique (local.get $tickets)) (local.get $env)))
+(func $request_poll (param $env (ref null $env)) (result eqref)
+  (return_call $request_pause (i32.const 2) (local.get $env)))
+
 "#;
 
 /// The types of control (§9.4), after `$env`.

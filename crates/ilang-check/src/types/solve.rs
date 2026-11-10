@@ -1285,7 +1285,7 @@ pub(crate) fn flatten_union(ms: &[Ty], out: &mut Vec<Ty>) {
 pub(crate) fn builtin_variance(b: BuiltinType) -> Vec<Variance> {
     use Variance::*;
     match b {
-        BuiltinType::List => vec![Co],
+        BuiltinType::List | BuiltinType::Request => vec![Co],
         BuiltinType::Key => vec![Inv],
         BuiltinType::Boundary => vec![Inv, Inv, Inv],
         BuiltinType::Continuation => vec![Contra, Co, Co, Co],

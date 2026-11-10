@@ -167,7 +167,7 @@ pub struct Checked {
 /// only inferred when resolution found no errors, so that one mistake is
 /// not reported many times.
 pub fn check(graph: &PackageGraph) -> Checked {
-    let (program, mut diags) = resolve_program(graph);
+    let (mut program, mut diags) = resolve_program(graph);
     let types = match &program {
         Some(p) if !diags.iter().any(Diagnostic::is_error) => {
             let (typed, more) = types::check(p, &graph.sources);
@@ -176,6 +176,34 @@ pub fn check(graph: &PackageGraph) -> Checked {
         }
         _ => None,
     };
+    if let (Some(p), Some(t)) = (&mut program, &types)
+        && !diags.iter().any(Diagnostic::is_error)
+    {
+        let dependency = p
+            .modules
+            .iter()
+            .position(|m| m.path == "i/request")
+            .map(|i| hir::ModuleId(i as u32));
+        let mut changed = false;
+        for (entry, services) in &t.entry_services {
+            let needed = services.iter().any(|id| {
+                let service = p.ty(*id);
+                service.host.as_ref().is_some_and(|h| h.is_async)
+                    || p.module(service.module).path == "i/request"
+            });
+            if needed
+                && let Some(dep) = dependency
+                && dep != entry.module
+                && !p.modules[entry.module.0 as usize].imports.contains(&dep)
+            {
+                p.modules[entry.module.0 as usize].imports.push(dep);
+                changed = true;
+            }
+        }
+        if changed {
+            order::order(p, &mut diags);
+        }
+    }
     Checked {
         program,
         types,

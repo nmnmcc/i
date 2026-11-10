@@ -409,7 +409,13 @@ impl<'a> Checker<'a> {
                     if self.p.ty(*id).host.is_some() {
                         services.push(*id);
                     }
-                    self.p.ty(*id).host.is_some() || TypeRef::Custom(*id) == self.b.assert
+                    let service = self.p.ty(*id);
+                    let request = self.p.module(service.module).path == "i/request"
+                        && matches!(service.name.as_str(), "Root" | "Owner" | "Await");
+                    if request {
+                        services.push(*id);
+                    }
+                    service.host.is_some() || TypeRef::Custom(*id) == self.b.assert || request
                 }
                 _ => false,
             };

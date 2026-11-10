@@ -207,6 +207,8 @@ pub enum Op {
     Cancel,
     /// Keeps all currently bound services in a fresh one-argument function.
     KeepEnv,
+    WaitRequests,
+    PollRequests,
 }
 
 impl Op {
@@ -227,6 +229,8 @@ impl Op {
                 | Op::Suspend
                 | Op::Resume
                 | Op::Cancel
+                | Op::WaitRequests
+                | Op::PollRequests
         )
     }
 
@@ -234,7 +238,14 @@ impl Op {
     pub fn needs_env(self) -> bool {
         matches!(
             self,
-            Op::Catch | Op::Ensure | Op::Boundary | Op::Resume | Op::Cancel | Op::KeepEnv
+            Op::Catch
+                | Op::Ensure
+                | Op::Boundary
+                | Op::Resume
+                | Op::Cancel
+                | Op::KeepEnv
+                | Op::WaitRequests
+                | Op::PollRequests
         )
     }
 
@@ -243,7 +254,14 @@ impl Op {
     pub fn suspends(self) -> bool {
         matches!(
             self,
-            Op::Catch | Op::Ensure | Op::Boundary | Op::Suspend | Op::Resume | Op::Cancel
+            Op::Catch
+                | Op::Ensure
+                | Op::Boundary
+                | Op::Suspend
+                | Op::Resume
+                | Op::Cancel
+                | Op::WaitRequests
+                | Op::PollRequests
         )
     }
 }
@@ -338,7 +356,7 @@ pub enum Value {
         args: Vec<Atom>,
     },
     /// Starts the async import with the arguments, and records that the
-    /// program waits for it (B.4). Its value is Nil.
+    /// host may answer it (B.4). Its value is the typed request cell.
     HostStart {
         import: ImportId,
         args: Vec<Atom>,
@@ -701,6 +719,9 @@ pub struct Import {
     pub name: String,
     pub abi: ExportAbi,
     pub kind: ImportKind,
+    pub request: bool,
+    pub request_result: bool,
+    pub awaited: bool,
 }
 
 /// A host service that the host gives (§9.7): its value is put in the root
@@ -735,6 +756,7 @@ pub struct Program {
     pub globals: u32,
     /// The number of service ids, at least 1 for `Assert` (§9.2).
     pub services: u32,
+    pub request_owner: Option<u32>,
     /// The code of `ilang_start` after the tables are installed.
     pub start: Option<Func>,
     pub exports: Vec<Export>,

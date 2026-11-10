@@ -110,7 +110,7 @@ const CORE: &str = r#"
 ;; Functions, boundaries and continuations are the same only as themselves.
 (func $value_identity_kind (param $kind i32) (result i32)
   (i32.or (i32.eq (local.get $kind) (i32.const 7))
-    (i32.or (i32.eq (local.get $kind) (i32.const 11)) (i32.or (i32.eq (local.get $kind) (i32.const 12)) (i32.eq (local.get $kind) (i32.const 15))))))
+    (i32.or (i32.eq (local.get $kind) (i32.const 11)) (i32.or (i32.eq (local.get $kind) (i32.const 12)) (i32.or (i32.eq (local.get $kind) (i32.const 15)) (i32.eq (local.get $kind) (i32.const 17)))))))
 (func $compare_i32 (param $a i32) (param $b i32) (result i32)
   (i32.sub (i32.gt_s (local.get $a) (local.get $b)) (i32.lt_s (local.get $a) (local.get $b))))
 (func $compare_i64 (param $a i64) (param $b i64) (result i32)

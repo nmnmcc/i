@@ -1064,6 +1064,7 @@ fn builtin_head(b: BuiltinType) -> String {
     match b {
         BuiltinType::List => "List(A)".into(),
         BuiltinType::Key => "Key(A)".into(),
+        BuiltinType::Request => "Request(A)".into(),
         BuiltinType::Boundary => "Boundary(R, E, N)".into(),
         BuiltinType::Continuation => format!("Continuation({})", PARAMS.join(", ")),
         b => b.name().into(),

@@ -63,6 +63,8 @@ const DECLARED: &[&str] = &[
     "$control_unpend",
     "$keep_call",
     "$keep_reenter",
+    "$request_handoff",
+    "$wait_requests_reenter",
 ];
 
 /// The WAT text of the whole module.
@@ -130,6 +132,9 @@ pub fn wat(p: &Program) -> String {
     } else {
         m.push_str(runtime::HOST);
     }
+    if p.imports.iter().any(|x| x.kind == ImportKind::AsyncService) {
+        m.push_str("(import \"ilang:host/v1\" \"cancel\" (func $host_cancel (param i32)))\n");
+    }
     // The imports of B.4, before every definition.
     for (i, x) in p.imports.iter().enumerate() {
         if x.kind == ImportKind::WasiStdout {
@@ -182,10 +187,13 @@ pub fn wat(p: &Program) -> String {
             );
         }
     }
+    if !p.imports.iter().any(|x| x.kind == ImportKind::AsyncService) {
+        m.push_str("(func $host_cancel (param i32) unreachable)\n");
+    }
     m.push_str(runtime::wat());
     m.push_str(SUPPORT);
     m.push_str(control::EFFECTS);
-    m.push_str(host::EFFECTS);
+    m.push_str(&host::effects());
     m.push_str(ENTRY);
     m.push_str(&e.data);
     for (ctor, ty) in &e.ctors {
@@ -552,6 +560,14 @@ impl<'p> Emitter<'p> {
             Op::Resume => format!("(call $control_resume {a} {b} {env})"),
             Op::Cancel => format!("(call $control_cancel {a} {env})"),
             Op::KeepEnv => format!("(call $control_keep_env {a} {env})"),
+            Op::WaitRequests => format!("(call $request_wait_any {a} {env})"),
+            Op::PollRequests => {
+                if self.p.target == Target::Wasi {
+                    "(ref.null eq)".to_string()
+                } else {
+                    format!("(call $request_poll {env})")
+                }
+            }
         }
     }
 
