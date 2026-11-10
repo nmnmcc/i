@@ -7,7 +7,7 @@
 The CLI reports whole-test times to 1 ms. We amortize instance startup, loop,
 checksum and timer quantization over a stated number of calls. Each reported
 sample is a batch mean, NOT a measured worst single-call latency. No overhead
-is subtracted. This substitute suffices to reject the gate by large margins;
+is subtracted. Run float_hosts.py first for slow-path classification. This substitute suffices to reject the gate by large margins;
 it cannot certify a strict per-input upper bound or 20x throughput acceptance.
 The transient test file is removed even after failure. Logs go under target/.
 """
@@ -51,6 +51,13 @@ def cases():
     # Exact realizable norm midpoint from the independent review.
     m, n = 2**26 + 1, 2**26
     rows.append(dict(group='hard', fn='hypot', x=float(2*m*n), y=float(m*m-n*n), count=2))
+    for row in rows:
+        if row['group'] == 'ordinary' and (
+                row['fn'] in ['sin', 'cos'] and abs(row['x']) <= .75 or
+                row['fn'] in ['asin', 'acos'] and abs(row['x']) == 1):
+            row['count'] = 512
+        if row['group'] == 'subnormal' and row['fn'] in ['sin', 'cos', 'tan', 'asin', 'atan']:
+            row['count'] = 16384
     return rows
 
 
@@ -101,13 +108,19 @@ def run():
                 [str(binary), str(NAMES.index(row['fn'])), row['x'].hex(), row['y'].hex()],
                 text=True)) for _ in range(5)]
         (work / 'measurements.json').write_text(json.dumps(rows, indent=2))
+        classifications = json.loads((ROOT / 'target/std3-hosts/slow-share.json').read_text())
+        assert len(classifications) == len(rows), 'run float_hosts.py first'
+        for row, classified in zip(rows, classifications):
+            assert (row['fn'], row['x'], row['y']) == (classified['fn'], classified['x'], classified['y'])
+            row['slow'] = classified['slow']
+        (work / 'measurements.json').write_text(json.dumps(rows, indent=2))
         for group in ['ordinary', 'huge', 'subnormal', 'hard']:
             selected = [r for r in rows if r['group'] == group]
             samples = [s for r in selected for s in r['seconds']]
             native = [s for r in selected for s in r['native_seconds']]
             ratios = [statistics.median(r['seconds']) / statistics.median(r['native_seconds'])
                       for r in selected]
-            print(group, 'inputs', len(selected), 'median_us', statistics.median(samples)*1e6,
+            print(group, 'slow_calls', sum(r['count'] for r in selected if r['slow']), '/', sum(r['count'] for r in selected), 'slow_inputs', sum(r['slow'] for r in selected), '/', len(selected), 'inputs', len(selected), 'median_us', statistics.median(samples)*1e6,
                   'worst_us', max(samples)*1e6, 'native_median_ns', statistics.median(native)*1e9,
                   'median_ratio', statistics.median(ratios), flush=True)
     finally:

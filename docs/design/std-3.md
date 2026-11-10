@@ -1,6 +1,7 @@
 # Design: property tests, finite mathematics, and codepoint strings
 
-Status: accepted with the coordinator rulings; implementation and feasibility evidence below.
+Status: accepted contract with coordinator rulings. The implementation candidate
+fails the float feasibility gate; see section 11.4.
 Source baseline: `b9173ce013405fd3a055ffa34edf3b8829672104`.
 Repository line references are to that baseline, not the older baseline of
 std-1. Examples use the accepted syntax. Signature inventories describe ordinary
@@ -337,8 +338,8 @@ No compiler special rule, new annotation, CLI flag or runner branch.
 Language stops remain stops and are not shrinkable. Expected errors must be
 explicitly handled using Result/fail.catch inside the property.
 
-format uses decimal integers, LF separators, and exactly this order, without a
-trailing LF:
+format uses decimal integers, LF separators, and exactly this order, without an
+added trailing LF:
 
 ```text
 std/property v1: falsified
@@ -353,7 +354,8 @@ smallest: <show(smallest)>
 reason: <reason>
 ```
 
-Multiline show/reason text is included literally. Passed gives
+Multiline show/reason text is included literally, including a final LF supplied
+by the caller. The formatter itself appends none. Passed gives
 `std/property v1: passed; successes: <n>; discards: <d>`; GaveUp substitutes
 `gave up`; InvalidConfig gives `std/property v1: invalid config; <message>`.
 show runs exactly twice for Falsified, zero times otherwise. It is pure, but
@@ -521,7 +523,7 @@ ends with TwoSum normalization. The first omitted sine/cosine terms are below
 Here is a deliberately loose forward bound, rather than a claim of exact
 arithmetic for a pair. Put u=2^-53. In these recurrences the high operands and
 partial sums have magnitude <=2, normalized low parts have magnitude <=8u,
-and d is an exactly represented integer in [2,1560]. Split products cannot
+and d is an exactly represented integer in [2,1640]. Split products cannot
 overflow. A product residual that underflows contributes at most 2^-1074 per
 rounded operation. TwoSum is exact outside that case. In pair addition the
 only discarded errors are the rounding of at most three low terms; in pair
@@ -1051,3 +1053,172 @@ suites and temporary kernels are not substitutes for §7's implementation gates.
 These are coordinator design choices, not permission requests blocking this
 note. No deliberate source conflict remains. Section 9 records verification
 limits separately from the proposed implementation gates.
+
+## 11. Implementation evidence and remaining gate
+
+This section supersedes section 9's note-only evidence limits. Section 9 remains
+historical evidence, not a claim about the finished implementation. No interrupted
+worker changes were present at the start. All work and builds stayed in the lane;
+only assigned source/test paths and this note were committed. The Binaryen
+submodule was initialized using the coordinator's local mirror, without changing
+shared git configuration. The release compiler was built in this lane through
+the heavy wrapper (`cargo build -p ilang-cli --release --locked`, exit 0).
+
+### 11.1 Interpretation checks, independently of implementation checks
+
+| Decision | Controlling sentence and consequence |
+|---|---|
+| Ordinary pure generators and assertion adapter | P1: “make stores draw; sample calls it with max(0,size)”; P9: “The final fail is outside the per-case catch.” Pure fields and the caller's Assert are preserved. |
+| Structural shrinking and versioned replay | Coordinator ruling 1 and P8: “Guarantees require the same library version, generator code, captured values”. No numerical-decrease promise for map or cross-version guarantee. |
+| Dependent shrinking | P2: “sample with(a.value) on the same right and s”; discarded branches are pruned rather than promoting descendants. Tests check regenerated bounds and retained outer alternatives after inner shrinking. |
+| Greedy sequence and exhaustion | P4 integer child formula and P7: “At the first Fail, adopt that node/reason”; “limited=True whenever budget is exhausted”. Root 10 gives [0,5,8,9], then adopted 8 gives [0,4,6,7], then 6 gives [0,3,5]. Hence path [2,2] and nine checks, independently of running the implementation. |
+| String access/search | S1: “i<0 means n+i”; S2: “Require 0<=from<=n”; S3: “empty needle gives 0”; S5 names Pattern_White_Space. Expected Unicode indexes and review table results come from these rules, not generated snapshots. |
+| Remove alias and keep last split | Coordinator ruling 2: “drop partition (it equals the existing split_once)” and “under the name split_once_last”. The corrected inventory has 13 additions. |
+| Float result | Spec 11.3: “A Float is a finite IEEE 754 binary64 number. Results are rounded to the nearest value, with ties to even.” F1: “Interpret inputs as exact binary rationals”; F2–F4 supply bit signs, domains and axes. MPFR expectations use those real functions and the independent directed-rounding oracle. |
+| Replace the production math method | Coordinator ruling 3: “The exact-rational baseline of the note is rejected as the production method” and requires two levels. Section 4.3 now supplies the Float error argument and fixed-point enclosures. Hypot's changed search uses the same F8 exact-square midpoint comparison. |
+| Literal report text | P9: “Multiline show/reason text is included literally.” “Without a trailing LF” means the formatter adds none; it does not strip a caller-supplied final LF from reason. |
+| Keep failed feasibility visible | Coordinator ruling 4: “If a target cannot be met, do not relax the contract yourself”. F1 is unchanged; a bounded-error alternative needs a new decision. |
+
+`std/test/std3_interfaces.py` compares the compiler's shown types against each
+signature in sections 3.2, 4.1 and 5.2. All 49 new bindings match exactly,
+including argument labels and E/N effects; there are no inferred-interface
+differences beyond the explicit string correction. The inventories in those
+sections list the actual interfaces. Gen remains abstract; Tree, Config,
+BuildError, Verdict, Failure and Report expose the specified constructors. No
+new public compiler, ABI, runner, core or standard-service API was introduced.
+
+The independent review supplied the 331 input matrix, five searched midpoint
+inputs, six realizable hypot ties, four representative bit patterns and MPFR
+oracle methodology. The production implementation does not use its exact-rational
+kernel. The fixed-point prototype informed the interval representation; its
+one-input timing was not treated as a whole-library performance result.
+`float_oracle.py` regenerates expectations from MPFR functions, not the review's
+rational evaluation or i's formulas. It requires agreement of two directed
+endpoints before rounding to binary64. MPFR 4.2.2 was used; its exponent range
+comfortably covers the intermediate magnitudes here. Hypot ties are exact
+midpoints, for which both MPFR endpoints agree and binary64 ties-to-even applies.
+
+### 11.2 Executed checks
+
+All commands below run through `direnv exec /home/agent/Programming/i` from this
+lane, except that the quiet-window and heavy wrappers go before that prefix.
+
+| Command after the shell prefix | Result and interpretation |
+|---|---|
+| `target/release/i test --project std --opt 0` | 1,799 passed, 0 failed after the final source amendments were merged and lazy pi was installed. Includes 331 MPFR cases, 14 property tests, five string-addition tests and all existing tests. |
+| `target/release/i test --project std --opt 2` | 1,799 passed, 0 failed on the same sources. |
+| `target/release/i fmt --check std` | Exit 0. Generated vectors were formatted by their generator, not edited. |
+| `./scripts/old-syntax-check` | Exit 0: 1,194 extracted snippets, exact diagnostics, 19 future-track entries. No Std-3 exception was added or removed. The script sends its cargo build through the heavy wrapper. |
+| `python3 std/test/std3_interfaces.py` | 49/49 signatures match the corrected note exactly. |
+| `UPDATE=1 /tmp/review-std3/venv/bin/python std/test/float_oracle.py` | Generated 331 bit expectations with MPFR 4.2.2; the same command without UPDATE independently regenerated and compared equal. No Python math output is used as a transcendental oracle. |
+| `python3 std/test/float_hosts.py` | All 331 cases passed on native Wasmtime, Node v24.21.0 and WASI (Wasmtime CLI 49.0.2), at O0 and O2. The native compiler embeds Wasmtime 50. No browser run is claimed. |
+| `python3 std/test/property_failures.py` | At O0 and O2, intentionally returned exit 1: exactly one property assertion failure and three nonfinite-construction stops, before float library entry. The harness accepted those expected outcomes and exited 0. Its transient fixture was removed. |
+
+Public interface comparison is an interpretation check. The MPFR tests check
+implemented output bits independently. The copied classification module used by
+float_hosts adds a probe export only in build artifacts under target; it runs the
+same fast_sincos certificate and classifies interval demand. No public probe,
+mutable counter or hidden service is present in the production library.
+
+### 11.3 Failed and interrupted checks and environment accounting
+
+- Early `i check --project std --types` runs rejected author mistakes: an invalid
+  environment lookup spelling, the module import `list` colliding with the new
+  function `list`, and constructor patterns that did not use their declared
+  field labels. The adapter now uses an ordinary environment parameter, the
+  import is named lists, and labelled patterns follow spec 7.1. An exhaustive
+  match replaced a potentially failing Ok binding in the pure hypot body. No
+  compiler rejection required an API change or a Rust fix.
+- An initial `i test` invocation gave two positional filters; the CLI accepts
+  one. The corrected module invocations passed.
+- A new property-test run rejected an incorrectly ordered list.index_map
+  callback, and a later run failed one hand-written element-shrink expectation.
+  P4 says element shrinks its index: duplicate value at index 2 has children
+  at indices 0 and 1, giving ["first","second"], not two copies of "first".
+  The corrected test uses the source-prescribed integer child sequence; no
+  implementation or check was weakened. Fourteen property tests now pass.
+- The first interface comparison script accidentally read prose after a fenced
+  inventory and excluded digits from names such as atan2. Parsing just the
+  inventories and admitting name digits fixed the harness; all 49 comparisons
+  then passed without changing any library type.
+- The first cross-host harness used the unsupported Node flag --wasm-exnref
+  and exited 9. Node 24 already enables exnref by default. Removing that flag
+  made the same cases pass at both optimization levels; no engine setting was
+  changed or left behind.
+- The first quiet-window benchmark was interrupted while waiting for a slot,
+  before Python or any timing sample started, to serialize final verification
+  and measurement. It supplied no reported measurement. The final quiet run is
+  described below.
+- A directly executed Python syntax check for the development scripts passed.
+  Build artifacts, copied probes and logs remain only under ignored target/.
+  Transient intentionally failing and timing fixtures remove themselves in
+  finally. The lane submodule and release build are retained; no shared git
+  configuration, tool installation or other checkout was changed.
+
+Source discrepancies resolved: the original rational production method and
+partition alias disagree with coordinator rulings 3 and 2 respectively; sections
+4.3–4.4 and 5 now follow those rulings. The negative-index convention, correct
+rounding, same-version replay and finite-only Float contracts are retained.
+There is no remaining implementation interpretation conflict with spec 11.
+
+### 11.4 Float feasibility measurements: gate failed
+
+Command (exit 0, five repetitions, all three heavy slots held throughout):
+
+```text
+/home/agent/Programming/i/.rd/cache/quiet direnv exec /home/agent/Programming/i python3 std/test/float_gate.py
+```
+
+The script builds/runs at --opt 2 and compares with C libm compiled by the dev
+shell's cc at -O2 -fno-builtin. Native timing uses CLOCK_MONOTONIC around 100,000
+volatile function-pointer calls, five processes per input; unit conversions
+use the stated arithmetic wrapper. Native libm values are timing references,
+never numerical test oracles. No other checks from this lane ran concurrently.
+
+**Substitute measurement:** i's CLI timer has 1 ms resolution and includes new
+instance startup. Each sample below is whole-test elapsed divided by its stated
+batch size, including loop, checksum, GC and startup overhead; none is subtracted.
+These are batch means per call, not individually instrumented call latencies or
+a proof of a universal worst case. Median and worst range over five samples for
+each input in the group. The script retains all samples and batch sizes under
+ignored target/std3-gate/measurements.json and reproduces the table. The fixture
+is removed in finally. This substitute rejects practical feasibility by large
+margins; it cannot certify strict per-call bounds or fast-path 20x acceptance.
+
+| Input group | Inputs | Median batch mean/call | Worst batch mean/call | Native median/call | Interval calls / timed calls | Inputs taking intervals |
+|---|---:|---:|---:|---:|---:|---:|
+| Ordinary magnitudes 1e-6 through 1e6, all ten numerical operations, valid inverse domains | 66 | 0.84375 ms | 3.5625 ms | 8.496 ns | 1,568 / 6,912 (22.69%) | 49 / 66 (74.24%) |
+| 1e300 and max finite, each operation with a valid domain | 16 | 2.000 ms | 88.250 ms | 9.757 ns | 56 / 64 (87.50%) | 14 / 16 (87.50%) |
+| Minimum and largest subnormal | 20 | 0.50046 ms | 450.500 ms | 8.681 ns | 16 / 163,860 (0.0098%) | 8 / 20 (40.00%) |
+| Five searched sine midpoints, half-subnormal atan2 and one exact hypot midpoint | 7 | 20.250 ms | 70.500 ms | 90.137 ns | 21 / 23 (91.30%) | 6 / 7 (85.71%) |
+
+Batch sizes are 512 for ordinary fast-region sine/cosine and inverse endpoints,
+32 for other ordinary inputs, 16,384 for tiny fast shortcuts, two for other
+subnormals and the norm midpoint, four for huge/searched angles, and one for the
+hard atan2. Thus call-weighted and input-weighted slow shares differ markedly;
+the very small subnormal call share does not mean slow conversions are cheap.
+Exact-square hypot is not an interval-refinement call; its counts are separately
+available from float_hosts (7 ordinary, 2 huge, 2 subnormal, 1 hard input).
+
+The ordinary median of paired per-input slowdowns is 132,603x native libm,
+against the 20x target. This paired statistic is not the quotient of the table's
+two aggregate medians. For concrete inputs, sin(1) has median 1.34375 ms and
+worst 1.375 ms, versus native median 9.306 ns. sin(1e300) has median 79.500 ms
+and worst 81.250 ms, versus native median 91.154 ns. The largest huge batch is
+tan(max_finite), 88.250 ms; the largest overall is degrees(min_positive),
+450.500 ms. The worst ordinary batch is hypot(1,0.75), 3.5625 ms. Even the
+certified Float path sin(0.5) measures median 89.844 us (worst 119.141 us),
+versus native 9.201 ns, about 9,765x; fixed-point work alone does not explain
+the gap. Tiny sin(min_positive) measures 0.305 us including harness overhead;
+that estimate does not isolate the function body from the loop/checksum.
+
+**Escalation / coordinator question:** should a new design replace F1 with a
+deterministic algorithm with a proved error strictly below one ulp? The current
+candidate is correctly rounded on the independent vectors but fails both speed
+targets by the measurements above. A relaxed rounding contract alone has not
+been shown to reach 20x: even the measured Float fast path is about 9,765x at
+sin(0.5). No bounded-error replacement, new compiler optimization or host math
+import was implemented or authorized here. Property and all 13 string additions
+are complete. The float candidate remains available for review, with F1 kept;
+it must not be described as meeting the feasibility gate. General compiler
+performance work or a different math contract is outside this lane's ownership.
