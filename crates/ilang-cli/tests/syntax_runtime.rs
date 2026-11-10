@@ -393,3 +393,124 @@ exercise = () {
         );
     }
 }
+
+#[test]
+fn compiler_definition_service_returns_and_aborts_at_the_query() {
+    use ilang_host::syntax::{DefinitionAbort, DefinitionContext, DefinitionReply};
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("test")).unwrap();
+    std::fs::write(
+        dir.path().join("test/main.i"),
+        r#"
+(i/fail, syntax = i/syntax)
+@test
+answer = () -> Nil ^ syntax.SyntaxError ! Assert {
+  ! syntax.Definitions = syntax._definitions()
+  answer = syntax.definition(syntax._template(0))
+  assert(syntax.show(answer) == "(Box {(Box Int)})")
+  Nil
+}
+@test
+catchable = () -> Nil ! Assert {
+  ! syntax.Definitions = syntax._definitions()
+  query = syntax._template(1)
+  fail.catch(() { syntax.definition(query) }).{
+    Error(syntax.SyntaxError(message, at)) -> {
+      assert(message == "not visible")
+      assert(at == query)
+    }
+    Ok(_) -> panic("expected an error")
+  }
+  Nil
+}
+@test
+deferred = () -> Nil ! Assert {
+  ! syntax.Definitions = syntax._definitions()
+  fail.catch(() { syntax.definition(syntax._template(2)) })
+  Nil
+}
+@test
+compile_error = () -> Nil ! Assert {
+  ! syntax.Definitions = syntax._definitions()
+  fail.catch(() { syntax.definition(syntax._template(3)) })
+  Nil
+}
+"#,
+    )
+    .unwrap();
+    let parsed = parse("Box Hidden Waiting Missing (Box {(Box Int)})").unwrap();
+    let scope = Scope {
+        module: 9,
+        marks: BTreeSet::new(),
+    };
+    let templates: Arc<[Syntax]> = parsed
+        .iter()
+        .map(|d| Syntax::from_datum(d, &scope))
+        .collect::<Vec<_>>()
+        .into();
+    assert_eq!(templates[4].show(), "(Box {(Box Int)})");
+    for opt in [ilang_cli::Level::O0, ilang_cli::Level::O2] {
+        let built = ilang_cli::build(
+            dir.path(),
+            ilang_cli::BuildOptions {
+                tests: true,
+                opt,
+                offline: true,
+                target: ilang_cli::Target::Ilang,
+            },
+        )
+        .unwrap();
+        let program = built.host_program().unwrap();
+        for name in ["answer", "catchable", "deferred", "compile_error"] {
+            let answer = templates[4].clone();
+            let context = Arc::new(DefinitionContext::new(move |of| match of.show().as_str() {
+                "Box" => DefinitionReply::Answer(answer.clone()),
+                "Hidden" => DefinitionReply::Error {
+                    message: "not visible".into(),
+                    at: of.clone(),
+                },
+                "Waiting" => DefinitionReply::Deferred { at: of.clone() },
+                "Missing" => DefinitionReply::CompileError {
+                    message: "not found".into(),
+                    at: of.clone(),
+                },
+                _ => panic!("unexpected query"),
+            }));
+            let mut options = ilang_cli::standard_options();
+            ilang_host::syntax::install_with_context(
+                &mut options.imports,
+                templates.clone(),
+                Some(context.clone()),
+            )
+            .unwrap();
+            options
+                .imports
+                .grant_package(&built.binding_plan, &built.trusted_package);
+            let result = program.run_test_with(&format!("app/main.{name}"), options);
+            match name {
+                "answer" | "catchable" => {
+                    assert!(
+                        matches!(result, ilang_host::TestResult::Passed),
+                        "{result:?}"
+                    );
+                    assert!(context.take_abort().is_none());
+                }
+                "deferred" => {
+                    assert!(!matches!(result, ilang_host::TestResult::Passed));
+                    assert!(
+                        matches!(context.take_abort(), Some(DefinitionAbort::Deferred { at }) if at.show() == "Waiting")
+                    );
+                }
+                "compile_error" => {
+                    assert!(!matches!(result, ilang_host::TestResult::Passed));
+                    assert!(
+                        matches!(context.take_abort(), Some(DefinitionAbort::CompileError { message, at }) if message == "not found" && at.show() == "Missing")
+                    );
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+}

@@ -23,6 +23,7 @@
 	_match_ok
 	_match_one
 	_match_many
+	_definitions
 )
 
 Syntax {}
@@ -34,6 +35,8 @@ SyntaxResult {}
 TextResult {}
 
 MatchResult {}
+
+DefinitionResult {}
 
 Node {
 	Name(String)
@@ -85,6 +88,37 @@ definition = (
 	of: Syntax
 	service ! Definitions
 ) -> Syntax ^ SyntaxError ! Definitions { service.definition(of) }
+
+@external("i:compiler/syntax/v1", "definition")
+raw_definition: (Syntax) -> DefinitionResult
+
+@external("i:compiler/syntax/v1", "definition_ok")
+raw_definition_ok: (DefinitionResult) -> Bool
+
+@external("i:compiler/syntax/v1", "definition_value")
+raw_definition_value: (DefinitionResult) -> Syntax
+
+@external("i:compiler/syntax/v1", "definition_message")
+raw_definition_message: (DefinitionResult) -> String
+
+@external("i:compiler/syntax/v1", "definition_at")
+raw_definition_at: (DefinitionResult) -> Syntax
+
+/// Constructs the compiler's definition service for one macro run.
+_definitions = () -> Definitions {
+	Definitions((of) -> Syntax ^ SyntaxError {
+		result = raw_definition(of)
+		raw_definition_ok(result).{
+			True -> raw_definition_value(result)
+			False -> fail.raise(
+				SyntaxError(
+					raw_definition_message(result)
+					raw_definition_at(result)
+				)
+			)
+		}
+	})
+}
 
 @external("i:compiler/syntax/v1", "match")
 _match: (Syntax, Syntax) -> MatchResult
