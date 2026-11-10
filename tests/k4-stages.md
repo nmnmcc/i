@@ -581,3 +581,26 @@ owned implementation paths and are unchanged here. The coordinator/Std-2
 owner must promote them after integration. No other source work is left in
 this lane. The final commit contains only generated expectations and is
 named “Regenerate derived files.”
+
+
+## QA integration follow-up
+
+Started with a clean lane at 9695b32a and retained all K4 work. Redesign
+d655684b (QA) merged cleanly as 60ab7b64. Its 1,855-project corpus is the
+permanent home of review inputs; the former K4 fixture directory and runners
+are consolidated into it. This follow-up is authorized to change the QA
+registry, requirements and tooling as well as K4's existing owned paths.
+
+The initial full corpus comparison intentionally used the saved expectations
+and failed on changed outputs and unexpected passes. Its differences are
+retained under target/k4d-checks/qa-initial-differences.json. The first real
+non-K4 regression was review-t1/error_rows: subtracting a previously handled
+scalar literal from an error-row variable recorded a service equality between
+“a” and “b”. Solver::handle now skips scalar same-form obligations for Mode::Row
+while retaining them for Mode::Env. Source: §4.4 says scalar difference removes
+values; §4.5 rule 8 says scalar subtype follows value-set inclusion, and the
+F2 amendment explicitly retains rule 8 for E <: F. Named service forms still
+retain their argument-equality obligation. The unchanged T1 fixture passes
+check/types and run at both optimization levels, and coalescing, generic-service
+and row-scheme tests pass (qa-error-row-fix.log). Temporary backtrace tracing
+was removed before the successful checks.

@@ -551,6 +551,11 @@ impl Solver {
     /// Store it there, so generalizing a member cannot lose a restriction
     /// that was reached only through a reverse inclusion link.
     fn handle(&mut self, v: V, h: &Ty) {
+        // Error-row scalar subtraction removes values (§4.4, §4.5 rule 8).
+        // It does not install a service with an equal value set.
+        if self.var(v).row == Mode::Row && h.scalar().is_some() {
+            return;
+        }
         // There is nothing to retain for a constructor with just one form.
         if matches!(h, Ty::Con(_, values, args) if values.is_all() && args.is_empty())
             && h.scalar().is_none()
