@@ -15,20 +15,8 @@
 	same_code
 	show
 	show_as
-	_template
-	_rebuild
-	_append
-	MatchResult
-	_match
-	_match_ok
-	_match_one
-	_match_many
-	_definitions
-	_report_error
 	Items(..)
-	_items
 	Diagnostics(..)
-	_diagnostics
 )
 
 Syntax {}
