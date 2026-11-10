@@ -708,3 +708,84 @@ fn fixed_type_identity_never_falls_back_to_a_same_named_alias() {
         graph.sources.render_all(&checked.diags)
     );
 }
+
+#[test]
+fn builtin_constructor_identity_bypasses_caller_constructor_shadow() {
+    use ilang_syntax::lisp::syntax::ScopeIdentity;
+    let (mut graph, _, _) = common::check_files(&[("src/main.i", "Option { Ok }\nf = () { 0 }\n")]);
+    let (mut parsed, errors) = ilang_check::parse(&graph);
+    assert!(errors.is_empty());
+    let caller = parsed
+        .iter()
+        .find(|p| p.path == "app/main")
+        .unwrap()
+        .source
+        .0;
+    let root = syntax("(Ok 1)", caller, &[]);
+    let Node::Round(parts) = root.node() else {
+        panic!("call")
+    };
+    let builtin = parts[0].with_scope_identity(ScopeIdentity::Builtin { name: "Ok".into() });
+    let root = root.replace_children(vec![builtin, parts[1].clone()]);
+    let module = parsed.iter_mut().find(|p| p.source.0 == caller).unwrap();
+    let mut scoped = ScopedSource::new(graph.sources.get(module.source).text.clone());
+    let expr = scoped.expression(&root, &syntax("f", caller, &[])).unwrap();
+    let ItemKind::Binding(binding) = &mut module.ast.items[1].kind else {
+        panic!("binding")
+    };
+    let ExprKind::Fn(function) = &mut binding.value.kind else {
+        panic!("function")
+    };
+    function.body.stmts[0] = Stmt::Expr(expr);
+    graph
+        .sources
+        .set_text(module.source, scoped.text().to_owned());
+    module.scoped = Some(scoped);
+    let checked = ilang_check::check_parsed(&graph, &parsed);
+    assert!(
+        !checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn same_text_type_parameters_in_distinct_scopes_are_distinct() {
+    let (mut graph, mut parsed, caller, template) = setup();
+    let root = syntax("(= (Box A A) (, A A))", template, &[7]);
+    let Node::Round(parts) = root.node() else {
+        panic!("definition")
+    };
+    let Node::Round(head) = parts[1].node() else {
+        panic!("head")
+    };
+    let head = parts[1].replace_children(vec![
+        head[0].clone(),
+        head[1].clone(),
+        syntax("A", caller, &[]),
+    ]);
+    let Node::Round(body) = parts[2].node() else {
+        panic!("body")
+    };
+    let body = parts[2].replace_children(vec![
+        body[0].clone(),
+        body[1].clone(),
+        syntax("A", caller, &[]),
+    ]);
+    let root = root.replace_children(vec![parts[0].clone(), head, body]);
+    append_items(&mut graph, &mut parsed, caller, &[root]);
+    let checked = ilang_check::check_parsed(&graph, &parsed);
+    assert!(
+        !checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    let program = checked.program.unwrap();
+    let ty = program
+        .types
+        .iter()
+        .find(|t| t.name == "Box" && t.module == common::module(&program, "app/main"))
+        .unwrap();
+    assert_eq!(ty.params.len(), 2);
+    assert_ne!(ty.params[0].1, ty.params[1].1);
+}
