@@ -744,3 +744,102 @@ fn alias_pattern_query_preserves_the_written_definition() {
     assert!(head[2].scope_identity().is_none());
     assert!(result.show_as(Position::Item).unwrap().contains("value"));
 }
+
+#[test]
+fn definition_table_distinguishes_waits_catchable_and_compile_errors() {
+    use ilang_syntax::lisp::definition_schedule::Mode;
+    use ilang_syntax::lisp::definition_table::{Definition, DefinitionTable, Lookup, QueryResult};
+    let mut table = DefinitionTable::default();
+    let source = "Box(A) { Box(A) }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty());
+    let of = root("Box");
+    table.insert(
+        1,
+        Definition::Written {
+            item: Box::new(module.items[0].clone()),
+            source: source.into(),
+            scope: of.scope().clone(),
+            ready: false,
+        },
+    );
+    table.insert(2, Definition::Builtin { name: "Int".into() });
+    table.insert(
+        3,
+        Definition::Builtin {
+            name: "Result".into(),
+        },
+    );
+    assert!(matches!(
+        table.query(&of, Mode::Normal, 5, |_, _| Lookup::Found(1)),
+        QueryResult::Deferred { .. }
+    ));
+    table.set_ready(&1, true);
+    assert!(matches!(
+        table.query(&of, Mode::Normal, 6, |_, _| Lookup::Found(1)),
+        QueryResult::Answer { key: 1, .. }
+    ));
+    assert!(matches!(
+        table.query(&root("Int"), Mode::Normal, 7, |_, _| Lookup::Found(2)),
+        QueryResult::Error(_)
+    ));
+    assert!(matches!(
+        table.query(&root("Result"), Mode::Normal, 8, |_, _| Lookup::Found(3)),
+        QueryResult::Answer { key: 3, .. }
+    ));
+    assert!(matches!(
+        table.query(&of, Mode::Normal, 9, |_, _| Lookup::TypeParameter),
+        QueryResult::Error(_)
+    ));
+    assert!(matches!(
+        table.query(&of, Mode::Normal, 10, |_, _| Lookup::ConstructorsHidden),
+        QueryResult::Error(_)
+    ));
+    assert!(matches!(
+        table.query(&of, Mode::Normal, 11, |_, _| Lookup::Missing),
+        QueryResult::CompileError(_)
+    ));
+    assert!(matches!(
+        table.query(&root("1"), Mode::Normal, 12, |_, _| Lookup::Found(1)),
+        QueryResult::Error(_)
+    ));
+}
+
+#[test]
+fn definition_table_keeps_scopes_from_expanded_type_items() {
+    use ilang_syntax::lisp::definition_schedule::Mode;
+    use ilang_syntax::lisp::definition_table::{Definition, DefinitionTable, Lookup, QueryResult};
+    use ilang_syntax::lisp::definitions::builtin_definition;
+    use ilang_syntax::lisp::syntax::{Node, ScopeIdentity};
+    let like = root("Result").flip_mark(11);
+    let syntax = builtin_definition("Result", like.scope(), like.span(), 1).unwrap();
+    let mut table = DefinitionTable::default();
+    table.insert(
+        1,
+        Definition::Expanded {
+            syntax,
+            parameter_answer: Some(1),
+            ready: true,
+        },
+    );
+    let QueryResult::Answer { syntax, .. } =
+        table.query(&like, Mode::Normal, 2, |_, _| Lookup::Found(1))
+    else {
+        panic!("expected answer")
+    };
+    let Node::Round(parts) = syntax.node() else {
+        panic!("item")
+    };
+    let Node::Round(head) = parts[0].node() else {
+        panic!("head")
+    };
+    assert!(head[1].scope().marks.contains(&11));
+    assert!(matches!(
+        head[1].scope_identity(),
+        Some(ScopeIdentity::DefinitionParameter {
+            answer: 2,
+            parameter: 0,
+            ..
+        })
+    ));
+}

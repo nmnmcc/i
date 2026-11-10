@@ -178,6 +178,16 @@ impl Syntax {
     pub fn scope_identity(&self) -> Option<&ScopeIdentity> {
         self.0.identity.as_ref()
     }
+    /// Whether a made name remains compatible with a compiler-owned identity.
+    /// A false result is a compile error, not a catchable SyntaxError.
+    pub fn valid_scope_identity(&self) -> bool {
+        match (self.provenance(), self.scope_identity(), self.node()) {
+            (Provenance::Made { .. }, Some(identity), Node::Name(name) | Node::Up(name)) => {
+                name == identity.name()
+            }
+            _ => true,
+        }
+    }
     /// Assign the query identity of a name in a compiler-provided answer.
     pub fn with_scope_identity(&self, identity: ScopeIdentity) -> Self {
         let name = match self.node() {
@@ -583,10 +593,7 @@ pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), S
     }
     let mut used = HashSet::new();
     descend(result, &mut |s| {
-        if let (Provenance::Made { .. }, Some(identity), Node::Name(name) | Node::Up(name)) =
-            (s.provenance(), s.scope_identity(), s.node())
-            && name != identity.name()
-        {
+        if !s.valid_scope_identity() {
             return Err(s.error("a made name cannot change a compiler-provided name identity"));
         }
         if matches!(

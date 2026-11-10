@@ -11,6 +11,7 @@ use num_bigint::BigUint;
 
 mod comments;
 pub mod definition_schedule;
+pub mod definition_table;
 pub mod definitions;
 mod encode;
 pub mod expansion;
