@@ -16,6 +16,46 @@ struct Link {
 struct SyntaxResult(Result<Syntax, String>);
 struct TextResult(Result<String, (String, Syntax)>);
 struct MatchResult(Option<Vec<Capture>>);
+struct DefinitionResult(Result<Syntax, (String, Syntax)>);
+
+/// A compiler definition resolver's answer or control outcome.
+#[derive(Clone, Debug)]
+pub enum DefinitionReply {
+    Answer(Syntax),
+    Error { message: String, at: Syntax },
+    Deferred { at: Syntax },
+    CompileError { message: String, at: Syntax },
+}
+
+/// An uncatchable query outcome observed after the macro instance stops.
+#[derive(Clone, Debug)]
+pub enum DefinitionAbort {
+    Deferred { at: Syntax },
+    CompileError { message: String, at: Syntax },
+}
+
+type DefinitionCallback = dyn Fn(&Syntax) -> DefinitionReply + Send + Sync;
+
+/// The resolver and uncatchable outcome for one fresh macro instance.
+pub struct DefinitionContext {
+    callback: Arc<DefinitionCallback>,
+    abort: Mutex<Option<DefinitionAbort>>,
+}
+
+impl DefinitionContext {
+    pub fn new(callback: impl Fn(&Syntax) -> DefinitionReply + Send + Sync + 'static) -> Self {
+        Self {
+            callback: Arc::new(callback),
+            abort: Mutex::new(None),
+        }
+    }
+    pub fn take_abort(&self) -> Option<DefinitionAbort> {
+        self.abort
+            .lock()
+            .expect("definition context lock poisoned")
+            .take()
+    }
+}
 
 fn opaque<T: Send + Sync + 'static>(value: T) -> Value {
     Value::Externref(HostReference::new(value))
@@ -150,6 +190,32 @@ fn invoke(name: &str, args: &[Value]) -> Result<Value> {
             _ => bail!("syntax node is not a bracket"),
         },
         ("child", [value, index]) => Ok(encode(child(get(value)?, number(index)?)?.clone())),
+        ("definition_ok", [result]) => Ok(Value::Bool(get::<DefinitionResult>(result)?.0.is_ok())),
+        ("definition_value", [result]) => Ok(encode(
+            get::<DefinitionResult>(result)?
+                .0
+                .as_ref()
+                .expect("definition result is an error")
+                .clone(),
+        )),
+        ("definition_message", [result]) => Ok(Value::String(
+            get::<DefinitionResult>(result)?
+                .0
+                .as_ref()
+                .err()
+                .expect("definition result is not an error")
+                .0
+                .clone(),
+        )),
+        ("definition_at", [result]) => Ok(encode(
+            get::<DefinitionResult>(result)?
+                .0
+                .as_ref()
+                .err()
+                .expect("definition result is not an error")
+                .1
+                .clone(),
+        )),
         ("match", [pattern, value]) => {
             let result = get::<Syntax>(pattern)?
                 .match_quote(get(value)?)
@@ -324,6 +390,15 @@ pub fn install(imports: &mut HostImports) -> Result<()> {
 
 /// Install syntax operations with the templates belonging to this instance.
 pub fn install_with_templates(imports: &mut HostImports, templates: Arc<[Syntax]>) -> Result<()> {
+    install_with_context(imports, templates, None)
+}
+
+/// Install syntax operations and an optional per-instance definition resolver.
+pub fn install_with_context(
+    imports: &mut HostImports,
+    templates: Arc<[Syntax]>,
+    definition: Option<Arc<DefinitionContext>>,
+) -> Result<()> {
     const NAMES: &[&str] = &[
         "kind",
         "text",
@@ -339,6 +414,10 @@ pub fn install_with_templates(imports: &mut HostImports, templates: Arc<[Syntax]
         "match_one",
         "match_many_len",
         "match_many_child",
+        "definition_ok",
+        "definition_value",
+        "definition_message",
+        "definition_at",
         "make_text",
         "make_int",
         "make_float",
@@ -358,6 +437,36 @@ pub fn install_with_templates(imports: &mut HostImports, templates: Arc<[Syntax]
     for &name in NAMES {
         imports.external("i:compiler/syntax/v1", name, move |args| invoke(name, args))?;
     }
+    imports.external("i:compiler/syntax/v1", "definition", move |args| {
+        let [value] = args else {
+            bail!("definition resolver expects one syntax value")
+        };
+        let context = definition
+            .as_ref()
+            .expect("compiler instance has no definition resolver");
+        match (context.callback)(get::<Syntax>(value)?) {
+            DefinitionReply::Answer(value) => Ok(opaque(DefinitionResult(Ok(value)))),
+            DefinitionReply::Error { message, at } => {
+                Ok(opaque(DefinitionResult(Err((message, at)))))
+            }
+            DefinitionReply::Deferred { at } => {
+                *context
+                    .abort
+                    .lock()
+                    .expect("definition context lock poisoned") =
+                    Some(DefinitionAbort::Deferred { at });
+                bail!("definition query deferred")
+            }
+            DefinitionReply::CompileError { message, at } => {
+                *context
+                    .abort
+                    .lock()
+                    .expect("definition context lock poisoned") =
+                    Some(DefinitionAbort::CompileError { message, at });
+                bail!("definition query produced a compile error")
+            }
+        }
+    })?;
     imports.external("i:compiler/syntax/v1", "template", move |args| {
         let [index] = args else {
             bail!("syntax template expects one index")
