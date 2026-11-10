@@ -1916,10 +1916,14 @@ loop = (state: State) -> RunReply {
 						False -> Nil
 					}
 					polled = s.current |> {
-						Present(_) -> s
-						Absent -> apply_run_control(
+						Present(_) ? work == [] -> s
+						_ -> apply_run_control(
 							s
-							runner.poll(s.run, work, core.not(s.ready == []))
+							runner.poll(
+								s.run
+								work
+								s.current != Absent || core.not(s.ready == [])
+							)
 						)
 					}
 

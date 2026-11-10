@@ -201,3 +201,12 @@ The r2:gates/v1 service starts controlled requests. r2:control/v1 releases
 selected producers and checks cancellation before returning to the guest.
 See tests/r2-stages.md for the source requirements and tests/r2-interface.md
 for the public-interface audit. No test timer chooses a completion order.
+
+## r2-laws/
+
+The generator in crates/ilang-cli/tests/r2_fixtures.rs reads the runnable spec
+cases of §§9.9/9.11, preserving their hand-authored expectations. It bundles
+those bodies into O0/O2 host-export modules for Node and browser execution.
+Only temporary sources get entry wrappers and distinct test-host namespaces;
+the original spec cases still run through the Rust spec harness unchanged.
+`bash scripts/build-abi-fixture.sh` regenerates the modules, plans and case list.

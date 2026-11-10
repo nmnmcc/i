@@ -1638,5 +1638,11 @@
   },
   "crates/ilang-package/tests/manifest.rs:f09186ea668f8c28": {
     "not_source": "TOML manifest for the future JP provider plan; R2 explicitly rejects it"
+  },
+  "crates/ilang-cli/tests/r2_fixtures.rs:7d393432eb121ee8": {
+    "not_source": "TOML manifest assembled for the R2 conformance bundle, not i code"
+  },
+  "tests/browser/r2-laws.mjs:e3c0158bcdafc3f6": {
+    "not_source": "JavaScript diagnostic text about case/export coverage, not an i case expression"
   }
 }

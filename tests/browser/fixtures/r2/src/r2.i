@@ -13,6 +13,7 @@
 	Gates
 	Control
 	unlisted_answer
+	go_progress
 	overlap
 	cancel_owned
 	cancel_borrowed
@@ -64,6 +65,18 @@ unlisted_answer = (gates ! Gates, control ! Control) {
 		value = task.join(first)
 		assert(request.state(b) == request.Ready(2))
 		value + request.await_owned(b)
+	})
+}
+
+// §6.4: go keeps the parent turn but polls an existing IO interest.
+go_progress = (gates ! Gates, control ! Control) {
+	task.scope((s) {
+		waiter = task.go(s, () { request.await_owned(gates.wait(10)) })
+		task.yield()
+		control.release(10)
+		task.go(s, () { Nil })
+		control.check(5)
+		task.join(waiter)
 	})
 }
 

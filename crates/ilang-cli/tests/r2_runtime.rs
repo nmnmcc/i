@@ -102,7 +102,7 @@ fn gate_imports(built: &ilang_cli::Built, state: Arc<Mutex<GateState>>) -> HostI
             let index = state.gates.len();
             state.gates.push(GateRecord {
                 id,
-                ready: id == 9,
+                ready: false,
                 polls: 0,
                 completed: false,
                 dropped: false,
@@ -121,11 +121,16 @@ fn gate_imports(built: &ilang_cli::Built, state: Arc<Mutex<GateState>>) -> HostI
             assert!(context.is_live());
             let id = number(args);
             let mut state = releasing.lock().unwrap();
-            assert_eq!(
-                state.gates.iter().map(|g| g.id).collect::<Vec<_>>(),
-                [1, 2],
-                "both operations must start before release"
-            );
+            if id == 10 {
+                assert_eq!(state.gates.iter().map(|g| g.id).collect::<Vec<_>>(), [10]);
+                assert!(state.gates[0].polls > 0 && !state.gates[0].completed);
+            } else {
+                assert_eq!(
+                    state.gates.iter().map(|g| g.id).collect::<Vec<_>>(),
+                    [1, 2],
+                    "both operations must start before release"
+                );
+            }
             for gate in &mut state.gates {
                 if id == 0 || id == gate.id {
                     gate.ready = true;
@@ -154,6 +159,10 @@ fn gate_imports(built: &ilang_cli::Built, state: Arc<Mutex<GateState>>) -> HostI
                 4 => assert_eq!(
                     first.polls, 0,
                     "raw-only runnable tasks do not authorize polls"
+                ),
+                5 => assert!(
+                    first.completed,
+                    "go must deliver an existing ready IO interest before returning"
                 ),
                 phase => panic!("unknown phase {phase}"),
             }
@@ -192,6 +201,7 @@ fn completion_gates_and_root_accounting_on_the_rust_host() {
             for name in [
                 "overlap",
                 "unlisted_answer",
+                "go_progress",
                 "cancel_owned",
                 "cancel_borrowed",
                 "race_read",
@@ -204,12 +214,32 @@ fn completion_gates_and_root_accounting_on_the_rust_host() {
                 let mut instance = program
                     .instantiate(HostOptions::new(gate_imports(&built, state.clone())))
                     .unwrap();
-                let outcome =
-                    block_on(instance.call_async(&format!("app/r2.{name}"), &[])).unwrap();
+                let entry = format!("app/r2.{name}");
+                let mut invocation = Box::pin(instance.call_async(&entry, &[]));
+                let outcome = block_on(std::future::poll_fn(|cx| {
+                    let answer = invocation.as_mut().poll(cx);
+                    if answer.is_pending() {
+                        let mut gates = state.lock().unwrap();
+                        for gate in &mut gates.gates {
+                            // The explicit host release is after a real Pending
+                            // producer poll, never an elapsed-time decision.
+                            if gate.id == 9 && gate.polls > 0 && !gate.ready {
+                                gate.ready = true;
+                                if let Some(waker) = gate.waker.take() {
+                                    waker.wake();
+                                }
+                                cx.waker().wake_by_ref();
+                            }
+                        }
+                    }
+                    answer
+                }))
+                .unwrap();
                 match name {
                     "overlap" | "unlisted_answer" => expect_int(outcome, 3),
                     "race_read" => expect_int(outcome, 2),
                     "nested_interest" => expect_int(outcome, 9),
+                    "go_progress" => expect_int(outcome, 10),
                     "raw_only" => expect_int(outcome, 7),
                     "owned_idle" | "unrelated_idle" => {
                         let Outcome::Stop(stop) = outcome else {
@@ -237,7 +267,7 @@ fn completion_gates_and_root_accounting_on_the_rust_host() {
                         .all(|g| g.dropped && !g.context.is_live())
                 );
                 if name == "owned_idle" {
-                    assert_eq!(state.gates[0].polls, 1);
+                    assert_eq!(state.gates[0].polls, 2);
                 }
                 if name == "unrelated_idle" {
                     assert_eq!(state.gates[0].polls, 0);

@@ -13,7 +13,7 @@ test("R2 completion gates, ownership, quiescence and 200 seeded replays at O0/O2
   for (const level of [0, 2]) {
     const { bytes, plan } = await load(level);
     const result = await checkR2(sdk, bytes, plan);
-    assert.equal(result.results.length, 9);
+    assert.equal(result.results.length, 10);
     if (previous) assert.equal(result.expected, previous.expected);
     previous = result;
   }
@@ -32,5 +32,15 @@ test("pure task switches finish without a host macrotask", async () => {
     try { assert.equal(await value.callAsync("app/r2.pure_tasks"), 7n); }
     finally { globalThis.setImmediate = original; }
     assert.equal(calls, 0);
+  }
+});
+
+test("every runnable R2 spec body passes on Node at O0/O2", { timeout: 120_000 }, async () => {
+  const { default: cases } = await import("../../../tests/browser/fixtures/r2-laws/cases.mjs");
+  const { checkR2Laws } = await import("../../../tests/browser/r2-laws.mjs");
+  for (const level of [0, 2]) {
+    const bytes = await readFile(new URL(`../../../tests/browser/fixtures/r2-laws/laws-o${level}.wasm`, import.meta.url));
+    const plan = JSON.parse(await readFile(new URL(`../../../tests/browser/fixtures/r2-laws/laws-o${level}.bindings.json`, import.meta.url), "utf8"));
+    assert.equal(await checkR2Laws(sdk, bytes, plan, cases), cases.length);
   }
 });
