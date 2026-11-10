@@ -370,6 +370,9 @@ impl<'a> Resolver<'a> {
                 }
             }
         }
+        conflicts.sort_by(|a, b| {
+            (a.0.0, a.2.start, a.2.end, &a.1).cmp(&(b.0.0, b.2.start, b.2.end, &b.1))
+        });
         for (m, name, span) in conflicts {
             self.cur = m;
             self.error(
