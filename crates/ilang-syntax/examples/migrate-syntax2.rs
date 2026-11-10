@@ -324,6 +324,20 @@ fn migrate(src: &str) -> Value {
     for (start, end, repl) in g.edits.iter().rev() {
         out.replace_range(*start..*end, repl)
     }
+    if g.empty.is_empty() {
+        let (after, after_diags) = ilang_syntax::parse_module(&out);
+        if !after_diags.is_empty() {
+            return json!({"diagnostics": after_diags.iter().map(|d| format!("migrated source: {}: {}", d.code.as_str(), d.message)).collect::<Vec<_>>()});
+        }
+        let mut before = m.clone();
+        for item in &mut before.items {
+            item.attributes
+                .retain(|a| a.module.is_some() || a.name.name != "main");
+        }
+        if ilang_syntax::shape::canon(&before) != ilang_syntax::shape::canon(&after) {
+            return json!({"diagnostics": ["migrated source changes the syntax tree"]});
+        }
+    }
     let names: Vec<_> = lex(&out)
         .tokens
         .into_iter()
