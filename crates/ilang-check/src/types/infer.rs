@@ -1663,6 +1663,25 @@ impl<'a> Checker<'a> {
                 }
             }
         }
+        // §2.4/§6.7: selection takes apart this constructor's value.
+        if let Some((c, _)) = ctors.iter().find(|(c, _)| {
+            let ty = self.p.ty(c.ty);
+            ty.module != self.module && !ty.constructors_exported
+        }) {
+            let ty = self.p.ty(c.ty);
+            self.error(
+                code::NOT_EXPORTED,
+                name.span,
+                format!(
+                    "cannot select field `{}`: the constructors of `{}` are not exported from `{}` (§2.4, §6.7)",
+                    name.name,
+                    ty.name,
+                    self.p.module(ty.module).path
+                ),
+            );
+            // Keep the ordinary field type and access metadata for error
+            // recovery. The diagnostic still rejects the program.
+        }
         let mut found: Vec<(CtorRef, u32)> = Vec::new();
         for (c, _) in &ctors {
             let TypeBody::Custom(cs) = &self.p.ty(c.ty).body else {

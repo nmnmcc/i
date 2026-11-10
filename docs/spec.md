@@ -225,7 +225,7 @@ ExportItem = name | UpName [ "(" ".." ")" ] .
 ```
 
 - A top-level name that is not in the exports may only be used in its module.
-- `T` exports the type `T` but not its constructors. Other modules may use the type, but they may not make or take apart its values. `T(..)` exports the type and all its constructors.
+- `T` exports the type `T` but not its constructors. Other modules may use the type, but they may not make or take apart its values, including by field selection or constructor update (§6.7). `T(..)` exports the type and all its constructors.
 - Every exported name must be defined in this module.
 - If the type of an exported definition uses a type defined in this module, that type must be exported too. If not, it is a compile error.
 
@@ -665,6 +665,8 @@ The type of `[e1, …, en]` is `List(T)`, where every part has the type `T`. `T`
 ### 6.7 Constructors and fields
 
 `C(a1, …, an)` makes a value. It is a call (§6.6); the labels are the field labels.
+
+Selecting a field of a nominal value requires the same constructor visibility as taking it apart by a constructor pattern (§2.4). Exporting `T` without its constructors permits neither field selection nor constructor update outside its module. Structural record fields retain their own rules.
 
 `v.f` gets the field with the label `f` from the value `v`. The constructors that **may have made** `v` are the one constructor that `v` is known to be made by (§7.5), when there is one. If not, every member of the known type of `v` (§4.8) must be a custom type, and they are all the constructors of these types. Each of them must have a field with the label `f`, but it may be in any position and of any type (§4.8 rule 13). So, as in TypeScript, `v.f` is correct on a union when every member has the field, and its type is the union of the field types.
 
