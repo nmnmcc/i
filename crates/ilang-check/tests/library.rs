@@ -58,15 +58,7 @@ fn library_modules_have_sources() {
 /// documentation comment: no imports, no exports and no items.
 #[test]
 fn reserved_modules_are_placeholders() {
-    for path in [
-        "i/task",
-        "i/clock",
-        "i/random",
-        "i/fs",
-        "i/process",
-        "i/net",
-        "i/stdio",
-    ] {
+    for path in RESERVED {
         let (_, text) = ilang_package::library::MODULES
             .iter()
             .find(|(p, _)| *p == path)
@@ -80,7 +72,7 @@ fn reserved_modules_are_placeholders() {
     }
 }
 
-/// The exported names of each library module, as in §9.3–§9.6 and §13.
+/// The exported names of each library module, as in §9.3–§9.6, §9.10 and §13.
 #[test]
 fn library_names() {
     let (_, program, _) = common::check_files(&[]);
@@ -128,7 +120,10 @@ fn library_names() {
         ("i/io", &[]),
         ("i/task", &[]),
         ("i/clock", &[]),
-        ("i/random", &[]),
+        (
+            "i/random",
+            &["from_seed", "word", "int", "float", "split", "at_path"],
+        ),
         ("i/fs", &[]),
         ("i/process", &[]),
         ("i/net", &[]),
@@ -168,6 +163,12 @@ fn library_names() {
         ("i/fail", "from_result"),
         ("i/fail", "map_error"),
         ("i/prelude", "assert"),
+        ("i/random", "from_seed"),
+        ("i/random", "word"),
+        ("i/random", "int"),
+        ("i/random", "float"),
+        ("i/random", "split"),
+        ("i/random", "at_path"),
     ] {
         let d = common::def(&program, path, name);
         assert!(matches!(d.kind, DefKind::Binding { .. }), "{path}.{name}");
@@ -243,21 +244,11 @@ fn hello_example_checks() {
     assert!(checked.program.is_some() && checked.types.is_some());
 }
 
-const RESERVED: [&str; 7] = [
-    "i/task",
-    "i/clock",
-    "i/random",
-    "i/fs",
-    "i/process",
-    "i/net",
-    "i/stdio",
-];
+const RESERVED: [&str; 6] = ["i/task", "i/clock", "i/fs", "i/process", "i/net", "i/stdio"];
 
 /// User code imports every reserved module with no problems.
 ///
-/// Known gap: docs/spec.md (§0, §2.1, §12) still names only the six library
-/// modules. The spec text for the reserved modules belongs to later tracks
-/// (IO and R), so this test runs ahead of the spec until they land.
+/// The paths in RESERVED are explicitly kept as empty modules (§0, §2.1).
 #[test]
 fn reserved_modules_import_cleanly() {
     let imports: String = RESERVED.iter().map(|p| format!("  {p}\n")).collect();
