@@ -3,14 +3,10 @@ mod common;
 
 use ilang_check::hir::*;
 
-fn checked(src: &str) -> (ilang_package::PackageGraph, ilang_check::Checked) {
+fn checked(src: &str, unused: &[&str]) -> (ilang_package::PackageGraph, ilang_check::Checked) {
     let (graph, _, _) = common::check_files(&[("src/main.i", src)]);
     let checked = ilang_check::check(&graph);
-    assert!(
-        checked.diags.is_empty(),
-        "{:?}",
-        graph.sources.render_all(&checked.diags)
-    );
+    common::expect_unused(&checked.diags, unused);
     (graph, checked)
 }
 
@@ -21,6 +17,7 @@ fn declared_frames_hide_outer_variables_and_generalize() {
     let (_, c) = checked(
         "outer(A) = (x: A) { inner(A) = (y: A) { y }
  (inner(1), inner(True), x) }\nnested(A) = (x: A) { inner(B) = (y: B, z: A) { (y, z) }  inner(1, x) }\nid(A) = (x: A) { y: A = x  y }\nuses = () { (id(1), id(True)) }",
+        &["outer", "nested", "id", "uses"],
     );
     let p = c.program.as_ref().unwrap();
     let m = p.module(common::module(p, "app/main"));
@@ -59,11 +56,7 @@ fn declared_external_variables_are_general_in_library_declarations() {
     assert!(text.contains("inspect(A)"));
     graph.sources.set_text(source, text);
     let c = ilang_check::check(&graph);
-    assert!(
-        c.diags.is_empty(),
-        "{:?}",
-        graph.sources.render_all(&c.diags)
-    );
+    common::expect_unused(&c.diags, &["f"]);
     let p = c.program.as_ref().unwrap();
     let DefKind::External { ty_vars, .. } = &common::def(p, "i/core", "inspect").kind else {
         panic!()
@@ -75,7 +68,10 @@ fn declared_external_variables_are_general_in_library_declarations() {
 fn new_match_is_a_non_generalized_binding_at_the_pattern() {
     // §3.9(a): resolve subject outside p's scope and keep p.span as the
     // binding span. The subject function must still call the top-level f.
-    let (_, c) = checked("f = (x) { x + 1 }\ng = () { (x) { f(x) * 2 } |> { f -> f(1) } }");
+    let (_, c) = checked(
+        "f = (x) { x + 1 }\ng = () { (x) { f(x) * 2 } |> { f -> f(1) } }",
+        &["f", "g"],
+    );
     let p = c.program.as_ref().unwrap();
     let m = p.module(common::module(p, "app/main"));
     let ExprKind::Fn(g) = &m.bindings[1].binding.value.kind else {
@@ -118,6 +114,7 @@ fn clause_function_labels_and_synthetic_spans_follow_the_rule() {
     // Spec §4.8 rule 11 permits values outside Int through the catch-all.
     let (_, c) = checked(
         "one = { n -> n }\nmany = { 0 -> 1  _ -> 2 }\nstring_argument = () { many(\"s\") }",
+        &["one", "many", "string_argument"],
     );
     let p = c.program.as_ref().unwrap();
     let m = p.module(common::module(p, "app/main"));

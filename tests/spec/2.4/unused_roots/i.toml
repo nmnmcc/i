@@ -1,0 +1,6 @@
+# spec: 2.4.1; entries, tests, exports and their references count as uses.
+# expect: pass
+name = "app"
+
+[wasm]
+exports = ["app/host.run"]

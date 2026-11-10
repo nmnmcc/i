@@ -5,9 +5,9 @@ mod common;
 use ilang_check::hir::*;
 use ilang_check::order;
 
-fn ok(src: &str) -> Program {
-    let (graph, program, diags) = common::check_files(&[("src/main.i", src)]);
-    assert!(diags.is_empty(), "{:#?}", graph.sources.render_all(&diags));
+fn ok(src: &str, unused: &[&str]) -> Program {
+    let (_, program, diags) = common::check_files(&[("src/main.i", src)]);
+    common::expect_unused(&diags, unused);
     program.unwrap()
 }
 
@@ -22,14 +22,17 @@ fn binding_names(program: &Program, b: BindingRef) -> Vec<String> {
 
 #[test]
 fn groups_and_init_order() {
-    let program = ok("
+    let program = ok(
+        "
 a = b()
 b = () { c }
 c = 1
 (even, odd) = ((n) { n == 0 || odd(n - 1) }, (n) { n != 0 && even(n - 1) })
 f = (n) { g(n) }
 g = (n) { f(n) }
-");
+",
+        &["a", "b", "c", "even", "odd", "f", "g"],
+    );
     let main = common::module(&program, "app/main");
     let groups: Vec<Vec<Vec<String>>> = program
         .order
@@ -84,6 +87,7 @@ g = (n) { f(n) }
 fn names_resolve() {
     let program = ok(
         "\n (i/core, c = (not) = i/core)\n\nT(A) { C(A) }\n\nf(A) = (x: A) -> A {\n  y = C(x)\n   y |> {\n    C(z) | C(z = _) ? True -> core.not(not(True))\n    _ -> panic(\"unreachable\")\n  }\n  x\n}\n",
+        &["f"],
     );
     let main = program.module(common::module(&program, "app/main"));
     let b = &main.bindings[0].binding;

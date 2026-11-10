@@ -227,6 +227,7 @@ impl<'a> Checker<'a> {
         self.entry_points();
         // The shown type schemes (§4.7).
         let mut typed = std::mem::take(&mut self.out);
+        let mut test_shaped = HashSet::new();
         for (mi, m) in p.modules.iter().enumerate() {
             self.set_module(ModuleId(mi as u32));
             for (di, d) in m.defs.iter().enumerate() {
@@ -244,6 +245,12 @@ impl<'a> Checker<'a> {
                 // A type with itself inside it has been reported by the
                 // occurs check, and is not shown.
                 if let Ok(shown) = display::scheme(&self.s, &scheme.ty, opts) {
+                    if let super::ShownType::Fn(f) = &shown
+                        && f.params.is_empty()
+                        && f.ret == super::ShownType::Named(self.b.nil, Vec::new())
+                    {
+                        test_shaped.insert(id);
+                    }
                     typed
                         .scheme_hovers
                         .insert(id, shown.text_limited(&self.s.type_names, 12));
@@ -254,6 +261,9 @@ impl<'a> Checker<'a> {
                 }
                 self.exported_type(d, &scheme.ty.clone(), opts);
             }
+        }
+        if !self.recovery && !self.diags.iter().any(Diagnostic::is_error) {
+            self.diags.extend(crate::unused::check(p, &test_shaped));
         }
         if self.keep_locals {
             typed.locals = Some(std::sync::Arc::new(super::LocalTypes {

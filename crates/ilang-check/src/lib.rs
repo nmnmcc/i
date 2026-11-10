@@ -10,6 +10,7 @@ pub mod order;
 pub mod query;
 pub mod resolve;
 pub mod types;
+mod unused;
 
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId, SourceId};
 use ilang_syntax::ast;
@@ -110,6 +111,7 @@ pub mod code {
     pub const NEVER_USED: &str = "W0501";
     pub const VALUE_NOT_USED: &str = "W0502";
     pub const EQ_DISJOINT: &str = "W0503";
+    pub const UNUSED_BINDING: &str = "W0504";
 }
 
 /// A parsed module of the graph.

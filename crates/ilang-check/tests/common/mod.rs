@@ -6,6 +6,24 @@ use ilang_check::hir::{Def, ModuleId, Program};
 use ilang_package::{Diagnostic, PackageGraph};
 use std::fs;
 
+/// Spec §2.4.1: exact warnings for fixtures with no entry or export roots.
+pub fn expect_unused(diags: &[Diagnostic], names: &[&str]) {
+    let actual = diags
+        .iter()
+        .map(|d| (d.code, d.message.clone()))
+        .collect::<Vec<_>>();
+    let expected = names
+        .iter()
+        .map(|name| {
+            (
+                ilang_check::code::UNUSED_BINDING,
+                format!("top-level binding `{name}` is not used"),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(actual, expected);
+}
+
 /// Writes a package named `app` with the given files into a new directory,
 /// then loads and checks it.
 pub fn check_files(files: &[(&str, &str)]) -> (PackageGraph, Option<Program>, Vec<Diagnostic>) {

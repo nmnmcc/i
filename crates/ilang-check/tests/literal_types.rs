@@ -25,8 +25,32 @@ fn check_export(source: &str, export: bool) -> (Vec<(String, String)>, Vec<Strin
     }
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/main.i"), source).unwrap();
-    let (graph, problems) = ilang_package::load(dir.path());
+    let (mut graph, problems) = ilang_package::load(dir.path());
     assert!(problems.is_empty(), "{problems:?}");
+    // These fixtures inspect every top-level value's type. Make that use
+    // explicit without exporting private nominal types or changing any
+    // constraints on the values. Unused binding behavior has its own suite.
+    let (program, _) = ilang_check::resolve_program(&graph);
+    if let Some(p) = program {
+        let m = p
+            .modules
+            .iter()
+            .find(|m| Some(m.package) == graph.root)
+            .unwrap();
+        let names = m
+            .defs
+            .iter()
+            .filter_map(|d| {
+                matches!(d.kind, ilang_check::hir::DefKind::Binding { .. })
+                    .then_some(d.name.as_str())
+            })
+            .collect::<Vec<_>>();
+        let reads = names
+            .iter()
+            .map(|name| format!("\n_ = {name}\n"))
+            .collect::<String>();
+        graph.sources.set_text(m.source, format!("{source}{reads}"));
+    }
     let checked = ilang_check::check(&graph);
     let lines = match (&checked.program, &checked.types) {
         (Some(p), Some(t)) => p
