@@ -183,3 +183,31 @@ every optimized function body against the actual timed artifact before using
 debug names. The hot WAT and executed allocation/call counts in r2-performance.md
 come from that same frozen source. Public task/request schemes are unchanged;
 all O0/O2 retention, cancellation and re-entry laws remain independent checks.
+
+After merge 1c1f212 of redesign 82375c0 (W0503), target/r2-wat-w520 passed
+in 373.95 s and contains 1,294 results. The original 522-file comparison stays
+exactly 188 byte-equal ERROR results and 334 already-attributed compiling
+changes, with 772 added results and no missing reference or status transition.
+Against the preceding 1,286-result dump, 1,275 results are byte-identical.
+The eleven changes are exactly these inherited source edits:
+
+- 11/equality, 6/blocks and 6/strings restore direct literal comparisons instead
+  of generic callback wrappers, removing those wrappers and their re-entry code.
+- 11/stop_tail_service removes the Int annotation (both targets); its retained
+  runtime check is the same, while its source column changes back.
+- 6/equality_repairs removes its generic equality helper and explicit widening,
+  preserving the three runtime assertions (both targets).
+- 4.8/known_map_reject adds an executable main asserting the false map result,
+  and changes its expectation to W0503. Its two ilang modules change and its
+  two WASI error results become executable modules with that main.
+
+The eight additions are 11/assert_disjoint and 6/disjoint_guard at all four
+configurations. They test runtime assertion failure and guard fall-through,
+respectively. These are W0503 source changes, not R2 test repairs. The exact
+common runtime-function comparison over the nine changed compiling modules
+finds only seven $ilang_start changes; every other common named runtime function
+is byte-identical. target/r2-runtime-w520-exact.json records the file list.
+The performance module rebuilt by the merged release compiler is wholly
+byte-identical to the accepted quiet artifact. The official interface and ABI
+fixture generation commands also produce no diff. There is no unexplained
+additional runtime-operation or public-interface change.

@@ -202,3 +202,9 @@ with no State/TaskState operand; its surrounding re-entry frame saves no such
 local. This is retention evidence, not a claimed measured reduction in peak
 live heap. The final source snapshots and hashes are saved with the accepted
 measurement, and the driver rejects source edits during build/measurement.
+
+After merging redesign's W0503 diagnostic change (82375c0), a rebuilt release
+compiler generated target/r2-performance-w520.wasm with i build --opt 2.
+cmp against the accepted quiet run's outer/kernels.wasm passed byte-for-byte.
+The entire measured module, not just selected functions, is unchanged; these
+timings and counts therefore still describe the final generated code.

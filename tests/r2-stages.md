@@ -1055,3 +1055,30 @@ commit the source/tests/audits and then the generated artifacts, and run both
 the complete dev-verify and old-syntax-check on that final committed head.
 The final report records those final-head commands and outcomes; preliminary
 passes and the interrupted exports are not substituted for them.
+
+Redesign then advanced again to 82375c0 (W0503). Merge 1c1f212 retains the
+approved Event fixture qualification and the R2 host-data inventory entry.
+The first final-head dev-verify was still waiting for a slot; its empty log
+confirmed it had run no check. Its exact owned process group was stopped with
+SIGTERM (143) before this merge. This is an interrupted queued invocation,
+not a failed test or a passing gate. The syntax check on 8e262d7 had passed;
+both gates are repeated on the later committed head.
+
+The W0503 merge makes known-disjoint equality advisory, per amended spec §11,
+and restores ordinary literal comparisons in the inherited tests. It changes
+no scheduler, request or host runtime operation. A release compiler rebuilt
+from this merge produced target/r2-performance-w520.wasm. cmp against the
+accepted quiet run's outer/kernels.wasm passed byte-for-byte, so those quiet
+timings and dynamic counts describe the final code despite the diagnostic
+change. A fresh full WAT export and both official generation commands follow
+that check. No alternative compiler or substitute timing is used.
+
+The repeated post-W0503 export passed in 373.95 s with 1,294 results. Its exact
+inventory and inherited-source attribution are in r2-wat.md. The subsequent
+UPDATE=1 library generation and build-abi-fixture.sh both passed and produced
+no diff: all generated artifacts are already at a fixed point on the merged
+code. The nine changed compiling exports have no changed common runtime
+function except seven source-initializer changes. A stray slash in the first
+scratch-audit shell command returned 126 before running the diagnostic; the
+correct command then completed successfully. No file or environment change
+resulted from that shell typo.
