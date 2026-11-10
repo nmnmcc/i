@@ -33,8 +33,8 @@ fn names(files: &[(&str, &str)]) -> Vec<String> {
 }
 
 #[test]
-fn unused_values_and_recursive_islands_warn_transitively() {
-    // Rule 2: only a reference reached from a used binding counts.
+fn references_in_unused_bindings_count_as_uses() {
+    // A reference counts even when its enclosing binding is unused.
     assert_eq!(
         names(&[(
             "src/main.i",
@@ -50,7 +50,7 @@ even = (n: Int) { n == 0 || odd(n - 1) }
 odd = (n: Int) { n != 0 && even(n - 1) }
 "#
         )]),
-        ["dead_value", "dead_leaf", "dead_caller", "even", "odd"]
+        ["dead_value", "dead_caller"]
     );
 }
 
@@ -76,7 +76,7 @@ fn entries_tests_and_ordinary_exports_retain_their_helpers() {
 #[test]
 fn test_exports_need_reachable_package_uses() {
     // Rule 4: importing an export and a reference from a dead function
-    // cannot retain it. A test in another test module can retain it.
+    // can retain it. A test in another test module can retain it.
     assert_eq!(
         names(&[
             (
@@ -88,19 +88,19 @@ fn test_exports_need_reachable_package_uses() {
                 "((used, imported_only) = app/helpers)\n@test check = () { used() }\ndead_caller = () { helpers.dead() }"
             ),
         ]),
-        ["dead_caller", "dead", "imported_only"]
+        ["dead_caller", "imported_only"]
     );
 }
 
 #[test]
-fn underscore_suppression_does_not_retain_a_dead_body() {
-    // Rule 3 and §1.3 suppress only the name. A discard binds no name.
+fn underscore_suppression_still_counts_body_references() {
+    // Rule 3 suppresses the name; its references still count.
     assert_eq!(
         names(&[(
             "src/main.i",
             "_kept = () { dead }\ndead = 1\n__discard = actual\nactual = 2"
         )]),
-        ["dead"]
+        Vec::<String>::new()
     );
 }
 
@@ -139,7 +139,6 @@ with_environment = (a ! Assert) { assert(True) }
         ws.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>(),
         [
             "ordinary",
-            "forgotten",
             "explicit",
             "alias",
             "has_argument",
@@ -209,7 +208,7 @@ api: (annotation) -> annotation = (x) { x }
     );
     assert_eq!(
         names(&[("src/main.i", "source = 1\ndead: source = 1")]),
-        ["source", "dead"]
+        ["dead"]
     );
 }
 

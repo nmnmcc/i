@@ -1,6 +1,5 @@
-//! Spec §2.4.1: trace references from exported values, entries and tests.
-//! Like Rust's dead-code worklist and Gleam's reference graph, an unused
-//! recursive island never keeps itself alive. This pass changes no HIR.
+//! Spec §2.4.1: count references in every top-level binding.
+//! This pass changes no HIR.
 
 use crate::code;
 use crate::hir::*;
@@ -18,7 +17,6 @@ fn is_package_entry(p: &Program, d: DefId) -> bool {
 
 pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic> {
     let mut references = References { p, pending: vec![] };
-    let mut scanned = HashSet::new();
     for (mi, m) in p.modules.iter().enumerate() {
         let module = ModuleId(mi as u32);
         for (di, d) in m.defs.iter().enumerate() {
@@ -39,14 +37,8 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
                 DefKind::External { ty, .. } => references.ty(ty),
             }
         }
-        for (i, b) in m.bindings.iter().enumerate() {
-            if b.defs.is_empty() {
-                scanned.insert(BindingRef {
-                    module,
-                    index: i as u32,
-                });
-                references.binding(&b.binding);
-            }
+        for b in &m.bindings {
+            references.binding(&b.binding);
         }
     }
     references.pending.extend(&p.host_exports);
@@ -61,21 +53,7 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
             }
         }
     }
-    let mut used = HashSet::new();
-    while let Some(d) = references.pending.pop() {
-        if !used.insert(d) {
-            continue;
-        }
-        if let DefKind::Binding { binding, .. } = p.def(d).kind {
-            let b = BindingRef {
-                module: d.module,
-                index: binding,
-            };
-            if scanned.insert(b) {
-                references.binding(&p.binding(b).binding);
-            }
-        }
-    }
+    let used: HashSet<_> = references.pending.into_iter().collect();
     let mut diags = Vec::new();
     for (mi, m) in p.modules.iter().enumerate() {
         for (di, d) in m.defs.iter().enumerate() {

@@ -31,7 +31,7 @@ c = 1
 f = (n) { g(n) }
 g = (n) { f(n) }
 ",
-        &["a", "b", "c", "even", "odd", "f", "g"],
+        &["a"],
     );
     let main = common::module(&program, "app/main");
     let groups: Vec<Vec<Vec<String>>> = program

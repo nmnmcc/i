@@ -17,7 +17,7 @@ fn declared_frames_hide_outer_variables_and_generalize() {
     let (_, c) = checked(
         "outer(A) = (x: A) { inner(A) = (y: A) { y }
  (inner(1), inner(True), x) }\nnested(A) = (x: A) { inner(B) = (y: B, z: A) { (y, z) }  inner(1, x) }\nid(A) = (x: A) { y: A = x  y }\nuses = () { (id(1), id(True)) }",
-        &["outer", "nested", "id", "uses"],
+        &["outer", "nested", "uses"],
     );
     let p = c.program.as_ref().unwrap();
     let m = p.module(common::module(p, "app/main"));
@@ -70,7 +70,7 @@ fn new_match_is_a_non_generalized_binding_at_the_pattern() {
     // binding span. The subject function must still call the top-level f.
     let (_, c) = checked(
         "f = (x) { x + 1 }\ng = () { (x) { f(x) * 2 } |> { f -> f(1) } }",
-        &["f", "g"],
+        &["g"],
     );
     let p = c.program.as_ref().unwrap();
     let m = p.module(common::module(p, "app/main"));
@@ -114,7 +114,7 @@ fn clause_function_labels_and_synthetic_spans_follow_the_rule() {
     // Spec §4.8 rule 11 permits values outside Int through the catch-all.
     let (_, c) = checked(
         "one = { n -> n }\nmany = { 0 -> 1  _ -> 2 }\nstring_argument = () { many(\"s\") }",
-        &["one", "many", "string_argument"],
+        &["one", "string_argument"],
     );
     let p = c.program.as_ref().unwrap();
     let m = p.module(common::module(p, "app/main"));

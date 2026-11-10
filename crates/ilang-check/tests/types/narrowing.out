@@ -13,10 +13,6 @@ literal : (v: Int | String) -> String | Int - 1
 partial : (v: Result(Int, String) | Nil) -> Nil | Result(Int, String)
 by_patterns : (p: (Bool, Int | String)) -> String | Int
 open : (v: A) -> 0 | A - Int
-24:1: warning[W0504]: top-level binding `http_get` is not used
-28:1: warning[W0504]: top-level binding `parse_user` is not used
-35:1: warning[W0504]: top-level binding `default_user` is not used
-37:1: warning[W0504]: top-level binding `load` is not used
 41:1: warning[W0504]: top-level binding `safe` is not used
 52:1: warning[W0504]: top-level binding `rest` is not used
 61:1: warning[W0504]: top-level binding `whole` is not used

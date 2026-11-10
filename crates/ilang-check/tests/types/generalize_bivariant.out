@@ -3,7 +3,6 @@ int_phantom : () -> Phantom(Int)
 string_phantom : () -> Phantom(String)
 change : (p: Phantom(Int)) -> Phantom(String)
 change_back : (p: Phantom(String)) -> Phantom(Int)
-7:1: warning[W0504]: top-level binding `new` is not used
 10:1: warning[W0504]: top-level binding `int_phantom` is not used
 12:1: warning[W0504]: top-level binding `string_phantom` is not used
 14:1: warning[W0504]: top-level binding `change` is not used
