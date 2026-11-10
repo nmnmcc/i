@@ -943,3 +943,65 @@ fn expanded_definition_preserves_attributes_and_parameter_identities() {
         Some(ScopeIdentity::DefinitionParameter { answer: 90, .. })
     ));
 }
+
+#[test]
+fn scoped_conversion_separates_repeated_origins_and_keeps_sliceable_text() {
+    use ilang_syntax::ast::ExprKind;
+    use ilang_syntax::lisp::scoped::ScopedSource;
+    use ilang_syntax::lisp::syntax::Node;
+    let template = root("(+ x x)");
+    let Node::Round(parts) = template.node() else {
+        panic!("template")
+    };
+    let original = parts[1].clone();
+    let marked = original.flip_mark(41);
+    let result =
+        template.replace_children(vec![parts[0].clone(), original.clone(), marked.clone()]);
+    let call = root("call");
+    let mut source = ScopedSource::new("original source".into());
+    let expr = source.expression(&result, &call).unwrap();
+    let ExprKind::Binary { lhs, rhs, .. } = expr.kind else {
+        panic!("binary")
+    };
+    assert_ne!(lhs.span, rhs.span);
+    assert_eq!(
+        source
+            .text()
+            .get(lhs.span.start as usize..lhs.span.end as usize),
+        Some("x")
+    );
+    assert_eq!(
+        source
+            .text()
+            .get(rhs.span.start as usize..rhs.span.end as usize),
+        Some("x")
+    );
+    assert_eq!(
+        source.origin(lhs.span).unwrap().syntax.scope(),
+        original.scope()
+    );
+    assert_eq!(
+        source.origin(rhs.span).unwrap().syntax.scope(),
+        marked.scope()
+    );
+    assert_eq!(
+        source.origin(rhs.span).unwrap().syntax.span(),
+        original.span()
+    );
+    assert!(source.origin(rhs.span).unwrap().call_site.same_code(&call));
+    assert!(source.is_generated(lhs.span));
+    assert!(source.text().starts_with("original source\n"));
+    let again = source.expression(&result, &call).unwrap();
+    assert_ne!(again.span, expr.span);
+}
+
+#[test]
+fn scoped_conversion_reports_the_actual_scoped_bad_node() {
+    use ilang_syntax::lisp::scoped::ScopedSource;
+    let bad = root("(f (,))");
+    let call = root("call");
+    let mut source = ScopedSource::new("text".into());
+    let error = source.expression(&bad, &call).unwrap_err();
+    assert_eq!(error.origin.syntax.show(), "(,)");
+    assert!(error.origin.call_site.same_code(&call));
+}

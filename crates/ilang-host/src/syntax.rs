@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use anyhow::{Context, Result, bail};
-use ilang_syntax::lisp::syntax::{Node, Position, Syntax};
+use ilang_syntax::lisp::syntax::{Capture, Node, Position, Substitution, Syntax};
 
 use crate::{HostImports, HostReference, Value};
 
@@ -15,6 +15,7 @@ struct Link {
 }
 struct SyntaxResult(Result<Syntax, String>);
 struct TextResult(Result<String, (String, Syntax)>);
+struct MatchResult(Option<Vec<Capture>>);
 
 fn opaque<T: Send + Sync + 'static>(value: T) -> Value {
     Value::Externref(HostReference::new(value))
@@ -149,6 +150,46 @@ fn invoke(name: &str, args: &[Value]) -> Result<Value> {
             _ => bail!("syntax node is not a bracket"),
         },
         ("child", [value, index]) => Ok(encode(child(get(value)?, number(index)?)?.clone())),
+        ("match", [pattern, value]) => {
+            let result = get::<Syntax>(pattern)?
+                .match_quote(get(value)?)
+                .expect("a compiled quote pattern is valid");
+            Ok(opaque(MatchResult(result)))
+        }
+        ("match_ok", [result]) => Ok(Value::Bool(get::<MatchResult>(result)?.0.is_some())),
+        ("match_one", [result, index]) => {
+            let captures = get::<MatchResult>(result)?
+                .0
+                .as_ref()
+                .expect("cannot read captures from a failed match");
+            let capture = &captures[number(index)?];
+            let Substitution::One(value) = &capture.value else {
+                panic!("quote capture is a splice")
+            };
+            Ok(encode(value.clone()))
+        }
+        ("match_many_len", [result, index]) => {
+            let captures = get::<MatchResult>(result)?
+                .0
+                .as_ref()
+                .expect("cannot read captures from a failed match");
+            let capture = &captures[number(index)?];
+            let Substitution::Many(values) = &capture.value else {
+                panic!("quote capture is not a splice")
+            };
+            Ok(Value::Int(values.len().into()))
+        }
+        ("match_many_child", [result, index, position]) => {
+            let captures = get::<MatchResult>(result)?
+                .0
+                .as_ref()
+                .expect("cannot read captures from a failed match");
+            let capture = &captures[number(index)?];
+            let Substitution::Many(values) = &capture.value else {
+                panic!("quote capture is not a splice")
+            };
+            Ok(encode(values[number(position)?].clone()))
+        }
         ("rebuild", [template, list]) => {
             let mut children = Vec::new();
             let mut link = get::<List>(list)?.0.as_deref();
@@ -293,6 +334,11 @@ pub fn install_with_templates(imports: &mut HostImports, templates: Arc<[Syntax]
         "list_new",
         "list_push",
         "rebuild",
+        "match",
+        "match_ok",
+        "match_one",
+        "match_many_len",
+        "match_many_child",
         "make_text",
         "make_int",
         "make_float",

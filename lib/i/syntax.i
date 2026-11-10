@@ -18,6 +18,11 @@
 	_template
 	_rebuild
 	_append
+	MatchResult
+	_match
+	_match_ok
+	_match_one
+	_match_many
 )
 
 Syntax {}
@@ -27,6 +32,8 @@ SyntaxList {}
 SyntaxResult {}
 
 TextResult {}
+
+MatchResult {}
 
 Node {
 	Name(String)
@@ -78,6 +85,21 @@ definition = (
 	of: Syntax
 	service ! Definitions
 ) -> Syntax ^ SyntaxError ! Definitions { service.definition(of) }
+
+@external("i:compiler/syntax/v1", "match")
+_match: (Syntax, Syntax) -> MatchResult
+
+@external("i:compiler/syntax/v1", "match_ok")
+_match_ok: (MatchResult) -> Bool
+
+@external("i:compiler/syntax/v1", "match_one")
+_match_one: (MatchResult, Int) -> Syntax
+
+@external("i:compiler/syntax/v1", "match_many_len")
+raw_match_many_len: (MatchResult, Int) -> Int
+
+@external("i:compiler/syntax/v1", "match_many_child")
+raw_match_many_child: (MatchResult, Int, Int) -> Syntax
 
 @external("i:compiler/syntax/v1", "template")
 _template: (Int) -> Syntax
@@ -159,6 +181,30 @@ reverse = (items: List(Syntax), result: List(Syntax)) -> List(Syntax) {
 		[]              -> result
 		[first, ..rest] -> reverse(rest, [first, ..result])
 	}
+}
+
+match_children = (
+	match: MatchResult
+	capture: Int
+	index: Int
+	end: Int
+	result: List(Syntax)
+) -> List(Syntax) {
+	{ index == end }.{
+		True -> reverse(result, [])
+		False -> match_children(
+			match
+			capture
+			index + 1
+			end
+			[raw_match_many_child(match, capture, index), ..result]
+		)
+	}
+}
+
+/// Gives a splice capture in source order.
+_match_many = (match: MatchResult, capture: Int) -> List(Syntax) {
+	match_children(match, capture, 0, raw_match_many_len(match, capture), [])
 }
 
 prepend_reversed = (items: List(Syntax), result: List(Syntax)) -> List(Syntax) {
