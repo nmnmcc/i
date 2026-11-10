@@ -489,12 +489,24 @@ impl<'a> Checker<'a> {
             .chain([("the value", &f.ret, false)]);
         for (what, t, input) in parts {
             if !self.host_type(t) || input && !t.values().is_all() {
+                let suffix = if input
+                    && let Some(b) = t.scalar()
+                    && !t.values().is_all()
+                {
+                    format!(
+                        "; the host gives this value, so it must be all of `{}`, not `{}`",
+                        b.name(),
+                        show(self, t)
+                    )
+                } else {
+                    String::new()
+                };
                 let t = show(self, t);
                 self.error(
                     code::ENTRY_TYPE,
                     span,
                     format!(
-                        "`{name}` is a host export, so {what} must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `{t}`"
+                        "`{name}` is a host export, so {what} must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `{t}`{suffix}"
                     ),
                 );
             }
@@ -726,7 +738,7 @@ impl<'a> Checker<'a> {
                     }
                 }
             }
-            TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
+            TypeKind::Lit(_) | TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
         }
     }
 
@@ -906,6 +918,7 @@ impl<'a> Checker<'a> {
     /// parameters of a definition.
     pub fn conv(&mut self, t: &Type, local: &HashMap<TyVarId, Ty>) -> Ty {
         match &t.kind {
+            TypeKind::Lit(v) => Ty::literal(v),
             TypeKind::Named { ty, args } => {
                 if let TypeRef::Custom(id) = ty
                     && let TypeBody::Alias(body) = &self.p.ty(*id).body
@@ -2464,7 +2477,7 @@ fn walk_variance(
             go(ret, v, acc);
             err.iter().chain(env).for_each(|x| go(x, v, acc));
         }
-        TypeKind::Hole | TypeKind::Error => {}
+        TypeKind::Lit(_) | TypeKind::Hole | TypeKind::Error => {}
     }
 }
 

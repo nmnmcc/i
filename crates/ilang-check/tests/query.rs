@@ -612,3 +612,28 @@ fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
             .contains("(A) -> 1 | 2")
     );
 }
+
+#[test]
+fn private_value_and_written_alias_hovers_limit_literals_only_in_human_text() {
+    // Decision 11: the hover is limited; Typed::schemes and package text stay full.
+    let lits = (0..14).map(|i| format!("\"m{i:02}\"")).collect::<Vec<_>>();
+    let source = format!("Modes = {}\nxs = [{}]\n", lits.join(" | "), lits.join(", "));
+    let f = Fixture::new(&[("src/main.i", &source)]);
+    assert!(
+        !f.checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        f.checked.diags
+    );
+    for name in ["Modes", "xs ="] {
+        let text = f.hover("app/main", name, 0);
+        assert!(text.contains("… (4 more)"), "{text}");
+        assert!(!text.contains("m13"), "{text}");
+    }
+    let types = f.checked.types.as_ref().unwrap();
+    assert!(
+        types
+            .schemes
+            .values()
+            .any(|t| t.contains("m13") && !t.contains('…'))
+    );
+}

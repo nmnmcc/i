@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 
 RULES = {
+    'A': 'types-joint section 5 Literal Prim and literal-types section 6.1: scalar literals now start a type. A reserved record recovers after consuming that literal annotation and then expects its arrow.',
     'L': 'literal-types decision 4: "No widening, no template literal types, no literal arithmetic." Literal leaves retain their value; existing principal inference propagates them through tuples, lists, calls, returns and errors.',
     'P': 'literal-types decision 6: "A literal pattern gets its literal type only in a match." Rule 11 unions those values; fitted/shared places keep their whole head.',
     'K': 'literal-types decision 7: "Rule 13 does not use value sets." Its covariant bounds keep whole scalars and noncovariant parts become fresh holes; known results stay separate.',
@@ -22,6 +23,8 @@ RULES = {
 
 
 def rule(line, path):
+    if 'ilang-syntax/tests/' in path:
+        return 'A'
     if 'E0235' in line:
         return 'F'
     if 'E0520' in line:

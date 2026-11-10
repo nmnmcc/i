@@ -406,6 +406,7 @@ impl<'a> Query<'a> {
                     format!("{base}({})", args.join(", "))
                 }
             }
+            TypeKind::Lit(v) => v.text(),
             TypeKind::Var(v) => self.ty_var_name(*v),
             TypeKind::Hole | TypeKind::Error => "_".into(),
             TypeKind::Tuple(parts) => {
@@ -447,7 +448,7 @@ impl<'a> Query<'a> {
                 wrap(s, 0)
             }
             TypeKind::Union(ms) => {
-                let ms: Vec<String> = ms.iter().map(|m| self.show_type_prec(m, 1)).collect();
+                let ms = self.shown_type_parts(ms, 1);
                 wrap(ms.join(" | "), 0)
             }
             TypeKind::Inter(ms) => {
@@ -455,10 +456,40 @@ impl<'a> Query<'a> {
                 wrap(ms.join(" & "), 1)
             }
             TypeKind::Diff(ms) => {
-                let ms: Vec<String> = ms.iter().map(|m| self.show_type_prec(m, 3)).collect();
+                let ms = self.shown_type_parts(ms, 3);
                 wrap(ms.join(" - "), 2)
             }
         }
+    }
+
+    /// Written alias hovers follow the same per-scalar limit as inferred hovers.
+    fn shown_type_parts(&self, parts: &[Type], prec: u8) -> Vec<String> {
+        let kind = |t: &Type| match &t.kind {
+            TypeKind::Lit(crate::types::LitValue::Int(_)) => Some(0usize),
+            TypeKind::Lit(crate::types::LitValue::Str(_)) => Some(1usize),
+            _ => None,
+        };
+        let mut counts = [0usize; 2];
+        for t in parts {
+            if let Some(k) = kind(t) {
+                counts[k] += 1;
+            }
+        }
+        let mut seen = [0usize; 2];
+        let mut result = Vec::new();
+        for t in parts {
+            if let Some(k) = kind(t) {
+                seen[k] += 1;
+                if counts[k] > 12 && seen[k] > 10 {
+                    if seen[k] == 11 {
+                        result.push(format!("… ({} more)", counts[k] - 10));
+                    }
+                    continue;
+                }
+            }
+            result.push(self.show_type_prec(t, prec));
+        }
+        result
     }
 
     /// The `///` comment of the item whose span holds `span`.
@@ -1220,7 +1251,7 @@ impl Walk<'_> {
                 args.iter().for_each(|a| self.ty(a));
             }
             TypeKind::Var(v) => self.occ.push((t.span, Target::TyVar(*v))),
-            TypeKind::Hole | TypeKind::Error => {}
+            TypeKind::Lit(_) | TypeKind::Hole | TypeKind::Error => {}
             TypeKind::Tuple(ts)
             | TypeKind::Union(ts)
             | TypeKind::Inter(ts)

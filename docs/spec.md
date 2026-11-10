@@ -1071,8 +1071,7 @@ An entry point that may call a function of an async host service (§9.7) is **as
 
 Where i code gives a value to the host, an `Int` or `String` member counts as `Int` or `String`, whatever its value set (§4.2): a literal type, a union of literal types of one type constructor (also through an alias), or all the values but a finite set, such as `Int - 0`. Where the host gives the value (the value of an external function, the value and errors of a host-service function, and the parameters of a host export), an `Int` or `String` member must have all its values, because the host's values are checked only for their form (§B.2).
 
-<!-- Literal-type syntax is not yet checked; T1 step 8 removes this mark. -->
-```i pending=T1
+```i
 @external("app", "mode")
 mode: () -> "on" | "off"           // compile error: the host gives the value
 @external("app", "log")

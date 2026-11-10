@@ -88,6 +88,14 @@ pub(crate) struct FnTy {
 }
 
 impl Ty {
+    pub fn literal(v: &LitValue) -> Ty {
+        let (b, text) = match v {
+            LitValue::Int(n) => (crate::hir::BuiltinType::Int, n.to_string()),
+            LitValue::Str(s) => (crate::hir::BuiltinType::String, s.clone()),
+        };
+        Ty::lit(b, lits::ValueSet::only([text.into()]).unwrap())
+    }
+
     pub fn lit(b: crate::hir::BuiltinType, values: lits::ValueSet) -> Ty {
         debug_assert!(matches!(
             b,

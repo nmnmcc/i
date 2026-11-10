@@ -4,16 +4,12 @@
 //! Keys are decoded strings or canonical decimal integers. The persistent
 //! B-tree copies only the search path when a stored bound gains one value.
 
-use num_bigint::{BigInt, BigUint};
+use num_bigint::BigUint;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum LitValue {
-    Int(BigInt),
-    Str(String),
-}
+pub use ilang_syntax::ast::LitValue;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TestValues {

@@ -248,3 +248,189 @@ fn nested_missing_values_are_one_coverage_error() {
         assert!(ds[0].1.ends_with(&format!("matches `{witness}`")), "{ds:?}");
     }
 }
+
+#[test]
+fn written_literals_and_negative_differences_constrain_calls() {
+    // §3 and §10: at a primary, minus builds a literal; after a type it subtracts.
+    for (annotation, accepted, rejected) in [
+        ("Int - -1", "1", "-1"),
+        ("Int - 1", "-1", "1"),
+        ("-1 | 1", "-1", "0"),
+        ("-{1}", "-1", "1"),
+    ] {
+        let source = format!("f = (n: {annotation}) {{ n }}\nv = f({accepted})\n");
+        let (ds, _) = check(&source);
+        assert!(ds.is_empty(), "{source}: {ds:?}");
+        let (ds, _) = check(&source.replace(&format!("f({accepted})"), &format!("f({rejected})")));
+        assert!(ds.iter().any(|d| d.0 == "E0501"), "{annotation}: {ds:?}");
+    }
+}
+
+#[test]
+fn typed_complements_keep_the_head_and_cover_cross_columns() {
+    // §5.5: each excluded scalar value has its own specialization.
+    let cases = [
+        (
+            "f = (s: String) { s |> { \"a\" -> 0  x: String - \"a\" -> 1 } }",
+            None,
+        ),
+        (
+            "f = (s: String) { s |> { \"a\" -> 0  x: String - \"a\" - \"b\" -> 1 } }",
+            Some("\"b\""),
+        ),
+        (
+            "f = (s: String) { s |> { \"a\" -> 0  \"\" <> r -> 1 } }",
+            None,
+        ),
+        (
+            "f = (p: (String, Bool)) { p |> {\n (x: String - \"a\", _) -> 1\n (\"a\", True) -> 2\n} }",
+            Some("(\"a\", False)"),
+        ),
+        (
+            "f = (m: \"a\" | \"b\" | \"c\") { m |> { \"a\" -> 0  x: String - \"a\" -> 1 } }",
+            None,
+        ),
+    ];
+    for (source, witness) in cases {
+        let (ds, _) = check(source);
+        if let Some(w) = witness {
+            assert_eq!(ds.len(), 1, "{source}: {ds:?}");
+            assert_eq!(ds[0].0, "E0516");
+            assert!(ds[0].1.contains(&format!("matches `{w}`")), "{ds:?}");
+        } else {
+            assert!(ds.is_empty(), "{source}: {ds:?}");
+        }
+    }
+}
+
+#[test]
+fn narrowing_checks_the_entire_row_and_ignores_guards() {
+    // §5.3: only a fully covered candidate row may be removed. The fast
+    // path is reserved for a literal alone at the top place of the real row.
+    for (pattern, catch, annotation, accept) in [
+        ("\"a\"", "t", "String", true),
+        ("\"a\" ? c", "t", "String", false),
+        ("\"a\" | \"b\"", "t", "String", true),
+        ("Ok(\"a\")", "Ok(t)", "Result(String, Nil)", true),
+        ("(\"a\", True)", "(t, _)", "(String, Bool)", false),
+        ("(\"a\", _)", "(t, _)", "(String, Bool)", true),
+        ("(\"a\", x: Int)", "(t, _)", "(String, Int | String)", false),
+        ("[\"a\"]", "[t, ..]", "List(String)", false),
+        ("[\"a\", ..]", "[t, ..]", "List(String)", true),
+        ("x: String - \"a\"", "t", "String", true),
+    ] {
+        let need = if pattern.starts_with("x: String -") {
+            "\"a\""
+        } else {
+            "String - \"a\""
+        };
+        let source = format!(
+            "g = (s: {need}) {{ 1 }}\nf = (v: {annotation}, c: Bool) {{ v |> {{\n {pattern} -> 0\n {catch} -> g(t)\n _ -> 2\n}} }}\n"
+        );
+        let (ds, _) = check(&source);
+        let errors: Vec<_> = ds.iter().filter(|d| d.0.starts_with('E')).collect();
+        if accept {
+            assert!(errors.is_empty(), "{source}: {ds:?}");
+        } else {
+            assert!(errors.iter().any(|d| d.0 == "E0501"), "{source}: {ds:?}");
+        }
+    }
+}
+
+#[test]
+fn prefix_after_complement_does_not_erase_other_columns() {
+    // §5.5: an excluded string starting with a prefix prevents treating
+    // that Except row as covering the whole prefix.
+    let source = "h = (n: Int) { n }\nf = (p: (String, Int)) { p |> {\n (x: String - \"ab\", _) -> 0\n (\"a\" <> r, t) -> h(t)\n _ -> 2\n} }\n";
+    let (ds, _) = check(source);
+    assert!(!ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
+    // The last wildcard is redundant: the two preceding rows cover String.
+    // Without it, neither remaining clause may be called never used.
+    let (covered, _) = check(&source.replace(" _ -> 2\n", ""));
+    assert!(covered.is_empty(), "{covered:?}");
+    let (ds, _) = check(&source.replace("(n: Int)", "(n: String)"));
+    assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
+}
+
+#[test]
+fn host_directions_expand_aliases_and_same_scalar_unions() {
+    // Decision 9/§5.8: i may send literal sets; host values must be whole.
+    let (ds, _) = check(
+        "Level = \"info\" | \"warn\"\n@external(\"test\", \"log\")\nlog: (Level | \"error\") -> Nil\n",
+    );
+    assert!(ds.is_empty(), "{ds:?}");
+    for ty in [
+        "\"a\"",
+        "\"a\" | \"b\"",
+        "String - \"a\"",
+        "1 | 2",
+        "Int - 0",
+    ] {
+        let (ds, _) = check(&format!(
+            "Level = {ty}\n@external(\"test\", \"get\")\nget: () -> Level\n"
+        ));
+        assert!(ds.iter().any(|d| d.0 == "E0318"), "{ty}: {ds:?}");
+        let (ds, _) = check(&format!(
+            "@host(\"test:state\")\nState {{ State(get: () -> {ty}) }}\n"
+        ));
+        assert!(ds.iter().any(|d| d.0 == "E0320"), "{ty}: {ds:?}");
+    }
+}
+
+#[test]
+fn literal_values_use_numeric_and_decoded_scalar_identity() {
+    // Decision 12 and §11.4: canonical numbers, decoded strings, no NFC normalization.
+    for (ty, accepted, rejected) in [
+        ("0x10", "16", "17"),
+        ("-0", "0", "1"),
+        ("\"\\u{e9}\"", "\"é\"", "\"e\\u{301}\""),
+    ] {
+        let source = format!("f = (x: {ty}) {{ x }}\nv = f({accepted})\n");
+        let (ds, _) = check(&source);
+        assert!(ds.is_empty(), "{ds:?}");
+        let (ds, _) = check(&source.replace(&format!("f({accepted})"), &format!("f({rejected})")));
+        assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
+    }
+    let (ds, _) =
+        check("f = (m: \"\\u{0}\" | \"a\" | \"b\") { m |> { \"a\" -> 1  \"b\" -> 2 } }\n");
+    assert_eq!(ds.len(), 1, "{ds:?}");
+    assert!(ds[0].1.contains("matches `\"\\u{0000}\"`"), "{ds:?}");
+}
+
+#[test]
+fn shared_parameters_require_all_combinations_of_a_written_finite_set() {
+    // §5.3: inference keeps a shared head whole; written finite sets constrain coverage.
+    let (ds, _) = check(
+        "Pair(A) { Pair(A, A) }\nf = (p: Pair(\"a\" | \"b\")) { p |> { Pair(\"a\", \"a\") -> 0  Pair(\"b\", \"b\") -> 1 } }\n",
+    );
+    assert_eq!(ds.len(), 1, "{ds:?}");
+    assert_eq!(ds[0].0, "E0516");
+    let (ds, _) = check(
+        "Pair(A) { Pair(A, A) }\nf = (p: Pair(\"a\" | \"b\")) { p |> { Pair(\"a\", \"a\") -> 0  Pair(\"b\", \"b\") -> 1  Pair(\"a\", \"b\") -> 2  Pair(\"b\", \"a\") -> 3 } }\n",
+    );
+    assert!(ds.is_empty(), "{ds:?}");
+}
+
+#[test]
+fn whole_known_bounds_keep_non_covariant_literal_parts_as_holes() {
+    // Decision 7/rule 13: copying a known function, invariant cell or
+    // contravariant sink must not impose whole String in the wrong direction.
+    let source = r#"
+Sink(A) { Sink(put: (A) -> Nil) }
+Cell(A) { Cell(get: () -> A, set: (A) -> Nil) }
+State(A) { State(get: () -> A) }
+g = (s: String - "a") { 1 }
+p = (g, 0).1
+read = (c: Cell("a")) { c.get() }
+s = Sink(put: (m: "GET" | "POST") { Nil })
+use = () { s.put("GET") }
+stored = (st ! State("a")) { st.get() }
+e = (stored, 0).1
+apply(A, B) = (x: A, f: (A) -> B) { (f, f(x)) }
+q = apply("a", { "a" -> 1  "b" -> 2 }).1
+"#;
+    let (ds, _) = check(source);
+    assert!(ds.is_empty(), "{ds:?}");
+    let (ds, _) = check(&source.replace("s.put(\"GET\")", "s.put(\"x\")"));
+    assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
+}

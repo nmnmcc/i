@@ -167,6 +167,7 @@ impl Checker<'_> {
         }
         let go = |x: &Type| self.kconv_in(x, local, depth);
         match &t.kind {
+            TypeKind::Lit(v) => Ty::literal(v),
             TypeKind::Named { ty, args } => {
                 let args: Vec<Ty> = args.iter().map(go).collect();
                 if let TypeRef::Custom(id) = ty

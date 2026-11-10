@@ -1303,6 +1303,7 @@ impl<'a> Resolver<'a> {
     fn ty(&mut self, t: &ast::TypeExpr) -> Type {
         use ast::TypeKind as T;
         let kind = match &t.kind {
+            T::Lit(v) => TypeKind::Lit(v.clone()),
             T::Named { module, name, args } => {
                 let variable = if module.is_none() {
                     self.ty_frames
@@ -1498,7 +1499,7 @@ impl<'a> Resolver<'a> {
                         self.error(
                             code::HOST_TYPE,
                             f.ty.span,
-                            "the parameters and the value of a function of a host service are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors; its errors are a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; and it has no environment (§9.7, §10.3)",
+                            format!("the parameters and the value of a function of a host service are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors; its errors are a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; and it has no environment (§9.7, §10.3){}", match &f.ty.kind { TypeKind::Fn{ret,err,..}=>[Some(&**ret),err.as_deref()].into_iter().flatten().find_map(|t| { let n=self.host_input_note(t); (!n.is_empty()).then_some(n) }).unwrap_or_default(),_=>String::new() }),
                         );
                     }
                 }
@@ -1526,9 +1527,9 @@ impl<'a> Resolver<'a> {
         }
         let params = params
             .iter()
-            .map(|p| self.host_part(&p.ty))
+            .map(|p| self.host_part(&p.ty, true))
             .collect::<Option<Vec<_>>>()?;
-        let result = self.host_part(ret)?;
+        let result = self.host_part(ret, false)?;
         let mut members = Vec::new();
         if let Some(err) = err {
             if !errors && !self.is_never(err) {
@@ -1543,7 +1544,7 @@ impl<'a> Resolver<'a> {
                 if self.is_never(&m) {
                     continue;
                 }
-                let h = self.host_part(&m)?;
+                let h = self.host_part(&m, false)?;
                 if matches!(h, HostType::Opaque(_)) || members.contains(&h) {
                     return None;
                 }
@@ -1569,7 +1570,17 @@ impl<'a> Resolver<'a> {
     }
 
     /// The part of B.2 for a type that the host can take (§10.3).
-    fn host_part(&self, t: &Type) -> Option<HostType> {
+    fn host_part(&self, t: &Type, outgoing: bool) -> Option<HostType> {
+        if let Some((b, all)) = self.scalar_abi(t) {
+            if outgoing || all {
+                return Some(match b {
+                    BuiltinType::Int => HostType::Int,
+                    BuiltinType::String => HostType::String,
+                    _ => unreachable!(),
+                });
+            }
+            return None;
+        }
         match &self.expand(t).kind {
             TypeKind::Named {
                 ty: TypeRef::Builtin(b),
@@ -1628,7 +1639,11 @@ impl<'a> Resolver<'a> {
                 );
             }
         }
-        for part in params.iter().map(|p| &p.ty).chain([&**ret]) {
+        for (part, outgoing) in params
+            .iter()
+            .map(|p| (&p.ty, true))
+            .chain([(&**ret, false)])
+        {
             if let Some(span) = find_in_type(part, &|k| matches!(k, TypeKind::Hole)) {
                 self.error(
                     code::EXTERNAL_HOLE,
@@ -1641,18 +1656,122 @@ impl<'a> Resolver<'a> {
                     span,
                     "the type of an external function may not have type variables (§10.1)",
                 );
-            } else if !self.host_type(part) {
+            } else if !self.host_type(part, outgoing) {
                 self.error(
                     code::EXTERNAL_HOST_TYPE,
                     part.span,
-                    "the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3)",
+                    format!("the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3){}", if outgoing { String::new() } else { self.host_input_note(part) }),
                 );
             }
         }
     }
 
+    /// Expand scalar unions before deciding their ABI; aliases have no privilege.
+    fn lit_parts(&self, t: &Type) -> Vec<Type> {
+        let t = self.expand(t);
+        match &t.kind {
+            TypeKind::Union(ms) => ms.iter().flat_map(|t| self.lit_parts(t)).collect(),
+            _ => vec![t],
+        }
+    }
+
+    /// The supported scalar boundary forms, and whether their set is whole.
+    fn scalar_abi(&self, t: &Type) -> Option<(BuiltinType, bool)> {
+        use crate::types::LitValue;
+        let t = self.expand(t);
+        match &t.kind {
+            TypeKind::Named {
+                ty: TypeRef::Builtin(b @ (BuiltinType::Int | BuiltinType::String)),
+                args,
+            } if args.is_empty() => Some((*b, true)),
+            TypeKind::Lit(LitValue::Int(_)) => Some((BuiltinType::Int, false)),
+            TypeKind::Lit(LitValue::Str(_)) => Some((BuiltinType::String, false)),
+            TypeKind::Union(_) => {
+                let mut head = None;
+                let mut all = false;
+                for part in self.lit_parts(&t) {
+                    let (b, a) = match &part.kind {
+                        TypeKind::Lit(LitValue::Int(_)) => (BuiltinType::Int, false),
+                        TypeKind::Lit(LitValue::Str(_)) => (BuiltinType::String, false),
+                        TypeKind::Named {
+                            ty: TypeRef::Builtin(b @ (BuiltinType::Int | BuiltinType::String)),
+                            args,
+                        } if args.is_empty() => (*b, true),
+                        _ => return None,
+                    };
+                    if head.is_some_and(|old| old != b) {
+                        return None;
+                    }
+                    head = Some(b);
+                    all |= a;
+                }
+                head.map(|h| (h, all))
+            }
+            TypeKind::Diff(ts) if ts.len() > 1 => {
+                let first = self.expand(&ts[0]);
+                let TypeKind::Named {
+                    ty: TypeRef::Builtin(b @ (BuiltinType::Int | BuiltinType::String)),
+                    args,
+                } = &first.kind
+                else {
+                    return None;
+                };
+                if !args.is_empty() {
+                    return None;
+                }
+                for part in ts[1..].iter().flat_map(|t| self.lit_parts(t)) {
+                    if !matches!(
+                        (&part.kind, b),
+                        (TypeKind::Lit(LitValue::Int(_)), BuiltinType::Int)
+                            | (TypeKind::Lit(LitValue::Str(_)), BuiltinType::String)
+                    ) {
+                        return None;
+                    }
+                }
+                Some((*b, false))
+            }
+            _ => None,
+        }
+    }
+
+    fn host_input_note(&self, t: &Type) -> String {
+        let Some((b, false)) = self.scalar_abi(t) else {
+            return String::new();
+        };
+        let expanded = self.expand(t);
+        let complement = matches!(&expanded.kind, TypeKind::Diff(_));
+        let parts = match &expanded.kind {
+            TypeKind::Diff(ts) => ts[1..].iter().flat_map(|t| self.lit_parts(t)).collect(),
+            _ => self.lit_parts(t),
+        };
+        let mut texts: Vec<_> = parts
+            .iter()
+            .filter_map(|t| match &t.kind {
+                TypeKind::Lit(v) => Some(v.text()),
+                _ => None,
+            })
+            .collect();
+        let count = texts.len();
+        if count > 12 {
+            texts.truncate(10);
+            texts.push(format!("… ({} more)", count - 10));
+        }
+        let shown = if complement {
+            format!("{} - {}", b.name(), texts.join(" - "))
+        } else {
+            texts.join(" | ")
+        };
+        format!(
+            "; the host gives this value, so it must be all of `{}`, not `{shown}`",
+            b.name()
+        )
+    }
+
     /// §10.3: a type that the host can take. Aliases are expanded.
-    fn host_type(&self, t: &Type) -> bool {
+    fn host_type(&self, t: &Type, outgoing: bool) -> bool {
+        if let Some((_, all)) = self.scalar_abi(t) {
+            return outgoing || all;
+        }
         match &self.expand(t).kind {
             TypeKind::Error => true,
             TypeKind::Named {
@@ -2771,7 +2890,7 @@ fn named_types(t: &Type, out: &mut Vec<TypeId>) {
             named_types(ret, out);
             err.iter().chain(env).for_each(|a| named_types(a, out));
         }
-        TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
+        TypeKind::Lit(_) | TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
     }
 }
 
@@ -2797,7 +2916,7 @@ fn for_each_child(t: &Type, f: &mut dyn FnMut(&Type)) {
             f(ret);
             err.iter().chain(env).for_each(|a| f(a));
         }
-        TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
+        TypeKind::Lit(_) | TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
     }
 }
 
@@ -2819,6 +2938,7 @@ fn find_in_type(t: &Type, is: &dyn Fn(&TypeKind) -> bool) -> Option<Span> {
 /// `t` with the type variables in `map` replaced.
 pub(crate) fn subst(t: &Type, map: &HashMap<TyVarId, &Type>) -> Type {
     let kind = match &t.kind {
+        TypeKind::Lit(v) => TypeKind::Lit(v.clone()),
         TypeKind::Var(v) => match map.get(v) {
             Some(r) => return (*r).clone(),
             None => TypeKind::Var(*v),

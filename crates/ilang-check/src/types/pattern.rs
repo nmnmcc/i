@@ -11,7 +11,7 @@ use crate::hir::*;
 use ilang_syntax::span::Span;
 use std::collections::HashMap;
 
-const LITERAL_CANDIDATES: bool = false;
+const LITERAL_CANDIDATES: bool = true;
 
 /// A catch-all is a name, a discard, or `x = q` where `q` is one (§4.8).
 pub(crate) fn catch_all(p: &Pattern) -> bool {
@@ -842,21 +842,53 @@ impl Checker<'_> {
                             .collect(),
                     )
                 };
-                if let Pat::Or(alts) = &pat {
-                    let heads = alts
+                if matches!(&pat, Pat::Or(_)) {
+                    let heads = members
                         .iter()
-                        .filter_map(|a| match a {
-                            Pat::Head(h, _) => Some(super::TestMember {
-                                head: *h,
-                                values: super::TestValues::All,
-                            }),
-                            _ => None,
+                        .filter_map(|m| {
+                            m.head().map(|head| super::TestMember {
+                                head,
+                                values: if m.values().is_all() {
+                                    super::TestValues::All
+                                } else {
+                                    let values = m
+                                        .values()
+                                        .items()
+                                        .map(|v| match m.scalar().unwrap() {
+                                            BuiltinType::Int => {
+                                                super::LitValue::Int(v.parse().unwrap())
+                                            }
+                                            BuiltinType::String => {
+                                                super::LitValue::Str(v.to_string())
+                                            }
+                                            _ => unreachable!(),
+                                        })
+                                        .collect();
+                                    if m.values().is_finite() {
+                                        super::TestValues::Only(values)
+                                    } else {
+                                        super::TestValues::Except(values)
+                                    }
+                                },
+                            })
                         })
                         .collect();
                     self.out.type_tests.insert((self.module, q.span), heads);
-                    for a in alts {
-                        if let Pat::Head(h, n) = a {
-                            places[at].seen.push((v.clause, v.unguarded, *h, *n));
+                    for m in &members {
+                        if m.scalar().is_some() && !m.values().is_all() {
+                            places[at].scalar_seen.push((
+                                v.clause,
+                                v.unguarded,
+                                m.clone(),
+                                coverage::scalar_pat(m),
+                            ));
+                        } else if let Some(h) = m.head() {
+                            let n = match m {
+                                Ty::Con(_, _, xs) => xs.len(),
+                                Ty::Fn(f) => f.params.len(),
+                                _ => 0,
+                            };
+                            places[at].seen.push((v.clause, v.unguarded, h, n));
                         }
                     }
                     // Rule 11: the test takes every value of the type

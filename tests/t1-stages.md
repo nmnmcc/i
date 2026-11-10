@@ -537,3 +537,71 @@ Final stage-7 gate: full dev-verify exit 0, 175 spec cases at O0/O2,
 fixtures, 13 interpretation tests and all existing Rust targets pass.
 Log: target/t1/continued/resumed-stage7-verified-full.log. Source stage 7
 is committed with all generated outputs held for the final derived commit.
+
+### Stage 8: written literals and narrowing
+
+AST/HIR Lit use one shared LitValue (signed BigInt or decoded String).
+TypeArg is TypeExpr, as types-joint §5 requires. The grammar accepts signed
+integer primaries through brace groups and rejects Float with the existing
+E0101 message “Float has no literal types”. Literal leaves introduce no
+names, variables, variance occurrences or dependencies; the resolution,
+substitution, place/variance and query visitors explicitly preserve that.
+The written and inferred interface paths retain full values. Query-only
+alias/value hovers have the 12/10 limit; the 14-value alias publication test
+changes a value beyond that limit and requires a new major version.
+
+Type tests now carry All/Only/Except sets through the existing TestMember
+contract into the previously staged equality/tag-and-negation lowering.
+Rule 12 is enabled only with these tests: actual top rows justify the fast
+path; nested rows use usefulness across every column. Literal choices,
+cofinite tests, guarded rows, tuple/list cross-columns and prefix-after-
+Except all have accepted/rejected checks. Written finite list and repeated
+Pair parameters run every alternative; wrong-tag and boxed Int tests run
+at O0 and O2. Unicode/canonical integers, NUL witnesses, literal-negative
+differences, noncovariant known bounds and cofinite prefix remainders are
+also checked.
+
+The host gate follows decision 9: “Where the host gives a value ... must
+have all its values.” Alias/union flattening accepts the listed outgoing
+scalar forms; cofinite outputs retain their scalar ABI. A same-head union
+containing a whole head is whole and may be received. Literal returns of
+externals/host services are rejected, with existing E0318/E0320; inferred
+export inputs use E0521. Provider fitting remains ordinary subtyping,
+while service use compares equal sets (E0515 for Counter(0)/Counter(Int)).
+
+T1's three future entries are retired. The note's mixed statement example
+needs a normal function-body prefix/suffix because it contains bare
+expression statements; it remains parsed in full and has no future marker.
+Mixed T1/T2/T3 entries now belong to T2/T3. Remaining reserved-record
+recovery diagnostics reflect Literal Prim consuming scalar annotations
+before expecting an arrow; the record rejection itself is unchanged.
+The parser's former negative `x: 1 -> 2` test is now a positive clause
+assertion, as replacement §6.1 requires. No i source is skipped.
+
+Changed goldens: existing value/type lines retain stage-7 rules. Rule 12
+now changes narrowing.literal's result to String | Int - 1. The syntax
+err_record diagnostic now expects an arrow after consuming literal 1;
+Literal Prim, not regeneration, requires that change. UPDATE=1 generated
+all outputs; the audit inventory assigns each line its source rule.
+
+Checks/failures: early compiles found missing Lit leaves in the place and
+variance visitors, then passed after adding them. A prefix test incorrectly
+forbade the warning on a redundant final wildcard; it now proves the second
+clause useful by checking the exhaustive two-row form without that wildcard.
+The first full gate passed 183/184 spec cases: an external fixture tried a
+service-kind test provider. It now uses the supported external math provider;
+the separate finite-string service test also runs. The next full gate passed
+184 cases, then two complete runs added the remaining finite/shared and
+written-bound cases (185 and 186). No check was interrupted.
+
+Final full dev-verify: exit 0, 186 spec cases at both O0/O2, 1422 std tests
+per level, 33 browser tests; Clippy -D warnings and all Rust targets pass.
+Log: target/t1/continued/stage8-final-full.log. old-syntax-check: exit 0,
+1161 snippets, exact diagnostics, 17 future entries, none owned by T1.
+The corpus audit again finds only types/spec.i's required E0520 as a lost
+accepted checker fixture. Four original runtime fixtures, before §8's
+parameter rewrites, were separately checked with both binaries: all were
+accepted before and rejected with E0520 after, exactly as §8 lists:
+11/equality, 11/stop_tail_service, 6/blocks and 6/strings. Their current
+runtime versions still pass. Artifact: original-runtime.json under the
+continuation target directory.

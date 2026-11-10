@@ -844,13 +844,10 @@ impl Printer {
                 }
                 self.w(&name.name);
                 self.w("(");
-                self.list(args, |p, a| match a {
-                    TypeArg::Type(t) => p.ty(t),
-                    TypeArg::Int(v, _) => p.w(&v.to_string()),
-                    TypeArg::String(s, _) => p.w(&string_literal(s)),
-                });
+                self.list(args, |p, t| p.ty(t));
                 return self.w(")");
             }
+            TypeKind::Lit(v) => return self.w(&v.text()),
             TypeKind::Hole => return self.w("_"),
             TypeKind::Tuple(items) => {
                 self.w("(");
