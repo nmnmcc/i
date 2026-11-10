@@ -1,0 +1,6 @@
+{
+  "name": "hidden_conflict_nested",
+  "code": 0,
+  "time": 0.01975267007946968,
+  "out": "app/main.int : () -> Int ! Cell(Int)\napp/main.text : () -> String ! Cell(String)\napp/main.apply : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.both : (a: () -> A ? E ! N, b: () -> B ? E2 ! N2) -> () -> B ? E | E2 ! N | N2\napp/main.bad : () -> () -> String ! Cell(Int) | Cell(String)\n"
+}

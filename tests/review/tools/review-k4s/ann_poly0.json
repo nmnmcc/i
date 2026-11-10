@@ -1,0 +1,6 @@
+{
+  "name": "ann_poly0",
+  "code": 0,
+  "time": 0.018289458006620407,
+  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.test : () -> Nil ! N | S(N)\n"
+}

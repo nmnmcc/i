@@ -1,0 +1,11 @@
+[package]
+name = "ilang-check-before"
+version = "0.1.0"
+edition = "2024"
+[dependencies]
+ilang-syntax = { path = "/home/agent/Programming/i/.rd/std1/crates/ilang-syntax" }
+ilang-package = { path = "/home/agent/Programming/i/.rd/std1/crates/ilang-package" }
+num-bigint = "0.5.1"
+num-traits = "0.2.19"
+petgraph = "0.8"
+rustc-hash = "2"

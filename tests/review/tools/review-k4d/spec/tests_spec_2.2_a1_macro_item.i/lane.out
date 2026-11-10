@@ -1,0 +1,2 @@
+test/a1_macro_item.i:4:1: error[E0234]: a call at the top level is kept for macros
+1 error

@@ -1,0 +1,6 @@
+{
+  "code": 1,
+  "out": "app/main.run : (body: () -> Nil ! N) -> Nil ! N\n",
+  "err": "src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:4:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n2 errors\n",
+  "seconds": 0.019674808951094747
+}

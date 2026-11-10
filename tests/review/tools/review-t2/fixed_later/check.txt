@@ -1,0 +1,6 @@
+review/main.cell : (x: A) -> Cell(A)
+review/main.put : (c: Cell(A), x: A) -> Nil
+review/main.r : Cell(String | Int)
+review/main.later : () -> Nil
+src/main.i:6:16: error[E0501]: `String` is not a subtype of `Int` (the type at 6:10 needs it) (this type was fixed here: review/main:5:6)
+1 error

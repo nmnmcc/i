@@ -1,0 +1,4 @@
+spec/a1_identity_recursion_tail.make : () -> (n: A) -> A
+spec/a1_identity_recursion_tail.loop : (Int) -> Int
+spec/a1_identity_recursion_tail.via_match : (n: Int) -> Int
+spec/a1_identity_recursion_tail.main : () -> Nil ! Assert

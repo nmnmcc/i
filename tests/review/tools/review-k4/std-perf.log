@@ -1,0 +1,12 @@
+{'label': 'before', 'i': 0, 'wall': 1.2924850471317768, 'code': 0, 'stderr': 'CHECK_SECONDS=1.275511831\n'}
+{'label': 'after', 'i': 0, 'wall': 1.2095990229863673, 'code': 0, 'stderr': 'CHECK_SECONDS=1.195173459\n'}
+{'label': 'after', 'i': 1, 'wall': 1.2544404030777514, 'code': 0, 'stderr': 'CHECK_SECONDS=1.237884427\n'}
+{'label': 'before', 'i': 1, 'wall': 1.3226956021972, 'code': 0, 'stderr': 'CHECK_SECONDS=1.306978285\n'}
+{'label': 'before', 'i': 2, 'wall': 1.2456926710437983, 'code': 0, 'stderr': 'CHECK_SECONDS=1.231528691\n'}
+{'label': 'after', 'i': 2, 'wall': 1.1926581470761448, 'code': 0, 'stderr': 'CHECK_SECONDS=1.179526780\n'}
+{'label': 'after', 'i': 3, 'wall': 1.1428513149730861, 'code': 0, 'stderr': 'CHECK_SECONDS=1.129354904\n'}
+{'label': 'before', 'i': 3, 'wall': 1.2267891780938953, 'code': 0, 'stderr': 'CHECK_SECONDS=1.213051625\n'}
+{'label': 'before', 'i': 4, 'wall': 1.234312199987471, 'code': 0, 'stderr': 'CHECK_SECONDS=1.221059860\n'}
+{'label': 'after', 'i': 4, 'wall': 1.2573095420375466, 'code': 0, 'stderr': 'CHECK_SECONDS=1.243543453\n'}
+{'label': 'after', 'i': 5, 'wall': 1.2669901249464601, 'code': 0, 'stderr': 'CHECK_SECONDS=1.252905485\n'}
+{'label': 'before', 'i': 5, 'wall': 1.1800155518576503, 'code': 0, 'stderr': 'CHECK_SECONDS=1.156143858\n'}

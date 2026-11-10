@@ -1,0 +1,17 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:1:8: error[E0232]: a type parameter is an `UpName` with no module name and no arguments; old lowercase type parameters are now declared as UpNames, as in `Box(A) { Box(A) }` or `Id(A) = A`\nsrc/main.i:4:6: error[E0232]: a type parameter is an `UpName` with no module name and no arguments; old lowercase type parameters are now declared as UpNames, as in `Box(A) { Box(A) }` or `Id(A) = A`\nsrc/main.i:5:13: error[E0224]: the type `Stream` has 0 type parameters, but 3 are given\nsrc/main.i:5:20: error[E0201]: `a` is not defined\nsrc/main.i:5:30: error[E0201]: `n` is not defined\nsrc/main.i:6:15: error[E0224]: the type `Step` has 0 type parameters, but 3 are given\nsrc/main.i:6:20: error[E0201]: `a` is not defined\nsrc/main.i:6:30: error[E0201]: `n` is not defined\nsrc/main.i:6:35: error[E0201]: `n` is not defined\nsrc/main.i:6:51: error[E0201]: `n` is not defined\nsrc/main.i:9:20: error[E0224]: the type `Stream` has 0 type parameters, but 3 are given\n11 errors\n"
+    }
+  }
+}

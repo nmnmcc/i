@@ -1,0 +1,29 @@
+spec/control.check : (got: String, want: String) -> Nil
+spec/control.show : (x: A) -> String
+spec/control.length : (xs: List(A), n: Int) -> Int
+spec/control.collect : (body: () -> Nil ! Yield(A) | N) -> List(A) ! N
+spec/control.emit : (x: A) -> Nil ! Yield(A)
+spec/control.count : (from: Int & A, to: Int) -> Nil ! Yield(A)
+spec/control.generator : () -> Nil
+spec/control.values : () -> Nil
+spec/control.again : () -> Nil
+spec/control.nested_boundaries : () -> Nil
+spec/control.cancel : () -> Nil
+spec/control.cancel_runs_final_functions : () -> Nil
+spec/control.name : () -> String ! Name
+spec/control.deep : (b: Boundary(A, B, C & D)) -> String
+spec/control.environment : () -> Nil
+spec/control.errors : () -> Nil
+spec/control.numbers : (from: Int, to: Int) -> Step
+spec/control.take : (step: Step, n: Int, acc: A & List(B)) -> A | List(B | Int)
+spec/control.sum : (step: Step, acc: Int) -> Int
+spec/control.pulled : () -> Nil
+spec/control.loop : (n: Int, acc: Int) -> Int
+spec/control.tail_calls : () -> Nil
+spec/control.deep_generators : () -> Nil
+spec/control.in_branches : () -> Nil
+spec/control.paused_again : () -> Nil
+spec/control.walk : (n: Int & A) -> Nil ! Yield(A)
+spec/control.deep_paused_part : () -> Nil
+spec/control.through_inner_boundaries : () -> Nil
+spec/control.assertions_in_generators : () -> Nil

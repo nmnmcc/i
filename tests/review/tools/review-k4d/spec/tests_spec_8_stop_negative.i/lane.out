@@ -1,0 +1,2 @@
+spec/stop_negative.make : (n: Int) -> BitArray
+spec/stop_negative.main : () -> Nil

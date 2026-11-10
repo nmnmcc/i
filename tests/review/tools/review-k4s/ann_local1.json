@@ -1,0 +1,6 @@
+{
+  "name": "ann_local1",
+  "code": 0,
+  "time": 0.018684246111661196,
+  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.test : () -> Nil ! N | S(N)\n"
+}

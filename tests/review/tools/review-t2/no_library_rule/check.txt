@@ -1,0 +1,3 @@
+review/lib.make : (d: (String) -> A, e: (B) -> String) -> Schema(A, B)
+review/main.user : Schema((String, Int), Never)
+review/main.x : (String, Int)

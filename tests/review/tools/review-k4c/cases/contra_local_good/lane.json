@@ -1,0 +1,6 @@
+{
+  "code": 0,
+  "out": "app/main.use : (x: A) -> Int ! S(A)\napp/main.wrap : (x: A) -> Int ! S(B)\napp/main.main : () -> Nil\n",
+  "err": "",
+  "seconds": 0.02352366503328085
+}

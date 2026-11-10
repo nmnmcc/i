@@ -1,0 +1,1 @@
+spec/control_used_twice.main : () -> Nil

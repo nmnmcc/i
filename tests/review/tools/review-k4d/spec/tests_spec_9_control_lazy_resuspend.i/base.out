@@ -1,0 +1,6 @@
+spec/control_lazy_resuspend.check : (got: String, want: String) -> Nil
+spec/control_lazy_resuspend.show : (x: A) -> String
+spec/control_lazy_resuspend.note : (log: Boundary(String, A, B), text: String) -> Nil
+spec/control_lazy_resuspend.gen : (log: Boundary(String, A, B), b: Boundary(Step, Never, Never), n: Int) -> String
+spec/control_lazy_resuspend.drive : (step: Step, acc: String) -> String
+spec/control_lazy_resuspend.resume_suspend_resume : () -> Nil

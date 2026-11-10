@@ -1,0 +1,3 @@
+spec/strings.check : (got: String, want: String) -> Nil
+spec/strings.append : () -> Nil
+spec/strings.escapes : () -> Nil

@@ -1,0 +1,1 @@
+spec/a1_pipe_groups.main : () -> Nil ! Assert

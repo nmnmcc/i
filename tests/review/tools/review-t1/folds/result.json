@@ -1,0 +1,34 @@
+[
+  {
+    "cmd": [
+      "check",
+      "--types"
+    ],
+    "exit": 0,
+    "seconds": 0.14605353912338614,
+    "stdout": "probe/main.rec : (n: Int, acc: Int) -> Int\nprobe/main.main : () -> Nil ! Assert\n",
+    "stderr": ""
+  },
+  {
+    "cmd": [
+      "run",
+      "--opt",
+      "0"
+    ],
+    "exit": 0,
+    "seconds": 0.19706308608874679,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cmd": [
+      "run",
+      "--opt",
+      "2"
+    ],
+    "exit": 0,
+    "seconds": 0.3054094249382615,
+    "stdout": "",
+    "stderr": ""
+  }
+]

@@ -1,0 +1,2 @@
+src/main.i:1:12: error[E0530]: the type of odd is needed to type even, but the dependencies form a circle (even, odd -> even, odd); write the type instead
+1 error

@@ -1,0 +1,34 @@
+[
+  {
+    "cmd": [
+      "check",
+      "--types"
+    ],
+    "exit": 0,
+    "seconds": 0.1392670029308647,
+    "stdout": "probe/main.a : Int\nprobe/main.b : String\nprobe/main.c : -1\nprobe/main.d : Int\nprobe/main.x : 0\nprobe/main.y : 16\nprobe/main.s : \"\u00e9\"\nprobe/main.main : () -> Nil ! Assert\n",
+    "stderr": ""
+  },
+  {
+    "cmd": [
+      "run",
+      "--opt",
+      "0"
+    ],
+    "exit": 0,
+    "seconds": 0.20238851616159081,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cmd": [
+      "run",
+      "--opt",
+      "2"
+    ],
+    "exit": 0,
+    "seconds": 0.28552065207622945,
+    "stdout": "",
+    "stderr": ""
+  }
+]

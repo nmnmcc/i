@@ -1,0 +1,15 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 15.1ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 16.5ms
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running `/tmp/review-native3/probe/target/debug/review-native3-probe /tmp/review-native3/field /tmp/review-native3/external /tmp/review-native3/injection_control`
+PROJECT /tmp/review-native3/field
+ACCEPTED
+PROJECT /tmp/review-native3/external
+src/main.i:3:17: error[E0318]: the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3)
+REJECTED
+PROJECT /tmp/review-native3/injection_control
+ACCEPTED

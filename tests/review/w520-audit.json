@@ -1,0 +1,1412 @@
+{
+  "source": "docs/spec.md §6.9: the compiler gives warning W0503, showing both types; the comparison is well defined and has type Bool; literal types are not widened; the warning adds no narrowing fact",
+  "changes": [
+    {
+      "case": "review-k4d/_loose/spec/tests_spec_11_equality",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "test/equality.i",
+          "36",
+          "5"
+        ],
+        [
+          "test/equality.i",
+          "38",
+          "5"
+        ],
+        [
+          "test/equality.i",
+          "39",
+          "6"
+        ],
+        [
+          "test/equality.i",
+          "44",
+          "5"
+        ]
+      ],
+      "new_locations": [
+        [
+          "test/equality.i",
+          "36",
+          "5"
+        ],
+        [
+          "test/equality.i",
+          "38",
+          "5"
+        ],
+        [
+          "test/equality.i",
+          "39",
+          "6"
+        ],
+        [
+          "test/equality.i",
+          "44",
+          "5"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "test/equality.i",
+          "line": 36,
+          "column": 5,
+          "source": "\tno(1 == 2)"
+        },
+        {
+          "path": "test/equality.i",
+          "line": 38,
+          "column": 5,
+          "source": "\tno(100000000000000000000 == 100000000000000000001)"
+        },
+        {
+          "path": "test/equality.i",
+          "line": 39,
+          "column": 6,
+          "source": "\tyes(1 != 2)"
+        },
+        {
+          "path": "test/equality.i",
+          "line": 44,
+          "column": 5,
+          "source": "\tno(\"a\" == \"A\")"
+        }
+      ]
+    },
+    {
+      "case": "review-k4d/_loose/spec/tests_spec_11_stop_tail_service",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "test/stop_tail_service.i",
+          "20",
+          "20"
+        ]
+      ],
+      "new_locations": [
+        [
+          "test/stop_tail_service.i",
+          "20",
+          "20"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "test/stop_tail_service.i",
+          "line": 20,
+          "column": 20,
+          "source": "\tapply((v) { check(v == 0) }, 1)"
+        }
+      ]
+    },
+    {
+      "case": "review-k4d/_loose/spec/tests_spec_6_blocks",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "test/blocks.i",
+          "28",
+          "4"
+        ]
+      ],
+      "new_locations": [
+        [
+          "test/blocks.i",
+          "28",
+          "4"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "test/blocks.i",
+          "line": 28,
+          "column": 4,
+          "source": "\t{ check == \"\" } |> {"
+        }
+      ]
+    },
+    {
+      "case": "review-k4d/_loose/spec/tests_spec_6_strings",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "test/strings.i",
+          "24",
+          "21"
+        ]
+      ],
+      "new_locations": [
+        [
+          "test/strings.i",
+          "24",
+          "21"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "test/strings.i",
+          "line": 24,
+          "column": 21,
+          "source": "\tcheck(core.inspect(\"a\" != \"b\"), \"True\")"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/cross-consumer",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "src/main.i",
+          "4",
+          "20"
+        ]
+      ],
+      "new_locations": [
+        [
+          "src/main.i",
+          "4",
+          "20"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "src/main.i",
+          "line": 4,
+          "column": 20,
+          "source": "main = () { assert(f(api.last) == \"v19\") Nil }"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/display_tuple",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "src/main.i",
+          "2",
+          "10"
+        ]
+      ],
+      "new_locations": [
+        [
+          "src/main.i",
+          "2",
+          "10"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "src/main.i",
+          "line": 2,
+          "column": 10,
+          "source": "f = () { x == \"wrong\" }"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/display_union",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "src/main.i",
+          "2",
+          "17"
+        ]
+      ],
+      "new_locations": [
+        [
+          "src/main.i",
+          "2",
+          "17"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "src/main.i",
+          "line": 2,
+          "column": 17,
+          "source": "f = (x: Many) { x == \"wrong\" }"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/equality",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "src/main.i",
+          "2",
+          "10"
+        ],
+        [
+          "src/main.i",
+          "3",
+          "10"
+        ],
+        [
+          "src/main.i",
+          "4",
+          "20"
+        ]
+      ],
+      "new_locations": [
+        [
+          "src/main.i",
+          "2",
+          "10"
+        ],
+        [
+          "src/main.i",
+          "3",
+          "10"
+        ],
+        [
+          "src/main.i",
+          "4",
+          "20"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "src/main.i",
+          "line": 2,
+          "column": 10,
+          "source": "f = () { x == \"b\" }"
+        },
+        {
+          "path": "src/main.i",
+          "line": 3,
+          "column": 10,
+          "source": "g = () { 1 != 2 }"
+        },
+        {
+          "path": "src/main.i",
+          "line": 4,
+          "column": 20,
+          "source": "h = (x: Int - 1) { x == 1 }"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/original-blocks",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "test/main_test.i",
+          "28",
+          "4"
+        ]
+      ],
+      "new_locations": [
+        [
+          "test/main_test.i",
+          "28",
+          "4"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "test/main_test.i",
+          "line": 28,
+          "column": 4,
+          "source": "\t{ check == \"\" } |> {"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/original-equality",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "test/main_test.i",
+          "36",
+          "5"
+        ],
+        [
+          "test/main_test.i",
+          "38",
+          "5"
+        ],
+        [
+          "test/main_test.i",
+          "39",
+          "6"
+        ],
+        [
+          "test/main_test.i",
+          "44",
+          "5"
+        ]
+      ],
+      "new_locations": [
+        [
+          "test/main_test.i",
+          "36",
+          "5"
+        ],
+        [
+          "test/main_test.i",
+          "38",
+          "5"
+        ],
+        [
+          "test/main_test.i",
+          "39",
+          "6"
+        ],
+        [
+          "test/main_test.i",
+          "44",
+          "5"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "test/main_test.i",
+          "line": 36,
+          "column": 5,
+          "source": "\tno(1 == 2)"
+        },
+        {
+          "path": "test/main_test.i",
+          "line": 38,
+          "column": 5,
+          "source": "\tno(100000000000000000000 == 100000000000000000001)"
+        },
+        {
+          "path": "test/main_test.i",
+          "line": 39,
+          "column": 6,
+          "source": "\tyes(1 != 2)"
+        },
+        {
+          "path": "test/main_test.i",
+          "line": 44,
+          "column": 5,
+          "source": "\tno(\"a\" == \"A\")"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/original-stop_tail_service",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "test/main_test.i",
+          "20",
+          "20"
+        ]
+      ],
+      "new_locations": [
+        [
+          "test/main_test.i",
+          "20",
+          "20"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "test/main_test.i",
+          "line": 20,
+          "column": 20,
+          "source": "\tapply((v) { check(v == 0) }, 1)"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/original-strings",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "test/main_test.i",
+          "24",
+          "21"
+        ]
+      ],
+      "new_locations": [
+        [
+          "test/main_test.i",
+          "24",
+          "21"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "test/main_test.i",
+          "line": 24,
+          "column": 21,
+          "source": "\tcheck(core.inspect(\"a\" != \"b\"), \"True\")"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/regress_const",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "src/main.i",
+          "2",
+          "10"
+        ]
+      ],
+      "new_locations": [
+        [
+          "src/main.i",
+          "2",
+          "10"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "src/main.i",
+          "line": 2,
+          "column": 10,
+          "source": "f = () { x == 2 }"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/regress_const-before",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "src/main.i",
+          "2",
+          "10"
+        ]
+      ],
+      "new_locations": [
+        [
+          "src/main.i",
+          "2",
+          "10"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "src/main.i",
+          "line": 2,
+          "column": 10,
+          "source": "f = () { x == 2 }"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/regress_map",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "src/main.i",
+          "2",
+          "31"
+        ]
+      ],
+      "new_locations": [
+        [
+          "src/main.i",
+          "2",
+          "31"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "src/main.i",
+          "line": 2,
+          "column": 31,
+          "source": "f = () { list.map([\"a\"],(x) { x == \"b\" }) }"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/regress_map-before",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "src/main.i",
+          "2",
+          "31"
+        ]
+      ],
+      "new_locations": [
+        [
+          "src/main.i",
+          "2",
+          "31"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "src/main.i",
+          "line": 2,
+          "column": 31,
+          "source": "f = () { list.map([\"a\"],(x) { x == \"b\" }) }"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/regress_result",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "src/main.i",
+          "2",
+          "10"
+        ]
+      ],
+      "new_locations": [
+        [
+          "src/main.i",
+          "2",
+          "10"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "src/main.i",
+          "line": 2,
+          "column": 10,
+          "source": "f = () { status() == \"error\" }"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/regress_result-before",
+      "old_exit": 1,
+      "new_exit": 0,
+      "old_locations": [
+        [
+          "src/main.i",
+          "2",
+          "10"
+        ]
+      ],
+      "new_locations": [
+        [
+          "src/main.i",
+          "2",
+          "10"
+        ]
+      ],
+      "shown_types_unchanged": true,
+      "source_excerpts": [
+        {
+          "path": "src/main.i",
+          "line": 2,
+          "column": 10,
+          "source": "f = () { status() == \"error\" }"
+        }
+      ]
+    }
+  ],
+  "censored_changes": [
+    "review-k4/perf/wide_2048",
+    "review-k4d/_loose/fuzz/bad/run_44_188",
+    "review-k4d/_loose/fuzz/bad/run_44_361",
+    "review-std3/bench",
+    "review-t1/stress-keys-2000",
+    "review-t1/stress-keys-5000",
+    "review-t1/stress-nested-50"
+  ],
+  "startup_harness_changes": [
+    "review-a1/cases/01_headers_tuple",
+    "review-a1/_loose/cases/01_headers_tuple/original",
+    "review-a1/cases/02_old_headers",
+    "review-a1/cases/03_mixed_headers",
+    "review-a1/cases/06_old_empty_headers",
+    "review-a1/cases/07_tuple_first",
+    "review-a1/_loose/cases/07_tuple_first/original",
+    "review-a1/cases/08_attr_tuple_newline",
+    "review-a1/_loose/cases/08_attr_tuple_newline/original",
+    "review-a1/cases/12_group",
+    "review-a1/_loose/cases/12_group/original",
+    "review-a1/cases/13_first_fn_binding",
+    "review-a1/_loose/cases/13_first_fn_binding/original",
+    "review-a1/cases/14_first_chain_fn",
+    "review-a1/_loose/cases/14_first_chain_fn/original",
+    "review-a1/cases/15_first_typed_fn",
+    "review-a1/_loose/cases/15_first_typed_fn/original",
+    "review-a1/cases/16_body_returns_fn",
+    "review-a1/_loose/cases/16_body_returns_fn/original",
+    "review-a1/cases/17_old_unbound_fn_group",
+    "review-a1/cases/19_new_alias_tuple_clause",
+    "review-a1/_loose/cases/19_new_alias_tuple_clause/original",
+    "review-a1/cases/20_old_alias_returns_fn",
+    "review-a1/cases/22_new_tuple_returns_fn",
+    "review-a1/_loose/cases/22_new_tuple_returns_fn/original",
+    "review-a1/cases/24_guard_fn_grouped",
+    "review-a1/_loose/cases/24_guard_fn_grouped/original",
+    "review-a1/cases/25_old_guard_fn",
+    "review-a1/cases/27_param_first",
+    "review-a1/_loose/cases/27_param_first/original",
+    "review-a1/cases/28_param_later",
+    "review-a1/_loose/cases/28_param_later/original",
+    "review-a1/cases/32_call_constructor_boundary",
+    "review-a1/_loose/cases/32_call_constructor_boundary/original",
+    "review-a1/cases/34_single_assert",
+    "review-a1/_loose/cases/34_single_assert/original",
+    "review-a1/cases/36_multi_typed_test",
+    "review-a1/_loose/cases/36_multi_typed_test/original",
+    "review-a1/cases/37_old_single_typed",
+    "review-a1/cases/38_single_choices_pending",
+    "review-a1/_loose/cases/38_single_choices_pending/original",
+    "review-a1/cases/39_old_choices",
+    "review-a1/cases/40_guarded_choices",
+    "review-a1/_loose/cases/40_guarded_choices/original",
+    "review-a1/cases/41_old_match_times",
+    "review-a1/cases/42_old_plus_match",
+    "review-a1/cases/43_old_match_compare_subject",
+    "review-a1/cases/44_old_match_concat_subject",
+    "review-a1/cases/45_old_match_call",
+    "review-a1/cases/46_old_match_tuple_field",
+    "review-a1/cases/47_old_match_named_field",
+    "review-a1/cases/49_new_grouped_product",
+    "review-a1/_loose/cases/49_new_grouped_product/original",
+    "review-a1/cases/50_new_match_empty_call",
+    "review-a1/_loose/cases/50_new_match_empty_call/original",
+    "review-a1/cases/51_old_negative_clauses",
+    "review-a1/cases/52_new_tuple_clauses_lines",
+    "review-a1/_loose/cases/52_new_tuple_clauses_lines/original",
+    "review-a1/cases/54_minus_newline",
+    "review-a1/_loose/cases/54_minus_newline/original",
+    "review-a1/cases/55_minus_continued",
+    "review-a1/_loose/cases/55_minus_continued/original",
+    "review-a1/cases/56_old_guard_lines",
+    "review-a1/cases/57_new_guard_lines",
+    "review-a1/_loose/cases/57_new_guard_lines/original",
+    "review-a1/cases/58_old_typevars",
+    "review-a1/cases/59_mixed_capture_inner",
+    "review-a1/cases/60_mixed_capture_outer",
+    "review-a1/cases/61_old_type_alias_join",
+    "review-a1/cases/63_new_greedy_type",
+    "review-a1/_loose/cases/63_new_greedy_type/original",
+    "review-a1/cases/64_empty_clauses",
+    "review-a1/_loose/cases/64_empty_clauses/original",
+    "review-a1/cases/65_new_expected_subject",
+    "review-a1/_loose/cases/65_new_expected_subject/original",
+    "review-a1/cases/66_new_subject_scope",
+    "review-a1/_loose/cases/66_new_subject_scope/original",
+    "review-a1/confirmed/idempotence-from-old",
+    "review-a1/_loose/confirmed/idempotence-from-old/once",
+    "review-a1/confirmed/idempotence-keep-layout",
+    "review-a1/confirmed/idempotence-plain",
+    "review-a1/_loose/confirmed/idempotence-plain/once",
+    "review-a1/corrected29",
+    "review-a1/runtime-new/01",
+    "review-a1/_loose/runtime-new/01/original",
+    "review-a1/runtime-new/03",
+    "review-a1/runtime-new/08",
+    "review-a1/_loose/runtime-new/08/original",
+    "review-a1/runtime-new/19",
+    "review-a1/_loose/runtime-new/19/original",
+    "review-a1/runtime-new/22",
+    "review-a1/_loose/runtime-new/22/original",
+    "review-a1/runtime-new/24",
+    "review-a1/_loose/runtime-new/24/original",
+    "review-a1/runtime-new/27",
+    "review-a1/_loose/runtime-new/27/original",
+    "review-a1/runtime-new/28",
+    "review-a1/_loose/runtime-new/28/original",
+    "review-a1/runtime-new/32",
+    "review-a1/_loose/runtime-new/32/original",
+    "review-a1/runtime-new/34",
+    "review-a1/_loose/runtime-new/34/original",
+    "review-a1/runtime-new/36",
+    "review-a1/_loose/runtime-new/36/original",
+    "review-a1/runtime-new/40",
+    "review-a1/_loose/runtime-new/40/original",
+    "review-a1/runtime-new/49",
+    "review-a1/_loose/runtime-new/49/original",
+    "review-a1/runtime-new/50",
+    "review-a1/_loose/runtime-new/50/original",
+    "review-a1/runtime-new/52",
+    "review-a1/_loose/runtime-new/52/original",
+    "review-a1/runtime-new/57",
+    "review-a1/_loose/runtime-new/57/original",
+    "review-a1/runtime-new/59",
+    "review-a1/runtime-new/60",
+    "review-a1/runtime-new/64",
+    "review-a1/_loose/runtime-new/64/original",
+    "review-a1/runtime-new/65",
+    "review-a1/_loose/runtime-new/65/original",
+    "review-a1/runtime-new/66",
+    "review-a1/_loose/runtime-new/66/original",
+    "review-a1/runtime/02",
+    "review-a1/runtime/06",
+    "review-a1/runtime/07",
+    "review-a1/_loose/runtime/07/original",
+    "review-a1/runtime/12",
+    "review-a1/_loose/runtime/12/original",
+    "review-a1/runtime/13",
+    "review-a1/_loose/runtime/13/original",
+    "review-a1/runtime/14",
+    "review-a1/_loose/runtime/14/original",
+    "review-a1/runtime/15",
+    "review-a1/_loose/runtime/15/original",
+    "review-a1/runtime/16",
+    "review-a1/_loose/runtime/16/original",
+    "review-a1/runtime/17",
+    "review-a1/runtime/20",
+    "review-a1/runtime/25",
+    "review-a1/runtime/37",
+    "review-a1/runtime/39",
+    "review-a1/runtime/41",
+    "review-a1/runtime/42",
+    "review-a1/runtime/43",
+    "review-a1/runtime/44",
+    "review-a1/runtime/45",
+    "review-a1/runtime/46",
+    "review-a1/runtime/47",
+    "review-a1/runtime/51",
+    "review-a1/runtime/54",
+    "review-a1/_loose/runtime/54/original",
+    "review-a1/runtime/55",
+    "review-a1/_loose/runtime/55/original",
+    "review-a1/runtime/56",
+    "review-a1/runtime/58",
+    "review-a1/runtime/61",
+    "review-js/coarse",
+    "review-js/raw",
+    "review-js/stop",
+    "review-js3/capability",
+    "review-js4/bootstrap",
+    "review-js4/generic",
+    "review-js4/rebinding",
+    "review-js4/settings",
+    "review-k4/cases/closure_closed",
+    "review-k4/cases/conflict_2046229799906290556",
+    "review-k4/cases/conflict_4759503553685934015",
+    "review-k4/cases/hidden_conflict",
+    "review-k4/cases/matrix_False_False_False",
+    "review-k4/cases/matrix_False_False_False_reverse",
+    "review-k4/cases/matrix_False_True_False",
+    "review-k4/cases/matrix_False_True_False_reverse",
+    "review-k4/cases/provision_closure_False",
+    "review-k4/cases/provision_closure_True",
+    "review-k4/cases/provision_direct_False",
+    "review-k4/cases/provision_direct_True",
+    "review-k4/cases/provision_helper_False",
+    "review-k4/cases/provision_helper_True",
+    "review-k4/cases/provision_inferred_False",
+    "review-k4/cases/provision_inferred_True",
+    "review-k4/cases/same_row",
+    "review-k4/cases/two_rows",
+    "review-k4/cases/wrapper_0_False_False",
+    "review-k4/cases/wrapper_0_False_True",
+    "review-k4/cases/wrapper_10_False_False",
+    "review-k4/cases/wrapper_10_False_True",
+    "review-k4/cases/wrapper_3_False_False",
+    "review-k4/cases/wrapper_3_False_True",
+    "review-k4/cases/wrapper_4_False_False",
+    "review-k4/cases/wrapper_4_False_True",
+    "review-k4/perf/plain_chain_1024",
+    "review-k4/perf/plain_chain_128",
+    "review-k4/perf/plain_chain_2048",
+    "review-k4/perf/plain_chain_256",
+    "review-k4/perf/plain_chain_512",
+    "review-k4/perf/plain_chain_64",
+    "review-k4/perf/wide_1024",
+    "review-k4/perf/wide_128",
+    "review-k4/perf/wide_256",
+    "review-k4/perf/wide_512",
+    "review-k4/perf/wide_64",
+    "review-k4/perf/wide_generic_128",
+    "review-k4/perf/wide_generic_256",
+    "review-k4/perf/wide_generic_64",
+    "review-k4c/cases/annotation_0",
+    "review-k4c/cases/annotation_1",
+    "review-k4c/cases/annotation_2",
+    "review-k4c/cases/closure_statement",
+    "review-k4c/cases/closure_statement_ok",
+    "review-k4c/cases/co_callback",
+    "review-k4c/cases/co_deep",
+    "review-k4c/cases/co_direct",
+    "review-k4c/cases/co_escape",
+    "review-k4c/cases/co_higher",
+    "review-k4c/cases/co_local",
+    "review-k4c/cases/co_nested",
+    "review-k4c/cases/contra_callback",
+    "review-k4c/cases/contra_deep",
+    "review-k4c/cases/contra_direct",
+    "review-k4c/cases/contra_escape",
+    "review-k4c/cases/contra_higher",
+    "review-k4c/cases/contra_local",
+    "review-k4c/cases/contra_local_good",
+    "review-k4c/cases/contra_nested",
+    "review-k4c/cases/effects_co_0_0",
+    "review-k4c/cases/effects_co_1_0",
+    "review-k4c/cases/effects_co_2_0",
+    "review-k4c/cases/effects_co_4_0",
+    "review-k4c/cases/effects_co_6_0",
+    "review-k4c/cases/effects_inv_0_0",
+    "review-k4c/cases/effects_inv_2_0",
+    "review-k4c/cases/effects_two_0_0",
+    "review-k4c/cases/effects_two_1_0",
+    "review-k4c/cases/effects_two_2_0",
+    "review-k4c/cases/effects_two_4_0",
+    "review-k4c/cases/effects_two_6_0",
+    "review-k4c/cases/finite_field_0",
+    "review-k4c/cases/finite_pattern_0",
+    "review-k4c/cases/inv_callback",
+    "review-k4c/cases/inv_deep",
+    "review-k4c/cases/inv_direct",
+    "review-k4c/cases/inv_escape",
+    "review-k4c/cases/inv_higher",
+    "review-k4c/cases/inv_local",
+    "review-k4c/cases/inv_nested",
+    "review-k4c/cases/missing_0_0_0_2",
+    "review-k4c/cases/missing_0_1_0_0",
+    "review-k4c/cases/missing_0_1_0_1",
+    "review-k4c/cases/missing_0_1_0_2",
+    "review-k4c/cases/missing_0_1_1_0",
+    "review-k4c/cases/missing_0_1_1_1",
+    "review-k4c/cases/missing_0_1_1_2",
+    "review-k4c/cases/missing_0_2_0_2",
+    "review-k4c/cases/missing_0_4_1_0",
+    "review-k4c/cases/missing_0_4_1_1",
+    "review-k4c/cases/missing_0_4_1_2",
+    "review-k4c/cases/missing_0_7_0_0",
+    "review-k4c/cases/missing_0_7_0_1",
+    "review-k4c/cases/missing_0_7_0_2",
+    "review-k4c/cases/missing_0_7_1_0",
+    "review-k4c/cases/missing_0_7_1_1",
+    "review-k4c/cases/missing_0_7_1_2",
+    "review-k4c/cases/missing_2_0_0_2",
+    "review-k4c/cases/missing_2_1_0_0",
+    "review-k4c/cases/missing_2_1_0_1",
+    "review-k4c/cases/missing_2_1_0_2",
+    "review-k4c/cases/missing_2_1_1_0",
+    "review-k4c/cases/missing_2_1_1_1",
+    "review-k4c/cases/missing_2_1_1_2",
+    "review-k4c/cases/missing_2_2_0_2",
+    "review-k4c/cases/missing_2_4_1_0",
+    "review-k4c/cases/missing_2_4_1_1",
+    "review-k4c/cases/missing_2_4_1_2",
+    "review-k4c/cases/missing_2_7_0_0",
+    "review-k4c/cases/missing_2_7_0_1",
+    "review-k4c/cases/missing_2_7_0_2",
+    "review-k4c/cases/missing_2_7_1_0",
+    "review-k4c/cases/missing_2_7_1_1",
+    "review-k4c/cases/missing_2_7_1_2",
+    "review-k4c/cases/missing_3_0_0_2",
+    "review-k4c/cases/missing_3_1_0_0",
+    "review-k4c/cases/missing_3_1_0_1",
+    "review-k4c/cases/missing_3_1_0_2",
+    "review-k4c/cases/missing_3_1_1_0",
+    "review-k4c/cases/missing_3_1_1_1",
+    "review-k4c/cases/missing_3_1_1_2",
+    "review-k4c/cases/missing_3_2_0_2",
+    "review-k4c/cases/missing_3_7_0_0",
+    "review-k4c/cases/missing_3_7_0_1",
+    "review-k4c/cases/missing_3_7_0_2",
+    "review-k4c/cases/missing_3_7_1_0",
+    "review-k4c/cases/missing_3_7_1_1",
+    "review-k4c/cases/missing_3_7_1_2",
+    "review-k4c/cases/multi_run",
+    "review-k4c/cases/mutual",
+    "review-k4c/cases/nested_env_function",
+    "review-k4c/cases/order_hidden_conflict_0",
+    "review-k4c/cases/order_hidden_conflict_1",
+    "review-k4c/cases/order_hidden_conflict_10",
+    "review-k4c/cases/order_hidden_conflict_11",
+    "review-k4c/cases/order_hidden_conflict_12",
+    "review-k4c/cases/order_hidden_conflict_13",
+    "review-k4c/cases/order_hidden_conflict_14",
+    "review-k4c/cases/order_hidden_conflict_15",
+    "review-k4c/cases/order_hidden_conflict_16",
+    "review-k4c/cases/order_hidden_conflict_17",
+    "review-k4c/cases/order_hidden_conflict_18",
+    "review-k4c/cases/order_hidden_conflict_19",
+    "review-k4c/cases/order_hidden_conflict_2",
+    "review-k4c/cases/order_hidden_conflict_20",
+    "review-k4c/cases/order_hidden_conflict_21",
+    "review-k4c/cases/order_hidden_conflict_22",
+    "review-k4c/cases/order_hidden_conflict_23",
+    "review-k4c/cases/order_hidden_conflict_24",
+    "review-k4c/cases/order_hidden_conflict_25",
+    "review-k4c/cases/order_hidden_conflict_26",
+    "review-k4c/cases/order_hidden_conflict_27",
+    "review-k4c/cases/order_hidden_conflict_28",
+    "review-k4c/cases/order_hidden_conflict_29",
+    "review-k4c/cases/order_hidden_conflict_3",
+    "review-k4c/cases/order_hidden_conflict_30",
+    "review-k4c/cases/order_hidden_conflict_31",
+    "review-k4c/cases/order_hidden_conflict_4",
+    "review-k4c/cases/order_hidden_conflict_5",
+    "review-k4c/cases/order_hidden_conflict_6",
+    "review-k4c/cases/order_hidden_conflict_7",
+    "review-k4c/cases/order_hidden_conflict_8",
+    "review-k4c/cases/order_hidden_conflict_9",
+    "review-k4c/cases/order_multi_instance_0",
+    "review-k4c/cases/order_multi_instance_1",
+    "review-k4c/cases/order_multi_instance_10",
+    "review-k4c/cases/order_multi_instance_11",
+    "review-k4c/cases/order_multi_instance_12",
+    "review-k4c/cases/order_multi_instance_13",
+    "review-k4c/cases/order_multi_instance_14",
+    "review-k4c/cases/order_multi_instance_15",
+    "review-k4c/cases/order_multi_instance_16",
+    "review-k4c/cases/order_multi_instance_17",
+    "review-k4c/cases/order_multi_instance_18",
+    "review-k4c/cases/order_multi_instance_19",
+    "review-k4c/cases/order_multi_instance_2",
+    "review-k4c/cases/order_multi_instance_20",
+    "review-k4c/cases/order_multi_instance_21",
+    "review-k4c/cases/order_multi_instance_22",
+    "review-k4c/cases/order_multi_instance_23",
+    "review-k4c/cases/order_multi_instance_24",
+    "review-k4c/cases/order_multi_instance_25",
+    "review-k4c/cases/order_multi_instance_26",
+    "review-k4c/cases/order_multi_instance_27",
+    "review-k4c/cases/order_multi_instance_28",
+    "review-k4c/cases/order_multi_instance_29",
+    "review-k4c/cases/order_multi_instance_3",
+    "review-k4c/cases/order_multi_instance_30",
+    "review-k4c/cases/order_multi_instance_31",
+    "review-k4c/cases/order_multi_instance_4",
+    "review-k4c/cases/order_multi_instance_5",
+    "review-k4c/cases/order_multi_instance_6",
+    "review-k4c/cases/order_multi_instance_7",
+    "review-k4c/cases/order_multi_instance_8",
+    "review-k4c/cases/order_multi_instance_9",
+    "review-k4c/cases/order_mutual_0",
+    "review-k4c/cases/order_mutual_1",
+    "review-k4c/cases/order_mutual_10",
+    "review-k4c/cases/order_mutual_11",
+    "review-k4c/cases/order_mutual_12",
+    "review-k4c/cases/order_mutual_13",
+    "review-k4c/cases/order_mutual_14",
+    "review-k4c/cases/order_mutual_15",
+    "review-k4c/cases/order_mutual_16",
+    "review-k4c/cases/order_mutual_17",
+    "review-k4c/cases/order_mutual_18",
+    "review-k4c/cases/order_mutual_19",
+    "review-k4c/cases/order_mutual_2",
+    "review-k4c/cases/order_mutual_20",
+    "review-k4c/cases/order_mutual_21",
+    "review-k4c/cases/order_mutual_22",
+    "review-k4c/cases/order_mutual_23",
+    "review-k4c/cases/order_mutual_24",
+    "review-k4c/cases/order_mutual_25",
+    "review-k4c/cases/order_mutual_26",
+    "review-k4c/cases/order_mutual_27",
+    "review-k4c/cases/order_mutual_28",
+    "review-k4c/cases/order_mutual_29",
+    "review-k4c/cases/order_mutual_3",
+    "review-k4c/cases/order_mutual_30",
+    "review-k4c/cases/order_mutual_31",
+    "review-k4c/cases/order_mutual_4",
+    "review-k4c/cases/order_mutual_5",
+    "review-k4c/cases/order_mutual_6",
+    "review-k4c/cases/order_mutual_7",
+    "review-k4c/cases/order_mutual_8",
+    "review-k4c/cases/order_mutual_9",
+    "review-k4c/cases/plain_0",
+    "review-k4c/cases/plain_2",
+    "review-k4c/cases/plain_4",
+    "review-k4c/cases/plain_5",
+    "review-k4c/cases/plain_6",
+    "review-k4c/cases/row_callback",
+    "review-k4c/cases/row_deep",
+    "review-k4c/cases/row_direct",
+    "review-k4c/cases/row_escape",
+    "review-k4c/cases/row_higher",
+    "review-k4c/cases/row_local",
+    "review-k4c/cases/row_nested",
+    "review-k4c/cases/stress_plain_1024",
+    "review-k4c/cases/stress_plain_128",
+    "review-k4c/cases/stress_plain_32",
+    "review-k4c/cases/stress_plain_512",
+    "review-k4c/cases/stress_wide_1024",
+    "review-k4c/cases/stress_wide_128",
+    "review-k4c/cases/stress_wide_32",
+    "review-k4c/cases/stress_wide_512",
+    "review-k4c/cases/stress_wide_open_128",
+    "review-k4c/cases/stress_wide_open_32",
+    "review-k4d/fuzz/pl45",
+    "review-k4d/_loose/p/b4",
+    "review-k4d/_loose/p/b5",
+    "review-k4d/_loose/p/b7",
+    "review-k4d/_loose/p/d2",
+    "review-k4d/_loose/p/e1",
+    "review-k4d/_loose/p/e2",
+    "review-k4d/_loose/p/f2",
+    "review-k4d/_loose/p/f3",
+    "review-k4d/_loose/p/f4",
+    "review-k4d/_loose/p/g_inf_SDep",
+    "review-k4d/_loose/p/m3",
+    "review-k4d/_loose/p/m4",
+    "review-k4d/_loose/p/q24",
+    "review-k4d/_loose/p/q29",
+    "review-k4d/_loose/p/q3",
+    "review-k4d/_loose/p/q8",
+    "review-k4d/_loose/p/r2",
+    "review-k4d/_loose/p/r3",
+    "review-k4d/_loose/p/r6",
+    "review-k4d/_loose/p/w13",
+    "review-k4d/_loose/p/w5",
+    "review-k4d/_loose/p/z1",
+    "review-k4d/_loose/p/z4",
+    "review-k4d/perf/chain1000",
+    "review-k4d/perf/chain200",
+    "review-k4d/perf/chain4000",
+    "review-k4d/perf/mutdep100",
+    "review-k4d/perf/mutdep150",
+    "review-k4d/perf/mutdep200",
+    "review-k4d/perf/mutdep25",
+    "review-k4d/perf/mutdep50",
+    "review-k4d/perf/mutplain100",
+    "review-k4d/perf/mutplain150",
+    "review-k4d/perf/mutplain200",
+    "review-k4d/perf/mutplain25",
+    "review-k4d/perf/mutplain50",
+    "review-k4d/perf/twice1000",
+    "review-k4d/perf/twice200",
+    "review-k4d/perf/twice4000",
+    "review-k4d/perf/wide20",
+    "review-k4d/perf/wide200",
+    "review-k4d/perf/wide80",
+    "review-k4d/proj/b4",
+    "review-k4d/proj/b5",
+    "review-k4d/proj/b7",
+    "review-k4d/proj/d2",
+    "review-k4d/proj/e1",
+    "review-k4d/proj/e2",
+    "review-k4d/proj/f2",
+    "review-k4d/proj/f3",
+    "review-k4d/proj/f4",
+    "review-k4d/proj/g_inf_SDep",
+    "review-k4d/proj/m3",
+    "review-k4d/proj/m4",
+    "review-k4d/proj/q24",
+    "review-k4d/proj/q29",
+    "review-k4d/proj/q3",
+    "review-k4d/proj/q8",
+    "review-k4d/proj/r2",
+    "review-k4d/proj/r3",
+    "review-k4d/proj/r6",
+    "review-k4d/proj/w13",
+    "review-k4d/proj/w5",
+    "review-k4d/proj/z1",
+    "review-k4d/proj/z4",
+    "review-k4s/ann_arg0",
+    "review-k4s/ann_different0",
+    "review-k4s/ann_different1",
+    "review-k4s/ann_direct0",
+    "review-k4s/ann_local_install0",
+    "review-k4s/ann_twice0",
+    "review-k4s/co_0_0",
+    "review-k4s/hidden_conflict_closure",
+    "review-k4s/hidden_conflict_nested",
+    "review-k4s/local_env_closure",
+    "review-k4s/min_main_6_0",
+    "review-k4s/mixed_order_1",
+    "review-k4s/outer_closure_var",
+    "review-k4s/outer_no_helper",
+    "review-k4s/recursive_never",
+    "review-k4s/wide_plain_128",
+    "review-k4s/wide_plain_256",
+    "review-k4s/wide_plain_64",
+    "review-native/fake",
+    "review-num/async",
+    "review-num/trace",
+    "review-std2/arithmetic",
+    "review-std2/client_no_error",
+    "review-std2/client_no_marker",
+    "review-std2/closed",
+    "review-std2/error",
+    "review-std2/explicit_arg",
+    "review-std2/full_closed",
+    "review-std2/marker",
+    "review-std2/marker_pure",
+    "review-std2/minimal",
+    "review-std2/replacement_scope",
+    "review-std2/replacement_unused",
+    "review-std3/failures",
+    "review-t1/annotation_added",
+    "review-t1/annotation_removed",
+    "review-t1/assert_group",
+    "review-t1/choices_assert",
+    "review-t1/cofinite",
+    "review-t1/cross-lib",
+    "review-t1/error_rows",
+    "review-t1/finite",
+    "review-t1/folds",
+    "review-t1/functions_acc",
+    "review-t1/fuzz-1",
+    "review-t1/fuzz-10",
+    "review-t1/fuzz-104",
+    "review-t1/fuzz-105",
+    "review-t1/fuzz-106",
+    "review-t1/fuzz-109",
+    "review-t1/fuzz-117",
+    "review-t1/fuzz-118",
+    "review-t1/fuzz-12",
+    "review-t1/fuzz-122",
+    "review-t1/fuzz-126",
+    "review-t1/fuzz-130",
+    "review-t1/fuzz-132",
+    "review-t1/fuzz-134",
+    "review-t1/fuzz-138",
+    "review-t1/fuzz-140",
+    "review-t1/fuzz-141",
+    "review-t1/fuzz-142",
+    "review-t1/fuzz-143",
+    "review-t1/fuzz-15",
+    "review-t1/fuzz-154",
+    "review-t1/fuzz-160",
+    "review-t1/fuzz-161",
+    "review-t1/fuzz-162",
+    "review-t1/fuzz-164",
+    "review-t1/fuzz-165",
+    "review-t1/fuzz-166",
+    "review-t1/fuzz-167",
+    "review-t1/fuzz-171",
+    "review-t1/fuzz-173",
+    "review-t1/fuzz-175",
+    "review-t1/fuzz-177",
+    "review-t1/fuzz-20",
+    "review-t1/fuzz-23",
+    "review-t1/fuzz-25",
+    "review-t1/fuzz-3",
+    "review-t1/fuzz-30",
+    "review-t1/fuzz-31",
+    "review-t1/fuzz-33",
+    "review-t1/fuzz-34",
+    "review-t1/fuzz-37",
+    "review-t1/fuzz-40",
+    "review-t1/fuzz-41",
+    "review-t1/fuzz-43",
+    "review-t1/fuzz-44",
+    "review-t1/fuzz-49",
+    "review-t1/fuzz-50",
+    "review-t1/fuzz-53",
+    "review-t1/fuzz-54",
+    "review-t1/fuzz-62",
+    "review-t1/fuzz-63",
+    "review-t1/fuzz-64",
+    "review-t1/fuzz-65",
+    "review-t1/fuzz-69",
+    "review-t1/fuzz-71",
+    "review-t1/fuzz-74",
+    "review-t1/fuzz-75",
+    "review-t1/fuzz-76",
+    "review-t1/fuzz-81",
+    "review-t1/fuzz-84",
+    "review-t1/fuzz-86",
+    "review-t1/fuzz-89",
+    "review-t1/fuzz-91",
+    "review-t1/fuzz-93",
+    "review-t1/fuzz-96",
+    "review-t1/generic_difference",
+    "review-t1/host_equivalent_finite",
+    "review-t1/host_equivalent_inter",
+    "review-t1/host_equivalent_whole",
+    "review-t1/host_one_control",
+    "review-t1/host_outbound",
+    "review-t1/host_service_union_error",
+    "review-t1/host_union_internal",
+    "review-t1/host_whole_control",
+    "review-t1/invariant",
+    "review-t1/list_annotated",
+    "review-t1/negative_group_break",
+    "review-t1/operators",
+    "review-t1/ordinary_group_break",
+    "review-t1/prefix_tuple",
+    "review-t1/regress_cells",
+    "review-t1/regress_cells-before",
+    "review-t1/regress_map_fixed",
+    "review-t1/regress_result_fixed",
+    "review-t1/regress_single",
+    "review-t1/regress_single-before",
+    "review-t1/service",
+    "review-t1/shared_finite",
+    "review-t1/stress-alias-1000",
+    "review-t1/stress-alias-2000",
+    "review-t1/stress-alias-250",
+    "review-t1/stress-alias-500",
+    "review-t1/stress-calls-2500",
+    "review-t1/stress-calls-5000",
+    "review-t1/stress-keys-1000",
+    "review-t1/stress-keys-250",
+    "review-t1/stress-keys-500",
+    "review-t1/stress-nested-10",
+    "review-t1/stress-nested-20",
+    "review-t1/stress-nested-30",
+    "review-t1/stress-pick-1000",
+    "review-t1/stress-pick-2000",
+    "review-t1/stress-pick-250",
+    "review-t1/stress-pick-500",
+    "review-t1/stress-pick-5000",
+    "review-t1/typed_function_acc",
+    "review-t2/chain128",
+    "review-t2/chain256",
+    "review-t2/chain512",
+    "review-t2/chain64",
+    "review-t2/order/0",
+    "review-t2/order/1",
+    "review-t2/order/10",
+    "review-t2/order/100",
+    "review-t2/order/101",
+    "review-t2/order/102",
+    "review-t2/order/103",
+    "review-t2/order/104",
+    "review-t2/order/105",
+    "review-t2/order/106",
+    "review-t2/order/107",
+    "review-t2/order/108",
+    "review-t2/order/109",
+    "review-t2/order/11",
+    "review-t2/order/110",
+    "review-t2/order/111",
+    "review-t2/order/112",
+    "review-t2/order/113",
+    "review-t2/order/114",
+    "review-t2/order/115",
+    "review-t2/order/116",
+    "review-t2/order/117",
+    "review-t2/order/118",
+    "review-t2/order/119",
+    "review-t2/order/12",
+    "review-t2/order/13",
+    "review-t2/order/14",
+    "review-t2/order/15",
+    "review-t2/order/16",
+    "review-t2/order/17",
+    "review-t2/order/18",
+    "review-t2/order/19",
+    "review-t2/order/2",
+    "review-t2/order/20",
+    "review-t2/order/21",
+    "review-t2/order/22",
+    "review-t2/order/23",
+    "review-t2/order/24",
+    "review-t2/order/25",
+    "review-t2/order/26",
+    "review-t2/order/27",
+    "review-t2/order/28",
+    "review-t2/order/29",
+    "review-t2/order/3",
+    "review-t2/order/30",
+    "review-t2/order/31",
+    "review-t2/order/32",
+    "review-t2/order/33",
+    "review-t2/order/34",
+    "review-t2/order/35",
+    "review-t2/order/36",
+    "review-t2/order/37",
+    "review-t2/order/38",
+    "review-t2/order/39",
+    "review-t2/order/4",
+    "review-t2/order/40",
+    "review-t2/order/41",
+    "review-t2/order/42",
+    "review-t2/order/43",
+    "review-t2/order/44",
+    "review-t2/order/45",
+    "review-t2/order/46",
+    "review-t2/order/47",
+    "review-t2/order/48",
+    "review-t2/order/49",
+    "review-t2/order/5",
+    "review-t2/order/50",
+    "review-t2/order/51",
+    "review-t2/order/52",
+    "review-t2/order/53",
+    "review-t2/order/54",
+    "review-t2/order/55",
+    "review-t2/order/56",
+    "review-t2/order/57",
+    "review-t2/order/58",
+    "review-t2/order/59",
+    "review-t2/order/6",
+    "review-t2/order/60",
+    "review-t2/order/61",
+    "review-t2/order/62",
+    "review-t2/order/63",
+    "review-t2/order/64",
+    "review-t2/order/65",
+    "review-t2/order/66",
+    "review-t2/order/67",
+    "review-t2/order/68",
+    "review-t2/order/69",
+    "review-t2/order/7",
+    "review-t2/order/70",
+    "review-t2/order/71",
+    "review-t2/order/72",
+    "review-t2/order/73",
+    "review-t2/order/74",
+    "review-t2/order/75",
+    "review-t2/order/76",
+    "review-t2/order/77",
+    "review-t2/order/78",
+    "review-t2/order/79",
+    "review-t2/order/8",
+    "review-t2/order/80",
+    "review-t2/order/81",
+    "review-t2/order/82",
+    "review-t2/order/83",
+    "review-t2/order/84",
+    "review-t2/order/85",
+    "review-t2/order/86",
+    "review-t2/order/87",
+    "review-t2/order/88",
+    "review-t2/order/89",
+    "review-t2/order/9",
+    "review-t2/order/90",
+    "review-t2/order/91",
+    "review-t2/order/92",
+    "review-t2/order/93",
+    "review-t2/order/94",
+    "review-t2/order/95",
+    "review-t2/order/96",
+    "review-t2/order/97",
+    "review-t2/order/98",
+    "review-t2/order/99",
+    "review-t2/ordinarychain1024",
+    "review-t2/ordinarychain2048",
+    "review-t2/reversechain128",
+    "review-t2/reversechain256",
+    "review-t2/reversechain512",
+    "review-t2/valuechain1024",
+    "review-t2/valuechain2048",
+    "review-t2/valuechain4096"
+  ],
+  "startup_source": "docs/spec.md §2.5: Its value is worked out once, when the program starts, before any entry point runs. An added Nil test now exercises startup; this is a harness change, not a W520 runtime-equivalence assertion.",
+  "failures": []
+}

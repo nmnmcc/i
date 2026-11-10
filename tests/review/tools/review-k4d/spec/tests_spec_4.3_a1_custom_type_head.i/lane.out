@@ -1,0 +1,2 @@
+test/a1_custom_type_head.i:4:5: error[E0231]: a type parameter may not have the name of a type
+1 error

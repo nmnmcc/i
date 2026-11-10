@@ -1,0 +1,7 @@
+spec/recursion.check : (got: String, want: String) -> Nil
+spec/recursion.show : (x: A) -> String
+spec/recursion.is_even : (n: Int) -> Bool
+spec/recursion.is_odd : (n: Int) -> Bool
+spec/recursion.local_recursion : () -> Nil
+spec/recursion.local_mutual_recursion : () -> Nil
+spec/recursion.top_level_mutual_recursion : () -> Nil

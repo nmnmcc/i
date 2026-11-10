@@ -1,0 +1,6 @@
+{
+  "code": 0,
+  "out": "app/main.use : () -> Nil ! N | S(A & N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\n",
+  "err": "",
+  "seconds": 0.0057083251886069775
+}

@@ -1,0 +1,6 @@
+{
+  "code": 1,
+  "out": "",
+  "err": "src/main.i:1:12: error[E0105]: a block ends with an expression\n1 error\n",
+  "seconds": 0.008020200999453664
+}

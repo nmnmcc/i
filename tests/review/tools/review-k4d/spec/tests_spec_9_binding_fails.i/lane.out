@@ -1,0 +1,2 @@
+spec/binding_fails.first : (r: Result(Int, Int)) -> Int ! Assert
+spec/binding_fails.main : () -> Nil ! Assert

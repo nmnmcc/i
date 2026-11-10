@@ -1,0 +1,8 @@
+#!/bin/bash
+set -eu
+args=()
+for crate in ilang_syntax ilang_package ilang_check ilang_wasm serde_json; do
+ files=(/tmp/review-a1/target/debug/deps/lib${crate}-*.rlib)
+ args+=(--extern "$crate=${files[0]}")
+done
+rustc --edition=2024 /tmp/review-a1/probe.rs -L dependency=/tmp/review-a1/target/debug/deps "${args[@]}" -o /tmp/review-a1/probe

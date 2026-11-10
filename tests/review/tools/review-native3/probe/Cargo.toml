@@ -1,0 +1,8 @@
+[package]
+name = "review-native3-probe"
+version = "0.1.0"
+edition = "2024"
+[dependencies]
+ilang-package = { path = "/home/agent/Programming/i/.rd/note-native/crates/ilang-package" }
+ilang-check = { path = "/home/agent/Programming/i/.rd/note-native/crates/ilang-check" }
+ilang-wasm = { path = "/home/agent/Programming/i/.rd/note-native/crates/ilang-wasm" }

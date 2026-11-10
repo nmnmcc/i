@@ -1,0 +1,3 @@
+review/main.v : (String, String)
+src/main.i:3:14: error[E0535]: the source type does not match the alias pattern head or constant part
+1 error

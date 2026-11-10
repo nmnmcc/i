@@ -1,0 +1,3 @@
+spec/never_used.name : (b: Bool) -> String
+spec/never_used.names : () -> Nil
+test/never_used.i:8:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)

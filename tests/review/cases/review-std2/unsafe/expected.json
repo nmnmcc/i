@@ -1,0 +1,17 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 1,
+      "stdout": "probe/main.bad : (s: Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never))\n",
+      "stderr": "src/main.i:3:73: error[E0501]: `Int` is not a subtype of `Never` (the type at 3:42 needs it)\n1 error\n"
+    }
+  }
+}

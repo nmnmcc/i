@@ -1,0 +1,40 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 0,
+      "stdout": "spec/blocks.check : (got: String, want: String) -> Nil\nspec/blocks.show : (x: A) -> String\nspec/blocks.pair : (a: A, b: B) -> (A, B)\nspec/blocks.shadowing : () -> Nil\nspec/blocks.values_in_every_place : () -> Nil\nspec/blocks.recursion_inside_closures : () -> Nil\nspec/blocks.parameters_that_name_the_whole_value : () -> Nil\n",
+      "stderr": "test/blocks.i:28:4: warning[W0503]: both sides are constants, `\"a local name may cover a top-level name\"` and `\"\"`, which can never be equal, so `==` is always `False` (§6.9)\ntest/blocks.i:39:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4); the value matched is always `3`\ntest/blocks.i:52:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass spec/blocks.shadowing\npass spec/blocks.values_in_every_place\npass spec/blocks.recursion_inside_closures\npass spec/blocks.parameters_that_name_the_whole_value\npass spec/qa_corpus_runtime_test.qa_startup\n5 passed, 0 failed\n",
+      "stderr": "test/blocks.i:28:4: warning[W0503]: both sides are constants, `\"a local name may cover a top-level name\"` and `\"\"`, which can never be equal, so `==` is always `False` (§6.9)\ntest/blocks.i:39:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4); the value matched is always `3`\ntest/blocks.i:52:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass spec/blocks.shadowing\npass spec/blocks.values_in_every_place\npass spec/blocks.recursion_inside_closures\npass spec/blocks.parameters_that_name_the_whole_value\npass spec/qa_corpus_runtime_test.qa_startup\n5 passed, 0 failed\n",
+      "stderr": "test/blocks.i:28:4: warning[W0503]: both sides are constants, `\"a local name may cover a top-level name\"` and `\"\"`, which can never be equal, so `==` is always `False` (§6.9)\ntest/blocks.i:39:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4); the value matched is always `3`\ntest/blocks.i:52:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
+    }
+  },
+  "transitions": [
+    "W520 applied: E0520 -> W0503; docs/spec.md §6.9 requires Bool, no widening or new narrowing fact"
+  ]
+}

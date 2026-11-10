@@ -1,0 +1,6 @@
+{
+  "name": "principal_missing_retann",
+  "code": 0,
+  "time": 0.02467504097148776,
+  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (f: () -> A ! N) -> A ! N\n"
+}

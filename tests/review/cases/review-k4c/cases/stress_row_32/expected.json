@@ -1,0 +1,17 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 1,
+      "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\n",
+      "stderr": "src/main.i:4:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:6:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:7:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:8:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:9:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:10:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:11:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:12:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:13:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:14:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:15:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:16:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:17:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:18:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:19:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:20:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:21:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:22:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:23:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:24:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:25:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:26:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:27:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:28:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:29:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:30:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:31:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:32:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:33:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:34:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:35:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\n32 errors\n"
+    }
+  }
+}

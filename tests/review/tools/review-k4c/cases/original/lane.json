@@ -1,0 +1,6 @@
+{
+  "code": 1,
+  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.main : () -> Nil ! N | S(N)\n",
+  "err": "src/main.i:4:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (\u00a710.2), but it needs `N`, which must be given before it gets to the entry point\nsrc/main.i:4:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (\u00a710.2), but it needs `S(N)`, which must be given before it gets to the entry point\n2 errors\n",
+  "seconds": 0.019314531004056334
+}

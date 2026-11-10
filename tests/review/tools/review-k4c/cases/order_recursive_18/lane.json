@@ -1,0 +1,6 @@
+{
+  "code": 1,
+  "out": "app/main.use : () -> Nil ! N | S(N)\n",
+  "err": "src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n2 errors\n",
+  "seconds": 0.023081511026248336
+}

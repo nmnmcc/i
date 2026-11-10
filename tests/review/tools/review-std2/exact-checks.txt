@@ -1,0 +1,28 @@
+PROJECT /tmp/review-std2/annotated
+src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+PROJECT /tmp/review-std2/full
+probe/main.make : (send: (Entry) -> Nil ? E ! N) -> Sink(E, N)
+probe/main.write : (entry: Entry) -> Nil ? E ! N | Sink(E, N)
+src/main.i:6:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+PROJECT /tmp/review-std2/full_closed
+probe/main.make : (send: (Entry) -> Nil ? E ! N) -> Sink(E, N)
+probe/main.write : (entry: Entry) -> Nil ? E ! N | Sink(E, N)
+probe/main.send : (Entry) -> Nil ? String ! Sink(String, Never)
+probe/main.example : () -> Nil ! Assert
+PROJECT /tmp/review-std2/pure_catch
+probe/main.use : () -> Nil ! N | S(N)
+src/main.i:4:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+PROJECT /tmp/review-std2/pure_wrap
+probe/main.use : () -> Nil ! N | S(N)
+probe/main.wrap : (f: () -> A ! N) -> A ! N
+src/main.i:4:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+PROJECT /tmp/review-std2/client_nil_error
+probe/main.use : () -> Nil ? E ! N | S(E, N)
+src/main.i:4:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+PROJECT /tmp/review-std2/unsafe
+probe/main.bad : (s: Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never))
+src/main.i:3:73: error[E0501]: `Int` is not a subtype of `Never` (the type at 3:42 needs it)
+PROJECT /tmp/review-std2/minimal_client_final
+probe/main.use : () -> Nil ! N | S(N)
+probe/main.run : (body: () -> Nil ! N) -> Nil ! N
+src/main.i:4:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)

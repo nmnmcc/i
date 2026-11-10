@@ -1,0 +1,3 @@
+name = "probe"
+[dependencies]
+std = { path = "../../../../../std" }

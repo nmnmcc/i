@@ -1,0 +1,17 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:4:22: error[E0203]: `i/net` has no type `Stream`\nsrc/main.i:5:8: error[E0203]: `i/task` has no `race`\nsrc/main.i:5:22: error[E0203]: `i/net` has no `read`\nsrc/main.i:6:7: error[E0203]: `i/net` has no `read`\n4 errors\n"
+    }
+  }
+}

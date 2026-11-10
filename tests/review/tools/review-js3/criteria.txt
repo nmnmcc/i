@@ -1,0 +1,11 @@
+Pre-note criteria recorded before opening docs/design/js.md.
+Sources: spec all sections; syntax replacement rules; runtime decisions, requests, IO, target behavior and replacement spec; meta summary and section 8; native N1-N9.5 and general grants; multicore captures/keep_env/portability; host concurrency ABI contracts; lazy-reentry environment retention; records/types-joint structural rules. User principles control: standalone, no keywords/library special cases, sets of values, three unrelated uses, principal inference, plain-i libraries.
+1. Preserve ordinary principal types, dynamic call-site environments, identity, initialization and effects under target selection. Hard cases: Target overrides, aliases, higher order calls, recursion, kept closures, multiple entries.
+2. Finite precise specified availability analysis independent of optimizer, conservative with explained limits. Hard cases: dead branch, unused binding, strict initializers, escaping function, overridden unavailable service, recursive summaries, effects of service implementation.
+3. General language mechanisms usable by user services, dispatchers, plugins, test doubles; host details must not replace ordinary language semantics.
+4. Standalone root defaults on supported targets; absent default compile error despite unsupported handler; capabilities split; explicit custom WASI imports retained.
+5. Private nominal Int resource wrappers on all targets, non-reused identities, context/kind checked access, grants/privacy and no injection, cleanup under cancellation and teardown.
+6. Opaque promise outcomes decoded in i after wait; ownership for starts/cancel, rejection, malformed outcome, provisional resources and already-ready cancellation.
+7. Checked memory only; lifetime/bounds/overflow; canonical SDK representations and i value sets including arbitrary Int, finite Float, Unicode, bits, references.
+8. No executable JS bindings in macro program, including transitive aliases, closure bodies and startup roots; ordinary runtime code in shared macro modules.
+9. Complete amendment ledger: exact affected paragraphs/APIs/typing/ABI/metadata/diagnostics/tests and sequencing; no silent contradictions left for implementer.

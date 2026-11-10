@@ -1,0 +1,40 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 0,
+      "stdout": "probe/main.x : (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14)\nprobe/main.f : () -> Bool\n",
+      "stderr": "src/main.i:2:10: warning[W0503]: the two sides have the known types `(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, … (5 more))` and `\"wrong\"`, which can never be equal, so `==` is always `False` (§6.9)\n"
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass probe/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": "src/main.i:2:10: warning[W0503]: the two sides have the known types `(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, … (5 more))` and `\"wrong\"`, which can never be equal, so `==` is always `False` (§6.9)\n"
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass probe/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": "src/main.i:2:10: warning[W0503]: the two sides have the known types `(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, … (5 more))` and `\"wrong\"`, which can never be equal, so `==` is always `False` (§6.9)\n"
+    }
+  },
+  "transitions": [
+    "W520 applied: E0520 -> W0503; docs/spec.md §6.9 requires Bool, no widening or new narrowing fact"
+  ]
+}

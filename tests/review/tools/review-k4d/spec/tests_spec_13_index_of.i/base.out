@@ -1,0 +1,7 @@
+spec/index_of.check : (got: Result(Int, Nil), want: Result(Int, Nil)) -> Nil
+spec/index_of.found : () -> Nil
+spec/index_of.not_found : () -> Nil
+spec/index_of.empty_find : () -> Nil
+spec/index_of.from_at_the_end : () -> Nil
+spec/index_of.from_outside_the_string : () -> Nil
+spec/index_of.from_inside_a_character : () -> Nil

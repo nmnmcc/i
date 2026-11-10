@@ -1,0 +1,105 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 20.7ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 29.0ms
+✖ sync opaque thenable is returned unchanged and is not executed (39.43267ms)
+✖ dispose during status 2 must prevent continuation and successful return (5.836645ms)
+✖ teardown gate rejects lease commits from cancellation callbacks (1.14416ms)
+✖ throwing cancellation does not skip resource cleanup (0.543732ms)
+✔ baseline control: same opaque thenable returns unchanged (10.075375ms)
+✔ JS authorization control: editing the source plan cannot remove a denied coalesced declaration (6.901465ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 2
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 153.197606
+
+✖ failing tests:
+
+test at ../../../../../../tmp/review-bg/review.test.mjs:8:1
+✖ sync opaque thenable is returned unchanged and is not executed (39.43267ms)
+  TypeError: value.finally is not a function
+      at Object.invoke [as call] (file:///home/agent/Programming/i/.rd/c/bindings/javascript/ilang.mjs:1142:76)
+      at TestContext.<anonymous> (file:///tmp/review-bg/review.test.mjs:13:24)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at ../../../../../../tmp/review-bg/review.test.mjs:18:1
+✖ dispose during status 2 must prevent continuation and successful return (5.836645ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /disposed|ended/. Input:
+  
+  'Stop: fixture: starved'
+  
+      at async TestContext.<anonymous> (file:///tmp/review-bg/review.test.mjs:22:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Stop: fixture: starved
+        at Bridge.trapped (file:///home/agent/Programming/i/.rd/c/bindings/javascript/ilang.mjs:562:18)
+        at Bridge.enter (file:///home/agent/Programming/i/.rd/c/bindings/javascript/ilang.mjs:528:18)
+        at Bridge.enterAccepting (file:///home/agent/Programming/i/.rd/c/bindings/javascript/ilang.mjs:488:17)
+        ... 3 lines matching cause stack trace ...
+        at async strict.rejects (node:assert:769:25)
+        at async TestContext.<anonymous> (file:///tmp/review-bg/review.test.mjs:22:3)
+        at async Test.run (node:internal/test_runner/test:1409:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+      [cause]: RuntimeError: unreachable
+          at fail (wasm://wasm/59b0e94a:wasm-function[41]:0xc4e)
+          at wasm://wasm/59b0e94a:wasm-function[49]:0xea5
+          at file:///home/agent/Programming/i/.rd/c/bindings/javascript/ilang.mjs:1011:67
+          at file:///home/agent/Programming/i/.rd/c/bindings/javascript/ilang.mjs:491:16
+          at Bridge.enter (file:///home/agent/Programming/i/.rd/c/bindings/javascript/ilang.mjs:526:14)
+          at Bridge.enterAccepting (file:///home/agent/Programming/i/.rd/c/bindings/javascript/ilang.mjs:488:17)
+          at wait (file:///home/agent/Programming/i/.rd/c/bindings/javascript/ilang.mjs:1011:29)
+          at async callAsync (file:///home/agent/Programming/i/.rd/c/bindings/javascript/ilang.mjs:1106:7)
+          at async waitForActual (node:assert:646:5)
+          at async strict.rejects (node:assert:769:25)
+    },
+    expected: /disposed|ended/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at ../../../../../../tmp/review-bg/review.test.mjs:25:1
+✖ teardown gate rejects lease commits from cancellation callbacks (1.14416ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///tmp/review-bg/review.test.mjs:35:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../../../../../tmp/review-bg/review.test.mjs:38:1
+✖ throwing cancellation does not skip resource cleanup (0.543732ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///tmp/review-bg/review.test.mjs:44:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

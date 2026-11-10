@@ -1,0 +1,2 @@
+src/main.i:4:1: error[E0532]: an alias-pattern head must expand to one named type or tuple; each formal occurs at most once and only through named arguments or tuple parts
+1 error

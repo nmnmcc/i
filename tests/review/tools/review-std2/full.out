@@ -1,0 +1,4 @@
+probe/main.make : (send: (Entry) -> Nil ? E ! N) -> Sink(E, N)
+probe/main.write : (entry: Entry) -> Nil ? E ! N | Sink(E, N)
+src/main.i:6:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+1 error

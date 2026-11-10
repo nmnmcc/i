@@ -1,0 +1,21 @@
+use std::{path::Path, time::Instant};
+fn main() {
+ let args: Vec<_> = std::env::args().collect();
+ let (g, ds) = ilang_package::load(Path::new(&args[2]));
+ for d in g.sources.render_all(&ds) { println!("{d}"); }
+ let count: usize = args.get(3).map(|x| x.parse().unwrap()).unwrap_or(1);
+ for _ in 0..count {
+  let start = Instant::now();
+  if args[1] == "before" {
+   let c = before::check(&g);
+   eprintln!("check_us={} diags={}",start.elapsed().as_micros(),c.diags.len());
+   for d in g.sources.render_all(&c.diags) { println!("{d}"); }
+   if count == 1 {if let (Some(p), Some(t)) = (&c.program, &c.types) { for (i,m) in p.modules.iter().enumerate() { if m.path.starts_with("app/") { for l in t.lines(p,before::hir::ModuleId(i as u32)) {println!("{l}");} } } }}
+  } else {
+   let c = after::check(&g);
+   eprintln!("check_us={} diags={}",start.elapsed().as_micros(),c.diags.len());
+   for d in g.sources.render_all(&c.diags) { println!("{d}"); }
+   if count == 1 {if let (Some(p), Some(t)) = (&c.program, &c.types) { for (i,m) in p.modules.iter().enumerate() { if m.path.starts_with("app/") { for l in t.lines(p,after::hir::ModuleId(i as u32)) {println!("{l}");} } } }}
+  }
+ }
+}

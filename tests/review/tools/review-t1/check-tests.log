@@ -1,0 +1,80 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 16.1ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 17.4ms
+   Compiling ilang-check v0.1.0 (/home/agent/Programming/i/.rd/a/crates/ilang-check)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.66s
+     Running unittests src/lib.rs (target/debug/deps/ilang_check-01dffe148437b6b2)
+
+running 26 tests
+test types::coverage::literal_coverage_tests::unknown_alternatives_are_whole_even_beside_an_explicit_head ... ok
+test types::literal_representation_tests::scalar_sets_survive_child_mapping ... ok
+test types::literal_representation_tests::only_int_and_string_carry_sets - should panic ... ok
+test types::known::literal_known_tests::hidden_inputs_and_recursive_widening ... ok
+test types::display::literal_display_tests::set_normalization_and_full_text ... ok
+test types::lits::tests::canonical_literal_values ... ok
+test types::lits::tests::canonical_sets_and_hashes ... ok
+test types::solve::literal_stress_tests::t1_stress_alias_1000 ... ignored, literal-types §9 performance gate
+test types::solve::literal_stress_tests::t1_stress_calls_5000 ... ignored, literal-types §9 performance gate
+test types::solve::literal_stress_tests::t1_stress_match_2000 ... ignored, literal-types §9 performance gate
+test types::solve::literal_stress_tests::t1_stress_nested_50_by_50 ... ignored, literal-types §9 performance gate
+test types::solve::literal_tests::ordinary_bounds_do_not_skip_a_later_environment_check ... ok
+test types::solve::literal_tests::literal_subtyping_and_right_difference ... ok
+test types::solve::literal_tests::difference_left_all_three_splits_and_later_bounds ... ok
+test types::solve::literal_tests::fused_bounds_propagate_through_variable_links ... ok
+test types::solve::literal_tests::route_only_the_uncovered_values ... ok
+test types::solve::literal_tests::service_equality_does_not_widen_literal_arguments ... ok
+test types::solve::literal_tests::scalar_boolean_algebra_and_never_intersections ... ok
+test types::lits::tests::algebra_on_large_shared_sets ... ok
+test types::solve::literal_tests::bounds_fuse_without_losing_constraints ... ok
+test types::lits::tests::exhaustive_infinite_domain_model ... ok
+test types::coverage::literal_coverage_tests::complements_preserve_cross_columns_and_prefixes ... ok
+test types::pattern::shared_place_tests::written_occurrences_include_other_constructors_and_aliases ... ok
+test types::coverage::literal_coverage_tests::scalar_index_agrees_with_the_full_matrix ... ok
+test types::lits::tests::bulk_join_matches_the_infinite_domain_model ... ok
+test types::lits::tests::persistent_tree_insert_remove_and_bulk_build ... ok
+
+test result: ok. 22 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running tests/literal_types.rs (target/debug/deps/literal_types-af80f778bbbab9b2)
+
+running 23 tests
+test fitted_choices_keep_the_deferred_binding_error ... ok
+test expressions_do_not_widen_or_compute_arithmetic ... ok
+test inferred_host_export_cannot_receive_a_restricted_scalar ... ok
+test guarded_list_heads_leave_tail_items_unrestricted ... ok
+test scalar_matches_infer_literals_but_fitting_keeps_whole_types ... ok
+test prefix_witness_does_not_match_a_prefix_row ... ok
+test shared_fields_do_not_infer_an_empty_parameter ... ok
+test empty_optional_accumulator_requires_a_written_tuple_shape ... ok
+test host_directions_expand_aliases_and_same_scalar_unions ... ok
+test nested_missing_values_are_one_coverage_error ... ok
+test equality_diagnostics_distinguish_the_operator ... ok
+test missing_values_report_coverage_and_later_constraints_are_kept ... ok
+test unknown_parts_and_all_hidden_input_directions_are_conservative ... ok
+test shared_list_items_need_coverage_but_an_option_parameter_keeps_literals ... ok
+test whole_known_bounds_keep_non_covariant_literal_parts_as_holes ... ok
+test shared_parameters_require_all_combinations_of_a_written_finite_set ... ok
+test prefix_after_complement_does_not_erase_other_columns ... ok
+test one_clause_choices_are_fitted_and_never_constructor_flow ... ok
+test typed_complements_keep_the_head_and_cover_cross_columns ... ok
+test literal_values_use_numeric_and_decoded_scalar_identity ... ok
+test grouped_negatives_supply_the_same_written_group_facts ... ok
+test written_literals_and_negative_differences_constrain_calls ... ok
+test narrowing_checks_the_entire_row_and_ignores_guards ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.42s
+
+     Running tests/types.rs (target/debug/deps/types-965c4aad71308f16)
+
+running 5 tests
+test library ... ok
+test shown_names_skip_types_and_ignore_written_variable_names ... ok
+test scheme_types_know_each_type_by_what_it_is ... ok
+test many_uses_of_a_parameter ... ok
+test types ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+

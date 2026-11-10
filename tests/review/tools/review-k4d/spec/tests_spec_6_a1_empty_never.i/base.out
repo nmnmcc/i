@@ -1,0 +1,2 @@
+spec/a1_empty_never._empty : (Never) -> Int
+spec/a1_empty_never.main : () -> Nil ! Assert

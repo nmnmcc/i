@@ -1,0 +1,6 @@
+{
+  "code": 1,
+  "out": "app/main.get : () -> Nil ! Dep\napp/main.run : (body: () -> Nil ? E ! N) -> Nil ? E ! N\napp/main.use : () -> Nil ! N | N2 | S(A & N, B & N2)\n",
+  "err": "src/main.i:7:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n",
+  "seconds": 0.02035723300650716
+}

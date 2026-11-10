@@ -1,0 +1,6 @@
+{
+  "code": 0,
+  "out": "app/main.use : (x: A) -> Int ! S(A)\napp/main.wrap : (x: A) -> Int ! S(B)\napp/main.same : (f: (Int) -> Int ! S(Int)) -> (Int) -> Int ! S(Int)\napp/main.test : (Int) -> Int ! S(Int)\n",
+  "err": "",
+  "seconds": 0.006707706023007631
+}

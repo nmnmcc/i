@@ -1,0 +1,13 @@
+spec/laws.identity : () -> Nil ? random.RandomError ! Assert
+spec/laws.invalid : () -> Nil ! Assert
+spec/laws.paths : () -> Nil ? random.RandomError ! Assert
+spec/laws.advance : (g: random.Generator, n: Int) -> random.Generator
+spec/laws.boundaries : () -> Nil ? random.RandomError ! Assert
+spec/laws.check_range : (g: random.Generator, below: Int, count: Int) -> Nil ? random.RandomError ! Assert
+spec/laws.ranges : () -> Nil ? random.RandomError ! Assert
+spec/laws.check_float : (g: random.Generator, count: Int) -> Nil ! Assert
+spec/laws.floats : () -> Nil ! Assert
+spec/laws.histogram : (g: random.Generator, count: Int, a: Int, b: Int, c: Int) -> (Int, Int, Int) ? random.RandomError
+spec/laws.small_bound_frequencies : () -> Nil ? random.RandomError ! Assert
+spec/laws.walk : (g: random.Generator, count: Int) -> random.Generator
+spec/laws.deep_splits : () -> Nil ! Assert
