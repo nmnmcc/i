@@ -486,11 +486,22 @@ pub fn lower(
     typed: &Typed,
     options: Options,
 ) -> Result<ir::Program, Vec<Diagnostic>> {
+    lower_with_bindings(graph, program, typed, options).map(|(ir, _)| ir)
+}
+
+/// Capture every required resolved declaration before import coalescing. This
+/// plan is returned separately; it changes neither WAT nor ilang.abi (native 3.1).
+pub fn lower_with_bindings(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: Options,
+) -> Result<(ir::Program, Vec<serde_json::Value>), Vec<Diagnostic>> {
     let mut l = Lowerer::new(graph, program, typed, options);
     l.run();
     if l.diags.is_empty() {
         crate::control::split(&mut l.out);
-        Ok(l.out)
+        Ok((l.out, l.bindings))
     } else {
         Err(l.diags)
     }
@@ -521,6 +532,7 @@ struct Lowerer<'a> {
     import_funcs: HashMap<(ImportId, AbiType), FuncId>,
     /// Where each import is declared first, by its index in `out.imports`.
     import_sites: Vec<(ModuleId, Span)>,
+    bindings: Vec<serde_json::Value>,
     /// The function of each external function outside the library (§10.1),
     /// or `None` when it has a problem, which is told one time.
     external_funcs: HashMap<DefId, Option<FuncId>>,
@@ -556,6 +568,7 @@ impl<'a> Lowerer<'a> {
             services: HashMap::new(),
             import_funcs: HashMap::new(),
             import_sites: Vec::new(),
+            bindings: Vec::new(),
             external_funcs: HashMap::new(),
             out: ir::Program::default(),
             diags: Vec::new(),
@@ -998,7 +1011,14 @@ impl<'a> Lowerer<'a> {
             };
             let abi = host_abi(hf);
             let site = (def.module, label.span);
-            match self.import(&host.namespace, &label.name, abi, kind, site) {
+            match self.import(
+                &host.namespace,
+                &label.name,
+                abi,
+                kind,
+                site,
+                &format!("{}.{}", def.name, label.name),
+            ) {
                 Ok(import) => {
                     let f = self.import_func(import, hf.result);
                     self.constants.insert(f);
@@ -1046,7 +1066,14 @@ impl<'a> Lowerer<'a> {
             return None;
         };
         let site = (d.module, def.span);
-        match self.import(module, function, host_abi(hf), ImportKind::External, site) {
+        match self.import(
+            module,
+            function,
+            host_abi(hf),
+            ImportKind::External,
+            site,
+            &def.name,
+        ) {
             Ok(import) => {
                 // §11.4: each declaration is one value, so two declarations
                 // of one import have two functions, which call the same
@@ -1072,6 +1099,7 @@ impl<'a> Lowerer<'a> {
         abi: ExportAbi,
         kind: ImportKind,
         site: (ModuleId, Span),
+        declaration: &str,
     ) -> Result<ImportId, (ModuleId, Span, String)> {
         if module == "ilang:host/v1" {
             return Err((
@@ -1089,6 +1117,56 @@ impl<'a> Lowerer<'a> {
                     "on the WASI target, the runtime imports `{module}` `{name}` itself, so a program may not import it (B.7)"
                 ),
             ));
+        }
+        if kind != ImportKind::WasiStdout {
+            let source_module = self.program.module(site.0);
+            let package = &self.graph.packages[source_module.package];
+            use ilang_package::lock::{FileKind, PackageFile, hash};
+            let module_file = PackageFile {
+                path: source_module.path.clone(),
+                kind: FileKind::Regular,
+                bytes: self
+                    .graph
+                    .sources
+                    .get(source_module.source)
+                    .text
+                    .as_bytes()
+                    .to_vec(),
+            };
+            let mut files: Vec<_> = package
+                .modules
+                .iter()
+                .map(|m| PackageFile {
+                    path: m.path.clone(),
+                    kind: FileKind::Regular,
+                    bytes: self.graph.sources.get(m.source).text.as_bytes().to_vec(),
+                })
+                .collect();
+            if let Some(source) = package.manifest_source {
+                files.push(PackageFile {
+                    path: "i.toml".into(),
+                    kind: FileKind::Regular,
+                    bytes: self.graph.sources.get(source).text.as_bytes().to_vec(),
+                });
+            }
+            let binding = serde_json::json!({
+                "package": package.location.as_ref().map(|p| p.hash.clone()).unwrap_or_else(|| hash(&files)),
+                "module": source_module.path,
+                "module_digest": hash(&[module_file]),
+                "declaration": declaration,
+                "namespace": module,
+                "name": name,
+                "kind": if kind == ImportKind::External { "external" } else { "service" },
+                "signature": {
+                    "params": abi.params.iter().map(|t| t.name()).collect::<Vec<_>>(),
+                    "result": abi.result.name(),
+                    "errors": abi.errors.iter().map(|t| t.name()).collect::<Vec<_>>(),
+                    "async": kind == ImportKind::AsyncService,
+                },
+            });
+            if !self.bindings.contains(&binding) {
+                self.bindings.push(binding);
+            }
         }
         if let Some(i) = self
             .out
