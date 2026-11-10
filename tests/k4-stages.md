@@ -137,3 +137,21 @@ Consequently the ring's before/after comparison uses the pre-follow-up lane
 binary at 63e5f3a as a substitute baseline. Standard-project timing uses the
 actual merged redesign. Every sample, compiler identity probe and runtime
 result is retained under target/k4d-checks.
+
+## Alias and runtime boundary completion
+
+F2 also applies when a function alias has no algebraic operators. Alias
+instantiation's early return previously bypassed the parameter modes already
+computed from its definition. `instantiate_alias` now marks each actual
+argument before applying the template. The environment and error regressions
+use concrete Svc(Int) and Svc(Nil) parameters to constrain one row variable;
+rule 4 requires equal arguments, so both must give E0515. An earlier test
+used unannotated constructors with unconstrained callback results; those can
+share a wider result type and were correctly accepted. That expectation was
+corrected to test the stated rule with concrete arguments.
+
+The original K4 service, helper, nested-service, logging and local-closure
+shapes also run through the CLI with all providers removed. Both optimization
+levels must stop with E0522, including the 64-helper chain. These runtime
+boundary checks complement the original principal-scheme and query checks;
+they do not replace them.

@@ -221,6 +221,12 @@ impl Checker<'_> {
     }
 
     pub(super) fn instantiate_alias(&mut self, id: TypeId, args: Vec<Ty>) -> Ty {
+        for (arg, mode) in args.iter().zip(
+            self.s
+                .rows(super::Head::Named(TypeRef::Custom(id)), args.len()),
+        ) {
+            self.s.mark_mode(arg, mode);
+        }
         let Some(template) = self.reads.templates.get(&id) else {
             if !self.recovery && !self.reads.aliases.contains_key(&id) {
                 panic!("pending alias {id:?}");

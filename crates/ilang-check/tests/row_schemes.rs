@@ -114,3 +114,27 @@ wrap(N) = (body: () -> Nil ! N | Svc(Extra | Dep), svc: Svc(Dep | Extra)) -> Nil
     assert_eq!(before, after);
     assert!(before["app/main.wrap"].contains("Svc(Dep | Extra)"));
 }
+
+#[test]
+fn row_kind_survives_an_alias_without_algebra() {
+    // F2 requires N to remain a row even when a function alias is copied
+    // without normalization. Its value positions must compare Svc's
+    // arguments equally before generalization can combine the forms.
+    for mode in ["!", "?"] {
+        let source = "Svc(A) { Svc(() -> A) }
+Row(N) = () -> Nil ! N
+bad(N) = (body: Row(N), one: Svc(Int), two: Svc(Nil)) {
+ first: N = one
+ second: N = two
+ second
+}"
+        .replace("! N", &format!("{mode} N"));
+        let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
+        let checked = ilang_check::check(&graph);
+        assert!(
+            checked.diags.iter().any(|d| d.code == "E0515"),
+            "{:?}",
+            graph.sources.render_all(&checked.diags)
+        );
+    }
+}

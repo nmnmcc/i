@@ -63,6 +63,8 @@ fn rows_inside_type_arguments_keep_service_arguments_equal() {
     // a different S form or an unprovided Dep; neither may reach runtime.
     for name in [
         "row_alias",
+        "alias_kind_env",
+        "alias_kind_error",
         "g_ann_SDep",
         "g_inf_SDep",
         "m3",
@@ -150,4 +152,83 @@ fn generic_handlers_have_finite_types_with_or_without_annotations() {
             "",
         );
     }
+}
+
+#[test]
+fn previous_finite_schemes_reject_missing_providers_before_runtime() {
+    // §4.8 preserves requirements across calls, and §10.2 rejects an entry
+    // without providers. Exercise the original K4 shapes at the CLI boundary.
+    let sources = [
+        "S(N) { S(() -> Nil ! N) }
+use(N) = (s ! S(N)) -> Nil ! N | S(N) { S(f) = s f() }
+example = () { use() }",
+        "S(N) { S(() -> Nil ! N, (N) -> Nil) }
+use(N) = (s ! S(N)) { S(f, _) = s f() }
+run(N) = (body: () -> Nil ! N) { body() }
+example = () { run(() { use() }) }",
+        "Inner(A, E, N) { Inner((A) -> A ? E ! N, (N) -> Nil) }
+Outer(A, E, N) { Outer(Inner(A, E, N)) }
+use(A, E, N) = (x: A, s ! Outer(A, E, N)) -> A ? E ! N | Outer(A, E, N) {
+ Outer(Inner(f, _)) = s f(x)
+}
+run(A, E, N) = (body: () -> A ? E ! N) { body() }
+example = () { run(() { use(1) }) }",
+        "Dependency { Dependency(value: Int) }
+get = (d ! Dependency) { d.value }
+Inner(N) { Inner(() -> Int ! N, (N) -> Nil) }
+read(N) = (s ! Inner(N)) { Inner(f, _) = s f() }
+Outer(N) { Outer(() -> Int ! N, (N) -> Nil) }
+use(N) = (s ! Outer(N)) -> Int ! N | Outer(N) { Outer(f, _) = s f() }
+run(A, N) = (body: () -> A ! N) { body() }
+example = () { run(() { use() }) }",
+        "(i/fail)
+Entry { Entry(message: String) }
+Sink(E, N) { Sink((Entry) -> Nil ? E ! N, (N) -> Nil) }
+write(E, N) = (entry: Entry, sink ! Sink(E, N)) -> Nil ? E ! N | Sink(E, N) {
+ Sink(send, _) = sink send(entry)
+}
+example = () { fail.catch(() { write(Entry(\"seen\")) }) }",
+        "S(N) { S(() -> Nil ! N) }
+use(N) = (s ! S(N)) { S(f) = s f() }
+example(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }",
+        "S(E, N) { S(() -> Nil ? E ! N) }
+use(E, N) = (s ! S(E, N)) { S(f) = s f() }
+run(E, N) = (body: () -> Nil ? E ! N) { body() }
+example(E, N) = () { run(() -> Nil ? E ! N | S(E, N) { use() }) }",
+    ];
+    for (i, source) in sources.iter().enumerate() {
+        for inferred in [false, true] {
+            let mut source = source.to_string();
+            if inferred {
+                source = source
+                    .replace("local: () -> Nil ! N | S(N)", "local")
+                    .replace("-> Nil ! N | S(N)", "")
+                    .replace("-> A ? E ! N | Outer(A, E, N)", "")
+                    .replace("-> Int ! N | Outer(N)", "")
+                    .replace("-> Nil ? E ! N | Sink(E, N)", "")
+                    .replace("() -> Nil ? E ! N | S(E, N) {", "() {");
+            }
+            source.push_str("\n@main\nmain = () { example() }\n");
+            check_and_run(
+                &format!("original-{i}-{inferred}"),
+                &source,
+                Some("E0522"),
+                "",
+            );
+        }
+    }
+    let mut chain = String::from(
+        "S(N) { S(() -> Nil ! N, (N) -> Nil) }
+use(N) = (s ! S(N)) { S(f, _) = s f() }
+run(N) = (body: () -> Nil ! N) { body() }
+forward_0 = () { run(() { use() }) }\n",
+    );
+    for n in 1..64 {
+        chain.push_str(&format!(
+            "forward_{n} = () {{ run(() {{ forward_{}() }}) }}\n",
+            n - 1
+        ));
+    }
+    chain.push_str("\n@main\nmain = () { forward_63() }\n");
+    check_and_run("original-helper-chain", &chain, Some("E0522"), "");
 }
