@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { customAbi, customImports, hostImports } from "../../../tests/browser/fixture-abi.mjs";
-import { HOST_VALUE_REASON, instantiate, integerFromLimbs, integerToLimbs, readAbi, runTests, supportsRequiredFeatures, AbiError, GuestError, Stop } from "../ilang.mjs";
+import { customAbi, customImports, fold, gateService, hostImports, nextMacrotask } from "../../../tests/browser/fixture-abi.mjs";
+import { HOST_VALUE_REASON, instantiate, integerFromLimbs, integerToLimbs, readAbi, requestSignal, runTests, supportsRequiredFeatures, AbiError, GuestError, Stop } from "../ilang.mjs";
 
 const fixture = await readFile(new URL("../../../tests/browser/fixtures/host-abi.wasm", import.meta.url));
 const customFixture = await readFile(new URL("../../../tests/browser/fixtures/custom-imports.wasm", import.meta.url));
+const noContinueFixture = await readFile(new URL("../../../tests/browser/fixtures/no-continue.wasm", import.meta.url));
 const guest = (printed = [], overrides = {}) => instantiate(fixture, { imports: hostImports(GuestError, printed, overrides) });
 const custom = (overrides = {}) => instantiate(customFixture, { abi: customAbi, imports: customImports(GuestError, overrides) });
 const integers = [0n, 1n, -1n, (1n << 30n) - 1n, 1n << 30n, -(1n << 30n), 1n << 32n, -(1n << 64n), (1n << 4096n) + 0x123456789abcdefn];
@@ -252,15 +253,22 @@ test("GC, tail calls and exceptions remain available through the adapter", async
 
 test("metadata that does not follow B.6 fails before instantiation", async () => {
   const module = await WebAssembly.compile(customFixture);
-  const base = { version: 2, entry: null, tests: [], exports: {}, services: {}, externals: {} };
+  const base = { version: 3, entry: null, tests: [], exports: {}, services: {}, externals: {} };
   assert.equal(readAbi(module, base).entry, null);
+  assert.equal(readAbi(module, base).version, 3);
+  for (const old of [1, base.version - 1]) {
+    assert.throws(() => readAbi(module, { ...base, version: old }), { message: `the module uses i ABI version ${old}; build it again with this version of i` });
+  }
+  assert.throws(() => readAbi(module, { ...base, version: base.version + 1 }), { message: `the module uses i ABI version ${base.version + 1}, but this host reads version ${base.version}; update the host` });
   for (const malformed of [
     null, [], { ...base, exports: [] }, { ...base, services: null }, { ...base, tests: null },
-    { ...base, version: 1 }, { ...base, imports: {} }, { ...base, entry: "main" }, { version: 2 },
+    { ...base, version: 1 }, { ...base, imports: {} }, { ...base, entry: "main" }, { version: base.version },
     { ...base, exports: { f: { params: ["list"], result: "nil" } } },
     { ...base, exports: { f: { params: [], result: "nil", errors: ["string", "int"] } } },
     { ...base, exports: { f: { params: [], result: "nil", errors: ["externref"] } } },
     { ...base, exports: { ilang_start: { params: [], result: "nil" } } },
+    { ...base, exports: { ilang_continue: { params: [], result: "nil" } } },
+    { ...base, entry: { name: "ilang_continue", async: true } },
     { ...base, entry: { name: "f" }, exports: { f: { params: [], result: "nil" } } },
     { ...base, services: { "ilang:host/v1": {} } },
     { ...base, externals: { m: { f: { params: [], result: "nil", errors: ["nil"] } } } },
@@ -278,4 +286,218 @@ test("Wasm linking rejects signatures that do not match the metadata", async () 
   await assert.rejects(instantiate(customFixture, { abi: wrongImport, imports: customImports(GuestError) }), WebAssembly.LinkError);
   const module = await WebAssembly.compile(customFixture);
   await assert.rejects(instantiate(module, { abi: wrongExport, imports: customImports(GuestError) }), /signature does not match/);
+});
+
+/** host-abi.wasm with gates for `later`. */
+const gated = (options = {}) => {
+  const gates = gateService({ requestSignal, ...options });
+  return instantiate(fixture, { imports: hostImports(GuestError, [], { later: gates.later }) }).then((value) => ({ value, gates }));
+};
+
+test("many requests complete out of order", async () => {
+  for (let seed = 0; seed < 200; seed++) {
+    const n = 1 + (seed % 16);
+    const { value, gates } = await gated({ seed });
+    const h = await gates.drive(value.callAsync("app/async.many", [n]));
+    assert.equal(h, fold(gates.answered()), `seed ${seed}`);
+    assert.equal(gates.starts, 2 * n);
+    assert.ok(gates.requests.every((gate) => !gate.signal.aborted));
+    // The ids are used again in a second call.
+    const again = await gates.drive(value.callAsync("app/async.many", [2]));
+    assert.equal(again, fold(gates.answered().slice(2 * n)));
+    assert.equal(value.unusable, null);
+    noAllocations(value);
+  }
+});
+
+test("the service runs during the import", async () => {
+  const marks = [];
+  const value = await guest([], { later: async (x) => { marks.push(x); return x; } });
+  const call = value.callAsync("app/async.later", [1]);
+  assert.deepEqual(marks, [1]);
+  assert.equal(await call, 2);
+  assert.deepEqual(marks, [1, 2]);
+});
+
+test("a service may not call the instance during the import", async () => {
+  for (const reenter of [(value) => value.call("nil_roundtrip"), (value) => value.callAsync("app/async.later", [2])]) {
+    let value;
+    let starts = 0;
+    value = await guest([], {
+      later: (x) => {
+        starts++;
+        const inner = reenter(value);
+        return inner instanceof Promise ? inner.then(() => x) : x;
+      },
+    });
+    await assert.rejects(value.callAsync("app/async.later", [1]), { message: "The instance is running Wasm; a host function may not call it (§B.3)" });
+    assert.equal(starts, 1);
+    assert.ok(value.unusable);
+    assert.throws(() => value.call("nil_roundtrip"), /make a new instance/);
+  }
+});
+
+test("the calling convention of services is unchanged, and requestSignal works only while a service starts", async () => {
+  const value = await guest([], { later: (x, scale = 2) => x * scale });
+  assert.equal(await value.callAsync("app/async.later", [1.5]), 8);
+  assert.throws(() => requestSignal(), { message: "requestSignal() may only be called while an async service starts" });
+  const late = await guest([], { later: async (x) => { await null; requestSignal(); return x; } });
+  await assert.rejects(late.callAsync("app/async.later", [1]), { message: "requestSignal() may only be called while an async service starts" });
+  assert.ok(late.unusable);
+});
+
+test("a stop drops outstanding requests and aborts their signals", async () => {
+  const { value, gates } = await gated({ seed: 7 });
+  await assert.rejects(gates.drive(value.callAsync("app/async.stop_mid")), (error) => {
+    assert.ok(error instanceof Stop);
+    assert.equal(error.stopMessage, "fixture: stop");
+    assert.equal(gates.requests.filter((gate) => gate.signal.aborted).length, 2);
+    return true;
+  });
+  assert.equal(gates.starts, 3);
+  assert.throws(() => value.call("nil_roundtrip"), /make a new instance/);
+});
+
+test("a host failure drops the others", async () => {
+  const { value, gates } = await gated({ seed: 3, fail: 2 });
+  await assert.rejects(gates.drive(value.callAsync("app/async.fan", [5])), (error) => {
+    assert.equal(error.message, "the gate failed");
+    assert.ok(gates.requests.filter((gate) => gate.x !== 2).every((gate) => gate.signal.aborted || gates.released.includes(gate)));
+    return true;
+  });
+  assert.equal(value.unusable, "the gate failed");
+});
+
+test("status 1 with nothing outstanding and other statuses are faults", async () => {
+  for (const [name, message] of [
+    ["app/async.stuck", "the module waits, but no host function is running"],
+    ["app/async.bad_status", "export app/async.bad_status gave the status 7, which is not 0, 1 or 2"],
+  ]) {
+    const { value } = await gated();
+    await assert.rejects(value.callAsync(name), { message });
+    assert.equal(value.unusable, message);
+  }
+});
+
+test("duplicate and negative ids trap before the service runs", async () => {
+  for (const [name, message, starts] of [
+    ["app/async.dup", "the module started request 7 twice", 1],
+    ["app/async.negative", "the module started request -1, which is below 0", 0],
+  ]) {
+    const { value, gates } = await gated();
+    await assert.rejects(value.callAsync(name), { message });
+    assert.equal(value.unusable, message);
+    assert.equal(gates.starts, starts);
+  }
+});
+
+test("requests start and are cancelled only during an async call", async () => {
+  for (const [name, message, starts] of [
+    ["app/sync.starts", "the module started request 3 outside an async call", 0],
+    ["app/sync.cancels", "the module cancelled request 0 outside an async call", 0],
+    ["app/async.nested", "the module started request 77 outside an async call", 0],
+    ["app/async.nested_cancel", "the module cancelled request 5 outside an async call", 1],
+    ["app/async.result_starts", "the module started request 6 outside an async call", 1],
+    ["app/async.result_cancels", "the module cancelled request 0 outside an async call", 1],
+  ]) {
+    const { value, gates } = await gated();
+    if (name.startsWith("app/sync.")) assert.throws(() => value.call(name), { message }, name);
+    else await assert.rejects(gates.drive(value.callAsync(name)), { message }, name);
+    assert.equal(value.unusable, message, name);
+    assert.equal(gates.starts, starts, name);
+  }
+});
+
+test("leftovers are dropped at status 0", async () => {
+  const { value, gates } = await gated({ seed: 5 });
+  const h = await gates.drive(value.callAsync("app/async.leftover").then((result) => {
+    assert.equal(gates.requests.filter((gate) => gate.signal.aborted).length, 2);
+    return result;
+  }));
+  assert.equal(h, fold(gates.answered()));
+  assert.equal(gates.answered().length, 1);
+  assert.equal(value.unusable, null);
+  const many = await gates.drive(value.callAsync("app/async.many", [3]));
+  assert.equal(many, fold(gates.answered().slice(1)));
+});
+
+test("cancel drops one request and aborts its signal", async () => {
+  for (let seed = 0; seed < 200; seed++) {
+    const n = 2 + (seed % 15);
+    const { value, gates } = await gated({ seed });
+    const h = await gates.drive(value.callAsync("app/async.cancel", [n]));
+    assert.equal(h, fold(gates.answered()), `seed ${seed}`);
+    const cancelled = gates.requests.filter((gate) => gate.signal.aborted);
+    assert.equal(cancelled.length, Math.floor(n / 2));
+    assert.ok(cancelled.every((gate) => !gates.released.includes(gate)));
+  }
+  const { value } = await gated();
+  await assert.rejects(value.callAsync("app/async.cancel_bad"), { message: "the module cancelled request 12345, which is not outstanding" });
+  assert.ok(value.unusable);
+});
+
+test("status 2 gives ready answers and calls ilang_continue", async () => {
+  const value = await guest([], { later: async (x) => 2 * x });
+  const count = await value.callAsync("app/async.yielding", [1000]);
+  assert.ok(count >= 1 && count < 1000, `${count}`);
+  const timer = await guest([], { later: (x) => new Promise((resolve) => setTimeout(() => resolve(2 * x), 1)) });
+  const waited = await timer.callAsync("app/async.yielding", [1e7]);
+  assert.ok(waited >= 1 && waited < 1e7, `${waited}`);
+});
+
+test("every exit of the wait drops the requests", async () => {
+  const { value, gates } = await gated({ seed: 2, wrongTypeFirst: true });
+  await assert.rejects(gates.drive(value.callAsync("app/async.fan", [3])), (error) => {
+    assert.ok(error instanceof Stop);
+    assert.equal(error.stopMessage, HOST_VALUE_REASON);
+    assert.equal(gates.requests.filter((gate) => gate.signal.aborted).length, 2);
+    return true;
+  });
+  assert.equal(value.unusable, HOST_VALUE_REASON);
+  // Late answers of the dropped requests change nothing.
+  for (const gate of gates.requests) gate.resolve(2 * gate.x);
+  await nextMacrotask();
+  assert.equal(value.unusable, HOST_VALUE_REASON);
+});
+
+test("cancel and reuse an id whose answer is finished", async () => {
+  let finished = 0;
+  for (let seed = 0; seed < 200; seed++) {
+    const n = 2 + (seed % 15);
+    const { value, gates } = await gated({ seed, burst: true });
+    const h = await gates.drive(value.callAsync("app/async.cancel_reuse", [n]));
+    assert.equal(h, fold(gates.answered()), `seed ${seed}`);
+    finished += gates.released.filter((gate) => gate.signal.aborted).length;
+  }
+  assert.ok(finished > 0);
+});
+
+test("requests start and are cancelled from ilang_continue", async () => {
+  for (let seed = 0; seed < 200; seed++) {
+    const n = 2 + (seed % 8);
+    const { value, gates } = await gated({ seed });
+    const h = await gates.drive(value.callAsync("app/async.continue_io", [n]));
+    assert.equal(h, fold(gates.answered()), `seed ${seed}`);
+    assert.equal(gates.starts, n);
+    const held = gates.requests.filter((gate) => gate.x === 0);
+    assert.equal(held.length, 1);
+    assert.ok(held[0].signal.aborted);
+  }
+});
+
+test("a module without ilang_continue or an ilang_resume export breaks", async () => {
+  for (const [name, message] of [
+    ["app/async.runnable", "the module is runnable, but has no ilang_continue"],
+    ["app/async.no_resume", "the module does not export ilang_resume:app:clock/v1:later"],
+  ]) {
+    const value = await instantiate(noContinueFixture, { imports: { "app:clock/v1": { later: async (x) => x } } });
+    await assert.rejects(value.callAsync(name), { message });
+    assert.equal(value.unusable, message);
+    assert.throws(() => value.call("app/sync.nil"), /make a new instance/);
+    assert.equal(value.exports.calls(), 0);
+  }
+  const value = await guest();
+  const waiting = value.callAsync("app/async.later", [1]);
+  assert.throws(() => value.exports.ilang_continue(), WebAssembly.RuntimeError);
+  assert.equal(await waiting, 2);
 });

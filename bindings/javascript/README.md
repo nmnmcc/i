@@ -1,7 +1,7 @@
 # i JavaScript host
 
 `ilang.mjs` is a self-contained ECMAScript module that runs i programs through
-the binary interface version 2 of `docs/spec.md` (Appendix B). It runs in modern
+the binary interface version 3 of `docs/spec.md` (Appendix B). It runs in modern
 browsers and Node.js without npm runtime dependencies. `ilang.d.ts` describes the
 same API for TypeScript.
 
@@ -38,7 +38,7 @@ exception handling with `exnref`. `supportsRequiredFeatures()` checks all four
 with a tiny probe module, without a network request.
 
 `instantiate` compiles the module, reads and checks its `ilang.abi` metadata
-(B.6), links `ilang:host/v1` (`panic` and `reference_id`, B.4) and every
+(B.6), links `ilang:host/v1` (`panic`, `reference_id` and `cancel`, B.4) and every
 function in `services` and `externals`, and calls `ilang_start` once (B.1). The
 loader checks every declared signature with Wasm's linker, also for an already
 compiled `WebAssembly.Module`. `abi` gives the metadata of a module without the
@@ -111,11 +111,42 @@ result buffer whose address is not 0, also an empty one.
 ## Async
 
 A function of an async host service (`@host("…", "async")`) gives a Promise.
-`callAsync(name, args)` calls an async export (B.5): while the status is 1, it
-awaits the Promise of the one host function that the module started, gives its
-value to `ilang_resume:namespace:label`, and at status 0 reads the results from
-`ilang_result:name`. While it waits, other calls are refused. `run()` and
-`runTests` also wait for async entry points.
+The module picks a request id for each async host function that it starts,
+and may keep many requests outstanding (B.4). The loader calls the service
+during the import, and answers the requests one at a time, in the order their
+Promises settle, through `ilang_resume:namespace:label` with the id first.
+`callAsync(name, args)` calls an async export (B.5). At status 2 (the module
+can go on without an answer) it waits one macrotask, gives an answer that is
+done, and otherwise calls `ilang_continue`. At status 0 it reads the results
+from `ilang_result:name`. While it waits, and while Wasm runs, other calls are
+refused; so a service may not call the instance. `run()` and `runTests` also
+wait for async entry points.
+
+The service is called during the import, so the part of an `async` function
+before its first `await` runs then. Fix anything that depends on the time of
+the call, such as a deadline, before the first `await`.
+
+A request is dropped when the module cancels it with the runtime import
+`cancel`, when the entry point ends while it is outstanding, when the program
+stops, and when the work of another request fails. JavaScript cannot stop a
+Promise, so the loader gives each request an `AbortSignal` and aborts it when
+the request is dropped. Call `requestSignal()` before the first `await` of the
+service to get it, and use it to clear a timer or abort a `fetch`:
+
+```javascript
+import { requestSignal } from "./ilang.mjs";
+
+const sleep = (ms) => {
+  const signal = requestSignal();
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener("abort", () => clearTimeout(timer));
+  });
+};
+```
+
+A service that ignores the signal keeps running, and its side effects still
+happen; only its answer is ignored.
 
 ## Verification
 

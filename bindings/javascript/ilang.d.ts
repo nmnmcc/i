@@ -11,7 +11,7 @@ export interface Signature {
 export interface EntryPoint { name: string; async?: boolean }
 /** The ilang.abi metadata (Appendix B.6). */
 export interface Abi {
-  version: 2;
+  version: 3;
   entry?: EntryPoint | null;
   tests?: EntryPoint[];
   exports?: Record<string, Signature>;
@@ -28,7 +28,8 @@ export interface Options {
   /**
    * Host service functions and external functions, by import module and name.
    * A service function throws `GuestError(value)` to give an error; an async
-   * one gives a Promise.
+   * one gives a Promise. An async one is called during the import; it may
+   * call `requestSignal()` before its first `await`.
    */
   imports?: Record<string, Record<string, (...args: any[]) => unknown>>;
   rawImports?: WebAssembly.Imports;
@@ -68,6 +69,11 @@ export const HOST_VALUE_REASON: "host: value is not correct";
 export function supportsRequiredFeatures(): boolean;
 export function integerToLimbs(value: bigint): { sign: number; bytes: Uint8Array };
 export function integerFromLimbs(sign: number, bytes: Uint8Array): bigint;
+/**
+ * The AbortSignal of the async request whose service is starting; it is
+ * aborted when the request is dropped. Throws when no service is starting.
+ */
+export function requestSignal(): AbortSignal;
 export function readAbi(module: WebAssembly.Module, supplied?: Abi): Readonly<Required<Abi>>;
 export function instantiate(source: ModuleSource, options?: Options): Promise<Guest>;
 export function runTests(source: ModuleSource, options?: Options & { tests?: string[] }): Promise<Array<{ name: string; passed: boolean; error?: unknown }>>;
