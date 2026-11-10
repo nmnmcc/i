@@ -413,6 +413,11 @@ example = () { cli.parse(options(), ["--verbose", "--jobs=4"]) }
 
 ### 5.3 Exact grammar and rules
 
+All errors for a recognized option use its canonical `--long` name, including
+when a short alias was entered. Scanning errors identify that option token's
+index; conversion errors retain A6's value-index rule. Unknown-option errors
+preserve the original token instead of inventing a canonical name.
+
 - **A1 Definitions.** Metadata order is the left-to-right leaf order of map2;
   map preserves it; pure contributes none. Long and positional names match
   ASCII `[a-z][a-z0-9-]*`; a short name is exactly one ASCII letter of either
