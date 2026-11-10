@@ -4,13 +4,14 @@
 // a type test, so a test of `Window` would also take a `Socket`.
 
 Window {}
+
 Socket {}
 
 kind = (h: Window | Socket) {
-  case h {
-    _: Window -> "window"
-    _: Socket -> "socket"
-  }
+	h |> {
+		_: Window -> "window"
+		_: Socket -> "socket"
+	}
 }
 
 @test

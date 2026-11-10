@@ -2,20 +2,20 @@ literals : Bool
 typed : (s: String) -> Bool
 with_nil : (x: Int | Nil) -> Bool
 lists : Bool
-type_var : (a: a, b: b) -> Bool
-type_var_literal : (a: a) -> Bool
-untyped : (s: a) -> Bool
+type_var : (a: A, b: B) -> Bool
+type_var_literal : (a: A) -> Bool
+untyped : (s: A) -> Bool
 not_equal : Bool
 shared : (x: Int | String, y: String | Nil) -> Bool
 apart : (x: Int | String, y: Float | Nil) -> Bool
 sizes : Bool
 same_size : Bool
 function : (f: (Int) -> Int) -> Bool
-holes : (x: a) -> Bool
+holes : (x: A) -> Bool
 6:12: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
-7:23: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-16:13: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
-19:45: error[E0520]: the two sides have the known types `Int | String` and `Float | Nil`, which are disjoint, so the result would always be the same (§6.9)
-21:9: error[E0520]: the two sides have the known types `(Int, Int)` and `(Int, Int, Int)`, which are disjoint, so the result would always be the same (§6.9)
-24:32: error[E0520]: the two sides have the known types `(Int) -> Int` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-26:15: error[E0520]: the two sides have the known types `(_, Int)` and `String`, which are disjoint, so the result would always be the same (§6.9)
+8:23: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
+22:13: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
+27:45: error[E0520]: the two sides have the known types `Int | String` and `Float | Nil`, which are disjoint, so the result would always be the same (§6.9)
+30:9: error[E0520]: the two sides have the known types `(Int, Int)` and `(Int, Int, Int)`, which are disjoint, so the result would always be the same (§6.9)
+35:32: error[E0520]: the two sides have the known types `(Int) -> Int` and `Int`, which are disjoint, so the result would always be the same (§6.9)
+38:15: error[E0520]: the two sides have the known types `(_, Int)` and `String`, which are disjoint, so the result would always be the same (§6.9)

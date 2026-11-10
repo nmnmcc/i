@@ -17,6 +17,9 @@ pub struct Module {
     pub imports: Vec<ImportItem>,
     pub exports: Vec<ExportItem>,
     pub items: Vec<Item>,
+    /// The imports group.
+    pub imports_span: Option<Span>,
+    pub exports_span: Option<Span>,
 }
 
 /// `[alias =] [(A, b) =] a/b/c` (§2.3).
@@ -45,10 +48,15 @@ pub struct Item {
     pub span: Span,
 }
 
+/// `@[module.]name[(args)]` (§2.2). `args` holds the arguments when every
+/// one is a string literal with no label and there is at least one; `call`
+/// holds them, with the span of the `( )`, in every other case with `( )`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Attribute {
+    pub module: Option<Ident>,
     pub name: Ident,
     pub args: Vec<(String, Span)>,
+    pub call: Option<(Vec<Arg>, Span)>,
     pub span: Span,
 }
 
@@ -56,18 +64,28 @@ pub struct Attribute {
 pub enum ItemKind {
     TypeDef(TypeDef),
     Binding(Binding),
-    /// `name: Type`, only with `@external` (§2.5, §10.1).
+    /// `name[(A, …)]: Type` (§2.5, §10.1).
     Declaration {
         name: Ident,
+        type_params: Vec<Ident>,
         ty: TypeExpr,
+    },
+    /// `[module.]name(args)` at the top level, kept for macros (§2.2).
+    MacroItem {
+        module: Option<Ident>,
+        name: Ident,
+        args: Vec<Arg>,
     },
 }
 
-/// `T(a, b) { C1 C2 }` or `T(a) = Type` (§4.3).
+/// `T(A, B) { C1 C2 }` or `T(A) = Type` (§4.3). `params` holds a head of
+/// plain `UpName`s with no module and no arguments. `head` holds any other head,
+/// and `params` is then empty.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeDef {
     pub name: Ident,
     pub params: Vec<Ident>,
+    pub head: Vec<TypeExpr>,
     pub body: TypeBody,
 }
 
@@ -91,12 +109,14 @@ pub struct Field {
     pub span: Span,
 }
 
-/// `pattern = value` (§2.5, §6.10).
+/// `pattern = value`, or `name(A, …)[: T] = value` (§2.5, §6.10).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Binding {
     pub pattern: Pattern,
     pub value: Expr,
     pub span: Span,
+    /// The type variables declared after the name (§4.7).
+    pub type_params: Vec<Ident>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -221,10 +241,13 @@ pub enum ExprKind {
     BitArray(Vec<Segment<Expr>>),
     Block(Block),
     Fn(Box<Function>),
+    /// The match `e |> { … }` (§6.12).
     Case {
         subject: Box<Expr>,
         clauses: Vec<Clause>,
     },
+    /// A clause block that is not the right side of `|>` (§6.12).
+    Clauses(Vec<Clause>),
     Call {
         callee: Box<Expr>,
         args: Vec<Arg>,
@@ -386,7 +409,17 @@ pub enum TypeKind {
         name: Ident,
         args: Vec<TypeExpr>,
     },
-    Var(String),
+    /// `name` or `a.x` with a lowercase `x`, kept for the type of a value (§3).
+    ValueOf {
+        module: Option<Ident>,
+        name: Ident,
+    },
+    /// `[a.]m(args)` with a lowercase `m`, kept for macros (§3).
+    Call {
+        module: Option<Ident>,
+        name: Ident,
+        args: Vec<TypeArg>,
+    },
     /// `_`.
     Hole,
     Tuple(Vec<TypeExpr>),
@@ -402,4 +435,12 @@ pub enum TypeKind {
     Inter(Vec<TypeExpr>),
     /// `A - B - …`, from left to right, two or more members.
     Diff(Vec<TypeExpr>),
+}
+
+/// An argument of a `TypeCall` (§3).
+#[derive(Clone, Debug, PartialEq)]
+pub enum TypeArg {
+    Type(TypeExpr),
+    Int(BigUint, Span),
+    String(String, Span),
 }

@@ -1,4 +1,4 @@
-import ( // what we use
+( // what we use
 	i/core // printing
 	// decoding
 	decode = json/decode
@@ -9,7 +9,7 @@ import ( // what we use
 	) = std/option
 )
 
-export (
+(
 	main
 )
 

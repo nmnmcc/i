@@ -1,4 +1,4 @@
-import (
+(
 	i/core
 	i/fail
 	list = std/list
@@ -350,14 +350,14 @@ partition_long_test = () {
 }
 
 build = (n, acc) {
-	case n {
+	n |> {
 		0 -> acc
 		_ -> build(n - 1, [Ok(n), ..acc])
 	}
 }
 
 build_plain = (n, acc) {
-	case n {
+	n |> {
 		0 -> acc
 		_ -> build_plain(n - 1, [n, ..acc])
 	}
@@ -373,7 +373,7 @@ map_effects_test = () {
 error_union_test = () {
 	// `then` keeps the error type of the first result; a union is fine.
 	r: Result(Int, String | Int) = result.then(Ok(1), (x) {
-		case x > 0 {
+		{ x > 0 } |> {
 			True  -> Error(0)
 			False -> Error("negative")
 		}

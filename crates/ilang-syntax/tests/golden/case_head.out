@@ -1,32 +1,32 @@
-a = case (x, y) {
+a = (x, y) |> {
   (1, 2) -> 3
   _ -> 4
 }
 
-b = case (x) -> Int { x }(1) {
+b = (x) -> Int { x }(1) |> {
   _ -> 0
 }
 
-c = case f((x) { x }) {
+c = f((x) { x }) |> {
   _ -> 0
 }
 
-d = case {
+d = {
   (x) { x }
-} {
+} |> {
   _ -> 0
 }
 
-e = case x {
+e = x |> {
   y -> (z) { z }
 }
 
-f = case [x, (y)] {
+f = [x, (y)] |> {
   _ -> 0
 }
 
-g = case (x) {
+g = (x) |> {
   _ -> 0
 }
 
-h = case x {}
+h = x |> {}

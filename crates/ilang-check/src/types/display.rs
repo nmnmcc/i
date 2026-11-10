@@ -5,8 +5,9 @@
 //! Simplification removes a variable that is only in output places (it is
 //! `Never`) or only in input places (it has no effect), and puts together a
 //! variable with a type that it always comes with, both as an output and as
-//! an input. A variable written in an annotation keeps its name, and is
-//! not removed for being on one side only.
+//! an input. A variable written in an annotation is
+//! not removed for being on one side only. Shown names are chosen independently
+//! of written names.
 
 use super::solve::Solver;
 use super::{FnTy, Head, ShownFn, ShownType, Ty, V, Variance};
@@ -93,7 +94,7 @@ struct SchemeNames {
     /// For each variable that a name of the scheme stands for: the place of
     /// the name in the scheme, and the name.
     names: HashMap<V, (usize, String)>,
-    /// Every name of the scheme.
+    /// Names used by the scheme and by unqualified types.
     taken: HashSet<String>,
 }
 
@@ -1131,18 +1132,27 @@ enum Role {
     Env,
 }
 
-struct Namer<'s> {
-    s: &'s Solver,
+struct Namer {
     names: HashMap<V, String>,
     taken: HashSet<String>,
 }
 
-impl<'s> Namer<'s> {
-    fn new(s: &'s Solver) -> Namer<'s> {
+impl Namer {
+    fn new(s: &Solver) -> Namer {
+        let taken = s
+            .type_names
+            .iter()
+            .filter(|n| !n.contains('.'))
+            .cloned()
+            .chain(
+                crate::hir::BuiltinType::ALL
+                    .into_iter()
+                    .map(|b| b.name().to_string()),
+            )
+            .collect();
         Namer {
-            s,
             names: HashMap::default(),
-            taken: HashSet::default(),
+            taken,
         }
     }
 
@@ -1156,15 +1166,6 @@ impl<'s> Namer<'s> {
     fn assign(&mut self, t: &Ty) {
         let mut order = Vec::new();
         roles(t, Role::Value, &mut order);
-        // Written names first, then the others.
-        for (v, _) in &order {
-            if let Some(n) = self.s.vars.get(v.0 as usize).and_then(|s| s.name.clone())
-                && !self.names.contains_key(v)
-                && self.taken.insert(n.clone())
-            {
-                self.names.insert(*v, n);
-            }
-        }
         for (v, role) in &order {
             if self.names.contains_key(v) {
                 continue;
@@ -1183,18 +1184,18 @@ impl<'s> Namer<'s> {
     fn fresh(&mut self, role: Role) -> String {
         let candidates: Box<dyn Iterator<Item = String>> = match role {
             Role::Err => {
-                Box::new(std::iter::once("e".to_string()).chain((2..).map(|i| format!("e{i}"))))
+                Box::new(std::iter::once("E".to_string()).chain((2..).map(|i| format!("E{i}"))))
             }
             Role::Env => {
-                Box::new(std::iter::once("n".to_string()).chain((2..).map(|i| format!("n{i}"))))
+                Box::new(std::iter::once("N".to_string()).chain((2..).map(|i| format!("N{i}"))))
             }
             Role::Value => Box::new(
-                ('a'..='z')
-                    .filter(|c| *c != 'e' && *c != 'n')
+                ('A'..='Z')
+                    .filter(|c| *c != 'E' && *c != 'N')
                     .map(String::from)
                     .chain((2..).flat_map(|i| {
-                        ('a'..='z')
-                            .filter(|c| *c != 'e' && *c != 'n')
+                        ('A'..='Z')
+                            .filter(|c| *c != 'E' && *c != 'N')
                             .map(move |c| format!("{c}{i}"))
                     })),
             ),

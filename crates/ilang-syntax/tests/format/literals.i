@@ -5,7 +5,7 @@ strings = ("tab\there", "quote \" and backslash \\", "\u{1F600} and \u{e9}", "li
 line three")
 
 patterns = (n) {
-  case n {
+   n |> {
     -1_000 -> "minus a thousand"
     0x10 -> "sixteen"
     "pre\n" <> rest -> rest

@@ -1,0 +1,8 @@
+7:5: error[E0231]: a type parameter may not have the name of a type
+8:7: error[E0232]: a type parameter is an `UpName` with no module name and no arguments; old lowercase type parameters are now declared as UpNames, as in `Box(A) { Box(A) }` or `Id(A) = A`
+9:13: error[E0202]: the type `Undeclared` is not defined; to use a type parameter, declare it in the head, as in `Box(A) { … }`
+2:9: error[E0226]: the type variable `A` is declared more than once here
+3:7: error[E0231]: a type variable may not have the name of a type
+4:15: error[E0230]: a type variable takes no arguments
+5:15: error[E0202]: the type `Missing` is not defined; to use a type variable, declare it after the name of the binding, as in `f(A) = …`
+6:22: error[E0237]: a lowercase name in a type is kept for the type of a value; declare a type variable as an UpName, as in `f(A) = …`

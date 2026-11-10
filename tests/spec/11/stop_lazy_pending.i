@@ -1,0 +1,47 @@
+// spec: 11.7, 9.4
+// expect: stop "panic: after"
+// at: spec/stop_lazy_pending:31:3
+// at: spec/stop_lazy_pending:25:7
+// at: spec/stop_lazy_pending:20:7
+// at: spec/stop_lazy_pending:15:7
+// at: spec/stop_lazy_pending:39:5
+// at: spec/stop_lazy_pending:43:18
+(i/control)
+
+Paused { Paused(Continuation(Nil, Paused, Never, Never))  Done }
+
+// Three frames that wait.
+f1 = (b) {
+  x = f2(b)
+  x
+}
+
+f2 = (b) {
+  x = f3(b)
+  x
+}
+
+f3 = (b) {
+  x = leaf(b)
+  x
+}
+
+leaf = (b) {
+  control.suspend(b, (k) { Paused(k) })
+  panic("after")
+}
+
+// After the resume, the stop shows the innermost frame, the three frames
+// that wait, then the place of `resume`.
+@main
+main = () {
+  p = control.boundary((b) {
+    f1(b)
+    Done
+  })
+  p |> {
+    Paused(k) -> control.resume(k, Nil)
+    Done -> panic("not paused")
+  }
+  Nil
+}

@@ -4,7 +4,7 @@
 //// `Int`, `Float`, `String`, `List`, `BitArray`, `UtfCodepoint`, `Never`,
 //// `Boundary`, and `Continuation` are built into the compiler.
 
-export (
+(
 	Bool(..)
 	Nil(..)
 	Result(..)
@@ -23,9 +23,9 @@ Nil {
 	Nil
 }
 
-Result(a, e) {
-	Ok(a)
-	Error(e)
+Result(A, E) {
+	Ok(A)
+	Error(E)
 }
 
 AssertionFailure {
@@ -43,7 +43,7 @@ panic: (message: String) -> Never
 /// Reports a failure to `Assert` when `c` is `False` (§9.6).
 /// type: (c: Bool) -> Nil ! Assert
 assert = (c: Bool, a ! Assert) {
-	case c {
+	c |> {
 		True  -> Nil
 		False -> a.fail(AssertionFailure("assert"))
 	}

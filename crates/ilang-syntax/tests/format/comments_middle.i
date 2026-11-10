@@ -16,11 +16,11 @@ f = (x) {
 	p = xs // before a pipe
 		|> g // before another pipe
 		|> h
-	q = case x {
+	q =  x |> {
 		A // before an arrow
 			-> 1
 		B // before a guard
-			if c -> 2
+			? c -> 2
 	}
 	d // before an equals sign
 		= 2
@@ -34,7 +34,7 @@ T = // after an equals sign in a type
 	String
 
 g = (x) {
-	q = case x {
+	q =  x |> {
 		A | // after a bar
 			B -> 1
 		_ -> 0

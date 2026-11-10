@@ -1,3 +1,4 @@
+// old-syntax-check: E0111,E0111,E0111,E0111,E0111
 a = x |> 1
 b = x |> [f]
 c = x |> -f

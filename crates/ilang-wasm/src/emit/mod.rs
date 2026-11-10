@@ -60,6 +60,7 @@ const DECLARED: &[&str] = &[
     "$final_reenter",
     "$boundary_reenter",
     "$cancel_reenter",
+    "$control_unpend",
 ];
 
 /// The WAT text of the whole module.

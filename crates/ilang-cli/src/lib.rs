@@ -58,9 +58,33 @@ impl std::fmt::Display for BuildError {
 
 impl std::error::Error for BuildError {}
 
+/// Diagnostics followed by one old-version note per affected dependency.
+pub fn diagnostic_lines(graph: &PackageGraph, diags: &[Diagnostic]) -> Vec<String> {
+    let mut lines = graph.sources.render_all(diags);
+    for (id, package) in graph.packages.iter().enumerate() {
+        if Some(id) == graph.root || id == graph.library {
+            continue;
+        }
+        if package.modules.iter().any(|m| {
+            diags
+                .iter()
+                .any(|d| d.is_error() && d.source == Some(m.source))
+                && ilang_syntax::old_syntax_marks(&graph.sources.get(m.source).text)
+        }) {
+            let tag = package
+                .location
+                .as_ref()
+                .map(|l| format!("v{}", l.version))
+                .unwrap_or_else(|| "path dependency".into());
+            lines.push(format!("note: this version of `{}` (`{tag}`) is written in the syntax from before {} (A3); it cannot be used with this compiler; use a newer version of the package, or an older version of `i`", package.name, env!("CARGO_PKG_VERSION")));
+        }
+    }
+    lines
+}
+
 fn program_error(graph: &PackageGraph, diags: &[Diagnostic]) -> BuildError {
     BuildError::Program {
-        lines: graph.sources.render_all(diags),
+        lines: diagnostic_lines(graph, diags),
         codes: diags
             .iter()
             .filter(|d| d.is_error())

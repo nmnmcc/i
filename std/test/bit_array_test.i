@@ -1,4 +1,4 @@
-import (
+(
 	i/core
 	bit_array = std/bit_array
 	result = std/result
@@ -215,7 +215,7 @@ concat_bits_test = () {
 
 @test
 concat_slices_test = () {
-	case <<170, 85, 255>> {
+	<<170, 85, 255>> |> {
 		<<_:u3, middle:bits(13), rest:bits>> -> {
 			assert(
 				bit_array.concat([middle, rest, middle]) ==

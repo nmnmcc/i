@@ -1,3 +1,5 @@
-import (app/helper)
+(
+	app/helper
+)
 
 x = 1

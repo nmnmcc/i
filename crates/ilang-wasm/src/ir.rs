@@ -50,10 +50,10 @@
 //! function, each such call is a [`Stmt::Suspendable`] with a [`Point`]: a
 //! handler around the call adds the frame record of the point. The point has
 //! a **segment**, a function with the rest of the function after the call,
-//! and a **re-entry** function that rebuilds the frame when the
-//! continuation is resumed: it puts the frame on the shadow stack with the
-//! slot that the frame record keeps, rebuilds the environment, re-enters the
-//! inner frames, and goes on with the segment. A segment goes on with a
+//! and a **re-entry** function that rebuilds the frame when the frames inside
+//! it have returned: it rebuilds the environment, puts the frame on the
+//! shadow stack with the slot that the frame record keeps, and goes on with
+//! the segment. A segment goes on with a
 //! [`Join`], the code after an `If` or a `Block` around the point, so that no
 //! code is in more than one segment. The normal path does not use segments:
 //! the rest of the function stays where it is. See `control.rs` and
@@ -506,8 +506,10 @@ pub struct Func {
 #[derive(Clone, Debug)]
 pub struct Point {
     pub func: FuncId,
-    /// The environment of the call, given to the inner frames when they are
-    /// rebuilt.
+    /// The environment of the call. The environment statements between the
+    /// function's environment and this one (`Point::delta`) are kept in the
+    /// frame record, so that the frames inside it get them when they are
+    /// re-entered (§9.4 rule 3).
     pub env: Env,
     /// The value of the call.
     pub dst: Local,
@@ -557,6 +559,30 @@ impl Point {
             .iter()
             .copied()
             .filter(|&l| locals[l as usize] != LocalType::Env)
+    }
+
+    /// The environment statements between the function's environment and
+    /// the environment of the call, outermost first: the links of `envs`
+    /// from `env` back to [`Env::Param`]. `None` when a link is missing.
+    pub fn delta(&self) -> Option<Vec<EnvLink>> {
+        let mut links = Vec::new();
+        let mut env = self.env;
+        loop {
+            match env {
+                Env::Param => break,
+                Env::Local(l) => {
+                    let link = self.envs.iter().find(|e| e.dst == l)?;
+                    if links.len() == self.envs.len() {
+                        // The links go round in a circle.
+                        return None;
+                    }
+                    links.push(*link);
+                    env = link.from;
+                }
+            }
+        }
+        links.reverse();
+        Some(links)
     }
 }
 

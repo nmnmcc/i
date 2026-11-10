@@ -7,4 +7,4 @@ f = (x) -> Int & { Nil } { x }
 g = (x) -> (Int) -> { Int } { x }
 h = (x) -> (Int) -> Int ? E ! N { x }
 i = (x) -> { (Int) -> Int ? E } ! N { x }
-j = (x: a) -> a { x }
+j(A) = (x: A) -> A { x }

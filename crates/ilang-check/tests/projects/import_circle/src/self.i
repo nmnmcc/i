@@ -1,3 +1,5 @@
-import (app/self)
+(
+	app/self
+)
 
 w = 1

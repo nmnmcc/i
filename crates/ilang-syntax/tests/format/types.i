@@ -1,6 +1,6 @@
-Alias(a) = (a) -> { (Int) -> Int } ! Assert | Nil
+Alias(A) = (A) -> { (Int) -> Int } ! Assert | Nil
 
-Wide(a, b) = (first_parameter_type: List(a), second_parameter_type: Dict(a, b), third: Int) -> Bool
+Wide(A, B) = (first_parameter_type: List(A), second_parameter_type: Dict(A, B), third: Int) -> Bool
 
 Handler = { (Int) -> Int } | { (String) -> String }
 

@@ -12,4 +12,4 @@ guarded : (v: Int | String) -> String | Int
 literal : (v: Int | String) -> String | Int
 partial : (v: Result(Int, String) | Nil) -> Nil | Result(Int, String)
 by_patterns : (p: (Bool, Int | String)) -> String | Int
-open : (v: a) -> Int | a - Int
+open : (v: A) -> Int | A - Int

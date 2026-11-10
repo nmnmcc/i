@@ -1,0 +1,3 @@
+main = 1
+--- errors ---
+E0115 @2:1 a file with nothing to import or export leaves the group out

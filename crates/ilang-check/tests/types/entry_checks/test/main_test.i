@@ -1,6 +1,8 @@
 // §10.2: a test gives `Nil`, and its environment has only host services
 // and `Assert`.
-import ((Clock, Storage) = app/main)
+(
+	(Clock, Storage) = app/main
+)
 
 @test
 passes = () { assert(1 == 1) }

@@ -1,5 +1,5 @@
-outer = (xs: List(Int), f: (Int) -> Int ? e ! n) -> List(Int) ? e ! n {
-  helper = (rest, acc) { case rest { [] -> list.reverse(acc)  [x, ..more] -> helper(more, [f(x), ..acc]) } }
+outer(E, N) = (xs: List(Int), f: (Int) -> Int ? E ! N) -> List(Int) ? E ! N {
+  helper = (rest, acc) {  rest |> { [] -> list.reverse(acc)  [x, ..more] -> helper(more, [f(x), ..acc]) } }
   helper(xs, [])
 }
 

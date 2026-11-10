@@ -115,7 +115,7 @@ pub fn run(command: PackageCommand) -> Result<ExitCode> {
 fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
     if !is_name(name) || name == "i" {
         bail!(
-            "the package name `{name}` must be a name (§1.3): a lowercase letter, then lowercase letters, digits and `_`; and it may not be `i` or a keyword"
+            "the package name `{name}` must be a name (§1.3): a lowercase letter, then lowercase letters, digits and `_`; and it may not be `i`"
         );
     }
     let dir = path.unwrap_or_else(|| PathBuf::from(name));
@@ -152,9 +152,9 @@ fn main_module(name: &str) -> String {
         r#"//// The package `{name}`. It imports the standard service `Io` from `i/io`
 //// (§9.7), and `i run` gives it, so the program can print.
 
-import ((Io) = i/io)
+((Io) = i/io)
 
-export (greeting)
+(greeting)
 
 /// The greeting for `who`.
 greeting = (who: String) -> String {{ "Hello, " <> who <> "!" }}
@@ -169,11 +169,11 @@ main = (io ! Io) {{
 
 fn test_module(name: &str) -> String {
     format!(
-        r#"import ({name}/main)
+        r#"({name}/main)
 
 @test
 greets = () {{
-  case main.greeting("i") {{
+  main.greeting("i") |> {{
     "Hello, i!" -> Nil
     other -> panic(other)
   }}
@@ -1022,6 +1022,28 @@ fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interfac
         );
     }
     let dir = tmp.path().join(prefix);
+    let (graph, mut diags) = ilang_package::load_with(
+        &dir,
+        &LoadOptions {
+            tests: false,
+            write_lock: false,
+            ..LoadOptions::from_env()
+        },
+    );
+    diags.extend(ilang_check::check(&graph).diags);
+    let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
+    if !errors.is_empty()
+        && errors.iter().all(|d| {
+            d.source
+                .is_some_and(|s| ilang_syntax::old_syntax_marks(&graph.sources.get(s).text))
+        })
+    {
+        println!(
+            "the interface of `{tag}` is in the syntax from before {} (A3) and cannot be compared; check the interface by hand",
+            env!("CARGO_PKG_VERSION")
+        );
+        return Ok(None);
+    }
     Ok(Some(interface_of(&dir, false)?))
 }
 
@@ -1137,8 +1159,8 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
             .chain(library_hosts(program, graph.library, m));
         for t in types {
             let def = program.ty(t);
-            let shown = TypeShow::new(program, def, &shown_names, false);
-            let canonical = TypeShow::new(program, def, &canonical_names, true);
+            let shown = TypeShow::new(def, &shown_names, false);
+            let canonical = TypeShow::new(def, &canonical_names, true);
             // The host gives the functions of a host service by their
             // labels (§9.7), so they are part of the interface even when
             // the type or its constructor is not exported.
@@ -1250,9 +1272,8 @@ fn canonical_type(t: &ShownType, names: &[String]) -> String {
 }
 
 /// Shows the parts of a type definition. The parameters are named by their
-/// place, `a`, `b`, …, so that renaming them is no change.
+/// place, `A`, `B`, …, so that renaming them is no change.
 struct TypeShow<'a> {
-    program: &'a hir::Program,
     def: &'a hir::TypeDef,
     /// The name of each custom type, by `TypeId`.
     names: &'a [String],
@@ -1263,14 +1284,8 @@ struct TypeShow<'a> {
 }
 
 impl<'a> TypeShow<'a> {
-    fn new(
-        program: &'a hir::Program,
-        def: &'a hir::TypeDef,
-        names: &'a [String],
-        canonical: bool,
-    ) -> Self {
+    fn new(def: &'a hir::TypeDef, names: &'a [String], canonical: bool) -> Self {
         TypeShow {
-            program,
             def,
             names,
             canonical,
@@ -1279,11 +1294,23 @@ impl<'a> TypeShow<'a> {
     }
 
     fn param(&self, i: usize) -> String {
-        let letters = b"abcdefghijklmnopqrstuvwxyz";
-        match letters.get(i) {
-            Some(&c) => (c as char).to_string(),
-            None => format!("t{i}"),
+        if self.canonical {
+            return format!("'p{i}");
         }
+        let letters = b"ABCDFGHIJKLMOPQRSTUVWXYZ";
+        (0..)
+            .flat_map(|round| {
+                letters.iter().map(move |c| {
+                    if round == 0 {
+                        (*c as char).to_string()
+                    } else {
+                        format!("{}{suffix}", *c as char, suffix = round + 1)
+                    }
+                })
+            })
+            .filter(|name| !self.names.contains(name))
+            .nth(i)
+            .unwrap()
     }
 
     /// The name of a type variable that is not a parameter.
@@ -1296,14 +1323,15 @@ impl<'a> TypeShow<'a> {
             });
             return format!("'{i}");
         }
-        self.program
-            .ty_var_names
-            .get(v.0 as usize)
-            .cloned()
-            .unwrap_or_else(|| "_".to_string())
+        let mut vars = self.vars.borrow_mut();
+        let i = vars.iter().position(|x| *x == v).unwrap_or_else(|| {
+            vars.push(v);
+            vars.len() - 1
+        });
+        self.param(self.def.params.len() + i)
     }
 
-    /// `@host("ns") Name(a, b)`, or `Name(a) = Type` for an alias.
+    /// `@host("ns") Name(A, B)`, or `Name(A) = Type` for an alias.
     fn head(&self) -> String {
         let mut s = String::new();
         if let Some(h) = &self.def.host {
@@ -1482,4 +1510,14 @@ fn relative(from: &Path, to: &Path) -> String {
         return ".".to_string();
     }
     parts.join("/")
+}
+
+#[cfg(test)]
+mod syntax_templates {
+    #[test]
+    fn new_package_sources_parse() {
+        for source in [super::main_module("example"), super::test_module("example")] {
+            assert!(ilang_syntax::parse_module(&source).1.is_empty(), "{source}");
+        }
+    }
 }

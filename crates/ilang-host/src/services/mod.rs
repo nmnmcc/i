@@ -5,7 +5,7 @@
 //!   which a program imports like this:
 //!
 //!   ```text
-//!   import ((Io) = i/io)
+//!   ((Io) = i/io)
 //!   ```
 //!
 //!   `print` writes the text and a line feed. Another embedder gives it like
@@ -34,6 +34,12 @@
 //! - A sync service runs inside the tokio runtime of `block_on`. It must not
 //!   start or block on a runtime of its own; write it as an async service,
 //!   or do that work on a thread of its own and join it.
+
+mod clock;
+mod fs;
+mod net;
+mod process;
+mod stdio;
 
 use crate::{BigInt, HostImports, Value};
 use anyhow::bail;

@@ -45,6 +45,14 @@ pub mod code {
     pub const TYPE_PARAM_TWICE: &str = "E0226";
     pub const EXPORT_HIDDEN_TYPE: &str = "E0227";
     pub const ENV_PARAMS_SAME: &str = "E0228";
+    pub const TYPE_OF_VALUE_RESERVED: &str = "E0229";
+    pub const TYPE_VAR_ARGS: &str = "E0230";
+    pub const TYPE_VAR_IS_TYPE: &str = "E0231";
+    pub const TYPE_PARAM_FORM: &str = "E0232";
+    pub const ALIAS_PATTERN_RESERVED: &str = "E0233";
+    pub const MACRO_RESERVED: &str = "E0234";
+    pub const LOWERCASE_TYPE_RESERVED: &str = "E0237";
+    pub const CHOICES_ONE_CLAUSE: &str = "E0235";
     // Attributes and entry points.
     pub const UNKNOWN_ATTRIBUTE: &str = "E0301";
     pub const ATTRIBUTE_ARGS: &str = "E0302";
@@ -149,7 +157,8 @@ pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagn
 pub struct Checked {
     /// `None` when a module has a syntax error.
     pub program: Option<hir::Program>,
-    /// `None` when the program could not be resolved.
+    /// `None` when the program could not be resolved, or the equivalence
+    /// audit needs a known type before it can supply lowering data.
     pub types: Option<types::Typed>,
     pub diags: Vec<Diagnostic>,
 }

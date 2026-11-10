@@ -141,7 +141,10 @@ mod tests {
         let c = Change::new(old, new);
         assert!(!c.is_same());
         // Before the change, and after it.
-        assert_eq!(c.old_span(span(new, "a =")), Some(span(old, "a =")));
+        assert_eq!(
+            c.old_span(span(new, /* old-syntax-check: E0101 */ "a =")),
+            Some(span(old, /* old-syntax-check: E0101 */ "a ="))
+        );
         assert_eq!(c.old_span(span(new, "foo")), Some(span(old, "foo")));
         assert_eq!(c.old_span(span(new, "c")), Some(span(old, "c")));
         assert_eq!(c.new_span(span(old, "c")), Some(span(new, "c")));
@@ -155,7 +158,7 @@ mod tests {
     #[test]
     fn a_name_just_before_a_new_dot() {
         let old = "f = (u) { u }\n";
-        let new = "f = (u) { u. }\n";
+        let new = /* old-syntax-check: E0101 */ "f = (u) { u. }\n";
         let c = Change::new(old, new);
         let dot = new.find("u.").unwrap() as u32 + 1;
         let base = name_before(new, dot);

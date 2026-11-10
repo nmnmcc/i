@@ -12,9 +12,9 @@ use std::collections::HashMap;
 use std::fs;
 
 const SOURCE: &str = r#"
-import (i/fail)
+ (i/fail)
 
-export (div, Handle)
+ (div, Handle)
 
 Cat { Cat(lives: Int, name: String) }
 Dog { Dog(name: String) }
@@ -27,7 +27,7 @@ minus = (a: Int, b: Int) { a - b }
 by_label = minus(b: 1, a: 2)
 piped = 5 |> minus(b: 1)
 tests = (x) {
-  case x {
+   x |> {
     _: Int | String -> 1
     _: { (Int, Int) } -> 2
     _ -> 3
@@ -46,7 +46,7 @@ first = (r) {
 pair = ((a, b)) { a }
 Handle {}
 div = (a: Int, h: Handle) {
-  case a {
+   a |> {
     0 -> fail.raise("zero")
     1 -> fail.raise(a)
     2 -> fail.raise(Nil)

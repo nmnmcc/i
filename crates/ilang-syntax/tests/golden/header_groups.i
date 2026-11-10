@@ -1,0 +1,4 @@
+(i/fail, opt = (Option, Some) = std/option)
+export (main)
+(a, b) = (1, 2)
+main = () { a + b }

@@ -31,6 +31,9 @@ const WAT: &str = r#"
 (global $site_table (mut (ref null $sites)) (ref.null $sites))
 (global $site_modules (mut (ref null $values)) (ref.null $values))
 (global $stopping (mut i32) (i32.const 0))
+;; Set by control: puts the frames that wait to be re-entered back on the
+;; shadow stack before a stop prints it.
+(global $stop_unpend (mut (ref null $unpend)) (ref.null $unpend))
 
 (func $sites_install (param $table (ref $sites)) (param $modules (ref $values))
   (global.set $site_table (local.get $table))
@@ -145,6 +148,8 @@ const WAT: &str = r#"
   (local $parts eqref) (local $i i32) (local $site i32) (local $printed i32)
   (if (global.get $stopping) (then unreachable))
   (global.set $stopping (i32.const 1))
+  (if (i32.eqz (ref.is_null (global.get $stop_unpend)))
+    (then (call_ref $unpend (ref.as_non_null (global.get $stop_unpend)))))
   (local.set $parts (call $list_cons (local.get $reason) (call $list_nil)))
   ;; A tail call whose callee has not entered yet.
   (if (i32.le_s (global.get $tail) (i32.const -2))

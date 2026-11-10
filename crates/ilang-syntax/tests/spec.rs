@@ -34,6 +34,7 @@ fn spec_blocks_parse() {
             diags.is_empty(),
             "spec.md block at line {line}: {diags:?}\n{src}"
         );
+        assert_eq!(ilang_syntax::print::unprintable(&module), None);
         let printed = print_module(&module);
         let (again, diags) = parse_module(&printed);
         assert!(

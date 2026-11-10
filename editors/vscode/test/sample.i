@@ -1,17 +1,18 @@
+// old-syntax-check: E0003,E0106
 //// The module documentation.
 
-import (
+(
   i/fail
   decode = json/decode
   opt = (Option, Some) = std/option
 )
 
-export (main, User(..), Shape)
+(main, User(..), Shape)
 
 /// A user.
 User { User(name: String, age: Int) }
 
-Shape(a) = (a, a) -> a | Nil
+Shape(A) = (A, A) -> A | Nil
 
 @host("console")
 Console { Console(print: (String) -> Nil) }
@@ -35,7 +36,7 @@ over two lines"
 
 floats = (x: Float, y) -> Float ? fail.Fail ! Nil {
   z = -.x *. y +. 1.5 /. 2.0 -. 0.5
-  case z <. 1.0 || z >=. 2.0 && z <=. 3.0 || z >. 4.0 {
+  z <. 1.0 || z >=. 2.0 && z <=. 3.0 || z >. 4.0 |> {
     True -> z
     False -> 0.0
   }
@@ -47,9 +48,9 @@ main = (io ! Console) {
   [first, ..rest] = [1, 2, 3]
   user = User(..base, name: "x")
   label = user.name <> "!"
-  n = case first {
+  n = first |> {
     0 | 1 -> 1
-    n if n > 10 -> n % 3
+    n ? n > 10 -> n % 3
     _ -> __ignored
   }
   1 |> plus(2) == 3 != False
@@ -58,3 +59,9 @@ main = (io ! Console) {
 
 @test
 adds = () { assert(plus(1, 2) == 3) }
+
+identity(A) = (x: A) { x }
+import = (x) { x }
+export = import
+case = export
+if = case

@@ -27,6 +27,9 @@ scripts/bench sort     # the ones whose name has `sort`
 | `inspect` | `core.inspect` of a list of 200k tuples with lists |
 | `dict_insert` | 200k `dict.insert`s |
 | `equality` | 20 `==` of two lists of 100k tuples |
+| `resume_depth_10` | 100k resumes of a computation paused under 10 frames |
+| `resume_depth_100` | 100k resumes of a computation paused under 100 frames |
+| `resume_depth_1000` | 100k resumes of a computation paused under 1000 frames |
 
 The environment variables `ILANG_GC` (`copying`, `drc`, `null`) and
 `ILANG_GC_HEAP` (MiB) choose the garbage collector and the initial size of
@@ -145,14 +148,122 @@ What is left in the hot loops is mostly the shadow stack (a call on entry
 and before a tail call, for the positions of stop messages) and the tag
 checks of patterns, which test `$value_tag` again for each case.
 
+## Resuming a continuation
+
+A paused computation keeps one record for each of its frames, innermost
+first. `control.resume` rebuilds only the innermost frame. The others are
+rebuilt one at a time, when the frames inside them return. When the resumed
+code suspends again, only the frames it entered since the resume are
+captured, and the records still waiting are joined on in one step. So a
+resume and the next suspend cost the same at any depth of the paused stack.
+
+Some frames still cost something at each resume:
+
+- a frame whose call is under an environment statement (`! S = v`) of its
+  function: its environment is worked out again;
+- a boundary that the computation is paused inside, and a cancel whose
+  final function suspended: they are re-entered at once, and a later
+  suspend through them packs the frames inside them.
+
+`fail.catch` and `resource.ensure` cost nothing at a resume. An error or a
+cancel goes through the waiting frames one at a time, as an unwind does. So
+`control.cancel` costs time in proportion to the number of waiting frames,
+as it did before.
+
+`bench/test/control_test.i` uses frames without environment statements or
+inner boundaries. At `--opt 2`, the median of five runs at depth 1000,
+and at depth 100, must be at most 1.5 times the median at depth 10
+(`docs/design/lazy-reentry.md`, section 10). The coordinator measures this
+in a quiet window. In a lane, repeat this command five times at the eager
+baseline `0e7c450`, then at the lazy implementation `56196f6`:
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i ./scripts/bench control
+```
+
+One sample of each compiler with other jobs running gave the following
+wall and process CPU times: the release compiler at `1df2fe0` on the eager
+baseline sources, then the release compiler at `56196f6`. These are
+substitute measurements, not the five-run acceptance measurement.
+
+| Depth | Eager wall seconds | Eager CPU seconds | Lazy wall seconds | Lazy CPU seconds |
+|---|---|---|---|---|
+| 10 | 0.489 | 0.45 | 0.146 | 0.15 |
+| 100 | 3.420 | 2.92 | 0.162 | 0.15 |
+| 1000 | 27.304 | 26.10 | 0.157 | 0.15 |
+
+CI uses the exact fuel check of section 13.2, test 6 instead. It compiles
+the benchmark as a WASI command once for each depth and round count,
+precompiles it with fuel enabled, then bisects the fuel needed to finish
+to a bracket narrower than 0.05%. The extra fuel per round is the
+difference between 4000 and 1000 rounds, divided by 3000. Both deeper
+values must be at most 1.05 times the depth-10 value. With the dev-shell
+Wasmtime 49.0.2 CLI on Linux x86-64, lazy gave:
+
+| Depth | Fuel upper bound, 1000 rounds | Fuel upper bound, 4000 rounds | Extra fuel per round | Ratio to depth 10 |
+|---|---|---|---|---|
+| 10 | 707840 | 2817024 | 703.0613 | 1.000000 |
+| 100 | 739328 | 2848768 | 703.1467 | 1.000122 |
+| 1000 | 1057792 | 3167232 | 703.1467 | 1.000122 |
+
+Run these checks with the slot/dev-shell prefix above and
+`cargo test -p ilang-wasm --test control_lazy --locked -- --nocapture`.
+At the eager baseline, set `CALIBRATE_EAGER=1` and filter that command
+to `eager_stack_calibration` to repeat the stack calibration.
+
+The stack checks use a child shell with a 64 MiB native stack and a Wasm
+stack at most half that size. A signal fails the check; only a clean
+Wasm stack trap counts as reaching the stack limit. On the same CLI:
+
+- The first eager captures at depths 10000 and 100000 finish with a
+  32 MiB Wasm stack; the depth-10000 fallback also fits in 4 MiB.
+  The lazy deep test completes 1000 rounds at depth 100000 with that stack (section 13.2, test 7).
+- With a fixed 128 KiB Wasm stack, the largest complete nested generator
+  walk is depth 219 on eager and 262 on lazy. The test requires at least
+  80% of the eager depth (test 10). The tree has a recursive left subtree
+  and a right leaf, so it checks all values in order without an exponential
+  number of nodes.
+- The same callback-based 50000-deep recursion is used with and without
+  the resume. On eager, recursion alone needs between 5600085 and 5601109
+  bytes. Test 11 fixes S11 at 8401663 bytes, 1.5 times the upper bound
+  rounded down.
+  Eager recursion plus a resume of 50000 paused frames gives a clean
+  Wasm stack trap there; lazy finishes and counts all 100000 frames.
+  Using the same recursive function matters: calibrating a one-argument
+  recursion and then testing a two-argument recursion measures different
+  native frame layouts.
+
+The eager baseline keeps exactly six lazy-only tests ignored, as section
+14 requires. Its other control tests pass. The 19 new spec cases pass on
+eager at O0 and O2; their checked headers and values are the eager
+baseline for lazy. Run tests 12 to 16, plus the error through a final
+record, compare the entire eager output, stop text and exit code at O0
+in `control_lazy.rs` and at O2 in `ilang-cli/tests/wasi.rs`. D15 keeps
+unspecified cancel behaviour out of the spec suite. D16 preserves the
+known environment-before-tail-call gap; its expected name is `resumer`.
+
+The section 11.4 WAT audit compares the 598 exports of the eager baseline
+and lazy: 380 compiled modules are byte-identical after the allowed shared
+runtime patch, record checks and masking; 218 ERROR exports are identical.
+It checks the saved values, shapes and positions of 5438 code records.
+The O2 long-pending program also keeps its recursive calls as non-tail
+calls: the recursive deep function calls itself with `call`, and the
+resumed generator segment calls its generator with `call` before returning
+to `keep`. This checks the growing pending list required by section 13.3.
+
+No export is added or removed between those two commits. The generated
+segments, joins, host runtime, sites, imports, exports and custom sections
+have no other differences.
+
 ## Type checker
 
 A function with many suspend points and no annotations, of this shape
 (`s` suspends):
 
+<!-- old-syntax-check: E0101 -->
 ```i
-a1 = case a0 % 3 { 0 -> s(b, a0 + 1)  _ -> a0 + 2 }
-a2 = case a1 % 3 { 0 -> s(b, a1 + 1)  _ -> a1 + 2 }
+a1 = { a0 % 3 } |> { 0 -> s(b, a0 + 1)  _ -> a0 + 2 }
+a2 = { a1 % 3 } |> { 0 -> s(b, a1 + 1)  _ -> a1 + 2 }
 ...
 ```
 

@@ -1,14 +1,25 @@
 // §4.4: in a written type, a union with two or more type variables only in
 // an output place, and an intersection with a type variable only in an
 // input place.
-union_in = (v: a | b) { v }
-inter_out = (v: Int) -> a & Int { v }
-inter_both = (x: a, y: b) -> a & b { x }
-inter_param_of_param = (f: (a & Int) -> Int) { 1 }
-union_in_alias = (v: Either(a, b)) { v }
-Either(a, b) = a | b
+union_in(A, B) = (v: A | B) { v }
+
+inter_out(A) = (v: Int) -> A & Int { v }
+
+inter_both(A, B) = (x: A, y: B) -> A & B { x }
+
+inter_param_of_param(A) = (f: (A & Int) -> Int) { 1 }
+
+union_in_alias(A, B) = (v: Either(A, B)) { v }
+
+Either(A, B) = A | B
+
 // Allowed.
-inter_in = (x: a & Int) -> a { x }
-union_param_of_param = (f: (a | b) -> Int) { 1 }
-union_out: (Int) -> a | b = (x) { panic("") }
-Wrap(a, b) { Wrap(value: a | b) }
+inter_in(A) = (x: A & Int) -> A { x }
+
+union_param_of_param(A, B) = (f: (A | B) -> Int) { 1 }
+
+union_out(A, B): (Int) -> A | B = (x) { panic("") }
+
+Wrap(A, B) {
+	Wrap(value: A | B)
+}

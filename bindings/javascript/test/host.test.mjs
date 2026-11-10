@@ -469,19 +469,36 @@ test("ilang_continue and ilang_resume exports of the wrong type are faults", asy
 test("status 2 waits reuse one MessageChannel where there is no setImmediate", async () => {
   const saved = { setImmediate: globalThis.setImmediate, MessageChannel: globalThis.MessageChannel };
   let channels = 0;
+  let messages = 0;
+  let channel;
+  let reply;
+  const delivered = () => {
+    // Hold the answer until at least two calls of ilang_continue have run.
+    if (++messages === 3) reply();
+  };
   globalThis.MessageChannel = class extends saved.MessageChannel {
     constructor() {
       super();
       channels++;
+      channel = this;
+      this.port1.addEventListener("message", delivered);
     }
   };
   delete globalThis.setImmediate;
+  let timeout;
   try {
-    const timer = await guest([], { later: (x) => new Promise((resolve) => setTimeout(() => resolve(2 * x), 5)) });
-    const turns = await timer.callAsync("app/async.yielding", [1e7]);
+    const value = await guest([], { later: (x) => new Promise((resolve) => { reply = () => resolve(2 * x); }) });
+    // Keep Node alive while the SDK's channel is unreferenced, and bound a hang.
+    const deadline = new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new Error("MessageChannel waits did not finish")), 5000);
+    });
+    const turns = await Promise.race([value.callAsync("app/async.yielding", [1e7]), deadline]);
     assert.ok(turns >= 2, `${turns}`);
-    assert.ok(channels <= 1, `${channels} channels for ${turns} turns`);
+    assert.equal(channels, 1, `${channels} channels for ${turns} turns`);
+    assert.ok(messages >= 3, `${messages} messages`);
   } finally {
+    clearTimeout(timeout);
+    channel?.port1.removeEventListener("message", delivered);
     globalThis.setImmediate = saved.setImmediate;
     globalThis.MessageChannel = saved.MessageChannel;
   }

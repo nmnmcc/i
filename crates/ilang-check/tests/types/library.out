@@ -1,16 +1,16 @@
 i/prelude.panic : (message: String) -> Never
 i/prelude.assert : (c: Bool) -> Nil ! Assert
-i/fail.raise : (error: e) -> Never ? e
-i/fail.catch : (body: () -> a ? e ! n) -> Result(a, e) ! n
-i/fail.from_result : (result: Result(a, e)) -> a ? e
-i/fail.map_error : (body: () -> a ? e ! n, with: (e) -> e2 ! n) -> a ? e2 ! n
-i/control.boundary : (body: (b: Boundary(r, e, n)) -> r ? e ! n) -> r ? e ! n
-i/control.suspend : (b: Boundary(r, e, n), f: (k: Continuation(a, r, e, n)) -> r ? e ! n) -> a
-i/control.resume : (k: Continuation(a, r, e, n), value: a) -> r ? e ! n
-i/control.cancel : (k: Continuation(a, r, e, n)) -> Nil ! n
-i/resource.ensure : (body: () -> a ? e ! n, with: () -> Nil ! n) -> a ? e ! n
-i/resource.acquire : (open: () -> r ? e ! n, release: (r) -> Nil ! n, use: (r) -> a ? e ! n) -> a ? e ! n
-i/assertion.catch : (body: () -> a ? e ! n) -> Result(a, AssertionFailure) ? e ! n - Assert
+i/fail.raise : (error: A) -> Never ? A
+i/fail.catch : (body: () -> A ? E ! N) -> Result(A, E) ! N
+i/fail.from_result : (result: Result(A, B)) -> A ? B
+i/fail.map_error : (body: () -> A ? E ! N, with: (E) -> B ! N) -> A ? B ! N
+i/control.boundary : (body: (b: Boundary(A, B, C)) -> A ? B ! C) -> A ? B ! C
+i/control.suspend : (b: Boundary(A, B, C), f: (k: Continuation(D, A, B, C)) -> A ? B ! C) -> D
+i/control.resume : (k: Continuation(A, B, C, D), value: A) -> B ? C ! D
+i/control.cancel : (k: Continuation(A, B, C, D)) -> Nil ! D
+i/resource.ensure : (body: () -> A ? E ! N, with: () -> Nil ! N) -> A ? E ! N
+i/resource.acquire : (open: () -> A ? E ! N, release: (A) -> Nil ! N, use: (A) -> B ? E ! N) -> B ? E ! N
+i/assertion.catch : (body: () -> A ? E ! N) -> Result(A, AssertionFailure) ? E ! N - Assert
 i/core.not : (Bool) -> Bool
 i/core.to_float : (Int) -> Float
 i/core.truncate : (Float) -> Int
@@ -38,5 +38,5 @@ i/core.index_of : (in: String, find: String, from: Int) -> Result(Int, Nil)
 i/core.bit_size : (BitArray) -> Int
 i/core.bit_array_to_string : (BitArray) -> Result(String, Nil)
 i/core.bit_array_concat : (List(BitArray)) -> BitArray
-i/core.inspect : (a) -> String
-i/core.hash : (a) -> Int
+i/core.inspect : (A) -> String
+i/core.hash : (A) -> Int

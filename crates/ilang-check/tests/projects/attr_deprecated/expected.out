@@ -1,4 +1,4 @@
-src/main.i:3:5: warning[W0301]: `old` is deprecated: use fresh
-src/main.i:4:9: warning[W0301]: `old` is deprecated: use fresh
-src/main.i:5:8: warning[W0301]: `Old` is deprecated: use New
-src/main.i:5:18: warning[W0301]: `OldC` is deprecated: use New
+src/main.i:5:5: warning[W0301]: `old` is deprecated: use fresh
+src/main.i:7:9: warning[W0301]: `old` is deprecated: use fresh
+src/main.i:9:8: warning[W0301]: `Old` is deprecated: use New
+src/main.i:9:18: warning[W0301]: `OldC` is deprecated: use New

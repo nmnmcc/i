@@ -5,6 +5,6 @@ f = () {
 
 g = 1 + h
 --- errors ---
-E0101 @2:7 expected an expression, found `=`
-E0101 @4:7 expected an expression, found `*`
-E0101 @8:3 expected an item: a type definition, or a binding `pattern = value`, found `=`
+E0101 @3:7 expected an expression, found `=`
+E0101 @5:7 expected an expression, found `*`
+E0101 @9:3 expected an item: a type definition, or a binding `pattern = value`, found `=`

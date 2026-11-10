@@ -1,7 +1,7 @@
 b = 1
 --- errors ---
-E0010 @1:5 `(` is not closed
-E0009 @1:10 `]` does not close `(`
-E0101 @1:10 expected `,` or `)`, found `]`
-E0010 @3:5 `[` is not closed
-E0101 @4:1 expected `,` or `]`, found the end of the file
+E0010 @2:5 `(` is not closed
+E0009 @2:10 `]` does not close `(`
+E0101 @2:10 expected `,` or `)`, found `]`
+E0010 @4:5 `[` is not closed
+E0101 @5:1 expected `,` or `]`, found the end of the file

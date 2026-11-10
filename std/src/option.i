@@ -5,7 +5,7 @@
 //// example `list.first` and `dict.get`. A function that may fail, such as
 //// `int.parse`, gives a `Result`.
 
-export (
+(
 	Option(..)
 	is_some
 	is_none
@@ -25,22 +25,22 @@ export (
 )
 
 /// A value that may be there (`Some`) or not (`None`).
-Option(a) {
-	Some(a)
+Option(A) {
+	Some(A)
 	None
 }
 
 /// `True` when the option is `Some`.
-is_some = (option: Option(a)) -> Bool {
-	case option {
+is_some(A) = (option: Option(A)) -> Bool {
+	option |> {
 		Some(_) -> True
 		None    -> False
 	}
 }
 
 /// `True` when the option is `None`.
-is_none = (option: Option(a)) -> Bool {
-	case option {
+is_none(A) = (option: Option(A)) -> Bool {
+	option |> {
 		Some(_) -> False
 		None    -> True
 	}
@@ -51,8 +51,11 @@ is_none = (option: Option(a)) -> Bool {
 /// ```i
 /// option.map(Some(1), (x) { x + 1 })  // Some(2)
 /// ```
-map = (over: Option(a), with: (a) -> b ? e ! n) -> Option(b) ? e ! n {
-	case over {
+map(A, B, E, N) = (
+	over: Option(A)
+	with: (A) -> B ? E ! N
+) -> Option(B) ? E ! N {
+	over |> {
 		Some(value) -> Some(with(value))
 		None        -> None
 	}
@@ -64,70 +67,70 @@ map = (over: Option(a), with: (a) -> b ? e ! n) -> Option(b) ? e ! n {
 /// ```i
 /// option.then(Some(1), (x) { Some(x + 1) })  // Some(2)
 /// ```
-then = (
-	option: Option(a)
-	apply: (a) -> Option(b) ? e ! n
-) -> Option(b) ? e ! n {
-	case option {
+then(A, B, E, N) = (
+	option: Option(A)
+	apply: (A) -> Option(B) ? E ! N
+) -> Option(B) ? E ! N {
+	option |> {
 		Some(value) -> apply(value)
 		None        -> None
 	}
 }
 
 /// Takes away one level of `Option`.
-flatten = (option: Option(Option(a))) -> Option(a) {
-	case option {
+flatten(A) = (option: Option(Option(A))) -> Option(A) {
+	option |> {
 		Some(inner) -> inner
 		None        -> None
 	}
 }
 
 /// The value in a `Some`, or `default` for `None`.
-unwrap = (option: Option(a), or: a) -> a {
-	case option {
+unwrap(A) = (option: Option(A), or: A) -> A {
+	option |> {
 		Some(value) -> value
 		None        -> or
 	}
 }
 
 /// The value in a `Some`, or the value of `default()` for `None`.
-lazy_unwrap = (option: Option(a), or: () -> a ? e ! n) -> a ? e ! n {
-	case option {
+lazy_unwrap(A, E, N) = (option: Option(A), or: () -> A ? E ! N) -> A ? E ! N {
+	option |> {
 		Some(value) -> value
 		None        -> or()
 	}
 }
 
 /// The first option when it is `Some`, and the second when not.
-or = (first: Option(a), second: Option(a)) -> Option(a) {
-	case first {
+or(A) = (first: Option(A), second: Option(A)) -> Option(A) {
+	first |> {
 		Some(_) -> first
 		None    -> second
 	}
 }
 
 /// The first option when it is `Some`, and the value of `second()` when not.
-lazy_or = (
-	first: Option(a)
-	second: () -> Option(a) ? e ! n
-) -> Option(a) ? e ! n {
-	case first {
+lazy_or(A, E, N) = (
+	first: Option(A)
+	second: () -> Option(A) ? E ! N
+) -> Option(A) ? E ! N {
+	first |> {
 		Some(_) -> first
 		None    -> second()
 	}
 }
 
 /// `Ok` with the value of a `Some`, or `Error(error)` for `None`.
-to_result = (option: Option(a), error: e) -> Result(a, e) {
-	case option {
+to_result(A, E) = (option: Option(A), error: E) -> Result(A, E) {
+	option |> {
 		Some(value) -> Ok(value)
 		None        -> Error(error)
 	}
 }
 
 /// `Some` with the value of an `Ok`, or `None` for an `Error`.
-from_result = (result: Result(a, e)) -> Option(a) {
-	case result {
+from_result(A, E) = (result: Result(A, E)) -> Option(A) {
+	result |> {
 		Ok(value) -> Some(value)
 		Error(_)  -> None
 	}
@@ -140,9 +143,9 @@ from_result = (result: Result(a, e)) -> Option(a) {
 /// option.all([Some(1), Some(2)])  // Some([1, 2])
 /// option.all([Some(1), None])     // None
 /// ```
-all = (options: List(Option(a))) -> Option(List(a)) {
+all(A) = (options: List(Option(A))) -> Option(List(A)) {
 	go = (rest, acc) {
-		case rest {
+		rest |> {
 			[]              -> Some(reverse(acc))
 			[Some(x), ..xs] -> go(xs, [x, ..acc])
 			[None, ..]      -> None
@@ -156,9 +159,9 @@ all = (options: List(Option(a))) -> Option(List(a)) {
 /// ```i
 /// option.values([Some(1), None, Some(3)])  // [1, 3]
 /// ```
-values = (options: List(Option(a))) -> List(a) {
+values(A) = (options: List(Option(A))) -> List(A) {
 	go = (rest, acc) {
-		case rest {
+		rest |> {
 			[]              -> reverse(acc)
 			[Some(x), ..xs] -> go(xs, [x, ..acc])
 			[None, ..xs]    -> go(xs, acc)
@@ -168,12 +171,12 @@ values = (options: List(Option(a))) -> List(a) {
 }
 
 /// Keeps a `Some` only when its value passes the test.
-filter = (
-	option: Option(a)
-	keeping: (a) -> Bool ? e ! n
-) -> Option(a) ? e ! n {
-	case option {
-		Some(value) -> case keeping(value) {
+filter(A, E, N) = (
+	option: Option(A)
+	keeping: (A) -> Bool ? E ! N
+) -> Option(A) ? E ! N {
+	option |> {
+		Some(value) -> keeping(value) |> {
 			True  -> option
 			False -> None
 		}
@@ -182,12 +185,12 @@ filter = (
 }
 
 /// Puts the values of two options together when both are `Some`.
-map2 = (
-	a: Option(a)
-	b: Option(b)
-	with: (a, b) -> c ? e ! n
-) -> Option(c) ? e ! n {
-	case (a, b) {
+map2(A, B, C, E, N) = (
+	a: Option(A)
+	b: Option(B)
+	with: (A, B) -> C ? E ! N
+) -> Option(C) ? E ! N {
+	(a, b) |> {
 		(Some(x), Some(y)) -> Some(with(x, y))
 		_                  -> None
 	}
@@ -195,7 +198,7 @@ map2 = (
 
 reverse = (list) {
 	go = (rest, acc) {
-		case rest {
+		rest |> {
 			[]        -> acc
 			[x, ..xs] -> go(xs, [x, ..acc])
 		}

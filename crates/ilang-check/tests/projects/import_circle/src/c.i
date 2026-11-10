@@ -1,3 +1,5 @@
-import (app/a)
+(
+	app/a
+)
 
 z = 1

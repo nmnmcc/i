@@ -10,8 +10,8 @@ Editor support for **the i programming language**, as defined in
   - strings with escapes, including `\u{…}`, over one or more lines;
   - integers in every base (`0x`, `0o`, `0b`, `_` between digits) and
     floats (`1.0`, `2.`, `6.25e-3`); `t.0.1` is two tuple parts;
-  - the keywords `import`, `export`, `case`, and `if`, with the module paths
-    and aliases of `import (…)`;
+  - header groups and their module paths and aliases, clause blocks, guards,
+    and declared type parameters;
   - the attributes `@main`, `@test`, `@external`, `@host`, and
     `@deprecated`;
   - types and constructors (`UpName`s), built-in types, `True`, `False`, and

@@ -1,18 +1,21 @@
 // spec: 2.5, 11.7
 // expect: stop "panic: not ready"
-// at: spec/stop_in_start:11:36
-// at: spec/stop_in_start:8:9
+// at: spec/stop_in_start:15:12
+// at: spec/stop_in_start:10:9
 
-import (i/core)
+(
+	i/core
+)
 
 ready = check(1)
 
 check = (n: Int) {
-  case n > 5 { True -> n  False -> panic("not ready") }
+	{ n > 5 } |> {
+		True  -> n
+		False -> panic("not ready")
+	}
 }
 
 // No entry point runs when working out a value stops.
 @main
-main = () {
-  core.inspect(ready)
-}
+main = () { core.inspect(ready) }
