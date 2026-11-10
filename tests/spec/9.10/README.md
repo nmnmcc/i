@@ -2,7 +2,8 @@
 
 The implementation is `lib/i/random.i`. It uses ordinary i types, integer
 operations and error handling. There are no host declarations, services, task
-imports, compiler primitives or Rust changes.
+imports or compiler primitives. Rust implementation files are unchanged; the
+authorized Rust test expectations now recognize the implemented module.
 
 ## Interpretation and sources
 
@@ -80,8 +81,8 @@ service effect in any of them.
 | at_path | `(g: random.Generator, path: List(Int)) -> random.Generator ? random.RandomError` |
 
 interface.i keeps the aliases unannotated and exercises their labels and pure
-top-level calls. The compiler's library-type test also prints the actual schemes
-on its golden mismatch.
+top-level calls. The compiler's library-type golden records those six public
+schemes and the 17 private implementation schemes.
 
 ## Reproduction
 
@@ -138,26 +139,115 @@ and the pinned Haskell source were available. An initial reviewer C indentation
 warning was corrected before its -Werror build; upstream PractRand warnings
 were retained and its self-test passed. No system package was installed.
 
-## Scope boundaries and acceptance blockers
+## Coordinator follow-up
 
-The current spec opening still reserves i/random as empty, while the accepted
-runtime note assigns its implementation and new §9.10 to R1. The opening's
-module-list edits belong to IO under runtime.md §11; they remain an escalation.
-Similarly, runtime.md's instruction to replace multicore.md §5's old PRF sketch
-is outside R1's assigned paths. The implemented numerical contract follows
-runtime.md §4, not that superseded sketch.
+The coordinator authorized the test expectations and spec reservation updates.
+The opening now lists seven implemented modules and reserves only task, clock,
+fs, process, net and stdio as empty. The count in §2.1 is updated consistently.
+The multicore.md random text is reconciled by the upstream native/multicore
+merge 681ad65. Its merge leaves the complete R1 section of runtime.md unchanged.
 
-The full verification gate encounters stale assertions in
-crates/ilang-check/tests/library.rs: reserved_modules_are_placeholders and
-library_names still require i/random to be empty. The library-type golden
-crates/ilang-check/tests/types/library.out also needs regeneration. These paths
-are outside R1 ownership and were not edited or blessed. No check was weakened.
+Every changed Rust expectation has a source:
 
-Existing WAT is not byte-equal after a real library introduces nominal types.
-Lower::number_types in crates/ilang-wasm/src/lower.rs enumerates all program
-types, installs every constructor name, and assigns numeric type/constructor
-IDs before emission. Adding even unused Generator/RandomError types therefore
-changes old constructor tables and IDs. Removing eager constant initialization
-within R1 avoids unrelated new start-up work, but cannot fix that compiler
-policy. Constructor reachability/numbering needs an outside-scope compiler
-change, or the coordinator must revise the byte-equality acceptance rule.
+| Expectation | Change and reason |
+|---|---|
+| reserved_modules_are_placeholders | Check the six remaining reserved paths. Random now has the API required by runtime.md §4 and spec §9.10. |
+| reserved_modules_import_cleanly | Import those six reserved paths; random imports and pure calls are covered by interface.i. |
+| reserved_modules_have_no_names | Check missing names in those same six empty modules. Random's real public names belong to its API inventory. |
+| library_names | Replace random's empty list with from_seed, word, int, float, split and at_path: exactly the §4/§9.10 table. |
+| Binding-kind checks | Require all six random functions to be ordinary bindings: the assignment says plain i and no new primitive. |
+| types/library.out | Append 23 inferred schemes; no existing scheme changes. The six public schemes are required by the API table above. The 17 private schemes describe the implementation below. |
+
+The private golden additions and their reasons are:
+
+- word_size, mask and xor_shift are pure Int operations for unsigned 64-bit
+  arithmetic (runtime.md §4.1).
+- mix, variant, popcount and mix_gamma are pure Int operations implementing M,
+  V and G in the same numerical contract.
+- space_for computes the least allowed power of W as an Int; word_group and
+  bounded return an Int and Generator, threading every accepted/rejected draw
+  (runtime.md §4.2).
+- native_split returns two States and edge projects one State, as required by
+  the published split and fork definitions.
+- valid_path returns Bool; binary returns List(Int) and Int; zeros and follow
+  return State; derive_path returns Generator. They implement validation,
+  Elias gamma navigation and tagged component-wise history from §4.2.
+
+Private golden entries record implementation schemes; they do not independently
+prove the numerical requirements. The vectors and laws provide that evidence.
+
+The golden is generated only with UPDATE=1 cargo test -p ilang-check --test
+types --locked library. No old expectation was removed to conceal a failure.
+
+## WAT acceptance and cost
+
+The coordinator replaced byte equality with renumbering-only acceptance.
+The compiler's enumeration is unchanged. The audit command is:
+
+```sh
+python3 tests/spec/9.10/wat_audit.py target/r1/wat-base target/r1/wat-final
+```
+
+The script invokes the unchanged scripts/wat-diff compare function on each
+baseline export, using its reference normalization and no allowed exceptions.
+The CLI rejects --renumber without an A1 may-fail migration report; no false
+report was fabricated. The audit separately classifies nominal IDs using the
+actual number_types order: constructor IDs at least 17 move by six, and program
+type IDs at least 22 move by four. String data references and nullary global
+names move consistently. A diagnostic removes only the individually verified
+new entries/data to check for any other code change. This is a substitute
+classification check, not a passing acceptance comparison.
+
+All 383 previously successful exports were assembled and validated as Wasm;
+the 219 baseline ERROR exports remain byte-identical. Thus there is no new
+compilation failure. The normalizing wat-diff comparison reports 219 equal
+ERROR exports, 328 differences, and 55 unsupported site forms. The latter are
+pre-existing `(call $shadow_leave_tail (i32.const -1))` forms: the same
+normalizer fails on the baseline alone in all 55 cases. Default wat-diff
+comparison on those 55 also reports differences. No comparator was changed.
+
+The size-independent raw audit finds six new constructor table entries in
+every successful export. Existing string IDs and nullary global names are
+renumbered along with nominal operands. One export, 9_environment.i.ilang.true,
+also moves its existing State string definition earlier; its bytes are
+unchanged, and wat-diff's established data-order normalization accounts for
+that relocation. All additions remain failures of renumbering-only acceptance.
+
+Across all 602 exports, the raw audit classifies 71 exports with nominal ID
+references changed, six new table entries in each of the 383 successful
+exports, 2,297 added string definitions containing 17,613 bytes in total, and
+one relocation of an existing State data definition. After individually
+checking those additions and the established reference/data-order
+normalization, the diagnostic finds no other change in all 383 successful
+exports. The unchanged ERROR files supply the other 219 comparisons. These
+results do not turn the real additions into renumbering; acceptance still fails.
+
+The exact per-export report is target/r1/wat-audit/results.json. The separate
+baseline sentinel control is site-normalizer-check.json in that directory.
+Validation of all successful exports is also reproducible without the longer
+comparison pass:
+
+```sh
+python3 tests/spec/9.10/wat_audit.py target/r1/wat-base target/r1/wat-final --validate-only
+```
+
+The six extra installed names are Split, Path, State, Generator, InvalidBound
+and InvalidPath. New constructor table entries and their startup work are not
+renumbering and are reported as failures. Each of the two measured examples
+installs six additional strings containing 46 payload bytes.
+
+These static measurements assemble the original unoptimized WAT with
+wasm-tools parse, run wasm-tools strip, and validate both resulting binaries.
+They measure binary size, not execution latency or optimized CLI artifacts.
+
+| Existing export | Before bytes | After bytes | Increase | Installed names before/after |
+|---|---:|---:|---:|---:|
+| examples_hello.ilang.false.wat | 47,011 | 47,159 | 148 | 2 / 8 |
+| 11_float_arithmetic.i.ilang.false.wat | 46,513 | 46,662 | 149 | 1 / 7 |
+
+Both WAT files grow by 716 bytes. A later compiler track should remove the
+unneeded constructor table initialization and stabilize numbering against
+unused library types. The measured size and extra initialization exist even
+when the program never uses random. Stable IDs alone would not remove that
+startup work. This track changes no compiler enumeration and does not mask
+these additions to obtain a passing result.
