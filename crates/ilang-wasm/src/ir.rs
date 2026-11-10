@@ -333,6 +333,7 @@ pub enum Value {
     HostCall {
         import: ImportId,
         args: Vec<Atom>,
+        result: AbiType,
     },
     /// Starts the async import with the arguments, and records that the
     /// program waits for it (B.4). Its value is Nil.
@@ -342,7 +343,14 @@ pub enum Value {
     },
     /// The answer of the async import, given to its `ilang_resume:…`
     /// export (B.5): its value, or its error thrown.
-    HostReply(ImportId),
+    HostReply(ImportReply),
+}
+
+/// A declaration's decoder, even when its wire import is shared.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ImportReply {
+    pub import: ImportId,
+    pub result: AbiType,
 }
 
 /// An `i64` value for a `Let` into an `I64` local.
@@ -607,7 +615,7 @@ impl FuncKind {
 }
 
 /// How an export of the binary interface gives and takes values (B.2).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AbiType {
     Nil,
     Bool,
@@ -615,7 +623,8 @@ pub enum AbiType {
     Float,
     String,
     BitArray,
-    Externref,
+    /// The resolved nominal type, carried only inside the guest.
+    Externref(u32),
 }
 
 impl AbiType {
@@ -627,7 +636,7 @@ impl AbiType {
             AbiType::Float => "float",
             AbiType::String => "string",
             AbiType::BitArray => "bit_array",
-            AbiType::Externref => "externref",
+            AbiType::Externref(_) => "externref",
         }
     }
 }
