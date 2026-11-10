@@ -594,10 +594,10 @@ fn everyday_disjoint_equalities_warn_without_widening() {
                 .any(|l| l.ends_with("-> Bool") || l.ends_with("-> List(Bool)")),
             "{lines:?}"
         );
-        if source.starts_with("x =") {
+        if source.starts_with("x ") {
             assert!(lines.iter().any(|l| l.ends_with("x : 1")), "{lines:?}");
         }
-        if source.starts_with("status =") {
+        if source.starts_with("status ") {
             assert!(
                 lines.iter().any(|l| l.ends_with("status : () -> \"ok\"")),
                 "{lines:?}"
