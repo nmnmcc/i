@@ -597,3 +597,10 @@ checker type probe showed `user : Schema((age: 36, name: "Ada"))` but
 `result : (age: Int)`, so a record field is lost across the `decode` call.
 This is an open implementation failure, not a known-failure entry or a
 completed track; investigate inference/known-type propagation before landing.
+
+The schema regression was traced to `match_k` skipping graph-shaped known
+parameters: it did not bind the record base variable and the second builder
+call lost the first field in its known result. Matching graph views and known
+record fields now retains that base. `t3_record_schema.i` passes at O0/O2;
+the K4 merge also builds and all 33 existing T3 source cases pass at both
+levels. Label and graph interface audits and the full merge gate remain open.

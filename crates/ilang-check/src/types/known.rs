@@ -478,6 +478,19 @@ impl Checker<'_> {
             return;
         }
         match p {
+            Ty::Graph(graph) => {
+                if let Some(view) = graph.view() {
+                    self.match_k(&view, k, sigma, depth + 1);
+                } else if let Some(fields) = graph.fields()
+                    && let Some(Ty::Graph(known)) = member(k, Some(Head::Record))
+                {
+                    for (label, ty) in fields {
+                        if let super::records::Field::Found(actual) = known.field(&label) {
+                            self.match_k(&ty, &actual, sigma, depth + 1);
+                        }
+                    }
+                }
+            }
             Ty::Var(v) => sigma.entry(*v).or_default().push(k.clone()),
             Ty::Con(..) | Ty::Fn(_) => match (p, member(k, p.head())) {
                 (Ty::Con(_, _, ps), Some(Ty::Con(_, _, ks))) if ps.len() == ks.len() => {
