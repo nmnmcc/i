@@ -16,7 +16,7 @@ pub(super) fn show_as(d: &Datum, position: super::syntax::Position) -> Result<St
             K::Curly(xs) => joined(xs, item, "\n"),
             _ => item(d),
         },
-        Attribute => attribute(d),
+        Attribute => attribute(d).map(|s| format!("@{s}")),
         Constructor => constructor(d),
         Field => field_type(d),
         Type => typ(d),

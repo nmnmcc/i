@@ -23,6 +23,15 @@ struct SyntaxData {
     node: Node,
     scope: Scope,
     span: Span,
+    provenance: Provenance,
+}
+
+/// Name provenance determines which foreign declarations `make` may reach.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Provenance {
+    Written,
+    Answer,
+    Made { from_answer: bool },
 }
 
 /// The contents of a syntax value; children keep their own scopes and spans.
@@ -109,6 +118,7 @@ impl Syntax {
             node,
             scope: scope.clone(),
             span: d.span,
+            provenance: Provenance::Written,
         }))
     }
     pub fn node(&self) -> &Node {
@@ -119,6 +129,38 @@ impl Syntax {
     }
     pub fn scope(&self) -> &Scope {
         &self.0.scope
+    }
+    pub fn provenance(&self) -> Provenance {
+        self.0.provenance
+    }
+    fn with_node(&self, node: Node) -> Self {
+        Self(Arc::new(SyntaxData {
+            node,
+            scope: self.scope().clone(),
+            span: self.span(),
+            provenance: self.provenance(),
+        }))
+    }
+
+    /// Mark a definition-query answer and all of its descendants as such.
+    pub fn as_answer(&self) -> Self {
+        let map = |xs: &[Syntax]| xs.iter().map(Syntax::as_answer).collect();
+        let node = match self.node() {
+            Node::Round(xs) => Node::Round(map(xs)),
+            Node::Square(xs) => Node::Square(map(xs)),
+            Node::Curly(xs) => Node::Curly(map(xs)),
+            Node::Bits(xs) => Node::Bits(map(xs)),
+            Node::Quote(x) => Node::Quote(x.as_answer()),
+            Node::Unquote(x) => Node::Unquote(x.as_answer()),
+            Node::Splice(x) => Node::Splice(x.as_answer()),
+            leaf => leaf.clone(),
+        };
+        Self(Arc::new(SyntaxData {
+            node,
+            scope: self.scope().clone(),
+            span: self.span(),
+            provenance: Provenance::Answer,
+        }))
     }
     pub fn identical(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
@@ -208,6 +250,12 @@ impl Syntax {
             node,
             scope: like.scope().clone(),
             span: like.span(),
+            provenance: Provenance::Made {
+                from_answer: matches!(
+                    like.provenance(),
+                    Provenance::Answer | Provenance::Made { from_answer: true }
+                ),
+            },
         })))
     }
 
@@ -232,6 +280,7 @@ impl Syntax {
             node,
             scope,
             span: self.span(),
+            provenance: self.provenance(),
         }))
     }
 
@@ -298,10 +347,10 @@ impl Syntax {
                     Substitution::Many(_) => Err(s.error("an unquote needs one syntax value")),
                 },
                 Node::Splice(_) => Err(s.error("a splice must be inside brackets")),
-                Node::Round(xs) => Syntax::make(Node::Round(sequence(xs, eval)?), s),
-                Node::Square(xs) => Syntax::make(Node::Square(sequence(xs, eval)?), s),
-                Node::Curly(xs) => Syntax::make(Node::Curly(sequence(xs, eval)?), s),
-                Node::Bits(xs) => Syntax::make(Node::Bits(sequence(xs, eval)?), s),
+                Node::Round(xs) => Ok(s.with_node(Node::Round(sequence(xs, eval)?))),
+                Node::Square(xs) => Ok(s.with_node(Node::Square(sequence(xs, eval)?))),
+                Node::Curly(xs) => Ok(s.with_node(Node::Curly(sequence(xs, eval)?))),
+                Node::Bits(xs) => Ok(s.with_node(Node::Bits(sequence(xs, eval)?))),
                 Node::Quote(_) => Err(s.error("a quote cannot be nested directly in a quote")),
                 _ => Ok(s.clone()),
             }

@@ -1,6 +1,6 @@
 use ilang_syntax::lisp::{
     parse,
-    syntax::{Node, Position, Scope, Substitution, Syntax},
+    syntax::{Node, Position, Provenance, Scope, Substitution, Syntax},
 };
 use std::collections::BTreeSet;
 
@@ -27,6 +27,7 @@ fn templates_splice_and_patterns_capture_without_losing_origin() {
             _ => unreachable!(),
         })
         .unwrap();
+    assert_eq!(expanded.provenance(), Provenance::Written);
     assert_eq!(expanded.show(), "(f item another)");
     let Node::Round(parts) = expanded.node() else {
         panic!()
@@ -88,4 +89,12 @@ fn made_atoms_are_one_valid_token_and_keep_origin() {
         assert!(Syntax::make(node, &like).is_err());
     }
     assert!(Syntax::make(Node::Symbol("^".into()), &like).is_ok());
+    let from_answer = like.as_answer();
+    let made = Syntax::make(Node::Name("x".into()), &from_answer).unwrap();
+    assert_eq!(made.provenance(), Provenance::Made { from_answer: true });
+    let again = Syntax::make(Node::Name("y".into()), &made).unwrap();
+    assert_eq!(
+        again.flip_mark(4).provenance(),
+        Provenance::Made { from_answer: true }
+    );
 }
