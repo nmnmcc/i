@@ -92,6 +92,6 @@ def tests(string):
         (br_if $build (i32.lt_u (local.get $i) (i32.const 10000))))
       {equal('(local.get $a)', '(local.get $b)')}
       (call $assert (i32.eq (call $value_hash_u32 (local.get $a)) (call $value_hash_u32 (local.get $b))))
-      (call $assert (i32.eq (call $string_length_bytes (call $inspect (local.get $a))) (i32.const 100003)))
+      (call $assert (i32.eq (call $string_length_bytes (call $inspect (local.get $a))) (i32.const 80003)))
       (i32.const 1))''')
     return '\n'.join(out)

@@ -1170,7 +1170,7 @@ impl<'a> Formatter<'a> {
             ExprKind::Record { base, fields } => {
                 let mut spans = Vec::new();
                 if let Some(b) = base {
-                    spans.push((b.span.start - 2, b.span.end));
+                    spans.push((b.span.start.saturating_sub(2), b.span.end));
                 }
                 spans.extend(
                     fields
@@ -1185,7 +1185,7 @@ impl<'a> Formatter<'a> {
                     }
                     let (label, value) = &fields[i - usize::from(base.is_some())];
                     cat(vec![
-                        text(label.name.as_str()),
+                        text(f.slice(label.span)),
                         text(": "),
                         f.expr(value, 0),
                     ])

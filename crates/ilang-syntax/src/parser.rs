@@ -269,6 +269,15 @@ impl Parser<'_> {
         }
     }
 
+    fn record_value_label(&mut self) -> PResult<Ident> {
+        if let T::Str(value) = self.kind() {
+            let name = value.clone();
+            Ok(Ident { name, span: self.bump() })
+        } else {
+            self.name()
+        }
+    }
+
     fn up_name(&mut self) -> PResult<Ident> {
         match self.kind() {
             T::UpName(n) => {
@@ -1225,7 +1234,7 @@ impl Parser<'_> {
         } else if self.eat(&T::RParen) {
             ExprKind::Record { base: None, fields: Vec::new() }
         } else if self.at(&T::DotDot)
-            || matches!(self.kind(), T::Name(_)) && *self.nth(1) == T::Colon
+            || matches!(self.kind(), T::Name(_) | T::Str(_)) && *self.nth(1) == T::Colon
         {
             self.record_expr()?
         } else {
@@ -1254,7 +1263,7 @@ impl Parser<'_> {
                         break;
                     }
                 }
-                let label = p.name()?;
+                let label = p.record_value_label()?;
                 p.expect(&T::Colon)?;
                 fields.push((label, p.expr()?));
             }

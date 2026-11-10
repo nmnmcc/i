@@ -549,7 +549,13 @@ impl Printer {
                     if i > 0 || base.is_some() {
                         self.w(", ");
                     }
-                    self.w(&label.name);
+                    let name = label.name.strip_prefix('_').unwrap_or(&label.name);
+                    if name.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
+                        && label.name.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_') {
+                        self.w(&label.name);
+                    } else {
+                        self.w(&string_literal(&label.name));
+                    }
                     self.w(": ");
                     self.expr(value, 0);
                 }
