@@ -890,3 +890,34 @@ fn expanded_definition_identifies_only_parameters_with_the_same_scope() {
     assert!(fields[1].scope_identity().is_none());
     assert_eq!(fields[1].scope(), other_scope.scope());
 }
+
+#[test]
+fn template_rebuild_preserves_origin_and_cannot_forge_foreign_attributes() {
+    use ilang_syntax::lisp::syntax::{Node, validate_expansion};
+    let template = root("(f x)");
+    let Node::Round(original) = template.node() else {
+        panic!("round template")
+    };
+    let inserted = root("y").flip_mark(7);
+    let rebuilt = template.replace_children(vec![original[0].clone(), inserted.clone()]);
+    assert!(template.same_origin(&rebuilt));
+    assert_eq!(rebuilt.scope(), template.scope());
+    assert_eq!(rebuilt.span(), template.span());
+    assert_eq!(rebuilt.provenance(), template.provenance());
+    let Node::Round(children) = rebuilt.node() else {
+        panic!("rebuilt")
+    };
+    assert!(children[1].identical(&inserted));
+    let attribute = root("(@ (external \"env\" \"f\") (: f (-> () Int)))");
+    let Node::Round(parts) = attribute.node() else {
+        panic!("attribute")
+    };
+    let altered = attribute.replace_children(vec![
+        parts[0].clone(),
+        parts[1].clone(),
+        root("(: g (-> () Int))"),
+    ]);
+    assert!(altered.same_origin(&attribute));
+    assert!(validate_expansion(&altered, std::slice::from_ref(&attribute)).is_err());
+    validate_expansion(&attribute.flip_mark(8), &[attribute]).unwrap();
+}

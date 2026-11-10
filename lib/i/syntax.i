@@ -15,6 +15,8 @@
 	same_code
 	show
 	show_as
+	_template
+	_rebuild
 )
 
 Syntax {}
@@ -75,6 +77,12 @@ definition = (
 	of: Syntax
 	service ! Definitions
 ) -> Syntax ^ SyntaxError ! Definitions { service.definition(of) }
+
+@external("i:compiler/syntax/v1", "template")
+_template: (Int) -> Syntax
+
+@external("i:compiler/syntax/v1", "rebuild")
+raw_rebuild: (Syntax, SyntaxList) -> Syntax
 
 @external("i:compiler/syntax/v1", "kind")
 raw_kind: (Syntax) -> Int
@@ -195,6 +203,11 @@ build_list = (items: List(Syntax), result: SyntaxList) -> SyntaxList {
 		[]              -> result
 		[first, ..rest] -> build_list(rest, raw_list_push(result, first))
 	}
+}
+
+/// Rebuilds one quoted template node with its evaluated children.
+_rebuild = (template: Syntax, children: List(Syntax)) -> Syntax {
+	raw_rebuild(template, build_list(children, raw_list_new()))
 }
 
 /// Makes syntax at the span and scope of `like`.

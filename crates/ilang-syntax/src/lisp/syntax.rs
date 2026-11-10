@@ -219,6 +219,36 @@ impl Syntax {
         }))
     }
 
+    /// Rebuild a quoted template node with its evaluated children. The node's
+    /// written origin and scope stay intact; each child keeps its own identity.
+    pub fn replace_children(&self, children: Vec<Syntax>) -> Self {
+        let node = match self.node() {
+            Node::Round(_) => Node::Round(children),
+            Node::Square(_) => Node::Square(children),
+            Node::Curly(_) => Node::Curly(children),
+            Node::Bits(_) => Node::Bits(children),
+            Node::Quote(_) | Node::Unquote(_) | Node::Splice(_) => {
+                let [child] = <[Syntax; 1]>::try_from(children)
+                    .expect("quote template node needs exactly one child");
+                match self.node() {
+                    Node::Quote(_) => Node::Quote(child),
+                    Node::Unquote(_) => Node::Unquote(child),
+                    Node::Splice(_) => Node::Splice(child),
+                    _ => unreachable!(),
+                }
+            }
+            _ => panic!("cannot replace children of a syntax atom"),
+        };
+        Self(Arc::new(SyntaxData {
+            node,
+            scope: self.scope().clone(),
+            span: self.span(),
+            provenance: self.provenance(),
+            identity: self.scope_identity().cloned(),
+            origin: self.0.origin.clone(),
+        }))
+    }
+
     /// Mark a definition-query answer and all of its descendants as such.
     pub fn as_answer(&self) -> Self {
         let map = |xs: &[Syntax]| xs.iter().map(Syntax::as_answer).collect();
@@ -545,7 +575,34 @@ impl Syntax {
 /// The inputs must be the syntax arguments of that run. Mark changes preserve
 /// node origins; rebuilding even an identical attribute does not.
 pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), SyntaxError> {
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
+    fn same_origin_tree(a: &Syntax, b: &Syntax) -> bool {
+        if !a.same_origin(b) {
+            return false;
+        }
+        match (a.node(), b.node()) {
+            (Node::Round(x), Node::Round(y))
+            | (Node::Square(x), Node::Square(y))
+            | (Node::Curly(x), Node::Curly(y))
+            | (Node::Bits(x), Node::Bits(y)) => {
+                x.len() == y.len() && x.iter().zip(y).all(|(x, y)| same_origin_tree(x, y))
+            }
+            (Node::Quote(x), Node::Quote(y))
+            | (Node::Unquote(x), Node::Unquote(y))
+            | (Node::Splice(x), Node::Splice(y)) => same_origin_tree(x, y),
+            (
+                Node::Round(_)
+                | Node::Square(_)
+                | Node::Curly(_)
+                | Node::Bits(_)
+                | Node::Quote(_)
+                | Node::Unquote(_)
+                | Node::Splice(_),
+                _,
+            ) => false,
+            _ => true,
+        }
+    }
     fn restricted(s: &Syntax) -> Option<&str> {
         let Node::Round(xs) = s.node() else {
             return None;
@@ -582,11 +639,11 @@ pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), S
         }
         Ok(())
     }
-    let mut allowed = HashSet::new();
+    let mut allowed = HashMap::new();
     for arg in arguments {
         descend(arg, &mut |s| {
             if restricted(s).is_some_and(|name| name != "macro") {
-                allowed.insert(Arc::as_ptr(&s.0.origin) as usize);
+                allowed.insert(Arc::as_ptr(&s.0.origin) as usize, s);
             }
             Ok(())
         })?;
@@ -607,7 +664,11 @@ pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), S
                 return Err(s.error("a macro result cannot define a macro"));
             }
             let origin = Arc::as_ptr(&s.0.origin) as usize;
-            if !allowed.contains(&origin) || !used.insert(origin) {
+            if !allowed
+                .get(&origin)
+                .is_some_and(|original| same_origin_tree(original, s))
+                || !used.insert(origin)
+            {
                 return Err(s.error("a foreign attribute must come unchanged from an argument and occur at most once"));
             }
         }
