@@ -916,7 +916,7 @@ fn compare_with(
             )
         }
         Some(Ok(old)) => {
-            let diff = Diff::new(old, now);
+            let diff = Diff::new(old, now)?;
             diff.print(&tag);
             if !diff.removed.is_empty() || !diff.changed.is_empty() {
                 (Step::Major, "something was removed or changed")
@@ -1061,6 +1061,10 @@ fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interfac
 struct Entry {
     shown: String,
     canonical: String,
+    alias: Option<(
+        ilang_check::types::AliasArtifact,
+        std::sync::Arc<Vec<String>>,
+    )>,
 }
 
 /// The public interface of the `src/` modules of a package: for each
@@ -1103,6 +1107,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
         return Ok(Err(problems(&graph, &diags)));
     }
     let canonical_names = canonical_names(&graph, program);
+    let artifact_names = std::sync::Arc::new(canonical_names.clone());
     let mut out = Interface::new();
     // What the host must give, by its key: how each declaration of it is
     // shown, and its canonical forms.
@@ -1154,6 +1159,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                 Entry {
                     shown: format!("{import}{ty}"),
                     canonical: format!("{import}{canonical}"),
+                    alias: None,
                 },
             );
         }
@@ -1200,6 +1206,11 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                         Some(body) => canonical.completed_head(body),
                         None => canonical.head(),
                     },
+                    alias: typed
+                        .alias_artifacts
+                        .get(&t)
+                        .cloned()
+                        .map(|a| (a, artifact_names.clone())),
                 },
             );
             if (def.constructors_exported || def.host.is_some())
@@ -1214,6 +1225,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                     Entry {
                         shown: all(&shown),
                         canonical: all(&canonical),
+                        alias: None,
                     },
                 );
             }
@@ -1226,6 +1238,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
             Entry {
                 shown: join(shown),
                 canonical: join(canonical),
+                alias: None,
             },
         );
     }
@@ -1444,6 +1457,13 @@ impl<'a> TypeShow<'a> {
                 .collect::<Vec<_>>()
                 .join(sep)
         };
+        let join_commutative = |ts: &[hir::Type], sep: &str, p: u8| {
+            let mut parts = ts.iter().map(|t| self.ty(t, p)).collect::<Vec<_>>();
+            if self.canonical {
+                parts.sort();
+            }
+            parts.join(sep)
+        };
         match &t.kind {
             TypeKind::Of { .. } => panic!("unresolved value type in a package interface"),
             TypeKind::Lit(v) => v.text(),
@@ -1520,8 +1540,8 @@ impl<'a> TypeShow<'a> {
                 }
                 wrap(s, 0)
             }
-            TypeKind::Union(ts) => wrap(join(ts, " | ", 1), 0),
-            TypeKind::Inter(ts) => wrap(join(ts, " & ", 2), 1),
+            TypeKind::Union(ts) => wrap(join_commutative(ts, " | ", 1), 0),
+            TypeKind::Inter(ts) => wrap(join_commutative(ts, " & ", 2), 1),
             TypeKind::Diff(ts) => wrap(join(ts, " - ", 3), 2),
         }
     }
@@ -1535,7 +1555,7 @@ struct Diff {
 }
 
 impl Diff {
-    fn new(old: &Interface, new: &Interface) -> Diff {
+    fn new(old: &Interface, new: &Interface) -> Result<Diff> {
         let mut d = Diff {
             removed: Vec::new(),
             changed: Vec::new(),
@@ -1544,10 +1564,27 @@ impl Diff {
         for (k, v) in old {
             match new.get(k) {
                 None => d.removed.push((k.clone(), v.clone())),
-                Some(n) if n.canonical != v.canonical => {
-                    d.changed.push((k.clone(), v.clone(), n.clone()))
+                Some(n) => {
+                    let equal = match (&v.alias, &n.alias) {
+                        (Some((left, left_names)), Some((right, right_names))) => left
+                            .equivalent(
+                                right,
+                                &mut |t| match t {
+                                    TypeRef::Builtin(b) => b.name().into(),
+                                    TypeRef::Custom(id) => left_names[id.0 as usize].clone(),
+                                },
+                                &mut |t| match t {
+                                    TypeRef::Builtin(b) => b.name().into(),
+                                    TypeRef::Custom(id) => right_names[id.0 as usize].clone(),
+                                },
+                            )
+                            .map_err(|e| anyhow!("cannot compare {k}: {e}"))?,
+                        _ => n.canonical == v.canonical,
+                    };
+                    if !equal {
+                        d.changed.push((k.clone(), v.clone(), n.clone()))
+                    }
                 }
-                Some(_) => {}
             }
         }
         for (k, v) in new {
@@ -1555,7 +1592,7 @@ impl Diff {
                 d.added.push((k.clone(), v.clone()));
             }
         }
-        d
+        Ok(d)
     }
 
     fn print(&self, tag: &str) {
@@ -1671,14 +1708,15 @@ fn canonical_alias_order(t: &ShownType, key: &dyn Fn(&ShownType) -> String) -> S
 mod value_type_interfaces {
     use super::*;
     use std::fs;
-    fn canonical(source: &str) -> BTreeMap<String, String> {
+    fn interface(source: &str) -> Interface {
         let dir = tempfile::tempdir().unwrap();
         fs::create_dir_all(dir.path().join("src")).unwrap();
         fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
         fs::write(dir.path().join("src/api.i"), source).unwrap();
-        interface_of(dir.path(), false)
-            .unwrap()
-            .unwrap()
+        interface_of(dir.path(), false).unwrap().unwrap()
+    }
+    fn canonical(source: &str) -> BTreeMap<String, String> {
+        interface(source)
             .into_iter()
             .map(|(key, entry)| (key, entry.canonical))
             .collect()
@@ -1740,5 +1778,35 @@ mod value_type_interfaces {
             "(f, Person)\nf(Key) = (r: (Key: String), key: Key) -> Int { 1 }\nPerson = (age: Int, name: String)",
         );
         assert_ne!(a, changed);
+    }
+
+    #[test]
+    fn record_union_interface_is_independent_of_member_order() {
+        let a = canonical("(T)\nT = (a: Int) | (b: String)");
+        let b = canonical("(T)\nT = (b: String) | (a: Int)");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn record_union_interface_compares_denoted_sets() {
+        let a = interface("(T)\nT = (a: Int)");
+        let b = interface("(T)\nT = (a: Int) | (a: 1)");
+        assert!(Diff::new(&a, &b).unwrap().changed.is_empty());
+        let joined = interface("(T)\nT = (a: Int | String)");
+        let split = interface("(T)\nT = (a: Int) | (a: String)");
+        assert!(Diff::new(&joined, &split).unwrap().changed.is_empty());
+    }
+
+    #[test]
+    fn record_alias_comparison_preserves_formal_positions_and_changed_fields() {
+        let a = interface("(T)\nT(A,B) = (a: A, b: B)");
+        let renamed = interface("(T)\nT(X,Y) = (b: Y, a: X)");
+        let swapped = interface("(T)\nT(X,Y) = (a: Y, b: X)");
+        assert!(Diff::new(&a, &a).unwrap().changed.is_empty());
+        assert!(Diff::new(&a, &renamed).unwrap().changed.is_empty());
+        assert!(!Diff::new(&a, &swapped).unwrap().changed.is_empty());
+        let concrete = interface("(T)\nT = (a: Int)");
+        let different = interface("(T)\nT = (a: String)");
+        assert!(!Diff::new(&concrete, &different).unwrap().changed.is_empty());
     }
 }

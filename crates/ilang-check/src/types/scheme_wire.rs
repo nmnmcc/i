@@ -634,3 +634,184 @@ mod tests {
         assert!(!restored.failures.is_empty());
     }
 }
+
+/// An alias template with formal positions retained for package comparison.
+#[derive(Clone, Debug)]
+pub struct AliasArtifact {
+    template: super::alias::Template,
+    solver: Arc<Mutex<Solver>>,
+    modes: Vec<Mode>,
+}
+
+impl AliasArtifact {
+    pub(super) fn new(
+        template: super::alias::Template,
+        solver: &Solver,
+        id: crate::hir::TypeId,
+    ) -> Self {
+        let mut snapshot = Solver::new(solver.variance.clone(), Vec::new());
+        snapshot.row_params = solver.row_params.clone();
+        let modes = solver
+            .row_params
+            .get(&id)
+            .cloned()
+            .unwrap_or_else(|| vec![Mode::Value; template.params]);
+        Self {
+            template,
+            solver: Arc::new(Mutex::new(snapshot)),
+            modes,
+        }
+    }
+
+    /// Compare denoted sets with the same rigid formal positions. The name
+    /// callbacks identify nominal types independently of each program's IDs.
+    pub fn equivalent(
+        &self,
+        other: &Self,
+        left_name: &mut impl FnMut(TypeRef) -> String,
+        right_name: &mut impl FnMut(TypeRef) -> String,
+    ) -> Result<bool, String> {
+        if self.template.params != other.template.params
+            || self.template.slots != other.template.slots
+            || self.modes != other.modes
+        {
+            return Ok(false);
+        }
+        let left = self.solver.lock().expect("alias snapshot").clone();
+        let right = other.solver.lock().expect("alias snapshot").clone();
+        let mut solver = Solver::new(HashMap::new(), Vec::new());
+        for _ in 0..self.template.slots {
+            let v = solver.fresh_at(0);
+            solver.vars[v.0 as usize].input = true;
+        }
+        let mut identities = HashMap::<String, TypeRef>::new();
+        let mut next_id = 0u32;
+        let mut import = |artifact: &AliasArtifact,
+                          source: &Solver,
+                          name: &mut dyn FnMut(TypeRef) -> String|
+         -> Result<Ty, String> {
+            let graph = source.records.graph(&artifact.template.ty);
+            let mut names = HashMap::new();
+            for (_, node) in graph.nodes() {
+                let Node::Con(Head::Named(ty), _, _) = node else {
+                    continue;
+                };
+                let key = match ty {
+                    TypeRef::Builtin(_) => format!("builtin:{}", name(ty)),
+                    TypeRef::Custom(_) => format!("nominal:{}", name(ty)),
+                };
+                let mapped = match ty {
+                    TypeRef::Builtin(_) => ty,
+                    TypeRef::Custom(old) => {
+                        let mapped = *identities.entry(key.clone()).or_insert_with(|| {
+                            let id = crate::hir::TypeId(next_id);
+                            next_id += 1;
+                            TypeRef::Custom(id)
+                        });
+                        let TypeRef::Custom(id) = mapped else {
+                            unreachable!()
+                        };
+                        if let Some(vs) = source.variance.get(&old) {
+                            if solver.variance.get(&id).is_some_and(|prior| prior != vs) {
+                                return Err("nominal variance differs".into());
+                            }
+                            solver.variance.insert(id, vs.clone());
+                        }
+                        if let Some(ms) = source.row_params.get(&old) {
+                            if solver.row_params.get(&id).is_some_and(|prior| prior != ms) {
+                                return Err("nominal row modes differ".into());
+                            }
+                            solver.row_params.insert(id, ms.clone());
+                        }
+                        mapped
+                    }
+                };
+                if names
+                    .insert(key, mapped)
+                    .is_some_and(|prior| prior != mapped)
+                {
+                    return Err("duplicate nominal identity".into());
+                }
+            }
+            let wire = records::codec::encode(
+                &graph,
+                &mut |ty| match ty {
+                    TypeRef::Builtin(_) => format!("builtin:{}", name(ty)),
+                    TypeRef::Custom(_) => format!("nominal:{}", name(ty)),
+                },
+                &mut |v| v.0.to_string(),
+                &mut |_| unreachable!("alias label parameter"),
+            );
+            records::codec::decode(
+                &wire,
+                &solver.records,
+                &mut |name| names.get(name).copied(),
+                &mut |name| {
+                    name.parse::<u32>()
+                        .ok()
+                        .filter(|&i| (i as usize) < artifact.template.slots)
+                        .map(V)
+                },
+                &mut |_, _, _| None,
+            )
+        };
+        let a = import(self, &left, left_name)?;
+        let b = import(other, &right, right_name)?;
+        // Function parameter names are call-site API metadata even though
+        // subtype proofs deliberately ignore them. Until their alignment is
+        // proved, do not infer interface equality from type inclusion alone.
+        let has_functions = [&a, &b].into_iter().any(|ty| {
+            solver
+                .records
+                .graph(ty)
+                .nodes()
+                .iter()
+                .any(|(_, node)| matches!(node, Node::Fn(_)))
+        });
+        if has_functions && a != b {
+            return Err("function parameter labels need interface alignment".into());
+        }
+        let prove = |a: &Ty, b: &Ty| {
+            records::prove(
+                &solver,
+                a,
+                b,
+                &mut records::Demand::new(records::Demand::LIMIT, true),
+            )
+        };
+        match (prove(&a, &b), prove(&b, &a)) {
+            (records::Verdict::Proven, records::Verdict::Proven) => Ok(true),
+            (records::Verdict::Refuted, _) | (_, records::Verdict::Refuted) => Ok(false),
+            (records::Verdict::ResourceLimit, _) | (_, records::Verdict::ResourceLimit) => {
+                Err("alias equivalence exceeded the proof limit".into())
+            }
+            _ if self.modes.iter().all(|m| *m == Mode::Value)
+                && self.template.params == self.template.slots =>
+            {
+                let int = Ty::named(TypeRef::Builtin(crate::hir::BuiltinType::Int), Vec::new());
+                let string = Ty::named(
+                    TypeRef::Builtin(crate::hir::BuiltinType::String),
+                    Vec::new(),
+                );
+                for selected in 0..self.template.params {
+                    let replace = |v: V| {
+                        if v.0 as usize == selected {
+                            int.clone()
+                        } else {
+                            string.clone()
+                        }
+                    };
+                    let a = super::alias::map_vars(&a, &mut replace.clone());
+                    let b = super::alias::map_vars(&b, &mut replace.clone());
+                    if matches!(prove(&a, &b), records::Verdict::Refuted)
+                        || matches!(prove(&b, &a), records::Verdict::Refuted)
+                    {
+                        return Ok(false);
+                    }
+                }
+                Err("alias equivalence could not be proven".into())
+            }
+            _ => Err("alias equivalence could not be proven".into()),
+        }
+    }
+}

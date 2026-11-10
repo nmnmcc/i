@@ -7,7 +7,7 @@ use crate::code;
 use crate::hir::*;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(super) struct Template {
     pub ty: Ty,
     pub params: usize,
@@ -124,6 +124,12 @@ impl Checker<'_> {
                 slots,
             });
             if let Some(template) = template {
+                if def.exported {
+                    self.out.alias_artifacts.insert(
+                        id,
+                        super::scheme_wire::AliasArtifact::new(template.clone(), &self.s, id),
+                    );
+                }
                 if self
                     .p
                     .value_aliases

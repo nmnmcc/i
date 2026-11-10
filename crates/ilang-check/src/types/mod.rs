@@ -33,7 +33,7 @@ mod value_types;
 
 pub use lits::{LitValue, TestValues};
 pub use records::ShownGraph;
-pub use scheme_wire::SchemeArtifact;
+pub use scheme_wire::{AliasArtifact, SchemeArtifact};
 pub use shown::{ShownFn, ShownType};
 
 use crate::hir::{BindingRef, CtorRef, DefId, ModuleId, Program, TypeRef};
@@ -405,6 +405,8 @@ pub struct Typed {
     pub(crate) diagnosed: bool,
     /// Full completed value-dependent alias bodies, with written formal names.
     pub alias_types: HashMap<crate::hir::TypeId, ShownType>,
+    /// Exact alias graphs for semantic interface comparison.
+    pub alias_artifacts: HashMap<crate::hir::TypeId, AliasArtifact>,
     /// The type scheme of each top-level name, simplified and shown in the
     /// syntax of §3 (§4.7).
     pub schemes: HashMap<DefId, String>,
