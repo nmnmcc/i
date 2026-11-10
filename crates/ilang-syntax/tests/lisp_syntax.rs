@@ -550,3 +550,23 @@ fn copied_definition_freshens_its_binders_and_uses_together() {
     ));
     assert!(copy.same_code(&original));
 }
+
+#[test]
+fn definition_query_accepts_only_type_names_and_keeps_atom_scopes() {
+    use ilang_syntax::lisp::definitions::type_query;
+    use ilang_syntax::lisp::syntax::{Node, ScopeIdentity, Syntax};
+    let like = root("x");
+    let dot = Syntax::make(Node::Symbol(".".into()), &like).unwrap();
+    let module = root("mod").flip_mark(9);
+    let ty = root("Result").with_scope_identity(ScopeIdentity::Builtin {
+        name: "Result".into(),
+    });
+    let qualified =
+        Syntax::make(Node::Round(vec![dot, module.clone(), ty.clone()]), &like).unwrap();
+    let query = type_query(&qualified).unwrap();
+    assert_eq!(query.module.unwrap().scope(), module.scope());
+    assert_eq!(query.name.scope_identity(), ty.scope_identity());
+    assert!(type_query(&root("(List Int)")).is_err());
+    assert!(type_query(&root("value")).is_err());
+    assert!(type_query(&root("(. mod value)")).is_err());
+}

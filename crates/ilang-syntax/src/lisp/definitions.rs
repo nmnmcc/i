@@ -195,3 +195,39 @@ pub fn freshen_parameters(definition: &Syntax, old_answer: u64, new_answer: u64)
     }
     walk(definition, old_answer, new_answer)
 }
+
+/// The name and optional module of a `definition` query; each atom keeps its
+/// own scope, span, and provenance for resolution.
+#[derive(Clone, Debug)]
+pub struct TypeQuery {
+    pub module: Option<Syntax>,
+    pub name: Syntax,
+}
+
+/// Read the accepted shapes of a `definition` argument (§6).
+pub fn type_query(of: &Syntax) -> Result<TypeQuery, super::syntax::SyntaxError> {
+    let query = match of.node() {
+        Node::Up(_) => Some(TypeQuery {
+            module: None,
+            name: of.clone(),
+        }),
+        Node::Round(parts) => match parts.as_slice() {
+            [dot, module, name]
+                if matches!(dot.node(), Node::Symbol(symbol) if symbol == ".")
+                    && matches!(module.node(), Node::Name(_))
+                    && matches!(name.node(), Node::Up(_)) =>
+            {
+                Some(TypeQuery {
+                    module: Some(module.clone()),
+                    name: name.clone(),
+                })
+            }
+            _ => None,
+        },
+        _ => None,
+    };
+    query.ok_or_else(|| super::syntax::SyntaxError {
+        message: "definition expects a type name or a qualified type name".into(),
+        span: of.span(),
+    })
+}
