@@ -182,8 +182,8 @@ In one module, every top-level name is defined one time only. Two bindings may n
 These are the attributes. An attribute whose name is one of them, with no module name before it, is that attribute. Its arguments must be string literals, given by position, with no labels, and an attribute that takes no arguments is written with no `( )`, as in `@test`. Any other argument, such as `@external("env" <> "", "f")`, `@external(module: "env", "f")`, or `@test()`, is a compile error. Any other attribute, such as `@m`, `@m(args)`, or `@a.m(args)`, is a macro before an item. It is kept for macros, and it is a compile error whose message says so. An attribute in another place, or one attribute given two times on one item, is a compile error.
 
 - `@js("expression")`: on a declaration of a closed opaque type (§10.1.1). A declaration cannot have both `@js` and `@external`.
-- `@external("module", "function")`: on a declaration (§10.1). The module may not start with `ilang:`, which is kept for the runtime (§B.4).
-- `@host("namespace")` and `@host("namespace", "async")`: on a type definition (§9.7). The namespace may not start with `ilang:`.
+- `@external("module", "function")`: on a declaration (§10.1). The module may not start with `ilang:` or `i:compiler/`, which are kept for the runtime and compiler (§B.4).
+- `@host("namespace")` and `@host("namespace", "async")`: on a type definition (§9.7). The namespace may not start with `ilang:` or `i:compiler/`.
 - `@test`: on such a binding in a module under `test/` (§10.2).
 - `@deprecated("note")`: on any item. Using the marked item from another module gives a compile warning.
 

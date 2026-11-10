@@ -267,7 +267,7 @@ pub fn install(imports: &mut HostImports) -> Result<()> {
         "text_error_at",
     ];
     for &name in NAMES {
-        imports.external("i:syntax/v1", name, move |args| invoke(name, args))?;
+        imports.external("i:compiler/syntax/v1", name, move |args| invoke(name, args))?;
     }
     Ok(())
 }

@@ -692,11 +692,17 @@ impl<'a> Resolver<'a> {
             }
             match name {
                 "external" | "host" => {
-                    if args[0].starts_with("ilang:") && !self.in_library() {
+                    if (args[0].starts_with("ilang:") || args[0].starts_with("i:compiler/"))
+                        && !self.in_library()
+                    {
                         self.error(
                             code::RESERVED_ILANG,
                             a.args[0].1,
-                            "names that start with `ilang:` are kept for the runtime",
+                            if args[0].starts_with("ilang:") {
+                                "names that start with `ilang:` are kept for the runtime"
+                            } else {
+                                "names that start with `i:compiler/` are kept for the compiler"
+                            },
                         );
                     }
                     if name == "external" {

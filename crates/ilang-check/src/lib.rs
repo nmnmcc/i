@@ -4,6 +4,7 @@
 //!
 //! The only authority is `docs/spec.md`; section numbers refer to it.
 
+mod capabilities;
 pub mod hir;
 pub mod identity;
 pub mod order;
@@ -78,6 +79,7 @@ pub mod code {
     pub const EXTERNAL_TYPE_VAR: &str = "E0317";
     pub const EXTERNAL_HOST_TYPE: &str = "E0318";
     pub const EXTERNAL_EFFECTS: &str = "E0319";
+    pub const COMPILER_CAPABILITY: &str = "E0322";
     pub const HOST_TYPE: &str = "E0320";
     pub const EXPORT_NAME_TWICE: &str = "E0321";
     pub const DEPRECATED: &str = "W0301";
@@ -161,6 +163,7 @@ pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagn
     let (mut program, more) = resolve::resolve(graph, &parsed);
     diags.extend(more);
     order::order(&mut program, &mut diags);
+    capabilities::check(&program, graph, &mut diags);
     (Some(program), diags)
 }
 

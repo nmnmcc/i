@@ -64,73 +64,73 @@ SyntaxError {
 	SyntaxError(message: String, at: Syntax)
 }
 
-@external("i:syntax/v1", "kind")
+@external("i:compiler/syntax/v1", "kind")
 raw_kind: (Syntax) -> Int
 
-@external("i:syntax/v1", "text")
+@external("i:compiler/syntax/v1", "text")
 raw_text: (Syntax) -> String
 
-@external("i:syntax/v1", "int")
+@external("i:compiler/syntax/v1", "int")
 raw_int: (Syntax) -> Int
 
-@external("i:syntax/v1", "float")
+@external("i:compiler/syntax/v1", "float")
 raw_float: (Syntax) -> Float
 
-@external("i:syntax/v1", "length")
+@external("i:compiler/syntax/v1", "length")
 raw_length: (Syntax) -> Int
 
-@external("i:syntax/v1", "child")
+@external("i:compiler/syntax/v1", "child")
 raw_child: (Syntax, Int) -> Syntax
 
-@external("i:syntax/v1", "list_new")
+@external("i:compiler/syntax/v1", "list_new")
 raw_list_new: () -> SyntaxList
 
-@external("i:syntax/v1", "list_push")
+@external("i:compiler/syntax/v1", "list_push")
 raw_list_push: (SyntaxList, Syntax) -> SyntaxList
 
-@external("i:syntax/v1", "make_text")
+@external("i:compiler/syntax/v1", "make_text")
 raw_make_text: (Int, String, Syntax) -> SyntaxResult
 
-@external("i:syntax/v1", "make_int")
+@external("i:compiler/syntax/v1", "make_int")
 raw_make_int: (Int, Syntax) -> SyntaxResult
 
-@external("i:syntax/v1", "make_float")
+@external("i:compiler/syntax/v1", "make_float")
 raw_make_float: (Float, Syntax) -> SyntaxResult
 
-@external("i:syntax/v1", "make_list")
+@external("i:compiler/syntax/v1", "make_list")
 raw_make_list: (Int, SyntaxList, Syntax) -> SyntaxResult
 
-@external("i:syntax/v1", "make_one")
+@external("i:compiler/syntax/v1", "make_one")
 raw_make_one: (Int, Syntax, Syntax) -> SyntaxResult
 
-@external("i:syntax/v1", "syntax_ok")
+@external("i:compiler/syntax/v1", "syntax_ok")
 raw_syntax_ok: (SyntaxResult) -> Bool
 
-@external("i:syntax/v1", "syntax_value")
+@external("i:compiler/syntax/v1", "syntax_value")
 raw_syntax_value: (SyntaxResult) -> Syntax
 
-@external("i:syntax/v1", "syntax_error")
+@external("i:compiler/syntax/v1", "syntax_error")
 raw_syntax_error: (SyntaxResult) -> String
 
-@external("i:syntax/v1", "same_code")
+@external("i:compiler/syntax/v1", "same_code")
 raw_same_code: (Syntax, Syntax) -> Bool
 
-@external("i:syntax/v1", "show")
+@external("i:compiler/syntax/v1", "show")
 raw_show: (Syntax) -> String
 
-@external("i:syntax/v1", "show_as")
+@external("i:compiler/syntax/v1", "show_as")
 raw_show_as: (Syntax, Int) -> TextResult
 
-@external("i:syntax/v1", "text_ok")
+@external("i:compiler/syntax/v1", "text_ok")
 raw_text_ok: (TextResult) -> Bool
 
-@external("i:syntax/v1", "text_value")
+@external("i:compiler/syntax/v1", "text_value")
 raw_text_value: (TextResult) -> String
 
-@external("i:syntax/v1", "text_error")
+@external("i:compiler/syntax/v1", "text_error")
 raw_text_error: (TextResult) -> String
 
-@external("i:syntax/v1", "text_error_at")
+@external("i:compiler/syntax/v1", "text_error_at")
 raw_text_error_at: (TextResult) -> Syntax
 
 reverse = (items: List(Syntax), result: List(Syntax)) -> List(Syntax) {

@@ -88,3 +88,60 @@ exercise = () -> Nil ^ syntax.SyntaxError ! Assert {
         );
     }
 }
+
+#[test]
+fn compiler_operations_are_limited_to_compiler_instances() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/helper.i"),
+        r#"
+(syntax = i/syntax)
+(show)
+@external("test:syntax", "source")
+source: () -> syntax.Syntax
+show = () { syntax.show(source()) }
+"#,
+    )
+    .unwrap();
+    let main = dir.path().join("src/main.i");
+    let options = ilang_cli::BuildOptions {
+        tests: false,
+        opt: ilang_cli::Level::O0,
+        offline: true,
+        target: ilang_cli::Target::Ilang,
+    };
+    std::fs::write(
+        &main,
+        "(helper = app/helper)\nmain = () { helper.show()  Nil }\n",
+    )
+    .unwrap();
+    let error = match ilang_cli::build(dir.path(), options) {
+        Ok(_) => panic!("ordinary entry acquired a compiler capability"),
+        Err(e) => e,
+    };
+    assert!(
+        matches!(&error, ilang_cli::BuildError::Program { codes, .. } if codes.contains(&"E0322")),
+        "{error}"
+    );
+    std::fs::write(
+        &main,
+        "(helper = app/helper)\nsnapshot = helper.show()\nmain = () { Nil }\n",
+    )
+    .unwrap();
+    let error = match ilang_cli::build(dir.path(), options) {
+        Ok(_) => panic!("ordinary initialization acquired a compiler capability"),
+        Err(e) => e,
+    };
+    assert!(
+        matches!(&error, ilang_cli::BuildError::Program { codes, .. } if codes.contains(&"E0322")),
+        "{error}"
+    );
+    std::fs::write(
+        &main,
+        "(helper = app/helper)\nunused = () { helper.show() }\nmain = () { Nil }\n",
+    )
+    .unwrap();
+    ilang_cli::build(dir.path(), options).unwrap();
+}
