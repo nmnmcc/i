@@ -1,0 +1,22 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 16.6ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 15.1ms
+FAIL review/cases.one_property_failure
+  assertion failed: std/property v1: falsified
+  seed: 0
+  reason: assert
+  review/cases:7:23
+FAIL review/cases.nan_before_library
+  float: result is not finite
+  review/cases:13:27
+FAIL review/cases.positive_infinity_before_library
+  float: result is not finite
+  review/cases:15:41
+FAIL review/cases.negative_infinity_before_library
+  float: result is not finite
+  review/cases:17:41
+pass review/cases.caller_can_catch_final_failure
+1 passed, 4 failed

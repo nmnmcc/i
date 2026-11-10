@@ -1,0 +1,5 @@
+spec/case_mapping.check : (got: String, want: String) -> Nil
+spec/case_mapping.ascii : () -> Nil
+spec/case_mapping.greek_and_cyrillic : () -> Nil
+spec/case_mapping.one_character_for_one : () -> Nil
+spec/case_mapping.outside_the_basic_plane : () -> Nil

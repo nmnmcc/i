@@ -1,0 +1,55 @@
+Independent std-3 review evidence, commit d3975a0
+
+criteria.md was written before reading std-3.md.
+All new source, tools and outputs live here; no tracked file was edited.
+
+Numerical checks:
+  venv/bin/python math_review.py       # 254 comparisons
+  venv/bin/python extra_math.py        # 59 comparisons, includes midpoint search
+  venv/bin/python hypot_ties.py        # six realizable exact midpoint ties
+  venv/bin/python underflow_review.py  # 12 comparisons, including atan2(minsub,2)
+Total: 331 comparisons. All passed. MPFR 4.2.2, directed 4096-bit rounding.
+The model uses exact GMP rationals for the note's algorithm. MPFR is an
+independent oracle; its directed endpoints must both round to the same binary64.
+These are not tests of an implemented std/float extension. No cross-engine
+execution was performed.
+
+Plain-i probes (from the review worktree):
+  direnv exec /home/agent/Programming/i /tmp/review-std3/i test --project /tmp/review-std3/bench pbt_test --time
+  direnv exec /home/agent/Programming/i /tmp/review-std3/i test --project /tmp/review-std3/bench reduced_ordinary --time
+  direnv exec /home/agent/Programming/i /tmp/review-std3/i test --project /tmp/review-std3/bench reduced_ordinary --time --opt 2
+  direnv exec /home/agent/Programming/i timeout 60 /tmp/review-std3/i test --project /tmp/review-std3/bench reduced_huge --time
+  direnv exec /home/agent/Programming/i /tmp/review-std3/i test --project /tmp/review-std3/bench fixed_test --time
+  direnv exec /home/agent/Programming/i /tmp/review-std3/i test --project /tmp/review-std3/failures
+
+The mathematical probes originally used the shared heavy wrapper before direnv.
+No cargo commands were run. i is a copy of the integration lane's cached binary;
+its hash is in metadata.json and matches the binary reported by the note. A
+build-to-source commit link is not established. Thus timings describe this
+available compiler/runtime, not a fresh build independently traced to a commit.
+The review commit differs from the note's source baseline only in std-3.md.
+
+Results:
+- Exact rational reduced sine kernel for input 1.0, 15 terms: 39.839 seconds
+  O0 / 40.972 seconds O2 (CPU 39.26 / 40.31 seconds), excluding compilation.
+  Reduced midpoint denominator: 331 bits; intermediate rationals about 9,679 bits.
+- The corresponding rational sine kernel for input 1e300 did not finish within
+  a 60-second process timeout (exit 124, includes compilation). Midpoint
+  denominator: 2,916 bits; model intermediates about 84,626 bits.
+- atan(1/5), 250 exact terms: 2.043 seconds, CPU 2.01 seconds (initial run).
+- Fixed-point 128-bit outward cosine enclosure for the reduced input of sin(1):
+  0.001 seconds O0 / 0.002 seconds O2. Both endpoints round to sin(1)'s correct
+  bits, 0x3feaed548f090cee. This is a one-input kernel feasibility probe, not
+  a full implementation or a performance bound. Its remainder allowance is one
+  fixed-point unit, exceeding 1/40! for the 20 cosine terms on |r|<1.
+- pbt: five tests pass; partial P2/P4/P7 kernels, not the proposed full API.
+  Includes 20 seeds with depth-four dependent trees, prescribed greedy path,
+  zero-budget thunk avoidance, cyclic-tree budget, and a mapped 90 -> 100 case.
+- failures: one ordinary property assertion failure, three nonfinite-bit stops,
+  and one passing test catching the adapter's final assertion. Exit 1 as expected.
+
+The rational kernel already cross-cancels products and denominator gcds in sums.
+Its cost is evidence against accepting the current baseline without a feasibility
+milestone, not a lower bound for every possible exact-rational implementation.
+Only fixed_test and pbt_test should be run together casually; the unfiltered
+benchmark suite contains the intentionally expensive rational tests.

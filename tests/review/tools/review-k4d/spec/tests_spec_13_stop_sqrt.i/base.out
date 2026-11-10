@@ -1,0 +1,2 @@
+spec/stop_sqrt.value : () -> Float
+spec/stop_sqrt.main : () -> Nil

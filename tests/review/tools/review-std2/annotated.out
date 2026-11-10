@@ -1,0 +1,2 @@
+src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+1 error

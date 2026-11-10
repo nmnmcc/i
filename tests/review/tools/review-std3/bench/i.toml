@@ -1,0 +1,3 @@
+name = "review"
+[dependencies]
+std = { path = "/home/agent/Programming/i/.rd/note-std3/std" }

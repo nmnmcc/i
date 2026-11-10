@@ -1,0 +1,2 @@
+spec/a1_expected_argument.list_map : (xs: List(A), f: (A) -> B) -> List(B)
+spec/a1_expected_argument.main : () -> Nil ! Assert

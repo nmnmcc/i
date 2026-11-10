@@ -1,0 +1,3 @@
+spec/not_covered.name : (c: Color) -> String
+test/not_covered.i:10:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Green`
+1 error

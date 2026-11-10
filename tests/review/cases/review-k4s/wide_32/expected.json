@@ -1,0 +1,17 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 1,
+      "stdout": "app/main.u0 : () -> Nil ! N | S0(N)\napp/main.u1 : () -> Nil ! N | S1(N)\napp/main.u2 : () -> Nil ! N | S2(N)\napp/main.u3 : () -> Nil ! N | S3(N)\napp/main.u4 : () -> Nil ! N | S4(N)\napp/main.u5 : () -> Nil ! N | S5(N)\napp/main.u6 : () -> Nil ! N | S6(N)\napp/main.u7 : () -> Nil ! N | S7(N)\napp/main.u8 : () -> Nil ! N | S8(N)\napp/main.u9 : () -> Nil ! N | S9(N)\napp/main.u10 : () -> Nil ! N | S10(N)\napp/main.u11 : () -> Nil ! N | S11(N)\napp/main.u12 : () -> Nil ! N | S12(N)\napp/main.u13 : () -> Nil ! N | S13(N)\napp/main.u14 : () -> Nil ! N | S14(N)\napp/main.u15 : () -> Nil ! N | S15(N)\napp/main.u16 : () -> Nil ! N | S16(N)\napp/main.u17 : () -> Nil ! N | S17(N)\napp/main.u18 : () -> Nil ! N | S18(N)\napp/main.u19 : () -> Nil ! N | S19(N)\napp/main.u20 : () -> Nil ! N | S20(N)\napp/main.u21 : () -> Nil ! N | S21(N)\napp/main.u22 : () -> Nil ! N | S22(N)\napp/main.u23 : () -> Nil ! N | S23(N)\napp/main.u24 : () -> Nil ! N | S24(N)\napp/main.u25 : () -> Nil ! N | S25(N)\napp/main.u26 : () -> Nil ! N | S26(N)\napp/main.u27 : () -> Nil ! N | S27(N)\napp/main.u28 : () -> Nil ! N | S28(N)\napp/main.u29 : () -> Nil ! N | S29(N)\napp/main.u30 : () -> Nil ! N | S30(N)\napp/main.u31 : () -> Nil ! N | S31(N)\napp/main.run : (body: () -> A ! N) -> A ! N\n",
+      "stderr": "src/main.i:66:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\n1 error\n"
+    }
+  }
+}

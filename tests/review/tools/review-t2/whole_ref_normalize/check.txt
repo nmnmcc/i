@@ -1,0 +1,4 @@
+review/main.v : Box(Int)
+src/main.i:3:7: error[E0534]: the type of review/main.v is still open after source completion; define and export a closed alias next to the source, or write a fully closed source annotation
+src/main.i:4:11: error[E0535]: the source type does not match the alias pattern head or constant part
+2 errors

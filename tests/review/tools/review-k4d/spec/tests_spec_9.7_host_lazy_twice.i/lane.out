@@ -1,0 +1,4 @@
+spec/host_lazy_twice.check : (ok: Bool) -> Nil
+spec/host_lazy_twice.leaf : (b: Boundary(Step, A & String, B & Later)) -> Int ? String ! Later
+spec/host_lazy_twice.down : (b: Boundary(Step, A & String, B & Later), n: Int) -> Int ? String ! Later
+spec/host_lazy_twice.main : () -> Nil ? String ! Later

@@ -1,0 +1,2 @@
+spec/stop_tail_ensure.guarded : () -> Int
+spec/stop_tail_ensure.main : () -> Nil

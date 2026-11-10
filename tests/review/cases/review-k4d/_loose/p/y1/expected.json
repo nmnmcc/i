@@ -1,0 +1,17 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 1,
+      "stdout": "app/main.f : (x: A & { List(Int) | B - List(Int) }) -> A\napp/main.g : (x: A) -> A\napp/main.h : (x: A | Nil) -> A\napp/main.k : (x: A & { List(Int) | B - List(Int) } | List(Int)) -> A\napp/main.a : () -> List(\"a\")\napp/main.b : () -> Box(\"s\")\napp/main.c : () -> Never\napp/main.d : () -> Box(1)\n",
+      "stderr": "src/main.i:19:12: error[E0501]: `\"a\"` is not a subtype of `Int` (the type at 19:10 needs it)\nsrc/main.i:21:12: error[E0501]: `\"a\"` is not a subtype of `Int` (the type at 21:10 needs it)\n2 errors\n"
+    }
+  }
+}

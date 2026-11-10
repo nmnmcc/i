@@ -1,0 +1,6 @@
+{
+  "name": "rec_local_1_17_8",
+  "code": 0,
+  "time": 0.019155221059918404,
+  "out": "app/main.use : () -> Nil ! N | S(N)\n"
+}

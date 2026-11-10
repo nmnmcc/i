@@ -1,0 +1,17 @@
+[
+  {
+    "mode": "check",
+    "code": 0,
+    "out": "app/main.use : () -> Nil ! N | S(N)\n"
+  },
+  {
+    "mode": "opt0",
+    "code": 1,
+    "out": "trap: wasm trap: cast failure\n"
+  },
+  {
+    "mode": "opt2",
+    "code": 1,
+    "out": "trap: wasm trap: cast failure\n"
+  }
+]

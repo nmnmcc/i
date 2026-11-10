@@ -1,0 +1,15 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 14.0ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 18.2ms
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running unittests src/lib.rs (target/debug/deps/ilang_cli-37db2a8ca6661edc)
+
+running 2 tests
+test cli_grants_the_resolved_library_content_to_restricted_default_bindings ... ok
+test binding_tests::compiler_plan_preserves_coalesced_external_declarations ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+

@@ -1,0 +1,7 @@
+import { readFile } from 'node:fs/promises';
+const {instance} = await WebAssembly.instantiate(await readFile('/tmp/review-js/stop.wasm'), {
+ wasi_snapshot_preview1:{fd_write(){return 0},proc_exit(){throw Error('exit')}}
+});
+const {ilang_alloc:alloc, ilang_free:free} = instance.exports;
+const p = alloc(8); free(p,8); free(p,8);
+console.log(JSON.stringify({freed:p,first:alloc(8),second:alloc(8)}));

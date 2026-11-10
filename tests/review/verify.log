@@ -1,0 +1,1123 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 23.1ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 23.0ms
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+    Checking foldhash v0.2.0
+   Compiling version_check v0.9.5
+   Compiling num-traits v0.2.19
+    Checking cfg-if v1.0.5
+    Checking typenum v1.20.1
+   Compiling syn v3.0.9
+    Checking bitflags v2.13.2
+    Checking cpufeatures v0.2.17
+    Checking equivalent v1.0.3
+   Compiling libc v0.2.191
+   Compiling rustix v1.1.6
+    Checking linux-raw-sys v0.12.1
+    Checking rustc-hash v2.1.3
+    Checking once_cell v1.21.4
+   Compiling generic-array v0.14.7
+    Checking winnow v1.0.5
+    Checking toml_writer v1.2.0+spec-1.1.0
+   Compiling getrandom v0.3.4
+    Checking num-integer v0.1.47
+    Checking fastrand v2.5.0
+   Compiling libm v0.2.16
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.7
+    Checking toml_parser v1.1.5+spec-1.1.0
+    Checking foldhash v0.1.5
+    Checking digest v0.10.7
+    Checking hashbrown v0.15.5
+    Checking sha2 v0.10.9
+    Checking memchr v2.8.3
+    Checking fixedbitset v0.5.9
+   Compiling anyhow v1.0.104
+    Checking allocator-api2 v0.2.21
+    Checking leb128fmt v0.1.0
+   Compiling zmij v1.0.23
+    Checking hashbrown v0.17.1
+    Checking toml_datetime v1.1.3+spec-1.1.0
+    Checking serde_spanned v1.1.3
+    Checking bumpalo v3.20.3
+    Checking semver v1.0.28
+    Checking toml v1.2.1+spec-1.1.0
+   Compiling wasmtime-internal-core v50.0.0
+    Checking indexmap v2.14.2
+    Checking tempfile v3.27.0
+    Checking log v0.4.34
+   Compiling serde_json v1.0.154
+   Compiling cranelift-srcgen v0.137.0
+   Compiling cranelift-assembler-x64-meta v0.137.0
+    Checking petgraph v0.8.3
+    Checking itoa v1.0.18
+   Compiling crossbeam-utils v0.8.23
+   Compiling heck v0.5.0
+   Compiling cranelift-isle v0.137.0
+   Compiling cranelift-codegen-shared v0.137.0
+   Compiling target-lexicon v0.13.5
+    Checking wasm-encoder v0.262.0
+   Compiling find-msvc-tools v0.1.15
+   Compiling cranelift-bitset v0.137.0
+    Checking hashbrown v0.16.1
+   Compiling shlex v2.0.1
+    Checking unicode-width v0.2.3
+    Checking fnv v1.0.7
+   Compiling cc v1.10.0
+    Checking wast v262.0.0
+    Checking arbitrary v1.5.0
+   Compiling crc32fast v1.5.3
+    Checking gimli v0.33.0
+    Checking cranelift-control v0.137.0
+   Compiling crossbeam-epoch v0.9.21
+   Compiling crossbeam-deque v0.8.8
+    Checking termcolor v1.4.1
+    Checking object v0.40.0
+    Checking wasm-encoder v0.261.0
+    Checking either v1.19.0
+   Compiling rayon-core v1.13.0
+    Checking wasmtime-internal-component-util v50.0.0
+   Compiling wasmtime-internal-unwinder v50.0.0
+   Compiling wasmtime-internal-cranelift v50.0.0
+    Checking itertools v0.14.0
+    Checking rayon v1.12.0
+   Compiling cranelift-assembler-x64 v0.137.0
+    Checking wat v1.262.0
+    Checking memfd v0.6.6
+    Checking bitflags v1.3.2
+    Checking pin-project-lite v0.2.17
+    Checking fluent-uri v0.1.4
+   Compiling cmake v0.1.58
+    Checking crossbeam-channel v0.5.17
+    Checking socket2 v0.6.5
+    Checking mio v1.2.4
+    Checking utf8parse v0.2.2
+    Checking futures-task v0.3.34
+    Checking slab v0.4.12
+    Checking futures-core v0.3.34
+    Checking tokio v1.53.3
+    Checking futures-util v0.3.34
+    Checking anstyle-parse v1.0.0
+    Checking anstyle v1.0.14
+    Checking anstyle-query v1.1.5
+    Checking is_terminal_polyfill v1.70.2
+    Checking colorchoice v1.0.5
+    Checking strsim v0.11.1
+   Compiling ilang-binaryen v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-binaryen)
+    Checking anstream v1.0.0
+    Checking clap_lex v1.1.1
+    Checking toml_edit v0.25.19+spec-1.1.0
+    Checking clap_builder v4.6.7
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling pulley-macros v50.0.0
+   Compiling wasmtime-internal-versioned-export-macros v50.0.0
+   Compiling async-trait v0.1.92
+   Compiling serde_repr v0.1.21
+   Compiling wasmtime v50.0.0
+   Compiling pulley-interpreter v50.0.0
+   Compiling clap_derive v4.6.7
+   Compiling cranelift-codegen-meta v0.137.0
+    Checking thiserror v2.0.21
+    Checking cobs v0.3.0
+    Checking num-bigint v0.5.1
+    Checking smallvec v1.16.4
+    Checking postcard v1.1.3
+    Checking wasmparser v0.262.0
+    Checking wasmparser v0.261.0
+    Checking regalloc2 v0.15.2
+    Checking lsp-server v0.10.0
+   Compiling cranelift-codegen v0.137.0
+    Checking cranelift-entity v0.137.0
+    Checking wasmtime-internal-jit-icache-coherence v50.0.0
+    Checking ilang-syntax v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-syntax)
+    Checking lsp-types v0.97.0
+    Checking cranelift-bforest v0.137.0
+    Checking clap v4.6.7
+    Checking ilang-package v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-package)
+    Checking ilang-check v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-check)
+    Checking ilang-wasm v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-wasm)
+    Checking wasmprinter v0.261.0
+    Checking wasmtime-environ v50.0.0
+    Checking ilang-lsp v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-lsp)
+    Checking cranelift-native v0.137.0
+    Checking cranelift-frontend v0.137.0
+    Checking ilang-host v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-host)
+    Checking ilang-cli v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 00s
+   Compiling foldhash v0.2.0
+   Compiling serde_core v1.0.229
+   Compiling cfg-if v1.0.5
+   Compiling typenum v1.20.1
+   Compiling bitflags v2.13.2
+   Compiling num-traits v0.2.19
+   Compiling thiserror v2.0.21
+   Compiling cpufeatures v0.2.17
+   Compiling equivalent v1.0.3
+   Compiling libc v0.2.191
+   Compiling linux-raw-sys v0.12.1
+   Compiling rustc-hash v2.1.3
+   Compiling once_cell v1.21.4
+   Compiling winnow v1.0.5
+   Compiling rustix v1.1.6
+   Compiling toml_writer v1.2.0+spec-1.1.0
+   Compiling fastrand v2.5.0
+   Compiling memchr v2.8.3
+   Compiling num-integer v0.1.47
+   Compiling generic-array v0.14.7
+   Compiling foldhash v0.1.5
+   Compiling getrandom v0.3.4
+   Compiling hashbrown v0.15.5
+   Compiling fixedbitset v0.5.9
+   Compiling libm v0.2.16
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling toml_parser v1.1.5+spec-1.1.0
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling anyhow v1.0.104
+   Compiling serde v1.0.229
+   Compiling hashbrown v0.17.1
+   Compiling toml_datetime v1.1.3+spec-1.1.0
+   Compiling num-bigint v0.5.1
+   Compiling serde_spanned v1.1.3
+   Compiling tempfile v3.27.0
+   Compiling toml v1.2.1+spec-1.1.0
+   Compiling log v0.4.34
+   Compiling indexmap v2.14.2
+   Compiling allocator-api2 v0.2.21
+   Compiling leb128fmt v0.1.0
+   Compiling semver v1.0.28
+   Compiling bumpalo v3.20.3
+   Compiling zmij v1.0.23
+   Compiling ilang-syntax v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-syntax)
+   Compiling petgraph v0.8.3
+   Compiling itoa v1.0.18
+   Compiling wasmtime-internal-core v50.0.0
+   Compiling serde_json v1.0.154
+   Compiling crossbeam-utils v0.8.23
+   Compiling cranelift-bitset v0.137.0
+   Compiling wasm-encoder v0.262.0
+   Compiling cranelift-codegen-shared v0.137.0
+   Compiling unicode-width v0.2.3
+   Compiling cranelift-entity v0.137.0
+   Compiling ilang-package v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-package)
+   Compiling pulley-interpreter v50.0.0
+   Compiling ilang-check v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-check)
+   Compiling wast v262.0.0
+   Compiling wasmparser v0.262.0
+   Compiling smallvec v1.16.4
+   Compiling cranelift-codegen-meta v0.137.0
+   Compiling cobs v0.3.0
+   Compiling hashbrown v0.16.1
+   Compiling fnv v1.0.7
+   Compiling postcard v1.1.3
+   Compiling cranelift-bforest v0.137.0
+   Compiling target-lexicon v0.13.5
+   Compiling arbitrary v1.5.0
+   Compiling cranelift-assembler-x64 v0.137.0
+   Compiling gimli v0.33.0
+   Compiling regalloc2 v0.15.2
+   Compiling cranelift-control v0.137.0
+   Compiling wat v1.262.0
+   Compiling crc32fast v1.5.3
+   Compiling wasmparser v0.261.0
+   Compiling termcolor v1.4.1
+   Compiling object v0.40.0
+   Compiling crossbeam-epoch v0.9.21
+   Compiling wasm-encoder v0.261.0
+   Compiling wasmtime-internal-component-util v50.0.0
+   Compiling either v1.19.0
+   Compiling crossbeam-deque v0.8.8
+   Compiling cranelift-codegen v0.137.0
+   Compiling rayon-core v1.13.0
+   Compiling wasmprinter v0.261.0
+   Compiling itertools v0.14.0
+   Compiling rayon v1.12.0
+   Compiling wasmtime-environ v50.0.0
+   Compiling wasmtime-internal-jit-icache-coherence v50.0.0
+   Compiling memfd v0.6.6
+   Compiling ilang-wasm v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-wasm)
+   Compiling pin-project-lite v0.2.17
+   Compiling bitflags v1.3.2
+   Compiling fluent-uri v0.1.4
+   Compiling crossbeam-channel v0.5.17
+   Compiling mio v1.2.4
+   Compiling socket2 v0.6.5
+   Compiling futures-core v0.3.34
+   Compiling futures-task v0.3.34
+   Compiling slab v0.4.12
+   Compiling lsp-types v0.97.0
+   Compiling futures-util v0.3.34
+   Compiling tokio v1.53.3
+   Compiling lsp-server v0.10.0
+   Compiling ilang-binaryen v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-binaryen)
+   Compiling utf8parse v0.2.2
+   Compiling anstyle-parse v1.0.0
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling colorchoice v1.0.5
+   Compiling anstyle v1.0.14
+   Compiling anstyle-query v1.1.5
+   Compiling anstream v1.0.0
+   Compiling clap_lex v1.1.1
+   Compiling strsim v0.11.1
+   Compiling clap_builder v4.6.7
+   Compiling ilang-lsp v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-lsp)
+   Compiling toml_edit v0.25.19+spec-1.1.0
+   Compiling clap v4.6.7
+   Compiling cranelift-native v0.137.0
+   Compiling wasmtime-internal-unwinder v50.0.0
+   Compiling cranelift-frontend v0.137.0
+   Compiling wasmtime-internal-cranelift v50.0.0
+   Compiling wasmtime v50.0.0
+   Compiling ilang-host v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-host)
+   Compiling ilang-cli v0.1.0 (/home/agent/Programming/i/.rd/note-pa-arch/crates/ilang-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 35s
+     Running unittests src/lib.rs (target/debug/deps/ilang_binaryen-24f3666c2461df61)
+
+running 3 tests
+test tests::malformed_input_is_an_error ... ok
+test tests::level_zero_gives_the_module_back ... ok
+warning: unknown name subsection with id 3 at 174
+warning: unknown name subsection with id 3 at 174
+test tests::optimized_module_is_valid_keeps_metadata_and_behaves_the_same ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running unittests src/lib.rs (target/debug/deps/ilang_check-90f3f23989bcb1ce)
+
+running 33 tests
+test types::known::literal_known_tests::hidden_inputs_and_recursive_widening ... ok
+test types::literal_representation_tests::only_int_and_string_carry_sets - should panic ... ok
+test types::solve::literal_stress_tests::t1_stress_alias_1000 ... ignored, literal-types §9 performance gate
+test types::solve::literal_stress_tests::t1_stress_calls_5000 ... ignored, literal-types §9 performance gate
+test types::solve::literal_stress_tests::t1_stress_match_2000 ... ignored, literal-types §9 performance gate
+test types::solve::literal_stress_tests::t1_stress_nested_50_by_50 ... ignored, literal-types §9 performance gate
+test types::solve::literal_tests::difference_left_all_three_splits_and_later_bounds ... ok
+test types::display::literal_display_tests::set_normalization_and_full_text ... ok
+test types::lits::tests::canonical_literal_values ... ok
+test types::solve::literal_tests::literal_subtyping_and_right_difference ... ok
+test types::solve::literal_tests::scalar_boolean_algebra_and_never_intersections ... ok
+test types::solve::literal_tests::service_equality_does_not_widen_literal_arguments ... ok
+test types::value_types::tests::closure_follows_reverse_edges_and_collapses_pure_cycles ... ok
+test types::value_types::tests::closure_rejects_structural_cycles_and_earlier_unfixed_parts ... ok
+test types::solve::literal_tests::route_only_the_uncovered_values ... ok
+test types::lits::tests::canonical_sets_and_hashes ... ok
+test types::value_types::tests::failed_literal_trial_restores_fused_bounds_and_ownership ... ok
+test types::solve::literal_tests::ordinary_bounds_do_not_skip_a_later_environment_check ... ok
+test types::value_types::tests::failed_trial_restores_every_solver_field ... ok
+test types::value_types::tests::shape_checks_keep_skipped_identities_and_observe_earlier_links ... ok
+test types::solve::literal_tests::fused_bounds_propagate_through_variable_links ... ok
+test types::lits::tests::algebra_on_large_shared_sets ... ok
+test types::literal_representation_tests::scalar_sets_survive_child_mapping ... ok
+test types::value_types::tests::closure_does_not_equate_a_predecessor_with_its_wider_successor ... ok
+test types::value_types::tests::normalized_same_head_bounds_retain_each_original_argument ... ok
+test types::coverage::literal_coverage_tests::unknown_alternatives_are_whole_even_beside_an_explicit_head ... ok
+test types::lits::tests::exhaustive_infinite_domain_model ... ok
+test types::solve::literal_tests::bounds_fuse_without_losing_constraints ... ok
+test types::coverage::literal_coverage_tests::complements_preserve_cross_columns_and_prefixes ... ok
+test types::pattern::shared_place_tests::written_occurrences_include_other_constructors_and_aliases ... ok
+test types::coverage::literal_coverage_tests::scalar_index_agrees_with_the_full_matrix ... ok
+test types::lits::tests::bulk_join_matches_the_infinite_domain_model ... ok
+test types::lits::tests::persistent_tree_insert_remove_and_bulk_build ... ok
+
+test result: ok. 29 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+     Running tests/codegen.rs (target/debug/deps/codegen-de646d72e334f8f7)
+
+running 1 test
+test codegen_data ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/field_privacy.rs (target/debug/deps/field_privacy-4dd963ec3c0b266d)
+
+running 3 tests
+test generic_value_use_and_public_constructor_fields_keep_their_types ... ok
+test constructor_forms_and_numeric_projection_do_not_bypass_privacy ... ok
+test private_fields_cannot_be_selected_through_other_names_or_values ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+     Running tests/front_end.rs (target/debug/deps/front_end-b9ee511afdc845ad)
+
+running 5 tests
+test new_match_is_a_non_generalized_binding_at_the_pattern ... ok
+test clause_function_labels_and_synthetic_spans_follow_the_rule ... ok
+test declared_frames_hide_outer_variables_and_generalize ... ok
+test kept_form_messages_are_independent_checks ... ok
+test declared_external_variables_are_general_in_library_declarations ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/hir.rs (target/debug/deps/hir-8e813b88e088edde)
+
+running 2 tests
+test names_resolve ... ok
+test groups_and_init_order ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/library.rs (target/debug/deps/library-5f10fde888921afd)
+
+running 10 tests
+test reserved_modules_are_placeholders ... ok
+test reserved_modules_have_no_names ... ok
+test library_modules_have_sources ... ok
+test prelude_types ... ok
+test reserved_modules_import_cleanly ... ok
+test unknown_library_path_is_missing ... ok
+test hello_example_checks ... ok
+test library_names ... ok
+test library_labels ... ok
+test library_resolves_cleanly ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/literal_types.rs (target/debug/deps/literal_types-f49648645610eae9)
+
+running 25 tests
+test inferred_host_export_cannot_receive_a_restricted_scalar ... ok
+test expressions_do_not_widen_or_compute_arithmetic ... ok
+test fitted_choices_keep_the_deferred_binding_error ... ok
+test guarded_list_heads_leave_tail_items_unrestricted ... ok
+test empty_optional_accumulator_requires_a_written_tuple_shape ... ok
+test prefix_witness_does_not_match_a_prefix_row ... ok
+test equality_diagnostics_distinguish_the_operator ... ok
+test missing_values_report_coverage_and_later_constraints_are_kept ... ok
+test nested_missing_values_are_one_coverage_error ... ok
+test scalar_matches_infer_literals_but_fitting_keeps_whole_types ... ok
+test host_directions_expand_aliases_and_same_scalar_unions ... ok
+test shared_fields_do_not_infer_an_empty_parameter ... ok
+test unknown_parts_and_all_hidden_input_directions_are_conservative ... ok
+test prefix_after_complement_does_not_erase_other_columns ... ok
+test shared_list_items_need_coverage_but_an_option_parameter_keeps_literals ... ok
+test shared_parameters_require_all_combinations_of_a_written_finite_set ... ok
+test everyday_disjoint_equalities_have_explicit_runtime_repairs ... ok
+test whole_known_bounds_keep_non_covariant_literal_parts_as_holes ... ok
+test one_clause_choices_are_fitted_and_never_constructor_flow ... ok
+test typed_complements_keep_the_head_and_cover_cross_columns ... ok
+test literal_values_use_numeric_and_decoded_scalar_identity ... ok
+test grouped_negatives_supply_the_same_written_group_facts ... ok
+test written_literals_and_negative_differences_constrain_calls ... ok
+test narrowing_checks_the_entire_row_and_ignores_guards ... ok
+test host_boundaries_depend_on_scalar_sets_not_written_forms ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.38s
+
+     Running tests/projects.rs (target/debug/deps/projects-15109a21e9814bcc)
+
+running 2 tests
+test ok_projects_are_clean ... ok
+test projects ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/query.rs (target/debug/deps/query-2c21d49cb3933313)
+
+running 17 tests
+test completions_in_scope ... ok
+test completions_of_fields_from_inference ... ok
+test completions_after_any_expression ... ok
+test completions_of_members ... ok
+test private_value_and_written_alias_hovers_limit_literals_only_in_human_text ... ok
+test new_match_scopes_cover_subjects_and_hide_synthetic_names ... ok
+test symbols_of_a_module ... ok
+test type_of_top_level_names ... ok
+test definitions_with_a_syntax_error ... ok
+test local_types_name_one_sided_variables_as_the_scheme ... ok
+test completions_of_the_name_being_bound ... ok
+test type_of_other_things ... ok
+test local_types_use_the_names_of_the_scheme ... ok
+test definitions ... ok
+test types_of_parameters_that_share_a_type_variable ... ok
+test types_in_a_program_with_errors ... ok
+test type_of_local_names ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/types.rs (target/debug/deps/types-f7cd410e462161e6)
+
+running 5 tests
+test library ... ok
+test shown_names_skip_types_and_ignore_written_variable_names ... ok
+test scheme_types_know_each_type_by_what_it_is ... ok
+test many_uses_of_a_parameter ... ok
+test types ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s
+
+     Running tests/types_joint.rs (target/debug/deps/types_joint-9fa07ef69b009010)
+
+running 9 tests
+test joint_queries_keep_full_literal_aliases_and_nested_head_targets ... ok
+test j6_early_context_provenance_wins_over_literal_boundary_checks ... ok
+test j5_completed_literal_aliases_produce_exact_runtime_tests ... ok
+test j1_j2_flow_facts_do_not_become_value_reads_through_access_or_calls ... ok
+test closed_substitution_survives_cached_literal_algebra ... ok
+test j7_invariant_scheme_reads_keep_fresh_instances_and_weak_sharing ... ok
+test j1_j5_new_narrowed_binders_have_literal_types_original_subjects_do_not ... ok
+test j4_literal_fixation_orders_completion_and_rejects_later_widening ... ok
+test j1_value_reads_and_patterns_preserve_exact_literal_sets ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests/value_types.rs (target/debug/deps/value_types-709de5ae125363c1)
+
+running 31 tests
+test dependency_diagnostics_keep_reader_span_alias_chain_and_return_path ... ok
+test early_contexts_preserve_dependency_provenance ... ok
+test imported_pattern_binders_are_never_reclassified ... ok
+test invalid_components_fail_dependents_without_cascading_diagnostics ... ok
+test closed_aliases_and_patterns_complete_eagerly ... ok
+test eager_alias_dependencies_and_reverse_ties ... ok
+test alias_formals_and_written_holes_are_instantiated_per_use ... ok
+test places_keep_local_declaration_identity_before_allocation ... ok
+test query_recovery_keeps_unrelated_results ... ok
+test a_consumer_cannot_fix_the_library ... ok
+test cached_templates_preserve_hole_sharing_and_deferred_constraints ... ok
+test annotation_instances_and_local_sharing ... ok
+test exported_aliases_cannot_leak_private_nominal_types ... ok
+test every_bad_dependency_component_recovers_without_publishing_aliases ... ok
+test query_sources_heads_binders_and_outline ... ok
+test pending_scopes_and_identity_shadowing ... ok
+test normalized_shapes_preserve_skips_and_nested_heads ... ok
+test expanded_places_and_constant_head_alias_parts ... ok
+test qualified_exact_heads_expand_through_named_and_tuple_aliases ... ok
+test nested_pattern_heads_have_hover_and_definition_targets ... ok
+test annotation_demands_fix_weak_sources_and_keep_generalized_instances ... ok
+test alias_exports_preserve_constructor_privacy ... ok
+test fixation_keeps_constraints_and_rejects_earlier_weak_parts ... ok
+test type_edges_do_not_change_runtime_needs_or_generalization ... ok
+test r7_closed_source_annotations_and_direct_roots ... ok
+test skipped_quantifiers_and_constant_parts_do_not_choose_instances ... ok
+test source_module_alias_is_the_foreign_closed_read_boundary ... ok
+test independent_review_reproducers ... ok
+test standard_library_reverse_order_and_recovery_preserve_types ... ok
+test review_declaration_permutations_are_identical ... ok
+test spec_corpus_reverse_order_and_recovery ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.07s
+
+     Running unittests src/lib.rs (target/debug/deps/ilang_cli-c747d631b73478e4)
+
+running 2 tests
+test cli_grants_the_resolved_library_content_to_restricted_default_bindings ... ok
+test binding_tests::compiler_plan_preserves_coalesced_external_declarations ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+     Running unittests src/main.rs (target/debug/deps/i-49436de22301d7d2)
+
+running 5 tests
+test commands::package::syntax_templates::new_package_sources_parse ... ok
+test commands::package::value_type_interfaces::commutative_alias_members_keep_canonical_formal_identity ... ok
+test commands::package::value_type_interfaces::completed_alias_keeps_formal_positions ... ok
+test commands::package::value_type_interfaces::exported_alias_uses_completed_body_not_private_source_spelling ... ok
+test commands::package::value_type_interfaces::completed_literal_aliases_have_full_canonical_identity ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/check.rs (target/debug/deps/check-bf3f57952ef2cec7)
+
+running 6 tests
+test migration_flags_are_removed ... ok
+test check_types ... ok
+test check_reports_type_errors ... ok
+test blind_expected_subject_is_checked_before_audit_codegen ... ok
+test old_forms_have_helpful_errors_without_reserving_names ... ok
+test new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running tests/commands.rs (target/debug/deps/commands-ae75da6b67b96ab4)
+
+running 14 tests
+test build_reports_errors ... ok
+test async_entry_points_and_needed_services ... ok
+test incorrect_host_answers_stop_in_the_module ... ok
+test the_compiled_fixture_is_current ... ok
+test test_runs_each_test ... ok
+test run_prints_the_stop_message ... ok
+test build_writes_the_module ... ok
+test run_the_example ... ok
+test run_gives_the_standard_services ... ok
+test host_exports ... ok
+test host_exports_with_services_and_async ... ok
+test located_packages ... ok
+test an_error_stops_a_test ... ok
+test host_exports_give_errors ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s
+
+     Running tests/fmt.rs (target/debug/deps/fmt-44fcfb459f23d762)
+
+running 4 tests
+test files_with_errors_are_left_as_they_are ... ok
+test paths_are_files_or_directories ... ok
+test formats_src_and_test ... ok
+test check_lists_files_that_would_change ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/lsp.rs (target/debug/deps/lsp-dd560ef7056e2552)
+
+running 1 test
+test initialize_and_exit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/package_commands.rs (target/debug/deps/package_commands-fd004e929067241e)
+
+running 27 tests
+test new_makes_files_that_are_formatted ... ok
+test new_with_a_path_and_bad_names ... ok
+test add_a_path_dependency ... ok
+test build_and_check_explain_an_old_syntax_dependency_tag ... ok
+test publish_needs_a_clean_tree_and_passing_tests ... ok
+test publish_keeps_literal_alias_values_beyond_hover_limits ... ok
+test publish_skips_an_old_syntax_interface_and_allows_a_patch ... ok
+test new_makes_a_package_that_checks_runs_and_tests ... ok
+test add_checks_the_names ... ok
+test add_puts_i_toml_back_when_loading_fails ... ok
+test add_takes_the_newest_tag_and_keeps_comments ... ok
+test add_over_a_dependency_written_as_a_table_keeps_its_comments ... ok
+test add_and_update_keep_crlf_line_ends ... ok
+test publish_sees_what_the_host_must_give ... ok
+test publish_sees_the_standard_service_of_i_io ... ok
+test deps_lists_the_packages_and_their_permissions ... ok
+test publish_sees_a_new_major_version_of_a_dependency ... ok
+test a_failed_add_or_update_leaves_i_toml_and_i_lock_as_they_were ... ok
+test publish_tags_a_first_version ... ok
+test remove_takes_the_entry_and_the_lock_line_out ... ok
+test update_and_add_keep_the_comments_of_an_entry ... ok
+test publish_sees_what_the_host_must_give_though_it_is_not_exported ... ok
+test update_raises_within_the_major_version_and_shows_new_permissions ... ok
+test publish_compares_types_by_what_they_are_not_by_their_names ... ok
+test publish_tells_apart_types_that_are_shown_alike ... ok
+test two_new_packages_work_together ... ok
+test publish_compares_the_interface ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.26s
+
+     Running tests/spec.rs (target/debug/deps/spec-620386a93750097d)
+ok   1.1/binding_text_cr.i
+ok   1.1/binding_text_crlf.i
+ok   1.7/a1_line_breaks.i
+ok   1.7/a1_same_line_negative.i
+ok   1.7/a1_same_line_tuple.i
+ok   10.1/external_literal.i
+ok   10.1/external_literal_result.i
+ok   10.1/externals.i
+ok   10.1/normalized_restricted_result.i
+ok   10.1/normalized_scalar_boundary.i
+ok   10.1/t1_rf_external_result.i
+ok   10.2/entries.i
+ok   10.2/export_literal
+ok   10.2/export_never_param
+ok   10.2/export_never_value
+ok   10.2/export_twice
+ok   10.2/main_and_test.i
+ok   10.2/test_stops.i
+ok   10/a1_entry_exports.i
+ok   11/a1_identity_recursion_tail.i
+ok   11/deep_recursion.i
+ok   11/equality.i
+ok   11/equality_externals.i
+ok   11/float_arithmetic.i
+ok   11/float_not_finite.i
+ok   11/int_arithmetic.i
+ok   11/positions.i
+ok   11/stop_lazy_after_catch.i
+ok   11/stop_lazy_descent.i
+ok   11/stop_lazy_nested.i
+ok   11/stop_lazy_pending.i
+ok   11/stop_lazy_tail.i
+ok   11/stop_tail_assert.i
+ok   11/stop_tail_async_service.i
+ok   11/stop_tail_catch.i
+ok   11/stop_tail_ensure.i
+ok   11/stop_tail_library.i
+ok   11/stop_tail_resume.i
+ok   11/stop_tail_service.i
+ok   11/tail_calls.i
+ok   11/text_form.i
+ok   13/bit_array_concat.i
+ok   13/case_mapping.i
+ok   13/core.i
+ok   13/index_of.i
+ok   13/long_values.i
+ok   13/stop_float_from_bits.i
+ok   13/stop_sqrt.i
+ok   13/stop_to_float.i
+ok   2.2/a1_builtin_attribute_call.i
+ok   2.2/a1_empty_header.i
+ok   2.2/a1_header_order.i
+ok   2.2/a1_headers_tuple.i
+ok   2.2/a1_macro_attribute_line.i
+ok   2.2/a1_macro_attribute_same_line.i
+ok   2.2/a1_macro_declaration.i
+ok   2.2/a1_macro_item.i
+ok   2.4/field_privacy_alias
+ok   2.4/field_privacy_allowed
+ok   2.4/field_privacy_function
+ok   2.4/field_privacy_select
+ok   2.4/field_privacy_service
+ok   2.5/modules
+ok   2.5/order.i
+ok   2.5/order_go.i
+ok   2.5/stop_in_start.i
+ok   3/a1_macro_type_call.i
+ok   3/a1_variable_arguments.i
+ok   4.3/a1_alias_pattern.i
+ok   4.3/a1_custom_type_head.i
+ok   4.3/alias_pattern_imported_binder.i
+ok   4.3/alias_pattern_repeated_head_param.i
+ok   4.3/alias_pattern_wrong_head.i
+ok   4.3/value_type_cycle.i
+ok   4.3/value_type_early_place.i
+ok   4.3/value_type_foreign_closed
+ok   4.3/value_type_foreign_open
+ok   4.3/value_type_literals
+ok   4.3/value_type_open_alias.i
+ok   4.3/value_type_review_runtime
+ok   4.3/value_type_same_header.i
+ok   4.3/value_type_unfilled_alias.i
+ok   4.3/value_types
+ok   4.7/a1_declared_variables.i
+ok   4.7/a1_duplicate_variables.i
+ok   4.7/a1_undeclared_variable.i
+ok   4.7/a1_variable_hides_type.i
+ok   4.8/known_fitted.i
+ok   4.8/known_map_reject
+ok   4.8/known_output
+ok   4.8/known_prefix.i
+ok   4.8/known_written_bounds.i
+ok   4.8/literal_narrow_nested.i
+ok   4.8/spread_catch_all.i
+ok   6.10/unused_value.i
+ok   6/a1_assert_required.i
+ok   6/a1_brace_decisions.i
+ok   6/a1_empty_inhabited.i
+ok   6/a1_empty_never.i
+ok   6/a1_expected_argument.i
+ok   6/a1_fitting_expected_subject.i
+ok   6/a1_labels_and_catchall.i
+ok   6/a1_no_label.i
+ok   6/a1_opening.i
+ok   6/a1_pipe_groups.i
+ok   6/a1_record_kept.i
+ok   6/a1_unused_clause.i
+ok   6/a1_wrong_pattern.i
+ok   6/blocks.i
+ok   6/choices_guard.i
+ok   6/closures.i
+ok   6/data.i
+ok   6/equality_repairs
+ok   6/evaluation_order.i
+ok   6/evaluation_order_callee.i
+ok   6/evaluation_order_pipe.i
+ok   6/joint_literal_order.i
+ok   6/joint_literal_pipe_order.i
+ok   6/labelled_calls.i
+ok   6/literal_types.i
+ok   6/one_clause_choices.i
+ok   6/recursion.i
+ok   6/short_circuit.i
+ok   6/strings.i
+ok   6/tail_and_or.i
+ok   7/a1_coverage_guard.i
+ok   7/a1_no_subject_constructor.i
+ok   7/a1_one_clause_annotation.i
+ok   7/choices_body_frame.i
+ok   7/choices_constructor_flow_error.i
+ok   7/choices_failure.i
+ok   7/choices_frames.i
+ok   7/choices_group.i
+ok   7/choices_group_written_error.i
+ok   7/choices_literal.i
+ok   7/choices_match_coverage_error.i
+ok   7/choices_monomorphic_error.i
+ok   7/choices_opaque_error.i
+ok   7/choices_stop_position.i
+ok   7/empty_types.i
+ok   7/empty_types_one.i
+ok   7/guarded_list_heads.i
+ok   7/literal_cover.i
+ok   7/literal_guard_index.i
+ok   7/literal_guard_index_missing.i
+ok   7/literal_type_test.i
+ok   7/may_fail_group_call.i
+ok   7/may_fail_group_ctor.i
+ok   7/may_fail_group_frames.i
+ok   7/may_fail_group_local.i
+ok   7/may_fail_group_match.i
+ok   7/may_fail_group_parameter.i
+ok   7/may_fail_group_top_error.i
+ok   7/may_fail_group_total.i
+ok   7/may_fail_group_tuple.i
+ok   7/may_fail_group_written_error.i
+ok   7/never_used.i
+ok   7/not_covered.i
+ok   7/patterns.i
+ok   7/t1_rf_covering_row.i
+ok   7/t1_rf_finite_fitted.i
+ok   7/t1_rf_guard.i
+ok   7/t1_rf_list.i
+ok   7/t1_rf_opaque_literal.i
+ok   7/t1_rf_tuple.i
+ok   7/t1_rf_type_column.i
+ok   7/t1_rf_unknown_return.i
+ok   8/build.i
+ok   8/match.i
+ok   8/stop_float.i
+ok   8/stop_negative.i
+ok   8/stop_not_whole.i
+ok   8/stop_short.i
+ok   8/stop_short_huge.i
+ok   8/stop_short_huge_bytes.i
+ok   9.10/constructor_hidden.i
+ok   9.10/interface.i
+ok   9.10/laws.i
+ok   9.10/vectors.i
+ok   9.7/async_error_main.i
+ok   9.7/async_many_waits.i
+ok   9.7/async_services.i
+ok   9.7/fake_service.i
+ok   9.7/host_error_main.i
+ok   9.7/host_errors_type.i
+ok   9.7/host_lazy_twice.i
+ok   9.7/host_literal_parameter.i
+ok   9.7/host_literal_result.i
+ok   9.7/host_services.i
+ok   9.7/host_type.i
+ok   9.7/host_value_async_stop.i
+ok   9.7/host_value_bits.i
+ok   9.7/host_value_stop.i
+ok   9.7/normalized_restricted_error.i
+ok   9.7/normalized_scalar_boundary.i
+ok   9.7/t1_rf_host_result.i
+ok   9/acquire_release.i
+ok   9/assert.i
+ok   9/assert_main.i
+ok   9/binding_fails.i
+ok   9/boundary_inactive.i
+ok   9/control.i
+ok   9/control_cancel_final.i
+ok   9/control_cancel_inner_first.i
+ok   9/control_cancel_then_resume.i
+ok   9/control_dropped.i
+ok   9/control_inactive_after.i
+ok   9/control_inactive_paused.i
+ok   9/control_lazy_cancel.i
+ok   9/control_lazy_cancel_inner_boundary.i
+ok   9/control_lazy_ensure.i
+ok   9/control_lazy_env.i
+ok   9/control_lazy_env_unwind.i
+ok   9/control_lazy_error.i
+ok   9/control_lazy_final_mode1.i
+ok   9/control_lazy_inactive.i
+ok   9/control_lazy_inner_boundary.i
+ok   9/control_lazy_long_pending.i
+ok   9/control_lazy_resuspend.i
+ok   9/control_lazy_skip.i
+ok   9/control_lazy_tail.i
+ok   9/control_many_points.i
+ok   9/control_stop_after_resume.i
+ok   9/control_used_twice.i
+ok   9/ensure.i
+ok   9/ensure_assertion.i
+ok   9/ensure_error.i
+ok   9/ensure_error_main.i
+ok   9/ensure_inner_first.i
+ok   9/ensure_normal.i
+ok   9/ensure_not_on_stop.i
+ok   9/ensure_outer_after.i
+ok   9/environment.i
+ok   9/error_main.i
+ok   9/errors.i
+ok   9/literal_service_equality.i
+ok   9/literal_service_whole.i
+ok   9/own_assert.i
+ok   9/parameter_fails.i
+
+spec: 239 of 239 cases passed at --opt 0 and --opt 2
+     Running tests/spec_update.rs (target/debug/deps/spec_update-7465a9eae739a5aa)
+
+running 2 tests
+test regeneration_rejects_trimmed_values_and_changed_frame_counts ... ok
+test regeneration_preserves_crlf_and_every_byte_after_the_header ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/value_type_performance.rs (target/debug/deps/value_type_performance-73f85ef96e63e83d)
+
+running 1 test
+test completed_alias_chains_are_linear_in_both_declaration_orders ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.02s
+
+     Running tests/value_types.rs (target/debug/deps/value_types-d8c4e7eaccbb999b)
+
+running 1 test
+test completed_aliases_and_projections_do_not_change_wat ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/wasi.rs (target/debug/deps/wasi-c53e16f1c83a2c11)
+
+running 17 tests
+test needs_an_entry ... ok
+test an_import_that_does_not_agree_with_the_library_is_told_in_the_program ... ok
+test only_wasi_modules_name_their_target ... ok
+test the_standard_service_is_the_one_of_i_io ... ok
+test the_wasi_imports_of_the_runtime_are_refused ... ok
+test host_references_keep_the_reference_id_import ... ok
+test lazy_cancel_suspends_to_inner_boundary ... ok
+test lazy_cancel_out_restores_before_mode2 ... ok
+test lazy_error_through_pending_final ... ok
+test lazy_cancel_out_two_trampolines ... ok
+test other_services_stay_imports_of_the_binary_interface ... ok
+test async_services_are_blocking_calls ... ok
+test hello_needs_only_wasi ... ok
+test lazy_cancel_out_trace ... ok
+test long_output_survives_short_writes ... ok
+test lazy_env_tail_call_as_eager ... ok
+test stops_write_the_message_and_exit_with_1 ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.61s
+
+     Running tests/wat_dump.rs (target/debug/deps/wat_dump-79f1dc5a382be6b5)
+
+running 1 test
+test wat_dump ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/ilang_host-4d3ae4db2acb2c09)
+
+running 77 tests
+test resources::teardown_joins_a_creation_job_before_a_resource_exists ... ok
+test resources::tests::concurrent_closes_and_teardown_join_cleanup_without_tombstones ... ok
+test resources::bg_review_tests::bg_review_reentrant_cancellation_cannot_publish_after_teardown ... ok
+test resources::tests::context_kind_type_lanes_and_stale_numbers_are_checked ... ok
+test resources::bg_review_tests::bg_review_cleanup_panics_do_not_skip_cancellation_wakes_or_cleanup ... ok
+test resources::controller_drops_request_work_without_a_store_or_another_poll ... ok
+test resources::bg_review_a_panicking_panic_payload_cannot_skip_later_cleanup ... ok
+test resources::a_host_future_can_reenter_its_controller_without_a_lock_cycle ... ok
+test resources::tests::concurrent_runs_share_only_the_allocator ... ok
+test resources::tests::exhaustion_disposes_before_exposure_and_never_recycles ... ok
+test resources::tests::close_revokes_outstanding_work_and_late_success ... ok
+test resources::tests::provisional_and_delivered_values_keep_context_ownership ... ok
+test resources::tests::numbers_are_monotone_unbounded_and_never_reissued ... ok
+test tests::bg_failed_duplicate_registration_cannot_broaden_a_grant ... ok
+test tests::a_stop_gives_its_message_and_the_instance_is_unusable ... ok
+test tests::bg_close_while_a_request_is_outstanding_rejects_its_late_success ... ok
+test tests::a_stop_in_ilang_start_is_reported_and_the_start_is_required ... ok
+test tests::async_exports_wait_for_host_functions ... ok
+test tests::bg_review_drop_at_status_zero_blocks_later_result_export ... ok
+test tests::bg_review_ended_context_blocks_runnable_continuations ... ok
+test tests::bg_review_gate_covers_sync_callbacks_allocations_and_each_free ... ok
+test tests::bg_review_no_request_runnable_and_result_paths_do_not_enter_ended_wasm ... ok
+test tests::bg_review_cleanup_failure_is_reported_without_replacing_a_success ... ok
+test tests::a_nested_store_in_the_allocator_gets_its_own_thread ... ok
+test tests::bg_review_opaque_shape_is_not_an_async_protocol_on_rust ... ok
+test tests::a_failing_host_function_traps_and_keeps_its_error ... ok
+test tests::a_stop_drops_outstanding_requests ... ok
+test tests::block_on_gives_services_tokio_io ... ok
+test tests::bg_two_concurrent_runs_in_one_host_are_independent ... ok
+test tests::allocation_traps_preserve_stops_and_the_first_failure ... ok
+test tests::bad_statuses_are_faults ... ok
+test tests::block_on_works_inside_a_tokio_runtime ... ok
+test tests::bg_review_complete_plan_cannot_drop_a_denied_coalesced_declaration ... ok
+test tests::dropping_a_waiting_call_makes_the_instance_unusable ... ok
+test tests::bg_grants_check_every_declaration_before_coalescing ... ok
+test tests::a_host_failure_drops_the_others ... ok
+test tests::bg_sequential_invocations_and_instances_have_fresh_tables ... ok
+test tests::a_sync_service_may_block_on_its_own_thread ... ok
+test tests::a_nested_store_gets_its_own_thread ... ok
+test tests::bg_stop_failure_and_abandoned_future_teardown_captured_contexts ... ok
+test tests::a_sync_call_may_not_start_requests ... ok
+test tests::futures_are_send ... ok
+test tests::externals_and_service_errors_round_trip_without_leaks ... ok
+test tests::host_services_and_externals_use_the_same_encoding ... ok
+test tests::identical_host_arcs_get_identical_ids_even_with_separate_externrefs ... ok
+test tests::exports_of_the_wrong_type_are_faults ... ok
+test tests::a_finished_program_does_not_wait_for_blocking_work ... ok
+test tests::duplicate_or_negative_id_traps ... ok
+test tests::every_return_from_wait_drops_the_requests ... ok
+test tests::metadata_that_does_not_follow_b6_is_refused ... ok
+test tests::old_and_new_versions_are_refused ... ok
+test tests::references_keep_identity_across_collection_and_support_null ... ok
+test tests::compiled_opaque_boundaries_preserve_nominal_identity ... ok
+test tests::a_wrong_resume_traps ... ok
+test tests::metadata_is_read_from_the_custom_section ... ok
+test tests::self_waking_work::next_lets_a_timer_fire_while_other_work_spins ... ok
+test tests::self_waking_work::ready_polls_self_waking_work_once_per_call ... ok
+test tests::run_entry_uses_one_thread ... ok
+test tests::entry_and_tests_run_by_name_each_test_in_a_new_instance ... ok
+test tests::start_runs_once_before_anything_and_may_call_imports ... ok
+test tests::bg_grants_are_bound_to_artifact_package_module_declaration_and_signature ... ok
+test tests::leftovers_are_dropped_at_status_zero ... ok
+test tests::errors_use_the_tag_and_the_canonical_order ... ok
+test tests::engine_features_include_gc_tail_calls_and_exceptions ... ok
+test tests::required_exports_are_checked_before_delivery_or_drop ... ok
+test tests::incorrect_guest_values_are_errors_of_the_module ... ok
+test tests::status_two_gives_ready_answers ... ok
+test tests::status_one_with_nothing_outstanding_is_a_fault ... ok
+test tests::incorrect_host_values_stop_the_program ... ok
+test tests::values_round_trip_and_every_buffer_is_freed ... ok
+test tests::deep_recursion_after_a_resume_stops_like_a_sync_call ... ok
+test tests::cancel_drops_one_request ... ok
+test tests::countdown_requests_match_the_observed_answer_order ... ok
+test tests::cancel_and_reuse_with_a_finished_answer ... ok
+test tests::requests_from_ilang_continue ... ok
+test tests::timers_answer_through_the_reactor ... ok
+test tests::many_requests_complete_out_of_order ... ok
+
+test result: ok. 77 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s
+
+     Running unittests src/lib.rs (target/debug/deps/ilang_lsp-fd3f72d7f09def43)
+
+running 5 tests
+test change::tests::a_name_just_before_a_new_dot ... ok
+test change::tests::places_that_did_not_change ... ok
+test change::tests::words ... ok
+test uri::tests::round_trip ... ok
+test position::tests::utf16_positions ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/protocol.rs (target/debug/deps/protocol-6b4c3c1234e919c1)
+
+running 14 tests
+test a_file_outside_a_package ... ok
+test the_library_is_written_in_a_private_directory ... ok
+test hover_on_a_local_name_uses_the_names_of_the_scheme ... ok
+test hover_on_a_local_name_names_one_sided_variables_as_the_scheme ... ok
+test a_definition_in_the_library ... ok
+test answers_from_the_last_check ... ok
+test completion_after_a_dot_just_written ... ok
+test completion_after_an_expression ... ok
+test t2_nested_pattern_heads_support_hover_and_definition_in_recovery ... ok
+test a_new_document ... ok
+test an_unsaved_manifest ... ok
+test unsaved_changes_in_another_file ... ok
+test an_editor_session ... ok
+test quick_changes_are_checked_once ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s
+
+     Running unittests src/lib.rs (target/debug/deps/ilang_package-63a3cb5e64bd22b1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/git.rs (target/debug/deps/git-418b9bb3e2250a32)
+
+running 17 tests
+test bad_lock_file ... ok
+test urls_and_cache_names ... ok
+test hash_vector_from_git ... ok
+test path_dependency_in_a_location_package ... ok
+test lock_is_written ... ok
+test dir_packages ... ok
+test crlf_is_hashed_as_git_keeps_it ... ok
+test offline ... ok
+test dev_dependencies_through_path_packages ... ok
+test package_circle ... ok
+test transitive_problems_say_where_they_come_from ... ok
+test moved_tag_is_an_error ... ok
+test two_majors_side_by_side ... ok
+test tags_and_commits ... ok
+test lines_are_added_and_taken_out ... ok
+test dev_dependencies_only_with_tests ... ok
+test diamond_and_highest_reached_version ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.10s
+
+     Running tests/load.rs (target/debug/deps/load-d5840198201d19c6)
+
+running 2 tests
+test circles_and_missing ... ok
+test graph_with_path_dependencies ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/lock.rs (target/debug/deps/lock-a06cd9dcfb551d0b)
+
+running 3 tests
+test hash_vector ... ok
+test bad_lock_lines ... ok
+test render_order_and_parse ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/manifest.rs (target/debug/deps/manifest-1133c2ef5f70a354)
+
+running 11 tests
+test dependency_manifest_ignores_dev_dependencies_and_wasm ... ok
+test dependency_names ... ok
+test dependency_values ... ok
+test path_dependencies_only_by_path ... ok
+test toml_syntax ... ok
+test name_rules ... ok
+test wasm_exports ... ok
+test former_keywords_are_package_and_dependency_names ... ok
+test versions ... ok
+test full_manifest ... ok
+test locations ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mvs.rs (target/debug/deps/mvs-616d137f72691456)
+
+running 5 tests
+test circles_end_and_errors_are_kept ... ok
+test diamond_takes_the_highest_reached ... ok
+test old_versions_still_count ... ok
+test majors_are_different_packages ... ok
+test origin_is_the_first_requirement ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/ilang_syntax-2fd3c9a429a62519)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/common.rs (target/debug/deps/common-14541dd36db14121)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/format.rs (target/debug/deps/format-2acd8ec16c821dd5)
+
+running 2 tests
+test format_golden ... ok
+test format_properties ... FAILED
+
+failures:
+
+---- format_properties stdout ----
+
+thread 'format_properties' (2857694) panicked at crates/ilang-syntax/tests/format.rs:172:9:
+assertion `left == right` failed: skipped sources changed
+  left: "parse crates/ilang-check/tests/projects/package_deps/lib/test/broken.i\nparse crates/ilang-check/tests/projects/syntax_error/src/main.i\nparse crates/ilang-syntax/tests/golden/err_arg_order.i\nparse crates/ilang-syntax/tests/golden/err_arrow_tail.i\nparse crates/ilang-syntax/tests/golden/err_attr_same_line.i\nparse crates/ilang-syntax/tests/golden/err_attribute_line.i\nparse crates/ilang-syntax/tests/golden/err_bang_line.i\nparse crates/ilang-syntax/tests/golden/err_block_end.i\nparse crates/ilang-syntax/tests/golden/err_body_next_line.i\nparse crates/ilang-syntax/tests/golden/err_brackets.i\nparse crates/ilang-syntax/tests/golden/err_clause_tuple_note.i\nparse crates/ilang-syntax/tests/golden/err_clause_tuple_type.i\nparse crates/ilang-syntax/tests/golden/err_discard.i\nparse crates/ilang-syntax/tests/golden/err_form_feed.i\nparse crates/ilang-syntax/tests/golden/err_guard_word.i\nparse crates/ilang-syntax/tests/golden/err_header_empty.i\nparse crates/ilang-syntax/tests/golden/err_header_order.i\nparse crates/ilang-syntax/tests/golden/err_import_late.i\nparse crates/ilang-syntax/tests/golden/err_list.i\nparse crates/ilang-syntax/tests/golden/err_pattern.i\nparse crates/ilang-syntax/tests/golden/err_pipe_group.i\nparse crates/ilang-syntax/tests/golden/err_pipe_target.i\nparse crates/ilang-syntax/tests/golden/err_record.i\nparse crates/ilang-syntax/tests/golden/err_recover.i\nparse crates/ilang-syntax/tests/golden/err_segment_type.i\nparse crates/ilang-syntax/tests/golden/err_spread.i\nparse crates/ilang-syntax/tests/golden/err_toplevel.i\nparse crates/ilang-syntax/tests/golden/err_trailing.i\nparse crates/ilang-syntax/tests/golden/err_type_group_break.i\nparse crates/ilang-syntax/tests/golden/literal_errors.i\nparse editors/vscode/test/sample.i\nparse tests/spec/1.7/a1_same_line_negative.i\nparse tests/spec/1.7/a1_same_line_tuple.i\nparse tests/spec/2.2/a1_empty_header.i\nparse tests/spec/2.2/a1_header_order.i\nparse tests/spec/2.2/a1_macro_attribute_same_line.i\nparse tests/spec/6/a1_record_kept.i\nparse tests/spec/6/a1_wrong_pattern.i\n"
+ right: "parse crates/ilang-check/tests/projects/package_deps/lib/test/broken.i\nparse crates/ilang-check/tests/projects/syntax_error/src/main.i\nparse crates/ilang-syntax/tests/golden/err_arg_order.i\nparse crates/ilang-syntax/tests/golden/err_arrow_tail.i\nparse crates/ilang-syntax/tests/golden/err_attr_same_line.i\nparse crates/ilang-syntax/tests/golden/err_attribute_line.i\nparse crates/ilang-syntax/tests/golden/err_bang_line.i\nparse crates/ilang-syntax/tests/golden/err_block_end.i\nparse crates/ilang-syntax/tests/golden/err_body_next_line.i\nparse crates/ilang-syntax/tests/golden/err_brackets.i\nparse crates/ilang-syntax/tests/golden/err_clause_tuple_note.i\nparse crates/ilang-syntax/tests/golden/err_clause_tuple_type.i\nparse crates/ilang-syntax/tests/golden/err_discard.i\nparse crates/ilang-syntax/tests/golden/err_form_feed.i\nparse crates/ilang-syntax/tests/golden/err_guard_word.i\nparse crates/ilang-syntax/tests/golden/err_header_empty.i\nparse crates/ilang-syntax/tests/golden/err_header_order.i\nparse crates/ilang-syntax/tests/golden/err_import_late.i\nparse crates/ilang-syntax/tests/golden/err_list.i\nparse crates/ilang-syntax/tests/golden/err_pattern.i\nparse crates/ilang-syntax/tests/golden/err_pipe_group.i\nparse crates/ilang-syntax/tests/golden/err_pipe_target.i\nparse crates/ilang-syntax/tests/golden/err_record.i\nparse crates/ilang-syntax/tests/golden/err_recover.i\nparse crates/ilang-syntax/tests/golden/err_segment_type.i\nparse crates/ilang-syntax/tests/golden/err_spread.i\nparse crates/ilang-syntax/tests/golden/err_toplevel.i\nparse crates/ilang-syntax/tests/golden/err_trailing.i\nparse crates/ilang-syntax/tests/golden/err_type_group_break.i\nparse crates/ilang-syntax/tests/golden/literal_errors.i\nparse editors/vscode/test/sample.i\nparse tests/review/cases/review-a1/capture/original.i\nparse tests/review/cases/review-a1/capture/src/types.i\nparse tests/review/cases/review-a1/cases/03_mixed_headers/original.i\nparse tests/review/cases/review-a1/cases/04_header_order/original.i\nparse tests/review/cases/review-a1/cases/04_header_order/src/main.i\nparse tests/review/cases/review-a1/cases/05_empty_header/original.i\nparse tests/review/cases/review-a1/cases/05_empty_header/src/main.i\nparse tests/review/cases/review-a1/cases/09_attr_tuple_same_line/original.i\nparse tests/review/cases/review-a1/cases/09_attr_tuple_same_line/src/main.i\nparse tests/review/cases/review-a1/cases/11_attributed_header/original.i\nparse tests/review/cases/review-a1/cases/11_attributed_header/src/main.i\nparse tests/review/cases/review-a1/cases/17_old_unbound_fn_group/original.i\nparse tests/review/cases/review-a1/cases/18_old_expected_fn_group/original.i\nparse tests/review/cases/review-a1/cases/18_old_expected_fn_group/src/main.i\nparse tests/review/cases/review-a1/cases/20_old_alias_returns_fn/original.i\nparse tests/review/cases/review-a1/cases/21_old_alias_typed_fn/original.i\nparse tests/review/cases/review-a1/cases/21_old_alias_typed_fn/src/main.i\nparse tests/review/cases/review-a1/cases/25_old_guard_fn/original.i\nparse tests/review/cases/review-a1/cases/29_param_shadow/original.i\nparse tests/review/cases/review-a1/cases/29_param_shadow/src/main.i\nparse tests/review/cases/review-a1/cases/33_lower_constructor_pattern/original.i\nparse tests/review/cases/review-a1/cases/33_lower_constructor_pattern/src/main.i\nparse tests/review/cases/review-a1/cases/48_new_ungrouped_product/original.i\nparse tests/review/cases/review-a1/cases/48_new_ungrouped_product/src/main.i\nparse tests/review/cases/review-a1/cases/53_new_tuple_clauses_joined/original.i\nparse tests/review/cases/review-a1/cases/53_new_tuple_clauses_joined/src/main.i\nparse tests/review/cases/review-a1/cases/56_old_guard_lines/original.i\nparse tests/review/cases/review-a1/cases/61_old_type_alias_join/original.i\nparse tests/review/cases/review-a1/cases/62_new_record_reserved/original.i\nparse tests/review/cases/review-a1/cases/62_new_record_reserved/src/main.i\nparse tests/review/cases/review-a1/confirmed/capture-from-old/original.i\nparse tests/review/cases/review-a1/confirmed/capture-from-old/src/types.i\nparse tests/review/cases/review-a1/confirmed/capture-keep-layout/once.i\nparse tests/review/cases/review-a1/confirmed/capture-keep-layout/original.i\nparse tests/review/cases/review-a1/confirmed/capture-keep-layout/src/types.i\nparse tests/review/cases/review-a1/confirmed/capture-plain/original.i\nparse tests/review/cases/review-a1/confirmed/capture-plain/src/types.i\nparse tests/review/cases/review-a1/confirmed/idempotence-from-old/original.i\nparse tests/review/cases/review-a1/confirmed/idempotence-keep-layout/once.i\nparse tests/review/cases/review-a1/confirmed/idempotence-keep-layout/original.i\nparse tests/review/cases/review-a1/confirmed/idempotence-plain/original.i\nparse tests/review/cases/review-a1/runtime-new/03/original.i\nparse tests/review/cases/review-a1/runtime/17/original.i\nparse tests/review/cases/review-a1/runtime/18/original.i\nparse tests/review/cases/review-a1/runtime/18/src/main.i\nparse tests/review/cases/review-a1/runtime/20/original.i\nparse tests/review/cases/review-a1/runtime/21/original.i\nparse tests/review/cases/review-a1/runtime/21/src/main.i\nparse tests/review/cases/review-a1/runtime/25/original.i\nparse tests/review/cases/review-a1/runtime/56/original.i\nparse tests/review/cases/review-a1/runtime/61/original.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-check/tests/types/case/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-check/tests/types/coverage/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-check/tests/types/errors/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-check/tests/types/known_types/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-check/tests/types/narrowing/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-check/tests/types/never_used/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-check/tests/types/spec/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/format/cases/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/format/comments_middle/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/format/imports/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/format/imports_comments/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/case_head/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_arg_order/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_arrow_tail/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_attribute_line/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_bang_line/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_block_end/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_body_next_line/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_brackets/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_case_brace/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_clause_tuple_type/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_discard/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_form_feed/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_list/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_pattern/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_pipe_target/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_recover/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_segment_type/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_spread/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_trailing/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_type_group_break/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/exports_only/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/exprs/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/guard_arrow/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/imports/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/lines/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/literal_errors/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/patterns/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/spec_inline/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/spec_retry/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/editors/vscode/test/sample/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/lib/i/io/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/lib/prelude/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/tests/spec/4.8/spread_catch_all/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/tests/spec/6/blocks/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/tests/spec/6/choices_guard/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/tests/spec/7/patterns/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/tests/spec/9/control/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/tests/spec/9/control_many_points/src/main.i\nparse tests/review/cases/review-c/_loose/mutation/tests/spec/9/errors/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/export_hidden/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/export_rules/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/import_dot/src/lib.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/import_exported/src/lib.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/import_exported/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/import_top_level/src/lib.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/import_top_level/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/import_twice/src/a/x.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/import_twice/src/b/x.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/import_twice/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/ok_multi/src/geometry/shapes.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/ok_multi/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/package_deps/lib/test/broken.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/package_deps/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/scope_cover_type/src/m.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/scope_cover_type/src/n.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/scope_rules/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/projects/syntax_error/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/types/entry_checks/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/types/entry_checks/test/main_test.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/types/known_imports/src/lib.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/types/known_imports/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/types/modules/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/types/modules/src/util/list.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/types/qualified/src/deep/third.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/types/qualified/src/main.i\nparse tests/review/cases/review-c/mutation/crates/ilang-check/tests/types/qualified/src/other.i\nparse tests/review/cases/review-c/mutation/examples/hello/src/main.i\nparse tests/review/cases/review-c/mutation/std/src/bit_array.i\nparse tests/review/cases/review-c/mutation/std/src/bool.i\nparse tests/review/cases/review-c/mutation/std/src/dict.i\nparse tests/review/cases/review-c/mutation/std/src/float.i\nparse tests/review/cases/review-c/mutation/std/src/int.i\nparse tests/review/cases/review-c/mutation/std/src/list.i\nparse tests/review/cases/review-c/mutation/std/src/option.i\nparse tests/review/cases/review-c/mutation/std/src/order.i\nparse tests/review/cases/review-c/mutation/std/src/result.i\nparse tests/review/cases/review-c/mutation/std/src/set.i\nparse tests/review/cases/review-c/mutation/std/src/string.i\nparse tests/review/cases/review-c/mutation/std/test/bit_array_test.i\nparse tests/review/cases/review-c/mutation/std/test/bool_test.i\nparse tests/review/cases/review-c/mutation/std/test/dict_test.i\nparse tests/review/cases/review-c/mutation/std/test/float_test.i\nparse tests/review/cases/review-c/mutation/std/test/int_test.i\nparse tests/review/cases/review-c/mutation/std/test/list_test.i\nparse tests/review/cases/review-c/mutation/std/test/option_test.i\nparse tests/review/cases/review-c/mutation/std/test/order_test.i\nparse tests/review/cases/review-c/mutation/std/test/pair_test.i\nparse tests/review/cases/review-c/mutation/std/test/result_test.i\nparse tests/review/cases/review-c/mutation/std/test/set_test.i\nparse tests/review/cases/review-c/mutation/std/test/string_test.i\nparse tests/review/cases/review-c/mutation/tests/spec/2.5/modules/src/app/base.i\nparse tests/review/cases/review-c/mutation/tests/spec/2.5/modules/src/app/top.i\nparse tests/review/cases/review-k4c/cases/plain_1/src/main.i\nparse tests/review/cases/review-k4c/cases/plain_3/src/main.i\nparse tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/src/main.i\nparse tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_46_85/src/main.i\nparse tests/review/cases/review-k4s/mut_ord_tmp/src/main.i\nparse tests/review/cases/review-k4s/outer_closure_direct/src/main.i\nparse tests/review/cases/review-k4s/rand_mut_tmp/src/main.i\nparse tests/review/cases/review-native3/alias/src/main.i\nparse tests/review/cases/review-native3/direct/src/main.i\nparse tests/review/cases/review-native3/external/src/main.i\nparse tests/review/cases/review-native3/field/src/main.i\nparse tests/review/cases/review-native3/injection_control/src/main.i\nparse tests/review/cases/review-native3/injection_control/src/resource.i\nparse tests/review/cases/review-native3/int_assign/src/main.i\nparse tests/review/cases/review-native3/positive/src/main.i\nparse tests/review/cases/review-native3/raw_ctor/src/main.i\nparse tests/review/cases/review-native3/update/src/main.i\nparse tests/review/cases/review-rec/_loose/growth/src/main.i\nparse tests/review/cases/review-rec/_loose/probes/src/main.i\nparse tests/review/cases/review-rec/_loose/schema-union/src/main.i\nparse tests/review/cases/review-runtime/echo-types/src/main.i\nparse tests/review/cases/review-std1/stream-positive/src/stream.i\nparse tests/review/cases/review-std1/stream/src/stream.i\nparse tests/spec/1.7/a1_same_line_negative.i\nparse tests/spec/1.7/a1_same_line_tuple.i\nparse tests/spec/2.2/a1_empty_header.i\nparse tests/spec/2.2/a1_header_order.i\nparse tests/spec/2.2/a1_macro_attribute_same_line.i\nparse tests/spec/6/a1_record_kept.i\nparse tests/spec/6/a1_wrong_pattern.i\n"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    format_properties
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.20s
+
+error: test failed, to rerun pass `-p ilang-syntax --test format`

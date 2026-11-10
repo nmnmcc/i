@@ -1,0 +1,6 @@
+spec/control_lazy_cancel.check : (got: String, want: String) -> Nil
+spec/control_lazy_cancel.show : (x: A) -> String
+spec/control_lazy_cancel.note : (log: Boundary(String, A, B), text: String) -> Nil
+spec/control_lazy_cancel.layer : (log: Boundary(String, A, B), hold: Boundary(Held, Never, Never), b: Boundary(Paused, Never, Never), n: Int) -> Int
+spec/control_lazy_cancel.guarded : (log: Boundary(String, A, B), hold: Boundary(Held, Never, Never), b: Boundary(Paused, Never, Never), n: Int, with: () -> Nil ! N) -> Int ! N
+spec/control_lazy_cancel.cancel_deep : () -> Nil

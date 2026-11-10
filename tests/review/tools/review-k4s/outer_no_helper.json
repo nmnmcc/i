@@ -1,0 +1,6 @@
+{
+  "name": "outer_no_helper",
+  "code": 0,
+  "time": 0.020247648004442453,
+  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.test : () -> Nil ! N - D | S(N)\n"
+}

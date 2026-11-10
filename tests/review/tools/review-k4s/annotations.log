@@ -1,0 +1,114 @@
+ann_direct0 0 0.022
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+
+ann_direct1 0 0.019
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+
+ann_wrap0 0 0.018
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+
+ann_wrap1 0 0.018
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+
+ann_arg0 0 0.019
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : (f: () -> Nil ! N) -> Nil ! N | S(N)
+
+ann_arg1 0 0.018
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : (f: () -> Nil ! N) -> Nil ! N | S(N)
+
+ann_local0 0 0.019
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+
+ann_local1 0 0.019
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+
+ann_capture0 0 0.018
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : (f: () -> Nil ! N) -> Nil ! N | S(N)
+
+ann_capture1 0 0.019
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : (f: () -> Nil ! N) -> Nil ! N | S(N)
+
+ann_install0 1 0.018
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N - D | S(N) | S(A)
+src/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+1 error
+
+ann_install1 1 0.018
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+src/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+1 error
+
+ann_poly0 0 0.018
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+
+ann_poly1 0 0.018
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+
+ann_nested0 0 0.026
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+
+ann_nested1 0 0.019
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+
+ann_local_install0 0 0.025
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N - D | S(N)
+
+ann_local_install1 0 0.024
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+
+ann_twice0 0 0.019
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+
+ann_twice1 0 0.02
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : () -> Nil ! N | S(N)
+
+ann_different0 0 0.018
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : (f: () -> Nil ! N, g: () -> Nil ! N2) -> Nil ! N | N2
+
+ann_different1 0 0.018
+app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ! N) -> A ! N
+app/main.test : (f: () -> Nil ! N, g: () -> Nil ! N2) -> Nil ! N | N2
+

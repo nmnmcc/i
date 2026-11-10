@@ -1,0 +1,8 @@
+Recorded before reading the change:
+1. Soundness: every accepted program obeys its type at runtime; every service lookup is provided with the identical service constructor arguments. Run suspect accepted executable candidates at --opt 0 and --opt 2.
+2. Principal schemes: inference preserves all finite solutions; generalisation abstracts exactly variables not free in the surrounding context; instantiation preserves required equalities. Correct annotations do not change acceptance. Compare baseline inferred schemes and acceptance.
+3. Finite types: genuine direct, indirect, mutual and invariant-constructor recursive types remain E0505 errors. Redundant reflexive row constraints must not create artificial recursion.
+4. Removing a bound must preserve the solution set in its full constraint context, including invariant service arguments, multiple type parameters, both polarities, lower/upper bounds, generalisation, nested environments and mutually recursive functions.
+5. Section 9.2: each environment has at most one instance of each service constructor; arguments must be equal, even for covariant/contravariant data constructors. Every environment parameter is provided; provision affects calls, not closure creation.
+6. The solver terminates, with practical running time on deep helper chains and wide unions. No acceptance, scheme, or performance dependence on declaration order.
+7. Compare checker time for std before/after only with equivalent builds/inputs and repeated timing; report limits explicitly.

@@ -1,0 +1,2 @@
+test/a1_macro_attribute_same_line.i:5:18: error[E0101]: expected an item: a type definition, or a binding `pattern = value`, found `=`
+1 error

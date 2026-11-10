@@ -1,0 +1,6 @@
+spec/control_lazy_error.check : (got: String, want: String) -> Nil
+spec/control_lazy_error.show : (x: A) -> String
+spec/control_lazy_error.down : (b: Boundary(A, B, C), n: Int) -> Int ? Bad
+spec/control_lazy_error.mid : (b: Boundary(A, B, C), n: Int) -> Int
+spec/control_lazy_error.error_after_resume : () -> Nil
+spec/control_lazy_error.caught_in_the_middle : () -> Nil

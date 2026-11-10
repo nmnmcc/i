@@ -1,0 +1,2 @@
+test/a1_wrong_pattern.i:5:21: error[E0108]: in a pattern, `-` comes before an int literal and `-.` before a float literal
+1 error

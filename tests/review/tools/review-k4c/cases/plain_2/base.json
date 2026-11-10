@@ -1,0 +1,6 @@
+{
+  "code": 0,
+  "out": "app/main.wrap : (f: (A) -> B ? E ! N) -> (x: A) -> B ? E ! N\n",
+  "err": "",
+  "seconds": 0.019271146971732378
+}

@@ -1,0 +1,6 @@
+set -euo pipefail
+for level in 0 2 3; do
+ target/release/i run --project /tmp/review-num/trace --opt "$level" > "/tmp/review-num/trace-o${level}.out" 2>&1 || true
+ target/release/i build --project /tmp/review-num/async --opt "$level" --out "/tmp/review-num/async-o${level}.wasm"
+done
+target/release/i test --project /tmp/review-num/probes --opt 3 > /tmp/review-num/probes-o3.log 2>&1

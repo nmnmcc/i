@@ -1,0 +1,3 @@
+review/main.v : Hidden
+src/main.i:4:1: error[E0227]: the exported alias `Read` exposes private type `Hidden`
+1 error

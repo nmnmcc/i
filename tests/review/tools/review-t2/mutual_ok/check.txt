@@ -1,0 +1,2 @@
+review/main.even : (n: Int) -> Bool
+review/main.odd : (n: Int) -> Bool

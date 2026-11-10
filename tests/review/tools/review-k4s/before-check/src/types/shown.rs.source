@@ -1,0 +1,176 @@
+//! A shown type (§4.7) as a tree: the type of [`super::Typed::schemes`]
+//! before it is written as text, with each named type known by what it is
+//! (its `TypeRef`), not by the name that a module gives it.
+
+use crate::hir::TypeRef;
+
+/// A type as it is shown (§4.7): simplified, with its type variables named.
+/// [`ShownType::text`] writes it in the syntax of §3.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ShownType {
+    /// A built-in or custom type, with its arguments.
+    Named(TypeRef, Vec<ShownType>),
+    /// `(A, B)`.
+    Tuple(Vec<ShownType>),
+    /// `(label: A, B) -> R ? E ! N`.
+    Fn(Box<ShownFn>),
+    /// A type variable, by its shown name. The variables of one shown type
+    /// have different names.
+    Var(String),
+    /// `_`: a part with no effect, as a member of `H` in `A - H` that only
+    /// counts by its type constructor (§4.4).
+    Hole,
+    /// `Never`, the type with no values.
+    Never,
+    /// `A | B`.
+    Union(Vec<ShownType>),
+    /// `A & B`.
+    Inter(Vec<ShownType>),
+    /// `A - H1 - H2`.
+    Diff(Box<ShownType>, Vec<ShownType>),
+}
+
+/// A function type: its parameters with their labels, its value, and its
+/// `? E` and `! N` parts, which are `None` when they are not written.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ShownFn {
+    pub params: Vec<(Option<String>, ShownType)>,
+    pub ret: ShownType,
+    pub err: Option<ShownType>,
+    pub env: Option<ShownType>,
+}
+
+impl ShownType {
+    /// The text in the syntax of §3, with the custom type `TypeId(i)` named
+    /// `type_names[i]`, as [`super::Typed::schemes`] has it.
+    pub fn text(&self, type_names: &[String]) -> String {
+        self.text_with(
+            &mut |r| match r {
+                TypeRef::Builtin(b) => b.name().to_string(),
+                TypeRef::Custom(id) => type_names
+                    .get(id.0 as usize)
+                    .cloned()
+                    .unwrap_or_else(|| format!("T{}", id.0)),
+            },
+            &mut |v| v.to_string(),
+        )
+    }
+
+    /// The text in the syntax of §3, with each named type named by `ty`
+    /// and each type variable by `var`. Both are called in the order of
+    /// the text, so `var` may number the variables by where they first
+    /// come.
+    pub fn text_with(
+        &self,
+        ty: &mut dyn FnMut(TypeRef) -> String,
+        var: &mut dyn FnMut(&str) -> String,
+    ) -> String {
+        let mut out = String::new();
+        self.write(0, &mut out, &mut Names { ty, var });
+        out
+    }
+
+    /// `prec` is what the place allows: 0 any type, 1 no union, 2 no
+    /// intersection, 3 no difference and no function type. A part that
+    /// binds less is put in `{ }`.
+    fn write(&self, prec: u8, out: &mut String, n: &mut Names) {
+        let open = |out: &mut String, own: u8| {
+            if prec > own {
+                out.push_str("{ ");
+            }
+        };
+        let close = |out: &mut String, own: u8| {
+            if prec > own {
+                out.push_str(" }");
+            }
+        };
+        let list = |xs: &[ShownType], sep: &str, p: u8, out: &mut String, n: &mut Names| {
+            for (i, x) in xs.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(sep);
+                }
+                x.write(p, out, n);
+            }
+        };
+        match self {
+            ShownType::Var(v) => out.push_str(&(n.var)(v)),
+            ShownType::Never => out.push_str("Never"),
+            ShownType::Hole => out.push('_'),
+            ShownType::Named(r, args) => {
+                out.push_str(&(n.ty)(*r));
+                if !args.is_empty() {
+                    out.push('(');
+                    list(args, ", ", 0, out, n);
+                    out.push(')');
+                }
+            }
+            ShownType::Tuple(parts) => {
+                out.push('(');
+                list(parts, ", ", 0, out, n);
+                out.push(')');
+            }
+            ShownType::Fn(f) => {
+                open(out, 0);
+                out.push('(');
+                for (i, (l, p)) in f.params.iter().enumerate() {
+                    if i > 0 {
+                        out.push_str(", ");
+                    }
+                    if let Some(l) = l {
+                        out.push_str(l);
+                        out.push_str(": ");
+                    }
+                    p.write(0, out, n);
+                }
+                out.push_str(") -> ");
+                // A function type followed by `?` or `!` is put in `{ }`.
+                let part = |x: &ShownType, followed: bool, out: &mut String, n: &mut Names| {
+                    let braces = followed && matches!(x, ShownType::Fn(_));
+                    if braces {
+                        out.push_str("{ ");
+                    }
+                    x.write(0, out, n);
+                    if braces {
+                        out.push_str(" }");
+                    }
+                };
+                part(&f.ret, f.err.is_some() || f.env.is_some(), out, n);
+                if let Some(e) = &f.err {
+                    out.push_str(" ? ");
+                    part(e, f.env.is_some(), out, n);
+                }
+                if let Some(e) = &f.env {
+                    out.push_str(" ! ");
+                    part(e, false, out, n);
+                }
+                close(out, 0);
+            }
+            ShownType::Union(ms) => {
+                open(out, 0);
+                list(ms, " | ", 1, out, n);
+                close(out, 0);
+            }
+            ShownType::Inter(ms) => {
+                open(out, 1);
+                list(ms, " & ", 2, out, n);
+                close(out, 1);
+            }
+            ShownType::Diff(a, h) => {
+                // Only the type constructors of `H` matter (§4.4).
+                open(out, 2);
+                a.write(2, out, n);
+                for m in h {
+                    out.push_str(" - ");
+                    m.write(3, out, n);
+                }
+                close(out, 2);
+            }
+        }
+    }
+}
+
+/// How the names in a text are found.
+struct Names<'a> {
+    ty: &'a mut dyn FnMut(TypeRef) -> String,
+    var: &'a mut dyn FnMut(&str) -> String,
+}

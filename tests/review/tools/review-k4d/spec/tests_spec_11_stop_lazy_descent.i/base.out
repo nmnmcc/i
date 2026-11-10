@@ -1,0 +1,4 @@
+spec/stop_lazy_descent.in1 : (outer: Boundary(Paused, Never, Never), inner: A) -> Never
+spec/stop_lazy_descent.leaf : (outer: Boundary(Paused, Never, Never), inner: A) -> Never
+spec/stop_lazy_descent.out1 : (outer: Boundary(Paused, Never, Never)) -> Never
+spec/stop_lazy_descent.main : () -> Nil

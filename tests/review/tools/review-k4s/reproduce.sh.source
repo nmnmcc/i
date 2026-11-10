@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -u
+cli=/home/agent/Programming/i/.rd/std1/target/debug/i
+project=/tmp/review-k4s/soundness
+"$cli" check --project "$project" --types --offline
+for opt in 0 2; do
+  "$cli" run --project "$project" --opt "$opt" --offline
+done

@@ -1,0 +1,23 @@
+@external("m", "f",)
+add: Int
+
+@external(
+  "m",
+  "f",
+)
+now: () -> Int
+
+T(a, b,) { C(a, b) }
+
+U(a,) = List(a)
+
+V { C(x: Int, y: Int,) }
+
+W = Result(
+  Int,
+  String,
+)
+
+f = (x: Result(a, e,)) { x }
+
+x: Result(Int, Int,) = y

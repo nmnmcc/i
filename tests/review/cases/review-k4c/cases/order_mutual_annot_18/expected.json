@@ -1,0 +1,17 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 1,
+      "stdout": "app/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.use : () -> Nil ! N | S(N)\n",
+      "stderr": "src/main.i:1:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:4:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:6:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\n3 errors\n"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "cmd": [
+      "check",
+      "--types"
+    ],
+    "exit": 0,
+    "seconds": 0.1597182280384004,
+    "stdout": "probe/main.read : () -> Int\n",
+    "stderr": ""
+  }
+]

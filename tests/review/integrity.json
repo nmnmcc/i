@@ -1,0 +1,9 @@
+{
+  "counts": {
+    "preserved": 1880,
+    "mapped": 1456,
+    "tools": 4108
+  },
+  "failures": [],
+  "source": "Original inventory fingerprints and recorded import revision; only the generated parser metadata prefix is excluded."
+}

@@ -1,0 +1,2 @@
+src/main.i:3:11: error[E0208]: the type `Item` is defined more than once in this module
+1 error

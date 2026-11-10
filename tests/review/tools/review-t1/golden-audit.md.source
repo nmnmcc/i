@@ -1,0 +1,108 @@
+77 sampled changed lines across 14 source fixtures.
+Independent sample: source files and corresponding changes read against the specification.
+Both removed and added rows count as changed golden lines. No unjustified semantic change found in this sample.
+
+## annotations
+| crates/ilang-check/tests/types/annotations.out:5 | removed | apart : () -> (Int, String) | L |
+| crates/ilang-check/tests/types/annotations.out:5 | added | apart : () -> (1, "s") | L |
+| crates/ilang-check/tests/types/annotations.out:17 | removed | 53:1: error[E0501]: `Int` is not a subtype of `String` | L |
+| crates/ilang-check/tests/types/annotations.out:17 | added | 53:1: error[E0501]: `1` is not a subtype of `String` | L |
+
+## basics
+| crates/ilang-check/tests/types/basics.out:1 | removed | one : Int | L |
+| crates/ilang-check/tests/types/basics.out:1 | added | one : 1 | L |
+| crates/ilang-check/tests/types/basics.out:3 | removed | hello : String | L |
+| crates/ilang-check/tests/types/basics.out:4 | removed | pair : (Int, String) | L |
+| crates/ilang-check/tests/types/basics.out:3 | added | hello : "hello" | L |
+| crates/ilang-check/tests/types/basics.out:4 | added | pair : (1, "a") | L |
+
+## bit_patterns
+| crates/ilang-check/tests/types/bit_patterns.out:1 | removed | text_name : (b: A) -> Int | L |
+| crates/ilang-check/tests/types/bit_patterns.out:2 | removed | not_last : (b: A) -> Int | L |
+| crates/ilang-check/tests/types/bit_patterns.out:3 | removed | fine : (b: A) -> Int | L |
+| crates/ilang-check/tests/types/bit_patterns.out:1 | added | text_name : (b: A) -> 0 | 1 | L |
+| crates/ilang-check/tests/types/bit_patterns.out:2 | added | not_last : (b: A) -> 0 | 1 | 2 | L |
+| crates/ilang-check/tests/types/bit_patterns.out:3 | added | fine : (b: A) -> 0 | 1 | 2 | L |
+
+## case
+| crates/ilang-check/tests/types/case.out:1 | removed | digit : (x: Int) -> String | L,P |
+| crates/ilang-check/tests/types/case.out:2 | removed | digit_or : (x: A) -> String | L |
+| crates/ilang-check/tests/types/case.out:1 | added | digit : (x: 0 | 1) -> "one" | "zero" | L,P |
+| crates/ilang-check/tests/types/case.out:2 | added | digit_or : (x: A) -> "other" | "zero" | L |
+| crates/ilang-check/tests/types/case.out:4 | removed | inner : (r: Result(A, B)) -> B | String | L |
+| crates/ilang-check/tests/types/case.out:4 | added | inner : (r: Result(A, B)) -> B | "one" | "other" | L |
+
+## choices
+| crates/ilang-check/tests/types/choices.out:2 | removed | small : (n: A) -> String | L |
+| crates/ilang-check/tests/types/choices.out:3 | removed | mixed : (v: Int | String | Nil) -> String | L |
+| crates/ilang-check/tests/types/choices.out:2 | added | small : (n: A) -> "big" | "small" | L |
+| crates/ilang-check/tests/types/choices.out:3 | added | mixed : (v: Int | String | Nil) -> "one or text" | "other" | L |
+| crates/ilang-check/tests/types/choices.out:6 | removed | shared : (r: Result(Int | String, A)) -> A | Int | L,P |
+| crates/ilang-check/tests/types/choices.out:7 | removed | shared_list : (xs: List(Int | String)) -> Int | L |
+
+## clauses
+| crates/ilang-check/tests/types/clauses.out:2 | removed | many : (A) -> Int | L |
+| crates/ilang-check/tests/types/clauses.out:3 | removed | blocks : List((A) -> Int) | L |
+| crates/ilang-check/tests/types/clauses.out:2 | added | many : (A) -> 1 | 2 | L |
+| crates/ilang-check/tests/types/clauses.out:3 | added | blocks : List((A) -> 0 | 1 | 2 | 3) | L |
+
+## display
+| crates/ilang-check/tests/types/display.out:6 | removed | errors_only : () -> Int ? Int | L |
+| crates/ilang-check/tests/types/display.out:6 | added | errors_only : () -> Int ? 1 | L |
+| crates/ilang-check/tests/types/display.out:9 | removed | rest : (v: A) -> Int | A - List(_) - Result(_, _) | L,N |
+| crates/ilang-check/tests/types/display.out:9 | added | rest : (v: A) -> 0 | 1 | 2 | 3 | A - List(_) - Result(_, _) | L,N |
+| crates/ilang-check/tests/types/display.out:11 | removed | mono : (x: Int | String) -> Int | String | L |
+| crates/ilang-check/tests/types/display.out:12 | removed | use_int : () -> Int | String | L |
+
+## environments
+| crates/ilang-check/tests/types/environments.out:3 | removed | inferred : () -> List(String) | L,P |
+| crates/ilang-check/tests/types/environments.out:4 | removed | run_never : (body: () -> Nil ! Yield(Never)) -> Int | L |
+| crates/ilang-check/tests/types/environments.out:5 | removed | bad_never : () -> Int | L |
+| crates/ilang-check/tests/types/environments.out:6 | removed | run_int : (body: () -> Nil ! Yield(Int)) -> Int | L |
+| crates/ilang-check/tests/types/environments.out:7 | removed | good_int : () -> Int | L |
+| crates/ilang-check/tests/types/environments.out:3 | added | inferred : () -> List("s") | L,P |
+
+## errors
+| crates/ilang-check/tests/types/errors.out:2 | removed | ids : (x: Int | String) -> Int | String | L |
+| crates/ilang-check/tests/types/errors.out:2 | added | ids : (x: 1 | "a") -> 1 | "a" | L |
+| crates/ilang-check/tests/types/errors.out:8 | removed | bad_guard : (x: A) -> A | Int | L |
+| crates/ilang-check/tests/types/errors.out:8 | added | bad_guard : (x: A) -> A | 2 | L |
+| crates/ilang-check/tests/types/errors.out:10 | removed | arity_var : (f: (Int) -> A ? E ! N) -> (A, Never) ? E ! N | L |
+| crates/ilang-check/tests/types/errors.out:10 | added | arity_var : (f: (1) -> A ? E ! N) -> (A, Never) ? E ! N | L |
+
+## generalize
+| crates/ilang-check/tests/types/generalize.out:2 | removed | both : (Int, String) | L |
+| crates/ilang-check/tests/types/generalize.out:3 | removed | ids : (x: Int | String) -> Int | String | L |
+| crates/ilang-check/tests/types/generalize.out:4 | removed | use_ids : () -> (Int | String, Int | String) | L |
+| crates/ilang-check/tests/types/generalize.out:5 | removed | local : () -> (Int, String) | L |
+| crates/ilang-check/tests/types/generalize.out:6 | removed | local_mono : () -> (Int | String, Int | String) | L |
+| crates/ilang-check/tests/types/generalize.out:7 | removed | param : (f: (Int | String) -> A & B ? E ! N) -> (A, B) ? E ! N | L |
+
+## groups
+| crates/ilang-check/tests/types/groups.out:1 | removed | g : (y: A) -> A | Int | L |
+| crates/ilang-check/tests/types/groups.out:2 | removed | f : (x: A) -> A | Int | L |
+| crates/ilang-check/tests/types/groups.out:3 | removed | h : (z: A) -> A | Int | L |
+| crates/ilang-check/tests/types/groups.out:1 | added | g : (y: A) -> A | 0 | L |
+| crates/ilang-check/tests/types/groups.out:2 | added | f : (x: A) -> A | 0 | L |
+| crates/ilang-check/tests/types/groups.out:3 | added | h : (z: A) -> A | 0 | L |
+
+## known_intersection
+| crates/ilang-check/tests/types/known_intersection.out:6 | removed | 11:14: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9) | E |
+| crates/ilang-check/tests/types/known_intersection.out:7 | removed | 14:19: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9) | E |
+| crates/ilang-check/tests/types/known_intersection.out:6 | added | 9:13: error[E0520]: both sides are constants, `5` and `1`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters. | E |
+| crates/ilang-check/tests/types/known_intersection.out:7 | added | 11:14: error[E0520]: both sides are constants, `5` and `"s"`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters. | E |
+| crates/ilang-check/tests/types/known_intersection.out:8 | added | 14:19: error[E0520]: the two sides have the known types `Int` and `"s"`, which are disjoint, so the result would always be the same (§6.9) | E |
+
+## may_fail
+| crates/ilang-check/tests/types/may_fail.out:9 | removed | from_value : () -> Int | L |
+| crates/ilang-check/tests/types/may_fail.out:9 | added | from_value : () -> 1 | L |
+| crates/ilang-check/tests/types/may_fail.out:22 | removed | param_literal : (Int) -> Int ! Assert | L,N |
+| crates/ilang-check/tests/types/may_fail.out:23 | removed | param_list : (List(A)) -> Int ! Assert | L |
+| crates/ilang-check/tests/types/may_fail.out:22 | added | param_literal : (Int) -> 1 ! Assert | L,N |
+| crates/ilang-check/tests/types/may_fail.out:23 | added | param_list : (List(A)) -> 1 ! Assert | L |
+
+## narrowing
+| crates/ilang-check/tests/types/narrowing.out:12 | removed | literal : (v: Int | String) -> String | Int | L,N |
+| crates/ilang-check/tests/types/narrowing.out:12 | added | literal : (v: Int | String) -> String | Int - 1 | L,N |
+| crates/ilang-check/tests/types/narrowing.out:15 | removed | open : (v: A) -> Int | A - Int | L |
+| crates/ilang-check/tests/types/narrowing.out:15 | added | open : (v: A) -> 0 | A - Int | L |

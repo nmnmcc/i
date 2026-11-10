@@ -1,0 +1,6 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 18.4ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 17.6ms

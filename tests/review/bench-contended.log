@@ -1,0 +1,37 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 18.5ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 14.8ms
+startup: wall median 0.007880s
+alias-64-ordinary-forward: wall median 0.009972s
+alias-64-ordinary-reverse: wall median 0.008954s
+alias-64-value-forward: wall median 0.009817s
+alias-64-value-reverse: wall median 0.011014s
+alias-256-ordinary-forward: wall median 0.009883s
+alias-256-ordinary-reverse: wall median 0.008934s
+alias-256-value-forward: wall median 0.010159s
+alias-256-value-reverse: wall median 0.010207s
+alias-1024-ordinary-forward: wall median 0.014456s
+alias-1024-ordinary-reverse: wall median 0.012080s
+alias-1024-value-forward: wall median 0.014077s
+alias-1024-value-reverse: wall median 0.013255s
+alias-4096-ordinary-forward: wall median 0.028471s
+alias-4096-ordinary-reverse: wall median 0.029245s
+alias-4096-value-forward: wall median 0.033594s
+alias-4096-value-reverse: wall median 0.030434s
+literal-union-16: wall median 0.007852s
+clauses-16: wall median 0.008974s
+wide-union-16: wall median 0.008853s
+literal-union-64: wall median 0.008853s
+clauses-64: wall median 0.009990s
+wide-union-64: wall median 0.011015s
+literal-union-256: wall median 0.008896s
+clauses-256: wall median 0.011054s
+wide-union-256: wall median 0.030571s
+literal-union-1024: wall median 0.011248s
+clauses-1024: wall median 0.025063s
+wide-union-1024: wall median 0.880681s
+service-ring-100: wall median 10.181789s
+std: wall median 0.346501s

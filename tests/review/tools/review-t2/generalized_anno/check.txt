@@ -1,0 +1,3 @@
+review/main.id : (x: A) -> A
+review/main.a : (x: Int) -> Int
+review/main.b : (x: String) -> String

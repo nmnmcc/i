@@ -1,0 +1,6 @@
+{
+  "name": "missing_scheme_main",
+  "code": 0,
+  "time": 0.018426747992634773,
+  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (f: () -> A ! N) -> A ! N\n"
+}

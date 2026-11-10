@@ -1,0 +1,7 @@
+{
+  "seed": 412,
+  "programs": 180,
+  "covered": 65,
+  "result": "all finite-model coverage decisions reproduce the original T1 stream",
+  "source": "docs/spec.md \u00a77.4: A clause with a guard is not counted."
+}
