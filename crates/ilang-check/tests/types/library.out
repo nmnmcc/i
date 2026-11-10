@@ -64,6 +64,11 @@ i/random.follow : (h: State, bits: List(Int)) -> State
 i/random.derive_path : (g: Generator, path: List(Int)) -> Generator
 i/random.at_path : (g: Generator, path: List(Int)) -> Generator ? RandomError
 i/syntax.definition : (of: Syntax) -> Syntax ? SyntaxError ! Definitions
+i/syntax._match : (Syntax, Syntax) -> MatchResult
+i/syntax._match_ok : (MatchResult) -> Bool
+i/syntax._match_one : (MatchResult, Int) -> Syntax
+i/syntax.raw_match_many_len : (MatchResult, Int) -> Int
+i/syntax.raw_match_many_child : (MatchResult, Int, Int) -> Syntax
 i/syntax._template : (Int) -> Syntax
 i/syntax.raw_rebuild : (Syntax, SyntaxList) -> Syntax
 i/syntax.raw_kind : (Syntax) -> Int
@@ -90,6 +95,8 @@ i/syntax.raw_text_value : (TextResult) -> String
 i/syntax.raw_text_error : (TextResult) -> String
 i/syntax.raw_text_error_at : (TextResult) -> Syntax
 i/syntax.reverse : (items: List(Syntax), result: List(Syntax)) -> List(Syntax)
+i/syntax.match_children : (match: MatchResult, capture: Int, index: Int, end: Int, result: List(Syntax)) -> List(Syntax)
+i/syntax._match_many : (match: MatchResult, capture: Int) -> List(Syntax)
 i/syntax.prepend_reversed : (items: List(Syntax), result: List(Syntax)) -> List(Syntax)
 i/syntax._append : (first: List(Syntax), second: List(Syntax)) -> List(Syntax)
 i/syntax.children : (syntax: Syntax, index: Int, end: Int, result: List(Syntax)) -> List(Syntax)
