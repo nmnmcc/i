@@ -385,7 +385,7 @@ fn return_type(d: &Datum) -> Result<String> {
             {
                 return Ok("_".into());
             }
-            return Ok(format!("{} ? {}", typ(r)?, typ(e)?));
+            return Ok(format!("{} ^ {}", typ(r)?, typ(e)?));
         }
         if symbol(h, "!") {
             return Ok(format!("{} ! {}", return_type(r)?, typ(e)?));
@@ -413,7 +413,7 @@ fn expr(d: &Datum) -> Result<String> {
             }
             [h, a, b] if symbol(h, ".") => {
                 if let K::Curly(cs) = &b.kind {
-                    Ok(format!("{} |> {}", field_target(a)?, clauses(cs)?))
+                    Ok(format!("{}.{}", field_target(a)?, clauses(cs)?))
                 } else {
                     Ok(format!(
                         "{}.{}",
@@ -455,7 +455,7 @@ fn expr(d: &Datum) -> Result<String> {
             [h, a, b] if is_binop(h) => Ok(format!(
                 "{} {} {}",
                 binary_operand(a)?,
-                if symbol(h, "|") { "|>".into() } else { show(h) },
+                show(h),
                 binary_operand(b)?
             )),
             [head, spread, base, fields @ ..] if symbol(spread, "..") => Ok(format!(
