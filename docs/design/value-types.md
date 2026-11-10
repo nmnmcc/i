@@ -1,6 +1,6 @@
 # Value types and alias patterns (T2)
 
-Status: revised design for G2/G3, not an implemented feature. This note replaces the interrupted S6 draft. T2 installs §7 in the spec before implementation. All examples use the accepted syntax. Code references below were checked in this lane at `f745f9fa3d8f59f371c422f0c9dcfed763cfca42`; numbers refer to that tree, before A1/A3/T1.
+Status: revised design for G2/G3, not an implemented feature. The coordinator accepted the five decisions in §12 and, after independent review, chose closed-only reuse after source completion (§4.2 R7). This note replaces the interrupted S6 draft. T2 installs §7 in the spec before implementation. All examples use the accepted syntax. Code references below were checked in this lane at `f745f9fa3d8f59f371c422f0c9dcfed763cfca42`; numbers refer to that tree, before A1/A3/T1.
 
 ## 1. Problem and sources
 
@@ -37,6 +37,7 @@ These are facts from reading code, not claims that T2 already works.
 | `resolve.rs:1445–1467`, `:1568–1600` | Service heads and host forms are inspected during resolution. | Reject value-dependent aliases there before those checks. |
 | `crates/ilang-check/src/order.rs:17–26`, `:36–85`, `:188–251` | The use walker visits patterns/expressions, not their types; expression uses form SCCs; initialization is computed separately from needs. | Add a second graph over existing groups, keeping runtime needs separate. |
 | `crates/ilang-check/src/types/infer.rs:155–191`, `:233–355` | External types are converted first; groups allocate holders, infer/link their values, generalize, then finish known types and coverage. | Complete value-type reads at explicit group/module events, not in a lazy alias conversion. |
+| `infer.rs:323`, `:1000–1005`, `:1346–1353` | A non-direct binding keeps its monotype; a call returns the instantiated function result, which may be a weak variable. | A closed decode component does not imply that its enclosing value type is closed; R7 must gate later extraction. |
 | `infer.rs:42–56`, `:1000–1005`, `:2052–2100` | A scheme has a level; mono schemes use `u32::MAX`; instantiation copies only quantified variables; local bindings are checked in order. | Keep the same instantiation and sharing rules for annotations. |
 | `infer.rs:852–870`, `:953–970`; `types/known.rs:102–137` | `conv` and `kconv` expand aliases lazily, with depth fallbacks to a fresh variable and `Top`. | Value-dependent definitions need a completed cache; a depth fallback must never invent their meaning. |
 | `infer.rs:2108–2120`; `types/display.rs:515–555` | Generalization preserves weak variables; mono display follows lower bounds **and** reverse `from` links. | Display is not evidence that a weak variable is immutable; a closure walk must include reverse links. |
@@ -89,11 +90,11 @@ For a completed top-level definition, the read parts of its scheme use the fixed
 
 **R2. Definitions.** In an alias body, every `Of(x)` must give a closed type: no quantified variable, unresolved weak variable, label parameter, `Top` or hole. This applies to `T = x` and to occurrences deeper in `T(A) = (A, x)`. The alias's own formal parameters remain formal parameters; the closure requirement concerns the value-derived part.
 
-For an alias pattern, only a binder's part, an exact part introduced by expanding a head alias, and the shapes needed to reach them are demanded. A skip demands no content. Quantified variables under a skip are fine. A used quantified variable gives E0533. There is no “pick an instance that matches” operation.
+For an alias pattern completed with its source in the source's own group, only a binder's part, an exact part introduced by expanding a head alias, and the shapes needed to reach them are demanded. A skip demands no content. Quantified variables under a skip are fine **at that completion point**. A used quantified variable gives E0533. For any extraction after that point, R7 first requires the whole completed source type to be closed; a skip does not waive that gate. There is no “pick an instance that matches” operation.
 
-**R3. Completion point and ownership.** Collect demands before inference, including unused aliases/patterns. Only a demand *written in the source definition's own module* can fix that source's weak parts. Transitive uses of an imported alias do not count as new demands in its source module. Imported readers never fix another module. They may read a closed structural part or a part already fixed there; otherwise E0534 at the reader.
+**R3. Completion point and ownership.** Collect demands before inference, including unused aliases/patterns. Only a demand *written in the source definition's own module* can fix that source's weak parts. Transitive uses of an imported alias do not count as new demands in its source module. Imported readers never fix another module. For a new definition read or alias pattern they may read only a closed completed source type (R7); a closed component behind an open enclosing type is not enough. Use the closed alias made and exported by the source instead. Annotation instantiation remains R1.
 
-At the end of a source's ordinary expression group, after linking and generalization, take a single snapshot for **all** its module's demands. Record the first solver-variable index before allocating the group's holders. All demands in that group see that snapshot, so one pattern cannot supply information to another. An earlier successfully fixed variable has its recorded closed form.
+At the end of a source's ordinary expression group, after linking and generalization, take a single snapshot for **all** its module's demands. Record the first solver-variable index before allocating the group's holders. All demands in that group see that snapshot, so one pattern cannot supply information to another. An earlier successfully fixed variable has its recorded closed form. A same-module written top-level pattern is a demand at its source's completion even if its item is written later or its alias is used by a later group. This does not authorize a later inference group or a typed expansion to reopen the source.
 
 A group that constrains any earlier, unfixed weak variable is **open**: no weak variable of that group can be fixed. Detect this throughout constraint propagation, including `compare`, `reach`, extrusion and reverse links, not just at the initial operands. Also reject a demanded part that merely carries an earlier unfixed weak variable, even when no constraint touched it. “Earlier” uses allocation ownership, not the current level. Quantification is relative to the source's Scheme.level, not a global “general” flag. These conservative checks prevent unrelated earlier groups from changing a snapshot.
 
@@ -109,13 +110,21 @@ Candidate collection reads an immutable snapshot. Closed-form normalization and 
 
 A solver checkpoint/trial copy is an implementation choice; its rollback includes variables, levels, bounds, reverse links, constraint/comparison caches, touched/reported sets and failures. No trial failures leak into the main diagnostic stream. This path runs only for demanded weak parts, not for every binding. Adding Solver cloning for a first implementation is acceptable; measure before adding an undo log.
 
-**R5. Fixing means constraining.** Keep the equations in the ordinary solver and record `fixed[v] = (closed_type, reading_site)` for extraction, display and diagnostic notes. Do **not** replace a variable at `constrain_in`, erase its old bounds, bypass `reach`, or forbid later bound insertion. Existing relationships must keep propagating. A later incompatible use gives the ordinary type error with “this type was fixed here” at the reading site. Extending a source annotation to a wider type is the remedy.
+**R5. Fixing means constraining.** Keep the equations in the ordinary solver and record `fixed[v] = (closed_type, reading_site)` for extraction, display and diagnostic notes. Do **not** replace a variable at `constrain_in`, erase its old bounds, bypass `reach`, or forbid later bound insertion. Existing relationships must keep propagating. A later incompatible use gives the ordinary type error with “this type was fixed here” at the reading site. Extending a source annotation to a wider type is the remedy. If a traversed skeleton becomes wholly closed using this batch's predetermined closed forms, check its equality and record that closed form in the same completion batch. Never record a partly open skeleton as a reusable type.
 
 Fixation never generalizes a weak variable. Variables not demanded remain shared and unfixed. A foreign top-level type read adds no fixation equations to its source. Adding only such reads cannot change the library's completion results. Ordinary expression uses and local monotype sharing can still constrain shared weak variables, as §4.7 already permits; this rule does not introduce separate compilation or make every shown weak scheme consumer-independent.
 
 **R6. Examples and cost.** With `id = (x) { x }`, `twice = (f: id, n: Int) { f(f(n)) }` instantiates `id`; `Same = id` is E0533. `g = id(id)` is weak and unfilled, so `G = g` is E0534. With `port = 8080`, `Port = port` is `8080`, never `Int`; write `port: Int = 8080` to obtain `Int`.
 
 With an invariant `Cell(A) { Cell(get: () -> A, set: (A) -> Nil) }`, `r = cell(1)` and `C = r` in one module fix the demanded parameter to `1` if the batch checks. A later `r.set(2)` fails. Without the read, later constraints may widen that parameter. This is a deliberate, visible cost of D; it is not ordinary display simplification.
+
+**R7. Closed-only reuse after completion (coordinator choice a).** A new definition read or extraction in another module, or performed by a later group, must start from a **wholly closed completed source type**. Replace recorded fixed variables by their closed forms; all remaining structure must contain no generalized variable, unresolved weak variable, label parameter, Top or hole. A successful source-completion batch may publish a wholly closed source form as well as its closed aliases. Do not reconstruct a shape from a weak variable's live bounds, use its displayed type, or add equations to obtain a closed form after the source has completed. The rule is the same for a direct constructor-shaped scheme and for a weak root with that constructor below it.
+
+Check this gate **before** matching P4, even if a pattern skips every open argument or only wants a previously fixed decode component. An open weak part is E0534; a generalized/open definition part is E0533. Neither changes the source solver. The weak-type message says, for example: “the type of lib.size is still open after source completion; use lib.LocalSize, the alias made by app/lib. Export LocalSize from app/lib if it is private.” In the source module, suggest LocalSize without an export requirement. Choose a named hint from the ordinary written alias items when applicable; if no suitable alias exists, say to define and export one next to the source, or to write a fully closed source annotation. Finding a hint does not reopen or reconstruct the source type.
+
+Ordinary aliases remain usable after completion: importing LocalSize and writing `RemoteSize = LocalSize` copies its closed structural body and never traverses size again. Generalized annotation instances and current-group local monotype sharing remain R1; R7 governs permanent definition reads, not a new restriction on ordinary value uses.
+
+Only closed read results, closed fixed forms and ordinary alias bodies survive as type-reading results. There is no persistent partial-shape table or reusable source-projection cache. A same-module definition needing several sources captures each Of's closed result at that source's completion, then assembles the alias after its dependencies are ready. It does not keep a partly open source snapshot to project later.
 
 ### 4.3 Alias patterns (P)
 
@@ -140,17 +149,19 @@ There is no new tuple-item grammar. `(Tree, _) = parsed` is still a value bindin
 
 `_` is a skip node, never a type hole. `m.T`, `T(P, …)`, `m.T(P, …)`, and tuple patterns recursively match shapes. A qualified zero-argument type is therefore an exact nominal-head test. Nested aliases follow P2. Records, functions, literals, unions, intersections, differences, value types and macro calls are not pattern forms in T2 (E0532). A record may still be the closed type bound by `User`; T3 adds no record-pattern syntax in this note.
 
-**P4. Matching is observation, then checked completion.** From the source scheme, expose the demanded outer structure without choosing a type for a quantified variable. A weak variable's lower-variable SCC may expose its normalized lower bounds; an unfilled variable gives E0534. At each named/tuple node require exactly one normalized member with that head/arity. Do not discard extra union members or select a convenient alternative. Mismatch is E0535.
+**P4. Matching is observation, then checked completion.** At the source's own completion, from its snapshot scheme, expose the demanded outer structure without choosing a type for a quantified variable. A weak variable's lower-variable SCC may expose its normalized lower bounds; an unfilled variable gives E0534. At each named/tuple node require exactly one normalized member with that head/arity. Do not discard extra union members or select a convenient alternative. Mismatch is E0535.
 
 Record every weak variable traversed to expose a shape. If it is not already fixed, it must be owned by this group and not open (R3). In the trial batch, require it to be a subtype of the observed skeleton, **reusing its original argument variables**, and recheck that skeleton after the batch. This closes the observed outer shape without closing a skipped argument. No fresh “hole” is made for a skip. An ambiguous choice needed to expose a skeleton, or an unknown head, fails; no search is permitted. Do not inspect skipped contents for matching or impose a new written-type place check inside them. The source's ordinary checks still apply. Do not stage a fresh argument to replace an existing weak variable, even when that argument occurs only under a skip.
 
 At a binder, compute a closed form by R2–R4 and store it as the alias body. At an exact subtree, close first and compare with the already closed expected type; the expected type cannot fill in missing information. At a skip, do nothing to that argument. A skip's variable may nevertheless be fixed if the same solver variable is also demanded elsewhere; skipping never breaks existing sharing.
 
-Example: a source with type `Schema(D, E)` and closed decode candidate `Int` gives `Schema(Size, _) = size` the alias `Size = Int`. It leaves the distinct `E` variable live. A source `Schema(A, A)` cannot promise that its second argument stays unfixed: both arguments are the same variable.
+After source completion, first apply R7. Matching then takes a closed type only: it stages no shape or fixation constraints, and every bound alias is a closed subtree. No old partly checked skeleton is traversed.
 
-**P5. Completion is eager, dependency ordered.** Check every pattern, even one with no binders, and every value-dependent alias, even unused. A site becomes ready after all its source groups and dependent alias sites complete. Process dependencies before dependents; use source order only to break ties. This matters for `A = List(B)` written before a pattern defining `B` from the same source.
+Example: at its own completion, a source with type `Schema(D, E)` and closed decode candidate `Int` gives `Schema(Size, _) = size` the alias `Size = Int`. It leaves the distinct `E` variable live. A source `Schema(A, A)` cannot promise that its second argument stays unfixed: both arguments are the same variable.
 
-At module start, complete sites whose sources are declarations, built-ins or completed imported modules. Do this also for a module with **no value bindings**. After each group, complete newly ready sites. Store Pending / Ready / Failed; each successful definition is read once. All sites use the pre-batch snapshot of their source's group (R3), not the solver as changed by whichever alias happened to be used first.
+**P5. Completion is eager, dependency ordered.** Check every pattern, even one with no binders, and every value-dependent alias, even unused. Each same-module pattern demand and definition-reading Of is captured at its source group's completion. Its result is closed or Failed, never a partly open snapshot. A composite alias becomes ready after all its closed site results and dependent aliases are available. Process dependencies before dependents; use source order only to break ties. This matters for `A = List(B)` written before a pattern defining `B` from the same source.
+
+At module start, complete sites whose sources are declarations, built-ins or completed imported modules; imported definition reads pass R7 before matching. Do this also for a module with **no value bindings**. After each group, capture its own-module demands from the one pre-batch snapshot (R3), then assemble newly ready aliases from closed results. Store Pending / Ready / Failed; each successful definition is read once. Discard temporary partial snapshots and skeletons after this batch. Ordinary source schemes and their constraints remain in the solver; they are not reusable partial type-read results.
 
 ### 4.4 Order and cycles (O)
 
@@ -215,6 +226,39 @@ Ordinary annotation parameter/result/error types and type tests are allowed. Rea
 
 T3 must add closure, provenance and inferred-shape arms for records/Without, rerun its L2a/L5 checks on `Of`, and test this builder. T2 itself tests an ordinary nominal Codec with closed scalar decode output. Until T3 adds those forms, unsupported closure is an explicit failure, never a partial type.
 
+**M1a. Why closed-only reuse keeps the required cross-module builders.** Choose R7, not a persistent projection record. The plan requires building a value and extracting its output type, not re-extracting a closed component through an open imported container. The library may live in another module/package; the builder call and its alias pattern live together in the consumer's source module:
+
+```i
+// app/users: ordinary imports from a schema library
+((Schema, object, field, string, int) = json/schema)
+(User, user)
+
+user = object |> field("name", string) |> field("age", int)
+Schema(User, _) = user
+```
+
+```i
+// app/client
+((User) = app/users)
+
+name = (u: User) { u.name }
+```
+
+User completes to `{ age: Int, name: String }` in app/users; app/client reads the exported alias, never users.user's partly open type. This is the plan's `Schema(User, _) = user` with an ordinary library across a module boundary and no repeated record annotation. The module paths are illustrative library paths, not compiler-reserved names.
+
+The accepted records.md §5.9 codec follows exactly the same placement, with Codec imported from the ordinary codec module:
+
+```i
+// app/codecs
+((Codec, object, field, string, int) = json/codec)
+(User, user)
+
+user = object |> field("name", string) |> field("age", int)
+Codec(User, _) = user
+```
+
+The local pattern fixes only decode, and later encode calls keep the distinct E live. Other modules import User from app/codecs. A new `Codec(RemoteUser, _) = codecs.user` there is E0534 while E remains open; it is replaced by `RemoteUser = codecs.User`. records.md §5.8's decode-only Schema builder also keeps its local extraction; without an open encode argument it can additionally publish a wholly closed source form. Thus neither accepted builder needs foreign partial traversal. The review's LocalSize case (§10.1) is the deciding example: exporting the already completed alias gives exactly Int without keeping a checked partial Codec shape.
+
 **M2.** Syntax-macro output is resolved and ordered like written code. Hygiene marks apply to value references, head type references and binder definitions. Classification is stored as P1 says; pattern parts are not type positions and cannot be macro calls. `Definitions` returns written items, not `Typed.alias_types`. A type definition is available for syntactic inspection before its inferred alias body is ready.
 
 The Lisp reader/printer needs rows for value type `x` / `(. m x)`, and pattern item `(= (Schema User _) user)`, with a distinct pattern-part position. Add these in whichever of M1/T2 lands second. Groups do not change classification. This agrees with the draft's core-tree/group rule (§1).
@@ -225,7 +269,7 @@ Never add demands or fixation equations during typed expansion: M4's “no new b
 
 ## 5. Errors
 
-T2 proposes E0530–E0537, leaving E0523–E0529 to T1 and E0540–E0549 to T3. Confirm the allocation at integration; only T3's block is already reserved by its accepted note.
+The coordinator approved E0530–E0537 for T2, leaving E0523–E0529 to T1 and E0540–E0549 to T3. Apply that allocation at integration.
 
 | Code | Meaning |
 |---|---|
@@ -233,7 +277,7 @@ T2 proposes E0530–E0537, leaving E0523–E0529 to T1 and E0540–E0549 to T3. 
 | E0531 VALUE_TYPE_PLACE | Forbidden early/trusted context, or unsafe typed-expansion read. |
 | E0532 TYPE_PATTERN_FORM | Invalid pattern, macro part, or non-projectable head alias. |
 | E0533 VALUE_TYPE_OPEN | Used quantified variable, hole, Top or label parameter in a definition read. |
-| E0534 VALUE_TYPE_NOT_FIXED | Unfilled/recursive/unsupported weak closure, open group, foreign unfixed part, or failed completion equations. Say which source part and suggest its annotation. |
+| E0534 VALUE_TYPE_NOT_FIXED | Unfilled/recursive/unsupported weak closure, open group, open completed source under R7, or failed completion equations. Say which source part; for later/foreign extraction suggest the source's closed alias and exporting it if needed, or a fully closed source annotation. |
 | E0535 TYPE_PATTERN_MISMATCH | Wrong head/arity/union, or closed exact part not equal. |
 | E0536 VALUE_TYPE_OWN_SCOPE | Same pattern/header or own binding value. Explain an outer name that would otherwise be captured. |
 | E0537 TYPE_PATTERN_BINDER_IS_TYPE | A new pattern binder conflicts with an imported/built-in type. |
@@ -256,7 +300,7 @@ Apply after syntax.md and T1's replacements; T3 subsequently adds record syntax/
 
 > - A type defined by an alias pattern (§4.3) is exported as an alias. It has no constructors of its own; exporting it with `(..)` has the same effect as exporting it without `(..)`.
 > - An exported alias or top annotation that uses the type of a value, directly or through aliases, is checked after that type is found (§4.7). It must obey the same rule about private types. Its source value need not be exported. Changing a private value can therefore change an exported structural alias.
-> - Reading a value's type from another module never fixes a part of that value's type (§4.7). Adding a consumer or a test module cannot change the types fixed by its source module.
+> - Reading a value's type from another module never fixes a part of that value's type (§4.7). Taking it apart there requires its completed type to be wholly closed, even if only a closed component is wanted. Otherwise use the structural alias made and exported by its source module. Adding a consumer or a test module cannot change the types fixed by that source.
 
 ### 7.2 §2.5 Top-level bindings: add after Order
 
@@ -301,7 +345,7 @@ TypePattern = UpName | "_"
 > - In a list of type parameters, each part is a different, unqualified UpName with no arguments, and must not already name an accessible type. Every parameter must be used in the body, and every type variable in the body must be a declared parameter.
 > - In an alias pattern, the unqualified head names an existing type, with the written arity; the item does not define that head. It may be a custom or built-in type, or a transparent alias expanding to one named type or tuple. In a head alias each parameter is used at most once, only as a named argument or tuple part. Constant subtrees of that alias require an equal, fully determined source part.
 > - A bare unqualified UpName in a pattern always defines a new zero-parameter structural alias. Its part of the source type must be fully determined (§4.7). It may not duplicate a definition or conflict with an imported or built-in type. It never tests an existing type with that name.
-> - `_` in an alias pattern skips a part and binds nothing; it is not an inference hole. Elsewhere in a type, `_` remains a hole. Shared type variables remain shared even if one occurrence is skipped.
+> - `_` in an alias pattern skips a part and binds nothing; it is not an inference hole. After source completion, the whole source type must first be closed (§4.7); a skip cannot hide an open argument from that check. Elsewhere in a type, `_` remains a hole. Shared type variables remain shared even if one occurrence is skipped.
 > - A named pattern with arguments, or a qualified named pattern, requires exactly one member with that type constructor and matches its arguments. A tuple pattern requires one tuple of the same size. No union member is discarded to make a match. A mismatch is a compile error. Function, record, literal, union, intersection, difference, value-type and macro-call patterns are compile errors.
 > - Every pattern and every value-dependent alias is checked, also when unused, after its sources and alias dependencies are complete. A definition read may not choose an instance of a generalized variable to make its pattern fit.
 > - Blocks have no type definitions. An item beginning with `(` or `{` is a value binding; `m.T(…) = v` is also a value binding under §2.2. Import `T` to use it as an alias-pattern head.
@@ -331,8 +375,8 @@ Pair(Tree, _) = parsed
 > - Fixing adds both subtype constraints between the variable and the resulting closed type, keeping every previous constraint. Every needed variable is fixed together, and the usual occurs and place rules apply. If these equations cannot hold, it is a compile error. Pattern shape checks use the original argument variables, so skipping a distinct argument leaves it shared and unfixed. The pattern cannot supply a type to fill an unknown.
 > - A group that constrains an earlier non-general variable that was not fixed cannot fix its own non-general parts. A demanded part carrying such an earlier variable also cannot be fixed. This conservative rule makes the result independent of unrelated groups' inference order.
 > - From then on, later uses must agree with each fixed part. A use that would widen it incompatibly is a type error with a note at the place that fixed it. Write a wider annotation at the source when needed. For example, reading `r = cell(1)` may fix its invariant argument to `1`; write `r: Cell(Int) = cell(1)` to allow other Int values.
-> - In another module, a read may use the source's generalized variables by instantiation, or its closed/fixed parts. A demanded weak part that the source module did not fix is a compile error at that read. Adding foreign fixation demands cannot change the source module's completion result. Ordinary expression constraints and local monomorphic sharing remain shared as elsewhere in this section; this rule does not fix the display of every uncompleted weak part.
-> - A permanent alias denotes the completed closed part. It does not change when later bindings are checked. Definitions are completed before their dependents, even if written later in the source.
+> - In another module, or when a new definition read is performed by a later group, an alias pattern or other permanent value-derived definition must start from a wholly closed completed source type. A fixed component behind an open enclosing type is not sufficient, even when the open arguments are skipped. This read adds no constraints to the source. If the source remains open, the error says to use the closed alias made by its source module and to export it when needed. Annotation instantiation and current-group local monotype sharing keep their rules above. Adding foreign fixation demands cannot change the source module's completion result. Ordinary expression constraints and local monomorphic sharing remain shared as elsewhere in this section; this rule does not fix the display of every uncompleted weak part.
+> - A permanent alias denotes the completed closed part. It does not change when later bindings are checked. A same-module top-level pattern is handled at its source's completion, regardless of where the item is written. Aliases with several sources assemble already closed per-source results, not saved partial source types. Definitions are completed before their dependents. Importing or using the closed alias later does not read its source value again.
 > - The whole annotation after value types and aliases are read must obey §4.4's rules of places. A value-type spelling does not hide variable members from that check.
 
 Replace syntax.md's declaration bullet ending “after the name of a type definition” with:
@@ -362,13 +406,13 @@ When M4 adds typed-macro rules, insert M3 verbatim in its spec section with lang
 Paths below are proposed changes, not changes made by this note.
 
 - `crates/ilang-syntax/src/ast.rs`, parser/type-head region and formatter/printer arms: retain A3's value-type node; add the P1 core-tree distinction and binder/part structure. Validate pattern forms after classification, not by consulting imports. Keep group-insensitive classification and TypeCall. Remove temporary A1/A3 errors. Update `crates/ilang-check/tests/hir.rs` and syntax round-trip fixtures.
-- `crates/ilang-check/src/hir.rs:56–79,167–192,273–296`: add `TypeKind::Of { value: ValueRef, site: OfId, projection: Option<ProjectionId> }`, site/context/provenance tables and the shared type visitor. Add AliasPattern and TypePat (Bind/Skip/Named/Tuple/Exact/Error). Each binder remains TypeBody::Alias(Of(...)), with no new TypeBody variant. Store its full item separately for queries/Definitions.
+- `crates/ilang-check/src/hir.rs:56–79,167–192,273–296`: add `TypeKind::Of { value: ValueRef, site: OfId, projection: Option<ProjectionId> }`, site/context/provenance tables and the shared type visitor. Add AliasPattern and TypePat (Bind/Skip/Named/Tuple/Exact/Error). Each binder remains TypeBody::Alias(Of(...)), with no new TypeBody variant. Store its full item separately for queries/Definitions. ProjectionId identifies the written pattern for one-shot completion; later conversion reads the binder's closed alias cache and never re-runs its source projection.
 - `resolve.rs:391–592,773–803,1098–1209,1329–1379`: collect pattern binders before exports/imports; resolve definition sources from the value scope; add pattern alias edges, summaries and demands. Do not register the head as a new type. Check E0537 after imports. Collect an AliasPattern slot for items with multiple binders.
 - `resolve.rs:1445–1660,1680–1755,1834–1905,2133–2202,2392–2486`: pending identities, value lookup and forbidden contexts; defer value-dependent hidden-type checks. Reuse one context/readiness check for M4 and one resolved-reference list for T3. All child/substitution/named-type walkers need Of arms.
 - `order.rs:17–135,188–251`: keep the old use graph and initialization; add the group dependency graph and provenance. Store source completion events and alias-site dependency order, including modules with no groups. Add an alternate topological tie-break mode for tests.
-- `types/infer.rs:72–149,155–228,233–355`: add demand snapshots, ownership/availability, completed read schemes, definition-site states, alias results, and a module loop around group processing. Completion must run after generalization and ordinary group checks; failed groups publish Failed, never partial aliases. Process module-start events even without groups.
-- `types/infer.rs:603–687,852–970,1000–1005,1926–1992,2052–2120`: inferred-shape place checking, Of annotation instantiation/local sharing, closed definition cache, and pure inferred-shape conversion for locals. Replace the depth fallback for any alias chain involving value-dependent aliases with checked cache lookup; ordinary alias cycle recovery remains explicit.
-- New `types/value_types.rs` or `types/alias_pattern.rs`: projection, closed-form collection including pure-variable SCCs/from edges, snapshot batch construction, P4 matching, failure provenance.
+- `types/infer.rs:72–149,155–228,233–355`: add temporary demand snapshots, ownership/availability, closed completed read forms, definition-site states, closed alias results, and a module loop around group processing. Completion must run after generalization and ordinary group checks; failed groups publish Failed, never partial aliases. Process module-start events even without groups.
+- `types/infer.rs:603–687,852–970,1000–1005,1926–1992,2052–2120`: inferred-shape place checking, Of annotation instantiation/local sharing, closed definition cache, R7's non-mutating completed-source gate, and pure inferred-shape conversion for locals. Replace the depth fallback for any alias chain involving value-dependent aliases with checked cache lookup; ordinary alias cycle recovery remains explicit.
+- New `types/value_types.rs` or `types/alias_pattern.rs`: projection, closed-form collection including pure-variable SCCs/from edges, snapshot batch construction, P4 matching, closed-only R7 reuse, failure provenance. No partial-source projection records survive completion.
 - `types/solve.rs:87–105,245–285,385–507,577–633`: trial/checkpoint support and optional group-origin observation for open-group checks. **No replacement-variable semantics and no bypass of bound propagation.** Existing constraints implement fixation. Include normalization operations in the observed trial state.
 - `types/known.rs:102–162,433–515`: Of known conversion from stored inferred monotypes/schemes, never narrowed `kvars`; no solver-variable allocation in kconv.
 - `types/mod.rs:148–210`, `types/display.rs:515–555`: alias results and exact fixed forms for extraction/display; preserve full typed value sets. Keep fixation metadata out of canonical types.
@@ -383,12 +427,12 @@ No-value-type programs bypass demand collection/closure/trial work. Do not promi
 ## 9. Ordered T2 checklist
 
 1. Rebase on A1/A3 and T1; map the cited regions to the new code. Verify UpName declaration/display migration and the AST value/head forms. Implement any missing prerequisite within the approved T2 integration scope; report a scope conflict to the coordinator.
-2. Confirm code allocation and cross-track edits; land §7 spec text first. Agree the fixation semantics, early-context limit and M4 boundary with G3.
+2. Apply the coordinator's accepted E0530–E0537 allocation, wider scope, fixation semantics, early-context limit, M4 boundary and closed-only completed-source rule. Land §7 spec text first and carry the decisions into G3 integration.
 3. Add core/HIR representations, early binder collection and error states, including multi-binder slots. Give every exhaustive match a deliberate arm; no new silent fresh-variable fallback.
 4. Implement syntactic classification, lookup/pending scope, pattern validation, alias-cycle edges, forbidden contexts, summaries and the shared type visitor.
 5. Add group ordering and diagnostics without altering SCC membership or runtime needs/init. Schedule dependency-ordered alias/module events.
 6. Add trial state and provenance observation; implement closure/equality batches and shape checks on pre-batch snapshots. Test reverse links, pure-variable SCCs and preserved constraints before wiring alias reads.
-7. Wire annotation instance/sharing, definition reads, kconv's inferred-shape conversion, whole-annotation places, recovery and cache completion. Eagerly check unused definitions.
+7. Wire annotation instance/sharing, definition reads, R7's closed-only gate and alias-use diagnostic, kconv's inferred-shape conversion, whole-annotation places, recovery and cache completion. Eagerly check unused definitions.
 8. Add deferred exports, Typed.alias_types, queries and canonical package comparison, including parameterized aliases containing a closed Of.
 9. Run the T2 tests in §10. With T1 integrated, run spec tests and `scripts/dev-verify rust`; compare existing checker/interface goldens. Use the coordinator's heavy wrapper for **every** cargo invocation. No Rust implementation or compiler run is part of this design-note commit.
 10. T3 adds record/Without closure and shape arms, label checks, shown-place checks and the §5.9 builder test. M1/M2 add or reconcile the Lisp/Definitions rows; M4 applies the expansion restrictions. Each track owns and runs its deferred tests.
@@ -413,14 +457,15 @@ These are implementation requirements, not tests reported as passing. Each expec
 | Lower-bound graph | Hand-built weak v with a concrete predecessor only in `from`; a pure-variable cycle with one concrete Int bound; same cycle with none. | Int, Int, E0534; R4. No bound disappears. |
 | Old constraints | In solver tests retain `v <: w`, fix v to 1, then constrain 2 <: w (allowed), and separately 2 <: v (fails). Include structural/invariant/env links and extrusion. | The first does not force w equal to v; the second retains the existing error. Fixing cannot detach the graph; R5. |
 | Failed batch | Lower-bound substitutions that conflict with an upper bound; unsupported form; structural recursion. Compare solver state before/after failure. | E0534 with unchanged main solver, no assertion/panic or leaked failures; R4. |
-| Shape traversal | Source root is a weak variable with lower bound Codec(D,E), not a direct Con. | Decode projection succeeds after the skeleton check; a later incompatible root member fails; skipped E stays shared; P4. |
+| Shape traversal | At its own source completion, the source root is a weak variable with lower bound Codec(D,E), not a direct Con. | Decode projection succeeds after the skeleton check; a later incompatible root member fails; skipped E stays shared; P4. |
 | Fixation restriction | Invariant Cell fixture below, `C = r` then `later = () { r.set(2) }`. | Later mismatch with note at C; source annotated Cell(Int) permits it; R5/R6. |
 | Earlier weak value | `c = cell(1)`; `get = () { c }`; `G = get`; unrelated `later = () { c.set("s") }`. | E0534 at G in either independent-group order; no fixation error in later; R3. |
+| Completed-source extraction | The two-module fixture in §10.1; remove the id wrapper in a variant; add a closed source annotation in another variant. | E0534 at RemoteSize for both partly open representations, with the LocalSize export/use hint; closed annotation permits RemoteSize = Int; R7. No consumer-added source constraints. |
 | Consumer isolation | Module lib exports r/reset with `r = cell(1)`, reset sets `"s"`, and no lib type read. App or a test module adds `C = lib.r`. | E0534 only at the consumer; library check/interface unchanged; R3/X3. With a source annotation Cell(Int), a consumer read is allowed. |
 | Scope | Own pattern/header/value examples V3; local m covers imported m in `m.x`; module-only `m`; private member. | E0536, E0207, E0205, E0204 respectively; V2/V3. Pending qualifier stays E0207 after adding an import. |
 | Import-stable item | Add/remove an import of User around `Schema(User, _) = user`; add it around `Pair(A) = (A,A)`. | First remains a pattern and gains E0537 on collision; second remains generic; P1/P3. |
 | Pattern shapes | Tuple through Pair alias; wrong head; union with Nil; exact head-alias part; duplicate binder; invalid macro part. | Correct projection; E0535; E0535; equality or mismatch without filling an unknown; E0208; E0532; P2–P4. |
-| Eager order | Unused mismatching pattern; `A = List(B)` before a pattern defining B; module containing only an imported-source pattern. | Unused error is reported; A completes after B; no-group module still completes; P5. |
+| Eager order | Unused mismatching pattern; `A = List(B)` before a pattern defining B; module containing only an imported closed-source pattern. | Unused error is reported; A completes after B; no-group module still completes; P5/R7. |
 | Cycles | O3 example; self Of through alias; two type edges between groups; pure alias circle; import circle. | E0530 with chain for the first three, E0223 and E0214 for the last two; O2/O3. SCCs/needs/init unaffected on valid fixtures. |
 | Recovery | Query all preceding bad-cycle fixtures and an unrelated valid binding. | No panic/fresh inferred alias; Failed propagates, unrelated hover/navigation survives; O4/X4. |
 | Early places | `T = x` under constructor field, service/env parameter/statement, host and external declaration, also through multiple aliases. | One E0531 at the use; K3. A completed cached body does not evade the ban. |
@@ -447,9 +492,55 @@ later = () { r.set(2) }
 
 The setter may ignore its argument; its type still makes A invariant. This fixture tests typing restrictions, not mutable-cell runtime behavior.
 
+### 10.1 Required two-module regression from the independent review
+
+Use the review's fixture unchanged first, including its initially private LocalSize:
+
+```i
+// app/lib
+(Codec, size)
+
+Codec(D, E) {
+  Codec(decode: (String) -> D, encode: (E) -> String)
+}
+
+make(D, E) = (d: (String) -> D, e: (E) -> String) {
+  Codec(decode: d, encode: e)
+}
+
+id = (x) { x }
+
+size = id(make(
+  (s: String) -> Int { 1 },
+  (n: Int) -> String { "" },
+))
+
+Codec(LocalSize, _) = size
+```
+
+```i
+// app/client
+((Codec) = app/lib)
+
+Codec(RemoteSize, _) = lib.size
+```
+
+Expected under R3–R5/P4: at app/lib's source completion LocalSize is Int, and the distinct encode E remains open. The outer weak root is constrained to its observed Codec shape but has no closed reusable form. Expected under R7: **E0534 at the client's lib.size**, with the message to export LocalSize from app/lib and use lib.LocalSize. RemoteSize is Failed; the client adds no source constraint and does not force E to Never or Int. The lower-bound display of E as Never is not evidence of closedness.
+
+Required variants:
+
+- Export LocalSize by changing the first module's exports to `(Codec, size, LocalSize)`. The direct remote extraction still gives E0534, now suggesting the exported lib.LocalSize. In a separate positive client use `((LocalSize) = app/lib)` and `RemoteSize = LocalSize`: RemoteSize is Int. Reading the alias adds no constraint to size.
+- Remove the id wrapper so size's inferred root may be a direct Codec form rather than a weak root. With E still open, remote extraction remains E0534. R7 must not depend on this representation difference.
+- Give size the explicit source annotation `size: Codec(Int, Int) = id(make(…))`, using the same two callbacks. Its whole stored source type is closed, so remote extraction succeeds with RemoteSize = Int and no added source constraint.
+- In app/lib add a normal later binding `use = (value: LocalSize) { value }`: it is accepted using the completed alias. A whole-value annotation using size instead remains E0534 while E is open. A second same-module top-level pattern `Codec(Again, _) = size`, even if written after use, is still an original source-completion demand and yields Again = Int; source order does not create a later-group projection privilege.
+- Use the two-module schema and codec placements of M1a after T3. Both exported User aliases equal `{ age: Int, name: String }`; codec encode calls remain legal. The negative client re-extraction of an open codec gives the same E0534/use-User guidance.
+- Run each variant with reversed independent-group tie breaking and through query recovery. Assert identical alias results/diagnostics and no new source bounds on either a successful closed-source read or a failed open-source read.
+
+The baseline code facts behind the fixture were checked here: calls may return a weak instantiated result (`crates/ilang-check/src/types/infer.rs:1346–1353`), non-direct size keeps its monotype (`:315–325`), and mono display coalesces lower bounds rather than establishing a closed type (`crates/ilang-check/src/types/display.rs:531–555`). The independent reviewer ran an old-syntax checker-only baseline without extraction and reported `size : Codec(Int, Never)`; that run was **not** repeated here and does not test T2. All T2 outcomes above are required implementation results, not reported executions.
+
 ## 11. Self-attack record
 
-All programs here use the proposed syntax. “Checked by reading” means the indicated implementation path was inspected. No T2 compiler exists in this lane; acceptance/rejection below is a prediction of these rules, not a claimed executable result.
+All programs here use the proposed syntax. “Checked by reading” means the indicated implementation path was inspected. No T2 compiler exists in this lane; acceptance/rejection below is a prediction of these rules, not a claimed executable result. The original passes describe c4c83a6 and missed the imported-partial-type inconsistency subsequently found by independent review; the correction and new passes are recorded below.
 
 ### Discovery pass: confirmed problems and corrections
 
@@ -475,15 +566,35 @@ All programs here use the proposed syntax. “Checked by reading” means the in
 - **Buildability/recovery:** `a = (n: b) { n }`, `b = a(1)`, plus a valid independent binding; also an alias-only module in an import cycle. Failed sites and prior-error state are set before query inference, so no new variable or missing-ready panic is required. Checked against `query.rs:26–48`. No further serious issue found.
 - **Sources/interface:** export an extraction alias with `(..)`; rename its private source without changing the inferred type; then change the source's literal set. X1/X3 preserve constructor privacy, ignore the rename and detect the type change. T3 label binders/key parameters still fail before inference; record closure uses its exact rewrites. No further serious issue found.
 
-These are two dry passes of design reasoning, not independent reviews or a solver proof. Implementation/RF must still execute §10, especially the rollback, alias-only module, weak-root projection and permutation tests.
+Those original passes were design reasoning, not independent reviews or a solver proof, and missed one serious issue. The independent report is `/home/agent/Programming/i/.rd/cache/gpt/report-review-s6.md`. I checked its finding against the actual call result, monomorphic binding and display paths cited in §10.1, and against R3/P4/R5: a fixed D leaves Codec(D,E)'s outer weak variable without the closed entry that later P4 requires. The finding is confirmed.
 
-## 12. Risks and coordinator questions
+**Correction chosen:** coordinator option (a), R7. Withdraw foreign/later partial extraction, keep partial demands at the source's own completion, and carry only closed read results and ordinary aliases forward. M1a checks both required builder placements. No persistent completed-projection record is added.
 
-1. **Approve explicit fixation at completion? Recommended: yes, with the exact §7.5 wording.** Reading a weak type can reject later widening. This is the substantive semantic decision inherited from the draft, now made ordinary checked constraints. If G3 rejects that cost, use design C and require a closed source annotation; do not silently publish a mutable snapshot. C would need reconciliation with records.md §5.9.
-2. **Confirm the early-context limit? Recommended: retain E0531 for T2.** A nominal wrapper around an extracted User is therefore unavailable; a structural alias works. Supporting such fields later requires ordering field-dependent inference and revisiting variance and macro readiness, not just an extra conv arm.
-3. **Confirm T2's code block and file scope? Recommended: E0530–E0537 and the solver/checker/export/interface work in §8.** T2's plan file list alone understates the required changes. Do not change other lanes' code or notes in this note-only task.
-4. **Accept the M4 boundary? Recommended: yes for the first version.** Direct value types in expansion are rejected; already completed dependency-safe aliases work. Coordinate the update on lane/note-meta before M4, including imported/module-start aliases and preserving the blackbox rule.
-5. **Extend parameter or pattern forms now? Recommended: no.** Keep own-header reads E0536; defer left-to-right parameter types, function/record type patterns, union matching, macro-generated pattern parts and consumer fixation. Each needs its own inference/readiness rule. Tuple extraction and renamed heads already work.
+### Post-review attack pass 1
+
+- **Soundness:** the §10.1 client skips E and requests only D. It still fails R7 before matching, so it cannot expose a weak root or constrain E. Importing the exported LocalSize instead uses a closed Int alias. Removing id leaves a direct Codec shape but the same open E, and still fails. Adding a later encode call cannot turn a previously open completion result into a closed one: no reader consults live bounds. No further serious issue found.
+- **Buildability:** local skeleton checks and decode fixation are consumed in app/lib's one completion batch. A fully closed source annotation passes the later gate without projection state; an alias-only client still receives its E0534 at module start. Compound aliases wait only for closed per-source results. No Pending partial snapshot needs to survive. No further serious issue found.
+- **Sources:** the cross-module schema library is imported into the module that constructs user and defines User. The codec's distinct encode part is still skipped there. Clients import User; no accepted builder needs to reconstruct it from a partly open foreign codec. No further serious issue found.
+
+### Post-review attack pass 2
+
+- **Soundness/order:** recheck §10.1 with the pattern text before/after the later use binding and with reversed independent groups. Both same-module pattern items are pre-collected source-completion demands; the later binding uses their closed aliases. Foreign re-extraction always fails while the source completion form is open. Failures and successful closed reads add no source equations. No further serious issue found.
+- **Buildability/recovery:** a private LocalSize remains a normal alias TypeDef. The error suggests exporting it; exporting it does not make the direct lib.size pattern pass. Query recovery marks only the client site/binder Failed and can still navigate the source and alias. No new persistent type form is required. No further serious issue found.
+- **Sources/interface:** LocalSize = Int is compared by the ordinary completed alias interface. Changing its export or source's type follows X1–X3; source renames still do not affect its structural body. The early-context, macro readiness, code allocation and scope decisions stay as accepted. No further serious issue found.
+
+These last two passes check the revised rules by reading and reasoning, not by executing T2. Implementation/RF must execute §10, including the §10.1 regression and its no-added-source-constraints checks.
+
+## 12. Risks and coordinator decisions
+
+The coordinator accepted all five original recommendations; they are no longer open questions:
+
+1. **Explicit fixation is accepted**, including the limit on later widening and the §7.5 wording. The source's own completion batch adds ordinary checked equalities.
+2. **The early-context E0531 limits are accepted for T2.** A nominal wrapper around an extracted User remains unavailable; a structural alias works. Supporting such fields later needs a new ordering/variance/readiness design.
+3. **E0530–E0537 and §8's wider scope are accepted.** Integration must reserve that block and include the solver/checker/export/interface work, not just the original plan's short file list.
+4. **The typed-macro readiness boundary is accepted for the first version.** Reject generated direct Of; allow dependency-safe completed aliases. Carry the rule into lane/note-meta/M4.
+5. **No wider parameter scope or pattern forms now.** Keep own-header E0536; defer left-to-right parameter types, function/record type patterns, union matching, macro-generated pattern parts and consumer fixation.
+
+The follow-up also accepts **closed-only post-completion reuse, option (a)**. A local partial extraction may leave a weak value partly open; export its completed alias for clients. A later definition read cannot traverse that open value even if it skips the open argument. The accepted schema and codec builders keep their local pattern and cross-module alias use (M1a); no completed-projection record is required. There is no further coordinator question introduced by this correction.
 
 The largest implementation risk is proving that trial batches preserve all prior relationships and roll back completely. Snapshot copies may be expensive for large sources; no timing or memory bound was measured here. Open-group rejection is deliberately coarse and can reject a disjoint read in a group that touches an earlier weak variable.
 
