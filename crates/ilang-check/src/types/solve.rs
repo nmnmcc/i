@@ -183,6 +183,13 @@ impl Solver {
         }
     }
 
+    /// A scratch solver for closed types keeps constructor row modes.
+    pub fn for_closed_types(&self) -> Solver {
+        let mut solver = Solver::new(self.variance.clone(), self.type_names.clone());
+        solver.row_params = self.row_params.clone();
+        solver
+    }
+
     fn observe(&self, v: V) {
         if let Some((boundary, fixed, seen)) = &self.observation
             && (v.0 as usize) < *boundary
@@ -395,6 +402,7 @@ impl Solver {
         while let Some(t) = todo.pop() {
             match t {
                 Ty::Var(v) if self.var(v).row < mode => {
+                    self.observe(v);
                     self.var_mut(v).row = mode;
                     added.push(v);
                     let st = self.var(v);
@@ -1569,6 +1577,7 @@ impl Solver {
         if let Ty::Var(v) = a
             && env
         {
+            self.observe(*v);
             self.var_mut(*v).difference = true;
             self.has_handlers = true;
             self.mark_row(a);
