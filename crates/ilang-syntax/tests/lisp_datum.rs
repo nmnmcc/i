@@ -37,6 +37,20 @@ fn macro_quotes_are_core_nodes_and_can_be_formatted() {
 }
 
 #[test]
+fn quote_splices_are_checked_in_their_written_position() {
+    for source in [
+        "(= f (-> () _ `~..xs))",
+        "(= f (-> (`(~..xs x)) _ Nil))",
+        "(= f (-> () _ `(~(+) x)))",
+    ] {
+        let doc = parse(source).unwrap();
+        assert!(ilang_syntax::lisp::parse_module(&doc).is_err(), "{source}");
+    }
+    let doc = parse("(= f (-> (`(f ~..xs)) _ Nil))").unwrap();
+    assert!(ilang_syntax::lisp::parse_module(&doc).is_ok());
+}
+
+#[test]
 fn invalid_datums_do_not_make_core_items() {
     for source in [
         "(@ (m) (= x 1))",

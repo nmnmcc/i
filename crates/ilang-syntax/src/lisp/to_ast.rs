@@ -169,7 +169,10 @@ fn binder(d: &Datum) -> Result<Binder> {
 /// Read a datum in pattern position.
 pub fn parse_pattern(d: &Datum) -> Result<Pattern> {
     let kind = match &d.kind {
-        K::Quote(_) => PatternKind::Quote(Box::new(d.clone())),
+        K::Quote(_) => {
+            check_quote(d, true)?;
+            PatternKind::Quote(Box::new(d.clone()))
+        }
         K::Name(n) => PatternKind::Var(n.clone()),
         K::Discard(n) => PatternKind::Discard(n.clone()),
         K::UpName(_) => {
@@ -342,7 +345,10 @@ fn binary(d: &Datum) -> Option<BinOp> {
 /// Read a datum in expression position without first printing normal syntax.
 pub fn parse_expression(d: &Datum) -> Result<Expr> {
     let kind = match &d.kind {
-        K::Quote(_) => ExprKind::Quote(Box::new(d.clone())),
+        K::Quote(_) => {
+            check_quote(d, false)?;
+            ExprKind::Quote(Box::new(d.clone()))
+        }
         K::Int(n) => ExprKind::Int(n.clone()),
         K::Float(n) => ExprKind::Float(*n),
         K::String(s) => ExprKind::String(s.clone()),
@@ -476,6 +482,42 @@ pub fn parse_expression(d: &Datum) -> Result<Expr> {
 }
 fn is_clause(d: &Datum) -> bool {
     matches!(round(d), Some([h, _, _]) if symbol(h, "->"))
+}
+
+fn check_quote(d: &Datum, pattern: bool) -> Result<()> {
+    let K::Quote(body) = &d.kind else {
+        unreachable!("quote check requires a quote")
+    };
+    fn part(d: &Datum, pattern: bool, in_sequence: bool, last: bool) -> Result<()> {
+        match &d.kind {
+            K::Unquote(inner) => {
+                if pattern {
+                    parse_pattern(inner)?;
+                } else {
+                    parse_expression(inner)?;
+                }
+            }
+            K::Splice(inner) => {
+                if !in_sequence || (pattern && !last) {
+                    return Err(bad(d, "a splice in this position"));
+                }
+                if pattern {
+                    parse_pattern(inner)?;
+                } else {
+                    parse_expression(inner)?;
+                }
+            }
+            K::Round(xs) | K::Square(xs) | K::Curly(xs) | K::Bits(xs) => {
+                for (i, child) in xs.iter().enumerate() {
+                    part(child, pattern, true, i + 1 == xs.len())?;
+                }
+            }
+            K::Quote(_) => return Err(bad(d, "a nested quote")),
+            _ => {}
+        }
+        Ok(())
+    }
+    part(body, pattern, false, true)
 }
 fn clause(d: &Datum) -> Result<Clause> {
     let Some([h, p, body]) = round(d) else {
