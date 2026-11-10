@@ -229,6 +229,8 @@ ExportItem = name | UpName [ "(" ".." ")" ] .
 - Every exported name must be defined in this module.
 - If the type of an exported definition uses a type defined in this module, that type must be exported too. If not, it is a compile error.
 
+A type bound by an alias pattern is an alias with no constructors of its own; exporting it with `(..)` has the same effect as exporting it alone. An exported alias or annotation that depends on a value is checked after its type is complete and must not expose a private nominal type. Its source value need not be exported. Reading from another module never fixes that source’s weak type; a new permanent read requires a wholly closed completed source, or the consumer uses a closed alias exported by the source module (§4.7).
+
 ### 2.5 Top-level bindings
 
 ```
@@ -260,6 +262,8 @@ A top-level binding has the same rules as a binding in a block (§6.10). Only th
 - The **needs** of a binding with a direct value are the top-level names of this module outside the function bodies in its value, and the needs of their bindings. The needs of any other binding are its full needs.
 
 A binding may not be among its own needs. If it is, it is a compile error: `x = [x]` and `x = f()`, where the body of `f` uses `x`, are compile errors, but `f = (n) { f(n - 1) }` is not. The values are worked out one at a time, with a module after the modules it imports. In a module, the next value worked out is always the first binding, in the order of the source, whose needs are all worked out, as in Go. So in `a = (1, z)  y = p("y")  z = p("z")`, the order is `y`, `z`, `a`.
+
+**Type dependencies.** A type may name a value (§3). This does not work out that value or add it to runtime needs or full needs. It only orders type inference: a binding whose annotations use the type of a value of its module, directly or through aliases, is typed after that value's group (§4.7). A type dependency within one group, including on itself, or a cycle between groups is a compile error. The message gives the chain of dependencies.
 
 ### 2.6 The package file
 
@@ -323,18 +327,22 @@ Type      = Union .
 Union     = Inter { "|" Inter } .
 Inter     = Diff { "&" Diff } .
 Diff      = Prim { "-" Prim } .
-Prim      = FnType | TupleType | NamedType | TypeCall | [ name "." ] name | "_" | "{" Type "}" .
+Prim      = FnType | TupleType | NamedType | TypeCall | ValueType | "_" | "{" Type "}" .
 FnType    = "(" [ ParamType { "," ParamType } [ "," ] ] ")" "->" Union [ "?" Union ] [ "!" Union ] .
 ParamType = [ name ":" ] Type .
 TupleType = "(" [ Type { "," Type } [ "," ] ] ")" .
 NamedType = [ name "." ] UpName [ "(" Type { "," Type } [ "," ] ")" ] .
+ValueType = [ name "." ] name .
 TypeCall  = [ name "." ] name "(" [ TypeArg { "," TypeArg } [ "," ] ] ")" .
 TypeArg   = Type | int_lit | string_lit .
 ```
 
 - An `UpName` with no module name before it is a type variable when a type variable with that name is declared where the type is written (§4.7, §5), and a type when not. `_` is a hole that type inference fills in.
 - A type variable takes no arguments: `A(Int)`, where `A` is a declared type variable, is a compile error.
-- A lowercase `name` in a type, or `a.x` with a lowercase `x`, whatever `a` is, with no `(` after it, is kept for a later use, the type of a value, and is a compile error. It is in the grammar, so a type with it is read in full, and the error says what the name is kept for. So `(p: User, q: p.name) { q }` is a compile error, where `p` is a parameter, as it is where `p` is a module.
+- A lowercase `x` in a type, without `(` after it, means the type of the value named `x` at that place. The name follows value scope (§5). `m.x` means an exported value of module `m`, never a field of a value. If `m` names a value, it is a compile error. `{ x }` groups the same type. A lowercase name or member followed by `(` remains a macro call, not a value type or a type application.
+- A type may not name a value bound by that same pattern; a parameter in the types of that function's own header, including its `->`, `?` and `!` parts; or its own binding's reserved name inside that binding's value. A distinct inner binder that has entered scope may cover that reserved name. This is a compile error even if an outer value has the same name. Those parameters may be named in types in the body. For example, `(x, y: x)` and `(x) -> x { x }` are errors, but `(x: Int) { y: x = x  y }` is allowed.
+- A value type is not its known type (§4.8). It follows the scheme, instantiation and completion rules of §4.7. It never makes a monomorphic value polymorphic.
+- A value type, directly or through aliases, may not occur in a custom constructor field, an external or host declaration, or a service/environment type. Those types must be complete before inference.
 - A lowercase `name`, or `a.m` with a lowercase `m`, whatever `a` is, followed by `(` is a `TypeCall`. It is kept for macros, and is a compile error. It is in the grammar, so a type with it is read in full, and the error says that it is kept for macros.
 - `A | B` is a union, `A & B` is an intersection, and `A - B` is a difference (§4.4). `-` is stronger than `&`, and `&` is stronger than `|`.
 - `( … )` with `->` after it is a function type. Without `->`, it is a tuple type.
@@ -385,17 +393,37 @@ TypeHead    = "(" Type { "," Type } [ "," ] ")" .
 TypeBody    = "{" { Constructor } "}" | "=" Type .
 Constructor = UpName [ "(" Field { "," Field } [ "," ] ")" ] .
 Field       = [ name ":" ] Type .
+TypePattern = UpName | "_"
+            | [ name "." ] UpName "(" TypePattern { "," TypePattern } [ "," ] ")"
+            | name "." UpName
+            | "(" [ TypePattern { "," TypePattern } [ "," ] ] ")" .
 ```
 
-- `T { C1 C2 … }` is a custom type. Every constructor has zero or more fields. A field may have a label.
-- `T {}` is a type with no constructors. i code may not make its values. They only come from the host (§10).
-- `T = Type` is a type alias. `T` is the same as the type on the right. An alias may not use itself, directly or through other aliases.
-- The head `( … )` is a **list of type parameters** when every part of it is an `UpName` with no module name and no arguments, and none of them is a type that may be written with no module name in the module: a type of the module, an imported `UpName`, or a built-in type. Its parts are then the **type parameters**, as in `TypeParams` of §2.5.
-- An alias whose head is not a list of type parameters, as in `Schema(User, _) = user`, or `Schema(User) = user` with a type `User`, is kept for a later use, alias patterns, and is a compile error whose message says so. The rule that tells an alias pattern from a generic alias is not yet given.
-- A custom type `T( … ) { … }` whose head is not a list of type parameters is a compile error. When a part of the head is not an `UpName` with no module name and no arguments, as in `Box(a)`, `Box(m.T)`, or `Box(List(A))`, the message says that a type parameter is an `UpName`. When every part is such an `UpName`, but one of them is a type that may be written with no module name in the module, as in `Box(Int) { B(Int) }` or `Pair(User) { Pair(User, User) }` with a type `User`, the message says that a type parameter may not have the name of a type.
-- The type parameters are the type variables of the definition: `Option(A) { Some(A) None }`. Every type parameter must be used on the right, and every type variable on the right must be a parameter.
-- The type parameters of one definition must have different names.
-- Custom types are **nominal**: two different definitions make two different types, even if they have the same form.
+- `T { C1 C2 … }` defines a nominal custom type. Each constructor has zero or more fields, which may have labels. Two custom type definitions are different types even if their fields are the same.
+- `T {}` has no constructors; i code cannot make its values. They come from the host (§10).
+- `T = Type` is a transparent alias. Aliases may not use themselves, directly or through other aliases or alias patterns.
+- An item `T(P1, …, Pn) = v` is an **alias pattern** exactly when its written right side is a value type (§3), after removing groups. Otherwise its head is a list of type parameters. This classification is made before expanding the right side; it never depends on imports or on what a macro returns there.
+- In a list of type parameters, each part is a different, unqualified UpName with no arguments, and must not already name an accessible type. Every parameter must be used in the body, and every type variable in the body must be a declared parameter.
+- In an alias pattern, the unqualified head names an existing type, with the written arity; the item does not define that head. It may be a custom or built-in type, or a transparent alias expanding to one named type or tuple. In a head alias each parameter is used at most once, only as a named argument or tuple part. Constant subtrees of that alias require an equal, fully determined source part.
+- A bare unqualified UpName in a pattern always defines a new zero-parameter structural alias. Its part of the source type must be fully determined (§4.7). It may not duplicate a definition or conflict with an imported or built-in type. It never tests an existing type with that name.
+- `_` in an alias pattern skips a part and binds nothing; it is not an inference hole. After source completion, the whole source type must first be closed (§4.7); a skip cannot hide an open argument from that check. Elsewhere in a type, `_` remains a hole. Shared type variables remain shared even if one occurrence is skipped.
+- A named pattern with arguments, or a qualified named pattern, requires exactly one member with that type constructor and matches its arguments. A tuple pattern requires one tuple of the same size. No union member is discarded to make a match. A mismatch is a compile error. Function, record, literal, union, intersection, difference, value-type and macro-call patterns are compile errors.
+- Every pattern and every value-dependent alias is checked, also when unused, after its sources and alias dependencies are complete. A definition read may not choose an instance of a generalized variable to make its pattern fit.
+- Blocks have no type definitions. An item beginning with `(` or `{` is a value binding; `m.T(…) = v` is also a value binding under §2.2. Import `T` to use it as an alias-pattern head.
+
+```i
+Codec(D, E) { Codec(decode: (String) -> D, encode: (E) -> String) }
+make(D, E) = (d: (String) -> D, e: (E) -> String) {
+  Codec(decode: d, encode: e)
+}
+size = make((s) { string.length(s) }, (n: Int) { int.to_string(n) })
+Codec(Size, _) = size
+// Size = Int; the distinct encode part is not fixed.
+
+Pair(A, B) = (A, B)
+Pair(Tree, _) = parsed
+// If parsed has the closed type (Ast, List(Warning)), Tree = Ast.
+```
 
 ### 4.4 Union, intersection, and difference
 
@@ -446,7 +474,7 @@ Types are worked out by inference with subtypes (algebraic subtyping).
 - For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance. MLsub (Dolan and Mycroft, POPL 2017) and MLstruct (Parreaux and Chau, OOPSLA 2022) give ways to do this.
 - A type is made simpler before it is shown: equal parts are put together, and type variables that have no effect on the meaning are taken out. This never changes which programs are correct or what they do. A type scheme that is used as a known type (§4.8) is in this simpler form. A type variable that is not generalized is shown as the union of the types that come to it.
 - Annotations are used in inference, and the inferred type must agree with them. A type variable in an annotation may become a more exact type.
-- A type variable is **declared** in one of three places: after the name of a binding (§2.5, §6.10), `map(A, B) = …`; after the name of a declaration, `inspect(A): (A) -> String`; or after the name of a type definition (§4.3).
+- A type variable is **declared** after a binding name (§2.5, §6.10), `map(A, B) = …`; after a declaration name, `inspect(A): (A) -> String`; or in the list of type parameters of a type definition (§4.3). The parts of an alias pattern are not declarations of type variables: its bare UpNames define structural aliases.
 - The type variables declared in one place must have different names. So `pair(A, A) = …` is a compile error.
 - A type variable declared by a binding may be used in the type on its pattern, as in `id(A): (A) -> A = …`, and in every type written in its value, also in the parameters, `->` parts, and clause patterns there, and in inner bindings. It is one type variable of that binding, and it is generalized with it. An inner binding may declare a type variable with the same name; inside it, the name means its own variable.
 - A type variable declared by a declaration may be used in the type of the declaration. It is general: each use of the declared name may give it a different type.
@@ -459,6 +487,21 @@ Types are worked out by inference with subtypes (algebraic subtyping).
 - Inside its own value (§6.10), a name of a binding is not general: all its uses there have one type. It becomes general when the binding is generalized.
 - A **group** is a set of top-level bindings that use one another, directly or through other bindings of the group. The bindings of a group are worked out together and then generalized together, after the groups that they use. Inside the group, their names are not general.
 - A type that has itself inside it, through a type variable, is a compile error.
+
+**Reading types of values.**
+
+- In an annotation, a completed generalized value is read as a fresh instance of its scheme (§4.8 rule 3), separately for each occurrence. A parameter, clause name or local monomorphic value shares its one type. Generalized local schemes also keep their non-general variables shared. A completed top-level value uses its fixed non-general parts; reading an unfixed part is a compile error. Reading through a local does not copy such a part or allow a structural alias to escape from it. A value type never generalizes its source or its annotated binder.
+- In an alias body or alias pattern, every used value-derived part must be closed: it has no generalized variable, unresolved type variable, label parameter, unknown top type or hole. The alias's own declared formal parameters remain parameters. A skip demands no contents, but the shapes needed to reach the used parts must also be determined.
+- A top-level value's group has one **completion point**, after its values are typed and linked and its generalization is decided. All value-type demands written in its own module are collected before inference, even in unused type definitions. Ordinary group checks finish first. All demands at this completion point read one unchanged snapshot and are checked in one batch before any permanent alias is published. At this point their weak parts are fixed as follows. A demand in another module never fixes them.
+- For a demanded non-general variable, collect all types that come to it, including through variable relationships. Put them together by union, replacing the non-general variables needed inside them by their fixed types. Pure cycles of variable relationships count once. A structural recursive type, an unfilled part, a generalized variable needed inside this replacement, or a part that cannot be made closed is a compile error. An explicit closed `Never` is allowed; the absence of any information does not invent `Never`. Literal types are never widened.
+- Fixing adds both subtype constraints between the variable and the resulting closed type, keeping every previous constraint. Every needed variable is fixed together, and the usual occurs and place rules apply. If these equations cannot hold, it is a compile error. Pattern shape checks use the original argument variables, so skipping a distinct argument leaves it shared and unfixed. The pattern cannot supply a type to fill an unknown.
+- A group that constrains an earlier non-general variable that was not fixed cannot fix its own non-general parts. A demanded part carrying such an earlier variable also cannot be fixed. This conservative rule makes the result independent of unrelated groups' inference order.
+- From then on, later uses must agree with each fixed part. A use that would widen it incompatibly is a type error with a note at the place that fixed it. Write a wider annotation at the source when needed. For example, reading `r = cell(1)` may fix its invariant argument to `1`; write `r: Cell(Int) = cell(1)` to allow other Int values.
+- In another module, or when a new definition read is performed by a later group, an alias pattern or other permanent value-derived definition must start from a wholly closed completed source type. A fixed component behind an open enclosing type is not sufficient, even when the open arguments are skipped. This read adds no constraints to the source. If the source remains open, the error says to use the closed alias made by its source module and to export it when needed. Annotation instantiation and current-group local monotype sharing keep their rules above. Adding foreign fixation demands cannot change the source module's completion result. Ordinary expression constraints and local monomorphic sharing remain shared as elsewhere in this section; this rule does not fix the display of every uncompleted weak part.
+- A permanent alias denotes the completed closed part. It does not change when later bindings are checked. A same-module top-level pattern is handled at its source's completion, regardless of where the item is written. Aliases with several sources assemble already closed per-source results, not saved partial source types. Definitions are completed before their dependents. Importing or using the closed alias later does not read its source value again.
+- The whole annotation after value types and aliases are read must obey §4.4's rules of places. A value-type spelling does not hide variable members from that check.
+
+Simplification and type display must preserve type variables that affect invariant arguments, even when their input and output forms print alike. Reading a type never changes a weak variable into a generalized one.
 
 ### 4.8 Typing rules
 
@@ -497,7 +540,9 @@ The **pattern type** of a pattern that is not a catch-all, and its parts, are:
 - `"lit" <> r`: `String`, and `r` gets `String`.
 - A bit array pattern: `BitArray`. The parts get the types of their formats (§8.2).
 - `x = q`: the pattern type of `q`, and `x` gets that type.
-- `x: T`: `T`, with a new type variable in place of each `_` in it, and `x` gets that type.
+- `x: T`: `T`, with new variables for holes and value types read as §4.7 says; `x` gets that type.
+
+A value type in an annotation uses the inferred type of its source, not a narrower known type at the use. A completed scheme gives its known structural form, with `_` for general variables. For a local source still being inferred, use its stored structural monotype with unresolved variables erased to `_`. A written type on the source name is part of that monotype. The known type of a matched value does not supply a type for a name inside its pattern. Do not infer a smaller shape from temporary lower bounds. Later literal tests or clause narrowing do not refine this shape. Thus `((a: Int, b: String)) { q: a = a  q == 1 }` gives `q` the known type `Int`. For `x = "a" = s` with `s: String`, x's inferred type is String even though its known type is "a"; an annotation naming x uses String.
 
 The **known type** `K(e)` of an expression is found from the parts of the expression, left to right, and from the expected type of its place (below). Where no case below gives it, `e` has no known type.
 
@@ -530,7 +575,7 @@ So `(u) { u.name }` needs a type, `(u: User) { u.name }`, but with `opt: Option(
 - Built-in names (§12) may be used in every module. Imported names and top-level names may cover them.
 - A top-level name may be used anywhere in its module (§2.5).
 - A local name may be used from the next statement to the end of its block. When the value of its binding is a direct value, it may also be used inside the function bodies in that value (§6.10). The names of a parameter may be used in the function body. A name in a pattern of a clause may be used in its guard and its expression.
-- A type variable declared on a binding (§4.7) may be used in the type on its pattern and in every type written in its value. A type variable declared on a declaration may be used in the type of the declaration. A type parameter of a type definition may be used in that definition (§4.3).
+- A type variable declared on a binding (§4.7) may be used in the type on its pattern and in every type written in its value. A type variable declared on a declaration may be used in the type of the declaration. A type parameter of a type definition may be used in that definition (§4.3). An alias pattern has no type parameters; its binders are types of the module.
 - A local name may cover an outer name with the same name, and an earlier binding in the same block.
 - A `discard` makes no name.
 
