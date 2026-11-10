@@ -144,7 +144,7 @@ def audit():
     lines += ['', 'Benchmark output hashes differ for: ' + ', '.join(r['workload'] for r in output_changes) + '.',
               'Exact hashes and all timing/counter differences are in k4-integration.json.', '',
               'Long-generation result differences from the stored long run: ' + json.dumps(generation_changes, ensure_ascii=False) + '.', '']
-    (CORPUS / 'k4-integration.md').write_text('\n'.join(lines) + '\n')
+    (CORPUS / 'k4-integration.md').write_text('\n'.join(lines).rstrip() + '\n')
     print(json.dumps({'promotions': len(promotions), 'remaining_k4': remaining,
                       'accepted_then_rejected': len(rejected), 'outside_changes': len(outside),
                       'all_changed_observations': len(changes), 'benchmark_workloads': len(benches)}))

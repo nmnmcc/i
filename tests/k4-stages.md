@@ -909,3 +909,12 @@ Only Solver::handle changes in compiler source in this QA follow-up. Other
 new functions are the migration/audit helpers and corpus selection, runtime
 observation and requirement checks; the earlier complete compiler function
 inventory still applies to K4 as a whole.
+
+
+The final cached diff check caught a generated trailing blank line in
+k4-integration.md. The generator now writes exactly one final newline.
+The unpublished derived-files commit was reset softly on this lane only,
+preserving every worktree/index file, so that the generator correction and
+this incident record precede the regenerated data commit. No source program,
+semantic expectation or successful test result changed. The corrected
+generated diff must pass git diff --cached --check before committing.
