@@ -2317,5 +2317,21 @@
     "diagnostics": [
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
+  },
+  "crates/ilang-package/tests/manifest.rs:ef830fe8a6451ed0": {
+    "not_source": "TOML manifest for the future JP provider plan; R2 explicitly rejects it"
+  },
+  "tests/browser/r2-laws.mjs:e3c0158bcdafc3f6": {
+    "not_source": "JavaScript diagnostic text about case/export coverage, not an i case expression"
+  },
+  "crates/ilang-cli/tests/r2_fixtures.rs:7d393432eb121ee8": {
+    "not_source": "TOML manifest assembled for the R2 conformance bundle, not i code"
+  },
+  "crates/ilang-package/tests/manifest.rs:f09186ea668f8c28": {
+    "not_source": "TOML manifest for the future JP provider plan; R2 explicitly rejects it"
+  },
+  "crates/ilang-cli/tests/r2_performance.rs:2dbd953bfd83802f": {
+    "not_source": true,
+    "reason": "Generated TOML manifest for the isolated interval measurement package; this is not i source."
   }
 }

@@ -1,0 +1,57 @@
+{
+  "compiler": "8ddb1c4f68d98848272585b38e84438a8169cf35",
+  "binary_sha256": "6dc694d066820e51f9e0e975018f221913403fccafa98b35949f52824ddf8c0d",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 10,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 0,
+      "stdout": "app/main.main : () -> Nil ! Io | task.Runner\n",
+      "stderr": ""
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": ""
+    },
+    "run0": {
+      "command": [
+        "run",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "([1, 1], (5319784238409264450, Generator(73, State(11381211674828311320, 4551409137500118393), [Path(1, 0), Path(1, 0)], 1)))\n([1, 2], (17070266908805236688, Generator(73, State(17136773297439476992, 11899038971559224479), [Path(2, 0), Path(1, 0)], 1)))\n([1, 3], (277717256051322705, Generator(73, State(9921756357648463419, 7110654929650414965), [Path(3, 0), Path(1, 0)], 1)))\na\nb\n",
+      "stderr": ""
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": ""
+    },
+    "run2": {
+      "command": [
+        "run",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "([1, 1], (5319784238409264450, Generator(73, State(11381211674828311320, 4551409137500118393), [Path(1, 0), Path(1, 0)], 1)))\n([1, 2], (17070266908805236688, Generator(73, State(17136773297439476992, 11899038971559224479), [Path(2, 0), Path(1, 0)], 1)))\n([1, 3], (277717256051322705, Generator(73, State(9921756357648463419, 7110654929650414965), [Path(3, 0), Path(1, 0)], 1)))\na\nb\n",
+      "stderr": ""
+    }
+  }
+}

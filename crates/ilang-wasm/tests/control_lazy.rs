@@ -264,6 +264,7 @@ fn record_kinds() {
         ("$catch_reenter", 4),
         ("$ensure_reenter", 2),
         ("$final_reenter", 5),
+        ("$wait_requests_reenter", 5),
     ] {
         let made = all(&text, &format!("(struct.new $frame (ref.func {reenter})"));
         assert_eq!(made.len(), 1, "{reenter}");
