@@ -228,7 +228,7 @@ impl<'p> Emitter<'p> {
     /// The value of the results of an import in the globals `$hr…` (B.2):
     /// the value, or the error thrown. The result buffers are freed (B.3);
     /// a value that is not correct stops.
-    pub(super) fn host_reply(&self, i: ImportId) -> String {
+    pub(super) fn host_reply(&self, i: ImportId, result: AbiType) -> String {
         let x = &self.p.imports[i as usize];
         let take = |t: AbiType, k: usize| -> String {
             let g = |j: usize| format!("(global.get $hr{i}_{})", k + j);
@@ -239,15 +239,15 @@ impl<'p> Emitter<'p> {
                 AbiType::Int => format!("(call $abi_int_take {} {} {})", g(0), g(1), g(2)),
                 AbiType::String => format!("(call $abi_string_take {} {})", g(0), g(1)),
                 AbiType::BitArray => format!("(call $abi_bits_take {} {})", g(0), g(1)),
-                AbiType::Externref => format!("(call $abi_ref_in {})", g(0)),
+                AbiType::Externref(ty) => format!("(call $abi_ref_in {} (i32.const {ty}))", g(0)),
             }
         };
         if x.abi.errors.is_empty() {
-            return take(x.abi.result, 0);
+            return take(result, 0);
         }
         let mut offsets = Vec::new();
         let mut k = 1;
-        for t in std::iter::once(x.abi.result).chain(x.abi.errors.iter().copied()) {
+        for t in std::iter::once(result).chain(x.abi.errors.iter().copied()) {
             offsets.push((t, k));
             k += abi_in(t).0.len();
         }

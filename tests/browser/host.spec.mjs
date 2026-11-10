@@ -206,3 +206,19 @@ test("status 2 and cancel", async ({ page }) => {
   }, `(${load})`);
   expect(result).toEqual({ yielded: true, wrong: [] });
 });
+
+// Exercise production compiler output, including coalesced external imports.
+test("compiled opaque boundaries preserve nominal identity", async ({ page }) => {
+  const result = await page.evaluate(async (loader) => {
+    const { instantiate, compiledImports, checkOpaque, GuestError } = await eval(loader)();
+    const reference = {};
+    for (const opaque of [reference, null]) {
+      const guest = await instantiate("/tests/browser/fixtures/compiled.wasm", {
+        imports: compiledImports(GuestError, [], { opaque }),
+      });
+      if (!await checkOpaque(guest, reference, {})) return false;
+    }
+    return true;
+  }, `(${load})`);
+  expect(result).toBe(true);
+});
