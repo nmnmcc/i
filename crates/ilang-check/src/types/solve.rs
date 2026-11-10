@@ -713,10 +713,16 @@ impl Solver {
         if let Ty::Union(ms) = &t
             && self.failures.len() == before
             && ms.iter().any(Ty::is_varlike)
+            && (ms.iter().filter(|m| m.is_varlike()).take(2).count() > 1
+                || ms
+                    .iter()
+                    .any(|m| matches!(m, Ty::Con(_, args) if !args.is_empty())))
         {
             // Check forms hidden behind a row variable too (§9.2). The
             // collector adds no requirement to the returned union; it
             // makes add_bound compare all its services, also later ones.
+            // With only one unknown row and services without arguments,
+            // no unequal pair can be introduced by this union.
             let row = self.fresh();
             for m in ms {
                 self.constrain_env(m, &row);
