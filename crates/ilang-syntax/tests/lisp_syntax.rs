@@ -318,3 +318,18 @@ fn expansion_marks_compiler_answers_with_the_same_run_mark() {
     assert_eq!(result.scope(), answer.scope());
     assert_eq!(result.provenance(), answer.provenance());
 }
+
+#[test]
+fn macro_item_results_accept_only_a_single_item_or_a_flat_curly_list() {
+    use ilang_syntax::lisp::{parse, parse_items};
+    assert_eq!(parse_items(&parse("{}").unwrap()[0]).unwrap().len(), 0);
+    assert_eq!(
+        parse_items(&parse("{ (= a 1) (= b 2) }").unwrap()[0])
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(parse_items(&parse("(= a 1)").unwrap()[0]).unwrap().len(), 1);
+    assert!(parse_items(&parse("{ { (= a 1) } }").unwrap()[0]).is_err());
+    assert!(parse_items(&parse("(, a b)").unwrap()[0]).is_err());
+}

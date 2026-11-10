@@ -648,7 +648,7 @@ pub fn parse_module(document: &Document) -> Result<Module> {
             continue;
         }
         stage = 3;
-        let mut item = item(d)?;
+        let mut item = parse_item(d)?;
         item.doc = d
             .docs
             .iter()
@@ -724,7 +724,8 @@ fn export(d: &Datum) -> Result<ExportItem> {
         }),
     }
 }
-fn item(d: &Datum) -> Result<Item> {
+/// Read one item, without accepting module headers.
+pub fn parse_item(d: &Datum) -> Result<Item> {
     let mut current = d;
     let mut attributes = Vec::new();
     while let Some([h, attr, body]) = round(current) {
@@ -768,6 +769,14 @@ fn item(d: &Datum) -> Result<Item> {
         span: d.span,
     })
 }
+/// Read a macro's item result: one item or a top-level curly list of items.
+pub fn parse_items(d: &Datum) -> Result<Vec<Item>> {
+    match &d.kind {
+        K::Curly(items) => items.iter().map(parse_item).collect(),
+        _ => Ok(vec![parse_item(d)?]),
+    }
+}
+
 fn attribute(d: &Datum) -> Result<Attribute> {
     let (head, args) = match round(d) {
         Some([h, args @ ..]) if !symbol(h, ".") => (h, Some(args)),

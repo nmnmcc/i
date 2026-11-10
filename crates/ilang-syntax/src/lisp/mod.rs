@@ -18,7 +18,9 @@ mod to_ast;
 mod to_source;
 pub use encode::{expression_syntax, item_syntax, pattern_syntax, type_syntax};
 pub use from_ast::{print_module, print_with_comments};
-pub use to_ast::{parse_expression, parse_module, parse_pattern, parse_type};
+pub use to_ast::{
+    parse_expression, parse_item, parse_items, parse_module, parse_pattern, parse_type,
+};
 pub use to_source::{normal_source, normal_with_comments};
 
 #[derive(Clone, Debug, PartialEq)]
