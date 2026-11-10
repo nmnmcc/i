@@ -25,6 +25,9 @@ compiler's i host, independently of the target of the program being built.
 | Enter a synthesized callable wrapper | 0 | 0 | 1 plus parameters |
 | Compiler Syntax operation | 1 plus nodes and bytes traversed | wrapper plus output and traversal words | traversal depth |
 | Copy a boundary buffer | bytes copied | 4 plus bytes rounded up to words | 0 |
+| Look up a host identity among `n` live or weak entries | `16 × (1 + bit_length(n + 1))` | 0 | 0 |
+| Install a host identity | the lookup cost again | `64 × (1 + bit_length(n + 1))` | 0 |
+| Sweep weak host identities | number of entries | 0 | 0 |
 
 Array element widths are taken from the generated type: i8 is one byte, i16
 two, i32/f32 four and references/i64/f64 eight. Fixed runtime globals and
@@ -40,6 +43,8 @@ bulk copies, so multiplying large integers or copying a large string cannot
 become a single unit. Compiler Syntax operations charge their source tree and
 worst-case escaped output before traversing or building the result. The host
 and guest use the same invocation budget; cloning the handle does not reset it.
+Host identities use a per-instance balanced map, so a lookup and an insertion
+have a deterministic size-based charge before comparison, allocation or sweep.
 
 Tail calls leave the caller's frame before the callee enters. Error handlers
 restore the saved frame depth, and resumed continuations restore their own
