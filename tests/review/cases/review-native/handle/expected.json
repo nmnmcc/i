@@ -1,0 +1,17 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:3:15: error[E0320]: the parameters and the value of a function of a host service are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors; its errors are a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; and it has no environment (§9.7, §10.3)\n1 error\n"
+    }
+  }
+}

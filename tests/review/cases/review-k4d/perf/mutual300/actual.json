@@ -1,0 +1,11 @@
+{
+  "check": {
+    "command": [
+      "check",
+      "--types"
+    ],
+    "exit": "timeout",
+    "stdout": "",
+    "stderr": ""
+  }
+}

@@ -1,0 +1,12 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 19.2ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 15.9ms
+pass review/pbt_test.dependent (0.020 s, cpu 0.02 s)
+pass review/pbt_test.greedy (0.001 s, cpu 0.00 s)
+pass review/pbt_test.zero_budget (0.001 s, cpu 0.00 s)
+pass review/pbt_test.cyclic_budget (0.001 s, cpu 0.00 s)
+pass review/pbt_test.map_has_no_numeric_smaller_law (0.001 s, cpu 0.00 s)
+5 passed, 0 failed

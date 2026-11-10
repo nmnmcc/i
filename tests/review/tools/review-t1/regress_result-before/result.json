@@ -1,0 +1,12 @@
+[
+  {
+    "cmd": [
+      "check",
+      "--types"
+    ],
+    "exit": 0,
+    "seconds": 0.15157116996124387,
+    "stdout": "probe/main.status : () -> String\nprobe/main.f : () -> Bool\n",
+    "stderr": ""
+  }
+]

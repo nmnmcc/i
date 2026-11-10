@@ -1,0 +1,22 @@
+// spec: 11.7, 9.6
+// expect: stop "assertion failed: mine"
+// at: spec/stop_tail_service:12:14
+// at: spec/stop_tail_service:16:19
+// at: spec/stop_tail_service:20:3
+
+// A tail call of a function of a service keeps its position as the first
+// one; the tail call of `check` is gone.
+check = (c: Bool, a ! Assert) {
+  case c {
+    True -> Nil
+    False -> a.fail(AssertionFailure("mine"))
+  }
+}
+
+apply = (f, x) { [f(x)] }
+
+@main
+main = () {
+  apply((v) { check(v == 0) }, 1)
+  Nil
+}

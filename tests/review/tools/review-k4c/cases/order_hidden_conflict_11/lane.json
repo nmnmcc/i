@@ -1,0 +1,6 @@
+{
+  "code": 1,
+  "out": "app/main.bad : () -> Nil ! S(Int) | S(String)\napp/main.one : () -> Nil ! S(Int)\napp/main.two : () -> Nil ! S(String)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\n",
+  "err": "src/main.i:1:7: error[E0515]: `String` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2)\n1 error\n",
+  "seconds": 0.019198358058929443
+}

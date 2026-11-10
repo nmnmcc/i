@@ -1,0 +1,34 @@
+[
+  {
+    "cmd": [
+      "check",
+      "--types"
+    ],
+    "exit": 0,
+    "seconds": 0.1680653898511082,
+    "stdout": "probe/main.mk : (x: A) -> Cell(A)\nprobe/main.f : () -> 0 | 1\nprobe/main.main : () -> Nil ! Assert\n",
+    "stderr": ""
+  },
+  {
+    "cmd": [
+      "run",
+      "--opt",
+      "0"
+    ],
+    "exit": 0,
+    "seconds": 0.2586563020013273,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cmd": [
+      "run",
+      "--opt",
+      "2"
+    ],
+    "exit": 0,
+    "seconds": 0.3912236699834466,
+    "stdout": "",
+    "stderr": ""
+  }
+]

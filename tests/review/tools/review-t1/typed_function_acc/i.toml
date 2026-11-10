@@ -1,0 +1,3 @@
+name = "probe"
+[dependencies]
+std = { path = "/home/agent/Programming/i/.rd/a/std" }

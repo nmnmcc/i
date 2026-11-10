@@ -1,0 +1,37 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 0,
+      "stdout": "review/fixed.scale : 340282366920938463463374607431768211456\nreview/fixed.floor : (a: Int, b: Int) -> Int\nreview/fixed.ceil : (a: Int, b: Int) -> Int\nreview/fixed.min : (a: Int, b: Int) -> Int\nreview/fixed.max : (a: Int, b: Int) -> Int\nreview/fixed.add : (a: I, b: I) -> I\nreview/fixed.neg : (a: I) -> I\nreview/fixed.mul : (a: I, b: I) -> I\nreview/fixed.div : (a: I, b: Int) -> I\nreview/fixed.cosine : (r: I) -> I\nreview/pbt.make : (f: (Int, random.Generator) -> Option(Tree(A))) -> Gen(A)\nreview/pbt.sample : (gen: Gen(A), size: Int, g: random.Generator) -> Option(Tree(A))\nreview/pbt.constant : (a: A) -> Gen(A)\nreview/pbt.map_tree : (t: Tree(A), f: (A) -> B) -> Tree(B)\nreview/pbt.map : (gen: Gen(A), f: (A) -> B) -> Gen(B)\nreview/pbt.bind_node : (outer: Tree(A), inner: Tree(B), f: (A) -> Gen(B), s: Int, g: random.Generator) -> Tree(B)\nreview/pbt.bind_outer : (outer: Tree(A), f: (A) -> Gen(B), s: Int, g: random.Generator) -> Option(Tree(B))\nreview/pbt.flat_map : (gen: Gen(A), f: (A) -> Gen(B)) -> Gen(B)\nreview/pbt.int_tree : (x: Int, t: Int) -> Tree(Int)\nreview/pbt.int : (lo: Int, hi: Int) -> Gen(Int)\nreview/pbt.shrink : (t: Tree(A), budget: Int, f: (A) -> Bool) -> (A, List(Int), Int)\nreview/pbt.descend : (current: Tree(A), left: Int, path: List(Int), count: Int, f: (A) -> Bool) -> (A, List(Int), Int)\nreview/pbt.scan : (current: Tree(A), children: List(Tree(A)), left: Int, path: List(Int), count: Int, index: Int, f: (A) -> Bool) -> (A, List(Int), Int)\nreview/rat.abs : (a: Int) -> Int\nreview/rat.gcd : (a: Int, b: Int) -> Int\nreview/rat.make : (n: Int, d: Int) -> R\nreview/rat.add : (a: R, b: R) -> R\nreview/rat.sub : (a: R, b: R) -> R\nreview/rat.mul : (a: R, b: R) -> R\nreview/rat.div : (a: R, b: R) -> R\nreview/rat.atan_terms : (z: R, count: Int) -> R\nreview/rat.sin_terms : (z: R, count: Int) -> R\nreview/fixed_test.cosine_reduced_one : () -> Nil ! Assert\nreview/math_test.atan_fifth_29 : () -> Nil ! Assert\nreview/math_test.atan_fifth_250 : () -> Nil ! Assert\nreview/math_test.atan_half_65 : () -> Nil ! Assert\nreview/math_test.sine_one_20 : () -> Nil ! Assert\nreview/pbt_test.walk : (t: pbt.Tree((Int, Int)), depth: Int) -> Nil ! Assert\nreview/pbt_test.dependent : () -> Nil ! Assert\nreview/pbt_test.greedy : () -> Nil ! Assert\nreview/pbt_test.zero_budget : () -> Nil ! Assert\nreview/pbt_test.cyclic_budget : () -> Nil ! Assert\nreview/pbt_test.map_has_no_numeric_smaller_law : () -> Nil ! Assert\nreview/reduced_huge_test.sine_reduced_huge : () -> Nil ! Assert\nreview/reduced_ordinary_test.sine_reduced_ordinary : () -> Nil ! Assert\n",
+      "stderr": ""
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": "timeout",
+      "stdout": "pass review/fixed_test.cosine_reduced_one\npass review/math_test.atan_fifth_29\npass review/math_test.atan_fifth_250\npass review/math_test.atan_half_65\npass review/math_test.sine_one_20\npass review/pbt_test.dependent\npass review/pbt_test.greedy\npass review/pbt_test.zero_budget\npass review/pbt_test.cyclic_budget\npass review/pbt_test.map_has_no_numeric_smaller_law\npass review/qa_corpus_runtime_test.qa_startup\n",
+      "stderr": ""
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": "timeout",
+      "stdout": "pass review/fixed_test.cosine_reduced_one\npass review/math_test.atan_fifth_29\npass review/math_test.atan_fifth_250\npass review/math_test.atan_half_65\npass review/math_test.sine_one_20\npass review/pbt_test.dependent\npass review/pbt_test.greedy\npass review/pbt_test.zero_budget\npass review/pbt_test.cyclic_budget\npass review/pbt_test.map_has_no_numeric_smaller_law\npass review/qa_corpus_runtime_test.qa_startup\n",
+      "stderr": ""
+    }
+  }
+}

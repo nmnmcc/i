@@ -1,0 +1,55 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 19.1ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 16.6ms
+50/1967 {'1': 16, '0': 34}
+100/1967 {'1': 21, '0': 79}
+150/1967 {'1': 50, '0': 100}
+200/1967 {'1': 100, '0': 100}
+250/1967 {'1': 150, '0': 100}
+300/1967 {'1': 193, '0': 107}
+350/1967 {'1': 230, '0': 120}
+400/1967 {'1': 262, '0': 138}
+450/1967 {'1': 298, '0': 152}
+500/1967 {'1': 336, '0': 163, 'timeout': 1, 'checker-crash-or-timeout': 1}
+550/1967 {'1': 352, '0': 194, 'timeout': 4, 'checker-crash-or-timeout': 4}
+600/1967 {'1': 392, '0': 204, 'timeout': 4, 'checker-crash-or-timeout': 4}
+650/1967 {'1': 423, '0': 223, 'timeout': 4, 'checker-crash-or-timeout': 4}
+700/1967 {'1': 467, '0': 229, 'timeout': 4, 'checker-crash-or-timeout': 4}
+750/1967 {'1': 506, '0': 240, 'timeout': 4, 'checker-crash-or-timeout': 4}
+800/1967 {'1': 541, '0': 255, 'timeout': 4, 'checker-crash-or-timeout': 4}
+850/1967 {'1': 542, '0': 304, 'timeout': 4, 'checker-crash-or-timeout': 4}
+900/1967 {'1': 542, '0': 354, 'timeout': 4, 'checker-crash-or-timeout': 4}
+950/1967 {'1': 587, '0': 359, 'timeout': 4, 'checker-crash-or-timeout': 4}
+1000/1967 {'1': 625, '0': 371, 'timeout': 4, 'checker-crash-or-timeout': 4}
+1050/1967 {'1': 661, '0': 383, 'timeout': 6, 'checker-crash-or-timeout': 6}
+1100/1967 {'1': 700, '0': 394, 'timeout': 6, 'checker-crash-or-timeout': 6}
+1150/1967 {'1': 742, '0': 402, 'timeout': 6, 'checker-crash-or-timeout': 6}
+1200/1967 {'1': 772, '0': 420, 'timeout': 8, 'checker-crash-or-timeout': 8}
+1250/1967 {'1': 810, '0': 426, 'timeout': 14, 'checker-crash-or-timeout': 14}
+1300/1967 {'1': 851, '0': 435, 'timeout': 14, 'checker-crash-or-timeout': 14}
+1350/1967 {'1': 893, '0': 443, 'timeout': 14, 'checker-crash-or-timeout': 14}
+1400/1967 {'1': 933, '0': 453, 'timeout': 14, 'checker-crash-or-timeout': 14}
+1450/1967 {'1': 977, '0': 459, 'timeout': 14, 'checker-crash-or-timeout': 14}
+1500/1967 {'1': 1023, '0': 463, 'timeout': 14, 'checker-crash-or-timeout': 14}
+1550/1967 {'1': 1064, '0': 470, 'timeout': 16, 'checker-crash-or-timeout': 16}
+1600/1967 {'1': 1085, '0': 499, 'timeout': 16, 'checker-crash-or-timeout': 16}
+1650/1967 {'1': 1120, '0': 514, 'timeout': 16, 'checker-crash-or-timeout': 16}
+1700/1967 {'1': 1150, '0': 534, 'timeout': 16, 'checker-crash-or-timeout': 16}
+1750/1967 {'1': 1181, '0': 553, 'timeout': 16, 'checker-crash-or-timeout': 16}
+1800/1967 {'1': 1208, '0': 576, 'timeout': 16, 'checker-crash-or-timeout': 16}
+1850/1967 {'1': 1215, '0': 619, 'timeout': 16, 'checker-crash-or-timeout': 16}
+1900/1967 {'1': 1215, '0': 669, 'timeout': 16, 'checker-crash-or-timeout': 16}
+1950/1967 {'1': 1215, '0': 719, 'timeout': 16, 'checker-crash-or-timeout': 16}
+{
+  "selected": 1967,
+  "checks": {
+    "1": 1215,
+    "0": 736,
+    "timeout": 16,
+    "checker-crash-or-timeout": 16
+  },
+  "failures": []
+}

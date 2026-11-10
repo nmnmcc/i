@@ -1,0 +1,6 @@
+{
+  "code": 1,
+  "out": "app/main.get : () -> Nil ! Dep\napp/main.run : (body: () -> Nil ? E ! N) -> Nil ? E ! N\napp/main.use : () -> Nil ? E ! N | S(A & E, B & N)\napp/main.main : () -> Nil ? E ! N | S(A & E, B & N)\n",
+  "err": "src/main.i:7:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (\u00a710.2), but it needs `S(a & b, c & d)`, which must be given before it gets to the entry point\nsrc/main.i:7:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (\u00a710.2), but it needs `a`, which must be given before it gets to the entry point\n2 errors\n",
+  "seconds": 0.018313620937988162
+}

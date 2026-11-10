@@ -1,0 +1,7 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 21.4ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 10.7ms
+W520: 18 marked cases, 7 censored changes, 762 startup harness changes, 0 unexplained changes

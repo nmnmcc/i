@@ -1,0 +1,7 @@
+spec/labelled_calls.check : (got: String, want: String) -> Nil
+spec/labelled_calls.show : (x: A) -> String
+spec/labelled_calls.span : (from: Int, to: Int) -> Int
+spec/labelled_calls.describe : (name: String, age: Int, city: String) -> String
+spec/labelled_calls.relabel : (first: Int, (Int, Int), last: Int) -> Int
+spec/labelled_calls.labels : () -> Nil
+spec/labelled_calls.pipes : () -> Nil

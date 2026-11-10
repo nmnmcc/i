@@ -1,0 +1,2 @@
+src/main.i:3:10: error[E0531]: a value-dependent type is not allowed in a constructor field or host type
+1 error

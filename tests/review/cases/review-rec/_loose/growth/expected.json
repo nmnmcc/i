@@ -1,0 +1,17 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:2:9: error[E0101]: expected an expression, found `..`\nsrc/main.i:3:26: error[E0101]: expected an expression, found `..`\nsrc/main.i:3:52: error[E0101]: expected an expression, found `..`\nsrc/main.i:4:26: error[E0101]: expected an expression, found `..`\nsrc/main.i:4:52: error[E0101]: expected an expression, found `..`\nsrc/main.i:5:26: error[E0101]: expected an expression, found `..`\nsrc/main.i:5:52: error[E0101]: expected an expression, found `..`\nsrc/main.i:6:26: error[E0101]: expected an expression, found `..`\nsrc/main.i:6:52: error[E0101]: expected an expression, found `..`\nsrc/main.i:7:26: error[E0101]: expected an expression, found `..`\nsrc/main.i:7:52: error[E0101]: expected an expression, found `..`\nsrc/main.i:8:26: error[E0101]: expected an expression, found `..`\nsrc/main.i:8:52: error[E0101]: expected an expression, found `..`\nsrc/main.i:9:26: error[E0101]: expected an expression, found `..`\nsrc/main.i:9:52: error[E0101]: expected an expression, found `..`\nsrc/main.i:10:26: error[E0101]: expected an expression, found `..`\nsrc/main.i:10:52: error[E0101]: expected an expression, found `..`\nsrc/main.i:11:26: error[E0101]: expected an expression, found `..`\nsrc/main.i:11:52: error[E0101]: expected an expression, found `..`\nsrc/main.i:12:28: error[E0101]: expected an expression, found `..`\nsrc/main.i:12:55: error[E0101]: expected an expression, found `..`\nsrc/main.i:13:28: error[E0101]: expected an expression, found `..`\nsrc/main.i:13:56: error[E0101]: expected an expression, found `..`\nsrc/main.i:14:28: error[E0101]: expected an expression, found `..`\nsrc/main.i:14:56: error[E0101]: expected an expression, found `..`\nsrc/main.i:15:28: error[E0101]: expected an expression, found `..`\nsrc/main.i:15:56: error[E0101]: expected an expression, found `..`\nsrc/main.i:16:28: error[E0101]: expected an expression, found `..`\nsrc/main.i:16:56: error[E0101]: expected an expression, found `..`\nsrc/main.i:17:28: error[E0101]: expected an expression, found `..`\nsrc/main.i:17:56: error[E0101]: expected an expression, found `..`\nsrc/main.i:18:28: error[E0101]: expected an expression, found `..`\nsrc/main.i:18:56: error[E0101]: expected an expression, found `..`\nsrc/main.i:19:28: error[E0101]: expected an expression, found `..`\nsrc/main.i:19:56: error[E0101]: expected an expression, found `..`\nsrc/main.i:20:28: error[E0101]: expected an expression, found `..`\nsrc/main.i:20:56: error[E0101]: expected an expression, found `..`\nsrc/main.i:21:28: error[E0101]: expected an expression, found `..`\nsrc/main.i:21:56: error[E0101]: expected an expression, found `..`\nsrc/main.i:22:28: error[E0101]: expected an expression, found `..`\nsrc/main.i:22:56: error[E0101]: expected an expression, found `..`\nsrc/main.i:26:16: error[E0101]: expected `}`, found `:`\n42 errors\n"
+    }
+  }
+}

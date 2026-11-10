@@ -1,0 +1,3 @@
+spec/a1_opening.make : (n: Int) -> (x: Int) -> Int
+spec/a1_opening.read : (v: Int | String) -> Int
+spec/a1_opening.main : () -> Nil ! Assert

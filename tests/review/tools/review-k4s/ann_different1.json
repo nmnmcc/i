@@ -1,0 +1,6 @@
+{
+  "name": "ann_different1",
+  "code": 0,
+  "time": 0.018128705210983753,
+  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.test : (f: () -> Nil ! N, g: () -> Nil ! N2) -> Nil ! N | N2\n"
+}

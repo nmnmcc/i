@@ -1,0 +1,6 @@
+{
+  "code": 0,
+  "out": "app/main.use : (x: A) -> A ? E ! N | N2 | S(A, E, N2, N)\napp/main.run : (body: () -> A ? E ! N) -> A ? E ! N\napp/main.wrap : (x: A & B) -> B ? E ! N | N2 | S(A & B, C & E, N, N2)\n",
+  "err": "",
+  "seconds": 0.022985836025327444
+}

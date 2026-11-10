@@ -1,0 +1,6 @@
+{
+  "code": 1,
+  "out": "",
+  "err": "src/main.i:1:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n",
+  "seconds": 0.01842425507493317
+}

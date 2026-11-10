@@ -1,0 +1,6 @@
+Design trace, not run:
+1. Browser worker 0 (B) has no runnable task while worker A is running. Section 6 forbids B from blocking and requires its ordinary request-mode wake request even with no user requests; B idles at status 1.
+2. A's last runnable task executes sync(never()). No user IO is outstanding and no task can make progress.
+3. The literal multicore section 6 predicate still sees B's outstanding wake request, so outstanding != 0 and no deadlock is reported.
+4. If A also installs a wake request, both wait forever. The wake requests are the only outstanding work.
+The quiescence predicate must exclude scheduler-control waits, with ownership/accounting specified using the general Root/Owner mechanism.

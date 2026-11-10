@@ -1,0 +1,8 @@
+import { readFile } from 'node:fs/promises';
+import { instantiate } from '/home/agent/Programming/i/.rd/note-js/bindings/javascript/ilang.mjs';
+const bytes = await readFile('/tmp/review-js3/opaque.wasm');
+const app = await instantiate(bytes);
+const shared = {};
+console.log('same raw object, A vs B:', app.call('probe/main.same', [shared, shared]));
+console.log('different raw objects, A vs B:', app.call('probe/main.same', [{}, {}]));
+console.log('null, A vs B:', app.call('probe/main.same', [null, null]));

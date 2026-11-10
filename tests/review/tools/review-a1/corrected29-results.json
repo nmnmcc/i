@@ -1,0 +1,22 @@
+{
+  "before": {
+    "rc": 0,
+    "out": "{\"check\":[],\"parse\":[],\"roundtrip\":true,\"wat\":true}\n",
+    "err": "RUN Ok(Ok(Nil))\n"
+  },
+  "fmt": {
+    "rc": 0,
+    "out": "",
+    "err": ""
+  },
+  "after": {
+    "rc": 0,
+    "out": "{\"check\":[],\"parse\":[],\"roundtrip\":true,\"wat\":true}\n",
+    "err": "RUN Ok(Ok(Nil))\n"
+  },
+  "idem": {
+    "rc": 0,
+    "out": "",
+    "err": ""
+  }
+}

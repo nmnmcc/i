@@ -1,0 +1,4 @@
+spec/choices_guard.check : (got: String, want: String) -> Nil
+spec/choices_guard.pick : (p: (Int, Int) | A - (Int, Int)) -> String
+spec/choices_guard.tag : (v: Result(A, B)) -> String
+spec/choices_guard.choices : () -> Nil
