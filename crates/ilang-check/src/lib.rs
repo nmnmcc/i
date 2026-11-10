@@ -7,6 +7,7 @@
 mod capabilities;
 pub mod hir;
 pub mod identity;
+pub mod macro_sandbox;
 pub mod order;
 pub mod query;
 pub mod resolve;
