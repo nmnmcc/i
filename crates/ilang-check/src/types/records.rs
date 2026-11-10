@@ -3,3 +3,4 @@
 //! The pure kernel is tested before production type conversion is connected.
 
 mod bdd;
+mod graph;

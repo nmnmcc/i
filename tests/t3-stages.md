@@ -317,3 +317,75 @@ checker branch-growth/Fan timings, 1/10/100/1,000-field measurements, std
 +10% comparison and final merged-baseline WAT comparison remain required.
 The 898-file export above is only a pre-W520 baseline capture. Model/kernel
 timings are not substitutes for the real-checker or runtime scale gates.
+
+## Examples corrected
+
+The coordinator resolved the head-test example: “the rule stands and the
+example is wrong.” Spec §7.1 and records §7 still require every possible
+record to satisfy the tested fields. Section 15.1 now requires the addition
+input `{ a: Int, K: Int }` and the removal input `{ a: Int }`. The original
+`r: {..}` forms are required rejections. Their exact frontend diagnostics
+will be recorded once record syntax and typing are connected; the finite
+model is not a substitute for those checks.
+
+Standing coordinator rule: when the spec and a numbered rule agree, correct
+an example or expected-output disagreement and continue. Only conflicting
+rules or an unbuildable rule require a stop. The earlier stop is historical.
+
+Resumption was clean at ba76bf8; no interrupted work needed preservation.
+`git merge refs/heads/redesign` initially reported Already up to date at
+82375c0. The type/compiler studies are still absent from this actual ref;
+their accepted git objects remain available and were read earlier. Continue
+using them and recheck the moving ref rather than block on that provenance.
+
+## Stage 3: exact source graph and record products
+
+References read before implementation:
+
+- Elixir descr.ex, map_literal_intersection and init_map_line_empty?: merge
+  required fields and stop at an empty required field. i uses only open
+  required source fields; absence predicates remain internal to proofs.
+- Elixir descr.ex, bdd_node_new and bdd_compute_hash (stage 2): shallow keys
+  and shared children. i adds suspended source Union/Inter/Without nodes
+  per §21.2; construction never calls Boolean apply or enumerates DNF.
+- MLstruct ConstraintSolver.scala, freshenAbove: one substitution map for
+  variables and their bounds, shared across the whole type. i's source graph
+  visitor is iterative and memoized by handle; labels use one separate map,
+  and replacement reruns N1/N2 and guarded E4 without losing invariant uses.
+- tsrs docs/CHECKER.md, the type arena and stable TypeId sections: use safe
+  integer handles with shallow payload keys. i does not take static pointers
+  or mutable type payloads; graph nodes are immutable and topological.
+
+Guarded E4 follows records §4.3/J8: only syntactically universally inhabited
+discarded fields may disappear, independent of live solver bounds. N2 and
+exact union retention follow §§20.2/21.2, not MLstruct's common-field join.
+
+Stage 3 results:
+
+- The first core build failed: ValueSet's operation is named meet, not
+  inter. Corrected the call; the next ten-test core run passed. The scheme
+  sharing probe selects fields by label, rather than assuming intern-ID
+  order gives source union order.
+- Added tests/t3-record-graph-oracle.py. The accepted eager model's independent
+  64-row set interpreter and the accepted compact model agree on 36,328
+  source construction/substitution cases. The Rust graph matches both.
+  This is a graph-engine differential test, not yet a frontend test.
+- `heavy direnv exec /home/agent/Programming/i env
+  ILANG_BROWSER_PORT=4181 ./scripts/dev-verify`: exit 0. All 11 record-core
+  tests passed, along with formatting, Clippy -D warnings, workspace tests,
+  241 existing spec cases O0/O2, the i O0/O2 suites, WASI smoke, SDK tests
+  and 51 browser tests. No production record path is connected yet.
+- `direnv exec /home/agent/Programming/i ./scripts/old-syntax-check`:
+  exit 0, 1,630 snippets, 25 T3 future entries. No new future entry needed.
+- The corrected head-test interpretation probe exits 0: broad inputs are
+  refuted and field-constrained repairs proven. Exact frontend diagnostics
+  for the two rejection fixtures remain pending the frontend connection.
+- `git diff --check` passes. No generated/golden change; no interrupted
+  check; command-scoped environment only. The separately queued final core
+  rerun is redundant with the full gate's 11 passing tests.
+
+The stage 4 consumer audit starts from 296 matches of the prescribed
+Ty::Con/Ty::Fn/head/Head search, saved in target/t3-ty-audit-before.txt.
+The audit must cover graph children and labels as well as record heads.
+Redesign is still 82375c0 and is an ancestor. This checkpoint continues
+directly into production graph/solver integration under the standing rule.

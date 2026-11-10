@@ -968,7 +968,9 @@ Correct programs (`// expect: pass`):
 - `schema.i`: the program of part 5.8, exactly as written, with the scheme of `field` and the type of `user`.
 - `codec.i`: the program of part 5.9, exactly as written, with the scheme of `field`; `Codec(User, _) = user` binds `User` to `{ age: Int, name: String }`, also when the module has a binding `roundtrip = (j) { user.encode(user.decode(j)?) }` that decodes a value and encodes it again, and `roundtrip` runs. The test does not expect a shown type for the encode side of `user`, because it depends on the calls of `user.encode` (part 5.9). The same program with `user: Codec({ age: Int, name: String }, { age: Int, name: String })` written is correct and is shown with that type.
 - `label_param_pass.i`: a label parameter passed through two levels of functions by the name of its parameter; and the same key passed by both names of the alias parameter `(r: { K: Int }, k2 = key: K)` (L4 step 2).
-- `type_test_spread_key.i`: `f(K) = (r: {..}, key: K) -> Int { r |> { y: { ..{ a: Int }, K: Int } -> 0  _ -> 1 } }`, and the same with `y: { ..{ a: Int }, -K }`; each type test takes every record (part 14, `pattern.rs`), and no CASE_TYPE_VAR is given.
+- `type_test_spread_key.i`: `f(K) = (r: { a: Int, K: Int }, key: K) -> Int { r |> { y: { ..{ a: Int }, K: Int } -> 0  _ -> 1 } }`, and `g(K) = (r: { a: Int }, key: K) -> Int { r |> { y: { ..{ a: Int }, -K } -> 0  _ -> 1 } }`. Each input satisfies the tested fields for every key; each test takes every record (part 14, `pattern.rs`), and no CASE_TYPE_VAR is given.
+
+  Coordinator ruling: “the rule stands and the example is wrong.” The standing correction rule is: “when the spec and a numbered design rule agree and only an example, fixture or expected output in a note disagrees with them, the rule wins: correct the example, add the wrong form as a rejection (or acceptance) test with the reason”. Spec §7.1 and rule 11 agree with part 7: a record head test cannot filter fields. The original broad-input versions below are rejection tests, not alternative runtime behavior.
 - `record_equality.i` (in `tests/spec/11/`, §11.4): `{ a: 1, b: 2 } == { b: 2, a: 1 }`; `{ a: 1 } != { a: 1, b: 2 }`, also when both reach `==` through a parameter of type `{ a: Int }`; `{ a: 1 } != { b: 1 }`.
 - `record_text_form.i` (in `tests/spec/11/`, §11.8): `core.inspect` of `{..}`, of `{ age: 36, name: "ada" }`, of a record with the quoted labels `"Type"` and `"first-name"` (`{ "Type": 1 }`, not `{ Type: 1 }`), and of a nested record.
 - `evaluation_order_record.i` (in `tests/spec/6/`, §6.2, as `evaluation_order.i`): effects in a literal `{ b: f(1), a: f(2) }` happen in the order written, not in label order; in `{ ..g(), a: f(1) }`, `g()` happens first.
@@ -999,6 +1001,7 @@ Correct programs (`// expect: pass`):
 - `texts.i`: `record.texts({ user: "ada", tries: 3 })` is `[("tries", "3"), ("user", "\"ada\"")]`, and a log line built from it in plain i.
 
 Programs that must be rejected (the refuter's list), each with its code:
+- `type_test_spread_key_broad.i`, `type_test_remove_key_broad.i`: the two original programs above with `r: {..}`. The addition variant with K = `"a"`, and the removal variant with K = `"b"`, require an a field that the empty record lacks. Both must report the ordinary missing-field subtype diagnostic, not CASE_TYPE_VAR. Record the exact emitted text when frontend typing is connected.
 - `bump_unsound.i` (E0501): part 5.6's `bump` with `put`.
 - `twist_unsound.i` (E0501): `twist({ a: 1 }, "a").a + 1`.
 - `twist_body.i` (E0544): part 5.7's `peek`, with `r: { a: Int }`, and again with `r: {..}`; both errors are in the body, at the `.a`.

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Interpretation probe for records section 15.1's spread-key test.
+"""Interpretation regression for corrected records section 15.1 examples.
 
 Spec 7.1: every possible record at a head test must satisfy its fields.
-Records 15.1 lists the broad-input function as a correct program instead.
+The coordinator corrected the broad-input fixture: it must be rejected.
 This checks the closed K = "a" instance against the accepted map model.
 It is not a frontend test: record syntax is not implemented yet.
 """
@@ -31,4 +31,4 @@ removed = kernel.project(kernel.leaf({"a": 3}), {"b"})
 assert kernel.inclusion(1, removed) == "Refuted"
 assert kernel.inclusion(target, removed) == "Proven"
 print("Broad inputs refuted in both variants; field-constrained repairs proven.")
-print("The empty record witnesses the conflict with the required pass verdict.")
+print("The empty record witnesses both required broad-input rejections.")
