@@ -106,3 +106,34 @@ fn every_frozen_old_golden_that_parses_can_migrate_or_is_explicitly_refused() {
         }
     }
 }
+
+#[test]
+fn review_write_check_preserves_string_and_documentation_payloads() {
+    for source in [
+        "f = () { \"@1..2\" }\n",
+        "//// @1..2\nf = 1\n",
+        "@deprecated(\"@1..2\")\nf = 1\n",
+        "f = (s) { case s { \"@1..2\" -> 1 _ -> 0 } }\n",
+    ] {
+        let (m, d) = parse_module_old(source);
+        assert!(d.is_empty());
+        let plan = migrate::plan(&m, &Env::new(&m));
+        let out = format_from_old(source).unwrap();
+        assert!(migrate::check_written(&m, &plan, &out.replace("@1..2", "@3..4")).is_err());
+    }
+}
+
+#[test]
+fn review_extraction_keeps_distinct_braces_and_reaches_a_fixed_point() {
+    let source = "f = () { case (x) -> Int { x }(42) { _ -> 42 } * 10 }\n@main\nmain = () { assert(f() == 420) Nil }\n";
+    let (m, d) = parse_module_old(source);
+    assert!(d.is_empty());
+    let plan = migrate::plan(&m, &Env::new(&m));
+    assert_eq!(plan.extractions.len(), 1);
+    let layout = migrate::splice(source, &plan).unwrap();
+    assert!(parse_module(&layout.text).1.is_empty());
+    migrate::check_written(&m, &plan, &layout.text).unwrap();
+    let out = format_from_old(source).unwrap();
+    assert_eq!(format(&out).unwrap(), out);
+    assert_eq!(format(&layout.text).unwrap(), out);
+}

@@ -140,8 +140,55 @@ def replace_pattern(text, pair, required=False):
     return use.sub(change, text)
 
 
+def symbolic_function_refs(text):
+    """Only the compiler's folded, symbolic function-reference dialect is safe.
+
+    Function order is normalized below. Numeric references and unsupported
+    element/start forms must not survive with an index-dependent meaning.
+    """
+    tokens = []
+    literal = re.compile(STRING)
+    atom = re.compile(r'[^\s()]+')
+    i = 0
+    while i < len(text):
+        if text.startswith(';;', i):
+            end = text.find('\n', i); i = len(text) if end < 0 else end; continue
+        if text.startswith('(;', i):
+            depth = 1; i += 2
+            while depth and i < len(text):
+                if text.startswith('(;', i): depth += 1; i += 2
+                elif text.startswith(';)', i): depth -= 1; i += 2
+                else: i += 1
+            require(depth == 0, 'unclosed WAT comment')
+            continue
+        if text[i].isspace(): i += 1; continue
+        if text[i] == '"':
+            m = literal.match(text, i); require(m is not None, 'unclosed WAT string')
+            tokens.append('<string>'); i = m.end(); continue
+        if text[i] in '()': tokens.append(text[i]); i += 1; continue
+        m = atom.match(text, i); tokens.append(m[0]); i = m.end()
+    for i, token in enumerate(tokens):
+        following = tokens[i + 1] if i + 1 < len(tokens) else ''
+        if token in {'call', 'return_call', 'ref.func'}:
+            require(i > 0 and tokens[i - 1] == '(' and following.startswith('$'),
+                    'allowed comparison requires folded symbolic function references')
+        if token == 'func':
+            require(not re.fullmatch(r'[+-]?(?:0x[0-9a-fA-F_]+|[0-9][0-9_]*)', following),
+                    'numeric function references are not supported in allowed comparison')
+        if token == 'start':
+            raise Failure('start forms are not supported in allowed comparison')
+        if token == 'elem':
+            require(tokens[i + 1:i + 3] == ['declare', 'func'],
+                    'only symbolic declare elements are supported in allowed comparison')
+            j = i + 3
+            while j < len(tokens) and tokens[j] != ')':
+                require(tokens[j].startswith('$'), 'numeric element references are not supported')
+                j += 1
+
+
 class Wat:
     def __init__(self, text):
+        symbolic_function_refs(text)
         self.text = text
         self.funcs = []
         self.names = {}

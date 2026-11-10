@@ -39,6 +39,12 @@ def check(a, b, allowed=None, ok=True, renumber=False):
 
 
 def main():
+    # Independent review F5: reordering definitions changes export index 1.
+    numeric = '(module\n(type $sites (array (mut i32)))\n(type $values (array (mut i32)))\n(data $site_data "")\n(func $sites_install (param (ref $sites)) (param (ref $values)))\n;; app/main.a\n(func $f0 (result i32) (i32.const 11))\n;; app/main.b\n(func $f1 (result i32) (i32.const 22))\n(func $ilang_start\n(call $sites_install (array.new_data $sites $site_data (i32.const 0) (i32.const 0))\n(array.new_fixed $values 0)))\n(export "answer" (func 1))\n)\n'
+    swapped = numeric.replace(';; app/main.a\n(func $f0 (result i32) (i32.const 11))\n;; app/main.b\n(func $f1 (result i32) (i32.const 22))', ';; app/main.b\n(func $f1 (result i32) (i32.const 22))\n;; app/main.a\n(func $f0 (result i32) (i32.const 11))')
+    assert numeric != swapped
+    check(numeric, swapped, '', ok=False)
+    check(numeric, numeric, '', ok=False)
     # Strict mode masks only the site bytes, and checks their count.
     check(wat(), wat(site='\\00\\00\\00\\00\\09\\00\\00\\00\\05\\00\\00\\00'))
     check(wat(), wat(count=0, site=''), ok=False)

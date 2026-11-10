@@ -1,45 +1,46 @@
-//! The shape of a syntax tree: its debug form with the spans taken out, to
-//! compare trees. Used by the tests.
+//! Structural normalization for write validation and syntax-tree tests.
+use crate::{
+    ast::*,
+    span::Span,
+    walk::{Visitor, Walk},
+};
 
-use crate::ast::Module;
-
-/// The debug form of a module without spans.
-pub fn shape(module: &Module) -> String {
-    let text = format!("{module:?}");
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text.as_str();
-    while let Some(at) = rest.find('@') {
-        out.push_str(&rest[..at]);
-        let tail = &rest[at + 1..];
-        let skip = tail
-            .find(|c: char| !(c.is_ascii_digit() || c == '.'))
-            .unwrap_or(tail.len());
-        if skip > 0 && tail[..skip].contains("..") {
-            rest = &tail[skip..];
-        } else {
-            out.push('@');
-            rest = tail;
-        }
+struct Unspan;
+impl Visitor for Unspan {
+    fn span(&mut self, span: &mut Span) {
+        *span = Span::default();
     }
-    out.push_str(rest);
-    out
 }
 
-/// The shape after removing expression groups, for the migration write
-/// check. No binding, parameter, annotation, or clause is erased.
-pub fn canon(module: &Module) -> String {
+/// The debug form of a module with its spans normalized structurally.
+/// String literals, names and documentation are never interpreted as spans.
+pub fn shape(module: &Module) -> String {
+    let mut module = module.clone();
+    module.walk(&mut Unspan);
+    format!("{module:?}")
+}
+
+/// Remove transparent expression groups and normalize spans. All other
+/// data, including every string payload, participates in AST equality.
+pub(crate) fn canonical(module: &Module) -> Module {
     struct Canon;
-    impl crate::migrate::Visit for Canon {
-        fn expr(&mut self, e: &mut crate::ast::Expr, enter: bool) {
+    impl Visitor for Canon {
+        fn expr(&mut self, e: &mut Expr, enter: bool) {
             if !enter
-                && let crate::ast::ExprKind::Block(b) = &e.kind
-                && let [crate::ast::Stmt::Expr(inner)] = &b.stmts[..]
+                && let ExprKind::Block(b) = &e.kind
+                && let [Stmt::Expr(inner)] = &b.stmts[..]
             {
                 *e = inner.clone();
             }
         }
     }
     let mut module = module.clone();
-    crate::migrate::visit_module(&mut module, &mut Canon);
-    shape(&module)
+    module.walk(&mut Canon);
+    module.walk(&mut Unspan);
+    module
+}
+
+/// The canonical debug form, for readable assertions in tests.
+pub fn canon(module: &Module) -> String {
+    format!("{:?}", canonical(module))
 }

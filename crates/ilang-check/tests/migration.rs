@@ -413,3 +413,26 @@ fn one_clause_report_checks_the_formatted_binding_positions() {
     assert!(count > 0, "no one-clause entries were checked");
     std::fs::write(path, output.join("\n") + "\n").unwrap();
 }
+
+#[test]
+fn review_extraction_does_not_capture_an_imported_module() {
+    let source = "import (g = app/types)\nf = () { case (x) -> Int { case g.Box(x) { g.Box(v) -> v } }(42) { _ -> 1 } * 10 }\n@main\nmain = () { assert(f() == 10) Nil }\n";
+    let types = "export (Box(..))\nBox { Box(Int) }\n";
+    for src in [
+        source.to_string(),
+        ilang_syntax::format::format_from_old(source).unwrap(),
+    ] {
+        let (g, _, d) = common::check_files(&[("src/main.i", &src), ("src/types.i", types)]);
+        assert!(d.is_empty(), "{:?}", g.sources.render_all(&d));
+    }
+    let (m, d) = ilang_syntax::parse_module_old(source);
+    assert!(d.is_empty());
+    let plan = migrate::plan(&m, &Env::new(&m));
+    assert!(plan.extractions.values().all(|e| e.name != "g"));
+    // Reserve unused outer names too, not just uses in the extracted body.
+    let source = "(g = app/types)\ng2 = 1\nf = (g3) { case (x) -> Int { x }(42) { _ -> 1 } * 10 }";
+    let (m, d) = ilang_syntax::parse_module(source);
+    assert!(d.is_empty());
+    let plan = migrate::plan(&m, &Env::new(&m));
+    assert!(plan.extractions.values().all(|e| e.name == "g4"));
+}

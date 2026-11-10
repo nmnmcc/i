@@ -369,6 +369,7 @@ struct Frame {
     declared: HashSet<String>,
 }
 struct Scan<'a> {
+    names: HashSet<String>,
     env: &'a Env,
     plan: Plan,
     owners: Vec<Owner>,
@@ -496,13 +497,14 @@ impl Scan<'_> {
             self.refuse("fn-expected-type", f.span);
             return;
         }
-        let names = expression_names(container);
+        let names = &mut self.names;
         let mut name = "g".to_string();
         let mut i = 2;
         while names.contains(&name) {
             name = format!("g{i}");
             i += 1;
         }
+        names.insert(name.clone());
         self.plan.extractions.insert(
             container.span,
             Extraction {
@@ -903,7 +905,19 @@ fn constructor(e: &Expr) -> bool {
 }
 
 pub fn plan(module: &Module, env: &Env) -> Plan {
+    use crate::walk::{Visitor, Walk};
+    struct Names(HashSet<String>);
+    impl Visitor for Names {
+        fn string(&mut self, name: &mut String) {
+            self.0.insert(name.clone());
+        }
+    }
+    // A module-wide superset is conservative for every insertion point. It
+    // includes qualifiers and binders in patterns, types and nested scopes.
+    let mut names = Names(HashSet::new());
+    module.clone().walk(&mut names);
     let mut scan = Scan {
+        names: names.0,
         env,
         plan: Plan::default(),
         owners: vec![],
@@ -1310,9 +1324,11 @@ pub fn check_written(old: &Module, plan: &Plan, out: &str) -> Result<(), Vec<cra
     if !errors.is_empty() {
         return Err(errors);
     }
-    let expected = crate::shape::canon(&apply(plan, old.clone()));
-    let actual = crate::shape::canon(&new);
+    let expected = crate::shape::canonical(&apply(plan, old.clone()));
+    let actual = crate::shape::canonical(&new);
     if expected != actual {
+        let expected = format!("{expected:?}");
+        let actual = format!("{actual:?}");
         let at = expected
             .bytes()
             .zip(actual.bytes())
@@ -1706,7 +1722,11 @@ pub fn splice(source: &str, plan: &Plan) -> Result<Spliced, Vec<crate::Diagnosti
     edits.sort_by_key(|e| (e.span.start, e.order, e.span.end));
     // Type definition parameter and type-expression spans may coincide in
     // a recovered tree. Identical edits are one edit, never overlapping.
-    edits.dedup_by(|a, b| a.span == b.span && a.text == b.text);
+    edits.dedup_by(|a, b| {
+        a.span == b.span
+            && a.text == b.text
+            && (a.span.start != a.span.end || a.order == b.order && a.scope == b.scope)
+    });
     let text = edited_range(source, Span::new(0, source.len() as u32), &edits)?;
     let before: Vec<_> = crate::lex(source)
         .comments

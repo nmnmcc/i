@@ -1456,18 +1456,19 @@ impl<'a> Formatter<'a> {
             self.printing_function.remove(&extract.function.span);
             let rest = self.expr(e, 0);
             self.expanding.remove(&e.span);
-            return cat(vec![
+            let (a, b, c) = (self.hard(), self.hard(), self.hard());
+            return group(cat(vec![
                 text("{"),
                 nest(cat(vec![
-                    Doc::Hard,
+                    a,
                     text(format!("{} = ", extract.name)),
                     value,
-                    Doc::Hard,
+                    b,
                     rest,
                 ])),
-                Doc::Hard,
+                c,
                 text("}"),
-            ]);
+            ]));
         }
 
         self.continued(e.span.start, |f| {
