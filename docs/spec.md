@@ -5,13 +5,13 @@ This document is the definition of the i programming language. A compiler or a p
 This document is complete in itself. It defines:
 
 - the source language (§1 to §8);
-- effects, and the library modules `i/fail`, `i/control`, `i/resource`, `i/assertion`, and `i/io` (§9);
+- effects, and the library modules `i/fail`, `i/control`, `i/resource`, `i/assertion`, `i/io`, and `i/random` (§9);
 - the library module `i/core`, which has the operations that are not written in i (§13);
 - packages, versions, and the files `i.toml` and `i.lock` (§2.1, §2.6 to §2.8);
 - what programs do when they run, and the text form of values (§11);
 - the binary interface between a compiled module and its host (§10 and Appendix B).
 
-Every compiler must give the six library modules above. The paths `i/task`, `i/clock`, `i/random`, `i/fs`, `i/process`, `i/net`, and `i/stdio` are kept for library modules that are not defined yet: each is a module with no names, and a program may not define a module with one of these paths. Other library modules, the command-line tools, and the way test results are shown are not part of the language.
+Every compiler must give the seven library modules above. The paths `i/task`, `i/clock`, `i/fs`, `i/process`, `i/net`, and `i/stdio` are kept for library modules that are not defined yet: each is a module with no names, and a program may not define a module with one of these paths. Other library modules, the command-line tools, and the way test results are shown are not part of the language.
 
 i is small, and every part of it is what it looks like. A thing that looks like a function is a normal function, and a clause block is a function too (§6.12). A binding is a binding wherever it is written, and a clause block with one clause and no guard binds its pattern as a parameter does. Where two forms look the same, they have the same rules, with these exceptions, where the place of a form decides its rules:
 
@@ -134,7 +134,7 @@ Modules in `test/` are only compiled when the tests of their package are run. Th
 
 In a module, the first part of a module path says which package the module is in. It must be one of these:
 
-- `i`, for the six **library modules** (§9, §13), which every compiler gives, and the kept paths named at the start of this document. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
+- `i`, for the seven **library modules** (§9, §13), which every compiler gives, and the kept paths named at the start of this document. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
 - the `name` of the module's own package;
 - a dependency name of the module's own package (§2.6); in a test module, also a dev-dependency name.
 
@@ -1008,6 +1008,81 @@ Storage { Storage(read: (key: String) -> String ? String) }
 - A host service in the environment of an entry point (§10.2) is given by the host. Every field is the Wasm import with the import module `namespace` and the field label as its name, encoded as in Appendix B.
 - i code may also give a host service with an environment statement, for example to put a fake in its place in a test.
 - The library module `i/io` declares and exports the **standard service**: `@host("i:io/v1") Io { Io(print: (text: String) -> Nil) }`. `print` writes the text and a line feed to the standard output. A program that prints imports it, for example `((Io) = i/io)`, and takes it from the environment of an entry point like any host service. `i run` and `i test` give it to every program, and on the WASI target the module gives it itself (§B.7). Any other host, such as an embedder or the JavaScript SDK, gives it like any other host service, or the program cannot run there. A host service declared in another module with the namespace `i:io/v1` is a normal host service, and the rule above about namespaces and labels is true for it as for any other: with a field `print`, it is a compile error.
+
+### 9.10 Random generators
+
+The module `i/random` gives pure, repeatable random computations. It needs no
+service and does not import `i/task`. It exports the type `Generator` with its
+constructor hidden, the error type below with its constructors, and these
+functions. The signatures describe bindings with bodies.
+
+```i
+RandomError { InvalidBound(Int) InvalidPath(List(Int)) }
+```
+
+| Name | Type |
+|---|---|
+| `from_seed` | `(seed: Int) -> Generator` |
+| `word` | `(g: Generator) -> (Int, Generator)` |
+| `int` | `(g: Generator, below: Int) -> (Int, Generator) ? RandomError` |
+| `float` | `(g: Generator) -> (Float, Generator)` |
+| `split` | `(g: Generator) -> (Generator, Generator)` |
+| `at_path` | `(g: Generator, path: List(Int)) -> Generator ? RandomError` |
+
+A Generator contains a normalized seed, SplitMix state, tagged derivation
+history, and a nonnegative draw index. Equality is ordinary structural equality.
+Reusing the same immutable input repeats the same result; callers pass the next
+generator to get more values. This is not a cryptographic generator. Different
+streams need not have disjoint outputs, and their finite states can collide.
+
+The algorithm is SplitMix, by Steele, Lea and Flood
+([OOPSLA 2014](https://gee.cs.oswego.edu/dl/papers/oopsla14.pdf)), using the
+`mkSMGen`, `nextWord64`, and `splitSMGen` variant of
+[splitmix 0.1.3.1](https://hackage-content.haskell.org/package/splitmix-0.1.3.1/docs/src/System.Random.SplitMix.html).
+Its exact operations are as follows. Let W = 2^64. Shifts are unsigned, and
+additions and multiplications reduce modulo W. M(x) applies xor-shift 33,
+multiply by 0xff51afd7ed558ccd, xor-shift 33, multiply by 0xc4ceb9fe1a85ec53,
+then xor-shift 33. V(x) applies xor-shift 30, multiply by 0xbf58476d1ce4e5b9,
+xor-shift 27, multiply by 0x94d049bb133111eb, then xor-shift 31. G(x) sets
+the low bit of V(x) to give z; if popcount(z xor (z >> 1)) < 24, it gives
+z xor 0xaaaaaaaaaaaaaaaa, otherwise z.
+
+`from_seed` reduces its arbitrary Int seed by Euclidean remainder modulo W to
+n in 0..W-1. Seeds differing by W give the same generator. Its initial state is
+(M(n), G(n + 0x9e3779b97f4a7c15)), with empty history and draw index zero.
+A state (s, gamma) draws M(s + gamma), then becomes (s + gamma, gamma).
+`word` gives this word in 0..W-1 and increments the draw index. Native splitting
+gives continuation (s + 2*gamma, gamma) and child
+(M(s + gamma), G(s + 2*gamma)).
+
+The public derivations navigate this native split tree. Define fork(h) by
+native-splitting h into (rest, a), then native-splitting rest into (_, b), and
+returning the two children (a, b). Each bit 0 or 1 selects that fork child,
+using the entire current state. Give the split step S(1) code 00 and S(2) code
+01. For a positive index i, give the path step P(i) code 1 followed by Elias
+gamma(i): put k-1 zeros before the k-bit binary representation of i. Thus
+P(1) = 11, P(2) = 1010, and P(3) = 1011. These codes are prefix-free.
+
+`split` returns the generators reached by S(1) and S(2). `at_path` follows
+P(i) for each successive list element. Each derivation appends the tagged step
+and the previous draw index to the history and resets its draw index to zero.
+Derivation after a draw therefore differs from derivation of its input.
+Consecutive path components behave the same whether given in one `at_path`
+call or several. `at_path(g, [])` is g. Path and split steps are distinct,
+including for arbitrarily large Int indices; scheduling never selects bits.
+
+`int(g, below)` requires below > 0, including arbitrary-size bounds. Otherwise
+it raises `InvalidBound(below)` without a draw. Use the least k with W^k >= below,
+at least one. Draw k words in least-significant-first order to form u. Let
+limit = W^k - (W^k % below). Reject u >= limit and draw another group. Give
+u % below and the generator after every accepted and rejected draw. This
+avoids modulo bias under the uniform word model. `float` draws one word u and
+gives floor(u / 2^11) / 2^53 as a Float, with that word's next generator. Its
+result is in [0, 1); at most 53 bits enter the conversion.
+
+`at_path(g, path)` requires every index to be strictly positive. Otherwise it
+raises `InvalidPath(path)` without a draw or derivation, carrying the whole
+supplied path.
 
 ## 10. The host boundary
 
