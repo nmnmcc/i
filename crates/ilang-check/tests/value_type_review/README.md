@@ -28,5 +28,6 @@ Interpretation requirements (not generated expectations):
 
 `review_declaration_permutations_are_identical` generates all 120 permutations
 from the review's five declarations. The CLI performance test generates every
-ordinary/value-dependent chain and reverse chain at all four requested sizes;
+ordinary/value-dependent chain and reverse chain at all four requested sizes
+and the review's earlier 64/128/256 probes;
 no scratch-directory files or external timing scripts are required.

@@ -291,3 +291,66 @@ from inside that same directory; checkout failed and was corrected to the
 exact upstream SHA before the queued build began. Temporary baseline worktrees
 and their exact Binaryen symlinks are retained under target/. No shared lock,
 user checkout, dependency, shell configuration or another lane was changed.
+
+The full post-merge Rust gate first stopped at kept.out: resolving heads before
+an invalid source now also reports E0202 for the undefined Schema. Spec §4.3
+requires the head to name an existing type; X4 retains resolved query references
+through failure. UPDATE=1 cargo test -p ilang-check --test types --locked adds
+only that diagnostic, without changing inferred type lines. The first
+old-syntax run found an incomplete Rust source-assembly fragment in the new
+negative Exact-head test. Replacing a complete valid declaration now builds
+the two cases; old-syntax passes without another exemption.
+
+The redesign merge at 94789e6 conflicted in the old alias-reservation paragraphs
+of syntax.md and spec §4.3. Resolution retains the accepted T2 classification
+and the upstream @js declaration wording (including the closed nominal host
+annotation). No provider/runtime text was rewritten. No controlling rule was
+overturned.
+
+The chain generator also covers the review's earlier 64/128/256-size probes,
+in addition to the four mandatory sizes. All 68 project reproducers are thus
+retained directly or generated in full by repository tests.
+
+## Verification after the independent review
+
+Compiler checkpoint: 1804086; redesign merge: 245f518, containing exactly
+94789e6141d9d2213d3b909b07bcbac9bbcdb02d as its upstream parent. The detached
+baseline at target/t2-baseline-1ce1a7e was moved to that exact upstream SHA;
+both its release compiler and WAT test compiler were rebuilt, and its WAT dump
+was exported again. Binaryen still resolves to the recorded fba5005 commit.
+
+| Criterion | Final command and result |
+| --- | --- |
+| Review semantics, transactional completion and query recovery | `cargo test -p ilang-check --test value_types --lib -p ilang-lsp --test protocol --locked`: 31 integration families, 6 solver checks and 14 LSP protocol checks pass. All 56 checked-in projects, 120 declaration permutations and the generated scale cases run from repository sources. The full Rust gate repeats these checks. |
+| Rust, package and interface consumers | `ILANG_BROWSER_PORT=4182 ./scripts/dev-verify`: fmt, clippy -D warnings and locked workspace tests pass, including all three value-type interface tests (`target/t2-review-verify2.log`). |
+| Runtime and hosts | The same full command passes std 1465, hello 2 and bench 12 tests at each of O0/O2, WASI smoke, 76 Node tests and 51 browser tests. |
+| Spec | `cargo test -p ilang-cli --test spec --locked`: 180/180 cases pass at O0/O2, including the four review runtime tests (`target/t2-review-spec.log`). |
+| Syntax | `./scripts/old-syntax-check`: 1409 snippets parsed, exact diagnostics match, 19 future-track entries and no T2 entry (`target/t2-review-old-syntax2.log`). No exemption was added. |
+| Existing WAT | `WAT_DUMP=... cargo test -p ilang-cli --test wat_dump --locked` at exact upstream and candidate: 636 baseline files, 674 candidate files, missing 0, changed 0; all 38 additions are T2 (`target/t2-review-wat-comparison.json`). The comparison checks every baseline byte. |
+| Alias-chain cost | `T2_PERFORMANCE_I=.../target/release/i cargo test -p ilang-cli --test value_type_performance --locked -- --nocapture`: all seven sizes in both orders pass the exact 3x gate. The normal debug-compiler run also passes (`target/t2-review-chain-debug-final.log`). |
+| Ordinary corpus cost | `python3 crates/ilang-check/tests/value_types_time.py --baseline .../t2-baseline-build/release/i --candidate .../target/release/i --project .../t2-baseline-1ce1a7e/std`: one warm-up plus 11 samples per compiler, medians 286.04/300.10 ms, +4.91%, below +10% (`target/t2-review-time-std.json`). This is a shared-machine measurement, not a substitute for an idle coordinator measurement. |
+
+Final release chain medians in milliseconds, with the same-count ordinary
+control for each size (target/t2-review-chain-release-final.log):
+
+| Alias count | Ordinary | Value forward | Value reverse |
+| --- | --- | --- | --- |
+| 512 | 7.61 | 9.11 | 10.06 |
+| 1024 | 14.21 | 11.97 | 12.64 |
+| 2048 | 19.09 | 19.11 | 17.72 |
+| 4096 | 27.25 | 28.34 | 29.06 |
+
+The largest required ratio is 1.33 (rounded upward); growth is near linear and
+reversing declarations adds no chain rescans. The earlier partial release
+measurement is superseded by these post-merge numbers. After adding the three
+smaller historical probes, fmt and the complete debug/release performance tests
+were rerun; compiler code did not change after the full gate.
+
+The worktree was clean at the start of this review continuation. Existing
+committed T2 work was retained and repaired; none was discarded. All failed or
+interrupted development checks above were followed by successful checks. The
+only derived change is the generated E0202 line in kept.out, committed last.
+No new unresolved implementation issue or source conflict remains. T1 is not
+in redesign at this baseline; its shared-region integration and literal-specific
+checks remain the already assigned follow-up, per the instruction not to wait
+for T1. Record builders and macro expansion remain T3/M4 scope.

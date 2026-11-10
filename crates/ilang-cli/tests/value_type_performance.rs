@@ -64,7 +64,7 @@ fn completed_alias_chains_are_linear_in_both_declaration_orders() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"scale\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    for n in [512, 1024, 2048, 4096] {
+    for n in [64, 128, 256, 512, 1024, 2048, 4096] {
         let ordinary = measure(&binary, dir.path(), &source(n, false, false));
         for reverse in [false, true] {
             let elapsed = measure(&binary, dir.path(), &source(n, true, reverse));

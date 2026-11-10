@@ -963,7 +963,7 @@ fn qualified_exact_heads_expand_through_named_and_tuple_aliases() {
     );
     good("Head(A)=(A,()->Int)\nv:(Int,()->Int)=(1,(){2})\nHead(Item)=v");
     for body in ["()->Int", "Int|String"] {
-        let lib = ["(Bad)\nBad=", body].concat();
+        let lib = "(Bad)\nBad=()->Int".replace("()->Int", body);
         let (_, c) = checked(&[
             ("src/lib.i", &lib),
             (
