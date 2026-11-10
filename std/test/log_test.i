@@ -252,8 +252,8 @@ log_format = () {
 
 // The compiler gate and negative service cases are executable checks, kept out
 // of the ordinary passing test suite per std-2 §7. The harness appends each
-// case to this owned file and restores it even when a check fails. K4 must make
-// all five positive cases pass; until then E0505 records a waiting gate.
+// case to this owned file and restores it even when a check fails. All five
+// positive cases must pass after the K4 checker changes.
 // Successful generic clients must also run at both optimization levels.
 // Run from the lane with the exact compiler:
 // direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec("\n".join(x[4:] for x in Path("std/test/log_test.i").read_text().splitlines() if x.startswith("//| ")))'
@@ -303,7 +303,7 @@ log_format = () {
 //| negative = {
 //|     'invariant stored environment (L5)': ('''Consumer(A) { Consumer((A) -> Nil) }
 //| bad = (s: log.Sink(Never, Consumer(Int))) -> log.Sink(Never, Consumer(Never)) { s }
-//| ''', 'E0501'),
+//| ''', 'E0515'),
 //|     'unequal service arguments (L5/spec 9.2)': ('''bad = (s ! log.Sink(String, Never)) -> Bool ! log.Sink(Int, Never) { True }''', 'E0515'),
 //| }
 //| baseline = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)
@@ -313,13 +313,14 @@ log_format = () {
 //|         path.write_text(original + '\n' + source + '\n')
 //|         result = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)
 //|         print(name, result.returncode, result.stderr, flush=True)
-//|         assert result.returncode == 0 or (result.returncode == 1 and 'error[E0505]' in result.stderr)
-//|         print('PASS' if result.returncode == 0 else 'WAITING FOR K4', flush=True)
+//|         assert result.returncode == 0, result.stderr
+//|         print('PASS', flush=True)
 //|         if result.returncode == 0 and '@test' in source:
 //|             for level in ('0', '2'):
 //|                 run = subprocess.run(['target/release/i', 'test', '--project', 'std', '--opt', level, 'gate_'], capture_output=True, text=True)
 //|                 print(name, 'opt ' + level, run.returncode, run.stdout, run.stderr, flush=True)
-//|                 assert run.returncode == 0 and '1 passed, 0 failed' in run.stdout
+//|                 test = 'gate_lazy' if name == 'generic lazy client (L3/section 7)' else 'gate_client'
+//|                 assert run.returncode == 0 and '0 failed' in run.stdout and 'pass std/log_test.' + test in run.stdout
 //|     for name, (source, code) in negative.items():
 //|         path.write_text(original + '\n' + source + '\n')
 //|         result = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)
