@@ -84,8 +84,11 @@ i/core.bit_array_concat : (List(BitArray)) -> BitArray
 i/core.inspect : (A) -> String
 i/core.hash : (A) -> Int
 i/core.portable : (value: A) -> Bool
+i/task.finalizing : (k: Continuation(A, B, C, D), b: Boundary(F, G, H)) -> Bool
+i/task.no_waiters : WaitQueue
 i/task.address_key : Key(Address)
 i/task.path_key : Key(List(Int))
+i/task.task_key : Key(Int)
 i/task.scope_key : Key(ScopeInfo)
 i/task.channel_key : Key(ChannelInfo)
 i/task.unit_key : Key(Nil)
@@ -93,6 +96,7 @@ i/task.scope_reply_key : Key(ScopeReply)
 i/task.selection_key : Key(Selection)
 i/task.read : (k: Key(A), value: Keyed) -> A
 i/task.retain : (value: A) -> A
+i/task.unit_value : Keyed
 i/task.unit : () -> Keyed
 i/task.answer : (reply: StepAnswer) -> Keyed
 i/task.ask : (own: Scheduler, command: Command) -> Keyed
@@ -104,21 +108,33 @@ i/task.append : (xs: List(A), ys: List(A)) -> List(A)
 i/task.reverse : (xs: List(A), acc: List(A)) -> List(A)
 i/task.without : (xs: List(A), value: A) -> List(A)
 i/task.tree_height : (tree: TaskTree(A)) -> Int
-i/task.tree_node : (id: List(Int), task: A, left: TaskTree(A), right: TaskTree(A)) -> TaskTree(A)
-i/task.tree_balance : (id: List(Int), task: A, left: TaskTree(A), right: TaskTree(A)) -> TaskTree(A)
-i/task.tree_find : (tree: TaskTree(A), wanted: List(Int)) -> Maybe(A)
-i/task.find_task : (tasks: TaskTree(TaskState), path: List(Int)) -> TaskState
-i/task.put_task : (tree: TaskTree(A), id: List(Int), task: A) -> TaskTree(A)
-i/task.update_task : (tree: TaskTree(A), wanted: List(Int), value: A) -> TaskTree(A)
-i/task.tree_first : (tree: TaskTree(A)) -> (List(Int), A)
-i/task.drop_task : (tree: TaskTree(A), wanted: List(Int)) -> TaskTree(A)
+i/task.tree_node : (id: Int, task: A, left: TaskTree(A), right: TaskTree(A)) -> TaskTree(A)
+i/task.tree_balance : (id: Int, task: A, left: TaskTree(A), right: TaskTree(A)) -> TaskTree(A)
+i/task.tree_find : (tree: TaskTree(A), wanted: Int) -> Maybe(A)
+i/task.empty_page : () -> TaskPage(Never)
+i/task.empty_store : () -> TaskStore(Never)
+i/task.page_get : (page: TaskPage(A), slot: Int) -> Maybe(A)
+i/task.page_put : (page: TaskPage(A), slot: Int, value: Maybe(A)) -> TaskPage(A)
+i/task.page_find : (store: TaskStore(A), id: Int) -> TaskPage(A)
+i/task.flush_page : (rows: TaskTree(TaskPage(A)), cache: Maybe(PageCache(A))) -> TaskTree(TaskPage(A))
+i/task.write_slot : (store: TaskStore(A), id: Int, value: Maybe(A)) -> TaskStore(A)
+i/task.store_find : (store: TaskStore(A), id: Int) -> Maybe(A)
+i/task.find_task : (store: TaskStore(TaskState), id: Int) -> TaskState
+i/task.flush_record : (store: TaskStore(A)) -> TaskStore(A)
+i/task.store_update : (store: TaskStore(A), id: Int, value: A) -> TaskStore(A)
+i/task.focus_task : (store: TaskStore(A), id: Int) -> TaskStore(A)
+i/task.put_task : (tree: TaskTree(A), id: Int, task: A) -> TaskTree(A)
+i/task.update_task : (tree: TaskTree(A), wanted: Int, value: A) -> TaskTree(A)
+i/task.tree_first : (tree: TaskTree(A)) -> (Int, A)
+i/task.drop_task : (tree: TaskTree(A), wanted: Int) -> TaskTree(A)
 i/task.tree_rows : (tree: TaskTree(A), rest: List(A)) -> List(A)
-i/task.drop_children : (tree: TaskTree(TaskState), paths: List(List(Int))) -> TaskTree(TaskState)
-i/task.find_scope : (scopes: List(ScopeState), id: Address) -> ScopeState
-i/task.put_scope : (scopes: List(ScopeState), scope: ScopeState) -> List(ScopeState)
-i/task.index_add : (tree: TaskTree(List(Int)), id: List(Int), path: List(Int)) -> TaskTree(List(Int))
-i/task.index_drop : (tree: TaskTree(List(Int)), id: List(Int)) -> TaskTree(List(Int))
-i/task.record_task : (s: State, t: TaskState, tasks: TaskTree(TaskState), active: TaskTree(List(Int))) -> State
+i/task.store_add : (store: TaskStore(A), id: Int, value: A) -> TaskStore(A)
+i/task.drop_children : (store: TaskStore(A), ids: List(Int)) -> TaskStore(A)
+i/task.address_index : (id: Address) -> Int
+i/task.find_scope : (scopes: TaskStore(ScopeState), id: Address) -> ScopeState
+i/task.put_scope : (scopes: TaskStore(ScopeState), scope: ScopeState) -> TaskStore(ScopeState)
+i/task.active_live : (task: ActiveTask) -> Bool
+i/task.record_task : (s: State, t: TaskState, tasks: TaskStore(TaskState), new: Bool) -> State
 i/task.set_task : (s: State, t: TaskState) -> State
 i/task.add_task : (s: State, t: TaskState) -> State
 i/task.set_scope : (s: State, scope: ScopeState) -> State
@@ -136,66 +152,81 @@ i/task.root_forget : (_run: Key(Nil)) -> Nil
 i/task.root_allocate : () -> List(Int)
 i/task.initial : (root: request.Root) -> Runner
 i/task.run_control : (reply: StepAnswer) -> RunControl
-i/task.make_scheduler : (b: Boundary(Turn, Never, Never), task_path: List(Int), run: Key(Nil), upstream: Runner) -> Scheduler
+i/task.make_scheduler : (b: Boundary(Turn, Never, Never), task_path: List(Int), id: Int, run: Key(Nil), upstream: Runner) -> Scheduler
 i/task.list_map : (xs: List(A), f: (A) -> B) -> List(B)
 i/task.any : (xs: List(A), f: (A) -> Bool) -> Bool
 i/task.filter : (xs: List(A), f: (A) -> Bool) -> List(A)
 i/task.first_path : (a: List(Int), b: List(Int)) -> Bool
 i/task.active_epochs : (frames: List(Frame)) -> List(Cause)
-i/task.exemptions : (t: TaskState) -> List(Cause)
+i/task.exemptions : (s: State, t: TaskState) -> List(Cause)
 i/task.frame_plan : (frames: List(Frame), cause: Cause) -> Maybe(CancelPlan)
 i/task.cause_for_chain : (s: State, t: TaskState, chain: List(Address)) -> Maybe(Cause)
-i/task.remove_registration : (s: State, task_path: List(Int)) -> State
-i/task.queue : (s: State, task_path: List(Int)) -> State
+i/task.withdraw : (s: State, flag: Request(Registration)) -> State
+i/task.remove_registration : (s: State, task_path: Int) -> State
+i/task.waiter_live : (w: Waiter) -> Bool
+i/task.compact_queue : (q: WaitQueue) -> WaitQueue
+i/task.waiter_queue : (q: WaitQueue, waiter: Waiter) -> WaitQueue
+i/task.queue_head : (q: WaitQueue, excluded: Maybe(Request(Registration)), skipped: List(Waiter)) -> QueueHead
+i/task.queue_live : (q: WaitQueue) -> Bool
+i/task.adjust_waiters : (s: State, leaves: List(Leaf)) -> State
+i/task.compact_sources : (s: State, leaves: List(Leaf)) -> State
+i/task.set_channel : (s: State, channel: ChannelState) -> State
+i/task.queue : (s: State, task_path: Int) -> State
 i/task.has_ready : (s: State) -> Bool
-i/task.reply : (s: State, task_path: List(Int), k: Continuation(StepAnswer, Turn, Never, Never), value: StepAnswer, switch: Bool) -> State
+i/task.reply : (s: State, task_path: Int, k: Continuation(StepAnswer, Turn, Never, Never), value: StepAnswer, switch: Bool) -> State
 i/task.accept_cancel : (s: State, t: TaskState, c: Cause) -> State
-i/task.propagate_tasks : (s: State, rows: List(List(Int))) -> State
+i/task.propagate_tasks : (s: State, rows: List(ActiveTask)) -> State
 i/task.propagate : (s: State) -> State
 i/task.cancel_scope : (s: State, id: Address) -> State
 i/task.cancel_run : (s: State) -> State
 i/task.portable_witness : (w: Witness) -> Bool
 i/task.check_scope : (s: State, t: TaskState, scope: ScopeInfo, message: String) -> Nil
-i/task.find_channel : (channels: List(ChannelState), id: Address) -> ChannelState
+i/task.find_channel : (channels: TaskStore(ChannelState), id: Address) -> ChannelState
 i/task.check_channel : (s: State, info: ChannelInfo) -> Nil
 i/task.check_leaf_run : (s: State, leaf: Leaf) -> Nil
 i/task.check_leaf : (s: State, t: TaskState, leaf: Leaf) -> Nil
 i/task.check_leaves : (s: State, t: TaskState, leaves: List(Leaf)) -> Nil
-i/task.match_leaves : (wanted: Leaf, leaves: List(Leaf), index: Int) -> Maybe((Int, Keyed))
-i/task.partner : (registrations: List(Registration), leaf: Leaf) -> Maybe(Partner)
-i/task.commit_partner : (s: State, p: Partner, payload: Keyed) -> State
-i/task.probe_leaf : (s: State, leaf: Leaf, index: Int) -> Maybe(Commit)
-i/task.probe : (s: State, leaves: List(Leaf), index: Int) -> Maybe(Commit)
+i/task.leaf_at : (leaves: List(Leaf), index: Int) -> Leaf
+i/task.partner : (s: State, leaf: Leaf, excluded: Maybe(Request(Registration))) -> Partner
+i/task.commit_partner : (s: State, waiter: Waiter, payload: Keyed) -> State
+i/task.probe_leaf : (s: State, leaf: Leaf, index: Int, excluded: Maybe(Request(Registration))) -> Commit
+i/task.probe : (s: State, leaves: List(Leaf), index: Int, excluded: Maybe(Request(Registration))) -> Commit
+i/task.register_leaves : (s: State, flag: Request(Registration), leaves: List(Leaf), index: Int) -> State
 i/task.select : (s: State, t: TaskState, k: Continuation(StepAnswer, Turn, Never, Never), leaves: List(Leaf)) -> State
-i/task.registration_alive : (s: State, id: Int) -> Bool
-i/task.recheck_events : (s: State, rows: List(Registration)) -> State
-i/task.wake_tickets : (s: State, paths: List(List(Int))) -> State
+i/task.wake_source_waiters : (s: State, rows: List(Waiter)) -> State
+i/task.wake_source_rows : (s: State, rows: List(Int)) -> State
+i/task.wake_sources : (s: State) -> State
+i/task.wake_tickets : (s: State, paths: List(Int)) -> State
 i/task.lowest_error : (errors: List((List(Int), Keyed)), best: (List(Int), Keyed)) -> Keyed
 i/task.scope_reply : (scope: ScopeState) -> ScopeReply
-i/task.scopes_of : (s: State, task_path: List(Int)) -> Bool
-i/task.refresh_rows : (s: State, rows: List(List(Int))) -> State
+i/task.refresh_rows : (s: State, rows: List(Int)) -> State
 i/task.refresh_clean : (s: State) -> State
-i/task.channel_owned : (c: ChannelState, id: Address) -> Bool
+i/task.owned_channel_bad : (s: State, ids: List(Address)) -> Bool
+i/task.owned_indices : (ids: List(Address)) -> List(Int)
 i/task.retire_scope : (s: State, scope: ScopeState) -> State
-i/task.retire_scopes : (s: State, rows: List(ScopeState)) -> State
+i/task.retire_scopes : (s: State) -> State
 i/task.maintain : (s: State) -> State
 i/task.new_address : (t: TaskState) -> Address
 i/task.head_scope : (chain: List(Address)) -> Maybe(Address)
-i/task.find_share : (shares: List(ShareState), id: Address) -> Keyed
+i/task.find_share : (shares: TaskStore(ShareState), id: Address) -> Keyed
 i/task.prevalidate : (s: State, t: TaskState, command: Command) -> Nil
 i/task.add_forward : (rows: List(Forward), id: Key(Nil), tickets: List(Ticket)) -> List(Forward)
 i/task.end_frame : (frames: List(Frame), id: Address) -> List(Frame)
 i/task.do_command : (s: State, t: TaskState, k: Continuation(StepAnswer, Turn, Never, Never), command: Command) -> State
 i/task.cancellation_reply : (t: TaskState) -> Bool
-i/task.on_command : (s: State, task_path: List(Int), command: Command, k: Continuation(StepAnswer, Turn, Never, Never)) -> State
+i/task.finals_changed : (frames: List(Frame), k: Continuation(StepAnswer, Turn, Never, Never)) -> Bool
+i/task.update_finals : (frames: List(Frame), k: Continuation(StepAnswer, Turn, Never, Never)) -> List(Frame)
+i/task.on_command : (s: State, task_path: Int, command: Command, k: Continuation(StepAnswer, Turn, Never, Never)) -> State
 i/task.observe_completion : (s: State, t: TaskState, completion: Completion) -> State
 i/task.turn : (s: State, t: TaskState) -> Turn
-i/task.interests_tasks : (s: State, paths: List(List(Int))) -> List(Ticket)
+i/task.interests_tasks : (s: State, paths: List(Int)) -> List(Ticket)
 i/task.interests_forward : (rows: List(Forward)) -> List(Ticket)
 i/task.interests : (s: State) -> List(Ticket)
 i/task.apply_run_control : (s: State, result: RunControl) -> State
 i/task.finished_run : (s: State) -> Bool
 i/task.run_reply : (s: State) -> RunReply
+i/task.script_rows : (s: State, ids: List(ActiveTask), wanted: List(Int)) -> Maybe(TaskState)
+i/task.script_task : (s: State, wanted: List(Int)) -> Maybe(TaskState)
 i/task.choose_turn : (state: State) -> State
 i/task.loop : (state: State) -> RunReply
 i/task.scope_call_body : (body: (Scope(A)) -> B ? A ! N, witness: Witness, mode: Mode, own: Scheduler) -> ScopeResult(B) ? A ! N
@@ -234,17 +265,16 @@ i/task.scope_call : (body: (Scope(A)) -> B ? A ! N, witness: Witness, mode: Mode
 i/task.execute : (body: () -> A ? E ! N & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }, runner: Runner, seed: rng.Generator, policy: Policy) -> Result(Result(A, E), ScheduleError) ! N - Scheduler - Runner - request.Await - request.Owner - request.Root
 i/task.sync : (e: Event(A, B, C)) -> A ? B ! C | Scheduler
 i/task.root_active : (_run: Key(Nil), _active: Active) -> RunControl
-i/task.cleanup_chain : (s: State, chain: List(Address)) -> Bool
 i/task.cause_allowed : (s: State, t: TaskState, cause: Cause) -> Bool
 i/task.frame_abort : (frames: List(Frame)) -> Maybe(() -> Never)
 i/task.effective_active : (s: State, t: TaskState) -> Active
 i/task.put_nest : (rows: List(Nest), id: Key(Nil), anchor: Maybe(Address), active: Active) -> List(Nest)
-i/task.register_driver : (s: State, task_path: List(Int), command: Command) -> State
+i/task.register_driver : (s: State, task_path: Int, command: Command) -> State
 i/task.pending_frame : (frames: List(Frame)) -> Maybe(Frame)
 i/task.older_shield : (rows: List(Nest), id: Key(Nil)) -> Bool
 i/task.cancel_response : (s: State, t: TaskState, abort: () -> Never) -> State
 i/task.notify_nested : (s: State, t: TaskState, id: Key(Nil)) -> State
-i/task.deliver_deferred : (s: State, path: List(Int), command: Command) -> State
+i/task.deliver_deferred : (s: State, path: Int, command: Command) -> State
 i/task.frame_owner : (frames: List(Frame)) -> Maybe(Address)
 i/task.anchor_within : (frames: List(Frame), anchor: Maybe(Address), target: Maybe(Address)) -> Bool
 i/task.affected_nests : (t: TaskState, frames: List(Frame)) -> List(Nest)
@@ -266,8 +296,8 @@ i/task.notice_ready : (t: TaskState, hop: Hop) -> Bool
 i/task.notice_live : (t: TaskState, hop: Hop) -> Bool
 i/task.post_notice : (s: State, notice: ForeignNotice) -> State
 i/task.apply_notice : (s: State, t: TaskState, notice: ForeignNotice) -> State
-i/task.pump_task_messages : (s: State, path: List(Int)) -> State
-i/task.pump_rows : (s: State, rows: List(List(Int))) -> State
+i/task.pump_task_messages : (s: State, path: Int) -> State
+i/task.pump_rows : (s: State, rows: List(ActiveTask)) -> State
 i/task.pump_messages : (s: State) -> State
 i/task.relay_notice : (s: State, t: TaskState, k: Continuation(StepAnswer, Turn, Never, Never), notice: ForeignNotice, value: Keyed, discard: Bool) -> State
 i/task.notice_hops : (notice: ForeignNotice) -> List(Hop)
