@@ -76,7 +76,7 @@ pub fn check(program: &Program, graph: &PackageGraph, diags: &mut Vec<Diagnostic
         for b in &m.bindings {
             let refs = order::references(&b.binding.pattern, &b.binding.value)
                 .into_iter()
-                .filter_map(|(d, inside)| (!inside).then_some(d));
+                .filter_map(|(d, inside)| (!b.binding.direct || !inside).then_some(d));
             if reaches_compiler(program, refs) {
                 diags.push(Diagnostic::error(code::COMPILER_CAPABILITY, Some(m.source), b.binding.span,
                     "an ordinary entry's initialization cannot reach a compiler-owned operation (§2.1)"));

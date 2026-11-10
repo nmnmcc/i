@@ -138,6 +138,15 @@ show = () { syntax.show(source()) }
         matches!(&error, ilang_cli::BuildError::Program { codes, .. } if codes.contains(&"E0322")),
         "{error}"
     );
+    std::fs::write(&main, "(helper = app/helper)\napply = (f) { f() }\nsnapshot = apply(() { helper.show() })\nmain = () { Nil }\n").unwrap();
+    let error = match ilang_cli::build(dir.path(), options) {
+        Ok(_) => panic!("ordinary initialization called a compiler capability through a closure"),
+        Err(e) => e,
+    };
+    assert!(
+        matches!(&error, ilang_cli::BuildError::Program { codes, .. } if codes.contains(&"E0322")),
+        "{error}"
+    );
     std::fs::write(
         &main,
         "(helper = app/helper)\nunused = () { helper.show() }\nmain = () { Nil }\n",
