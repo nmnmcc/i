@@ -434,3 +434,48 @@ fn compiler_answer_names_keep_their_own_identity() {
     assert!(parameter.same_code(&other_answer));
     assert_ne!(parameter.scope_identity(), other_answer.scope_identity());
 }
+
+#[test]
+fn builtin_definitions_preserve_builtins_and_fresh_parameter_binders() {
+    use ilang_syntax::lisp::definitions::builtin_definition;
+    use ilang_syntax::lisp::syntax::{Node, Position, ScopeIdentity};
+    let like = root("x");
+    for name in ["Bool", "Nil", "Result", "Assert", "AssertionFailure"] {
+        let result = builtin_definition(name, like.scope(), like.span(), 3).unwrap();
+        result.show_as(Position::Item).unwrap();
+    }
+    assert!(builtin_definition("Int", like.scope(), like.span(), 3).is_none());
+    let first = builtin_definition("Result", like.scope(), like.span(), 3).unwrap();
+    let second = builtin_definition("Result", like.scope(), like.span(), 4).unwrap();
+    let Node::Round(parts) = first.node() else {
+        panic!("item")
+    };
+    let Node::Round(head) = parts[0].node() else {
+        panic!("head")
+    };
+    assert!(
+        matches!(head[0].scope_identity(), Some(ScopeIdentity::Builtin { name }) if name == "Result")
+    );
+    assert!(matches!(
+        head[1].scope_identity(),
+        Some(ScopeIdentity::DefinitionParameter {
+            answer: 3,
+            parameter: 0,
+            ..
+        })
+    ));
+    let Node::Curly(constructors) = parts[1].node() else {
+        panic!("constructors")
+    };
+    let Node::Round(ok) = constructors[0].node() else {
+        panic!("constructor")
+    };
+    assert_eq!(head[1].scope_identity(), ok[1].scope_identity());
+    let Node::Round(parts2) = second.node() else {
+        panic!("item")
+    };
+    let Node::Round(head2) = parts2[0].node() else {
+        panic!("head")
+    };
+    assert_ne!(head[1].scope_identity(), head2[1].scope_identity());
+}
