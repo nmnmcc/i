@@ -246,6 +246,13 @@ impl Solver {
         if l == r || matches!(l, Ty::Never) || matches!(r, Ty::Top) {
             return;
         }
+        // §4.5 rule 2: these are inclusions, not recursive bounds such as
+        // `n <: n | S(n)`. Recording them would invent an occurs cycle.
+        if matches!(r, Ty::Union(ms) if ms.contains(l))
+            || matches!(l, Ty::Inter(ms) if ms.contains(r))
+        {
+            return;
+        }
         if (matches!(l, Ty::Var(_)) || matches!(r, Ty::Var(_)))
             && !self.cache.insert((l.clone(), r.clone(), env))
         {
@@ -260,6 +267,15 @@ impl Solver {
             (_, Ty::Inter(ms)) => {
                 for m in ms {
                     self.constrain_in(l, m, env);
+                }
+            }
+            (Ty::Var(_), Ty::Var(v)) if env && self.level_of(l) <= self.var(*v).level => {
+                // Collect requirements in the receiving row. An upper
+                // bound on its member can lead back through a service's
+                // invariant argument: n <: row, S(n) <: row is finite.
+                self.add_bound(*v, l.clone(), true, env);
+                for ub in self.var(*v).upper.clone() {
+                    self.constrain_in(l, &ub, env);
                 }
             }
             (Ty::Var(v), _) if self.level_of(r) <= self.var(*v).level => {
@@ -692,7 +708,21 @@ impl Solver {
     /// The union of environments (§9.2): two forms of one type constructor
     /// must have equal arguments, whatever their variance.
     pub fn env_union(&mut self, ms: Vec<Ty>) -> Ty {
-        self.union_in(ms, true)
+        let before = self.failures.len();
+        let t = self.union_in(ms, true);
+        if let Ty::Union(ms) = &t
+            && self.failures.len() == before
+            && ms.iter().any(Ty::is_varlike)
+        {
+            // Check forms hidden behind a row variable too (§9.2). The
+            // collector adds no requirement to the returned union; it
+            // makes add_bound compare all its services, also later ones.
+            let row = self.fresh();
+            for m in ms {
+                self.constrain_env(m, &row);
+            }
+        }
+        t
     }
 
     fn union_in(&mut self, ms: Vec<Ty>, env: bool) -> Ty {
@@ -954,13 +984,64 @@ impl Solver {
         // quadratic in it. `first_cycle` finds the same first root with one
         // pass over the graph; the search then runs for that root only, so
         // that the variables marked as reported are the same.
-        match self.first_cycle(&roots) {
+        let mut cycle = self.first_cycle(&roots);
+        if cycle.is_some() {
+            // A constraint graph can have redundant constructor paths
+            // even when its type is finite. Keep the usual fast path.
+            self.normalize_bounds(&roots);
+            cycle = self.first_cycle(&roots);
+        }
+        match cycle {
             Some(r) => {
                 let found = self.occurs_from(vec![r]);
                 debug_assert!(found, "the occurs check of a root disagrees");
                 found
             }
             None => false,
+        }
+    }
+
+    /// Remove redundant bounds before deciding that a type is recursive.
+    /// If T <: v <: T (or v <: Never), v is exactly T (§4.5). Its old
+    /// bounds have already been propagated through T by constrain_in.
+    /// Otherwise v <: u implies v <: u | T, also through variable chains.
+    /// These rewrites preserve every solution; they introduce no variables
+    /// and use only finite reachability searches.
+    fn normalize_bounds(&mut self, roots: &[V]) {
+        let mut done = HashSet::default();
+        for &v in roots {
+            if !done.insert(v) {
+                continue;
+            }
+            let upper = self.var(v).upper.clone();
+            let lower = self.reach(vec![v], true).1;
+            let exact = upper.iter().find(|t| match t {
+                Ty::Never => true,
+                Ty::Con(..) | Ty::Fn(_) => lower.contains(t),
+                Ty::Union(ms) => ms.iter().all(|m| lower.contains(m)),
+                _ => false,
+            });
+            if let Some(t) = exact {
+                let old_lower = std::mem::take(&mut self.var_mut(v).lower);
+                let old_upper = std::mem::take(&mut self.var_mut(v).upper);
+                for b in old_lower {
+                    if let Ty::Var(u) = b {
+                        self.var_mut(u).into.retain(|w| *w != v);
+                    }
+                }
+                for b in old_upper {
+                    if let Ty::Var(u) = b {
+                        self.var_mut(u).from.retain(|w| *w != v);
+                    }
+                }
+                self.var_mut(v).lower = vec![t.clone()];
+                self.var_mut(v).upper = vec![t.clone()];
+            } else {
+                let (vars, _) = self.reach(vec![v], false);
+                self.var_mut(v).upper.retain(|b| {
+                    !matches!(b, Ty::Union(ms) if ms.iter().any(|m| matches!(m, Ty::Var(u) if vars.contains(u))))
+                });
+            }
         }
     }
 
