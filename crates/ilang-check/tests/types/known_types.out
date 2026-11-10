@@ -108,7 +108,7 @@ annotated_call : Int
 132:3: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
 136:20: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
 136:30: error[E0520]: the two sides have the known types `List(String)` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-142:19: error[E0520]: the two sides have the known types `Int | String` and `Float`, which are disjoint, so the result would always be the same (§6.9)
+142:27: error[E0520]: the two sides have the known types `Int | String` and `Float`, which are disjoint, so the result would always be the same (§6.9)
 149:19: error[E0520]: the two sides have the known types `Int | String` and `Nil`, which are disjoint, so the result would always be the same (§6.9)
 158:3: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
 163:25: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
