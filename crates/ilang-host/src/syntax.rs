@@ -43,6 +43,7 @@ type DefinitionCallback = dyn Fn(&Syntax) -> DefinitionReply + Send + Sync;
 pub struct DefinitionContext {
     callback: Arc<DefinitionCallback>,
     abort: Mutex<Option<DefinitionAbort>>,
+    notes: Mutex<Vec<String>>,
 }
 
 impl DefinitionContext {
@@ -50,7 +51,12 @@ impl DefinitionContext {
         Self {
             callback: Arc::new(callback),
             abort: Mutex::new(None),
+            notes: Mutex::new(Vec::new()),
         }
+    }
+    /// Take this run's buffered diagnostic notes after a successful commit.
+    pub fn take_notes(&self) -> Vec<String> {
+        std::mem::take(&mut *self.notes.lock().expect("diagnostic buffer lock poisoned"))
     }
     pub fn take_abort(&self) -> Option<DefinitionAbort> {
         self.abort
@@ -449,6 +455,21 @@ pub fn install_with_items(
     for &name in NAMES {
         imports.external("i:compiler/syntax/v1", name, move |args| invoke(name, args))?;
     }
+    let note_context = definition.clone();
+    imports.external("i:compiler/syntax/v1", "note", move |args| {
+        let [message] = args else {
+            bail!("diagnostic note expects one message")
+        };
+        let context = note_context
+            .as_ref()
+            .expect("compiler instance has no macro run context");
+        context
+            .notes
+            .lock()
+            .expect("diagnostic buffer lock poisoned")
+            .push(text(message)?.to_owned());
+        Ok(Value::Nil)
+    })?;
     let report_context = definition.clone();
     imports.external("i:compiler/syntax/v1", "report_error", move |args| {
         let [message, at] = args else {

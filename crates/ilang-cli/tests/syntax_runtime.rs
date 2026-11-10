@@ -432,6 +432,20 @@ deferred = () -> Nil ! Assert {
   Nil
 }
 @test
+notes = () -> Nil {
+  diagnostics = syntax._diagnostics()
+  diagnostics.note("first")
+  diagnostics.note("second")
+  Nil
+}
+@test
+notes_failed = () -> Nil {
+  diagnostics = syntax._diagnostics()
+  diagnostics.note("discard me")
+  syntax._report_error("failed after note", syntax._template(1))
+  Nil
+}
+@test
 macro_error = () -> Nil ! Assert {
   fail.catch(() { syntax._report_error("macro failed", syntax._template(1)) })
   Nil
@@ -474,6 +488,8 @@ compile_error = () -> Nil ! Assert {
             "deferred",
             "compile_error",
             "macro_error",
+            "notes",
+            "notes_failed",
         ] {
             let answer = templates[4].clone();
             let context = Arc::new(DefinitionContext::new(move |of| match of.show().as_str() {
@@ -513,6 +529,19 @@ compile_error = () -> Nil ! Assert {
                     assert!(
                         matches!(context.take_abort(), Some(DefinitionAbort::Deferred { at }) if at.show() == "Waiting")
                     );
+                }
+                "notes" => {
+                    assert!(matches!(result, ilang_host::TestResult::Passed));
+                    assert_eq!(context.take_notes(), ["first", "second"]);
+                    assert!(context.take_notes().is_empty());
+                }
+                "notes_failed" => {
+                    assert!(!matches!(result, ilang_host::TestResult::Passed));
+                    assert!(matches!(
+                        context.take_abort(),
+                        Some(DefinitionAbort::MacroError { .. })
+                    ));
+                    // A failed run's context is discarded rather than committed.
                 }
                 "macro_error" => {
                     assert!(!matches!(result, ilang_host::TestResult::Passed));

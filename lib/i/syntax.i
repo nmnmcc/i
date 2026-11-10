@@ -27,6 +27,8 @@
 	_report_error
 	Items(..)
 	_items
+	Diagnostics(..)
+	_diagnostics
 )
 
 Syntax {}
@@ -95,6 +97,19 @@ definition = (
 	of: Syntax
 	service ! Definitions
 ) -> Syntax ^ SyntaxError ! Definitions { service.definition(of) }
+
+Diagnostics {
+	Diagnostics(note: (String) -> Nil)
+}
+
+@external("i:compiler/syntax/v1", "note")
+raw_note: (String) -> Nil
+
+/// Constructs the compiler's transactional diagnostic service.
+_diagnostics = () -> Diagnostics {
+	notify = (message: String) -> Nil { raw_note(message) }
+	Diagnostics(notify)
+}
 
 Items {
 	Items(
