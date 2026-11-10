@@ -318,3 +318,46 @@ main = () {
         );
     }
 }
+
+#[cfg(test)]
+#[test]
+fn cli_grants_the_resolved_library_content_to_restricted_default_bindings() {
+    let project = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello");
+    let built = build(
+        &project,
+        BuildOptions {
+            tests: false,
+            opt: Level::O0,
+            offline: true,
+            target: Target::Ilang,
+        },
+    )
+    .unwrap();
+    let declaration = built
+        .binding_plan
+        .declarations
+        .iter()
+        .find(|d| d.namespace == "i:io/v1" && d.name == "print")
+        .unwrap();
+    assert_eq!(declaration.package, built.trusted_package);
+    let mut imports = ilang_host::HostImports::default();
+    imports
+        .context_service("i:io/v1", "print", |_, _| Ok(Ok(ilang_host::Value::Nil)))
+        .unwrap();
+    let program = built.host_program().unwrap();
+    assert!(
+        program
+            .instantiate(ilang_host::HostOptions::new(imports.clone()))
+            .err()
+            .unwrap()
+            .to_string()
+            .starts_with("ungranted host import")
+    );
+    imports.grant_package(&built.binding_plan, &built.trusted_package);
+    assert!(matches!(
+        program
+            .run_entry(ilang_host::HostOptions::new(imports))
+            .unwrap(),
+        ilang_host::Outcome::Ok(_)
+    ));
+}

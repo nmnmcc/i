@@ -107,3 +107,47 @@ The lane was clean at b9173ce. There was no interrupted uncommitted work.
 - The stage-2 SHA-256 dependency updated Cargo.lock through `cargo check`, without
   cargo update. This generated lock change is held for the required final derived
   commit; it remains in the working tree during verification.
+
+## Stage 4 results
+
+- Merged redesign 7b3cea3ed2602744bcbb8c747ebffe177864f1a2, including P1 and
+  the accepted JS design. The only conflict was appended host tests; preserved
+  both complete sets and the incoming opaque-import setup. No opaque lowering
+  or equality implementation was edited by BG.
+- Merge incident: a guarded helper stopped, but the shell continued and committed
+  unresolved markers. The first full verification stopped at formatting/parsing.
+  Corrected the file, verified both test sets, and amended that merge to 68a4040.
+  No conflict markers remain in the branch.
+- Heavy-wrapped `ILANG_BROWSER_PORT=4184 ./scripts/dev-verify`: exit 0 (rust, i,
+  js); 67 Rust host tests, 60 Node tests, 42 browser tests. The spec suite reported
+  168/168 cases passing at both --opt 0 and --opt 2. No tests were ignored or
+  assertions weakened. The dev shell's pre-existing Playwright host-requirement
+  validation setting was inherited unchanged; all three engines ran their tests.
+- Additional final `./scripts/dev-verify rust`: exit 0 after adding the CLI
+  library-content grant regression; both CLI provenance tests passed. Full
+  formatting, Clippy -D warnings and workspace tests passed again.
+- `scripts/old-syntax-check`: exit 0; 1163 extracted literals/blocks, exact
+  expected diagnostics, 19 unchanged future-track entries. BG adds no syntax.
+- Actual WAT dumps: `WAT_DUMP=... cargo test -p ilang-cli --test wat_dump --locked`
+  on a source archive of redesign 7b3cea3 and on the merged lane. Compared every
+  filename and byte: 636/636 equal, including 410 WAT outputs and 226 identical
+  ERROR outputs; no missing/new/different files. These are real compiler runs,
+  not a substitute measurement. The archive and outputs are inside target/bg.
+- Build-cache incident: compiling the archived baseline in the lane's Cargo
+  target directory left its older ilang-wasm artifact visible to a later CLI
+  build (E0425 and cascading E0277). An mtime-only retry did not fix it. Ran
+  `cargo clean -p ilang-wasm` through the heavy wrapper, rebuilt the lane's real
+  crate, then reran both CLI tests, the lane WAT dump and the complete Rust gate
+  successfully. No baseline build ran afterward. The cache is restored to lane
+  sources; no persistent environment variable was changed.
+- `I=.../target/release/i ./scripts/build-abi-fixture.sh` generated the compiler
+  binding-plan sidecar. Existing Wasm fixtures and the feature probe are
+  byte-unchanged. The JS integration test loads that real compiler plan through
+  restricted context callbacks and verifies fresh invocation ownership.
+- Initialization interpretation: Appendix B.1 permits synchronous imports during
+  ilang_start; native N9.1 requires fresh entry/export invocations. Initialization
+  therefore has a separate context, torn down before the first SDK invocation
+  or disposal. Direct raw Wasm export access remains the embedder's ABI duty.
+- No semantic conflict between controlling sources was found. There are no
+  outside-lane implementation escalations. IO services, R2's request rows and
+  multicore worker transport remain assigned to their later tracks.

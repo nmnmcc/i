@@ -91,3 +91,29 @@ test("compiled opaque imports and exports preserve nominal identity", async () =
     assert.equal(await checkOpaque(value, reference, {}), true);
   }
 });
+
+// Native 3.1 and N9.1/N9.5: consume the real compiler's separate plan, keep
+// restricted callbacks in one invocation, and dispose every created resource.
+test("compiler binding plan authorizes context registrations on the JS host", async () => {
+  const { authorizeBindings } = await import("../ilang.mjs");
+  const plan = JSON.parse(await readFile(new URL("../../../tests/browser/fixtures/compiled.bindings.json", import.meta.url), "utf8"));
+  // These checked-in fixture bytes and compiler output are the test embedding's
+  // explicit trust path. Production callers authenticate their build outputs.
+  const bindings = await authorizeBindings(compiled, plan, () => true);
+  const contexts = new Set();
+  let created = 0;
+  let disposed = 0;
+  const contextImports = Object.fromEntries(Object.entries(compiledImports(GuestError)).map(([namespace, fields]) => [namespace, Object.fromEntries(Object.entries(fields).map(([name, fn]) => [name, (context, ...args) => {
+    assert.equal(context.live, true);
+    contexts.add(context);
+    created++;
+    context.insert("fixture", {}, () => { disposed++; });
+    return fn(...args);
+  }]))]));
+  const value = await instantiate(bindings.module, { contextImports, bindings });
+  assert.equal(value.call("app/app.distance", [3, 4]), 5);
+  assert.equal(await value.callAsync("app/app.wait_sum", [1.5, 2]), 3.5);
+  assert.equal(contexts.size, 2);
+  assert.equal(disposed, created);
+  assert.ok([...contexts].every((context) => !context.live));
+});
