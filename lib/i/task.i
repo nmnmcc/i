@@ -620,13 +620,7 @@ tree_find(A) = (tree: TaskTree(A), wanted: Int) -> Maybe(A) {
 // task and its peer without copying table paths; two page caches amortize
 // persistent-index updates across sequential task ids.
 TaskPage(A) {
-	TaskPage(
-		count: Int
-		p0:    Maybe(A)
-		p1:    Maybe(A)
-		p2:    Maybe(A)
-		p3:    Maybe(A)
-	)
+	TaskPage(count: Int, p0: Maybe(A), p1: Maybe(A), p2: Maybe(A), p3: Maybe(A))
 }
 
 empty_page(A) = () -> TaskPage(A) {
