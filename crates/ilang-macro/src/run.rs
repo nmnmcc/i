@@ -180,9 +180,22 @@ pub fn invoke_with_context(
     templates: std::sync::Arc<[Syntax]>,
     context: std::sync::Arc<ilang_host::syntax::DefinitionContext>,
 ) -> Result<RunOutcome> {
+    invoke_with_items(built, export, arguments, templates, context, None)
+}
+
+/// Execute with an item journal for an item-position run. The driver commits
+/// its requests and buffered notes only after the result has been validated.
+pub fn invoke_with_items(
+    built: &MacroProgram,
+    export: &str,
+    arguments: &[Syntax],
+    templates: std::sync::Arc<[Syntax]>,
+    context: std::sync::Arc<ilang_host::syntax::DefinitionContext>,
+    items: Option<std::sync::Arc<ilang_host::syntax::ItemContext>>,
+) -> Result<RunOutcome> {
     let program = built.host_program().context("load macro program")?;
     let mut imports = ilang_host::HostImports::default();
-    ilang_host::syntax::install_with_context(&mut imports, templates, Some(context.clone()))
+    ilang_host::syntax::install_with_items(&mut imports, templates, Some(context.clone()), items)
         .context("install compiler services")?;
     imports.grant_package(&built.binding_plan, &built.trusted_package);
     let result = (|| {

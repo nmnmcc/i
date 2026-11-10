@@ -175,6 +175,14 @@ pub fn import_closure(
     }
 }
 
+/// The position in which a macro is being expanded.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MacroPosition {
+    Item,
+    Expression,
+    Type,
+}
+
 /// Add a compiler-owned, host-compatible entry for a macro. The wrapper
 /// supplies compiler services, translates SyntaxError through the compiler
 /// context, and keeps all user code in its original module.
@@ -182,6 +190,7 @@ pub fn add_wrapper(
     graph: &mut PackageGraph,
     parsed: &mut Vec<Parsed>,
     binding: &MacroBinding,
+    position: MacroPosition,
 ) -> (String, String) {
     let definition = parsed
         .iter()
@@ -209,13 +218,19 @@ pub fn add_wrapper(
         .collect::<Vec<_>>()
         .join(", ");
     let arguments = args.join(", ");
+    let (item_service, item_row) = if position == MacroPosition::Item {
+        ("  ! syntax.Items = syntax._items()\n", " | syntax.Items")
+    } else {
+        ("", "")
+    };
     let source = format!(
         r#"(syntax = i/syntax, fail = i/fail, target = {})
 (_entry)
 _entry = ({parameters}) -> syntax.Syntax {{
   ! Assert = Assert((failure: AssertionFailure) -> Never {{ panic(failure.message) }})
   ! syntax.Definitions = syntax._definitions()
-  body = () -> syntax.Syntax ^ syntax.SyntaxError ! Assert | syntax.Definitions {{ target.{}({arguments}) }}
+{item_service}  ! syntax.Diagnostics = syntax._diagnostics()
+  body = () -> syntax.Syntax ^ syntax.SyntaxError ! Assert | syntax.Definitions{item_row} | syntax.Diagnostics {{ target.{}({arguments}) }}
   fail.catch(body).{{
     Ok(value) -> value
     Error(syntax.SyntaxError(message, at)) -> syntax._report_error(message, at)
