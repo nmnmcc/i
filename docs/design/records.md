@@ -1,8 +1,8 @@
 # Design: structural records
 
-Status: draft for review (study S3 of the redesign plan). When it is accepted at gate G3, track T3 puts the spec text of part 12 into `docs/spec.md` and makes the changes of parts 14 to 16. T3 starts after A1 (the new parser) and T1 (literal types) have landed, and after T2 has merged. Code facts are from commit 1865366. Line numbers are at that commit; A1, T1 and T2 move many of them.
+Status: draft for review (study S3 of the redesign plan). When it is accepted at gate G3, track T3 puts the spec text of part 12 into `docs/spec.md` and makes the changes of parts 14 to 16. T3 starts after A1 (the new parser) and T1 (literal types) have landed, and after T2 has merged. Code citations are re-anchored to merged redesign c2f41b7 (merge 669dbbb); the historical execution report explicitly identifies its original revision. Existing implementation descriptions below are proposals where they describe Rec/Without, which are not landed.
 
-Resolution at lane/note-rec: **section 20 is the substitution-stability amendment**. It supersedes the old common-field union, routing and empty-record claims wherever repeated in this note. Historical code citations above section 20 retain their stated baseline; the new code audit is at 6a6edc8.
+Resolution at lane/note-rec: **section 20 is the substitution-stability amendment**. It supersedes the old common-field union, routing and empty-record claims wherever repeated in this note. R1–R4 revise its proof, place and resource rules. All code anchors, including the earlier implementation plan, are re-derived against the merged sources; §20.6 is the current hand-off.
 
 The examples use the new syntax of `docs/design/syntax.md`.
 
@@ -41,11 +41,11 @@ Each decision has its reason. The exact rules follow in parts 3 to 10.
 **D1. All records are one type constructor.** There is one new head, `Head::Record`, and one run-time tag, 14. A conjunction of record fields has one canonical form, `Ty::Rec`: fields sorted by label. Exact unions may contain several such forms. It means the MLstruct intersection of one-field records, so `{ a: A } & { b: B }` is `{ a: A, b: B }`.
 *Reason:* the solver's rule "different heads are disjoint" is used by `inter_in`, `route`, `-`, type tests, `known::disjoint` and narrowing. With one head it stays true for records with no exception, and two records in one `&` merge by label instead of becoming `Never`.
 
-**D2. Record unions retain their alternatives.** Width subtyping stays. A union is set union, including when two members have the record head. Common fields form a conservative known-type summary, never a replacement for an inferred or written union. Multiple record alternatives, and unions retaining a spread member, are output-only. A right-side record union cannot choose new variable bounds from one alternative; the no-new-bounds gate in section 20 applies.
-*Reason:* the common-field join is an upper bound, not set equality, and can lose a variable before it becomes empty. Exact alternatives preserve correlations and substitution. Inference declines ambiguous constraints rather than selecting a solution. Section 20 states the restricted inference contract and its proof limits.
+**D2. Record unions retain their alternatives.** Width subtyping stays. A union is set union, including when two members have the record head. Common fields form a conservative known-type summary, never a replacement for an inferred or written union. Closed record unions are ordinary types in every place. Open record unions are also legal to write; a use that needs new alternative-specific variable bounds is rejected (U3/U4). A right-side record union cannot choose new variable bounds from one alternative; the no-new-bounds gate in section 20 applies.
+*Reason:* the common-field join is an upper bound, not set equality, and can lose a variable before it becomes empty. Exact alternatives preserve correlations and substitution. Inference declines obligations it cannot prove from existing bounds rather than selecting a solution. Section 20 states the restricted inference contract and its proof limits.
 
 **D3. "Forgetting" is one exact type form, `Ty::Without(T, L)`.** It means "the records of T, with the labels in L forgotten". It holds only records. The written form is a spread: `{ ..R, age: V }` is `Without(R, {age}) & { age: V }`, and `{ ..R, -age }` is `Without(R, {age}) & {..}`. There is no `\` operator and no new token.
-*Reason:* `put` and `remove` need a type for "R, except that this field may now be anything". `Without` has sound conservative rules on both sides of `<:`. It is rewritten only by equalities (part 4.3). So no rule depends on whether a type is in an input or an output place, and the coalescing and simplifying in `display.rs` (which make the schemes of generalized bindings, `infer.rs:2108`) cannot make it unsound.
+*Reason:* `put` and `remove` need a type for "R, except that this field may now be anything". `Without` has sound conservative rules on both sides of `<:`. It is rewritten only by equalities (part 4.3). So no rule depends on whether a type is in an input or an output place, and the coalescing and simplifying in `display.rs` (which make the schemes of generalized bindings, `infer.rs:2337`) cannot make it unsound.
 
 **D4. Keys are label parameters.** A type variable declared on a binding and used as a label (`{ K: V }`) in the binding's written types is a label parameter. A declared variable that is only the type of a parameter, as `A` in `id(A) = (x: A) { x }`, stays an ordinary type variable. As a type, it may only be the whole type of a top-level parameter of the binding's own function (`key: K`), its **key parameter**. At each call it is fixed from the key argument: an argument whose known type is exactly one String literal, which the solver then checks against that one-value type, or a key parameter of a binding around the call, passed by its own name. Union keys, plain `String` keys and keys with no known type are compile errors. A name bound by a binding with label parameters may only be the callee of a call, also inside its own value and in a type of a value (L5); a key parameter may not be named in a type of a value (L2a); a call of itself gives each label parameter its own key parameter (L6); and the binding may not be in a recursive group with other bindings. Inside the binding, a type that holds the label parameter may not reach a type variable of a name from outside the binding (L8). A binding with label parameters may not be an entry point or a host export, because the host calls it with no check of its keys (L9). The solver never sees a label that is an inference variable.
 *Reason:* this is the fallback rule of the task, made general: any library may declare label parameters, and `i/record` uses nothing else. Inference stays principal, because labels are fixed before solving and never by solving. The limits on where `K` may be a type are what tie the value of the key to its label (part 5.5).
@@ -95,7 +95,7 @@ pub enum Label { Name(Arc<str>), Param(LabelParamId) }
 
 ### 4.2 Forms
 
-In `crates/ilang-check/src/types/mod.rs`:
+In `crates/ilang-check/src/types/mod.rs` (logical node forms; U6 requires shared handles in the storage representation, not recursive child copies):
 
 - `Head::Record`: a new variant with no data, so `Head` stays `Copy`.
 - `Ty::Rec(Vec<(Label, Ty)>)`: fields sorted by label, no label twice. `head()` is `Some(Head::Record)`. Every field is covariant.
@@ -108,7 +108,7 @@ In `crates/ilang-check/src/types/mod.rs`:
 
 `map_children`, `extrude`, `freshen`, `bound_vars`, `level_of`, `occurs` and the Coalescer walk every field of a `Rec` and the base of a `Without` with the polarity of the type around them.
 
-**Types that have themselves inside them (§4.7).** A field of a `Rec` and the base of a `Without` count as places inside a type constructor, the same as the arguments of a `Con`: `bound_vars` (`solve.rs:1207`) passes `con = true` for them, and the Coalescer (`display.rs:~560`) goes in with `depth + 1`. So a cycle through a record field or a spread base is the existing error E0505, "this type has itself inside it, through a type variable". i has no recursive structural types: a recursive alias is already rejected, so a record type can never contain itself, and inference may not make one either. Two programs show what this means:
+**Types that have themselves inside them (§4.7).** A field of a `Rec` and the base of a `Without` count as places inside a type constructor, the same as the arguments of a `Con`: `bound_vars` (`solve.rs:1483`) passes `con = true` for them, and the Coalescer (`display.rs:~563`) goes in with `depth + 1`. So a cycle through a record field or a spread base is the existing error E0505, "this type has itself inside it, through a type variable". i has no recursive structural types: a recursive alias is already rejected, so a record type can never contain itself, and inference may not make one either. Two programs show what this means:
 
 - `last = (r) { r.next |> { Nil -> r.v  n -> last(n) } }` walks a chain of records. Rule 13b gives `R <: { next: A }`, and the recursive call gives `A <: R | Nil`. The cycle goes through the field `next`, so it is E0505, with or without annotations. A chain, a tree or any other recursive data is a custom type (`Node(A) { Node(v: A, next: Node(A) | Nil) }`), and then `.next` uses rule 13a. The spec says so in §4.9.3.
 - `build = (r, n) { n |> { 0 -> r  _ -> build(record.put(r, "a", n), n - 1) } }` gives `R :> Without(R, {a}) & { a: N }`: the cycle goes through the base of a `Without`, so it is E0505 too. The way out is a written parameter type that is not a type variable, `build = (r: {..}, n: Int) -> {..} { … }`. Then `record.put(r, "a", n)` has, in the solver, the type `Without(R2, {a}) & { a: Int }` with put's own `R2 :> {..}`. E4 does not apply to it, because its base is a variable. But it is checked against the written `{..}` of `r`, which is not a variable, so no variable gets a bound that holds itself, and there is no cycle. (In a shown type, `R2` is replaced by its lower bound `{..}`, and then E4 makes it `{ a: Int }`.)
@@ -119,11 +119,11 @@ Why not accept such a cycle? Its least solution is finite: when every field labe
 
 This keeps every shown scheme finite, so the read-back rule of 4.7 holds. Tests: `recursive_record.i`, `accumulate_put.i`, `fold_spread.i` and `fill_generic.i` in the reject list of 15.1, and `accumulate_put_annotated.i` and `fold_spread_annotated.i` in the pass list.
 
-Field types and labels are kept sorted, so structural `==`, the constraint cache and the quick exit `l == r` (`solve.rs:246`) keep working.
+Field types and labels are kept sorted. Under U6, handle identity is only a sufficient equality/cache fast path; semantic equality uses inclusion. The existing quick exit `l == r` (`solve.rs:346`) remains a sufficient fast path.
 
 ### 4.3 Building types: only exact rewrites
 
-Two smart constructors build every `Rec` and `Without`. They are the only place where these forms are rewritten, and they are used by `solve.rs`, by `Norm` and the Coalescer in `display.rs`, by known types, and after a label parameter is replaced.
+Two smart constructors build every `Rec` and `Without`. They are the only implementation of these exact rewrites, shared by `solve.rs`, `Norm` and the Coalescer in `display.rs`, known types and substitution. Under U6 they may retain a compact node instead of applying E2 immediately. E2 and distributivity are demand-time laws; no constructor must expand a union product.
 
 `rec(fields)`:
 
@@ -153,7 +153,7 @@ No rewrite makes a type larger. In particular, `Without(a & B, L)` is not split,
 
 ### 4.4 Subtyping: the arms of `constrain_in`
 
-The arms go into `constrain_in` (`solve.rs:245`) in this order. Arms that exist today keep their places.
+The arms go into `constrain_in` (`solve.rs:335`) in this order. Arms that exist today keep their places.
 
 1. (exists) `l == r`, `Never <: _`, `_ <: Top`; the cache.
    **Member (new, general).** `l <: r` when `l` is an `Inter` and `r` is one of its members. This is exact (`l & m` is a subset of `m`). It comes before the variable arms, so that `F & { K: V } <: F` holds at once and does not give `F` a lower bound that holds `F` itself (part 5.9).
@@ -165,8 +165,8 @@ The arms go into `constrain_in` (`solve.rs:245`) in this order. Arms that exist 
    - when `l` is an `Inter` with a member `Without(B, L2)`, `L2 ⊆ L`: `B <: U` for that member;
    - else: `l <: U` and `l <: {..}`.
 
-   This is sound: `Without` is monotone in its base, `Without(B, L2)` is a subset of `Without(B, L)` when `L2 ⊆ L`, `l & m` is a subset of `m`, and the records of `U` are a subset of `Without(U, L)`. It may reject a correct program. That only happens with a spread written in an input place, such as a parameter type `{ ..R, a: Int }`.
-5a. **R-record-union (replaces R-spread-union).** Before splitting a left intersection or inspecting a `Without`, collect all record alternatives on the right. With several alternatives, accept only a no-new-bounds proof of inclusion (section 20, U3). Otherwise report `FailKind::Ambiguous` (E0501), without mutating bounds. This includes Rec-plus-spread unions. With one alternative use the ordinary rules for it. Never pick an alternative by its labels or by order. Exact membership in a right union is also a no-new-bounds success and precedes the variable arms.
+   This is sound: `Without` is monotone in its base, `Without(B, L2)` is a subset of `Without(B, L)` when `L2 ⊆ L`, `l & m` is a subset of `m`, and the records of `U` are a subset of `Without(U, L)`. It may reject a correct program. Such incompleteness can occur in an open spread obligation in either position. A closed goal uses U3’s exact coverage fallback, so an equivalent closed spelling has the same verdict.
+5a. **R-record-union (replaces R-spread-union).** Before splitting a left intersection or inspecting a `Without`, inspect the right-hand graph for record alternatives without enumerating their Cartesian product. With several alternatives, accept only a no-new-bounds proof of inclusion (section 20, U3). Otherwise retain a proof obligation until ordinary group constraints finish; report the U3 proof diagnostic if it remains unproved, without mutating bounds. This includes Rec-plus-spread unions. With one alternative use the ordinary rules for it. Never pick an alternative by its labels or by order. Exact membership in a right union is also a no-new-bounds success and precedes the variable arms.
 
 6. **R-without-left.** `Without(B, L) <: U`, when `U` is a `Rec`, a `Con`, an `Fn`, `Never`, a `Union` or a `Diff`. (`U` is not a variable, an `Inter` or a `Without` here, because arms 2, 3 and 5 came first. A union with several record alternatives was handled by U3 in arm 5a. `Both` goes to its existing arm.) A `Without` holds only records, so it is treated as a type with the head `Record` (its `value_head()`, part 4.2). The steps, in order:
    - **a. A union.** Apply U3 to its complete record group first. With one record alternative, continue with it. With several, the no-new-bounds gate has already succeeded or failed. With no record alternative, use the existing single eligible var-like fallback; with none fail `Mismatch`, with more than one fail `Ambiguous`. A record-only alternative is never a fallback for a non-record head.
@@ -176,25 +176,27 @@ The arms go into `constrain_in` (`solve.rs:245`) in this order. Arms that exist 
    - **e. A record.** `U` is a `Rec` `R`. If a label `f` of `R` is the same as a label of `L`, or may be equal to one, fail at once, here, with the reason: `FailKind::NoField(f)`, "the field `f` may be missing here" (E0512), when the labels are the same, and `FailKind::LabelMayBe(K, f)`, "the key `K` may be `f`; it is not known here" (E0544), when they may be equal.
    - **f.** Else `B <: R`.
 
-   This arm ends: each step goes on with a part of `U`, or with `B`, which is a part of the left side. No step gives the same pair to this arm again, so no cache entry is needed (the cache at `solve.rs:248` only keeps pairs with a `Var`).
+   This arm ends: each step goes on with a part of `U`, or with `B`, which is a part of the left side. No step gives the same pair to this arm again, so no cache entry is needed (the cache at `solve.rs:349` only keeps pairs with a `Var`).
 
-   The last case is exact: `R` asks nothing about the labels of `L`, so a record of `Without(B, L)` is in `R` exactly when the record of `B` it came from is. Steps c (a difference that takes records out), d (another head) and e (a forgotten field is needed) fail at once, and they assume that `B` has a record: then a record of `Without(B, L)` is in no type with another head, in no `A - H` whose `H` has records, and, since a forgotten field can be anything or missing, not in `R`. If `B` has no records, `Without(B, L)` has no values and the check could pass, so these cases may reject a program that uses such an empty type. They never accept a wrong one. Every `Without` that `put`, `remove` or a spread expression makes has as its base the type of a value that was checked to be a record (`r: R & {..}` in part 5.1, `te <: {..}` in part 7), so in practice the base has records.
+   The last case is exact: `R` asks nothing about the labels of `L`, so a record of `Without(B, L)` is in `R` exactly when the record of `B` it came from is. Steps c (a difference that takes records out), d (another head) and e (a forgotten field is needed) fail at once, and they assume that `B` has a record: then a record of `Without(B, L)` is in no type with another head, in no `A - H` whose `H` has records, and, since a forgotten field can be anything or missing, not in `R`. If B has no records, Without(B, L) is empty. A closed goal must use exact emptiness/coverage before reporting these failures; the conservative failures here apply only when an open base prevents that proof. They never accept a wrong one. Every `Without` that `put`, `remove` or a spread expression makes has as its base the type of a value that was checked to be a record (`r: R & {..}` in part 5.1, `te <: {..}` in part 7), but an unreachable expression can still have an empty base; never use this runtime intuition as an inhabitance proof.
 
    The check fails here and not later. An earlier draft turned the record member into `Never` and went on with `B <: Never`. When `B` is a variable, that is only stored as a bound, so the failure came later as a plain mismatch with `Never`, far from its cause, or not at all when `B` had no lower bound. Failing at once keeps the reason and the place.
-7. (exists) the left-`Inter` arm (`solve.rs:285`). Its partition counts `Rec` as concrete, next to `Con` and `Fn`: `matches!(m, Ty::Con(..) | Ty::Fn(_) | Ty::Rec(_))`. A `Without` member is tried alone, like a variable. **Which failure is kept:** today, when every try fails, the failures of the last try are kept. Now the failures of the first try that failed with `NoField` or `LabelMayBe` are kept, if there is one, and else those of the last try. So in `Without(R2, {K}) & { K: "s" } <: { a: A }`, both tries fail with E0544, and E0544 is what the user sees.
+7. (exists) the left-`Inter` arm (`solve.rs:389`). Its partition counts `Rec` as concrete, next to `Con` and `Fn`: `matches!(m, Ty::Con(..) | Ty::Fn(_) | Ty::Rec(_))`. A `Without` member is tried alone, like a variable. **Which failure is kept:** today, when every try fails, the failures of the last try are kept. Now the failures of the first try that failed with `NoField` or `LabelMayBe` are kept, if there is one, and else those of the last try. So in `Without(R2, {K}) & { K: "s" } <: { a: A }`, both tries fail with E0544, and E0544 is what the user sees.
 8. (exists) `Diff <: _`, `Top <: _`, `Both`, `_ <: Union` (route), `_ <: Diff`. `route` and `_ <: Diff` compare `value_head()`, not `head()` (part 4.2). A `Without` on the left never reaches them, because arm 6 came first; the change is for a `Without` member on the right of `_ <: Union`, and so that no other path can treat a `Without` as disjoint from records.
 9. **R-width.** `Rec(fs) <: Rec(gs)`: for each `(g, G)` in `gs`, find the field of `fs` whose label is the same as `g`, and constrain `F <: G`. If there is none, fail. The failure is `LabelMayBe`, E0544 ("the key `K` may be `g`"), when a label of `fs` may be equal to `g`, and `NoField`, E0512 ("the record has no field `g`"), when not. With `env` true, fail: records are never services.
 10. (exists) `Con <: Con`, `Fn <: Fn`, and the catch-all mismatch. `Con <: Rec` and `Rec <: Con` fall to the catch-all. When the left is a custom type and the right is a record, the message adds the hint of part 11.
 
 ### 4.5 `&` and `|`
 
-**U1 (exact union).** Flatten unions, remove `Never`, deduplicate identical members, and sort canonically. Keep distinct record and spread alternatives. Do not call the common-field join from the solver, normalizer, Coalescer, substitution, alias completion, or package writer. For the first version do not factor even a one-field union: `{ a: Int } | { a: String }` remains two alternatives, although it denotes the same set as `{ a: Int | String }`. Syntactic normal forms need not be unique for all equal sets; their denotation must be equal.
+**U1 (exact union).** Union means set union. Remove `Never` and identical operands locally; retain distinct alternatives and their correlations. Store shared expression nodes, not a flat list of expanded alternatives. Associativity, field splitting and distributivity are equalities, not instructions to expand on construction. No common-field join occurs in solver types, substitution, display, alias completion or interfaces. Equal sets need not have identical graphs or text.
 
-**U2 (intersection).** `Rec(fs) & Rec(gs)` is `rec(fs ++ gs)`: same labels meet by N1; N2 detects an empty field. Labels that may coincide stay separate until substitution. A record and a concrete non-record head meet to `Never`. `Without` otherwise stays as a conjunct. Distribute intersection over record unions, including spread alternatives, to expose all branches; deduplicate. Do not distribute forgetting over intersection. Exact distributivity can grow exponentially; sharing is allowed, widening is not.
+**U2 (intersection).** `Rec(fs) & Rec(gs)` is `rec(fs ++ gs)`: N1 meets duplicate fields and N2 removes a plainly empty record. A record and a concrete non-record head meet to Never. Keep other intersections, including intersections with unions or Without, as shared nodes. Apply distributivity only when a demand needs it, under U6. Never distribute forgetting over intersection.
 
-**U3 (right union).** Use section 4.4 arm 5a and section 20’s no-new-bounds proof. A runtime head is not an alternative selector. The original one-Rec routing shortcut is removed.
+**U3 (right union).** A constraint against several record alternatives uses the pure inclusion proof in §20.3. It includes ordinary structural subtyping, exact field case splitting and reading established bounds. It never creates bounds, chooses a solution, fixes a weak variable, or treats a cycle as proof. Closed equivalent annotations have the same acceptance if checking completes. A failed open proof reports what inclusion is not established, not “ambiguous” unless alternative bound choices really are the problem.
 
-**U4 (places).** A union with two or more record alternatives, or any retained spread alternative, is output-only (E0518), in expanded written types and shown inferred types of every binding. Record alternatives include `Rec`, `Without`, and intersections known to contain only records. A single spread is not a union and remains legal in either place. Existing variable-union and variable-intersection restrictions remain. At these same written/shown boundaries, check again after closed substitution and T2 completion: an input `A | { a: Int }` can acquire a second record alternative. Do not place-check every temporary solver bound or reject ordinary instantiation of `id` merely because its argument has several record alternatives.
+**U4 (uses).** A closed record union is legal in every type position. An operation is valid when it is valid on every alternative; its result is the union of their results. Open record unions are not banned by place or number of alternatives. The restriction is exactly U3: an inclusion needing alternative-specific bounds must already be entailed by the ordinary constraints. Variable storage against the whole target and conjunction from left unions remain ordinary inference; choosing bounds to fit a right alternative does not. Existing restrictions on unions of ordinary variable members and on intersections with variable members remain. Check the actual obligations again after substitution/completion, not a record-alternative count.
+
+**U6 (compact exact types and resources).** Keep shared union, intersection and forgetting nodes. Demand only the portion required by an operation; §20.3a defines order, representation, interfaces and the 65,536-state budget. Exhaustion reports `type too large to check here`, with a source place and an annotation suggestion. It is a resource limit, never a typing rule, failed subtype proof, widening, or permission to publish a partial alias.
 
 **U5 (known summaries).** Only known-type analysis may use common guaranteed fields with unioned field types. Normalize away provably empty alternatives first. An unknown record alternative contributes no guaranteed fields. Preserve non-record alternatives outside this summary. Never use the summary as the inferred type, a permanent alias, a subtype target, or package identity. This is the conservative view required by joint J2. Form a safe upper union of each common field: merge scalar sets exactly; retain identical types and exact record alternatives; keep distinct concrete heads as a union. If unequal same-head nominal/function forms cannot be combined without equality constraints or loss of alternatives, use Top for that field. Never pick an invariant argument or invoke the mutating solver to construct a known summary.
 
@@ -202,30 +204,30 @@ The arms go into `constrain_in` (`solve.rs:245`) in this order. Arms that exist 
 
 ### 4.6 Bounds: `add_bound`, `reach`, `compare`
 
-The code is at `solve.rs:385-490`.
+The code is at `solve.rs:512-687`.
 
-- `reach` and the `new` list in `add_bound` collect `Rec` bounds like `Con` bounds: the arms `Ty::Con(..) | Ty::Fn(_)` at :397 and :438 become `is_headed()`. If one is missed, a record bound is dropped with no error, so this is the most important line of the audit.
-- **Every record upper bound is stored**, as every other bound is (`bounds.push` at :408). Nothing is keyed by label.
-- The rule "a new upper bound is compared only with the first upper bound of each head" (:390-393) stays. For two record upper bounds `compare` does nothing, because no field of a record is invariant: there is nothing to check. So no check is lost.
-- A variable's record upper bounds together act as their `&`. Each lower bound is checked against each upper bound (the loops at :266-270 and :272-276). So with `x <: { a: X }` and then `x <: { a: Y }`, every lower bound `lb` of `x` gets `lb.a <: X` and `lb.a <: Y`, which is `lb.a <: X & Y`. A second bound on the same label that conflicts with a lower bound fails there.
+- `reach` and the `new` list in `add_bound` collect `Rec` bounds like `Con` bounds: the arms `Ty::Con(..) | Ty::Fn(_)` at :564 and :635 become `is_headed()`. If one is missed, a record bound is dropped with no error, so this is the most important line of the audit.
+- **Every record upper bound is stored**, as every other bound is (`bounds.push` at :582). Nothing is keyed by label.
+- The rule "a new upper bound is compared only with the first upper bound of each head" (:557-560) stays. For two record upper bounds `compare` does nothing, because no field of a record is invariant: there is nothing to check. So no check is lost.
+- A variable's record upper bounds together act as their `&`. Each lower bound is checked against each upper bound (the loops at :366-371 and :373-378). So with `x <: { a: X }` and then `x <: { a: Y }`, every lower bound `lb` of `x` gets `lb.a <: X` and `lb.a <: Y`, which is `lb.a <: X & Y`. A second bound on the same label that conflicts with a lower bound fails there.
 - Two record **lower** bounds stay separate. `compare` must not join their field constraints: U1 permits alternatives with unrelated invariant field contents. Each lower bound is still checked against every upper bound. Current implementation sites are in section 20.
-- `needs_join(Rec(fs))` is true only when some field needs a join (:1267). So records of plain data make no join variables.
+- `needs_join(Rec(fs))` is true only when some field needs a join (:1543). So records of plain data make no join variables.
 
 ### 4.7 Display
 
 - `ShownType::Record { base: Option<Box<ShownType>>, fields: Vec<(String, Option<ShownType>)> }` in `shown.rs`. A field with `None` is a forgotten label, shown `-label`.
 - `{ name: String, age: Int }` is printed with the fields sorted, and `{..}` for no fields. A label that is not a `name` is printed as a string literal: `{ "first-name": String }`. A `Param` label is printed as its `UpName`.
-- **The Namer keeps the names of label parameters.** The Namer (`display.rs:1133-1207`, A2 changes it to capital names) puts only the written names of type variables into `taken`, and `fresh()` hands out letters in order. A label parameter is not a type variable, so an inferred variable could get its name: in `f(K) = (r: { K: Int }, key: K, x) { (record.get(r, key), x.a, x.b, x.c, x.d, x.f, x.g, x.h, x.i, x.j, x.k) }`, the ten variables of `x` would be named `A` to `K` (skipping `E` and `N`), and the last `K` would read back as the label parameter, which is E0543 as a field type. So, before `assign`, the Namer puts the name of every `Param` label of the type it shows into `taken`. This holds for schemes and for the types in error messages. Test: 15.2.
-- The text `{ ..B, fs, -m … }` means `Without(B, labels(fs) ∪ {m …}) & Rec(fs)` (part 3). So an `Inter` of `Without(B, L)` and `Rec(fs)` is printed `{ ..B, fs, -l … }` only when every label of `fs` is in `L`, with `-l` for each label of `L` that is not a label of `fs`. This is the case for every type that `put` and spreads make. When a label of `fs` is not in `L`, it is printed `{ ..B, -l … } & { fs }`, which reads back as the same type. A `Without(B, L)` alone is `{ ..B, -l … }`. A test checks that every shown type reads back as the same type (15.2).
-- `display::tree` (:1176 and :1280) gets an explicit `Rec` arm before the arm that shows every other `Con` as a tuple.
+- **The Namer keeps the names of label parameters.** The Namer (`display.rs:1168–1242`, with A2’s capital names) puts only the written names of type variables into `taken`, and `fresh()` hands out letters in order. A label parameter is not a type variable, so an inferred variable could get its name: in `f(K) = (r: { K: Int }, key: K, x) { (record.get(r, key), x.a, x.b, x.c, x.d, x.f, x.g, x.h, x.i, x.j, x.k) }`, the ten variables of `x` would be named `A` to `K` (skipping `E` and `N`), and the last `K` would read back as the label parameter, which is E0543 as a field type. So, before `assign`, the Namer puts the name of every `Param` label of the type it shows into `taken`. This holds for schemes and for the types in error messages. Test: 15.2.
+- The text `{ ..B, fs, -m … }` means `Without(B, labels(fs) ∪ {m …}) & Rec(fs)` (part 3). So an `Inter` of `Without(B, L)` and `Rec(fs)` is printed `{ ..B, fs, -l … }` only when every label of `fs` is in `L`, with `-l` for each label of `L` that is not a label of `fs`. This is the case for every type that `put` and spreads make. When a label of `fs` is not in `L`, it is printed `{ ..B, -l … } & { fs }`, which reads back as the same type. A `Without(B, L)` alone is `{ ..B, -l … }`. Small inline types parse back; shared full types use U6’s exact graph bundle. Both round-trip tests belong in 15.2.
+- `display::tree` (:1211 and :1315) gets an explicit `Rec` arm before the arm that shows every other `Con` as a tuple.
 - The Coalescer and `Norm` use only the smart constructors of 4.3 for these forms.
 
 Expect changes in the `.out` files of schemes: `(u) { u.name }` used to be an error (E0506), and now it has a type.
 
 ### 4.8 Known types (`known.rs`)
 
-- `members` (:21) treats a `Rec` as one member with head `Record`. An `Inter` gives its `Rec` member, as it gives its `Con` member today. A `Without(B, L)` gives the members of `B`, where a record member loses every field whose label is the same as, or may be equal to, a label of `L`. That is a larger type, which is safe for a known type.
-- `match_k` (:322) gets a `Rec` arm using the common guaranteed-field summary U5 of all record alternatives in K. A missing field contributes Top to the expected field variables, as joint J2 requires. Label substitution happens first; Param labels can only be those of the caller. Never match an arbitrary first record alternative.
+- `members` (:22) treats a `Rec` as one member with head `Record`. An `Inter` gives its `Rec` member, as it gives its `Con` member today. A `Without(B, L)` gives the members of `B`, where a record member loses every field whose label is the same as, or may be equal to, a label of `L`. That is a larger type, which is safe for a known type.
+- `match_k` (:414) gets a `Rec` arm using the common guaranteed-field summary U5 of all record alternatives in K. A missing field contributes Top to the expected field variables, as joint J2 requires. Label substitution happens first; Param labels can only be those of the caller. Never match an arbitrary first record alternative.
 - A record literal has the record of the known types of its fields, with `_` for a field that has none.
 - A spread `{ ..e, f1: e1, … }` has the known type `without(ke, {f1, …}) & rec(fi: ki)`, built with the smart constructors, where `ke` is the known type of `e` (`Top` when `e` has none, so that `without` gives `{..}`) and `ki` is the known type of `ei` (`_` when it has none). So `b = { ..a, n: 1 }` with `a = { u: User("bo") }` has the known type `{ n: 1, u: User }`, and `b.u.name` uses rule 13a, as `record.put(a, "n", 1).u.name` does. `{ ..e }` alone has the known type `ke & {..}`, built the same way: the record members of `ke`, and `{..}` when `e` has no known type. So `{ ..x }` always has a known type, and `g = (x) { { ..x } == 1 }` is the §6.9 error, because a record is never an `Int`. Part 12 says the same.
 - `ksubst` builds types with the smart constructors. With the known function type built under the label map of L4, the known type of `record.put({ age: 1 }, "age", "x")` is `{ age: "x" }`.
@@ -264,7 +266,7 @@ remove(R, K): (r: R & {..}, key: K) -> { ..R, -K }
      - anything else (no known type, `String`, a union `"a" | "b"`, a cofinite set, `_`): E0541. The call then gets fresh types and nothing more.
      When `K` is the type of more than one key parameter, each of their arguments gives a label by these rules, and the labels must all be the same, or it is E0541. This matters for `Param` labels: a parameter type `K` with `K := Param(J)` becomes `String` (step 3), so the solver checks nothing, and only this rule stops `pick(j, l)` from giving `pick(K) = (k1: K, k2: K)` two different strings (`key_two_params.i`, 15.1).
   3. the scheme is instantiated with these labels (`freshen` takes a label map and rebuilds with the smart constructors). For `K := Name("s")`, the parameter type `K` becomes the one-value String type `"s"`, so the solver checks that the argument is `"s"`; the known type only chose the label. For `K := Param(J)`, the parameter type `K` becomes `String`, and the check is the name rule of step 2.
-     **The known function type gets the same label map.** At 1865366, the known type `kf` of a callee name is built in `infer.rs:1087-1112` before any argument is looked at: `display::known(&s.ty, …)` for an external, `other_known` for an imported binding, and `self.kvars` (from `scheme_known`) for a binding of the module. `call()` (`infer.rs:1260-1345`) then uses it for the expected type of every argument (`ksubst(&ps[i], &sigma)`) and for the known type of the result (`call_known`). For a callee whose scheme has label parameters, T3 builds `kf` after step 2, from the scheme with the label map put in (`display::known`, `other_known` and `scheme_known` take the map, or `kf` is rebuilt with it through the smart constructors), and only then works out the expected types of the other arguments. So the expected types and known types of the caller never hold a `Param` of the callee: with `K := Name("a")` the known parameter type `Box({ K: Int })` is `Box({ a: Int })`, and with `K := Param(J)` it is `Box({ J: Int })`, a label of the caller's own binding. The key arguments of step 1 get the expected type `String` and no known type from `kf`. Without this, a correct caller would be rejected: with `apply(K) = (b: Box({ K: Int }), key: K, f: (Box({ K: Int })) -> Int) -> Int { f(b) }`, the call `apply(Box(item: { a: 1 }), "a", (x) { x.item.a })` would give `x` the known type `Box({ K: Int })` with apply's `K`, rule 13a would put that into the solver, and `{ a: Int } <: { K: Int }` would fail with E0544. A test checks this program (`key_known_fn.i`, 15.1).
+     **The known function type gets the same label map.** In the merged code, the known type `kf` of a callee name is built in `infer.rs:1220-1245` before any argument is looked at: `display::known(&s.ty, …)` for an external, `other_known` for an imported binding, and `self.kvars` (from `scheme_known`) for a binding of the module. `call()` (`infer.rs:1422-1512`) then uses it for the expected type of every argument (`ksubst(&ps[i], &sigma)`) and for the known type of the result (`call_known`). For a callee whose scheme has label parameters, T3 builds `kf` after step 2, from the scheme with the label map put in (`display::known`, `other_known` and `scheme_known` take the map, or `kf` is rebuilt with it through the smart constructors), and only then works out the expected types of the other arguments. So the expected types and known types of the caller never hold a `Param` of the callee: with `K := Name("a")` the known parameter type `Box({ K: Int })` is `Box({ a: Int })`, and with `K := Param(J)` it is `Box({ J: Int })`, a label of the caller's own binding. The key arguments of step 1 get the expected type `String` and no known type from `kf`. Without this, a correct caller would be rejected: with `apply(K) = (b: Box({ K: Int }), key: K, f: (Box({ K: Int })) -> Int) -> Int { f(b) }`, the call `apply(Box(item: { a: 1 }), "a", (x) { x.item.a })` would give `x` the known type `Box({ K: Int })` with apply's `K`, rule 13a would put that into the solver, and `{ a: Int } <: { K: Int }` would fail with E0544. A test checks this program (`key_known_fn.i`, 15.1).
   4. the call goes on as every call does (rule 5 of §4.8), with the other arguments.
 
   So the solver never gets a label that is an inference variable, and no type or known type of a caller holds a label parameter of another binding.
@@ -294,7 +296,7 @@ remove(R, K): (r: R & {..}, key: K) -> { ..R, -K }
   the call `f(r, j, k, 0)` would check against the self-type `({ K: Int, J: String }, String, String, Int) -> Int`, and in the second run `record.get(r, k)` would give `"s"` as an `Int`. L6 makes it E0541, because `j` refers to a key parameter of type `J` and is given where `K` is wanted (`recursive_key.i`, 15.1). A binding with label parameters may not be in a recursive group with other bindings (spec §4.7: the other names of a group are not general, so a call between them has no scheme for L4). That is E0543 on the label parameter, with a note that names the other binding of the group. The groups are known before inference (`order.rs`), so the check is made there.
 - **L7. Principal types.** The labels come from names and known types, which are found before solving, like the constructors of rule 13a. They never come from solving, so solving does not depend on its own order. Every binding that is accepted has a principal type; programs whose keys are not known are rejected, not guessed. An annotation can always make the key known.
 - **L8. No escape.** A type that holds `Param(K)` may not become a bound of a type variable from outside the binding that declares `K`: a variable of an outer parameter, of an outer binding that is not generalized, or of a name of the binding's group. Such a variable is not generalized with the binding, so `K` would stay in it after every call has replaced `K`, and would leak into the scheme of the outer binding, where nothing declares it. In `outer = (acc) { f(K) = (r: { K: Int }, key: K) { acc(r) } ⏎ f({ a: 1 }, "a") }`, `acc` would get the type `({ K: Int }) -> B`. That is E0545, "the label parameter `K` of `f` reaches `acc`, which is outside `f`", at the place where the constraint is made.
-  - **How it is found.** Each `LabelParamId` keeps a level: the **raised** level of the binding that declares it, the level at which the binding's own fresh variables are made. For a local binding this is `s.level` after the `self.s.level += 1` at `infer.rs:2056` (the binding is direct, by L2, so the raise always happens), not the outer level where the name is bound; generalization (`infer.rs:2108`) takes the variables above the outer level. For a top-level binding it is the level at which its value is inferred. So every variable from outside the binding, such as `acc` in the example, is at a level strictly below the level of `K`. If the outer level were stored, `{ K: Int }` would have `level_of` equal to the level of `acc`, `constrain_in` would take the plain `add_bound` arm with no `extrude`, and `K` would leak into the scheme of `outer` with no error. `level_of` (`solve.rs:203`) counts a `Rec` or `Without` with a `Param(k)` label as being at least at the level of `k`. So a constraint between such a type and a variable of a lower level goes through `extrude` (the variable arms, part 4.4 arm 3). `extrude` (`solve.rs:577`) to a level below the level of `k`, on a type with the label `Param(k)`, fails with `FailKind::LabelEscapes(k)` instead of copying it, because no fresh variable can stand for a label.
+  - **How it is found.** Each `LabelParamId` keeps a level: the **raised** level of the binding that declares it, the level at which the binding's own fresh variables are made. For a local binding this is `s.level` after the `self.s.level += 1` at `infer.rs:2246` (the binding is direct, by L2, so the raise always happens), not the outer level where the name is bound; generalization (`infer.rs:2337`) takes the variables above the outer level. For a top-level binding it is the level at which its value is inferred. So every variable from outside the binding, such as `acc` in the example, is at a level strictly below the level of `K`. If the outer level were stored, `{ K: Int }` would have `level_of` equal to the level of `acc`, `constrain_in` would take the plain `add_bound` arm with no `extrude`, and `K` would leak into the scheme of `outer` with no error. `level_of` (`solve.rs:285`) counts a `Rec` or `Without` with a `Param(k)` label as being at least at the level of `k`. So a constraint between such a type and a variable of a lower level goes through `extrude` (the variable arms, part 4.4 arm 3). `extrude` (`solve.rs:814`) to a level below the level of `k`, on a type with the label `Param(k)`, fails with `FailKind::LabelEscapes(k)` instead of copying it, because no fresh variable can stand for a label.
   - This is the same check as "a rigid type variable escapes its scope" in other languages. It keeps the rule of 4.1 true: `Param` labels exist only inside their binding and its scheme. So every shown scheme reads back (4.7), and the argument of 5.5 ("inside the binding") covers every place a `Param` can be.
 - **L9. Not called by the host.** A binding whose scheme has label parameters may not be an entry point (§10.2: a host export, a test, `main`). The host calls an entry point with no L4 check, and the host signature shows a key parameter only as `String` (L3). So in
   ```i
@@ -303,7 +305,7 @@ remove(R, K): (r: R & {..}, key: K) -> { ..R, -K }
     record.get(r, k2)
   }
   ```
-  listed in `[wasm] exports`, the body checks (both keys give `Param(K)`), the host signature is `(String, String) -> Int`, and `pick("a", "b")` would reach `unreachable` in `$record_get`. `entry_point` (`infer.rs:378`) looks at the scheme first: when it has label parameters, it is E0320, "`pick` has a label parameter, so the host cannot call it: the host gives its keys with no check (§10.3)", and no host type is worked out. This is the only way to call a binding without a call in i code: L5 rules out every other use of its name as a value.
+  listed in `[wasm] exports`, the body checks (both keys give `Param(K)`), the host signature is `(String, String) -> Int`, and `pick("a", "b")` would reach `unreachable` in `$record_get`. `entry_point` (`infer.rs:454`) looks at the scheme first: when it has label parameters, it is E0320, "`pick` has a label parameter, so the host cannot call it: the host gives its keys with no check (§10.3)", and no host type is worked out. This is the only way to call a binding without a call in i code: L5 rules out every other use of its name as a value.
 
 ### 5.3 Two label parameters with the same label
 
@@ -333,7 +335,7 @@ Inside the binding, a type with `Param` labels stands for every type you get by 
 
 - R-width finds a field only by "the same" label, never through "may be equal". After a replacement, the same field is still there.
 - `&` keeps fields that may be equal as two fields. After a replacement N1 merges them by `&`, which is the same set.
-- `|` retains exact alternatives before and after replacing labels. `{ K: Int } | { a: Int }` is not `{..}`. Substituting `K = "a"` deduplicates it to `{ a: Int }`. The example of an inner `h` with that union as its parameter is now E0518; it cannot accept `{ b: 1 }` by forgetting the alternatives. No “join once” exemption applies to substitution.
+- `|` retains exact alternatives before and after replacing labels. `{ K: Int } | { a: Int }` is not `{..}`. Substituting `K = "a"` deduplicates it to `{ a: Int }`. The inner `h` may declare that input union. It accepts `{ a: 1 }` uniformly, but cannot accept `{ b: 1 }` for arbitrary K: for K = "c" that value is outside the union (U3). No “join once” exemption applies to substitution.
 - E4 retains Without when a field label may coincide with a removed label. R-without-left cannot promise such a field. After substitution the exact rewrite may become possible and the check may become less conservative; a successful check stays sound.
 
 These two directions do not contradict each other: for `<:` and `&`, treating `K` as different from `a` only makes types smaller or checks stricter; for forgetting, treating `K` as possibly `a` retains the exact operator and promises fewer fields. Both are true for every string `K` may be.
@@ -400,7 +402,7 @@ user = object |> field("name", string) |> field("age", int)
 
 This checks as written, with no extra annotation:
 
-- `Schema` is covariant in `A` (its parameter is only in an output place, `infer.rs:2239`).
+- `Schema` is covariant in `A` (its parameter is only in an output place, `infer.rs:2472`).
 - Declared type variables are flexible (syntax.md §4.7). Inside `field`, `s.decode(j)` has the type `R`. The call of `put` adds `R <: R2 & {..}` for put's own fresh `R2`, so `R` gets the upper bound `{..}`. The shown scheme is `field: (s: Schema(R & {..}), key: K, value: Schema(V)) -> Schema({ ..R, K: V })`.
 - In the call of `put`, the key argument is the name `key`, the key parameter of `field`, so put's label parameter becomes `Param(K)` (L4).
 - The body's type `Schema({ ..R2, K: V2 })` is checked against the written `Schema({ ..R, K: V })`. The right side is split; R-without-right takes the `Without` member and gives `R2 <: R`; the `{ K: V2 }` member gives `V2 <: V`.
@@ -432,7 +434,7 @@ user = object |> field("name", string) |> field("age", int)
 Codec(User, _) = user          // User is { age: Int, name: String }
 ```
 
-- `Codec` is covariant in `D` and contravariant in `E` (`infer.rs:2239`).
+- `Codec` is covariant in `D` and contravariant in `E` (`infer.rs:2472`).
 - In `encode`, `x` gets no useful expected type. By §4.8, an argument of a call gets the type of the callee's parameter, here `(E0) -> Json` from the constructor `Codec`, with `E0` filled only from the other arguments, never from the `->` part of `field`. So `x` has a fresh type `X`. `s.encode(x)` gives `X <: E`, and `record.get(x, key)` gives `X <: { K: V3 }` (the key is the name `key`, so L4 gives `Param(K)`), and `value.encode(…)` gives `V3 <: V`.
 - The body's type is then checked against the written result. `Codec` is contravariant in its second parameter, so this needs `E & { K: V } <: X`, which goes on to the upper bounds of `X`: `E & { K: V } <: E`, which the Member arm (part 4.4, arm 1) makes true at once, with no bound that holds `E` itself, and `E & { K: V } <: { K: V3 }`, which the left-`Inter` arm gives by R-width (`V <: V3`). With `V3 <: V`, the encode side checks.
 - **What `user` is, and what to read from it.** `user` is not generalized: its value is a call, not a direct value (§6.10), so its type variables stay those of the module. The decode side `D` gets its lower bound `{ age: Int, name: String }` from the calls of `field`, and nothing else in the module gives it a lower bound: a use of `user.decode(j)` only adds upper bounds. So `Codec(User, _) = user` binds `User` to `{ age: Int, name: String }`, whatever the rest of the module does. The encode side is not stable. `object` gives `E1 <: {..}`, the first `field` gives `E2 <: E1 & { name: String }`, and the encode type of `user` is `E2 & { age: Int }`: only **upper** bounds, so the encode side accepts exactly the records of `{ age: Int, name: String }`. But a variable that is not generalized is shown as the union of the types that come to it (spec §4.7), and each `user.encode(v)` in the module gives `E2` the lower bound `v`. So the shown encode type is `Never` when the module never encodes, and the union of the encoded types when it does; it depends on which bindings call `user.encode`. Code should not read it: an alias pattern reads the decode side, the first argument. When the shown type of `user` matters, write it: `user: Codec({ age: Int, name: String }, { age: Int, name: String }) = …`.
@@ -452,16 +454,16 @@ M4 lands after T3 and expands typed macros (meta.md §7) after their call is che
 
 ## 6. Field access `v.f`
 
-`field()` (`infer.rs:1538`) works out the known type `kv` of `v` first, as today. Then:
+`field()` (`infer.rs:1705`) works out the known type `kv` of `v` first, as today. Then:
 
-- **13a. Fields of constructors.** When `v` is known to be made by one constructor (§7.5), or every member of `kv` is a custom type, also when `kv` has no members (`Never`): the existing code of the checker, unchanged. It records `Access::Field`, and the type of `v` must be a subtype of its known type. With no members, the list of `Access::Field` is empty (`infer.rs:1667-1676`), and the type of `v.f` is `Never`.
+- **13a. Fields of constructors.** When `v` is known to be made by one constructor (§7.5), or every member of `kv` is a custom type, also when `kv` has no members (`Never`): the existing code of the checker, unchanged. It records `Access::Field`, and the type of `v` must be a subtype of its known type. With no members, the list of `Access::Field` is empty (`infer.rs:1855-1864`), and the type of `v.f` is `Never`.
 - **13b. Fields of records.** When `v` has no known type, or `kv` has at least one member and every member is a record type, `_` or a type variable (a declared variable such as `A` in `(x: A) { x.name }`, or a variable from an expected type): make a fresh `A`, constrain `t <: { f: A }`, give `v.f` the type `A`, and record `Access::Label(f)`. The known type of `v.f` is the field `f` of U5’s conservative summary of all record alternatives of `kv`, when it is guaranteed.
 - **13c. Tuple parts.** `v.k`: unchanged.
-- **Otherwise** (a custom type and a record, or a function, an `Int`, …): E0512 with the message "`.f` reads a field of a record or of a custom type, and this value may be either; write its type". The code generator never sees a mixed target, so the shortcut "the last branch is not tested" in `Lowerer::field` (`lower.rs:1675`) stays correct.
+- **Otherwise** (a custom type and a record, or a function, an `Int`, …): E0512 with the message "`.f` reads a field of a record or of a custom type, and this value may be either; write its type". The code generator never sees a mixed target, so the shortcut "the last branch is not tested" in `Lowerer::field` (`lower.rs:1764`) stays correct.
 
-E0506 is no longer given for `.f` (it is still given at `infer.rs:1270`). Every program that is correct today has a known type at each `.f` whose members are all custom types, or that has no members, so it keeps rule 13a. The two rules never overlap: 13a needs every member to be a custom type, and 13b needs no known type or at least one member. So `list.map([], (x) { x.name })`, where `x` has the known type `Never`, keeps `Access::Field([])` and the type `Never`, as today.
+E0506 is no longer given for `.f` (it is still given at `infer.rs:1432`). Every program that is correct today has a known type at each `.f` whose members are all custom types, or that has no members, so it keeps rule 13a. The two rules never overlap: 13a needs every member to be a custom type, and 13b needs no known type or at least one member. So `list.map([], (x) { x.name })`, where `x` has the known type `Never`, keeps `Access::Field([])` and the type `Never`, as today.
 
-**The empty access list in lowering.** At 1865366 the checker accepts that program, and `i build` panics: `Lowerer::field` (`lower.rs:1675-1682`) starts with `let first = list[0].1`, so an empty list is an index out of bounds (checked with the compiler of the repo: "index out of bounds: the len is 0 but the index is 0" at `lower.rs:1682`, from `Lowerer::lower` at :1502). T3 fixes it: for an empty list, `Lowerer::field` pushes `Stmt::Unreachable` and gives `Atom::Nil`, as `ExprKind::Error` does (`lower.rs:1565`). The value has the type `Never`, so it is never made, and the trap is never reached. Tests: `field_never.i` builds and runs (15.1), and a codegen test (15.4).
+**The empty access list in lowering.** At 1865366 the checker accepts that program, and `i build` panics: `Lowerer::field` (`lower.rs:1764-1771`) starts with `let first = list[0].1`, so an empty list is an index out of bounds (checked with the compiler of the repo: "index out of bounds: the len is 0 but the index is 0" at `lower.rs:1771`, from `Lowerer::lower` at :1591). T3 fixes it: for an empty list, `Lowerer::field` pushes `Stmt::Unreachable` and gives `Atom::Nil`, as `ExprKind::Error` does (`lower.rs:1654`). The value has the type `Never`, so it is never made, and the trap is never reached. Tests: `field_never.i` builds and runs (15.1), and a codegen test (15.4).
 
 A written type only adds information (§4.7), so it never turns a correct `.f` into an error: `(x) { x.name }`, `id_name(A) = (x: A) { x.name }` and `names(A) = (xs: List(A)) { list.map(xs, (x) { x.name }) }` all use 13b. The known type of `v.f` under 13b is what lets `r.user.name` use 13a when `r = { user: User("bo") }`, and lets `r.cb(x: 1)` call by label when `r.cb` is a function.
 
@@ -481,8 +483,8 @@ name_of(User("bo"))             // E0501
 - **Spread** `{ ..e, f1: e1, … }`: `e` first, then the parts in order. `e` gets no expected type. Each `ei` gets the expected type of the guaranteed field `fi` of U5’s conservative expected summary of the whole spread, if there is one, as in a literal. So with `Cfg = { cb: (User) -> String, n: Int }`, in `next: Cfg = { ..base, cb: (u) { u.name } }` the parameter `u` has the known type `User`, and `.name` uses rule 13a. `te <: {..}`, and the type is `without(te, {f1, …}) & rec(fi: ti)`. `{ ..e }` alone has the type `te & {..}`. A label twice among the parts is E0540, as in a literal. The known type is in part 4.8.
 - **Same label.** Two labels are the same when their strings are the same, after the escapes of a string literal are worked out. A `name` label is the string of the name. So `{ a: 1, "a": 2 }`, `{ a: 1, "\u{61}": 2 }` and `{ ..r, a: 1, a: 2 }` are E0540. HIR keeps each label as its string (`LabelName` holds the string with no escapes), and E0540, the sort, `Ty::Rec` and the label constants of part 9 all use that string. The same holds in a written type: `{ a: Int, "a": String }` and `{ ..R, a: Int, -a }` are E0540.
 - **Empty record** `{..}`: the type `{..}`.
-- **Effects and direct values:** `has_no_effect` (`infer.rs:2340`) treats a literal as it treats a tuple: a literal whose parts give the warning gives the warning "its value is not used" as a statement that is not the last. A spread is treated as a constructor update `C(..v, …)` (the spec's "record update", renamed in part 12), which gives no warning. Part 12 adds this to the list of §6.10. A literal of direct values is a direct value (§6.10) and is generalized (rule 14).
-- **Type tests.** `x: { name: String }` in a clause with more than one clause takes every record, by head. Rule 11 already asks for `B <: T | r - T`, so every record that can come to that place must be in `{ name: String }`. To tell kinds of records apart, use a custom type. `lower.rs` `head_cond` (:2209) maps `Head::Record` to a test of tag 14.
+- **Effects and direct values:** `has_no_effect` (`infer.rs:2573`) treats a literal as it treats a tuple: a literal whose parts give the warning gives the warning "its value is not used" as a statement that is not the last. A spread is treated as a constructor update `C(..v, …)` (the spec's "record update", renamed in part 12), which gives no warning. Part 12 adds this to the list of §6.10. A literal of direct values is a direct value (§6.10) and is generalized (rule 14).
+- **Type tests.** `x: { name: String }` in a clause with more than one clause takes every record, by head. Rule 11 already asks for `B <: T | r - T`, so every record that can come to that place must be in `{ name: String }`. To tell kinds of records apart, use a custom type. `lower.rs` `head_cond` (:2340) maps `Head::Record` to a test of tag 14.
 - **No record patterns** in T3. `{ name: n } = r` is a parse error with the hint "read the field: `n = r.name`".
 
 ## 8. Syntax
@@ -540,12 +542,12 @@ Label      = name | string_lit | UpName .
 - A `{` in a type is a record type when `..` follows it, or a label and then `:`. Otherwise it groups a type, as today.
 - `{ ..R }` alone is allowed and is `R & {..}`. It is the written form of the type of the expression `{ ..e }`.
 - **Places (§4.4, E0518).** The §4.4 rule "an intersection with a type variable only in an input place" counts members that are type variables. In `{ ..R, f: T }`, which is `Without(R, {f}) & { f: T }`, no member is a type variable: `Without(R, {f})` is a form with `R` in a covariant place inside it, as `List(R)` is. So a spread with at least one field or `-` part may be in any place, and `put(R, K, V): (…) -> { ..R, K: V }` is correct. `{ ..R }` alone has no such form: it is `R & {..}`, an intersection with the type variable `R`, so in an output place it is E0518, the same as `R & {..}` written out. Two spellings of one type always get the same verdict.
-- **Record unions (§4.4, E0518).** U4 applies after expansion and exact normalization: a union retaining multiple record alternatives or a spread member is output-only. This applies to shown inferred binding types as well as annotations, at the same boundaries after substitution/completion. A single spread still works in either place. A union result is legal to write, but its body must pass U3; the former generic written-result examples are now rejected (section 20).
-- `check_places` (`infer.rs:603`) gets a `TypeKind::Record` arm. It visits every field type with the polarity of the record (fields are output places, as in a tuple), and the base of a spread with the same polarity (the base is covariant). A spread with no fields and no `-` parts whose base is a type variable (after aliases are expanded) is E0518 when the polarity is not `Neg`. Its union arm applies U4: multiple record alternatives or a spread member require `Pos`. This check is on written and shown types, not on every temporary bound in the solver. So `bad(A) = (x: A) -> { a: A & Int } { … }` is E0518, because the field `a` is an output place. `walk_variance` (`infer.rs:2269`) gets the same arm: field types and the base of a spread are covariant, so a type parameter used only in record fields of a custom type's fields goes in the same direction as the type.
+- **Record unions (§4.4, U4).** Record unions are legal in every place. U3 rejects only unproved inclusions that would need alternative-specific bounds. Apply this to actual obligations after substitution/completion; do not count record alternatives for E0518. Section 20 gives accepted closed cases and the remaining generic-result restrictions with workarounds.
+- `check_places` (`infer.rs:696`) gets a `TypeKind::Record` arm. It visits every field type with the polarity of the record (fields are output places, as in a tuple), and the base of a spread with the same polarity (the base is covariant). A spread with no fields and no `-` parts whose base is a type variable (after aliases are expanded) is E0518 when the polarity is not `Neg`. Its union arm retains ordinary-variable place restrictions only. U4 permits record unions; U3 checks actual inclusion obligations. So `bad(A) = (x: A) -> { a: A & Int } { … }` is E0518, because the field `a` is an output place. `walk_variance` (`infer.rs:2502`) gets the same arm: field types and the base of a spread are covariant, so a type parameter used only in record fields of a custom type's fields goes in the same direction as the type.
 - A `string_lit` label has no interpolation (8.1).
 - `-label` parts are allowed only after a `..` part (the grammar says so: `FPart` has no `-`).
 - An `UpName` label must be a declared type variable, which makes it a label parameter (L1). A label that starts with a capital letter is written as a string: `{ "Type": String }`.
-- Inside a record type, a break is a `,`. `TypeGroupBreak` (`parser.rs:1263`) applies only to groups.
+- Inside a record type, a break is a `,`. `TypeGroupBreak` (`parser.rs:1816`) applies only to groups.
 - `{ x }` (T2's type of a value, in a group) and `{ x: T }` (a record type) differ only by the `:`.
 - In a function's `->` part, a `{` right after `->` is part of the type (syntax.md §1.7), so `(x) -> { name: String } { name: x }` is a function with a record type and a record body.
 - `Person = { name: String }` is an alias. `Person { name: String }` stays a parse error, with the hint "a record type is written `Person = { name: String }`".
@@ -570,7 +572,7 @@ This answers meta.md §11 question 2 for records: a `{ }` with one part in a typ
 
 ### 9.2 `==`, compare and hash
 
-They need no new code. The generic `$obj` path of `$value_compare_i32` (`values.rs:125`) compares the tag first, then fields 2 and 1, then field 5 element by element. Its hash (`values.rs:269`) mixes fields 1 and 2, the length and every element. So:
+They need no new code. The generic `$obj` path of `$value_compare_i32` (`values.rs:132`) compares the tag first, then fields 2 and 1, then field 5 element by element. Its hash (`values.rs:276`) mixes fields 1 and 2, the length and every element. So:
 
 - `{ a: 1, b: 2 } == { b: 2, a: 1 }`, because both are sorted;
 - `{ a: 1 } != { a: 1, b: 2 }`, by length, even when both have the type `{ a: Int }`;
@@ -591,15 +593,15 @@ In a new file `runtime/values/record.rs`, included from `values.rs`:
 | `$record_put(r, label, v) -> eqref` | Copies the array, and puts the field in or replaces it. |
 | `$record_with(r, pairs) -> eqref` | A sorted merge of `r` and an already sorted interleaved array, for `{ ..r, … }`: one copy. |
 | `$record_remove(r, label) -> eqref` | Copies the array without the field (the same record when it is not there). |
-| `$record_has(r, label) -> eqref` | Whether the field is there, as a Bool value (`$bool_new`, `runtime/values.rs:40`). |
+| `$record_has(r, label) -> eqref` | Whether the field is there, as a Bool value (`$bool_new`, `runtime/values.rs:47`). |
 | `$record_keys(r) -> eqref` | The labels as a `List(String)`, in order. |
 | `$record_size(r) -> eqref` | The number of fields, as an Int value (`$int_from_i64`, `runtime/bigint.rs:87`). |
 | `$record_texts(r) -> eqref` | A `List((String, String))`: each label, in order, with the text form of its value (the code of `inspect`, 9.5). |
 | `$is_record(v) -> i32` | Tag 14, in `emit/mod.rs` next to `$is_ctor` (:16). Used only by `Cond::IsRec`, never as a value. |
 
-Every function that an `ilang:record` external maps to returns `eqref`, because `Op::Runtime` is emitted as `(call $name args)` and its result is used as an atom (`emit/mod.rs:539`). So `has` and `size` make a Bool and an Int value inside the runtime function; the `i32` and `i64` forms are local to `record.rs`. A test validates a module that calls each of the seven functions.
+Every function that an `ilang:record` external maps to returns `eqref`, because `Op::Runtime` is emitted as `(call $name args)` and its result is used as an atom (`emit/mod.rs:543`). So `has` and `size` make a Bool and an Int value inside the runtime function; the `i32` and `i64` forms are local to `record.rs`. A test validates a module that calls each of the seven functions.
 
-**Label constants.** Lowering makes one immutable global String for each distinct label used in a literal, a spread, a `.f` or a key argument (below) in the output module. The String builder of 1865366, `string()` in `emit/mod.rs:458-476`, emits `(call $string_from_bytes (array.new_data $bytes $sN …))`. Neither a call nor `array.new_data` is a constant expression, so it cannot initialize an immutable global. A label global is written out instead, with the layout of `$string_from_bytes` (`runtime/values/strings.rs:8`) and only constant instructions. Every label global is named by a number, `$label_N`, never by the text of its label: a label is any string, and a space, `(`, `)`, `"` or a byte that is not ASCII is not allowed in a WAT name, so `{ "a b": 1 }` would make text that does not assemble. The number is kept in a table keyed by the bytes of the label, as `string()` already keys its `$sN` data segments. Here is the global of the label `name`:
+**Label constants.** Lowering makes one immutable global String for each distinct label used in a literal, a spread, a `.f` or a key argument (below) in the output module. The current String builder, `string()` in `emit/mod.rs:462-480`, emits `(call $string_from_bytes (array.new_data $bytes $sN …))`. Neither a call nor `array.new_data` is a constant expression, so it cannot initialize an immutable global. A label global is written out instead, with the layout of `$string_from_bytes` (`runtime/values/strings.rs:8`) and only constant instructions. Every label global is named by a number, `$label_N`, never by the text of its label: a label is any string, and a space, `(`, `)`, `"` or a byte that is not ASCII is not allowed in a WAT name, so `{ "a b": 1 }` would make text that does not assemble. The number is kept in a table keyed by the bytes of the label, as `string()` already keys its `$sN` data segments. Here is the global of the label `name`:
 
 ```wat
 (global $label_3 (ref $obj)
@@ -612,7 +614,7 @@ Every function that an `ilang:record` external maps to returns `eqref`, because 
 
 **The limit of `array.new_fixed`.** Engines limit its number of operands: V8 takes at most 10000. `string()` uses `array.new_data` and has no such limit. So emit uses a constant `FIXED_MAX = 10000` and two fallbacks:
 
-- A label with more than `FIXED_MAX` bytes gets a mutable global instead, `(global $label_N (mut eqref) (ref.null eq))`, numbered in the same table, set from `string()` at the beginning of `$start` (`emit/mod.rs:86`), the code that sets the program's `$g` globals today, before any of them. Its uses are `(ref.as_non_null (global.get $label_N))`. It is still one object, so `ref.eq` works.
+- A label with more than `FIXED_MAX` bytes gets a mutable global instead, `(global $label_N (mut eqref) (ref.null eq))`, numbered in the same table, set from `string()` at the beginning of `$start` (`emit/mod.rs:87`), the code that sets the program's `$g` globals today, before any of them. Its uses are `(ref.as_non_null (global.get $label_N))`. It is still one object, so `ref.eq` works.
 - A literal or spread part list with more than `FIXED_MAX / 2` fields is built with `(array.new $values (ref.null eq) (i32.const 2n))` and one `array.set` for each label and value, in a local, and then passed to `$record_new` or `$record_with`. The order is the same, so the record is the same.
 
 Tests: a record with a label of 10001 bytes, and a literal with 5001 fields, validate and run, and give the same `==`, `hash` and `inspect` as the same records built with `put`.
@@ -636,8 +638,8 @@ The wasm crate already uses "Record" for constructors with fields (`CtorRepr::Re
 - `Value::RecNew(Vec<(LabelConst, Atom)>)`: the atoms are worked out in source order first (§6.2), then put in label order, which is fixed when the program is compiled. Emitted as `(call $record_new (array.new_fixed $values 2n …))`, or with `array.new` and `array.set` above `FIXED_MAX / 2` fields (9.3).
 - `Value::RecGet(Atom, LabelConst)`: `ExprKind::Field` with `Access::Label`. `Access::Field` and `Access::Part` are unchanged.
 - `Value::RecWith(Atom, Vec<(LabelConst, Atom)>)`: a spread.
-- `Cond::IsRec(Atom)`: `head_cond` (`lower.rs:2209`) for `Head::Record`, in T1's type-test region.
-- The `"ilang:record"` externals: a new arm in `external_op` (`lower.rs:1364`, next to `"ilang:core"` at :1380) that maps each name to its runtime function, as `CORE`/`CORE_FUNCS` do, as `Op::Runtime`. Each of these functions returns `eqref` (9.3).
+- `Cond::IsRec(Atom)`: `head_cond` (`lower.rs:2340`) for `Head::Record`, in T1's type-test region.
+- The `"ilang:record"` externals: a new arm in `external_op` (`lower.rs:1453`, next to `"ilang:core"` at :1469) that maps each name to its runtime function, as `CORE`/`CORE_FUNCS` do, as `Op::Runtime`. Each of these functions returns `eqref` (9.3).
 
 ### 9.5 inspect
 
@@ -717,14 +719,14 @@ T3 takes the block **E0540–E0549**, whatever order T1, T2 and T3 merge in. T1 
 | Code | Name | When | Message and hint |
 |---|---|---|---|
 | E0540 | `DUPLICATE_LABEL` | a label twice in a literal or a written record type | "the label `a` is given more than once"; for a type: "write `{ a: Int & String }`" |
-| E0541 | `LABEL_NOT_KNOWN` | a key argument that is not a name that refers to an outer key parameter (L4 step 2) and whose known type is not one string; key arguments of one label parameter that give different labels; a call of itself that does not give each label parameter its own key parameter (L6) | "the key of `record.put` must be one known string, such as `\"age\"`; here it may be any `String`" (or "… may be `\"a\"` or `\"b\"`"). Hint: "declare a label parameter, and use it as a label in a type of the function: `f(R, K, V) = (r: R, key: K, value: V) -> { ..R, K: V } …`; or write the key as a string, such as `record.get(r, \"a\")`". A clause that matches the key does not help: in `s |> { \"a\" -> record.get(r, s) … }`, `s` is still a `String` (§7.5 narrows only to constructors), and the hint does not suggest it. When the key argument is a parameter whose written type is a declared variable that is not a label parameter (L1), the hint says: "`K` is not a label parameter, because no record type of `f` uses it as a label; write it as a label, for example in the `->` part". When it is a name bound to a key (`k2 = key`, `key |> { k -> … }`), the hint says: "pass the key by the name of its parameter, `key`" |
+| E0541 | `LABEL_NOT_KNOWN` | a key argument that is not a name that refers to an outer key parameter (L4 step 2) and whose known type is not one string; key arguments of one label parameter that give different labels; a call of itself that does not give each label parameter its own key parameter (L6) | "the key of `record.put` must be one known string, such as `\"age\"`; here it may be any `String`" (or "… may be `\"a\"` or `\"b\"`"). Hint: "declare a label parameter, and use it as a label in a type of the function: `f(R, K, V) = (r: R, key: K, value: V) -> { ..R, K: V } …`; or write the key as a string, such as `record.get(r, \"a\")`". A clause that matches the key does not help: in `s \|> { \"a\" -> record.get(r, s) … }`, `s` is still a `String` (§7.5 narrows only to constructors), and the hint does not suggest it. When the key argument is a parameter whose written type is a declared variable that is not a label parameter (L1), the hint says: "`K` is not a label parameter, because no record type of `f` uses it as a label; write it as a label, for example in the `->` part". When it is a name bound to a key (`k2 = key`, `key \|> { k -> … }`), the hint says: "pass the key by the name of its parameter, `key`" |
 | E0542 | `LABEL_PARAM_VALUE` | a name bound by a binding with label parameters used other than as a callee, inside the binding's own value or outside it, also in T2's type of a value or an alias pattern (L5) | "`record.get` has a label parameter, so it may only be called: write `(r) { record.get(r, \"name\") }`" |
 | E0543 | `LABEL_PARAM_PLACE` | a label parameter as a type anywhere but the whole type of a top-level parameter of its binding's own function (an inner function, a parameter inside a written function type, a pattern, a result, inside another type); one that is no parameter's whole type; a name that refers to a key parameter in T2's type of a value or in an alias pattern (L2a); on a binding that is not generalized; on a binding in a recursive group with other bindings; a type parameter used as a label; a declared type variable that is not a label parameter used as a label in the code a typed macro gives back (5.10) | "the label parameter `K` may only be a label, or the type of a parameter of this function"; for a group: "a function with label parameters may not be recursive with `g`" |
 | E0544 | `LABEL_MAY_BE` | a check that needs a rigid label to differ from another label (`FailKind::LabelMayBe`, from R-width or R-without-left) | "the key `K` may be `name`; it is not known here" |
 | E0545 | `LABEL_PARAM_ESCAPES` | a type with a label parameter that would become a bound of a type variable from outside its binding (L8, `FailKind::LabelEscapes`) | "the label parameter `K` of `f` reaches `acc`, which is outside `f`". Hint: "pass the field's value out of `f`, not the record with the key `K`" |
-| E0518 | (exists, `TYPE_PLACE`) | a union with a spread member (4.5) in a place that is not an output place, written or in the shown type of a binding (4.5); `{ ..R }` alone in a place that is not an input place (8.2) | for the union: "a union with a spread type as a member may only be in an output place (§4.4): inference could not choose the member for a value that comes here"; in an inferred type, the hint "write the type of `x`" |
+| E0518 | (exists, `TYPE_PLACE`) | existing ordinary-variable place restrictions, including bare `{ ..R }` in an output place | No error solely for a record/spread union. U3 proof failures and U6 resource limits have distinct reasons (§20.3). |
 | E0505 | (exists) | a type that has itself inside it through a record field or the base of a spread (part 4.2) | the existing message; when the cycle goes through the base of a spread (a `Without`), the hint: "write the type of this parameter, such as `(acc: { n: Int, total: Int }, x)`, or build the new record as a full literal" |
-| E0512 | (exists, `NO_FIELD`) | a missing field of a record (`FailKind::NoField`, from R-width); a field that a `put` or a spread may have forgotten (R-without-left, step e) | "the record has no field `b`"; "the field `b` may be missing here". This is the code that `field()` already gives when a constructor has no field `f` (`infer.rs:1631`), so reading a field that is not there has one code for custom values and for records |
+| E0512 | (exists, `NO_FIELD`) | a missing field of a record (`FailKind::NoField`, from R-width); a field that a `put` or a spread may have forgotten (R-without-left, step e) | "the record has no field `b`"; "the field `b` may be missing here". This is the code that `field()` already gives when a constructor has no field `f` (`infer.rs:1819`), so reading a field that is not there has one code for custom values and for records |
 | E0501 | (exists) | a custom value given to a record type; a field value of the wrong type | "`User` is a custom type, not a record. … Write `(u: User) { u.name }` to read the field of the constructor." |
 | parse | (exists) | an interpolated string as a label | "a label is a string with no `\( )`" |
 | E0512 | (exists) | `.f` on a value whose known type mixes custom types and other types | "`.name` reads a field of a record or of a custom type, and this value may be either; write its type" |
@@ -758,7 +760,7 @@ Nothing is renumbered. New text goes into new subsections. The text is written f
 
 **§4.1.** Add: "Records (§4.9) are values of one type constructor."
 
-**§4.4.** Install the record exception and place rules of section 20: record union is exact; several record alternatives may share the runtime head. They are not merged by common fields. Multiple record alternatives, or a union retaining a spread member, are output-only. Apply the check after expansion, to every shown binding type, and after substitution and completion. Keep the existing variable-place rules and covariance of record fields and spread bases.
+**§4.4.** Install the record exception and place rules of section 20: record union is exact; several record alternatives may share the runtime head. They are not merged by common fields. Record unions are allowed in every place; U3 restricts only obligations needing alternative-specific bounds. Remove the record-count/spread place check. Preserve exact shared graphs through substitution and completion. Keep the existing variable-place rules and covariance of record fields and spread bases.
 
 **§4.5.** T1 owns rule 8. Rule **9** is: “Records obey the width, intersection, exact union, and forgetting rules of §4.9.3.”
 
@@ -803,9 +805,11 @@ The example line becomes: "So `(u) { u.name }` has the type `(u: { name: A }) ->
 >
 > - `{ fs } <: { gs }` when every label of `gs` is in `fs`, and the field type in `fs` is a subtype of the field type in `gs` (width).
 > - `{ fs } & { gs }` has the labels of both. A label in both has the `&` of its two types.
-> - `{ fs } | { gs }` contains exactly the records in either operand. It is not replaced by the common fields. Thus `{ a: Int, b: Int } | { a: String }` does not contain `{ a: 1 }`, even though `{ a: Int | String }` does. Empty alternatives are removed and identical alternatives are deduplicated. For the first implementation, other record alternatives stay separate, including one-field unions that have an equivalent single-record spelling.
-> - A union may retain several record or spread alternatives. A union with two or more record alternatives, or a spread member, may only be in an output place (§4.4). This is checked on expanded annotations and shown inferred binding types, including at those boundaries after substitution and completion. It is not a restriction on temporary solver bounds. A single spread remains allowed in either place. To use a common field requirement in an input place, write that record requirement explicitly.
-> - When checking against several record alternatives, the checker accepts a proof that adds no variable bounds. Exact membership is such a proof. It may also prove, without reading temporary bounds, that the left type fits an alternative by width, scalar inclusion, intersection projection, or the forgetting rules, recursively. If there is no such proof, the constraint is ambiguous and is a compile error; the checker never chooses an alternative by order or adds bounds to try one. A left union is checked one alternative at a time. With a single record alternative the ordinary constraint rules apply. The common-field summary of known types is not a subtype target.
+> - `{ fs } | { gs }` contains exactly the records in either operand. It is not replaced by the common fields. Thus `{ a: Int, b: Int } | { a: String }` does not contain `{ a: 1 }`, even though `{ a: Int | String }` does. Empty alternatives are removed and identical alternatives are deduplicated. Union and intersection are kept in a compact exact form with shared subexpressions. Distributivity and `{ a: X | Y, r } = { a: X, r } | { a: Y, r }` are set equalities, not instructions to expand every alternative when constructing a type.
+> - A closed union of records is an ordinary type in every position. An operation is valid when it is valid on every alternative, and its result is the union of those results. Thus reading `r.a` from `{ a: 1 } | { a: "x" }` gives `1 | "x"`; a missing required field on any inhabited alternative is an error. Open record unions may also be written in any place, subject to the existing restrictions on ordinary variable members. The restriction is on choosing bounds, as follows, not on the number of record alternatives.
+> - When checking inclusion against several record alternatives, prove it without creating variable bounds. Use ordinary structural subtyping beneath fields, including tuple parts, declared nominal variance, function types and literal sets. First try structural inclusion and existing bounds, then exact coverage by splitting relevant source field unions and target-tested field sets, one label at a time in label order. Scalar partitions include their residual sets. Every source case must be covered by the complete target union. Equivalent closed annotations have equal acceptance when checking finishes. A fresh variable's established upper bounds can prove an inclusion from it; its established lower bounds can prove an inclusion into it. A lower bound is not an upper bound. Unresolved obligations are retried after ordinary group constraints finish and before generalization or permanent alias completion; the proof never fixes a variable, creates a trial bound, or assumes a recursive goal. Whole-union variable storage and left-union conjunction remain ordinary inference. An obligation that still needs alternative-specific bounds is a compile error explaining the missing proof or bound choice; the checker never picks an alternative by order. A single record target uses ordinary constraints. Known summaries are not subtype targets.
+> - Keep record union, intersection and forgetting expressions shared and exact. Construction, substitution, completion, display and interface serialization must not expand products of alternatives. Field operations demand only relevant fields and any emptiness facts needed to justify them; inclusion and equality demand only their relevant uncovered cases. Equality and subtyping concern denoted sets, not graph or text identity. Full display and interfaces may encode a versioned type graph with a root, ordered nodes, scoped variable identities and child references; decoding it preserves the exact type. Inline full types still parse back as source. This graph form is an interface artifact, not new source syntax; shortened diagnostic text is never the interface type.
+> - Demanded checking has a resource limit of 65,536 distinct proof, partition and visitor states per operation, including recursive suboperations; charge split outcomes before allocating them. This is a resource limit, not a typing rule. Exhaustion reports “type too large to check here”, at the operation requiring the work, with a suggested local annotation or source simplification. It never widens a type, reports a false subtype mismatch, or publishes a partial alias. Equal types can take different work to check, so one spelling may exhaust the limit; successful checks cannot give them different meanings. The detailed demand order and accounting are records U6 (§20.3a).
 > - In a type test or a clause, a record type that is taken (§4.8 rule 12) is `{..}`.
 > - A record type is a type constructor for §4.7: a type may not have itself inside it through a field or through the base of a spread. So `last = (r) { r.next |> { Nil -> r.v  n -> last(n) } }` is a compile error. Recursive data, such as a chain or a tree, is a custom type: `Node(A) { Node(v: A, next: Node(A) | Nil) }`. A function that sets a field in a loop, such as `build = (r, n) { n |> { 0 -> r  _ -> build(record.put(r, "a", n), n - 1) } }`, needs a written type for its parameter: `build = (r: {..}, n: Int) -> {..} { … }`. The same holds for the accumulator of a fold whose callback uses a spread or `record.put` on it: `list.fold(xs, { n: 0, total: 0 }, (acc, x) { { ..acc, n: acc.n + 1 } })` is a compile error, and `(acc: { n: Int, total: Int }, x)` or the full literal `{ n: acc.n + 1, total: acc.total }` is correct. A loop cannot keep the other fields as a type variable: with a written type that is not a type variable, they are only the fields of that type.
 > - A type test `x: { … }` in a clause takes every record (§4.8 rule 11). So `x: { a: Int }` on a value of type `{ a: Int } | { a: String }` is a compile error.
@@ -858,7 +862,7 @@ Replace the bullet "A `{` followed by a label `name :` … is kept for records" 
 
 **§7.4.** Add: "All records count as one type constructor."
 
-**§9.2.** "A service is a value of a named type, normally a record of functions" becomes "A service is a value of a named type, normally a custom type whose constructor holds functions. A record (§4.9) is not a named type, so a record type, also through an alias such as `Clock = { now: () -> Int }`, is never a service type." The E0225 message of `env_type` (`resolve.rs:1445`) becomes "a service type is one named type `T(…)`: not a type variable, a union, a record type, or `Never` (§9.2)". `env_type` keeps sending `TypeKind::Record` to `_ => None`, and a test (`record_service.i`, 15.1) guards it.
+**§9.2.** "A service is a value of a named type, normally a record of functions" becomes "A service is a value of a named type, normally a custom type whose constructor holds functions. A record (§4.9) is not a named type, so a record type, also through an alias such as `Clock = { now: () -> Int }`, is never a service type." The E0225 message of `env_type` (`resolve.rs:1870`) becomes "a service type is one named type `T(…)`: not a type variable, a union, a record type, or `Never` (§9.2)". `env_type` keeps sending `TypeKind::Record` to `_ => None`, and a test (`record_service.i`, 15.1) guards it.
 
 **"Record update" for custom values.** The spec calls `C(..v, f: e)` a "record update" (the grammar name `RecordUpdate` in §6.1, the known types of §4.8, §6.2, and any other place the spec after A1 has it). With structural records in §4.9 and `{ ..e, … }` in §6.13, that name is confusing. It becomes "constructor update" (`CtorUpdate` in the grammar) everywhere, with no change of meaning. The word "record" in the spec then means only the values of §4.9.
 
@@ -883,9 +887,9 @@ Replace the bullet "A `{` followed by a label `name :` … is kept for records" 
 These are applied by T3, after G3. They are not part of this commit.
 
 - **syntax.md.** In the summary, "`{ name: e, … }` is kept for records (stream T3)" becomes "`{ name: e, … }` is a record (`docs/design/records.md`)". In §6.1, the "kept for records" bullet becomes the reading rule of part 8.1, and in the `Function` line the body `Block` becomes `( Block | Record )`. In §1.7, add the record line.
-- **syntax.md, "record update".** The rename of part 12 is made here too: in §6.1, `RecordUpdate` becomes `CtorUpdate` in the `Primary` line (:210) and in its own line (:220), and any text that calls `C(..e, …)` a "record update" calls it a "constructor update".
+- **syntax.md, "record update".** The rename of part 12 is made here too: in §6.1, `RecordUpdate` becomes `CtorUpdate` in the `Primary` line and in its own grammar line, and any text that calls `C(..e, …)` a "record update" calls it a "constructor update".
 - **meta.md §11 question 2.** The answer of part 8.2: a one-part `{ }` in a type is a group, unless it is `{..}`, begins with `..`, or is `label: T`.
-- **meta.md, "record update".** In §2.3, the row "Record update" (:171) becomes "Constructor update", and "when its second part is `..` it is a record update" (:174) becomes "… a constructor update". In the list of datums that are compile errors (:199), "a part of a record update with no label" becomes "a part of a constructor update with no label". Then spec, syntax.md and meta.md use "record" only for the values of §4.9.
+- **meta.md, "record update".** In §2.3, the row "Record update" becomes "Constructor update", and "when its second part is `..` it is a record update" becomes "… a constructor update". In the list of datums that are compile errors, "a part of a record update with no label" becomes "a part of a constructor update with no label". Then spec, syntax.md and meta.md use "record" only for the values of §4.9.
 - **meta.md §5 (names in expanded code, M2 and M4).** After "Labels of fields, of parameters, and of arguments are not names in this sense. They are compared by their text only.", add: "An `UpName` label in a record type is not such a label: it is a declared type variable (a label parameter, spec §4.9.4), so it is a name, looked up with its scope by rule 1. A template that writes `{ K: Int }` with its own `K` does not reach a `K` of the caller." (Part 5.10.)
 - **meta.md §7 (typed macros, M4).** The requirements of part 5.10: the checks of L1, L2, L2a, L5 and L6 run on every expansion; an expansion adds no label parameter; `type_of`, `subtype` and `members` handle record types, spreads and `Param` labels, and `subtype` answers `NotKnown`, not `No`, when a label parameter is in either type. §7.4's sentence on `No` becomes: "`No` when it is not, and neither type has a type variable or a label parameter (§4.9.4) in it."
 - **Lisp surface (proposed to M1 and D-meta; M1 decides).** In a `{ }` datum, a first part `(: label e)` or `..` makes a record: `{ (: name e) (: age e) }`, `{ .. r (: age e) }`, `{ .. }`, and in types `{ (: name T) }`, `{ .. R (: K V) (- age) }`, `{ .. R }`. The core-form tables of meta.md §2.3 would get these rows.
@@ -899,29 +903,29 @@ Line numbers are at 1865366.
 
 **`crates/ilang-syntax`**
 - `ast.rs`: `ExprKind::Record`, `TypeKind::Record`, `RecordField`, `LabelName`.
-- `parser.rs`: the record scan, used by `primary` (:766) and by `function` (:858) for the body `{`; `type_prim` (:1228), whose `T::LBrace` arm today always groups; a sequence reader in which a break is a `,`; the hints for `Person { … }` (`type_def`, :474) and for `{ name: n } = r`.
+- `parser.rs`: the record scan, used by `primary` (:1136) and by `function` (:1235) for the body `{`; `type_prim` (:1760), whose brace arm currently groups types; a sequence reader in which a break is a `,`; the hints for `Person { … }` (`type_def`, :768) and for `{ name: n } = r`.
 - `format.rs`, `print.rs`, parser tests, `tests/format.rs`.
 
 **`crates/ilang-check`**
-- `lib.rs` (:73-101): codes E0540 to E0545.
+- `lib.rs` (:86-114): codes E0540 to E0545.
 - `hir.rs`, `resolve.rs`: record nodes; labels are not names; `UpName` labels resolve to declared type variables (label parameters) or are an error; E0540, E0543.
 - `types/mod.rs`: `Label`, `LabelParamId` (with the level of its binding, L8), `Head::Record`, `Ty::Rec`, `Ty::Without`, the smart constructors `rec` and `without`, `is_headed`, `value_head`, `Access::Label`; the scheme gets the list of its label parameters and the index of the parameter of each.
-- `types/solve.rs`: the arms of 4.4; `inter_in`, `union_in`, `merge` (4.5); `add_bound`, `reach`, `compare`, `needs_join` (4.6); `map_children` (:642), `extrude` (:577), `freshen` (:618, with a label map), `bound_vars` (:1207), `level_of` (:203, counting the level of each `Param` label, L8); `FailKind::LabelMayBe`, `FailKind::LabelEscapes`; `value_head` used in `route` (:516), `_ <: Diff` (:316), `diff_in` (:877) and `diff_left` (:544).
-- `types/display.rs`: the Coalescer (:503), `Norm` (:632, `union_in` :698, `inter` :772), `tree` (:1176, :1280), the Namer (:1133-1207: the names of `Param` labels go into `taken` before `assign`, part 4.7), and the shown errors. `types/shown.rs`: `ShownType::Record`.
-- `types/known.rs`: `members` (:21), `match_k` (:322), `disjoint`, record literals, and record arms in T1's `whole_lits` and `hidden_inputs` (part 4.8).
+- `types/solve.rs`: the arms of 4.4; `inter_in`, `union_in`, `merge` (4.5); `add_bound`, `reach`, `compare`, `needs_join` (4.6); `map_children` (:880), `extrude` (:814), `freshen` (:856, with a label map), `bound_vars` (:1483), `level_of` (:285, counting the level of each `Param` label, L8); `FailKind::LabelMayBe`, `FailKind::LabelEscapes`; `value_head` used in `route` (:713), `_ <: Diff` (:421), `diff_in` (:1140) and `diff_left` (:765).
+- `types/display.rs`: the Coalescer (:506), `Norm` (:635, `union_in` :705, `inter` :780), `tree` (:1211, :1315), the Namer (:1168–1242: the names of `Param` labels go into `taken` before `assign`, part 4.7), and the shown errors. `types/shown.rs`: `ShownType::Record`.
+- `types/known.rs`: `members` (:22), `match_k` (:414), `disjoint`, record literals, and record arms in T1's `whole_lits` and `hidden_inputs` (part 4.8).
 - `types/mod.rs`: `Typed.key_labels` and `KeyLabel` (part 9.3).
-- `types/infer.rs`: `field()` (:1538) in three rules; record literals and spreads; label parameters in `call()` (:1260) and `instantiate` (:1000), with `key_labels` filled in `call()`; E0541, E0542; L9 in `entry_point` (:378); `has_no_effect` (:2340); `check_places` (:603) and `walk_variance` (:2269) get a `TypeKind::Record` arm (part 8.2), and the place check also runs on the shown type of each binding, at generalization (:2108) and for a binding that is not generalized (part 4.5); the known and expected types of spreads (parts 4.8 and 7).
-- `types/pattern.rs`: narrowing (`:608`, `h => Ty::Con(h, args)`) builds the taken type `{..}` for `Head::Record`, not `Ty::Con(Head::Record, [])`, which would reach the `unreachable!` arm of `variances`; the type test (`:727-748`): the guard before the `filter_map` raises CASE_TYPE_VAR ("may not have a type variable as a member") for every member whose `head()` is `None`, and a spread member (`is_spread()`, part 4.2: a `Without`, or an `Inter` with a `Without` member, as `{ ..{ a: Int }, K: Int }` or `{ ..{ a: Int }, -K }` converts to) has the `head()` `None`. So the guard skips a member for which `is_spread()` is true, and the `filter_map` maps a `Ty::Rec` member and a spread member to `Pat::Head(Head::Record, 0)`. Then the test is not `Pat::Or([])`, is recorded in `type_tests`, and a spread type in a type test takes every record, as any record type does. A test checks it (`type_test_spread_key.i`, 15.1). `types/coverage.rs`: `values()` (`:209`) gets a `Rec` arm (and a `Without` arm) giving the head entry `(Head::Record, ValueSet::ALL, [], mode)`, in T1's four-part form. The set must be `ALL`: the union and intersection of `Vals` drop an entry whose set is empty, and records have no value sets. And `show_head` (`:615`) shows `Head::Record` as `{..}`. Each is after T1's changes there.
+- `types/infer.rs`: `field()` (:1705) in three rules; record literals and spreads; label parameters in `call()` (:1422) and `instantiate` (:1133), with `key_labels` filled in `call()`; E0541, E0542; L9 in `entry_point` (:454); `has_no_effect` (:2573); `check_places` (:696) and `walk_variance` (:2502) get a `TypeKind::Record` arm (part 8.2), and the place check also runs on the shown type of each binding, at generalization (:2337) and for a binding that is not generalized (part 4.5); the known and expected types of spreads (parts 4.8 and 7).
+- `types/pattern.rs`: narrowing (`:652`, `h => Ty::Con(h, args)`) builds the taken type `{..}` for `Head::Record`, not `Ty::Con(Head::Record, [])`, which would reach the `unreachable!` arm of `variances`; the type test (`:871-895`): the guard before the `filter_map` raises CASE_TYPE_VAR ("may not have a type variable as a member") for every member whose `head()` is `None`, and a spread member (`is_spread()`, part 4.2: a `Without`, or an `Inter` with a `Without` member, as `{ ..{ a: Int }, K: Int }` or `{ ..{ a: Int }, -K }` converts to) has the `head()` `None`. So the guard skips a member for which `is_spread()` is true, and the `filter_map` maps a `Ty::Rec` member and a spread member to `Pat::Head(Head::Record, 0)`. Then the test is not `Pat::Or([])`, is recorded in `type_tests`, and a spread type in a type test takes every record, as any record type does. A test checks it (`type_test_spread_key.i`, 15.1). `types/coverage.rs`: `values()` (`:313`) gets a `Rec` arm (and a `Without` arm) giving the head entry `(Head::Record, ValueSet::ALL, [], mode)`, in T1's four-part form. The set must be `ALL`: the union and intersection of `Vals` drop an entry whose set is empty, and records have no value sets. And `show_head` (`:1034`) shows `Head::Record` as `{..}`. Each is after T1's changes there.
 - `query.rs`: `Access::Label` has no definition target; hover shows the field type; completion after `.` lists only U5’s common guaranteed labels.
 
 **`crates/ilang-wasm`**
 - `ir.rs`: `Atom::Label`, `Value::RecNew`, `Value::RecGet`, `Value::RecWith`, `Cond::IsRec`.
-- `lower.rs`: `ExprKind::Field` with `Access::Label` (:1502); `Lowerer::field` (:1675) gives `Stmt::Unreachable` for an empty `Access::Field` list (part 6); literals and spreads, label constants, key arguments from `key_labels`, `head_cond` (:2209), the `"ilang:record"` arm in `external_op` (:1364).
+- `lower.rs`: `ExprKind::Field` with `Access::Label` (:1591); `Lowerer::field` (:1764) gives `Stmt::Unreachable` for an empty `Access::Field` list (part 6); literals and spreads, label constants, key arguments from `key_labels`, `head_cond` (:2340), the `"ilang:record"` arm in `external_op` (:1453).
 - `emit/mod.rs`: `$is_record` (next to :16), the label globals (all named by number, `$label_N`; constant, and mutable ones set in `$start` above `FIXED_MAX`), the `Atom::Label` arm of `atom()`, the new values, and large literals with `array.new` (9.3).
 - `runtime/mod.rs`: tag 14 in the table (:37-52). `runtime/values.rs` and the new `runtime/values/record.rs`. `runtime/values/inspect.rs`: the branch of 9.5.
 
 **`crates/ilang-cli`**
-- `src/commands/package.rs`, the interface check of `i package publish` (`compare_with` :891, `Diff::new` :919, `canonical_type` :1235, `TypeShow` :1254). `canonical_type` renames the type variables of each scheme to `'0`, `'1`, …, so that renaming a type variable is no change. It renames the `Param` labels of a `ShownType::Record` the same way, in the order of the label parameters of the scheme, to `'k0`, `'k1`, …, so that renaming a label parameter is no change either. `TypeShow::ty` (:1351), an exhaustive match on `hir::TypeKind`, gets a `TypeKind::Record` arm that prints the text of 4.7 (fields sorted, labels that are not names quoted, `..B` and `-l` parts), with each `UpName` label renamed as above in the canonical form. So an exported alias `Person = { name: String }` and a constructor field of a record type are compared by their canonical text. Tests in 15.6.
+- `src/commands/package.rs`, the interface check of `i package publish` (`compare_with` :891, `Diff::new` :919, `canonical_type` :1263, `TypeShow` :1282). `canonical_type` renames the type variables of each scheme to `'0`, `'1`, …, so that renaming a type variable is no change. It renames the `Param` labels of a `ShownType::Record` the same way, in the order of the label parameters of the scheme, to `'k0`, `'k1`, …, so that renaming a label parameter is no change either. `TypeShow::ty` (:1429), an exhaustive match on `hir::TypeKind`, gets a `TypeKind::Record` arm that prints the text of 4.7 (fields sorted, labels that are not names quoted, `..B` and `-l` parts), with each `UpName` label renamed as above in the canonical form. Under U6, an exported alias `Person = { name: String }` and a constructor field retain exact graphs; canonical text is only the small inline encoding. Graph bytes are not semantic equality. Tests in 15.6.
 
 **Library, package, docs**
 - `lib/i/record.i` (new); `crates/ilang-package/src/library.rs` (:12); the library tests.
@@ -936,7 +940,7 @@ Line numbers are at 1865366.
 | `query.rs` | T2 (A3 at :971) | none | hover and completion for `Access::Label` | T2 → T3 |
 | `types/pattern.rs`, `types/coverage.rs` | T1 | none (T1 owns `types/*`) | the arms of `Head::Record` | T1 → T3 |
 | `infer.rs` `entry_point` | in the `infer.rs` order | T1 → T2 → T3 → R2 → M2 → M4 | L9 | no change |
-| `types/display.rs` Namer (:1133-1207) | A2 (capital names) | A2 before T3 | `Param` label names put into `taken` (4.7) | A2 → T3 |
+| `types/display.rs` Namer (:1168-1242) | A2 (capital names) | A2 before T3 | `Param` label names put into `taken` (4.7) | A2 → T3 |
 | `ilang-cli/src/commands/package.rs` | A3 | none | `canonical_type` for `Param` labels, `TypeShow::ty` record arm | A3 → T3 |
 | spec §9.2 (one existing sentence) | R and IO own new §9 text | none | "a record of functions" becomes "a custom type whose constructor holds functions" | after R and IO when they have landed; else they keep the T3 sentence |
 | spec §10.3 | T3 (for records), also C, R2, IO, M2 | C → R2 → IO → M2 | two sentences | T3 after whichever of these have landed, and the later ones keep them |
@@ -987,8 +991,8 @@ Correct programs (`// expect: pass`):
 - `fold_spread_annotated.i`: `list.fold(xs, { n: 0, total: 0 }, (acc: { n: Int, total: Int }, x) { { ..acc, n: acc.n + 1 } })`, the same with `record.put(acc, "n", acc.n + 1)`, and the literal form `(acc, x) { { n: acc.n + 1, total: acc.total } }` with no written type (part 4.2).
 - `function_body_record.i`: `(n) { name: n }`.
 - `spread_upper_bound.i`: a spread reaches an upper bound through a variable: a parameter `p: { ..R, a: Int }` in an input place, and a variable bounded above by a `Without`.
-- `union_spread_param_written.i`: moved to the reject list by section 20; the generic written result requires selecting new bounds for a record alternative, so U3 reports ambiguity. The version without the union result annotation passes.
-- `union_spread_written.i`: moved to the reject list by section 20, for the same U3 ambiguity. The original True branch value contains x, but the whole union result does not guarantee x. The inferred-output version `union_spread.i` still passes.
+- `union_spread_param_written.i`: moved to the reject list by section 20; the generic written result requires selecting new bounds for a record alternative, so U3 reports a missing established inclusion (§20.3); an explicit single-target update annotation also passes. The version without the union result annotation passes.
+- `union_spread_written.i`: moved to the reject list by section 20, for the same missing established inclusion. The original True branch value contains x, but the whole union result does not guarantee x. The inferred-output version `union_spread.i` still passes.
 - `known_fold_record.i`: `list.fold(xs, { n: 0 }, (acc, x) { { acc.n == 3 } |> { True -> acc  False -> { n: acc.n + 1 } } })` gives no E0520 (part 4.8, `whole_lits`), the same as the tuple form `(0, 0)` with `acc.0`.
 - `label_param_modules/` (a project with two modules, as `tests/spec/2.5/modules/`): module `schema` exports `object` and `field` of part 5.8, and module `main` has `user = schema.object |> schema.field("name", string) |> schema.field("age", int)` with the type `Schema({ age: Int, name: String })`, and a binding of `main` with its own label parameter that calls `schema.field` with its key by name. This checks `other_known` with the label map (L4 step 3) and the label parameters of a scheme across a module boundary.
 - `texts.i`: `record.texts({ user: "ada", tries: 3 })` is `[("tries", "3"), ("user", "\"ada\"")]`, and a log line built from it in plain i.
@@ -1017,8 +1021,8 @@ Programs that must be rejected (the refuter's list), each with its code:
 - `label_fn_value_type.i` (E0542): `apply = (f: { record.get }, r) { f(r, "a") }`, a value type that names a binding with label parameters (L5); and the same name in an alias pattern.
 - `key_value_type.i` (E0543): `g(K) = (r: { K: Int }, k: K, f: (y: { k }) -> Int) -> Int { f("zzz") }`, a value type that names the key parameter `k` (L2a); and `g(K) = (r: { K: Int }, k2 = k: K, f: (y: { k2 }) -> Int) -> Int { f("zzz") }`, which names the other name of an alias parameter.
 - `key_alias_local.i` (E0541, with the hint "pass the key by the name of its parameter"): in `f(K) = (r: { K: Int }, key: K) -> Int { … }`, the bodies `k2 = key ⏎ record.get(r, k2)`, `key |> { k -> record.get(r, k) }`, `key |> (k) { record.get(r, k) }` and `g = { k -> record.get(r, k) } ⏎ g(key)` each give E0541 (L4 step 2 follows no other binding).
-- `union_spread_param.i` (E0518, with the hint "write the type of `x`"): `f(R) = (c: Bool, r: R & {..}, x) -> { ..R, a: Int } | { b: Int } { c |> { True -> record.put(r, "a", 1)  False -> x } }`; the inferred type of `x` would be the union, in an input place (part 4.5).
-- `spread_union_input.i` (E0518): `h(R) = (p: { ..R, a: Int } | { b: Int }) -> Int { 0 }`, and `h2(R, S) = (p: { ..R, a: Int } | { ..S, b: Int }) -> Int { 0 }` (a union with a spread member only in an output place, part 4.5).
+- `union_spread_param.i` (U3 missing proof for the update; annotate the update as in §20.3, and x as the fallback): `f(R) = (c: Bool, r: R & {..}, x) -> { ..R, a: Int } | { b: Int } { c |> { True -> record.put(r, "a", 1)  False -> x } }`; the inferred type of `x` would be the union, in an input place (part 4.5).
+- `spread_union_input.i`: moved to the pass list by R2. `h(R) = (p: { ..R, a: Int } | { b: Int }) -> Int { 0 }` and `h2(R, S) = (p: { ..R, a: Int } | { ..S, b: Int }) -> Int { 0 }` are legal declarations; calls obey U3.
 - `label_param_modules_value/` (E0542, a project with two modules): `list.map(keys, schema.field)` in `main`, with `field` from the module `schema` of `label_param_modules/`.
 - `label_param_export/` (E0320, a project with `[wasm] exports`, as `tests/spec/10.2/export_never_param/`): the `pick` of L9, whose host signature has no record.
 - `matched_key.i` (E0541): `f = (r: { a: Int }, s: String) { s |> { "a" -> record.get(r, s)  _ -> 0 } }`; a matched String is not a one-value key (part 11).
@@ -1049,7 +1053,7 @@ Programs that must be rejected (the refuter's list), each with its code:
 
 - Each rewrite E1 to E5 and N1; that a `Rec` with a field that may be `K` is not rewritten.
 - R-split, R-without-left, R-without-right, R-width; the left-`Inter` arm with a `Rec` member.
-- U3 (arm 5a): `Without(R2, {a}) & { a: 1 } <: { ..R, a: Int } | { b: Int }` with distinct variables is Ambiguous, with no bound changes in either alternative order. Exact member proofs pass without mutation. A single record target still uses the ordinary rules. Test that multiple Rec targets never enter first-head routing.
+- U3 (arm 5a): `Without(R2, {a}) & { a: 1 } <: { ..R, a: Int } | { b: Int }` with distinct variables and no sufficient established bounds is Unknown, with no bound changes in either alternative order. With R2 <: R already established it passes; R <: R2 alone does not suffice. Exact member proofs pass without mutation. A single record target still uses the ordinary rules. Test that multiple Rec targets never enter first-head routing.
 - R-without-left fails at once with `LabelMayBe` or `NoField` when the base is a variable with no bounds, and with one; the left-`Inter` arm keeps that failure when the next member is a `Without`.
 - R-without-left, step by step: `Without(B, L) <: R | a - H` goes to `R`, not to the difference; `Without(B, L) <: a - {..}` and `<: a - { x: Int }` fail with `Mismatch`; `Without(B, L) <: a - Int` gives `Without(B, L) <: a`; `Without(B, L) <: Int` fails; `Without(B, L) <: (a - H) | Int` ends (a check with a depth counter). `value_head` of a `Without` is `Record` in `route`, `_ <: Diff`, `diff_in` and `known::disjoint`.
 - L8: a `Param` label that reaches a variable of a lower level fails in `extrude` with `LabelEscapes`; one that stays at its own level does not. The level kept in a `LabelParamId` is the raised level of its binding, and a variable made at the outer level (where the name is bound) is strictly below it, so `key_escape.i` gives E0545 and not a scheme with `K`.
@@ -1057,7 +1061,7 @@ Programs that must be rejected (the refuter's list), each with its code:
 - E0, the new E1 (`without(Int, L)` is `Never`) and E5 (`without(R & {..}, {a})` is `without(R, {a})`); E1 on `{ a: Never, b: Int }` with `{a}` gives `Never`, as on `{ a: Never, b: String }` and on `Never` (types with the same values give the same result); E4 on `{ a: A, b: Int }` removing a retains Without; A = Never gives Never and A = Int gives `{ b: Int }` (J8).
 - **Read back:** for each type made in these tests, show it, parse the text as a type, and check that the two types are equal (part 4.7).
 - `&` and `|` of records, with `Param` labels.
-- **Stable under replacement:** normalize before and after replacing type variables by closed types and label parameters by each mentioned and one fresh string. Compare denotations, and require each successful no-new-bounds proof to remain true. No “join once” exception is allowed. `{ K: Int } | { a: Int }` remains exact and deduplicates when K becomes a; it is E0518 as an input union. Use the exhaustive model and the compiler boundary probes in section 20.
+- **Stable under replacement:** normalize before and after replacing type variables by closed types and label parameters by each mentioned and one fresh string. Compare denotations, and require each successful no-new-bounds proof to remain true. No “join once” exception is allowed. `{ K: Int } | { a: Int }` remains exact and deduplicates when K becomes a; it is legal as an input union, but each call must prove inclusion (U3). Use the exhaustive model and the compiler boundary probes in section 20.
 - **No over-approximation:** a debug assertion in `Norm` and the Coalescer that a `Without` is rewritten only by `without()`; a test that runs `display::simplify` on schemes with `Without` in input and output places, and checks that no call of the reject list of 15.1 becomes correct.
 - **The Namer and label parameters:** the scheme of `f(K) = (r: { K: Int }, key: K, x) { (record.get(r, key), x.a, x.b, x.c, x.d, x.f, x.g, x.h, x.i, x.j, x.k) }` names no type variable `K`, and reads back as the same type (part 4.7). The same for an error message inside such a binding.
 - `add_bound` with many `.f` on one variable: two fields, then a lower bound with only one; then two bounds on one label and a lower bound that fits only one of them. Both must fail.
@@ -1096,7 +1100,7 @@ In order, after A1 and T1 have landed, T2 has merged, and S3 is approved.
 1. **Spec text (gate G3).** Part 12 goes to the user, written on top of the spec after T1 and T2. Check that §4.9, §6.13 and §14 are still free, with IO and M2 (part 19). Get the coordinator to add T3 to the merge orders of `resolve.rs`, `order.rs`, `query.rs`, `pattern.rs`, `coverage.rs`, spec §9.2 and §10.3 (the table at the end of part 14).
 2. **Runtime order.** Check that `$string_compare` orders exactly as Rust `str` does, with a test. (At 1865366 it does: bytes, then length.)
 3. **Soundness tests first.** Write the reject list of 15.1 and the unit tests of 15.2 as failing tests.
-4. **Types core.** `Label` (with `Arc<str>`, so that `Ty` stays `Send` for the LSP), `Head::Record`, `Ty::Rec`, `Ty::Without`, `rec()`, `without()`, `is_headed`, `Access::Label`, with unit tests. Then the audit. The exact pattern `Ty::Con(..) | Ty::Fn(_)` finds only 8 lines at 1865366 (solve 6, display 1, known 1), so it is not the gate. The gate is a list: at the start of this step, save the output of `rg -n -e 'Ty::Con\(' -e 'Ty::Fn\(' -e '\.head\(\)' -e 'Head::' crates/ilang-check/src` (200 lines at 1865366: solve 36, display 49, known 34, infer 41, pattern 15, coverage 19, mod 6; more after T1) into the T3 pull request as a checklist, and mark each line "handles `Rec`/`Without`", "cannot see a record" (with the reason), or "changed". The step is done when every line is marked. These come first: `reach` and the `new` list of `add_bound` (`solve.rs:397`, :438); narrowing and the type test in `pattern.rs` (`:608`, `:742`); `values()` and `show_head` in `coverage.rs` (`:209`, `:615`). A unit test runs the narrowing of rule 12 on `x: Int | { a: Int }` with a clause `y: { a: Int }` and a catch-all `n`, and checks that `n` is `Int` and that the type test is recorded.
+4. **Types core.** `Label` (with `Arc<str>`, so that `Ty` stays `Send` for the LSP), `Head::Record`, `Ty::Rec`, `Ty::Without`, `rec()`, `without()`, `is_headed`, `Access::Label`, with unit tests. Then the audit. The exact pattern `Ty::Con(..) | Ty::Fn(_)` finds only 8 lines at 1865366 (solve 6, display 1, known 1), so it is not the gate. The gate is a list: at the start of this step, save the output of `rg -n -e 'Ty::Con\(' -e 'Ty::Fn\(' -e '\.head\(\)' -e 'Head::' crates/ilang-check/src` (200 lines at 1865366: solve 36, display 49, known 34, infer 41, pattern 15, coverage 19, mod 6; more after T1) into the T3 pull request as a checklist, and mark each line "handles `Rec`/`Without`", "cannot see a record" (with the reason), or "changed". The step is done when every line is marked. These come first: `reach` and the `new` list of `add_bound` (`solve.rs:564`, :635); narrowing and the type test in `pattern.rs` (`:652`, `:886`); `values()` and `show_head` in `coverage.rs` (`:313`, `:1034`). A unit test runs the narrowing of rule 12 on `x: Int | { a: Int }` with a clause `y: { a: Int }` and a catch-all `n`, and checks that `n` is `Int` and that the type test is recorded.
 5. **Solver.** The Member arm and the arms of 4.4 (R-without-left with steps a to f, never sending a `Without` past a record member of a union or back to itself; it fails at once, with `FailKind::NoField` and `FailKind::LabelMayBe`; the left-`Inter` arm keeps the record failure; U3, arm 5a, proves multi-alternative inclusions without new bounds or rejects them), `&` and `|` of 4.5, the bounds of 4.6. `value_head` in `route`, `_ <: Diff`, `diff_in`, `diff_left` and `known::disjoint`. Run the unit tests.
 6. **Display and known types.** `display.rs` (with the read-back rule of 4.7, and the Namer keeping the names of `Param` labels), `shown.rs`, `known.rs` (with the record arms of T1's `whole_lits` and `hidden_inputs`, part 4.8). No `.out` file should change at this step, because no program has records yet; if one changes, find out why before going on.
 7. **Syntax.** AST, the scan (with the `,` rule), types (with `{ ..R }`), the printer and the formatter (the `,` after a first field with `->`), parser tests. First check with a test that no correct program has a `,` directly inside the braces of a block or a clause block. Remove the "kept for records" error.
@@ -1210,7 +1214,7 @@ and the smallest implementation that can be audited in this checker.
 | Empty-first joins, possibly guarded by current bounds | Reject. Closed empties improve, but an open field can later be empty; inhabited records still lose correlation. Current bounds are not universal facts. |
 | Delay a common-field approximation until a type is closed | Reject as the meaning of union. It can make evaluation order stable only by preserving the original expression and its dependencies until closure. It still adds records to the denoted set, and cannot replace the same type in both polarities. Keep it only for known summaries. |
 | Exact alternatives plus full semantic subtyping/Boolean constraint solving | Sound direction, but not the smallest change. It needs a new inference account for disjunctive constraints, especially with Without, and its principality does not follow from this checker. |
-| Exact alternatives with the existing output restriction extended, and no new bounds when selecting among record alternatives | Choose. Normalization is exact. Ordinary inferred results and builders work; ambiguous written union constraints are rejected. Keep empty-first reduction from candidate one and known summaries from candidate two. |
+| Compact exact types, closed union operations and proof-only right-union obligations | Choose under R1–R3. Keep empty-first reduction and known summaries; read established bounds, use structural inclusion and exact case splitting. No alternative-specific bounds are invented. Defer distribution until demanded. |
 
 These are general rules: they preserve alternatives in configuration results,
 protocol payloads and schema decoders. Forgetting also supports updates,
@@ -1228,11 +1232,11 @@ in S. These definitions apply to types, even when no expression constructs a
 value of them. Normalization must induce the identity on these sets. It need
 not print every two equivalent types with identical text.
 
-**The final rules are N1, N2, E0–E5 and U1–U5 in sections 4.3 and 4.5.**
+**The final rules are N1, N2, E0–E5 and U1–U6 in sections 4.3 and 4.5.**
 N1 is unchanged; N2 is new. E4 is J8's guarded rule, not the old open-field
 rewrite. E0–E3 and E5 are unchanged equalities. U1 removes the common-field
-union, U2 retains exact intersection, U3 replaces routing, U4 extends places,
-and U5 separates known summaries. R-width, R-split and single-target
+union, U2 retains exact intersection, U3 replaces routing, U4 admits closed unions in every place, U5 separates known summaries,
+and U6 bounds demanded work without changing sets. R-width, R-split and single-target
 R-without-left/right remain sound conservative checks, not normalization.
 
 For E4 use exactly J8's predicate after exact child normalization:
@@ -1274,7 +1278,7 @@ By structural induction, capture-free substitution obeys
 Each normalization step preserves this denotation under every ρ, by the
 cases above. Therefore
 `[[N(N(T)[σ])]]ρ = [[T]](ρ∘σ) = [[N(T[σ])]]ρ`.
-Normalization terminates on this fragment: expand a finite intersection into a finite union of branches only in that direction, then reduce fields and forgetting; never factor and re-expand. E2 moves forgetting into smaller union operands, and E3 removes a nested forgetting node.
+Compact normalization terminates by memoized bottom-up rebuilding of a finite acyclic graph. Local reductions decrease nodes or field requirements; no constructor expands a product of unions. Demanded proof search explores a finite partition for the finite record fragment, with active cycles yielding Unknown and U6 limiting work. E2 and distributivity remain valid equalities whether applied now or retained as nodes. Their schedule is absent from the denotation proof.
 
 This covers arbitrary finite trees of the stated record fragment, not only
 the bounded model. It includes substitutions whose record types have no
@@ -1293,83 +1297,264 @@ the right side is `{..}`. The two existential witnesses need not be one
 source record. Nor may `Without({ a: A }, {a})` become `{..}` until the
 witness guard passes.
 
-### 20.3 Inference without alternative selection
+### 20.3 Inclusion without alternative-specific bounds (R1 and R2)
 
-A union of exact alternatives is representable with the existing Union
-container (`crates/ilang-check/src/types/mod.rs:61–76`); T3 adds Rec and
-Without as already planned. This is not permission to feed multiple records
-to the existing first-head route (`types/solve.rs:648–696`). Its `.find`
-selects one member. Likewise both solver and display currently merge by
-head (`types/solve.rs:870–915`, `types/display.rs:705–740`). These paths must
-change together. Paths here and below beginning `types/` are under
-`crates/ilang-check/src/`; all code references in section 20 are at 6a6edc8.
+This revises f100d01 under coordinator R1–R3 and the independent review.
+The mathematical rules N2, guarded E4, U1 and U5 are unchanged. The review
+found incompleteness and avoidable expansion, not a counterexample to their
+set meaning. The following procedure replaces the earlier small proof gate
+and blanket input prohibition. Code evidence is collected in §20.6.
 
-The no-new-bounds gate U3 is a pure proof procedure, not a trial call to the
-mutating solver with only its error list rolled back. Its successful rules
-are fixed:
+Use an immutable snapshot of the established ordinary constraint graph.
+“Established” means a bound actually generated and propagated by ordinary
+inference, including an explicit single-target annotation, never a guessed
+bound from a union alternative. Queue an unresolved U3 obligation while the
+ordinary group worklist runs, then retry on the saturated snapshot before
+generalization and before T2's completion batch publishes aliases. A later
+ordinary constraint invalidates the snapshot cache and triggers rechecking.
+T2 completion constraints still follow T2's existing batch rules; U3 itself
+never contributes fixation or extra constraints to that batch.
 
-1. Reflexivity, Never on the left, Top on the right; exact membership in a
-   right union; exact projection from a left intersection.
-2. Every member of a left union must prove the target; a right intersection
-   requires all its members. A right union succeeds if any alternative has
-   a proof. A left intersection may supply a proof from a member. These
-   existential proof searches add no constraints and return no chosen
-   variable solution, so their order cannot change a scheme.
-3. Rec-to-Rec uses width and recursively proves field inclusions. Scalar
-   Int/String comparisons use T1 set inclusion. A record-only source proves
-   `{..}`. Exact normalization is allowed at each step.
-4. Apply the sufficient single-target Without rules with recursive proofs
-   in place of constraints; include their label guards and record-head checks.
-5. Distinct variables, and any remaining comparison, return Unknown. Do not
-   inspect temporary variable bounds. In particular there is no speculative
-   call to constrain, extrusion, equality, or fixation.
+Proof order, with memoization by node pair, polarity, label substitution and
+snapshot identity:
 
-The procedure is deliberately incomplete. A no-new-bounds proof is valid for
-every assignment to its remaining variables, so it imposes no extra choice
-on the constraint solution. Failure at a multiple-record target is E0501
-with `FailKind::Ambiguous`, and the hint: “write one common record result
-type, or leave the result to inference”. This replaces arm 5a and step 6a;
-there is no preferential Rec member and no label-inclusion selection of a
-spread member. Keep the gate before left-intersection and Without routing.
-Left unions and variable storage arms otherwise keep their positions, except
-that exact right-union membership must precede variable storage. Normalize once before proof search; recursive proof steps descend into a proper operand or field. A memoized repeat returns Unknown, never a recursive hypothesis. If a stored
-bound later generates this obligation, apply the same gate.
+1. Reflexivity, empty source, universal target, identical union membership,
+   record-domain facts, exact local simplification. A left union requires
+   every part; a right intersection requires every part.
+2. Use established bounds in the sound direction: to prove `v <: T`, prove
+   `(intersection of v's upper bounds) <: T`; to prove `S <: v`, prove
+   `S <: (union of v's lower bounds)`. Empty upper/lower lists give Top/Never,
+   not assumptions of equality. Follow established variable edges transitively.
+   A recursive active goal is Unknown, not a coinductive assumption. Bound
+   summaries may supply stronger sufficient proofs; they may never erase an
+   alternative. This applies beneath fields: if A already has upper bound
+   `Int | String`, a source `{ a: A }` fits `{ a: Int } | { a: String }`
+   by proving inclusion through `{ a: Int | String }` and splitting it.
+   This is an intermediate proof, not replacement of the inferred type or
+   an assertion that A equals its upper bound. Reading a bound does not turn a label parameter into a variable.
+3. Rec-to-Rec uses width and depth. Under fields use the ordinary closed
+   structural relation: tuple arity and component inclusion, nominal declared
+   variance (both directions for invariant arguments), function parameter
+   contravariance, result/error covariance and the existing environment
+   equality rule; Int/String use their finite/cofinite set inclusion. These
+   are pure counterparts of spec §4.5 rules 4–8, including their restrictions,
+   never calls to `constrain`/`equal` with errors rolled back. Apply the guarded
+   sufficient Without checks recursively. A left intersection may prove the
+   goal through a conjunct. With one record target, ordinary inference can
+   still add conjunctive bounds outside this procedure.
+4. Try whole-source proofs against target alternatives, in structural order.
+   If these fail, test exact coverage, not merely “fits one alternative”.
+   Split the source on a relevant field's union:
+   `{ a: X | Y, r } = { a: X, r } | { a: Y, r }`.
+   Check every part against the complete target. Choose the first relevant
+   label by UTF-8 bytes (then parameter id), then recurse into field structure.
+   A merged scalar set is still splittable: partition by the target's finite
+   and cofinite scalar sets, including the residual set, not by enumerating
+   Int or String. For example `{ a: Int }` fits
+   `{ a: 1 } | { a: Int - 1 }`. Tuple/product fields split componentwise.
+   For record coverage, split only target-tested labels; keep an absent-field
+   case as well as present-field cells when a source leaves a label free.
+   Nested records use the same procedure. These internal partitions are set
+   predicates, not a new written difference operator or runtime test.
+5. Interpret a closed record coverage goal as emptiness of the uncovered
+   source set. Build cells lazily from the source and target predicates,
+   retaining constraints on each field, so equivalent closed spellings have
+   equal verdicts. A cell is covered if one target accepts it. This is the
+   finite record Boolean fragment over the existing closed leaf relation;
+   it is not a new theorem about arbitrary intersections of function types.
+   For a closed Without, encode one existential source record: quantify its
+   presence/value at every removed label while equating all other fields to
+   the result. Eliminate those finite record cells only when demanded. This
+   preserves a common witness across intersections and is also the closed
+   emptiness fallback for the conservative Without rules in §4.4.
+   Non-record leaves retain spec §4.5's relation. An unresolved open cell is
+   Unknown. No unknown cell is counted as empty. U6 limits all these steps.
 
-Why retain the output-place restriction? A parameter of type
-`{ a: A } | { b: B }` would ask inference to choose incomparable solutions
-for A and B at a call. U4 rejects it in written and shown types. Even in an
-output annotation, this must be rejected:
+The whole proof returns Proven, Refuted (a closed uncovered case), Unknown
+(open constraints not entailed), or ResourceLimit. Only Proven accepts an
+obligation. No branch may mutate the snapshot. Reordering proofs can affect
+work but not meaning or inferred bounds. The semantic coverage procedure,
+not graph identity or one spelling's distribution, defines closed acceptance.
+
+These two previously rejected closed annotations now pass:
 
 ```i
-choose(A, B) = (c: Bool) -> { a: A } | { a: B } {
-  c |> { True -> { a: 1 }  False -> { a: 2 } }
+wrap_union = (x: Int | String) -> { a: Int } | { a: String } { a: x }
+pair = () -> { data: (Int, Int) } | { error: String } { data: (1, 2) }
+```
+
+`wrap` with result `{ a: Int | String }` has the same verdict as
+`wrap_union`. Giving `pair`'s local tuple `(Int, Int)` explicitly does not
+change its verdict. The corresponding covariant nominal and function field
+cases use step 3, not record-specific exceptions.
+
+**The review's choose(R) cases.** Instantiating `put` can leave a fresh R2
+with only `R & {..} <: R2`. This is a lower bound, not `R2 <: R`.
+Reading it cannot prove `Without(R2, {a}) <: Without(R, {a})`: R2 might also
+contain records that violate R. With R = `{ x: Int }`, permitting R2 to
+contain `{..}` demonstrates the missing inclusion. This is a statement about
+all solutions of the current constraints, not a claim that `put` loses x at
+runtime.
+
+| Program | Result under the saturated snapshot |
+|---|---|
+| Review's inferred `choose(R)` | Accepted. Ordinary inference retains the principal result and its bounds; no right-union proof is requested. |
+| `choose_written(R)` with fresh R2 having only that lower bound | Still rejected. The requested open inclusion is not entailed. |
+| Same written result with fallback `x: { b: Int }` | Still rejected for the True branch for the same reason; annotating x does not establish an upper bound on R2. |
+| Either written version after an ordinary single-target annotation of the update as `{ ..R, a: 1 }` (or `{ ..R, a: Int }`) | Accepted. That ordinary annotation establishes the needed inclusion; U3 reads it. Both alternative orders must pass. |
+| A closed R2 already bounded above by R, or an update already typed as the exact written member | Accepted by existing bounds or reflexivity; no new bounds. |
+
+The recommended written version is:
+
+```i
+choose_written(R) = (c: Bool, r: R & {..}) -> { ..R, a: 1 } | { b: 2 } {
+  updated: { ..R, a: 1 } = record.put(r, "a", 1)
+  c |> { True -> updated  False -> { b: 2 } }
 }
 ```
 
-Do not assign one literal to each variable. Without the result annotation
-the result is the principal exact union `{ a: 1 } | { a: 2 }`. An explicitly
-common result `{ a: Int }` also works.
+An unproved open inclusion reports E0501 with a new proof-failure reason:
+“cannot prove the result fits this union from the established bounds;
+annotate the updated value as { ..R, a: 1 }, or omit the result annotation”.
+The related note identifies the unproved forgotten-base inclusion; `R2 <: R` would be a sufficient established implication. Do not call
+this case ambiguous. A genuinely choice-dependent goal such as
+`{ a: 1 } <: { a: A } | { a: B }` reports “checking this union would require
+choosing bounds for A or B; write a common result type or omit the result
+annotation”. A closed counterexample reports the ordinary mismatch and its
+uncovered field case. Resource exhaustion has U6's separate diagnostic.
 
-For newly admitted left-union operations, constraint decomposition is
-conjunction and preserves all solutions: `(S | T) <: U` iff both inclusions
-hold, including field access. For a new multiple-record target, the only
-successful new rule is a universally valid proof, imposing no bounds.
-Otherwise the program is outside this restricted inference fragment. U1/U2
-preserve the generated type; they never replace it by a chosen upper bound.
-This is the preservation argument for the new rules, conditional on the
-existing inference rules, including the conservative Without rules. It is
-not a completeness theorem for all semantic subtyping, nor a proof of the
-whole compiler. In particular the Python model does not test inference.
-T3's principal-scheme, order, K1 and J7 regressions remain merge gates.
+**Every-position closed unions.** This complete example is accepted:
 
-Do not add Rec-field joins in `compare`: the existing `join` creates a
-variable used only to check bounds (`types/solve.rs:584–631`). That was
-justified for the old merged record. Under U1 two alternatives may contain
-`Cell(Int)` and `Cell(String)` under the same label without claiming that
-those invariant arguments are equal. Lower bounds must remain separate;
-checking every lower against every upper still happens in
-`types/solve.rs:301–312`. This avoids an extra rejection and an accidental
-strengthening of inferred constraints.
+```i
+Schema(A) { Schema(decode: () -> A) }
+make = (c: Bool) {
+  c |> {
+    True -> Schema(decode: () { a: 1 })
+    False -> Schema(decode: () { a: "x" })
+  }
+}
+schema = make(True)
+Schema(Row) = schema
+read = (r: Row) { r.a }
+```
+
+Row is `{ a: 1 } | { a: "x" }`; `read` returns `1 | "x"`. T2 completes the
+source and publishes this closed alias without running `make`. No rule
+recognizes Schema. Field selection, updates/removals and all other operations
+must be valid for every alternative, with the union of results; constructor
+head tests still cannot discriminate record fields. An empty union has no
+possible input and gives Never. A missing field on one inhabited alternative
+rejects the access even if another supplies it.
+
+The boundary is an obligation requiring new *alternative-specific bounds*,
+not an open annotation, a parameter position, or a record count. Thus
+`forward = (x) -> { a: Int } | { b: Int } { x }` is accepted: storing the
+whole upper bound on x does not select an alternative. Calling it with a
+closed `{ a: 1 }` passes. In contrast:
+
+```i
+select(A, B) = (x) -> { a: A } | { a: B } { x }
+bad = select({ a: 1 })
+```
+
+The function declaration may retain its whole union constraint, but this call
+requires a choice of bounds for its fresh A/B and rejects. The user writes
+`(x: { a: Int }) { x }` for a common accepted domain, or gives the desired
+single alternative explicitly before the union obligation. This restriction
+adds no solutions and discards no constraints from successful inference;
+it preserves the old principal constraints conditionally on the existing
+checker. Full principal-inference and leaf-algebra completeness proofs remain
+outside the model. The required order and J7 tests remain implementation gates.
+
+### 20.3a Compact exact representation and resource limits (R3)
+
+Use immutable shared nodes with stable handles for Rec, Union, Inter and
+Without. Record fields and leaves point to handles too. Hash keys compare
+handles, not recursively unfolded trees. Preserve the graph made by source
+operations; local sorting/deduplication, N2 and guarded E4 may simplify it.
+Do not flatten through a shared child by copying its descendants. A recursive
+copy during hashing, substitution, display or serialization would defeat this
+requirement. Memoize substitution by node and substitution environment;
+label substitution must recheck N1/N2 and E4's guards. Generalization preserves
+variable identity and invariant occurrences through these shared nodes (J7).
+
+| Operation | Required demand, and how much |
+|---|---|
+| Construct a union/intersection, infer branches, substitute, complete an alias, compare node identity | Visit existing reachable nodes once per environment; no alternative product. Combining two plain Rec nodes may combine their explicit fields. Completion must not run a DNF conversion as an extra step. |
+| Read a field or prove a common requirement | Follow unions in conjunction, intersect relevant field requirements, preserve result unions as shared nodes. Inspect only that field and any requirements needed to prove a source branch empty. A proof of Records uses domain facts without enumerating shapes. |
+| Put/remove/forget | Build Without and field-intersection nodes; E2 may expose individual union operands only on demand. For an intersection base keep one existential witness; never forget conjuncts separately. |
+| Inclusion/equality and written-union checking | Try §20.3's structural proofs first. Otherwise enumerate only uncovered cells relevant to this goal, lazily, memoizing shared subgoals. Equality is both inclusions, not a string or graph comparison. Stop a refuted inclusion at its first witnessed uncovered cell. |
+| Type tests, coverage, known summaries | Collect heads once per reachable node and verify relevant subtype obligations separately. Field facts are conservative U5 summaries. Never expand unrelated field combinations to collect the Record head. |
+| Full display, package/API identity and interface writing | Traverse the graph, not its alternative expansion. No semantic widening to shorten text. See the encoding below. |
+
+A full type may be larger than a source expression when expanded. Full output
+therefore uses an exact **graph bundle** when inline source would duplicate
+shared nodes: a version, root handle, topologically numbered node table,
+ordered child references, scoped type/label parameter identities, variance
+and nominal references. A diagnostic may abbreviate it and link the full
+bundle; it must not pretend the abbreviation is the type. The bundle is a
+type artifact with an exact decoder, not new i syntax. Small types still print
+ordinary source. Closed bundles may optionally be rendered as topologically
+ordered ordinary type aliases. Open label parameters remain scoped graph
+references, since i has no label parameters on type aliases.
+
+This refines the earlier full-source read-back requirement in §§4.7/12:
+small inline forms parse back, graph bundles decode back to the exact shared
+type. Package interfaces store the full graph, never hover text or expanded
+alternatives. Number nodes deterministically by traversal after structural
+child ordering and alpha-renaming, retaining nominal identities and scalar
+sets. Different equal graphs need not serialize identically. Byte identity
+is a cache key only; semantic equality is mutual inclusion. Interface change
+reporting may conservatively report a representation change under its existing
+policy; it must not assert set inequality from different bytes. Version the
+interface encoding when T3 installs it. No library gets a special rule.
+
+**Budget.** Each demanded operation gets 65,536 distinct work states. Charge
+before creating a new proof pair, partition cell, or demand-visitor state;
+shared repeated states count once within the demand. Include the snapshot,
+polarity, label environment and retained cell predicates in the state key.
+Do not reset the budget at recursive calls or per alternative. A cell split
+with k outcomes charges k before allocating them, so even the attempt is
+bounded. Use an iterative visitor, not an unbounded native stack. Construction
+and ordinary graph output are linear graph traversals, not split demands;
+ordinary compiler memory limits still apply. A cache hit must account for its
+recorded logical work if necessary to keep the local budget deterministic.
+
+On exhaustion stop that operation with the resource diagnostic
+“type too large to check here”, point at the access/call/annotation that
+demanded it, and suggest a local annotation, for example
+“annotate this intermediate value as { a: Int } if only a is needed”.
+An annotation still needs checking; it is not a bypass, and some exact goals
+require simplifying the source instead. Use a distinct ResourceLimit reason,
+not Ambiguous, Mismatch or E0518. Numeric diagnostic allocation is for the
+coordinator; until assigned this is a named diagnostic category. Do not
+publish partial types, cache failure as emptiness, fall back to a summary,
+or turn a failed resource check into a successful T2 fixation.
+
+A budget is a limit on finishing a proof, not a premise of subtyping. Equal
+types always denote the same values, and any successful proof still proves
+the same set inclusion. Equivalent representations can cost different work
+and one can hit the limit; then one program fails to finish checking. They
+cannot both compile with different denotations because of this limit.
+The commutation theorem is semantic and has no budget premise.
+
+For the review's family, define Fan(A) as the intersection, for i = 1…n,
+of `{ ai: A } | { bi: Int }`, with fresh literal labels ai/bi. Expanding at
+n = 12 gives 4,096 choices while substituting A = Never first leaves one
+record. At n = 20 the shared graph remains linear; substitution eliminates
+each ai branch locally and produces the one record with all bi fields.
+Never demand the 1,048,576 open alternatives just to store or show Fan.
+
+The other scale family starts with r0 = `{..}`; each next value branches
+between `{ ..r_previous, ai: 1 }` and `{ ..r_previous, bi: 1 }`, using fresh
+label pairs. It has 2^n incomparable record alternatives. Sharing retains
+both uses of r_previous without copying its graph. The mandatory scale gate
+constructs and checks 20 steps, verifies record-domain membership, serializes
+and decodes the exact graph, and does the same for Fan including A = Never.
+Each family must finish well under one second (target <0.1s model, <1s warmed
+compiler, excluding build/startup). Also demand an intentionally large
+coverage proof and require the resource diagnostic, never widening.
+The gate is not a claim that all exact inclusion questions at size 20 are fast.
 
 ### 20.4 MLstruct comparison
 
@@ -1384,9 +1569,9 @@ exact alternatives, collapse plainly empty records and use guarded
 existential forgetting. i also retains its nominal/record separation,
 head-only record tests, nonrecursive structural types and label parameters.
 MLstruct's inference theorem does not prove this changed system principal;
-U3/U4 deliberately restrict the new constraints instead of importing that
-claim. Full semantic union solving is a separate design, not a hidden T3
-requirement.
+U3 restricts choices of unknown-variable bounds instead of importing that
+claim. Closed record coverage and structural leaf proofs are required; full
+Boolean constraint solving for unknown types remains outside T3.
 
 
 ### 20.5 Audit of laws, examples and joint rules
@@ -1402,9 +1587,13 @@ The table distinguishes changed sets from changed shown forms or verdicts.
 | `union_join.i` (§15.1), with two one-field branches | Shown record union stays separate; `.a` still has the union of the field types by left-union constraints. This single-field case changes presentation, not the set. |
 | `union_spread_closed.i` (§15.1) | Result is `{ a: 1 } \| { b: 2 }`, not `{..}`. The empty record is excluded. |
 | The circle/square example (§17) | Retains both full alternatives, including radius/side and their correlation with kind. Its head test still takes both. |
-| The inner `h` parameter `{ K: Int } \| { a: Int }` (§5.5 and §15.2 replacement test) | E0518 before instantiation. It no longer becomes `{..}` and accepts `{ b: 1 }`. In an output alias, substituting the same label deduplicates exactly. |
-| `union_spread_written.i`, `union_spread_param_written.i` and §4.4's old arm-5a example | The generic bodies need new bounds to fit one alternative, so U3 rejects them with ambiguity. Omitting the union result annotation, or writing `{..}` as the result, is supported. Do not accidentally constrain R to `{ b: Int }`. |
-| `union_spread_param.i` | Still rejected. U3 may report ambiguity in the body before the final shown-type E0518; a separate direct forwarding probe must test E0518 itself. |
+| The inner `h` parameter `{ K: Int } \| { a: Int }` (§5.5 and §15.2) | Declaration accepted. `{ a: 1 }` fits uniformly; `{ b: 1 }` does not for arbitrary K (take K = "c"). Substitute K = "a" and deduplicate exactly. |
+| `union_spread_written.i`, `union_spread_param_written.i` and §4.4's old arm-5a example | The generic bodies need new bounds to fit one alternative, so U3 reports the missing established inclusion. Omitting the result annotation, writing a common result, or annotating the update as the exact member is supported (§20.3). Do not accidentally constrain R to `{ b: Int }`. |
+| `union_spread_param.i` | The unannotated update still lacks the proof; no E0518 solely for the inferred union input. Annotate the update and fallback for the intended result. |
+| `wrap_union`, `pair`, covariant nominal/function fields | Now accepted by structural inclusion and field splitting; equivalent closed annotations have equal verdicts (R1). |
+| `Schema(Row)` followed by `(r: Row) { r.a }` | Now accepted, returns `1 \| "x"` (R2); the alias remains exact. |
+| Closed `forward`, `spread_union_input.i`, open union declarations with unused inputs | Now accepted; calls and bodies must satisfy U3, not a record-count place rule. |
+| Fresh-label branch family and Fan(A) | Same sets, compact graphs instead of mandatory exponential output. Fan(Never) is one record; U6 can stop a demanded expensive proof with a resource diagnostic. |
 | E4 test removing a from `{ a: A, b: Int }` (§15.2) | Retain Without. A = Never gives Never; A = Int gives `{ b: Int }`. This is the already approved J8 change. |
 | Original closed and generic Gone witnesses | Never on both paths; `(x: Gone({..})) { x \|> {} }` has an impossible input and is valid (spec rule 11). |
 
@@ -1423,8 +1612,8 @@ algebraic reasoning, not compiler runs):
 - §§4.2/4.6/4.7: occurs checks, constructor-depth cycles, bound propagation,
   variable identities, labels, read-back and polarity remain. Recursive
   `last`, `build`, unannotated spread folds and `fill` still reject; their
-  stated annotated/full-literal workarounds still work. Exact alternatives
-  are retained in generalization and read-back. No arbitrary one-member
+  stated annotated/full-literal workarounds still work. Exact shared expressions
+  are retained in generalization and graph read-back (U6). No arbitrary one-member
   choice in known types or expected fields is allowed (U5, joint J2).
 - §§5.1–5.7: `get`, `put`, `remove`, `update`, L1–L9, `both`, `bump`, `twist`
   and `peek` keep their types/diagnostics except the explicit union example
@@ -1455,8 +1644,8 @@ algebraic reasoning, not compiler runs):
 | J1 | Value reads still use inferred types; singleton keys still need the inferred subtype check. Exact record unions do not license union keys. |
 | J2 | Common-field summaries remain here only. Summarize all record alternatives and preserve non-record alternatives; field inference still uses the fresh principal constraint. |
 | J3 | Key-first inference and written runtime evaluation order unchanged. Substitute labels in both known and inferred forms using the revised constructors. |
-| J4 | Completion keeps all alternatives, rechecks places, and publishes only closed checked aliases; no summary or open erasure is frozen. |
-| J5 | Replace its old routing order with U3 and full alternative traversal. Runtime Record/All tests and head-only narrowing remain. |
+| J4 | Completion preserves the compact exact graph, rechecks pending proof obligations and ordinary-variable places, then publishes closed aliases. Closed Row unions are usable as inputs. |
+| J5 | Replace its old routing order with U3 and lazy exact traversal. Runtime Record/All tests and head-only narrowing remain. |
 | J6 | Records remain excluded from the host boundary; no early value reads or label-generic entry points are newly admitted. |
 | J7 | Preserve invariant occurrences and variable sharing through every union branch; never rebuild a scheme from U5's summary. |
 | J8 | Keep the inhabitance guard. Add exact unions and N2; E4 alone could not resolve the reported conflict. |
@@ -1477,49 +1666,82 @@ still not provided: §10 explicitly has no typed `entries`, and this algebra
 fix adds neither type-level field iteration nor higher-rank callbacks.
 No claim that exact unions alone implement that stronger use is made.
 
-### 20.6 Exact implementation and spec hand-off
+### 20.6 Exact implementation and spec hand-off (R4)
 
-The changed normative sentences are installed in `docs/spec.md`, in the
-record portions of §4.4, subtype rule 9, §4.9.2 and §4.9.3. Section 12 above
-mirrors them. `types-joint.md` section 6 is the shared-text override; its
-earlier one-Rec representation and J5 routing lists must be read with that
-override. Nothing outside section 6 of that file is edited in this lane.
+The revision merges redesign c2f41b7 as 669dbbb before editing. Its T2 text
+is the combined specification. The record changes are installed in spec
+§4.4 and §4.9.3; §4.5 rule 9 and §4.9.2's N2/guarded forgetting stay.
+Section 12 mirrors §4.9.3 verbatim. Joint section 6 overrides earlier J4/J5
+place lists and later E0518 test expectations without changing those sections.
 
-| Region read at 6a6edc8 | T3 change required |
+All code anchors in this note were re-derived against this merged revision.
+Earlier anchors were mapped through the intervening changes and inspected;
+changed signatures and displaced operation names were re-anchored. The
+historical empty-access execution remains explicitly a report at 1865366,
+not a fresh run. Paths starting `types/` below are relative to
+`crates/ilang-check/src/`. These are code reads and required changes, not
+implemented compiler behavior.
+
+| Current region read | Fact and required change |
 |---|---|
-| `types/mod.rs:45–76,153–155` | Keep one runtime Record head; permit several Rec members in Union. Distinguish runtime head, merge eligibility and record-only alternatives. No new runtime tag beyond the existing T3 plan. |
-| `types/solve.rs:282–365,648–696` | Exact membership before variable storage; U3 before left-intersection/Without routing; left unions visit every alternative. Never select the first matching Record head. A pure proof helper returns Proven/Unknown without solver mutation. |
-| `types/solve.rs:449–515,584–631` | Preserve all record bounds. Do not add same-label lower-bound joins merely because their records share a head. Preserve T1's scalar-specific bound fusion. |
-| `types/solve.rs:870–1047` | U1 in union_in, U2 in inter_in, no union Rec arm using common fields in merge. One shared N1/N2/E0–E5 implementation for exact rebuilding. |
-| `types/display.rs:138–184,705–780,912–966` | Preserve alternatives through simplification and rebuilding. Norm must not reintroduce a same-head join. Canonical sort uses structured labels and type identity, not shortened display text. |
-| `types/known.rs:23–85,404–471,786–821` | Replace first-head selection for records by U5's summary; preserve scalar sets and all alternatives outside the summary. Use this for expected fields and known access, not inferred result types. |
-| `types/infer.rs:868–896,2272–2292` | Written conversion and generalized reconstruction use the same exact constructors. Add the U4 post-substitution/completion check as well as existing written/shown checks. |
-| `types/pattern.rs:470–501,700–719,877–927`; `types/coverage.rs:205–250`; `types/shown.rs:10–33` | Audit every record consumer for several alternatives. Coverage collects all alternatives but emits one Record/All head test. Full type output retains every alternative. No new runtime field discrimination. |
-| `crates/ilang-cli/src/commands/package.rs:1257–1275,1379–1410`; `crates/ilang-check/src/query.rs:1350–1365` | Extend canonical type traversal and access handling according to T3’s original plan; no conversion of exact unions to known summaries. |
+| `types/mod.rs:47–79,155` | Head/Ty currently have no records; Ty owns recursive Vec/Box children. Merely adding Rec to Union is insufficient for U6: add shared immutable handles and identity-aware visitors. Keep runtime Record head separate from merge eligibility. |
+| `types/solve.rs:335–487,713–762` | Variable storage and left-union conjunction exist; route uses the first matching head. Preserve whole-target storage, insert U3 before left-intersection/Without trials, and add pure structural/coverage/bound proofs. Closed record alternatives never route by first head. |
+| `types/solve.rs:365–388,512–645,649–697` | Lower/upper propagation and bound comparison mutate the solver. U3 reads a saturated snapshot and does not call these mutators. Keep separate lower record bounds, including invariant field contents; retain scalar-specific fusion. |
+| `types/solve.rs:936–1129` | union_in/inter_in/merge merge headed forms. U1/U2/U6 replace the record path with compact exact smart constructors, shared with display and substitution. Existing non-record leaf variance remains the structural proof relation. |
+| `types/display.rs:138–184,705–780,912–966,1319` | Simplification and display rebuild recursively. Add graph memoization and full graph output; preserve variables and exact alternatives. Head merging may not turn record unions into summaries. |
+| `types/known.rs:23–85,414–481,796–831` | Member selection, matching and literal widening need U5’s summary of all records. Summaries stay separate from inferred graphs and aliases. Avoid a Cartesian expansion to find guaranteed fields. |
+| `types/infer.rs:696–789,979–1090,2337–2388` | **Place checking starts at 696; written conversion starts at 979**, not at union helpers. Generalization/rebuild start at 2337/2355. Remove record-count places, preserve ordinary-variable places, discharge U3 before generalization and rebuild graphs exactly. These replace the review's pre-merge anchors 658/919. |
+| `types/infer.rs:1705–1866` | Field access builds inferred parts and Access::Field. Add record access via every alternative with union results; no known-summary substitution for inferred field types. |
+| `types/value_types.rs:715–799,991–1040,1441` | finish_reads takes a snapshot for completion; complete_ready_reads publishes ready reads; check_value_places handles expanded value types. Finish pending U3 checks before snapshot/publication and after any completion constraints affecting them. Preserve T2's one-batch fixation and closed foreign-read rules. Resource failure publishes no alias. |
+| `types/pattern.rs:470–501,595–655,871–927`; `types/coverage.rs:277–330`; `types/shown.rs:10–33` | Pattern/narrowing, coverage and shown forms consume types. Visit shared alternatives on demand; one Record/All runtime test still represents all record alternatives. Extend shown types with exact graph output. |
+| `crates/ilang-cli/src/commands/package.rs:1263–1280,1366–1429`; `crates/ilang-check/src/query.rs:1300,1414–1421` | Canonical text, completed aliases and written types feed interfaces; query records constructor field access. Add versioned exact graph encoding/decoding and Label access. Byte inequality is not semantic inequality. |
+| `crates/ilang-syntax/src/parser.rs:1175–1181,1784–1818` | Record shapes remain reserved. Future record programs below have not been compiler-run. T3 must replace the reservation, then run them as compiler gates. |
 
-The listed regions are code reads and implementation instructions, not a claim those consumers have already been changed.
-The existing bound-mutating left-intersection trials at
-`types/solve.rs:324–350` are specifically not a safe implementation of
-U3: truncating failures does not undo successful bounds added before a later
-failure. A new pure helper is smaller than transactional branch solving.
+The left-intersection loop at `types/solve.rs:389–415` truncates failures but
+does not roll back successful bounds. It cannot implement U3 by speculative
+calls. The pure helper must return Proven/Refuted/Unknown/ResourceLimit;
+resource failure is never cached as a negative semantic answer.
 
-Required compiler acceptance tests, in addition to the existing T3 stages:
+Exact spec sentence hand-off, by section:
 
-| Probe | Expected result tied to a rule |
+- §4.4: “A record union is not restricted by its number of alternatives or
+  its place.” Keep the adjacent existing ordinary-variable restrictions.
+- §4.9.2: keep “Normalization before or after substituting a closed type
+  must describe the same set”, N2 and the inhabited-discard guard unchanged.
+- §4.9.3 U1/U2: keep exact union and field intersection; replace mandatory
+  expanded alternatives with shared expressions and demand-time equalities.
+- §4.9.3 U3: install the whole paragraph beginning “When checking inclusion
+  against several record alternatives”; it includes field structural proofs,
+  partitions, established bound direction and completion timing.
+- §4.9.3 U4: install “A closed union of records is an ordinary type in every
+  position” and the every-alternative operation rule.
+- §4.9.3 U6: install the graph/full-output paragraph and the 65,536-state
+  resource paragraph together. The graph exception refines full read-back;
+  it does not change literal sets, label scoping or T2's source restrictions.
+- Joint §6: U1–U6 override the earlier one-Rec and record-place assumptions;
+  J1/J3/J6/J7 and U5's known-summary separation remain binding.
+
+Compiler gates, each tied to a rule:
+
+| Probe | Expected result |
 |---|---|
-| `Gone(A)` and `Gone({..})`, normalized at alias expansion, scheme display, substitution and T2 completion | Never at every boundary, N2/U1/E1/E2. The empty-clause probe is valid. |
-| `F(A) = { ..{ a: A, b: Int }, -a }`, instantiate Never and Int | Never and `{ b: Int }`; E4 guard, in either order. Include an empty closed record as A, not only the spelling Never. |
-| `{ a: 1, b: 1 } \| { a: 2, b: 2 }` | Retain both alternatives. Reject assigning `{ a: 1, b: 2 }` to it; U1/U3. |
-| `{ ..{ a: 1 } & { a: 2 }, -a }` versus `{ ..{ a: 1 }, -a } & { ..{ a: 2 }, -a }` | Never versus `{..}`; U2/E4 and no intersection-distribution for forgetting. |
-| `read = (r) { r.a }`; call with each branch of a record-producing match | Principal scheme `(r: { a: A }) -> A`; both lower alternatives constrain A. Reverse clause order and bound insertion order. |
-| Generic `choose(A, B)` with a written union result (§20.3) | Ambiguous, with unchanged bounds; U3. Both branch orders reject. Without the annotation, infer the exact union. |
-| `forward = (x) -> { a: Int } \| { b: Int } { x }` | E0518 on the shown input union; U4, independently of body branch ambiguity. |
-| Two records with the same field containing unrelated invariant `Cell(Int)`/`Cell(String)` | Exact result union, no equality between the Cell arguments; U1 and revised lower-bound compare. |
-| Common-field type test on two alternatives, one with the wrong field value | E0501, never a branch-specific runtime test; J5. |
-| `Schema(User) = user` / `Codec(User, _) = user` in the defining module | Closed `{ age: Int, name: String }`, plus the existing cross-module closed alias checks; J4/J8. Test overwriting a closed field too. |
-| Label substitution making two labels equal, including an empty field intersection | Same set in both orders; N1/N2 and the E4 may-equal guard. |
-| Known summary of `{ a: Never } \| { b: 1 }` | Only the surviving branch contributes facts; N2/U5. A summary never becomes the permanent inferred alias. |
-| Known summary of `{ a: Cell(Int) } \| { a: Cell(String) }` | Field a is Top if an exact safe field union is unavailable; U5. Never choose one invariant argument or add an equality between them. |
+| Gone at alias expansion, substitution, generalization and T2 completion | Never in both orders, N2/U1/E1/E2; empty-clause input probe is valid. |
+| Forget a from `{ a: A, b: Int }`, instantiate A = Never/Int | Never / `{ b: Int }`, guarded E4. Include an empty closed record as A. |
+| Correlated `{ a: 1, b: 1 } \| { a: 2, b: 2 }` | Reject `{ a: 1, b: 2 }`, U1/U3; no product widening. |
+| Forget incompatible a constraints together versus separately | Never versus `{..}`, U2/E4; no forgetting over intersection. |
+| wrap/wrap_union and pair/pair_annotated, both target orders | Both versions accepted; structural fields and exact splitting, U3. |
+| Covariant nominal fields, function parameter/result/error variance and invariant service arguments | Pure proof matches spec §4.5; no bounds added. Test reversed function parameters reject. |
+| `{ a: Int }` against `{ a: 1 } \| { a: Int - 1 }`, plus nested tuple/record field splits | Accepted, including the scalar residual cell. Equivalent target spellings have equal verdicts within budget. |
+| Review's inferred/written choose and fallback-parameter variant | Outcomes exactly §20.3's table. A lower bound alone is insufficient; the explicit single-target update annotation passes. Snapshot/bound order and target order give equal outcomes. |
+| Closed forward; declaration select(A,B); choice-dependent call | First two accepted; last rejected with the bound-choice explanation, U3/U4. Failed proofs leave bounds identical. |
+| Schema(Row) from the two-branch schema, then read | Row is exact; input accepted; result `1 \| "x"`, U4/J4. Same through a closed exported alias. |
+| Access a from `{ a: 1 } \| { b: 2 }` | Missing-field rejection, U4; no first-alternative selection. |
+| Label collisions and empty merged fields | Same set in either substitution order, N1/N2/E4 guards; open h call with a passes, b fails for arbitrary K. |
+| `Cell(Int)`/`Cell(String)` alternatives in one record field | Keep separate inferred alternatives; no new invariant equality. U5 may use Top only in the known summary. |
+| Field-sensitive record type test; known summaries with empty/unknown branches | Existing head-only mismatch and conservative summary rules, J2/J5/U5; never freeze summary as Row. |
+| Straight-line Schema/Codec and map_pair | Original types unchanged; closed branch schema additionally works. K1/J7 weak variables and invariant sharing remain exact. |
+| 20-step r0…r20 fresh-label branch and Fan | Construct/check record domain, graph round-trip, Fan(Never) one record; <1s each warmed checker excluding build/startup, U6. Record node/byte counts and time; no DNF output. |
+| Deliberately excessive uncovered-case search, then a sufficient-budget retry | First is ResourceLimit at the demand with annotation hint; second proves the original inclusion. No widening, partial alias, mismatch cache entry or T2 fixation. |
 
 ### 20.7 Executable model and limits
 
@@ -1532,7 +1754,8 @@ calls the compiler. The implementation-stage record says record syntax is
 still reserved (`tests/t3-stages.md:111–118`); no compiler execution of these
 examples is claimed.
 
-The bounded grammar is explicit, not an assertion about all type trees:
+The original bounded grammar (`tests/t3-record-substitution.py:169–211`) is
+explicit, not an assertion about all type trees:
 three labels a/b/c, each absent or of type Never/1/Int/A; the one variable A
 may also be a base. Each atom and each unordered pair's union receives each
 of the eight removal sets. Additional families cover spreads of A extended
@@ -1553,7 +1776,7 @@ also checks order independence. A further 1,024 label substitutions include
 colliding labels and a fresh label; these are focused checks, not exhaustive
 quantification over arbitrary labels.
 
-A separate set interpreter uses all 64 finite records over absence, 1,
+A separate set interpreter (`tests/t3-record-substitution.py:217–272`) uses all 64 finite records over absence, 1,
 another Int and a non-Int. It performs **33,344** closed-flat set checks,
 including unions, intersections, every removal set and nested removals.
 The new rules have zero mismatches; the old mode differs from the specified
@@ -1565,61 +1788,134 @@ or all scalar literal sets. The structural proof in §20.2 covers finite
 record composition; the model supplies bounded executable evidence.
 
 
-### 20.8 Self-attack and open issues
+**R1–R3 model extension.** Run
+`direnv exec /home/agent/Programming/i python3 tests/t3-record-demand.py`.
+The original model remains an eager, bounded algebra oracle; it is not the
+U6 implementation strategy. The new model uses interned integer handles,
+local exact constructors (`tests/t3-record-demand.py:38–96`), memoized substitution
+(:98), a graph codec (:143–164), pure bounded proofs (:166–216) and a finite
+flat-set oracle for closed field coverage (:354–366).
 
-The initial attack rounds found real failures in smaller proposals:
+Its bounded compact grammar (`tests/t3-record-demand.py:228–248`) has 67 atoms: A, Never, the all-record type and
+all three-field records over Never/1/Int/A. It takes each unordered atom pair,
+both union and intersection, and removal sets empty/{a}/{a,b,c}: **13,668**
+trees. Substituting each of the original 64 closed records checks **874,752**
+commutations against the eager oracle, with zero failures. Each open graph
+also round-trips through the codec. The original old-rule witness fails as
+required. This comparison is not an independent nested set oracle.
 
-1. **Set meaning:** empty-first joining fails for an open A and loses
-   correlations even for inhabited records. Fixed by exact alternatives,
-   not just E1 priority. Gone and the correlated-record probes test this.
-2. **Implementation:** several Rec nodes with the old first-head route lose
-   branches. The existing left-intersection retry loop is not transactional.
-   Fixed by U3's pure proof gate and the explicit consumer audit.
-3. **Principality/source conflict:** selecting `{ a: A }` or `{ a: B }`
-   for `{ a: 1 }` chooses incomparable constraints. Fixed by declining all
-   choices requiring new bounds and extending U4. Two generic written-result
-   examples are intentionally lost; their inferred-output versions remain.
-4. **Known summaries:** merging unequal invariant field contents can add
-   equalities or pick one argument. Fixed by U5's Top fallback. No summary
-   becomes an inferred or permanently read type.
-5. **Model evidence:** different old normalized trees need not have different
-   values. Added an independent exact product-denotation key for old closed
-   outputs, rather than counting every tree difference as a semantic failure.
+The proof oracle enumerates 64 two-field records (a field absent or any
+nonempty subset of representatives 1/2/"x"), all 2,080 unordered target pairs,
+and every source: **133,120** inclusions. All agree with a separate finite-set
+interpreter. Additional probes cover wrap_union, pair, covariant nominal
+fields, function variance, bounds beneath fields, bound direction and cycles,
+Schema's exact field read, a missing field, and ResourceLimit followed by a
+successful retry. The review's extension is retained as a separate bounded
+function (`tests/t3-record-demand.py:251–319`): **324** two-variable/four-label/nested sources, **15,876**
+substitutions and **4,202** independent flat-set comparisons, with an old-rule
+negative control. Nested cases there remain structural checks.
 
-After these fixes, pass one attacked N1/N2 and E0–E5 with empty field types,
-colliding labels, no removals, nested records and successive removals. It
-also checked the false distribution over intersection and the guarded
-open-field erasure against the proof and model. No new serious problem was
-found in the stated fragment.
+Measured 20-step construction/check/serialization/decoding
+(`tests/t3-record-demand.py:375–410`): branch family
+**137 reachable nodes / 3,487 bytes**, about **0.0013 s**; open Fan **81 nodes /
+2,091 bytes**, about **0.0009 s**, including substitution to its one closed
+record and a record-domain proof. Both meet the model's <0.1s target. The
+wire data here models only the record algebra, not the proposed complete
+nominal/variable-scope interface format. These timings do not measure a Rust
+checker or arbitrary worst-case inclusion. The compiler scale gate in §20.6
+still has to be implemented and measured.
 
-Pass two attacked integration: arbitrary first-member selection, retained
-speculative bounds, variable storage before membership, invariant-field
-summaries, shown-type place checks versus temporary bounds, and preservation
-of Schema/Codec closure and J1–J8. The changed spec and replacement text were
-compared, the stale join/routing expectations were replaced, and the original
-failing witness was rerun. No new serious problem was found in the stated
-fragment. These are two clean design passes, not independent reviews or
-compiler execution of future syntax.
+
+### 20.8 Deliberate restrictions, self-attack and open issues
+
+The algebra attacks from f100d01 still stand: empty-first joins lose open A;
+inhabited joins lose field correlation; forgetting conjuncts separately invents
+a witness; speculative solver calls retain bounds; invariant summaries cannot
+pick one Cell argument. N2/U1, guarded E4, U3 purity and U5 answer these.
+R1–R4 supersede the earlier proposed output-place restriction and expansion
+policy. No request to approve those old restrictions remains.
+
+Current deliberately rejected cases affected by this amendment:
+
+| User program | Reason and what to write instead |
+|---|---|
+| Review's choose_written or typed-fallback variant with only a lower bound for fresh R2 | The open inclusion is not established. Annotate `updated: { ..R, a: 1 }` before forming the union, or leave the outer result inferred (§20.3). A common `{..}` result is also possible but loses guarantees. |
+| Fresh A/B choice-dependent call to select (§20.3) | No principal alternative-specific bounds are selected. Write the intended single record requirement (for example `{ a: Int }`) before the union, or infer the result from explicit branches. |
+| h with input `{ K: Int } \| { a: Int }`, called with `{ b: 1 }` for arbitrary K | For K = "c" the argument belongs to neither set. Pass `{ a: 1 }`, or construct the K field with the label-aware builder. The declaration itself is accepted. |
+| `.a` on `{ a: 1 } \| { b: 2 }` | One inhabited alternative lacks a. Supply a in every branch, or use a nominal sum with a case for each shape. |
+| `{ a: 1, b: 2 }` against the correlated 1/1-or-2/2 union | The value is outside that set. Write the intended product `{ a: 1 \| 2, b: 1 \| 2 }` if mixed pairs should be accepted. |
+| An excessive exact coverage demand | Checking did not finish, not a typing rejection. Write a sufficient intermediate common-field annotation when possible, or simplify the source. U6 must say this explicitly. |
+
+The other rejection families in §15 keep their reasons and workarounds:
+recursive record shapes use nominal types; accumulating spreads annotate the
+accumulator or construct a full literal; unknown/union keys use a fixed label
+or a declared key parameter; label escapes pass out the field value; dynamic
+heterogeneous traversal needs a separately designed general feature. None is
+fixed by discarding record alternatives.
+
+**Revision attack and repairs.** I constructed the following counterexamples
+before the final two passes, and corrected the specification where needed:
+
+1. `wrap_union` and `pair` from the review expose missing closed proofs, not
+   ambiguity. Structural field inclusion and exact splitting now accept both;
+   the model tests nominal covariance and both directions of function variance.
+2. `{ a: Int } <: { a: 1 } | { a: Int - 1 }` would still fail if splitting
+   depended on an explicit Union node: T1 merges scalar sets. Coverage now
+   partitions target-tested scalar sets and keeps a residual cell. The finite
+   scalar oracle tests all 133,120 bounded inclusions independently.
+3. In the choose witness, interpreting `R <: R2` as `R2 <: R` would prove too
+   much. With R requiring x and R2 also allowing the empty record, the source
+   can lose x. The bound directions are explicit; model tests the failed
+   lower-only case and successful established-upper case without mutation.
+4. A graph printer could silently unfold the same exponential tree as U2.
+   The interface is now a node bundle, with actual decode/round-trip tests.
+   Native recursive hashing of nested Python tuples would have the same
+   problem; the compact model uses integer handles and shallow hash keys.
+5. Closed `Without({ a: 1 } & { a: 2 }, {a})` must remain Never even when its
+   graph has not distributed or merged yet. Closed demand uses a shared
+   existential witness and exact emptiness before an early missing-field
+   failure; the old conservative open rules cannot decide a closed mismatch.
+6. A budget failure reused as False could make a later adequate-budget check
+   reject. ResourceLimit is separate, publishes nothing, and is not a semantic
+   cache entry; the model forces failure with budget 1 then succeeds normally.
+
+**Clean pass one (sets and constraints).** Rechecked Gone, both forgetting
+orders, duplicate/possibly equal labels, the false intersection-forgetting law,
+correlated records, closed field union/tuple/nominal/function probes, scalar
+residual coverage, the bound-direction counterexample and an active bound
+cycle. Reran the original exhaustive model and the compact model with their
+old-rule negative controls. No new serious failure in the stated fragment.
+
+**Clean pass two (source and integration).** Compared spec §4.9.3 with its
+replacement text, checked the removed record-only place ban in all active
+sections, classified every old changed example and J1–J8 again, traced T2's
+snapshot/publication sites, and tested graph decoding plus both 20-step growth
+families. Rechecked that failures cannot mutate bounds or publish aliases.
+No new serious design conflict found. The proof engine, alias publication
+integration and compiler scale gates are specified, not implemented or run.
 
 Questions for the coordinator, with recommendations:
 
-1. **Accept U3/U4's deliberate restriction?** Recommend yes for T3. It avoids
-   a new disjunctive solver and preserves the required schema builders.
-   Keep exact inferred output unions; do not restore joins to regain the
-   two generic written-result examples. If those annotations are mandatory,
-   commission a semantic-subtyping/inference design before T3.
-2. **What does “mapping over fields” require?** Recommend the fixed-schema
-   builders and typed operations above for T3, as the accepted note says.
-   Arbitrary heterogeneous traversal with a shape-preserving mapped type
-   needs another general feature; this normalization repair does not add it.
-3. **Normalization size?** Recommend sharing exact nodes and measuring T3's
-   existing scale/std gates. Do not silently widen at a size threshold. A
-   fixed diagnostic limit, if measurements require it, needs a separate
-   coordinator decision.
+1. **Resource diagnostic number.** Recommend E0546 in T3's reserved block,
+   with a distinct ResourceLimit reason and the text specified in U6. The
+   limit and behavior are fixed here; only numeric allocation remains.
+2. **Interface graph format/version owner.** Recommend T3 owns the type-graph
+   codec and the package/query integration in §20.6, versioned with its merge.
+   Do not require expanded text to keep the old interface representation.
+3. **Heterogeneous field mapping scope.** Recommend retaining ordinary typed
+   schema builders and fixed-schema maps for T3; arbitrary shape-preserving
+   heterogeneous iteration is a separate general-feature design.
 
-Unproved/unverified: a machine-checked proof, a whole-checker principal-type
-or completeness theorem, all interactions with the existing nominal/function
-algebra, recursive types (excluded), compiler/runtime behavior, performance,
-WAT equivalence and T2 integration. No compiler implementation is in this
-commit. Those limits do not weaken the set-equality and substitution argument
-for the record fragment, or turn the bounded model into a compiler gate.
+Remaining proof/verification limits: no machine-checked proof; no theorem of
+principality for the whole checker or completeness for arbitrary nominal and
+function Boolean algebra; no complete implementation of the closed coverage
+procedure with existential forgetting, effects, invariant arguments and T2.
+The finite proof oracle covers flat records over a representative scalar
+universe; the richer field checks are probes, not an exhaustive inference
+oracle. Label commutation is covered by the original model, not the new graph
+model. The compact model's budget counts proof pairs; the full visitor/cell
+accounting is a compiler requirement. Graph wire format, alpha-renaming and
+package compatibility are specified but not implemented. No Rust compiler
+record-program, warmed-checker timing, runtime, or WAT result is claimed.
+The semantic commutation argument still covers arbitrary finite trees of the
+record fragment; model bounds and resource limits do not replace that argument.
