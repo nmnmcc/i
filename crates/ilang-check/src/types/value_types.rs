@@ -2,7 +2,7 @@
 //! (§4.7; value-types R3–R7). Nothing here inspects a runtime value.
 use super::infer::Checker;
 use super::solve::Solver;
-use super::{FnTy, Head, ShownFn, ShownType, Ty, V};
+use super::{FnTy, Head, ShownType, Ty, V};
 use crate::code;
 use crate::hir::*;
 use ilang_syntax::span::Span;
@@ -23,14 +23,40 @@ pub(super) struct Fixed {
 }
 #[derive(Default)]
 pub(super) struct Reads {
+    pub prepared: bool,
+    pub templates: HashMap<TypeId, super::alias::Template>,
+    pub queue: std::collections::BTreeSet<TypeId>,
+    pub remaining: Vec<usize>,
+    pub alias_waiters: Vec<Vec<TypeId>>,
+    pub read_waiters: HashMap<OfId, Vec<TypeId>>,
     pub sites: HashMap<OfId, Read>,
     pub fixed: HashMap<V, Fixed>,
     pub aliases: HashMap<TypeId, Option<()>>,
     pub completed: HashMap<DefId, Result<Ty, &'static str>>,
     pub patterns: HashSet<ProjectionId>,
     pub sources: HashSet<DefId>,
+    pub source_sites: HashMap<DefId, Vec<OfId>>,
+    pub source_patterns: HashMap<DefId, Vec<ProjectionId>>,
+    pub pending_sites: Vec<Vec<OfId>>,
+    pub pending_patterns: Vec<Vec<ProjectionId>>,
     pub boundary: usize,
     pub error_start: usize,
+}
+
+impl Reads {
+    pub(super) fn release_aliases(&mut self, ids: Vec<TypeId>) {
+        for id in ids {
+            self.remaining[id.0 as usize] -= 1;
+            if self.remaining[id.0 as usize] == 0 {
+                self.queue.insert(id);
+            }
+        }
+    }
+    fn set(&mut self, site: OfId, read: Read) {
+        self.sites.insert(site, read);
+        let ids = self.read_waiters.remove(&site).unwrap_or_default();
+        self.release_aliases(ids);
+    }
 }
 
 struct Closure<'a> {
@@ -40,6 +66,8 @@ struct Closure<'a> {
     level: u32,
     open: bool,
     visiting: HashSet<V>,
+    exposed: HashMap<V, Ty>,
+    exposing: HashSet<V>,
     pub equations: HashMap<V, Ty>,
     pub shapes: Vec<(V, Ty)>,
 }
@@ -59,6 +87,8 @@ impl<'a> Closure<'a> {
             level,
             open,
             visiting: HashSet::new(),
+            exposed: HashMap::new(),
+            exposing: HashSet::new(),
             equations: HashMap::new(),
             shapes: Vec::new(),
         }
@@ -201,49 +231,121 @@ impl<'a> Closure<'a> {
         }
     }
 
+    /// Annotation schemes retain quantified variables. Only weak parts are
+    /// completion demands; their candidates use the same immutable snapshot.
+    fn annotation(&mut self, t: &Ty) -> Result<Ty, &'static str> {
+        Ok(match t {
+            Ty::Var(v) if self.s.vars[v.0 as usize].level > self.level => t.clone(),
+            Ty::Var(_) => self.close(t)?,
+            Ty::Con(h, ts) => Ty::Con(
+                *h,
+                ts.iter()
+                    .map(|t| self.annotation(t))
+                    .collect::<Result<_, _>>()?,
+            ),
+            Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+                params: f
+                    .params
+                    .iter()
+                    .map(|(n, t)| Ok((n.clone(), self.annotation(t)?)))
+                    .collect::<Result<_, &'static str>>()?,
+                ret: self.annotation(&f.ret)?,
+                err: self.annotation(&f.err)?,
+                env: self.annotation(&f.env)?,
+            })),
+            Ty::Union(ts) => Ty::Union(
+                ts.iter()
+                    .map(|t| self.annotation(t))
+                    .collect::<Result<_, _>>()?,
+            ),
+            Ty::Inter(ts) => Ty::Inter(
+                ts.iter()
+                    .map(|t| self.annotation(t))
+                    .collect::<Result<_, _>>()?,
+            ),
+            Ty::Diff(t, ts) => Ty::Diff(
+                Box::new(self.annotation(t)?),
+                ts.iter()
+                    .map(|t| self.annotation(t))
+                    .collect::<Result<_, _>>()?,
+            ),
+            Ty::Both(a, b) => {
+                Ty::Both(Box::new(self.annotation(a)?), Box::new(self.annotation(b)?))
+            }
+            Ty::Top | Ty::Never => t.clone(),
+        })
+    }
+
     fn normalize(&self, t: Ty) -> Result<Ty, &'static str> {
-        let mut scratch = Solver::new(self.s.variance.clone(), self.s.type_names.clone());
-        let result = match t {
-            Ty::Union(ts) => scratch.union(ts),
-            Ty::Inter(ts) => scratch.inter(ts),
-            Ty::Diff(t, ts) => scratch.diff(*t, ts),
-            t => t,
-        };
-        if !scratch.failures.is_empty() || contains_var(&result) {
-            Err(code::VALUE_TYPE_NOT_FIXED)
-        } else {
-            Ok(result)
-        }
+        normalize_closed(self.s, t)
     }
 
     fn expose(&mut self, t: &Ty) -> Result<Ty, &'static str> {
-        match t {
-            Ty::Var(v) => {
-                if let Some(f) = self.fixed.get(v) {
-                    return Ok(f.ty.clone());
-                }
-                let (vars, bounds) = self.bounds(*v)?;
-                // Only the outer shape is observed. Its original arguments,
-                // including skipped arguments, retain their solver identities.
-                let mut unique = Vec::new();
-                for t in bounds {
-                    if !unique.contains(&t) {
-                        unique.push(t);
-                    }
-                }
-                if unique.len() != 1 {
-                    return Err(code::TYPE_PATTERN_MISMATCH);
-                }
-                let shape = unique.pop().unwrap();
-                if shape.head().is_none() {
-                    return Err(code::TYPE_PATTERN_MISMATCH);
-                }
-                for w in vars {
-                    self.shapes.push((w, shape.clone()));
-                }
-                Ok(shape)
+        if let Ty::Var(v) = t {
+            if let Some(f) = self.fixed.get(v) {
+                return Ok(f.ty.clone());
             }
-            t => Ok(t.clone()),
+            if let Some(t) = self.exposed.get(v) {
+                return Ok(t.clone());
+            }
+            if !self.exposing.insert(*v) {
+                return Err(code::VALUE_TYPE_NOT_FIXED);
+            }
+            let (vars, bounds) = self.bounds(*v)?;
+            let shape = self.expose(&Ty::Union(bounds))?;
+            if shape.head().is_none() {
+                return Err(code::TYPE_PATTERN_MISMATCH);
+            }
+            // Only a variable SCC shares one skeleton. A strict predecessor
+            // keeps its own (possibly narrower) normalized shape.
+            let component = vars
+                .iter()
+                .copied()
+                .filter(|w| self.reaches(*w, *v))
+                .collect::<Vec<_>>();
+            for w in component {
+                self.exposed.insert(w, shape.clone());
+                self.shapes.push((w, shape.clone()));
+            }
+            self.exposing.remove(v);
+            for w in vars {
+                if !self.exposed.contains_key(&w) {
+                    self.expose(&Ty::Var(w))?;
+                }
+            }
+            return Ok(shape);
+        }
+        if !matches!(t, Ty::Union(_) | Ty::Inter(_) | Ty::Diff(_, _)) {
+            return Ok(t.clone());
+        }
+        let mut scratch = self.s.clone();
+        let shape = match t {
+            Ty::Union(ts) => scratch.union(
+                ts.iter()
+                    .map(|t| self.expose(t))
+                    .collect::<Result<_, _>>()?,
+            ),
+            Ty::Inter(ts) => scratch.inter(
+                ts.iter()
+                    .map(|t| self.expose(t))
+                    .collect::<Result<_, _>>()?,
+            ),
+            Ty::Diff(t, ts) => {
+                let t = self.expose(t)?;
+                let ts = ts
+                    .iter()
+                    .map(|t| self.expose(t))
+                    .collect::<Result<_, _>>()?;
+                scratch.diff(t, ts)
+            }
+            t => t.clone(),
+        };
+        // Original arguments (skips included) are retained. Fresh extrusion
+        // variables or failed invariant equations cannot become a shape view.
+        if !scratch.failures.is_empty() || scratch.vars.len() != self.s.vars.len() {
+            Err(code::VALUE_TYPE_NOT_FIXED)
+        } else {
+            Ok(shape)
         }
     }
 }
@@ -263,7 +365,10 @@ fn contains_var(t: &Ty) -> bool {
 }
 
 fn closed_equal(s: &Solver, a: &Ty, b: &Ty) -> bool {
-    let mut scratch = Solver::new(s.variance.clone(), s.type_names.clone());
+    if a == b {
+        return true;
+    }
+    let mut scratch = Solver::new(s.variance.clone(), Vec::new());
     scratch.constrain(a, b);
     scratch.constrain(b, a);
     scratch.failures.is_empty()
@@ -296,7 +401,35 @@ fn shape(t: &Ty, fixed: &HashMap<V, Fixed>) -> Ty {
     }
 }
 
+fn normalize_closed(s: &Solver, t: Ty) -> Result<Ty, &'static str> {
+    if contains_var(&t) {
+        return Err(code::VALUE_TYPE_NOT_FIXED);
+    }
+    let mut scratch = Solver::new(s.variance.clone(), Vec::new());
+    let t = super::alias::normalize(&mut scratch, &t);
+    if scratch.failures.is_empty() {
+        Ok(t)
+    } else {
+        Err(code::VALUE_TYPE_NOT_FIXED)
+    }
+}
+
 fn completed(
+    t: &Ty,
+    s: &Solver,
+    fixed: &HashMap<V, Fixed>,
+    level: u32,
+) -> Result<Ty, &'static str> {
+    let t = completed_in(t, s, fixed, level)?;
+    // Closed algebraic parts produced by a merged skeleton are normalized too.
+    match &t {
+        Ty::Con(_, ts) if ts.is_empty() => Ok(t),
+        Ty::Never => Ok(t),
+        _ => normalize_closed(s, t),
+    }
+}
+
+fn completed_in(
     t: &Ty,
     s: &Solver,
     fixed: &HashMap<V, Fixed>,
@@ -312,38 +445,38 @@ fn completed(
         Ty::Con(h, ts) => Ok(Ty::Con(
             *h,
             ts.iter()
-                .map(|t| completed(t, s, fixed, level))
+                .map(|t| completed_in(t, s, fixed, level))
                 .collect::<Result<_, _>>()?,
         )),
         Ty::Fn(f) => Ok(Ty::Fn(Box::new(FnTy {
             params: f
                 .params
                 .iter()
-                .map(|(n, t)| Ok((n.clone(), completed(t, s, fixed, level)?)))
+                .map(|(n, t)| Ok((n.clone(), completed_in(t, s, fixed, level)?)))
                 .collect::<Result<_, &'static str>>()?,
-            ret: completed(&f.ret, s, fixed, level)?,
-            err: completed(&f.err, s, fixed, level)?,
-            env: completed(&f.env, s, fixed, level)?,
+            ret: completed_in(&f.ret, s, fixed, level)?,
+            err: completed_in(&f.err, s, fixed, level)?,
+            env: completed_in(&f.env, s, fixed, level)?,
         }))),
         Ty::Union(ts) => Ok(Ty::Union(
             ts.iter()
-                .map(|t| completed(t, s, fixed, level))
+                .map(|t| completed_in(t, s, fixed, level))
                 .collect::<Result<_, _>>()?,
         )),
         Ty::Inter(ts) => Ok(Ty::Inter(
             ts.iter()
-                .map(|t| completed(t, s, fixed, level))
+                .map(|t| completed_in(t, s, fixed, level))
                 .collect::<Result<_, _>>()?,
         )),
         Ty::Diff(t, ts) => Ok(Ty::Diff(
-            Box::new(completed(t, s, fixed, level)?),
+            Box::new(completed_in(t, s, fixed, level)?),
             ts.iter()
-                .map(|t| completed(t, s, fixed, level))
+                .map(|t| completed_in(t, s, fixed, level))
                 .collect::<Result<_, _>>()?,
         )),
         Ty::Both(a, b) => {
-            let a = completed(a, s, fixed, level)?;
-            let b = completed(b, s, fixed, level)?;
+            let a = completed_in(a, s, fixed, level)?;
+            let b = completed_in(b, s, fixed, level)?;
             if closed_equal(s, &a, &b) {
                 Ok(a)
             } else {
@@ -372,8 +505,46 @@ impl Checker<'_> {
                 }
             })
             .collect();
+        self.reads
+            .pending_sites
+            .resize(self.p.modules.len(), Vec::new());
+        self.reads
+            .pending_patterns
+            .resize(self.p.modules.len(), Vec::new());
+        for (i, site) in self.p.of_sites.iter().enumerate() {
+            let ValueRef::Def(d) = site.value else {
+                continue;
+            };
+            self.reads
+                .source_sites
+                .entry(d)
+                .or_default()
+                .push(OfId(i as u32));
+            if site.permanent
+                && site.projection.is_none()
+                && (d.module != site.module
+                    || !matches!(self.p.def(d).kind, DefKind::Binding { .. }))
+            {
+                self.reads.pending_sites[site.module.0 as usize].push(OfId(i as u32));
+            }
+        }
+        for (i, pattern) in self.p.alias_patterns.iter().enumerate() {
+            if let TypeKind::Of {
+                value: ValueRef::Def(d),
+                ..
+            } = pattern.source.kind
+            {
+                let id = ProjectionId(i as u32);
+                self.reads.source_patterns.entry(d).or_default().push(id);
+                if d.module != pattern.module
+                    || !matches!(self.p.def(d).kind, DefKind::Binding { .. })
+                {
+                    self.reads.pending_patterns[pattern.module.0 as usize].push(id);
+                }
+            }
+        }
         for site in &self.p.failed_reads {
-            self.reads.sites.insert(*site, Read::Failed);
+            self.reads.set(*site, Read::Failed);
         }
         for (id, scheme) in &self.defs {
             if !self.reads.sources.contains(id) {
@@ -463,13 +634,14 @@ impl Checker<'_> {
                 .filter(|(i, a)| {
                     a.module == d.module && self.out.alias_types.contains_key(&TypeId(*i as u32))
                 })
-                .filter(|(_, a)| {
+                .filter(|(i, a)| {
                     let TypeBody::Alias(t) = &a.body else {
                         return false;
                     };
-                    let mut sources = Vec::new();
-                    crate::order::type_sources(self.p, t, &mut Default::default(), &mut sources);
-                    sources.iter().any(|(_, value)| *value == ValueRef::Def(d))
+                    let _ = t;
+                    self.p.alias_sources[*i]
+                        .iter()
+                        .any(|site| self.p.of_sites[site.0 as usize].value == ValueRef::Def(d))
                 })
                 .map(|(_, a)| a)
                 .collect::<Vec<_>>();
@@ -508,14 +680,28 @@ impl Checker<'_> {
         }
         self.set_module(info.module);
         self.error(c, info.span, message);
-        self.reads.sites.insert(site, Read::Failed);
+        self.reads.set(site, Read::Failed);
     }
 
     pub(super) fn begin_reads(&mut self, group: &[BindingRef]) {
         self.reads.boundary = self.s.vars.len();
         self.reads.error_start = self.diags.len();
-        if self.p.of_sites.iter().any(|site| site.permanent && matches!(site.value, ValueRef::Def(d) if group.iter().any(|b| b.module == d.module && self.p.binding(*b).defs.contains(&d)))) {
-            self.s.observation = Some((self.s.vars.len(), self.reads.fixed.keys().copied().collect(), Default::default()));
+        if group
+            .iter()
+            .flat_map(|b| &self.p.binding(*b).defs)
+            .any(|d| {
+                self.reads.source_sites.get(d).is_some_and(|sites| {
+                    sites
+                        .iter()
+                        .any(|site| self.p.of_sites[site.0 as usize].module == d.module)
+                })
+            })
+        {
+            self.s.observation = Some((
+                self.s.vars.len(),
+                self.reads.fixed.keys().copied().collect(),
+                Default::default(),
+            ));
         }
     }
 
@@ -538,11 +724,34 @@ impl Checker<'_> {
         if !defs.iter().any(|d| self.reads.sources.contains(d)) {
             return;
         }
+        let mut sites = defs
+            .iter()
+            .flat_map(|d| {
+                self.reads
+                    .source_sites
+                    .get(d)
+                    .into_iter()
+                    .flatten()
+                    .copied()
+            })
+            .collect::<Vec<_>>();
+        let mut pattern_ids = defs
+            .iter()
+            .flat_map(|d| {
+                self.reads
+                    .source_patterns
+                    .get(d)
+                    .into_iter()
+                    .flatten()
+                    .copied()
+            })
+            .collect::<Vec<_>>();
+
+        sites.sort_by_key(|id| id.0);
+        pattern_ids.sort_by_key(|id| id.0);
         if failed {
-            for (i, site) in self.p.of_sites.iter().enumerate() {
-                if matches!(site.value,ValueRef::Def(d) if defs.contains(&d)) {
-                    self.reads.sites.insert(OfId(i as u32), Read::Failed);
-                }
+            for site in &sites {
+                self.reads.set(*site, Read::Failed);
             }
             for d in &defs {
                 self.reads
@@ -553,7 +762,9 @@ impl Checker<'_> {
             return;
         }
         let completion_start = self.diags.len();
-        let has_demands=self.p.of_sites.iter().any(|site|site.permanent && matches!(site.value,ValueRef::Def(d) if d.module==site.module && defs.contains(&d)));
+        let has_demands = sites
+            .iter()
+            .any(|site| self.p.of_sites[site.0 as usize].module == group[0].module);
         if !has_demands {
             for d in defs {
                 if !self.reads.sources.contains(&d) {
@@ -572,11 +783,12 @@ impl Checker<'_> {
         let snapshot = self.s.clone();
         let fixed = self.reads.fixed.clone();
         let mut equations = HashMap::new();
+        let mut origins = HashMap::new();
         let mut shapes = Vec::new();
         let mut results = Vec::new();
         let mut patterns = Vec::new();
-        for (i, pattern) in self.p.alias_patterns.iter().enumerate() {
-            let pid = ProjectionId(i as u32);
+        for pid in pattern_ids {
+            let pattern = &self.p.alias_patterns[pid.0 as usize];
             if self.reads.patterns.contains(&pid) {
                 continue;
             }
@@ -617,6 +829,15 @@ impl Checker<'_> {
             };
             match result {
                 Ok(()) => {
+                    for v in closure
+                        .equations
+                        .keys()
+                        .chain(closure.shapes.iter().map(|(v, _)| v))
+                    {
+                        origins
+                            .entry(*v)
+                            .or_insert((pattern.module, self.p.of_sites[site.0 as usize].span));
+                    }
                     equations.extend(closure.equations);
                     shapes.extend(closure.shapes);
                     patterns.push((pid, aliases, site));
@@ -627,9 +848,9 @@ impl Checker<'_> {
                 }
             }
         }
-        for (i, info) in self.p.of_sites.iter().enumerate() {
-            let id = OfId(i as u32);
-            if !info.permanent || info.projection.is_some() || self.reads.sites.contains_key(&id) {
+        for id in sites {
+            let info = &self.p.of_sites[id.0 as usize];
+            if info.projection.is_some() || self.reads.sites.contains_key(&id) {
                 continue;
             }
             let ValueRef::Def(d) = info.value else {
@@ -645,41 +866,42 @@ impl Checker<'_> {
                 Closure::new(&snapshot, &fixed, self.reads.boundary, scheme.level, open);
             let result = if failed {
                 Err(code::VALUE_TYPE_NOT_FIXED)
-            } else {
+            } else if info.permanent {
                 closure.close(&scheme.ty)
+            } else {
+                closure.annotation(&scheme.ty)
             };
             match result {
                 Ok(t) => {
+                    for v in closure
+                        .equations
+                        .keys()
+                        .chain(closure.shapes.iter().map(|(v, _)| v))
+                    {
+                        origins.entry(*v).or_insert((info.module, info.span));
+                    }
                     equations.extend(closure.equations);
+                    shapes.extend(closure.shapes);
                     results.push((id, t));
                 }
                 Err(c) => self.read_error(id, c),
             }
         }
         let mut staged_fixed = fixed.clone();
-        let provenance = self
-            .p
-            .of_sites
-            .iter()
-            .find(|site| {
-                matches!(site.value, ValueRef::Def(d) if d.module == site.module && defs.contains(&d)) && site.permanent
-            })
-            .map(|site| (site.module, site.span));
-        if let Some((module, span)) = provenance {
-            for (v, ty) in &equations {
-                staged_fixed.insert(
-                    *v,
-                    Fixed {
-                        ty: ty.clone(),
-                        module,
-                        span,
-                    },
-                );
-            }
-            for (v, t) in &shapes {
-                if let Ok(t) = completed(t, &snapshot, &staged_fixed, u32::MAX) {
-                    equations.entry(*v).or_insert(t);
-                }
+        for (v, ty) in &equations {
+            let (module, span) = origins[v];
+            staged_fixed.insert(
+                *v,
+                Fixed {
+                    ty: ty.clone(),
+                    module,
+                    span,
+                },
+            );
+        }
+        for (v, t) in &shapes {
+            if let Ok(t) = completed(t, &snapshot, &staged_fixed, u32::MAX) {
+                equations.entry(*v).or_insert(t);
             }
         }
         let trial = if self.diags[completion_start..].iter().any(|d| d.is_error()) {
@@ -690,7 +912,9 @@ impl Checker<'_> {
         if let Some(trial) = trial {
             self.s = trial;
             for (site, t) in results {
-                self.reads.sites.insert(site, Read::Ready(t));
+                if self.p.of_sites[site.0 as usize].permanent {
+                    self.reads.set(site, Read::Ready(t));
+                }
             }
             for (pid, aliases, site) in patterns {
                 for (id, t) in aliases {
@@ -699,23 +923,28 @@ impl Checker<'_> {
                         ..
                     }) = self.p.ty(id).body
                     {
-                        self.reads.sites.insert(site, Read::Ready(t));
+                        self.reads.set(site, Read::Ready(t));
                     }
                 }
-                self.reads.sites.insert(site, Read::Projected);
+                self.reads.set(site, Read::Projected);
                 self.reads.patterns.insert(pid);
             }
-            if let Some((module, span)) = provenance {
-                for (v, ty) in equations {
-                    self.reads.fixed.insert(v, Fixed { ty, module, span });
-                }
+            for (v, ty) in equations {
+                let (module, span) = origins[&v];
+                self.reads
+                    .fixed
+                    .entry(v)
+                    .or_insert(Fixed { ty, module, span });
             }
             // A shape may become wholly closed in this same batch. Record it
             // only when every original argument is already fixed.
             for (v, t) in shapes {
                 if let Ok(ty) = completed(&t, &self.s, &self.reads.fixed, u32::MAX) {
-                    let (module, span) = provenance.unwrap();
-                    self.reads.fixed.insert(v, Fixed { ty, module, span });
+                    let (module, span) = origins[&v];
+                    self.reads
+                        .fixed
+                        .entry(v)
+                        .or_insert(Fixed { ty, module, span });
                 }
             }
         } else {
@@ -747,7 +976,7 @@ impl Checker<'_> {
                 ..
             }) = self.p.ty(*id).body
             {
-                self.reads.sites.insert(site, Read::Failed);
+                self.reads.set(site, Read::Failed);
             }
         }
     }
@@ -758,30 +987,29 @@ impl Checker<'_> {
         }
         // Imported reads are observations of completed closed definitions.
         let active_module = self.module;
-        for (i, info) in self.p.of_sites.iter().enumerate() {
-            let site = OfId(i as u32);
-            if info.module != active_module
-                || !info.permanent
-                || info.projection.is_some()
-                || self.reads.sites.contains_key(&site)
-            {
+        let sites = std::mem::take(&mut self.reads.pending_sites[active_module.0 as usize]);
+        for site in sites {
+            let info = &self.p.of_sites[site.0 as usize];
+            if self.reads.sites.contains_key(&site) {
                 continue;
             }
             let ValueRef::Def(d) = info.value else {
                 continue;
             };
             let Some(result) = self.reads.completed.get(&d).cloned() else {
+                self.reads.pending_sites[active_module.0 as usize].push(site);
                 continue;
             };
             match result {
                 Ok(t) => {
-                    self.reads.sites.insert(site, Read::Ready(t));
+                    self.reads.set(site, Read::Ready(t));
                 }
                 Err(c) => self.read_error(site, c),
             }
         }
-        for (i, pattern) in self.p.alias_patterns.iter().enumerate() {
-            let pid = ProjectionId(i as u32);
+        let patterns = std::mem::take(&mut self.reads.pending_patterns[active_module.0 as usize]);
+        for pid in patterns {
+            let pattern = &self.p.alias_patterns[pid.0 as usize];
             if pattern.module != active_module || self.reads.patterns.contains(&pid) {
                 continue;
             }
@@ -800,6 +1028,7 @@ impl Checker<'_> {
                 continue;
             };
             let Some(result) = self.reads.completed.get(&d).cloned() else {
+                self.reads.pending_patterns[active_module.0 as usize].push(pid);
                 continue;
             };
             match result {
@@ -826,7 +1055,7 @@ impl Checker<'_> {
                                     ..
                                 }) = self.p.ty(id).body
                                 {
-                                    self.reads.sites.insert(site, Read::Ready(t));
+                                    self.reads.set(site, Read::Ready(t));
                                 }
                             }
                             self.reads.patterns.insert(pid);
@@ -892,7 +1121,25 @@ impl Checker<'_> {
                     .collect();
                 let mut used = HashSet::new();
                 let expanded = expand_pattern(t, &map, &mut used)?;
-                let r = self.match_type_pattern(&expanded, source, c, aliases, seen);
+                let r = if let TypePattern::Exact(t) = &expanded {
+                    let expected = self.closed_written(t, &HashMap::new(), &mut HashSet::new())?;
+                    let got = c.expose(source)?;
+                    match (&expected, &got) {
+                        (Ty::Con(h, xs), Ty::Con(k, ys)) if h == k && xs.len() == ys.len() => {
+                            let mut result = Ok(());
+                            for (x, y) in xs.iter().zip(ys) {
+                                if !closed_equal(c.s, x, &c.close(y)?) {
+                                    result = Err(code::TYPE_PATTERN_MISMATCH);
+                                    break;
+                                }
+                            }
+                            result
+                        }
+                        _ => Err(code::TYPE_PATTERN_MISMATCH),
+                    }
+                } else {
+                    self.match_type_pattern(&expanded, source, c, aliases, seen)
+                };
                 seen.remove(id);
                 r
             }
@@ -941,6 +1188,15 @@ impl Checker<'_> {
                 if let TypeRef::Custom(id) = ty
                     && let TypeBody::Alias(body) = &self.p.ty(*id).body
                 {
+                    if let Some(template) = self.reads.templates.get(id) {
+                        if template.params != template.slots {
+                            return Err(code::TYPE_PATTERN_FORM);
+                        }
+                        return normalize_closed(
+                            &self.s,
+                            template.apply(parts, || unreachable!("closed head has no holes")),
+                        );
+                    }
                     if !seen.insert(*id) {
                         return Err(code::ALIAS_CIRCLE);
                     }
@@ -1122,103 +1378,7 @@ fn fixed_scheme(
 }
 
 impl Checker<'_> {
-    fn alias_dependencies_ready(
-        &self,
-        t: &Type,
-        owner: TypeId,
-        seen: &mut HashSet<TypeId>,
-    ) -> Option<bool> {
-        let mut state = Some(false);
-        walk_type(t, &mut |t| {
-            let next = match &t.kind {
-                TypeKind::Of { site, .. } => self
-                    .reads
-                    .sites
-                    .get(site)
-                    .map(|r| matches!(r, Read::Failed)),
-                TypeKind::Named {
-                    ty: TypeRef::Custom(id),
-                    ..
-                } if *id != owner && seen.insert(*id) => {
-                    if let TypeBody::Alias(body) = &self.p.ty(*id).body {
-                        if value_dependent(self.p, body) {
-                            self.reads.aliases.get(id).map(|r| r.is_none())
-                        } else {
-                            self.alias_dependencies_ready(body, owner, seen)
-                        }
-                    } else {
-                        Some(false)
-                    }
-                }
-                _ => Some(false),
-            };
-            state = match (state, next) {
-                (Some(a), Some(b)) => Some(a || b),
-                _ => None,
-            };
-        });
-        state
-    }
-
-    fn assemble_aliases(&mut self) {
-        loop {
-            let mut progress = false;
-            for (i, def) in self.p.types.iter().enumerate() {
-                let id = TypeId(i as u32);
-                let TypeBody::Alias(body) = &def.body else {
-                    continue;
-                };
-                if self.reads.aliases.contains_key(&id) || !value_dependent(self.p, body) {
-                    continue;
-                }
-                let Some(failed) = self.alias_dependencies_ready(body, id, &mut HashSet::new())
-                else {
-                    continue;
-                };
-                progress = true;
-                if failed {
-                    self.reads.aliases.insert(id, None);
-                    continue;
-                }
-                self.set_module(def.module);
-                let map = def
-                    .params
-                    .iter()
-                    .map(|(n, v)| (*v, ShownType::Var(n.clone())))
-                    .collect();
-                if let Some(shown) = self.alias_shown(body, &map, &mut HashSet::new()) {
-                    if def.exported {
-                        let mut private = Vec::new();
-                        self.shown_hidden(&shown, def.module, &mut private);
-                        for name in private {
-                            self.error(
-                                code::EXPORT_HIDDEN_TYPE,
-                                def.span,
-                                format!(
-                                    "the exported alias `{}` exposes private type `{name}`",
-                                    def.name
-                                ),
-                            );
-                        }
-                    }
-                    self.out.alias_types.insert(id, shown);
-                    self.reads.aliases.insert(id, Some(()));
-                } else {
-                    self.error(
-                        code::VALUE_TYPE_NOT_FIXED,
-                        def.span,
-                        "the value-dependent alias did not complete to a closed body",
-                    );
-                    self.reads.aliases.insert(id, None);
-                }
-            }
-            if !progress {
-                break;
-            }
-        }
-    }
-
-    fn shown_hidden(&self, t: &ShownType, module: ModuleId, out: &mut Vec<String>) {
+    pub(super) fn shown_hidden(&self, t: &ShownType, module: ModuleId, out: &mut Vec<String>) {
         let mut refs = Vec::new();
         t.type_refs(&mut refs);
         for ty in refs {
@@ -1229,123 +1389,6 @@ impl Checker<'_> {
                 }
             }
         }
-    }
-
-    fn alias_shown(
-        &self,
-        t: &Type,
-        map: &HashMap<TyVarId, ShownType>,
-        seen: &mut HashSet<TypeId>,
-    ) -> Option<ShownType> {
-        Some(match &t.kind {
-            TypeKind::Of { site, .. } => {
-                let Read::Ready(t) = self.reads.sites.get(site)? else {
-                    return None;
-                };
-                if contains_var(t) {
-                    return None;
-                }
-                super::display::tree(t, &mut |_| unreachable!("closed read contains a variable"))
-            }
-            TypeKind::Var(v) => map.get(v)?.clone(),
-            TypeKind::Hole => ShownType::Hole,
-            TypeKind::Error => return None,
-            TypeKind::Named { ty, args } => {
-                let args = args
-                    .iter()
-                    .map(|t| self.alias_shown(t, map, seen))
-                    .collect::<Option<Vec<_>>>()?;
-                if let TypeRef::Custom(id) = ty
-                    && let TypeBody::Alias(body) = &self.p.ty(*id).body
-                {
-                    if !seen.insert(*id) {
-                        return None;
-                    }
-                    let map = self
-                        .p
-                        .ty(*id)
-                        .params
-                        .iter()
-                        .map(|(_, v)| *v)
-                        .zip(args)
-                        .collect();
-                    let shown = self.alias_shown(body, &map, seen);
-                    seen.remove(id);
-                    return shown;
-                }
-                if *ty == TypeRef::Builtin(BuiltinType::Never) {
-                    ShownType::Never
-                } else {
-                    ShownType::Named(*ty, args)
-                }
-            }
-            TypeKind::Tuple(ts) => ShownType::Tuple(
-                ts.iter()
-                    .map(|t| self.alias_shown(t, map, seen))
-                    .collect::<Option<_>>()?,
-            ),
-            TypeKind::Union(ts) => ShownType::Union(
-                ts.iter()
-                    .map(|t| self.alias_shown(t, map, seen))
-                    .collect::<Option<_>>()?,
-            ),
-            TypeKind::Inter(ts) => ShownType::Inter(
-                ts.iter()
-                    .map(|t| self.alias_shown(t, map, seen))
-                    .collect::<Option<_>>()?,
-            ),
-            TypeKind::Diff(ts) => {
-                let mut iter = ts.iter();
-                let first = self.alias_shown(iter.next()?, map, seen)?;
-                ShownType::Diff(
-                    Box::new(first),
-                    iter.map(|t| self.alias_shown(t, map, seen))
-                        .collect::<Option<_>>()?,
-                )
-            }
-            TypeKind::Fn {
-                params,
-                ret,
-                err,
-                env,
-            } => ShownType::Fn(Box::new(ShownFn {
-                params: params
-                    .iter()
-                    .map(|p| {
-                        Some((
-                            p.label.as_ref().map(|n| n.name.clone()),
-                            self.alias_shown(&p.ty, map, seen)?,
-                        ))
-                    })
-                    .collect::<Option<_>>()?,
-                ret: self.alias_shown(ret, map, seen)?,
-                err: match err {
-                    Some(t) => Some(self.alias_shown(t, map, seen)?),
-                    None => None,
-                },
-                env: match env {
-                    Some(t) => Some(self.alias_shown(t, map, seen)?),
-                    None => None,
-                },
-            })),
-        })
-    }
-
-    pub(super) fn instantiate_alias(&mut self, id: TypeId, args: Vec<Ty>) -> Ty {
-        if !matches!(self.reads.aliases.get(&id), Some(Some(()))) {
-            if !self.recovery && !self.reads.aliases.contains_key(&id) {
-                panic!("pending value-dependent alias {id:?}");
-            }
-            return Ty::Never;
-        }
-        let def = self.p.ty(id);
-        let TypeBody::Alias(body) = &def.body else {
-            unreachable!()
-        };
-        let map = def.params.iter().map(|(_, v)| *v).zip(args).collect();
-        // Only written formals and holes are instantiated here. Every Of
-        // reads its immutable completed site result, never its source again.
-        self.conv(body, &map)
     }
 }
 
@@ -1428,6 +1471,9 @@ impl Checker<'_> {
                     if let TypeRef::Custom(id) = ty
                         && let TypeBody::Alias(body) = &c.p.ty(*id).body
                     {
+                        if let Some(ty) = c.raw_alias(*id, args.clone()) {
+                            return ty;
+                        }
                         if !seen.insert(*id) {
                             return Ty::Never;
                         }
@@ -1539,7 +1585,14 @@ fn checked_batch(
         trial.constrain(t, &Ty::Var(*v));
     }
     for (v, t) in shapes {
-        trial.constrain(&Ty::Var(*v), t);
+        let t = super::alias::map_vars(t, &mut |w| {
+            equations
+                .get(&w)
+                .or_else(|| fixed.get(&w).map(|f| &f.ty))
+                .cloned()
+                .unwrap_or(Ty::Var(w))
+        });
+        trial.constrain_observed(&Ty::Var(*v), &t);
     }
     let roots = equations
         .keys()
@@ -1695,6 +1748,44 @@ mod tests {
         s.constrain(&int(), &Ty::Var(old));
         let mut c = Closure::new(&s, &fixed, s.vars.len(), u32::MAX, false);
         assert_eq!(c.close(&Ty::Var(old)), Err(code::VALUE_TYPE_NOT_FIXED));
+    }
+    #[test]
+    fn normalized_same_head_bounds_retain_each_original_argument() {
+        // P4: match the one normalized member; R5: skips keep live variables.
+        let mut s = solver();
+        let root = s.fresh_at(0);
+        let left = s.fresh_at(0);
+        let right = s.fresh_at(0);
+        for part in [left, right] {
+            s.constrain(&int(), &Ty::Var(part));
+            s.constrain(
+                &Ty::tuple(vec![Ty::Var(part), Ty::Var(part)]),
+                &Ty::Var(root),
+            );
+        }
+        let fixed = HashMap::new();
+        let before = s.clone();
+        let mut c = Closure::new(&s, &fixed, 0, u32::MAX, false);
+        let exposed = c.expose(&Ty::Var(root)).unwrap();
+        let Ty::Con(Head::Tuple(2), parts) = exposed else {
+            panic!("tuple required")
+        };
+        for part in &parts {
+            let mut vars = HashSet::new();
+            super::super::alias::map_vars(part, &mut |v| {
+                vars.insert(v);
+                Ty::Var(v)
+            });
+            assert_eq!(vars, HashSet::from([left, right]));
+        }
+        assert_eq!(s, before);
+        let mut skipped = checked_batch(&s, &c.equations, &c.shapes, 0, &fixed).unwrap();
+        skipped.constrain(&string(), &Ty::Var(right));
+        assert!(skipped.failures.is_empty());
+        assert_eq!(c.close(&parts[0]), Ok(int()));
+        let mut demanded = checked_batch(&s, &c.equations, &c.shapes, 0, &fixed).unwrap();
+        demanded.constrain(&string(), &Ty::Var(right));
+        assert!(!demanded.failures.is_empty());
     }
     #[test]
     fn shape_checks_keep_skipped_identities_and_observe_earlier_links() {

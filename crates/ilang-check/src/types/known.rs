@@ -120,6 +120,9 @@ impl Checker<'_> {
                 if let TypeRef::Custom(id) = ty
                     && let TypeBody::Alias(body) = &self.p.ty(*id).body
                 {
+                    if let Some(ty) = self.known_alias(*id, args.clone()) {
+                        return ty;
+                    }
                     let map = self
                         .p
                         .ty(*id)

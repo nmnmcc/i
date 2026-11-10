@@ -161,6 +161,7 @@ impl<'a> Checker<'a> {
 
     pub fn run(mut self) -> (Typed, Vec<Diagnostic>) {
         let p = self.p;
+        self.prepare_aliases();
         // Declarations have their written types (§10.1), generalized.
         for (mi, m) in p.modules.iter().enumerate() {
             self.set_module(ModuleId(mi as u32));
@@ -910,7 +911,7 @@ impl<'a> Checker<'a> {
                 if let TypeRef::Custom(id) = ty
                     && let TypeBody::Alias(body) = &self.p.ty(*id).body
                 {
-                    if value_dependent(self.p, body) {
+                    if self.reads.templates.contains_key(id) || value_dependent(self.p, body) {
                         let args = args.iter().map(|a| self.conv(a, local)).collect();
                         return self.instantiate_alias(*id, args);
                     }

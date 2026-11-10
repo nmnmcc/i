@@ -604,8 +604,8 @@ impl<'a> Query<'a> {
             if pattern.module != m {
                 continue;
             }
-            if let TypePattern::Named(head, _) = pattern.pattern {
-                w.occ.push((pattern.head_span, Target::Type(head)));
+            for (span, head) in &pattern.heads {
+                w.occ.push((*span, Target::Type(*head)));
             }
             w.ty(&pattern.source);
         }

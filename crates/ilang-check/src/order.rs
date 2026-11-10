@@ -283,7 +283,6 @@ struct TypeRead {
     site: OfId,
     reader: BindingRef,
     annotation: ilang_syntax::span::Span,
-    aliases: Vec<TypeId>,
 }
 
 /// Value-type edges order already computed expression SCCs. They never
@@ -322,8 +321,8 @@ fn type_order(
             }
             binding_types(&p.binding(*b).binding, &mut |t| {
                 let mut sources = Vec::new();
-                type_paths(p, t, &mut BTreeSet::new(), &mut Vec::new(), &mut sources);
-                for (site, source, aliases) in sources {
+                type_sources(p, t, &mut BTreeSet::new(), &mut sources);
+                for (site, source) in sources {
                     let ValueRef::Def(d) = source else { continue };
                     let DefKind::Binding { binding, .. } = p.def(d).kind else {
                         continue;
@@ -342,7 +341,6 @@ fn type_order(
                             site,
                             reader: *b,
                             annotation: t.span,
-                            aliases,
                         }),
                     );
                 }
@@ -400,12 +398,24 @@ fn type_order(
                         })
                         .collect::<Vec<_>>()
                         .join(" -> ");
-                    let via = if read.aliases.is_empty() {
+                    let mut aliases = Vec::new();
+                    binding_types(&p.binding(read.reader).binding, &mut |t| {
+                        if t.span == read.annotation {
+                            let mut paths = Vec::new();
+                            type_paths(p, t, &mut BTreeSet::new(), &mut Vec::new(), &mut paths);
+                            if let Some((_, _, path)) =
+                                paths.into_iter().find(|(site, _, _)| *site == read.site)
+                            {
+                                aliases = path;
+                            }
+                        }
+                    });
+                    let via = if aliases.is_empty() {
                         String::new()
                     } else {
                         format!(
                             " through {}",
-                            read.aliases
+                            aliases
                                 .iter()
                                 .map(|id| p.ty(*id).name.as_str())
                                 .collect::<Vec<_>>()
@@ -420,16 +430,13 @@ fn type_order(
     }
     // O4: failed components poison their dependents without another error.
     // Keep the expression SCCs intact; only recovery readiness is propagated.
-    loop {
-        let dependents = (0..groups.len())
-            .filter(|i| {
-                !bad.contains(i) && graph.neighbors(nodes[*i]).any(|n| bad.contains(&graph[n]))
-            })
-            .collect::<Vec<_>>();
-        if dependents.is_empty() {
-            break;
+    let mut pending = std::collections::VecDeque::from_iter(bad.iter().copied());
+    while let Some(i) = pending.pop_front() {
+        for n in graph.neighbors_directed(nodes[i], petgraph::Direction::Incoming) {
+            if bad.insert(graph[n]) {
+                pending.push_back(graph[n]);
+            }
         }
-        bad.extend(dependents);
     }
     for i in &bad {
         p.failed_type_groups.extend(groups[*i].iter().copied());
@@ -451,22 +458,36 @@ fn type_order(
             p.failed_reads.insert(OfId(i as u32));
         }
     }
-    let mut done = BTreeSet::new();
+    let mut remaining = (0..groups.len())
+        .map(|i| {
+            if bad.contains(&i) {
+                0
+            } else {
+                graph.neighbors(nodes[i]).count()
+            }
+        })
+        .collect::<Vec<_>>();
+    let mut ready = (0..groups.len())
+        .filter(|i| remaining[*i] == 0)
+        .collect::<BTreeSet<_>>();
     let mut out = Vec::new();
-    while done.len() < groups.len() {
-        let ready = (0..groups.len())
-            .filter(|i| {
-                !done.contains(i)
-                    && (bad.contains(i)
-                        || graph.neighbors(nodes[*i]).all(|n| done.contains(&graph[n])))
-            })
-            .collect::<Vec<_>>();
-        let next = if reverse { ready.last() } else { ready.first() }
-            .copied()
-            .unwrap_or_else(|| (0..groups.len()).find(|i| !done.contains(i)).unwrap());
-        done.insert(next);
+    while let Some(next) = if reverse {
+        ready.pop_last()
+    } else {
+        ready.pop_first()
+    } {
         out.push(groups[next].clone());
+        for n in graph.neighbors_directed(nodes[next], petgraph::Direction::Incoming) {
+            let i = graph[n];
+            if remaining[i] > 0 {
+                remaining[i] -= 1;
+                if remaining[i] == 0 {
+                    ready.insert(i);
+                }
+            }
+        }
     }
+    debug_assert_eq!(out.len(), groups.len());
     out
 }
 
@@ -477,9 +498,22 @@ pub(crate) fn type_sources(
     seen: &mut BTreeSet<TypeId>,
     out: &mut Vec<(OfId, ValueRef)>,
 ) {
-    let mut paths = Vec::new();
-    type_paths(p, t, seen, &mut Vec::new(), &mut paths);
-    out.extend(paths.into_iter().map(|(site, value, _)| (site, value)));
+    walk_type(t, &mut |t| match &t.kind {
+        TypeKind::Of { site, value, .. } => out.push((*site, *value)),
+        TypeKind::Named {
+            ty: TypeRef::Custom(id),
+            ..
+        } if seen.insert(*id) => {
+            if let Some(sites) = p.alias_sources.get(id.0 as usize) {
+                out.extend(
+                    sites
+                        .iter()
+                        .map(|site| (*site, p.of_sites[site.0 as usize].value)),
+                );
+            }
+        }
+        _ => {}
+    });
 }
 
 fn type_paths(

@@ -779,3 +779,202 @@ fn dependency_diagnostics_keep_reader_span_alias_chain_and_return_path() {
     assert!(d.message.contains("through Alias"), "{}", d.message);
     assert!(d.message.contains("a -> b -> a"), "{}", d.message);
 }
+
+#[test]
+fn independent_review_reproducers() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/value_type_review");
+    let cases = std::fs::read_to_string(root.join("cases.tsv")).unwrap();
+    for case in cases.lines() {
+        let (name, wanted) = case.split_once('\t').unwrap();
+        let (g, ds) = ilang_package::load_with(
+            &root.join(name),
+            &ilang_package::LoadOptions {
+                write_lock: false,
+                offline: true,
+                ..Default::default()
+            },
+        );
+        assert!(!ds.iter().any(Diagnostic::is_error), "{name}: {:?}", ds);
+        let c = check(&g);
+        if wanted.is_empty() {
+            assert!(
+                !c.diags.iter().any(Diagnostic::is_error),
+                "{name}: {:?}",
+                g.sources.render_all(&c.diags)
+            );
+        } else {
+            for code in wanted.split(',') {
+                assert!(
+                    c.diags.iter().any(|d| d.code == code),
+                    "{name}: {:?}",
+                    g.sources.render_all(&c.diags)
+                );
+            }
+        }
+        if name == "same_type_explicit" {
+            assert_eq!(alias(&c, "Item"), "Int");
+        }
+        if name == "fix_location" {
+            let d = c
+                .diags
+                .iter()
+                .find(|d| d.code == code::TYPE_MISMATCH)
+                .unwrap();
+            assert!(d.message.contains("review/main:6:"), "{}", d.message);
+        }
+        let q = query::check_for_queries(&g);
+        assert!(q.program.is_some(), "{name}");
+    }
+}
+
+#[test]
+fn normalized_shapes_preserve_skips_and_nested_heads() {
+    let (_, c) = good(
+        "Box(A) {Box(A)}\nleft: Int = 1\nright: Int = 2\nv = True |> {True -> Box(left) False -> Box(right)}\nBox(Item) = v",
+    );
+    assert_eq!(alias(&c, "Item"), "Int");
+    let (_, c) = good(
+        "Outer(A) {Outer(A)}\nBox(A) {Box(A)}\nleft: Int = 1\nright: Int = 2\nv = True |> {True -> Outer(Box(left)) False -> Outer(Box(right))}\nOuter(Box(Item)) = v",
+    );
+    assert_eq!(alias(&c, "Item"), "Int");
+    good(
+        "Cell(A) {Cell(get:()->A,set:(A)->Nil)}\ncell(A)=(x:A){Cell(get:(){x},set:(y:A){Nil})}\nput(A)=(c:Cell(A),x:A){c.set(x)}\nPair(A,B)=(A,B)\npack(A)=(a:Cell(A),b:Bool){(a,b |> {True -> (1,a) False -> (2,a)})}\n(a,v)=pack(cell(1),True)\nPair(Item,_) = v\nlater=(){put(a,\"s\")}",
+    );
+}
+
+#[test]
+fn cached_templates_preserve_hole_sharing_and_deferred_constraints() {
+    let prefix = "Cell(A){Cell(get:()->A,set:(A)->Nil)}\nci:Cell(Int)=Cell(get:(){1},set:(x:Int){Nil})\ncs:Cell(String)=Cell(get:(){\"s\"},set:(x:String){Nil})\nport:Int=1\nDuo(A)=(Cell(A),Cell(A))\nT=(Duo(_),port)\n";
+    bad(&[prefix, "a:T=((ci,cs),2)"].concat(), code::TYPE_MISMATCH);
+    good(&[prefix, "a:T=((ci,ci),3)\nb:T=((cs,cs),4)"].concat());
+    bad(
+        "Cell(A){Cell(get:()->A,set:(A)->Nil)}\nport: Int=1\nT(A)=Cell(A)|Cell(port)\nf=(x:T(String)){x}",
+        code::TYPE_INVARIANT,
+    );
+}
+
+#[test]
+fn nested_pattern_heads_have_hover_and_definition_targets() {
+    let src = "Pair(A,B)=(A,B)\nBox(A){Box(A)}\nv=(Box(1),\"s\")\nPair(Box(Item),_)=v\nx:Item=2";
+    let (g, c) = good(src);
+    let p = c.program.as_ref().unwrap();
+    let m = common::module(p, "app/main");
+    let q = query::Query::new(&g, p, c.types.as_ref());
+    let pos = src.find("Box(Item)").unwrap() as u32;
+    let hover = q.type_at(m, pos).unwrap();
+    assert!(hover.code.contains("Box"));
+    let target = q.definition_at(m, pos).unwrap();
+    assert_eq!(target.span.start as usize, src.find("Box(A)").unwrap());
+    for bad_src in [
+        src.replace("v=(Box(1),\"s\")", "v=1"),
+        src.replace("=v\nx:Item", "=missing\nx:Item"),
+    ] {
+        let (g, _) = checked(&[("src/main.i", &bad_src)]);
+        let c = query::check_for_queries(&g);
+        let p = c.program.as_ref().unwrap();
+        let q = query::Query::new(&g, p, c.types.as_ref());
+        let m = common::module(p, "app/main");
+        let pos = bad_src.find("Box(Item)").unwrap() as u32;
+        assert!(q.type_at(m, pos).unwrap().code.contains("Box"));
+        assert_eq!(
+            q.definition_at(m, pos).unwrap().span.start as usize,
+            bad_src.find("Box(A)").unwrap()
+        );
+    }
+}
+
+#[test]
+fn annotation_demands_fix_weak_sources_and_keep_generalized_instances() {
+    good("id=(x){x}\nv=id(1)\nx:v=2");
+    bad("id=(x){x}\nv=id(1)\nx:v=\"s\"", code::TYPE_MISMATCH);
+    good("id=(x){x}\nx:id=(n:Int){n}\ny:id=(s:String){s}");
+    recovery_order_invariant(&[("src/main.i", "id=(x){x}\nv=id(1)\nx:v=2")]);
+}
+
+#[test]
+fn review_declaration_permutations_are_identical() {
+    let mut items = [
+        "v: Int = 1",
+        "Pair(A,B)=(A,B)",
+        "parts:(Int,String)=(1,\"s\")",
+        "Pair(Left,Right)=parts",
+        "result:(v,Left,Right)=(2,3,\"ok\")",
+    ];
+    fn permutations(items: &mut [&str], i: usize, out: &mut Vec<String>) {
+        if i == items.len() {
+            out.push(items.join("\n"));
+            return;
+        }
+        for j in i..items.len() {
+            items.swap(i, j);
+            permutations(items, i + 1, out);
+            items.swap(i, j);
+        }
+    }
+    let mut programs = Vec::new();
+    permutations(&mut items, 0, &mut programs);
+    assert_eq!(programs.len(), 120);
+    let mut expected = None;
+    for src in programs {
+        let (_, c) = good(&src);
+        let p = c.program.as_ref().unwrap();
+        let m = common::module(p, "app/main");
+        let t = c.types.as_ref().unwrap();
+        let schemes = p
+            .module(m)
+            .defs
+            .iter()
+            .enumerate()
+            .map(|(i, d)| {
+                (
+                    d.name.clone(),
+                    t.schemes[&DefId {
+                        module: m,
+                        index: i as u32,
+                    }]
+                        .clone(),
+                )
+            })
+            .collect::<std::collections::BTreeMap<_, _>>();
+        assert_eq!(alias(&c, "Left"), "Int");
+        assert_eq!(alias(&c, "Right"), "String");
+        if let Some(expected) = &expected {
+            assert_eq!(expected, &schemes);
+        } else {
+            expected = Some(schemes);
+        }
+    }
+}
+
+#[test]
+fn qualified_exact_heads_expand_through_named_and_tuple_aliases() {
+    let main = "(app/lib)\nBox(A){Box(A)}\nv:Box(Int)=Box(1)\nBox(lib.Scalar)=v\nw:(Int,String)=(1,\"s\")\nPair(A,B)=(A,B)\nPair(lib.Scalar,lib.Text)=w\np:Box((Int,String))=Box((1,\"s\"))\nBox(lib.Parts)=p";
+    let (g, c) = checked(&[
+        (
+            "src/lib.i",
+            "(Scalar,Text,Parts)\nBase=Int\nScalar=Base\nText=String\nParts=(Int,String)",
+        ),
+        ("src/main.i", main),
+    ]);
+    assert!(
+        !c.diags.iter().any(Diagnostic::is_error),
+        "{:?}",
+        g.sources.render_all(&c.diags)
+    );
+    good("Head(A)=(A,()->Int)\nv:(Int,()->Int)=(1,(){2})\nHead(Item)=v");
+    for body in ["()->Int", "Int|String"] {
+        let lib = ["(Bad)\nBad=", body].concat();
+        let (_, c) = checked(&[
+            ("src/lib.i", &lib),
+            (
+                "src/main.i",
+                "(app/lib)\nBox(A){Box(A)}\nv:Box(Int)=Box(1)\nBox(lib.Bad)=v",
+            ),
+        ]);
+        assert!(
+            c.diags.iter().any(|d| d.code == code::TYPE_PATTERN_FORM),
+            "{:?}",
+            c.diags
+        );
+    }
+}

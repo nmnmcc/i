@@ -1,0 +1,56 @@
+alias_constant_nested	
+alias_no_binder	E0224
+alias_repeated_nested	E0532
+batch_recovery	E0501,E0533
+closed_annotated_fn	
+cycle_alias	E0530
+cycle_mixed	E0530
+duplicate	E0208
+earlier_constraints	E0534
+early_external	E0531
+early_field	E0531
+exact_bad	E0535
+exact_good	
+extra_union	E0535
+fix_location	E0501
+fixed_later	E0501
+fixed_reordered	E0501
+foreign_alias	
+foreign_closed	
+foreign_open	E0533
+foreign_weak	E0534
+generalized_alias	E0533
+generalized_anno	
+invariant_general	E0533
+local_alias_escape	E0534
+mismatch	E0535
+mutual_ok	
+mutual_type	E0530
+nested	
+no_library_rule	
+partial	
+pending	E0536
+pkg_app	
+pkg_client	
+pkg_lib	
+prior_weak	E0534
+privacy	E0227
+qualified_alias_closed	
+qualified_alias_pattern	
+recovery	E0501,E0535
+repeated_formal	E0532
+runtime	
+same_type_bounds	
+same_type_explicit	
+schema	
+shadow	
+shadow_reserved	
+shared_skip	
+unfilled	E0534
+union_annotated	
+union_samehead	
+union_samehead_alias_only	
+union_samehead_direct	
+weak_alias	
+weak_anno	
+whole_ref_normalize	

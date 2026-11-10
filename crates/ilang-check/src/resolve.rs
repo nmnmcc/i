@@ -55,6 +55,7 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
     for m in 0..parsed.len() {
         r.type_defs(ModuleId(m as u32));
     }
+    summarize_aliases(&mut r.p);
     r.alias_circles();
     r.early_types();
     for m in 0..parsed.len() {
@@ -359,6 +360,7 @@ impl<'a> Resolver<'a> {
                         self.collect_pattern_binders(m, part, &attrs, &mut binders);
                     }
                     self.p.alias_patterns.push(AliasPattern {
+                        heads: Vec::new(),
                         head_span: def.name.span,
                         module: m,
                         span: item.span,
@@ -1290,8 +1292,15 @@ impl<'a> Resolver<'a> {
                     .collect();
                 let expanded = projectable_body(body, &map, &mut HashSet::new());
                 let valid = expanded.is_some_and(|p| {
-                    matches!(p, TypePattern::Named(..) | TypePattern::Tuple(_))
-                        && self.projectable_pattern(&p, seen)
+                    let shape = match &p {
+                        TypePattern::Exact(t) => matches!(
+                            self.expand(t).kind,
+                            TypeKind::Named { .. } | TypeKind::Tuple(_)
+                        ),
+                        TypePattern::Named(..) | TypePattern::Tuple(_) => true,
+                        _ => false,
+                    };
+                    shape && self.projectable_pattern(&p, seen)
                 });
                 seen.remove(id);
                 valid
@@ -1611,19 +1620,17 @@ impl<'a> Resolver<'a> {
         let ast::TypeBody::Alias(source) = &def.body else {
             unreachable!()
         };
-        let source = self.ty(source);
-        let TypeKind::Of { value, site, .. } = source.kind else {
-            return;
-        };
-        self.p.of_sites[site.0 as usize].permanent = true;
-        self.p.of_sites[site.0 as usize].projection = Some(pid);
         let mut parts = Vec::new();
+        let mut heads = Vec::new();
         for t in &def.head {
-            parts.push(self.type_pattern(t, &ids));
+            parts.push(self.type_pattern(t, &ids, &mut heads));
         }
         let head = self.lookup_type(None, &def.name);
         let pattern = match head {
-            Some(ty) if self.arity(ty) == parts.len() => TypePattern::Named(ty, parts),
+            Some(ty) if self.arity(ty) == parts.len() => {
+                heads.push((def.name.span, ty));
+                TypePattern::Named(ty, parts)
+            }
             Some(_) => {
                 self.error(
                     code::TYPE_ARITY,
@@ -1634,6 +1641,15 @@ impl<'a> Resolver<'a> {
             }
             None => TypePattern::Error,
         };
+        self.p.alias_patterns[pid.0 as usize].heads = heads;
+        self.p.alias_patterns[pid.0 as usize].pattern = pattern;
+        let source = self.ty(source);
+        self.p.alias_patterns[pid.0 as usize].source = source.clone();
+        let TypeKind::Of { value, site, .. } = source.kind else {
+            return;
+        };
+        self.p.of_sites[site.0 as usize].permanent = true;
+        self.p.of_sites[site.0 as usize].projection = Some(pid);
         for id in &ids {
             let span = self.p.ty(*id).span;
             let t = self.new_of(value, span, true, Some(pid));
@@ -1641,10 +1657,14 @@ impl<'a> Resolver<'a> {
         }
         let slot = &mut self.p.alias_patterns[pid.0 as usize];
         slot.source = source;
-        slot.pattern = pattern;
     }
 
-    fn type_pattern(&mut self, t: &ast::TypeExpr, ids: &[TypeId]) -> TypePattern {
+    fn type_pattern(
+        &mut self,
+        t: &ast::TypeExpr,
+        ids: &[TypeId],
+        heads: &mut Vec<(Span, TypeRef)>,
+    ) -> TypePattern {
         match &t.kind {
             ast::TypeKind::Hole => TypePattern::Skip,
             ast::TypeKind::Named {
@@ -1659,10 +1679,13 @@ impl<'a> Resolver<'a> {
             ast::TypeKind::Named { module, name, args } => {
                 let parts = args
                     .iter()
-                    .map(|t| self.type_pattern(t, ids))
+                    .map(|t| self.type_pattern(t, ids, heads))
                     .collect::<Vec<_>>();
                 match self.lookup_type(module.as_ref(), name) {
-                    Some(ty) if self.arity(ty) == parts.len() => TypePattern::Named(ty, parts),
+                    Some(ty) if self.arity(ty) == parts.len() => {
+                        heads.push((name.span, ty));
+                        TypePattern::Named(ty, parts)
+                    }
                     Some(_) => {
                         self.error(
                             code::TYPE_ARITY,
@@ -1674,9 +1697,11 @@ impl<'a> Resolver<'a> {
                     None => TypePattern::Error,
                 }
             }
-            ast::TypeKind::Tuple(ts) => {
-                TypePattern::Tuple(ts.iter().map(|t| self.type_pattern(t, ids)).collect())
-            }
+            ast::TypeKind::Tuple(ts) => TypePattern::Tuple(
+                ts.iter()
+                    .map(|t| self.type_pattern(t, ids, heads))
+                    .collect(),
+            ),
             _ => {
                 self.error(
                     code::TYPE_PATTERN_FORM,

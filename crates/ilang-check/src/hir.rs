@@ -61,6 +61,10 @@ pub struct Program {
     /// Written value reads and structural extraction items (§4.3, §4.7).
     pub of_sites: Vec<OfSite>,
     pub alias_patterns: Vec<AliasPattern>,
+    /// Direct alias dependencies and their reverse closure, computed once.
+    pub alias_dependencies: Vec<Vec<TypeId>>,
+    pub alias_sources: Vec<Vec<OfId>>,
+    pub value_aliases: Option<std::collections::HashSet<TypeId>>,
     pub modules: Vec<Module>,
     pub types: Vec<TypeDef>,
     /// The module of the built-in names (§12), in the package `i`.
@@ -564,6 +568,7 @@ pub struct OfSite {
 }
 #[derive(Clone, Debug)]
 pub struct AliasPattern {
+    pub heads: Vec<(Span, TypeRef)>,
     pub head_span: Span,
     pub module: ModuleId,
     pub span: Span,
@@ -617,6 +622,18 @@ pub fn value_dependent(p: &Program, t: &Type) -> bool {
     if p.of_sites.is_empty() {
         return false;
     }
+    if let Some(aliases) = &p.value_aliases {
+        let mut found = false;
+        walk_type(t, &mut |t| match &t.kind {
+            TypeKind::Of { .. } => found = true,
+            TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                ..
+            } => found |= aliases.contains(id),
+            _ => {}
+        });
+        return found;
+    }
     fn go(p: &Program, t: &Type, seen: &mut std::collections::HashSet<TypeId>) -> bool {
         let mut found = false;
         walk_type(t, &mut |t| match &t.kind {
@@ -634,6 +651,79 @@ pub fn value_dependent(p: &Program, t: &Type) -> bool {
         found
     }
     go(p, t, &mut std::collections::HashSet::new())
+}
+
+/// Summaries use only direct written edges; propagating provenance visits
+/// each alias and edge once plus the materialized source sets (O1).
+pub fn summarize_aliases(p: &mut Program) {
+    let mut dependents = vec![Vec::new(); p.types.len()];
+    let mut dependencies = vec![Vec::new(); p.types.len()];
+    let mut affected = std::collections::HashSet::new();
+    let mut queue = std::collections::VecDeque::new();
+    for (i, d) in p.types.iter().enumerate() {
+        let TypeBody::Alias(body) = &d.body else {
+            continue;
+        };
+        walk_type(body, &mut |t| match &t.kind {
+            TypeKind::Of { .. } => {
+                if affected.insert(TypeId(i as u32)) {
+                    queue.push_back(TypeId(i as u32));
+                }
+            }
+            TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                ..
+            } if matches!(p.ty(*id).body, TypeBody::Alias(_)) => {
+                dependencies[i].push(*id);
+            }
+            _ => {}
+        });
+        dependencies[i].sort();
+        dependencies[i].dedup();
+        for id in &dependencies[i] {
+            dependents[id.0 as usize].push(TypeId(i as u32));
+        }
+    }
+    while let Some(id) = queue.pop_front() {
+        for next in &dependents[id.0 as usize] {
+            if affected.insert(*next) {
+                queue.push_back(*next);
+            }
+        }
+    }
+    let mut sources = vec![Vec::new(); p.types.len()];
+    let mut remaining = dependencies.iter().map(Vec::len).collect::<Vec<_>>();
+    let mut ready = std::collections::VecDeque::new();
+    for (i, d) in p.types.iter().enumerate() {
+        if let TypeBody::Alias(t) = &d.body {
+            walk_type(t, &mut |t| {
+                if let TypeKind::Of { site, .. } = t.kind {
+                    sources[i].push(site);
+                }
+            });
+            if remaining[i] == 0 {
+                ready.push_back(i);
+            }
+        }
+    }
+    while let Some(i) = ready.pop_front() {
+        for dep in &dependencies[i] {
+            let extra = sources[dep.0 as usize].clone();
+            sources[i].extend(extra);
+        }
+        sources[i].sort_by_key(|site| site.0);
+        sources[i].dedup();
+        for next in &dependents[i] {
+            let k = next.0 as usize;
+            remaining[k] -= 1;
+            if remaining[k] == 0 {
+                ready.push_back(k);
+            }
+        }
+    }
+    p.alias_sources = sources;
+    p.alias_dependencies = dependencies;
+    p.value_aliases = Some(affected);
 }
 
 /// All written types in a binding, including nested bodies and patterns.

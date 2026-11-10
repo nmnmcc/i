@@ -86,6 +86,7 @@ impl Pol {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Solver {
+    observed_shape: bool,
     /// Allocation ownership observed during a demanded source group.
     pub observation: Option<(usize, HashSet<V>, std::cell::RefCell<HashSet<V>>)>,
     pub vars: Vec<VarState>,
@@ -110,6 +111,7 @@ pub(crate) struct Solver {
 impl Solver {
     pub fn new(variance: StdHashMap<TypeId, Vec<Variance>>, type_names: Vec<String>) -> Solver {
         Solver {
+            observed_shape: false,
             observation: None,
             vars: Vec::new(),
             level: 0,
@@ -274,6 +276,14 @@ impl Solver {
         self.constrain_in(l, r, false);
     }
 
+    /// Observed skeletons contain derived unions of existing arguments, not
+    /// written choices. Reflexive inclusions need no bound insertion/routing.
+    pub fn constrain_observed(&mut self, l: &Ty, r: &Ty) {
+        self.observed_shape = true;
+        self.constrain(l, r);
+        self.observed_shape = false;
+    }
+
     /// Makes `N` **in** `M` true for two environments (§4.5 rule 4): every
     /// member of `N` is a type variable that is a subtype of `M`, or has a
     /// member of `M` with the same type constructor and equal arguments,
@@ -286,6 +296,12 @@ impl Solver {
     /// through the bounds of variables, but not into type arguments: those
     /// are compared as normal types.
     fn constrain_in(&mut self, l: &Ty, r: &Ty, env: bool) {
+        if self.observed_shape
+            && (matches!(r, Ty::Union(ts) if ts.contains(l))
+                || matches!(l,Ty::Inter(ts) if ts.contains(r)))
+        {
+            return;
+        }
         if l != r {
             self.observe_type(l);
             self.observe_type(r);

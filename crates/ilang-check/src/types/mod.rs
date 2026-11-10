@@ -18,6 +18,7 @@
 //!   the syntax of §3.
 //! - `shown.rs`: a shown type as a tree ([`ShownType`]), and its text.
 
+mod alias;
 mod coverage;
 mod display;
 mod infer;
