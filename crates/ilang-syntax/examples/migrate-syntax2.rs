@@ -22,18 +22,16 @@ impl<'a> Migrator<'a> {
     fn error(&mut self, value: &TypeExpr, err: &TypeExpr) {
         let start = value.span.end as usize;
         let end = err.span.start as usize;
-        if start <= end {
-            if let Some(tok) = lex(&self.src[start..end])
-                .tokens
-                .into_iter()
-                .find(|t| t.kind == T::Question)
-            {
-                self.edit(
-                    Span::new(start as u32 + tok.span.start, start as u32 + tok.span.end),
-                    "^",
-                );
-                self.counts[2] += 1;
-            }
+        if let Some(tok) = lex(&self.src[start..end])
+            .tokens
+            .into_iter()
+            .find(|t| t.kind == T::Question)
+        {
+            self.edit(
+                Span::new(start as u32 + tok.span.start, start as u32 + tok.span.end),
+                "^",
+            );
+            self.counts[2] += 1;
         }
     }
     fn ty(&mut self, t: &TypeExpr) {
@@ -101,10 +99,10 @@ impl<'a> Migrator<'a> {
             PatternKind::BitArray(xs) => {
                 for x in xs {
                     self.pat(&x.value);
-                    if let Some(f) = &x.format {
-                        if let Some(a) = &f.arg {
-                            self.expr(a)
-                        }
+                    if let Some(f) = &x.format
+                        && let Some(a) = &f.arg
+                    {
+                        self.expr(a)
                     }
                 }
             }
@@ -159,10 +157,10 @@ impl<'a> Migrator<'a> {
             ExprKind::BitArray(xs) => {
                 for x in xs {
                     self.expr(&x.value);
-                    if let Some(f) = &x.format {
-                        if let Some(a) = &f.arg {
-                            self.expr(a)
-                        }
+                    if let Some(f) = &x.format
+                        && let Some(a) = &f.arg
+                    {
+                        self.expr(a)
                     }
                 }
             }
