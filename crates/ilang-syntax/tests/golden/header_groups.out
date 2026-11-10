@@ -2,7 +2,8 @@
   i/fail
   opt = (Option, Some) = std/option
 )
-export (main)
+
+export(main)
 
 (a, b) = (1, 2)
 

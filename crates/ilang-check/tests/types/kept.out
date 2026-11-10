@@ -8,6 +8,6 @@
 17:1: error[E0308]: a declaration with no `@external` is kept for macros
 18:8: error[E0233]: the left side of an alias that is not a list of type parameters is kept for alias patterns
 19:7: error[E0233]: the left side of an alias that is not a list of type parameters is kept for alias patterns
-2:13: error[E0229]: `p.name` in a type is kept for the type of a value
+2:13: error[E0229]: a lowercase name in a type is kept for the type of a value; declare a type variable as an UpName, as in `f(A) = …`
 3:18: error[E0234]: a call in a type is kept for macros
 17:18: error[E0317]: the type of an external function may not have type variables (§10.1)

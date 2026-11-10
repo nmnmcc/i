@@ -11,7 +11,6 @@ parse crates/ilang-syntax/tests/golden/err_brackets.i
 parse crates/ilang-syntax/tests/golden/err_clause_tuple_note.i
 parse crates/ilang-syntax/tests/golden/err_clause_tuple_type.i
 parse crates/ilang-syntax/tests/golden/err_discard.i
-parse crates/ilang-syntax/tests/golden/err_dual_ambiguous.i
 parse crates/ilang-syntax/tests/golden/err_form_feed.i
 parse crates/ilang-syntax/tests/golden/err_guard_word.i
 parse crates/ilang-syntax/tests/golden/err_header_empty.i
@@ -29,30 +28,6 @@ parse crates/ilang-syntax/tests/golden/err_toplevel.i
 parse crates/ilang-syntax/tests/golden/err_trailing.i
 parse crates/ilang-syntax/tests/golden/err_type_group_break.i
 parse crates/ilang-syntax/tests/golden/literal_errors.i
-parse crates/ilang-syntax/tests/golden_old/err_arg_order.i
-parse crates/ilang-syntax/tests/golden_old/err_arrow_tail.i
-parse crates/ilang-syntax/tests/golden_old/err_attribute_line.i
-parse crates/ilang-syntax/tests/golden_old/err_bang_line.i
-parse crates/ilang-syntax/tests/golden_old/err_block_end.i
-parse crates/ilang-syntax/tests/golden_old/err_body_next_line.i
-parse crates/ilang-syntax/tests/golden_old/err_brackets.i
-parse crates/ilang-syntax/tests/golden_old/err_case_brace.i
-parse crates/ilang-syntax/tests/golden_old/err_clause_tuple_type.i
-parse crates/ilang-syntax/tests/golden_old/err_discard.i
-parse crates/ilang-syntax/tests/golden_old/err_form_feed.i
-parse crates/ilang-syntax/tests/golden_old/err_import_late.i
-parse crates/ilang-syntax/tests/golden_old/err_list.i
-parse crates/ilang-syntax/tests/golden_old/err_module_path.i
-parse crates/ilang-syntax/tests/golden_old/err_pattern.i
-parse crates/ilang-syntax/tests/golden_old/err_pipe_target.i
-parse crates/ilang-syntax/tests/golden_old/err_recover.i
-parse crates/ilang-syntax/tests/golden_old/err_segment_type.i
-parse crates/ilang-syntax/tests/golden_old/err_spread.i
-parse crates/ilang-syntax/tests/golden_old/err_trailing.i
-parse crates/ilang-syntax/tests/golden_old/err_type_group_break.i
-parse crates/ilang-syntax/tests/golden_old/literal_errors.i
-parse crates/ilang-syntax/tests/migrate/g_binding.i
-parse crates/ilang-syntax/tests/migrate/joined.i
 parse editors/vscode/test/sample.i
 parse tests/spec/1.7/a1_same_line_negative.i
 parse tests/spec/1.7/a1_same_line_tuple.i
@@ -61,7 +36,3 @@ parse tests/spec/2.2/a1_header_order.i
 parse tests/spec/2.2/a1_macro_attribute_same_line.i
 parse tests/spec/6/a1_record_kept.i
 parse tests/spec/6/a1_wrong_pattern.i
-refused crates/ilang-check/tests/types/type_params.i tyvar-owner
-refused crates/ilang-syntax/tests/migrate/expected_function.i fn-expected-type
-refused crates/ilang-syntax/tests/migrate/known.i one-clause-known
-refused crates/ilang-syntax/tests/migrate/unsafe_split.i tyvar-owner

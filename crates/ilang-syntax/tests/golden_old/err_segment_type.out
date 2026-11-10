@@ -1,5 +1,0 @@
-f = (b) {
-  case b {}
-}
---- errors ---
-E0101 @1:25 expected a name, found `Int`

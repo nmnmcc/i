@@ -1,7 +1,7 @@
 ok = 1
 --- errors ---
-E0109 @1:25 the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`
-E0109 @2:25 the nearest `->` cannot take this `!`: it already has one, or `!` came first; put the inner function type in `{ }`
-E0109 @3:26 the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`
-E0109 @4:18 the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`
+E0109 @2:25 the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`
+E0109 @3:25 the nearest `->` cannot take this `!`: it already has one, or `!` came first; put the inner function type in `{ }`
+E0109 @4:26 the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`
 E0109 @5:18 the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`
+E0109 @6:18 the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`

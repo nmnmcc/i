@@ -2,4 +2,4 @@ f = (b) {
   b |> {}
 }
 --- errors ---
-E0101 @1:24 expected a name, found `Int`
+E0101 @2:24 expected a name, found `Int`

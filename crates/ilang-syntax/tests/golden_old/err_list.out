@@ -1,5 +1,0 @@
-ok = 1
---- errors ---
-E0101 @1:6 expected an expression, found `,`
-E0107 @2:6 `..rest` comes after the parts of a list
-E0101 @3:14 expected `]`, found `2`

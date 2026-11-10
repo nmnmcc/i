@@ -1,2 +1,2 @@
 --- errors ---
-E0102 @2:3 expected the function body, a `{` on the same line, found `!`
+E0102 @3:3 expected the function body, a `{` on the same line, found `!`

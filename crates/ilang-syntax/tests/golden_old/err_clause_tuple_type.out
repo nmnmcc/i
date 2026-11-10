@@ -1,3 +1,0 @@
-f = case p {}
---- errors ---
-E0101 @2:33 expected `->`, found `}`

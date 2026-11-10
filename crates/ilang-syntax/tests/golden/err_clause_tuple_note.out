@@ -6,5 +6,5 @@ b = {
   0 -> 1
 }
 --- errors ---
-E0101 @1:39 expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`
-E0101 @2:34 expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`
+E0101 @2:39 expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`
+E0101 @3:34 expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`
