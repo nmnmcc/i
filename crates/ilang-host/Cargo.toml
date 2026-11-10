@@ -8,6 +8,7 @@ description = "Wasmtime embedding and versioned host ABI for the i programming l
 
 [dependencies]
 anyhow.workspace = true
+futures-util = { version = "0.3.34", default-features = false, features = ["alloc"] }
 num-bigint.workspace = true
 serde.workspace = true
 serde_json.workspace = true

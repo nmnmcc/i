@@ -1040,6 +1040,8 @@ impl Instance {
     /// it inside a tokio runtime with time and IO enabled when a service uses
     /// tokio; otherwise such a service panics with tokio's message.
     /// `block_on` and `Program::run_*` give such a runtime.
+    /// `block_on` needs a `Send` future; with a future that is not `Send`,
+    /// await `call_async` on your own executor.
     pub async fn call_async(&mut self, name: &str, arguments: &[Value]) -> Result<Outcome> {
         self.usable()?;
         ensure!(
@@ -1225,7 +1227,7 @@ impl Instance {
                 ) {
                     Ok(true) => Some(invoke_accepting(&mut scope, resume, &values, &mut status)),
                     Ok(false) => None,
-                    Err(error) => Some(Invoked::Failed(error)),
+                    Err(error) => Some(allocation_failed(&mut scope, error)),
                 }
             };
             let Some(invoked) = invoked else {
@@ -1362,7 +1364,13 @@ fn invoke_in(
     let Err(error) = called else {
         return Invoked::Done;
     };
-    let error = anyhow::Error::from(error);
+    trapped_in(context, anyhow::Error::from(error))
+}
+
+/// Every guest trap has the same outcome, including traps in the allocator
+/// while the host prepares a reply (H8, H11a). Keep the first import failure
+/// rather than replacing it with the trap that carried it out of Wasm (H2).
+fn trapped_in(context: &mut impl AsContextMut<Data = State>, error: anyhow::Error) -> Invoked {
     let mut context = context.as_context_mut();
     let state = context.data_mut();
     state.requests.drop_all();
@@ -1373,6 +1381,17 @@ fn invoke_in(
         message: state.stop_message.take(),
         trap: error.root_cause().to_string(),
     })
+}
+
+fn allocation_failed(
+    context: &mut impl AsContextMut<Data = State>,
+    error: anyhow::Error,
+) -> Invoked {
+    if error.is::<GuestTrap>() {
+        trapped_in(context, anyhow!("ilang_alloc trapped"))
+    } else {
+        Invoked::Failed(error)
+    }
 }
 
 /// `invoke_in` for a call in which the module may start and cancel requests
@@ -1408,15 +1427,7 @@ fn lower_all(
     let mut params = Vec::new();
     for (kind, value) in kinds.iter().zip(arguments) {
         if let Err(error) = lower(context, bridge, *kind, value, &mut params, allocations) {
-            if error.is::<GuestTrap>() {
-                let mut context = context.as_context_mut();
-                let state = context.data_mut();
-                return Err(Invoked::Stopped(Stop {
-                    message: state.stop_message.take(),
-                    trap: "ilang_alloc trapped".into(),
-                }));
-            }
-            return Err(Invoked::Failed(error));
+            return Err(allocation_failed(context, error));
         }
     }
     Ok(params)
@@ -1779,8 +1790,7 @@ impl Bridge {
             .alloc
             .context("the module does not export ilang_alloc")?
             .typed::<i32, i32>(context.as_context())?;
-        let ptr = alloc
-            .call(context.as_context_mut(), len as i32)
+        let ptr = run::in_wasm(|| alloc.call(context.as_context_mut(), len as i32))
             .map_err(|_| anyhow::Error::new(GuestTrap))? as u32;
         allocations.push(Allocation { ptr, len });
         memory
@@ -1809,10 +1819,12 @@ impl Bridge {
             {
                 continue;
             }
-            free.call(
-                context.as_context_mut(),
-                (allocation.ptr as i32, allocation.len as i32),
-            )?;
+            run::in_wasm(|| {
+                free.call(
+                    context.as_context_mut(),
+                    (allocation.ptr as i32, allocation.len as i32),
+                )
+            })?;
         }
         Ok(())
     }

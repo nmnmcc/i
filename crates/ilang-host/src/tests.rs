@@ -1933,3 +1933,230 @@ mod self_waking_work {
         assert_eq!(order, [1, 0]);
     }
 }
+
+/// H8 and H11a apply to traps during buffer allocation too. The first
+/// request is ready; the other two stay pending until the host drops them.
+fn allocation_fault_program(allocation: &str) -> Program {
+    let bytes = wat::parse_str(format!(
+        r#"(module
+        (import "ilang:host/v1" "panic" (func $panic (param i32 i32)))
+        (import "test:work/v1" "work" (func $work (param i32)))
+        (memory (export "memory") 1)
+        (data (i32.const 0) "allocator stop")
+        (func (export "ilang_start"))
+        (func (export "ilang_alloc") (param i32) (result i32)
+          {allocation} (i32.const 32))
+        (func (export "ilang_free") (param i32 i32))
+        (func (export "app/reply") (result i32)
+          (call $work (i32.const 0))
+          (call $work (i32.const 1))
+          (call $work (i32.const 2)) (i32.const 1))
+        (func (export "ilang_resume:test:work/v1:work") (param i32 i32 i32) (result i32)
+          (i32.const 0))
+        (func (export "ilang_result:app/reply"))
+        (func (export "app/params") (param i32 i32) (result i32) (i32.const 0))
+        (func (export "ilang_result:app/params")))"#
+    ))
+    .unwrap();
+    let mut abi = Abi::default();
+    abi.exports.insert(
+        "app/reply".into(),
+        Signature::new([], AbiType::Nil).asynchronous(),
+    );
+    abi.exports.insert(
+        "app/params".into(),
+        Signature::new([AbiType::String], AbiType::Nil).asynchronous(),
+    );
+    abi.services.insert(
+        "test:work/v1".into(),
+        BTreeMap::from([(
+            "work".into(),
+            Signature::new([], AbiType::String).asynchronous(),
+        )]),
+    );
+    Program::from_bytes(&bytes).unwrap().with_abi(abi).unwrap()
+}
+
+#[test]
+fn allocation_traps_preserve_stops_and_the_first_failure() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct Dropped(Arc<AtomicUsize>);
+    impl Drop for Dropped {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    for allocation in [
+        "unreachable",
+        "(call $panic (i32.const 0) (i32.const 14)) unreachable",
+        "(call $work (i32.const 99))",
+    ] {
+        let program = allocation_fault_program(allocation);
+        for name in ["app/reply", "app/params"] {
+            let starts = Arc::new(AtomicUsize::new(0));
+            let drops = Arc::new(AtomicUsize::new(0));
+            let (started, dropped) = (Arc::clone(&starts), Arc::clone(&drops));
+            let mut imports = HostImports::default();
+            imports
+                .async_service("test:work/v1", "work", move |_| {
+                    let first = started.fetch_add(1, Ordering::SeqCst) == 0;
+                    let guard = Dropped(Arc::clone(&dropped));
+                    async move {
+                        let _guard = guard;
+                        if !first {
+                            std::future::pending::<()>().await;
+                        }
+                        Ok(Ok(Value::String("answer".into())))
+                    }
+                })
+                .unwrap();
+            let mut instance = program.instantiate(HostOptions::new(imports)).unwrap();
+            let args = if name == "app/params" {
+                vec![Value::String("input".into())]
+            } else {
+                vec![]
+            };
+            let outcome = block_on(instance.call_async(name, &args));
+            if allocation.contains("$work") {
+                assert_eq!(
+                    error_text(outcome),
+                    "the module started request 99 outside an async call",
+                    "{name}"
+                );
+            } else {
+                let stopped = stop(outcome.unwrap());
+                assert_eq!(
+                    stopped.message.as_deref(),
+                    allocation.contains("$panic").then_some("allocator stop"),
+                    "{name}"
+                );
+            }
+            let expected_starts = if name == "app/reply" { 3 } else { 0 };
+            assert_eq!(starts.load(Ordering::SeqCst), expected_starts, "{name}");
+            assert_eq!(drops.load(Ordering::SeqCst), expected_starts, "{name}");
+            assert!(instance.unusable().is_some());
+            assert!(instance.store.data().requests.is_empty());
+        }
+    }
+}
+
+/// Design §10.1's countdown work wakes itself for a seeded number of
+/// polls. Unlike a gate, it makes no promise about completion order.
+#[test]
+fn countdown_requests_match_the_observed_answer_order() {
+    let program = program();
+    for seed in 0..200_u64 {
+        let order = Order::default();
+        let recorded = Arc::clone(&order);
+        let countdown = move |arguments: &[Value]| -> ServiceFuture {
+            let [Value::Float(x)] = arguments else {
+                panic!("later takes one Float")
+            };
+            let x = *x as i64;
+            let mut polls = (seed ^ (x as u64).wrapping_mul(37)) % 11;
+            let recorded = Arc::clone(&recorded);
+            Box::pin(std::future::poll_fn(move |context| {
+                if polls > 0 {
+                    polls -= 1;
+                    context.waker().wake_by_ref();
+                    return std::task::Poll::Pending;
+                }
+                recorded.lock().unwrap().push(x);
+                std::task::Poll::Ready(Ok(Ok(Value::Float(2.0 * x as f64))))
+            }))
+        };
+        let mut instance = program
+            .instantiate(HostOptions::new(imports_with(
+                |_| {},
+                |_| Ok(Ok(Value::Nil)),
+                countdown,
+            )))
+            .unwrap();
+        let n = 1 + seed % 16;
+        let h = float(
+            block_on(instance.call_async("app/async.many", &[Value::Float(n as f64)])).unwrap(),
+        );
+        let order = order.lock().unwrap();
+        assert_eq!(order.len(), 2 * n as usize, "seed {seed}");
+        assert_eq!(h, fold(&order), "seed {seed}");
+        assert!(instance.unusable().is_none());
+    }
+}
+
+/// D5's nested-store rule also applies while the host calls ilang_alloc or
+/// ilang_free outside the entry export itself (parameter/result buffers).
+#[test]
+fn a_nested_store_in_the_allocator_gets_its_own_thread() {
+    let threads = Threads::default();
+    let recorded = Arc::clone(&threads);
+    let inner = program()
+        .instantiate(HostOptions::new(imports_with(
+            move |_| {
+                recorded
+                    .lock()
+                    .unwrap()
+                    .push(("print", std::thread::current().id()));
+            },
+            |_| Ok(Ok(Value::Nil)),
+            |_| Box::pin(async { Ok(Ok(Value::Nil)) }),
+        )))
+        .unwrap();
+    threads.lock().unwrap().clear();
+    let inner = Mutex::new(inner);
+    let bytes = wat::parse_str(
+        r#"(module
+        (import "test:allocation/v1" "touch" (func $touch))
+        (memory (export "memory") 1)
+        (func (export "ilang_start"))
+        (func (export "ilang_alloc") (param i32) (result i32)
+          (call $touch) (i32.const 32))
+        (func (export "ilang_free") (param i32 i32) (call $touch))
+        (func (export "app/buffer") (param i32 i32) (result i32) (i32.const 0))
+        (func (export "ilang_result:app/buffer")))"#,
+    )
+    .unwrap();
+    let mut abi = Abi::default();
+    abi.exports.insert(
+        "app/buffer".into(),
+        Signature::new([AbiType::String], AbiType::Nil).asynchronous(),
+    );
+    abi.services.insert(
+        "test:allocation/v1".into(),
+        BTreeMap::from([("touch".into(), Signature::new([], AbiType::Nil))]),
+    );
+    let mut imports = HostImports::default();
+    imports
+        .service("test:allocation/v1", "touch", move |_| {
+            ensure!(matches!(
+                inner.lock().unwrap().run("app/main.main")?,
+                Outcome::Ok(_)
+            ));
+            Ok(Ok(Value::Nil))
+        })
+        .unwrap();
+    let mut instance = Program::from_bytes(&bytes)
+        .unwrap()
+        .with_abi(abi)
+        .unwrap()
+        .instantiate(HostOptions::new(imports))
+        .unwrap();
+    let outer = block_on(async {
+        assert!(matches!(
+            instance
+                .call_async("app/buffer", &[Value::String("input".into())])
+                .await
+                .unwrap(),
+            Outcome::Ok(Value::Nil)
+        ));
+        std::thread::current().id()
+    });
+    let recorded = threads.lock().unwrap();
+    assert_eq!(
+        recorded.len(),
+        2,
+        "both allocation and free enter the inner store"
+    );
+    assert!(recorded.iter().all(|(_, id)| *id != outer), "{recorded:?}");
+}

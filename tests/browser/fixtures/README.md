@@ -19,6 +19,10 @@ It has its own `ilang.abi` section. Its allocator only counts live buffers:
 `live_allocations` and `live_bytes` let tests check every free of B.3. Size 0
 gives address 0.
 
+The sparse request table uses linear memory: 1024 state words at 4096 and
+1024 expected-argument words at 8192. Allocations start at 12288, after both
+tables, so a result buffer cannot overwrite a request's expected answer.
+
 - `ilang_start` prints `start` and a line feed through the service, so tests see
   that it runs once and may call imports.
 - Imports: `ilang:host/v1` `panic`, `reference_id` and `cancel`; the services

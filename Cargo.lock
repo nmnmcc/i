@@ -691,6 +691,7 @@ name = "ilang-host"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "futures-util",
  "num-bigint",
  "serde",
  "serde_json",

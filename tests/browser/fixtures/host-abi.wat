@@ -4,7 +4,6 @@
 (module
   (type $box (struct (field i32)))
   (type $unary (func (param i32) (result i32)))
-  (type $i32s (array (mut i32)))
   (tag $fail (param i32))
 
   (import "ilang:host/v1" "panic" (func $panic (param i32 i32)))
@@ -20,7 +19,8 @@
   (import "app:math/v1" "hypot" (func $hypot (param f64 f64) (result f64)))
 
   (memory (export "memory") 1 256)
-  (global $next (mut i32) (i32.const 4096))
+  ;; Request flags and expected arguments occupy 4096..12288 (§8.1).
+  (global $next (mut i32) (i32.const 12288))
   (global $live (mut i32) (i32.const 0))
   (global $bytes (mut i32) (i32.const 0))
   (global $ready (mut i32) (i32.const 0))
@@ -262,8 +262,11 @@
   ;; (0 free, 1 outstanding, 2 cancelled) and its argument x. Test hosts
   ;; answer x with 2x. `$h` folds the arguments in answer order:
   ;; h = (h * 31 + x) mod (2^31 - 1).
-  (global $state (ref $i32s) (array.new_default $i32s (i32.const 1024)))
-  (global $args (ref $i32s) (array.new_default $i32s (i32.const 1024)))
+  ;; The state table starts at 4096 and the argument table at 8192.
+  (func $state (param $id i32) (result i32)
+    (i32.load offset=4096 (i32.mul (local.get $id) (i32.const 4))))
+  (func $arg (param $id i32) (result i32)
+    (i32.load offset=8192 (i32.mul (local.get $id) (i32.const 4))))
   (global $n (mut i32) (i32.const 0))
   (global $started (mut i32) (i32.const 0))
   (global $answered (mut i32) (i32.const 0))
@@ -279,7 +282,7 @@
 
   (func $begin (param $mode i32)
     (global.set $mode (local.get $mode))
-    (array.fill $i32s (global.get $state) (i32.const 0) (i32.const 0) (i32.const 1024))
+    (memory.fill (i32.const 4096) (i32.const 0) (i32.const 4096))
     (global.set $started (i32.const 0))
     (global.set $answered (i32.const 0))
     (global.set $outstanding (i32.const 0))
@@ -289,8 +292,8 @@
 
   ;; Starts later(x) with this id.
   (func $start (param $id i32) (param $x i32)
-    (array.set $i32s (global.get $state) (local.get $id) (i32.const 1))
-    (array.set $i32s (global.get $args) (local.get $id) (local.get $x))
+    (i32.store offset=4096 (i32.mul (local.get $id) (i32.const 4)) (i32.const 1))
+    (i32.store offset=8192 (i32.mul (local.get $id) (i32.const 4)) (local.get $x))
     (global.set $outstanding (i32.add (global.get $outstanding) (i32.const 1)))
     (global.set $started (i32.add (global.get $started) (i32.const 1)))
     (call $later (local.get $id) (f64.convert_i32_s (local.get $x))))
@@ -309,7 +312,7 @@
 
   (func $drop (param $id i32)
     (call $cancel (local.get $id))
-    (array.set $i32s (global.get $state) (local.get $id) (i32.const 2))
+    (i32.store offset=4096 (i32.mul (local.get $id) (i32.const 4)) (i32.const 2))
     (global.set $outstanding (i32.sub (global.get $outstanding) (i32.const 1))))
 
   ;; The outstanding request with the lowest id, or -1.
@@ -318,7 +321,7 @@
     (loop $again
       (if (i32.lt_s (local.get $id) (i32.const 1024))
         (then
-          (if (i32.eq (array.get $i32s (global.get $state) (local.get $id)) (i32.const 1))
+          (if (i32.eq (call $state (local.get $id)) (i32.const 1))
             (then (return (local.get $id))))
           (local.set $id (i32.add (local.get $id) (i32.const 1)))
           (br $again))))
@@ -329,15 +332,15 @@
     (local $x i32)
     (if (i32.or (i32.lt_s (local.get $id) (i32.const 0)) (i32.ge_s (local.get $id) (i32.const 1024)))
       (then (call $fail (i32.const 272) (i32.const 15))))
-    (if (i32.eq (array.get $i32s (global.get $state) (local.get $id)) (i32.const 2))
+    (if (i32.eq (call $state (local.get $id)) (i32.const 2))
       (then (call $fail (i32.const 320) (i32.const 35))))
-    (if (i32.ne (array.get $i32s (global.get $state) (local.get $id)) (i32.const 1))
+    (if (i32.ne (call $state (local.get $id)) (i32.const 1))
       (then (call $fail (i32.const 272) (i32.const 15))))
-    (local.set $x (array.get $i32s (global.get $args) (local.get $id)))
+    (local.set $x (call $arg (local.get $id)))
     (if (i32.or (local.get $tag)
           (f64.ne (local.get $value) (f64.convert_i32_s (i32.mul (local.get $x) (i32.const 2)))))
       (then (call $fail (i32.const 288) (i32.const 21))))
-    (array.set $i32s (global.get $state) (local.get $id) (i32.const 0))
+    (i32.store offset=4096 (i32.mul (local.get $id) (i32.const 4)) (i32.const 0))
     (global.set $outstanding (i32.sub (global.get $outstanding) (i32.const 1)))
     (global.set $answered (i32.add (global.get $answered) (i32.const 1)))
     (global.set $h (i64.rem_u
