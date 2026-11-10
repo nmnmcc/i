@@ -184,7 +184,9 @@ def main():
     counts = collections.Counter()
     failures = []
     reports = []
-    with tempfile.TemporaryDirectory(prefix='i-generation-') as temp:
+    work = CORPUS / '.work'
+    work.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='i-generation-', dir=work) as temp:
         project = Path(temp)
         project.joinpath('src').mkdir()
         project.joinpath('i.toml').write_text('name = "generated"\n')

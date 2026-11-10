@@ -1,6 +1,7 @@
 """Permanent review fixtures, using the public CLI's existing test commands."""
 import argparse
 import collections
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import os
@@ -18,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CORPUS = ROOT / 'tests/review'
 SKIP = {'.git', 'target', 'base-target', 'venv', 'node_modules', 'syntax-debug'}
 SNAPSHOTS = {'base-src', 'redesign', 'mutation', 'baseline-check', 'after-check', 'before-check'}
-TEXT = {'.py', '.mjs', '.js', '.sh', '.rs', '.c', '.cpp', '.wat', '.md', '.txt', '.json', '.jsonl', '.log', '.out', '.types', '.stderr', '.diff'}
+TEXT = {'.py', '.mjs', '.js', '.sh', '.rs', '.c', '.cpp', '.wat', '.md', '.txt', '.json', '.jsonl', '.log', '.out', '.types', '.stderr', '.diff', '.toml', '.lock'}
 SOURCES = {
     'review-a1': 'docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12',
     'review-t1': 'docs/spec.md §§4.2, 4.8, 7.4: literal sets and coverage',
@@ -91,12 +92,25 @@ def import_reviews(args):
                 index['programs'].append(entry)
                 continue
             if any(x in SNAPSHOTS for x in rel.parts):
-                # Retain changed snapshot sources as well; origins distinguish them.
+                # A copied checkout is not a new review program. Preserve its exact
+                # old bytes, with a link to the maintained test at the same path.
                 entry['snapshot'] = True
+                position = next(i for i, part in enumerate(rel.parts) if part in SNAPSHOTS)
+                repository_path = Path(*rel.parts[position + 1:])
+                if (ROOT / repository_path).is_file():
+                    target = CORPUS / 'tools' / review.name / (str(rel) + '.source')
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(data)
+                    entry['existing'] = [str(repository_path)]
+                    entry['historical_snapshot'] = str(target.relative_to(ROOT))
+                    index['programs'].append(entry)
+                    continue
             parent = p.parent
             while parent != review and not (parent / 'i.toml').exists():
                 parent = parent.parent
             if not (parent / 'i.toml').exists():
+                parent = None
+            if parent and p.relative_to(parent).parts[0] not in {'src', 'test'}:
                 parent = None
             if parent:
                 key = str(parent)
@@ -126,7 +140,7 @@ def import_reviews(args):
         if Path(origin).is_dir():
             for directory in ['src', 'test']:
                 for module_path in sorted((Path(origin) / directory).rglob('*.i')):
-                    project['files'][str(module_path.relative_to(origin))] = module_path.read_text()
+                    project['files'][str(module_path.relative_to(origin))] = module_path.read_bytes().decode()
         path = locations[origin]
         if path == CORPUS / 'cases' / project['review']:
             path = path / '_root'
@@ -151,6 +165,8 @@ def import_reviews(args):
         for name, data in project['files'].items():
             target = path / name
             target.parent.mkdir(parents=True, exist_ok=True)
+            if target.exists() and target.read_bytes() != data.encode():
+                (path / 'expected.json').unlink(missing_ok=True)
             target.write_text(data)
         case_id = str(path.relative_to(CORPUS / 'cases'))
         cases.append({'id': case_id, 'project': str(path.relative_to(ROOT)), 'origin': origin, 'source': project['source'], 'finding': Path(origin).stem, 'files': [x for x in project['files'] if x.endswith('.i')]})
@@ -166,6 +182,12 @@ def import_reviews(args):
             index['tools'].append({'origin': 'lane/note-rec:' + name, 'path': str(dest.relative_to(ROOT)), 'sha256': sha(data)})
     dump(CORPUS / 'inventory.json', index)
     dump(CORPUS / 'manifest.json', {'schema': 1, 'cases': cases})
+    retained = {c['project'] for c in cases}
+    for old_manifest in sorted((CORPUS / 'cases').rglob('i.toml'), key=lambda p: len(p.parts), reverse=True):
+        stale = old_manifest.parent
+        relative = str(stale.relative_to(ROOT))
+        if stale.exists() and relative not in retained and not any(p.startswith(relative + '/') for p in retained):
+            shutil.rmtree(stale)
     print(f'imported {len(cases)} projects, {len(index["programs"])} source occurrences, {len(index["tools"])} tools/evidence files')
 
 
@@ -190,6 +212,22 @@ def invoke(binary, project, command, bound):
 
 def observe(binary, case, bound):
     project = ROOT / case['project']
+    if case.get('stored'):
+        # Only parser-negative raw files live outside the formatter's source walk.
+        # Materialize the unchanged package for the existing public CLI.
+        runtime = project / '.work'
+        runtime.mkdir(exist_ok=True)
+        manifest = (project / 'i.toml').read_text()
+        def dependency(match):
+            return match[1] + json.dumps(str((project / match[2]).resolve()))
+        manifest = re.sub(r'(\bpath\s*=\s*)[\"\']([^\"\']+)[\"\']', dependency, manifest)
+        (runtime / 'i.toml').write_text(manifest)
+        for name in case['files']:
+            target = runtime / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            source = project / case.get('stored', {}).get(name, name)
+            target.write_bytes(source.read_bytes())
+        project = runtime
     check, elapsed = invoke(binary, project, ['check', '--types'], bound)
     result = {'check': check}
     if check['exit'] == 0:
@@ -216,20 +254,43 @@ def run_corpus(args):
     failures = []
     summary = collections.Counter()
     cases = select(args)
+    if args.missing_only:
+        cases = [c for c in cases if not (ROOT / c['project'] / 'expected.json').exists()]
+        if not cases:
+            print('all selected observations already exist')
+            return
     requirements = json.loads((CORPUS / 'requirements.json').read_text())
-    for n, case in enumerate(cases):
+    binary_digest = sha(args.binary.read_bytes())
+    revision = git('rev-parse', 'HEAD')
+    def comparable(outcome):
+        # A killed child has no complete diagnostic/output to compare. Preserve
+        # its raw partial output, but compare only its censored outcome.
+        return {k: ({'exit': 'timeout', 'command': v['command']} if v['exit'] == 'timeout' else v)
+                for k, v in outcome.items()}
+    def observe_case(case):
+        bound = args.timeout
+        saved = ROOT / case['project'] / 'expected.json'
+        if not update and saved.exists():
+            bound = json.loads(saved.read_text()).get('bound_seconds', 3)
+        return case, observe(args.binary, case, bound)[0]
+    pool = ThreadPoolExecutor(max_workers=args.jobs)
+    for n, (case, result) in enumerate(pool.map(observe_case, cases)):
         expected_path = ROOT / case['project'] / 'expected.json'
-        result, _ = observe(args.binary, case, args.timeout)
         if update:
-            dump(expected_path, {'compiler': git('rev-parse', 'HEAD'), 'binary_sha256': sha(args.binary.read_bytes()), 'kind': 'observation; semantic requirements are separate', 'outcome': result})
+            dump(expected_path, {'compiler': revision, 'binary_sha256': binary_digest, 'kind': 'observation; semantic requirements are separate', 'bound_seconds': args.timeout, 'outcome': result})
         elif not expected_path.exists():
             failures.append(case['id'] + ': missing expected.json')
         else:
             old = json.loads(expected_path.read_text())['outcome']
-            if old != result:
+            if comparable(old) != comparable(result):
                 failures.append(case['id'] + ': full output changed')
                 dump(ROOT / case['project'] / 'actual.json', result)
+            else:
+                (ROOT / case['project'] / 'actual.json').unlink(missing_ok=True)
         summary[str(result['check']['exit'])] += 1
+        applicable = [r for r in requirements['requirements'] if re.search(r['pattern'], case['id'])]
+        if any('cast failure' in v['stderr'] or 'panicked at' in v['stderr'] for v in result.values()) and not any(r.get('known_failure') for r in applicable):
+            failures.append(case['id'] + ': unclassified cast failure or compiler panic')
         for requirement in requirements['requirements']:
             if not re.search(requirement['pattern'], case['id']):
                 continue
@@ -237,10 +298,20 @@ def run_corpus(args):
             check = result['check']
             if wanted == 'reject':
                 met = check['exit'] == 1 and 'error[' in check['stderr'] and 'panicked at' not in check['stderr']
+                if requirement.get('phase') == 'entry':
+                    met = any(v['exit'] == 1 and ('error[' in v['stderr'] or 'provider:' in v['stderr'])
+                              and 'E0505' not in v['stderr'] and 'trap:' not in v['stderr']
+                              for v in result.values())
             elif wanted == 'accept':
                 met = check['exit'] == 0 and all(value['exit'] == 0 for value in result.values())
             else:
                 met = False
+            if requirement.get('diagnostic_codes'):
+                diagnostic_text = '\n'.join(v['stderr'] for v in result.values()) if requirement.get('phase') == 'entry' else check['stderr']
+                actual_codes = set(re.findall(r'error\[([^]]+)\]', diagnostic_text))
+                met = met and bool(actual_codes.intersection(requirement['diagnostic_codes'])) and 'E0505' not in actual_codes
+            for fragment in requirement.get('types_contain', []):
+                met = met and fragment in check['stdout']
             if requirement.get('known_failure'):
                 summary['XPASS' if met else 'XFAIL'] += 1
                 if met and not update:
@@ -252,6 +323,7 @@ def run_corpus(args):
         if (n + 1) % 50 == 0:
             print(f'{n+1}/{len(cases)} {dict(summary)}', flush=True)
     print(json.dumps({'selected': len(cases), 'checks': dict(summary), 'failures': failures}, indent=2))
+    pool.shutdown()
     if failures:
         raise SystemExit(1)
 
@@ -260,25 +332,53 @@ def register_parses(args):
     if os.environ.get('UPDATE') != '1':
         raise SystemExit('parse-register requires UPDATE=1')
     scanner = runpy.run_path(str(ROOT / 'scripts/old-syntax-check'))
-    files = sorted((CORPUS / 'cases').rglob('*.i'))
-    sources = [re.sub(r'(?m)^// old-syntax-check:.*\n?', '', p.read_text()) for p in files]
+    manifest_path = CORPUS / 'manifest.json'
+    manifest = json.loads(manifest_path.read_text())
+    files = []
+    owners = {}
+    for case in manifest['cases']:
+        for name in case['files']:
+            path = ROOT / case['project'] / case.get('stored', {}).get(name, name)
+            files.append(path)
+            owners[path] = case, name
+    files.sort()
+    sources = [re.sub(r'(?m)^// old-syntax-check:.*\n?', '', p.read_bytes().decode()) for p in files]
     results = scanner['parse'](sources)
     config_path = ROOT / 'scripts/old-syntax-check.json'
-    config = json.loads(config_path.read_text())
+    config = {k: v for k, v in json.loads(config_path.read_text()).items()
+              if not k.startswith('tests/review/cases/')}
     invalid = 0
     for path, source, diagnostics in zip(files, sources, results):
         if not diagnostics:
             continue
-        relative = str(path.relative_to(ROOT))
+        case, name = owners[path]
+        project = ROOT / case['project']
+        stored = Path('.invalid') / name
+        target = project / stored
+        target.parent.mkdir(parents=True, exist_ok=True)
+        relative = str(target.relative_to(ROOT))
         key = scanner['identity'](relative, source)
         config[key] = {'reason': 'Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.', 'diagnostics': diagnostics}
         if '/review-rec/' in relative:
             config[key]['track'] = 'T3'
         else:
             marker = '// old-syntax-check: ' + ','.join(d.split(':', 1)[0] for d in diagnostics) + '\n'
-            path.write_text(marker + source)
+            target.write_text(marker + source)
+        if config[key].get('track'):
+            target.write_text(source)
+        if path != target:
+            path.unlink()
+        case.setdefault('stored', {})[name] = str(stored)
         invalid += 1
-    dump(config_path, config)
+        # Prefix markers change diagnostic positions; recapture through the real CLI.
+        (project / 'expected.json').unlink(missing_ok=True)
+    config_path.write_text(json.dumps(config, indent=2) + '\n')
+    dump(manifest_path, manifest)
+    retained = {ROOT / c['project'] / c.get('stored', {}).get(name, name)
+                for c in manifest['cases'] for name in c['files']}
+    for stale in (CORPUS / 'cases').rglob('*.i'):
+        if stale not in retained and '.work' not in stale.parts:
+            stale.unlink()
     print(f'{len(files)} review modules parsed, {invalid} exact negative fixtures registered')
 
 
@@ -307,6 +407,13 @@ def report(args):
             if value['exit'] == 'timeout' or isinstance(value['exit'], int) and value['exit'] < 0 or 'trap' in value['stderr'] or 'panicked at' in value['stderr']:
                 incidents.append({'case': case['id'], 'phase': phase, 'exit': value['exit'], 'stderr': value['stderr'][:1000]})
     dump(CORPUS / 'summary.json', {'counts': counts, 'incidents': incidents, 'exclusions': inventory['excluded']})
+    requirements = json.loads((CORPUS / 'requirements.json').read_text())
+    lines = ['# Known review failures', '', 'Generated by `scripts/review-corpus report`. Required outcomes are independent of observed baselines.', '']
+    for requirement in requirements['requirements']:
+        if not requirement.get('known_failure'):
+            continue
+        lines += ['- ' + requirement['finding'], '  Required: ' + requirement['outcome'] + '.', '  Source: ' + requirement['source'], '  Cases: ' + ', '.join(c['id'] for c in manifest['cases'] if re.search(requirement['pattern'], c['id'])), '']
+    (CORPUS / 'known-failures.md').write_text('\n'.join(lines) + '\n')
     print(json.dumps({'counts': counts, 'incidents': len(incidents)}, indent=2))
 
 
@@ -319,6 +426,8 @@ def main():
     run.add_argument('--binary', type=Path, default=ROOT / 'target/release/i')
     run.add_argument('--filter', default='')
     run.add_argument('--timeout', type=float, default=10)
+    run.add_argument('--missing-only', action='store_true')
+    run.add_argument('--jobs', type=int, default=1)
     sub.add_parser('parse-register')
     sub.add_parser('report')
     args = parser.parse_args()

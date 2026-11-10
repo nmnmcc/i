@@ -14,6 +14,13 @@ recovered from temporary independent reviews. Its runner calls the same public
 `check --types`, `test`, and `run` commands; it does not implement another host
 or type checker. A missing expectation or empty selection is an error.
 
+Valid review modules take part in the existing formatter properties. Only
+parser-negative bytes live in each project's `.invalid` directory, because the
+formatter's fixed skip baseline is outside this track's ownership. The corpus
+runner materializes those bytes in an ignored `.work` directory for the public
+CLI. The existing `old-syntax-check` still scans and asserts their exact parser
+diagnostics; no parser-negative input is treated as a successful parse.
+
 ```sh
 scripts/review-corpus run --filter review-t2
 scripts/test-generation --mode short
@@ -38,6 +45,12 @@ are separate from `expected.json`, with source sentences, and known failures
 must be promoted when their required result is achieved. E0520 observations
 are marked for W520's error-to-warning transition. Future record cases remain
 held for T3 rather than becoming passing parser-error tests.
+
+Some review criteria predate §2.6.2's source/target split: they call for E0522
+from untargeted checking. The current spec says untargeted success does not
+promise that a target can run. The corpus therefore requires service failures
+before entry execution, through source or target validation. An unrelated
+E0505 rejection does not prove that the service obligation was retained.
 
 Regeneration is explicit and belongs in the final `Regenerate derived files`
 commit. `UPDATE=1 scripts/review-corpus import` reimports review sources;

@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 import time
 
-from corpus import ROOT, dump, git, sha
+from corpus import ROOT, CORPUS, dump, git, sha
 
 
 def workloads():
@@ -38,7 +38,7 @@ def workloads():
 
 def measure(argv, timeout):
     # wait4 returns this child's counters. RUSAGE_CHILDREN would give cumulative RSS.
-    with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
+    with tempfile.TemporaryFile(dir=CORPUS / '.work') as stdout, tempfile.TemporaryFile(dir=CORPUS / '.work') as stderr:
         start = time.perf_counter()
         child = subprocess.Popen(argv, cwd=ROOT, stdout=stdout, stderr=stderr, start_new_session=True)
         timed_out = False
@@ -67,6 +67,16 @@ def measure(argv, timeout):
 
 def compare(paths):
     runs = [json.loads(p.read_text()) for p in paths]
+    if len(runs) == 1:
+        run = runs[0]
+        labels = sorted({s['binary'] for s in run['samples']})
+        if labels != ['baseline', 'candidate']:
+            raise SystemExit('one input requires an interleaved baseline/candidate bundle')
+        runs = [dict(run, samples=[s for s in run['samples'] if s['binary'] == label]) for label in labels]
+    elif len(runs) != 2 or any(len({s['binary'] for s in r['samples']}) != 1 for r in runs):
+        raise SystemExit('compare two single-binary bundles or one interleaved bundle')
+    if runs[0]['catalogue'] != runs[1]['catalogue']:
+        raise SystemExit('workload source inputs differ')
     groups = []
     for run in runs:
         by_name = {}
@@ -94,7 +104,7 @@ def main():
     parser.add_argument('--runs', type=int, default=5)
     parser.add_argument('--timeout', type=float, default=30)
     parser.add_argument('--filter', default='')
-    parser.add_argument('--compare', nargs=2, type=Path)
+    parser.add_argument('--compare', nargs='+', type=Path)
     args = parser.parse_args()
     if args.compare:
         compare(args.compare)
@@ -113,7 +123,9 @@ def main():
               'quiet_window': 'caller must acquire cache/quiet; load averages recorded, not proof of isolation',
               'deferred': [{'workload': 'record-growth', 'reason': 'T3 held; tests/review/tools/record-models preserves reference models'}],
               'catalogue': [], 'samples': []}
-    with tempfile.TemporaryDirectory(prefix='i-checker-bench-') as temp:
+    work = CORPUS / '.work'
+    work.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='i-checker-bench-', dir=work) as temp:
         entries = []
         for name, source in workloads():
             if args.filter not in name:

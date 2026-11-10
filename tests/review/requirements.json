@@ -7,7 +7,14 @@
       "outcome": "reject",
       "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
-      "origin": "review-k4d/criteria.md C3/C5 and Result index"
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0501",
+        "E0522"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute."
     },
     {
       "pattern": "^review-k4d/(?:proj|_loose/p)/(?:g_(?:ann|inf)_SDep|m3|m4|r6)$",
@@ -15,10 +22,17 @@
       "outcome": "reject",
       "finding": "K4d F2: hidden Dep obligation must remain in the entry environment and be rejected when not supplied",
       "source": "docs/spec.md §4.5 rule 4: every member of N is a type variable that is a subtype of M, or has a member of M with the same type constructor and equal type arguments and the same value set; §9.2: The environment that a function needs is the union of the environments that its calls need",
-      "origin": "review-k4d/criteria.md C1/C5 and Result index"
+      "origin": "review-k4d/criteria.md C1/C5 and Result index",
+      "diagnostic_codes": [
+        "E0501",
+        "E0522"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute."
     },
     {
-      "pattern": "^review-k4d/(?:proj|_loose/p)/(?:q2[1-5]|q3[1-9]|q40|r4|w6|w7|w14|w15|w16)$",
+      "pattern": "^review-k4d/(?:proj|_loose/p)/(?:q2[1-35]|q3[1-9]|q40|r4|w6|w7|w14|w15|w16)$",
       "known_failure": true,
       "outcome": "accept",
       "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
@@ -31,7 +45,14 @@
       "outcome": "reject",
       "finding": "K4s P1: annotated local function must not erase an unprovided service from main",
       "source": "docs/spec.md §4.5 rule 4 and §9.2; review-k4s/review-summary.json records expected E0522, with E0505 on its historical baseline",
-      "origin": "review-k4s/soundness/src/main.i"
+      "origin": "review-k4s/soundness/src/main.i",
+      "diagnostic_codes": [
+        "E0501",
+        "E0522"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute."
     },
     {
       "pattern": "^review-rec/",
@@ -40,6 +61,41 @@
       "finding": "T3 exact-record syntax and substitution tests are specified but not implemented",
       "source": "docs/design/records.md; ledger 2026-11-11: T3 implementation is held until prior-art-types.md reports",
       "origin": "review-rec plus committed lane/note-rec models"
+    },
+    {
+      "pattern": "^review-k4d/(?:proj|_loose/p)/q24$",
+      "known_failure": true,
+      "outcome": "accept",
+      "types_contain": [
+        "use : () -> Int ! N | S(N)",
+        "fw : () -> Int ! N | S(N)"
+      ],
+      "finding": "K4d q24: acceptance alone is insufficient; use and forwarding must preserve the same row argument",
+      "source": "docs/spec.md §4.5 rule 4: equal type arguments; §4.7: principal type",
+      "origin": "review-k4d/p/q24.i; criteria C2/C5"
+    },
+    {
+      "pattern": "^review-(?:k4/cases/provision_(?:closure|direct|helper|inferred)_False|k4c/cases/(?:closure_statement|missing_(?:0|2|3)_(?:0_0_2|1_0_[012]|2_0_2|7_0_[012]))|k4d/(?:proj|_loose/p)/(?:b4|b7|r2|r3)|k4s/min_main_6_0)$",
+      "known_failure": true,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0501",
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute."
+    },
+    {
+      "pattern": "^review-(?:k4/perf/(?:generic_chain_2048|wide_generic_(?:512|1024|2048))|k4c/cases/stress_wide_open_(?:512|1024)|k4d/perf/(?:mutual(?:50|100|150|200|300)|runchain4000|wideann(?:80|200))|k4s/wide_plain_(?:512|1024)|t1/stress-(?:keys-(?:5000|10000)|nested-50))$",
+      "known_failure": true,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate"
     }
   ],
   "transitions": [
