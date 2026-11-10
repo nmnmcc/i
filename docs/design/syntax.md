@@ -12,7 +12,7 @@ Status: draft for review (stream A0 of the redesign plan). When it is accepted, 
 - A lowercase name in a type is kept for "the type of a value" (stream T2). Until then it is a compile error.
 - `{ name: e, … }` is kept for records (stream T3).
 - The left side of an alias that is not a list of type parameters, as in `Schema(User, _) = user`, is kept for alias patterns (streams S6 and T2). Until then it is a compile error with a message.
-- The forms of macros in `docs/design/meta.md` are kept: `@m` and `@m(args)` before an item, a top-level item that is a call, a declaration with no `@external`, and a call `m(…)` in a type. Until the macro streams, each is a compile error with a message.
+- The forms of macros in `docs/design/meta.md` are kept: `@m` and `@m(args)` before an item, a top-level item that is a call, a declaration with neither `@external` nor `@js`, and a call `m(…)` in a type. Until the macro streams, each is a compile error with a message.
 
 Decisions taken with the user:
 
@@ -66,7 +66,7 @@ char    = (* any Unicode scalar value but '"' and "\" *) .
 
 i has no keywords. Every word is a `name`, an `UpName`, or a discard (§1.3), and any `name` may be used as a name. The forms that other languages make with keywords are made with brackets and symbols: imports and exports are groups at the start of a file (§2.2), matching is a call of a clause block (§6.12), and a guard is written with `?`.
 
-Some forms are kept for macros, which are not yet part of i: an attribute that is not built in, such as `@m` or `@m(args)` before an item (§2.2); a top-level item that is a call, `m(args)` or `a.m(args)` (§2.2); a declaration with no `@external` (§2.2); and, in a type, a lowercase name or `a.m` followed by `(` (§3). The parser reads each of them in full, and each is a compile error whose message says that the form is kept for macros.
+Some forms are kept for macros, which are not yet part of i: an attribute that is not built in, such as `@m` or `@m(args)` before an item (§2.2); a top-level item that is a call, `m(args)` or `a.m(args)` (§2.2); a declaration with neither `@external` nor `@js` (§2.2); and, in a type, a lowercase name or `a.m` followed by `(` (§3). The parser reads each of them in full, and each is a compile error whose message says that the form is kept for macros.
 
 ### 1.7 Lines (full text)
 
@@ -135,13 +135,15 @@ The first paragraph, "A file has at most one `import` and at most one `export`. 
 >
 > A `MacroItem` is kept for macros. It is a compile error, and the message says that a call at the top level is kept for macros.
 >
-> A declaration with `@external` names a value of the host (§10.1). A declaration with no `@external` is kept for macros, where it goes with a binding of the same name. It is a compile error, and the message says that a declaration with no `@external` is kept for macros.
+> A declaration requires `@external` or `@js` (§10.1), or expansion by a macro. A declaration with neither attribute is kept for macros, where it goes with a binding of the same name. Until that expansion is defined, it is a compile error, and the message says that the declaration is kept for macros.
 
 The paragraph "In one module, every top-level name is defined one time only. …" keeps its text. The paragraph "These are the attributes. …" becomes:
 
 > These are the attributes. An attribute whose name is one of them, with no module name before it, is that attribute. Its arguments must be string literals, given by position, with no labels, and an attribute that takes no arguments is written with no `( )`, as in `@main`. Any other argument, such as `@external("env" <> "", "f")`, `@external(module: "env", "f")`, or `@main()`, is a compile error. Any other attribute, such as `@m`, `@m(args)`, or `@a.m(args)`, is a macro before an item. It is kept for macros, and it is a compile error whose message says so. An attribute in another place, or one attribute given two times on one item, is a compile error.
 
-The list of the attributes keeps its text.
+The list of the attributes keeps its text, with this addition from js.md §9:
+
+> - `@js("expression")`: on a declaration of a closed opaque type (§10.1.1). A declaration cannot have both `@js` and `@external`.
 
 ### 2.3 Imports (edits)
 
@@ -197,7 +199,7 @@ These paragraphs are added after the grammar:
 >
 > An item that is a call, `m(args)` or `a.m(args)`, and has no `=` or `:` after its `)`, is not a binding. It is kept for macros (§2.2).
 >
-> An item `name [ TypeParams ] : Type` with no `=` after the type is a declaration, whatever its attributes. A declaration with no `@external` is kept for macros, and is a compile error (§2.2).
+> An item `name [ TypeParams ] : Type` with no `=` after the type is a declaration, whatever its attributes. A declaration requires `@external` or `@js`, or expansion by a macro (§2.2). A `@js` declaration has the closed opaque type and foreign link semantics of §10.1. It is initialized once during start only if retained by the target link pass; ordinary bindings retain this section's initialization rules.
 
 The sentence "A declaration may only be used with `@external` (§10.1)." is removed, because the last paragraph above takes its place. The rest of the section keeps its text.
 
