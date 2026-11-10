@@ -1,6 +1,6 @@
 # Design: property tests, finite mathematics, and codepoint strings
 
-Status: proposed for coordinator review. This task changes only this note.
+Status: accepted with the coordinator rulings; implementation and feasibility evidence below.
 Source baseline: `b9173ce013405fd3a055ffa34edf3b8829672104`.
 Repository line references are to that baseline, not the older baseline of
 std-1. Examples use the accepted syntax. Signature inventories describe ordinary
@@ -64,10 +64,10 @@ reproducibility and a defensible error bound come before throughput.
 |---|---|---|---|---|
 | A: host-shaped | Reflection and runner registration | Host libm or JavaScript Math | Host indexes and locale | Familiar, but violates ordinary-library and target requirements. |
 | B: smallest wrappers | Separate generator and shrinker | Float Taylor series after modulo rounded tau | Only byte primitives or slice composition | Mapped invariants are lost, huge-angle reduction is wrong, and byte indexes conflict with the plan. |
-| C: pure explicit values | Value with attached lazy shrink tree | Exact-integer enclosures and one final rounding | Scalar operations over UTF-8 primitives | Choose: stronger auditability, with an explicit math performance cost. |
+| C: pure explicit values | Value with attached lazy shrink tree | Certified Float/fixed-point enclosures and one final rounding | Scalar operations over UTF-8 primitives | Choose: stronger auditability, with an explicit math performance cost. |
 
 Keep B's explicit callbacks/small API and A's familiar mathematical names and
-reference cases. Custom shrinkers can build trees through make/tree. A future
+reference cases. Custom shrinkers can build trees through make/tree. The Float
 fast polynomial must certify the same rounded result, not a target-dependent
 approximation.
 
@@ -84,7 +84,7 @@ approximation.
 4. **Float remains finite.** Nonfinite values have no cases in the domain.
    Domain/rounded-overflow errors use Error(Nil), as square_root/real_power do;
    signed zeros use bits (spec §4.2/§11.3; `float.i:510–515`, `:613–618`).
-5. **Correct rounding for new math.** Exact rational enclosures refine until
+5. **Correct rounding for new math.** Certified Float and fixed-point enclosures refine until
    both endpoints round to identical bits. Existing Int and bit conversions
    suffice (spec §11.2/§13). Existing exp/log/power contracts do not change.
 6. **Scalar string access follows existing slice.** Negative at indexes count
@@ -110,6 +110,9 @@ protocol text. Libraries remain optional ordinary i code.
 | [QuickCheck](https://hackage-content.haskell.org/package/QuickCheck-2.16.0.0/docs/Test-QuickCheck.html), [Hedgehog](https://github.com/hedgehogqa/haskell-hedgehog) | Seed/size and separate shrinkers; integrated shrinking | Explicit size/replay and attached shrinks | Type classes, discovery macros and parallel execution. |
 
 ### 3.2 Complete interface
+
+Shrinking is structural: a mapped value need not get numerically smaller.
+Replay is guaranteed only for the same library version under P8.
 
 Export Gen without its constructor. Export Tree, Config, BuildError, Verdict,
 Failure and Report with constructors. Gen's private representation is shown
@@ -473,126 +476,157 @@ rationals, never y /. x in Float. The following rows are ordered:
 Zero-axis rows precede comparisons. Equality of the two zeros does not remove
 their sign bits. Equal positive x,y give rounded pi/4 even at min_positive.
 
-### 4.3 Plain-i algorithm and bounds
+### 4.3 Two-level plain-i algorithm and bounds
 
-The baseline uses exact rational arithmetic and certified intervals. This is a
-concrete algorithm, not a request to find an accurate Taylor polynomial. Only
-input/output bit conversions and finite input comparisons are needed from Float.
-There is no missing Wasm trig instruction prerequisite. Existing square_root
-continues using guarded core.sqrt/f64.sqrt (`float.i:510–515`,
-`crates/ilang-wasm/src/runtime/core.rs:43–44`).
+The coordinator rejected exact-rational Taylor evaluation as the production
+method after the review measured about 40 seconds for the reduced sin(1) kernel.
+The implementation uses a certified Float path and outward fixed-point intervals.
+Both certify the same F1 rounding rule. A failed certificate selects refinement;
+it never selects a different approximation contract. No host math import is used.
 
-```i
-Rational { Rational(numerator: Int, denominator: Int) }
-Interval { Interval(low: Rational, high: Rational) }
-```
+**F5 Decode and certify.** Decode a finite input as the signed integer
+`dyadic(x) = x * 2^1074`. Normal exponent bits e and fraction f give magnitude
+`(2^52+f)*2^(e-1)`; subnormals give f. No large Int is converted to Float.
+At precision p, `Fixed(lo,hi)` denotes [lo/2^p,hi/2^p]. Each conversion and
+operation rounds its lower bound down and upper bound up. Negative integer
+division uses explicit floor/ceiling because Int division truncates toward zero.
+For multiplication take min/max of all four exact products before shifting.
+Division takes four directed endpoint quotients and refines if zero is enclosed.
 
-Private denominators are positive; reduce by Euclidean gcd to control growth.
-Implement floor/ceil for negative rational division explicitly: i division
-truncates toward zero. Interval +,-,*,/ use exact rational endpoint arithmetic
-and min/max; divide only after the denominator interval excludes zero. No large
-Int is converted to Float during computation. Helpers recurse at uniform types.
+Round each endpoint using exact integer quotient/remainder and ties to even,
+including normal carry, subnormals and conceptual overflow. Accept identical
+bits only, or overflow of both endpoints on the same signed side. Opposite
+signed zeros do not agree. Exact-zero cases use F3/F4 before evaluation. The
+existing ratio_bits helper is reused only with its positive-input precondition;
+zero, sign and overflow are handled outside it. Thus an accepted interval
+proves F1, independently of its width or how it was obtained.
 
-**F5 Decode/round.** Decode sign, exponent e and fraction f. With e=0 magnitude
-is f*2^-1074; otherwise (2^52+f)*2^(e-1075). Handle zero before evaluation.
-Round a rational using integer quotient/remainder at the normal/subnormal
-scale: compare twice the remainder with denominator, increment for greater,
-or equality with odd quotient. Carry exponent; check T before constructing
-bits; preserve sign of nonzero underflow. Existing ratio_bits is a starting
-point, not permission to ignore zero or overflow preconditions.
+**F6 Fast evaluation and error argument.** There are two Float fast paths.
+For |x|<=2^-27, sin, tan, asin and atan round to x; cos rounds to +1. Zero signs
+follow F3. For |x|<=2^-27, the sine/atan remainders have magnitude <=|x|^3/3;
+tangent/arcsine have magnitude <=|x|^3/2. These are <=|x|*2^-55, strictly below
+half the smaller adjacent spacing (at least |x|*2^-54 for normal x). For
+subnormals the same absolute inequalities are far below 2^-1075. For cosine,
+1-cos(x)<=x*x/2<=2^-55, below the midpoint 1-2^-54. Domain checks precede asin.
 
-Round both interval endpoints, including conceptual overflow, and accept only
-identical *bits*, or overflow on the same signed side: low>=T or high<=-T.
-Endpoints overflowing on opposite sides do not justify Error. Otherwise refine.
-Equal numeric zeros with different sign bits are not agreement. Known exact-zero
-cases use F3/F4 directly.
+For 2^-20<=|x|<=3/4, sine/cosine also try 20 Taylor terms evaluated as normalized
+double-double pairs. The code uses general TwoSum and Dekker's split product
+with splitter 2^27+1; it does not use fused operations. A pair means the exact
+sum of its two Float components. Multiplication retains the exact high product
+error and both cross products; division by the exact small integer d uses a
+high quotient, exact product residual and one quotient correction. Each step
+ends with TwoSum normalization. The first omitted sine/cosine terms are below
+2^-170 on this interval, by (3/4)^40/40! < 2^-170.
 
-**F6 Certified pi/atan.** For rational |z|<=1/2 sum N terms of
-atan(z)=sum((-1)^k*z^(2k+1)/(2k+1), k=0..N-1). Remainder magnitude is at most
-r(z,N)=|z|^(2N+1)/(2N+1). Add/subtract this exact rational. For positive z>1,
-use pi/2-atan(1/z). For 1/2<z<=1, use
-atan(1/2)+atan((z-1/2)/(1+z/2)); the new argument is at most 1/3. Negatives
-use odd symmetry. Bound pi with 16*atan(1/5)-4*atan(1/239), whose interval width
-is at most 32*r(1/5,N)+8*r(1/239,N). No fixed table runs out of bits at huge x.
-Series/addition identities: [DLMF §4.24](https://dlmf.nist.gov/4.24). The exact
-interval bookkeeping is this design's algorithm.
+Here is a deliberately loose forward bound, rather than a claim of exact
+arithmetic for a pair. Put u=2^-53. In these recurrences the high operands and
+partial sums have magnitude <=2, normalized low parts have magnitude <=8u,
+and d is an exactly represented integer in [2,1560]. Split products cannot
+overflow. A product residual that underflows contributes at most 2^-1074 per
+rounded operation. TwoSum is exact outside that case. In pair addition the
+only discarded errors are the rounding of at most three low terms; in pair
+multiplication they are the low-low product and rounding of at most three
+terms of size <=32u. In corrected division the high-product residual is exact,
+and the residual sum and quotient correction each round quantities of size
+<=32u. Applying |RN(t)-t|<=u*|t|+2^-1075 to those written operations bounds
+each pair operation's absolute error by 4096*u*u + 32*2^-1074 < 2^-93.
+This bound includes rounding of the intermediate cross-term sum and all
+normalization steps; it does not assume a fused product.
 
-**F7 sin/cos/tan.** At precision p, refine pi until the interval x/(pi/2)
-selects a unique nearest integer q. For nonzero rational x no half-integer tie
-is possible. Enclose r=x-q*pi/2; refine until width<=2^-p and |r|<1. Its true
-magnitude is <=pi/4. Take rational midpoint m and radius d. Evaluate N Taylor
-terms of sine/cosine at m exactly. Remainder bounds are respectively
-|m|^(2N+1)/(2N+1)! and |m|^(2N)/(2N)! for N>=1. Choose N making each bound
-<=2^-p; add d because both real derivatives have magnitude<=1. This encloses
-sin(r)/cos(r). Apply q modulo 4, explicitly nonnegative, swapping and negating
-intervals. For tan, divide the resulting intervals only once cos excludes zero;
-do not divide rounded outputs. [DLMF §4.19](https://dlmf.nist.gov/4.19) supplies
-the series; decreasing alternating terms for |m|<1 give these error bounds.
+The squared argument has error <2^-93. Multiplication by its exact square is
+a contraction <=9/16, and subsequent division has d>=2. Bounding each term
+magnitude by 2, a term recurrence error obeys
+`e_next <= (9/32)*e + 2*2^-93 + 2*2^-93`, so e<6*2^-93.
+Twenty such term errors plus twenty pair-add errors are <140*2^-93 <2^-85;
+the omitted analytic remainder and underflow allowances fit in the slack.
+The operand and low-part bounds above follow inductively from the same
+contraction and TwoSum normalization. This is an absolute bound on the pair's
+exact sum, not an empirical ulp estimate.
 
-**F8 Inverse functions/norm.** atan2 uses F4 and exact ratios, then F6. For
-asin/acos inside (-1,1), enclose sqrt(1-x*x) in rational arithmetic and use
-atan2(x,sqrt(...)) or atan2(sqrt(...),x), propagating intervals. Handle axes and
-endpoints first. To bound sqrt(a/b) at p, compute
-k=isqrt(floor(a*2^(2p)/b)). The interval [k/2^p,(k+1)/2^p] encloses it; return
-an exact singleton when k*k*b==a*2^(2p). Integer sqrt uses binary search or
-decreasing Newton iteration with final square comparisons. Apply monotone atan
-to endpoint ratios. Refine if a denominator still touches zero. Never compute
-1-.x*.x in Float and lose endpoint cancellation.
+To certify a pair h+l, the code computes RN(h+RN(l-2^-80)) and
+RN(h+RN(l+2^-80)). Since |l|<=8u, the inner rounding error is at most 2^-102;
+therefore these inner values enclose l±2^-85 with ample slack. Monotonicity of
+nearest rounding proves that identical endpoint bits are the correctly rounded
+real result. Ambiguity falls back. Values outside these two fast regions, and
+nontrivial inverse functions, norms and conversions, use the methods below.
+The narrow fast region is a performance limitation, not a change to F1.
 
-For hypot, avoid an interval loop that cannot resolve exact midpoint ties.
-Compute rational s=x*x+y*y. Binary-search nonnegative finite bit patterns using
-exact rational square comparisons for adjacent a<=sqrt(s)<=b. If s=a*a, return
-a. Otherwise compare s to ((a+b)/2)^2, selecting the even significand on equality.
-Above M compare s with T*T, yielding M or Error. Below min_positive use a=0,
-b=2^-1074. At most 63 bit-pattern bisections plus integer arithmetic. This handles
-Pythagorean results, midpoint ties and huge exponents without Float overflow.
+**F7 Fixed-point pi, atan and angle reduction.** Compute
+pi=16*atan(1/5)-4*atan(1/239). Each term of the reciprocal atan series is divided
+individually with directed rounding at scale 2^p; no rational denominator is
+carried into the next sum. Stop when the next exact denominator exceeds 2^p;
+one fixed-point unit bounds the alternating remainder. All accumulated interval
+width is retained. For a general |z|<=1/2, interval power recurrences enclose
+each exact Taylor term. Stop when the next power enclosure has magnitude at
+most two units; the next term and alternating tail have magnitude at most two
+units. Widen by two units. For z>1 use pi/2-atan(1/z); for 1/2<z<=1 use
+atan(1/2)+atan((z-1/2)/(1+z/2)). Odd symmetry handles negative results. This
+interval extension encloses the exact addition/inversion identities.
 
-**F9 Refinement/termination.** Start p=128 and double on F5 ambiguity. Increase
-series length/pi precision until the rational bounds hold; full-input reduction
-may need over 1024 bits of pi on its first pass. Unit conversions enclose the
-real x*pi/180 or x*180/pi, using the same refinement, never public rounded pi.
+For sin/cos/tan start angle reduction at p+max(0,input exponent)+32 bits.
+Enclose x/(pi/2), requiring a unique nearest integer q; enclose x-q*pi/2,
+requiring width<=2^-p and magnitude<1. Otherwise double reduction precision.
+Rescale outward to p. On this reduced interval, interval Taylor recurrences
+retain every rounding error, stopping when the first omitted term enclosure
+has magnitude<=two units, then widening by two units for its alternating tail.
+Apply q modulo four by swapping/negating enclosures. Tangent divides those
+enclosures only after cosine excludes zero, rather than dividing rounded results.
 
-Each enclosure contains the exact result, so F5 proves correct rounding and F1's
-bound. These are obligations to preserve in the implementation. Refinement
-terminates in exact arithmetic: nonzero algebraic angles have transcendental
-sin/cos/tan (by exponential transcendence), and a nonzero algebraic angle cannot
-have algebraic sin/cos/tan. Thus the nonexceptional inverse trig results here,
-whose arguments/ratios/roots are algebraic, cannot be rational rounding midpoints.
-Nonzero rational multiples/divisors of pi are irrational. Exact zeros/axes are
-handled explicitly and hypot uses exact square comparisons. This is not a small
-fixed-precision/runtime bound. Resource exhaustion remains possible as for other
-large-Int computations; an iteration cap must not manufacture a numeric result.
+**F8 Inverses and norm.** atan2 uses the exact integer ratio of its two dyadic
+inputs and the ordered axes in F4. For asin/acos, compute the exact rational
+1-x*x before enclosing its square root. To enclose sqrt(n/d) at p, take
+k=isqrt(floor(n*2^(2p)/d)); use [k,k+1] fixed-point units, or a singleton when
+k*k*d==n*2^(2p). Integer square root uses decreasing Newton iteration from a
+power-of-two upper bound. Interval division and atan identities propagate this
+uncertainty; acos uses pi/2-asin with its sign handled before subtraction.
+There is no rounded Float subtraction 1-x*x or rounded Float atan2 ratio.
 
-Optional fast paths must provide valid enclosures and fall back on ambiguity.
-No unsupported ulp claim or random-testing-only argument substitutes for F5–F9.
-Review enclosure code separately from the independent vector generator.
+Hypot does not refine through an exact midpoint. Form exact integer
+s=dyadic(x)^2+dyadic(y)^2. Compare s with (T*2^1074)^2 and (M*2^1074)^2 first.
+Compute k=isqrt(s), determine the adjacent nonnegative binary64 grid values
+a,b bracketing sqrt(s), then compare 4*s with (a+b)^2 in dyadic units. Equality
+chooses the even significand. This replaces the note's 63 bit-pattern bisections
+with an equivalent exact-square decision. Both zero inputs return +0. No
+intermediate Float can overflow and the six review midpoint ties terminate.
 
-### 4.4 Determinism, test gate and cost
+**F9 Refinement and termination.** Start the result scale at p=128 and double
+whenever F5 cannot certify. Radians/degrees enclose the exact real x*pi/180 or
+x*180/pi using the same fixed-point operations, not the rounded public pi.
+Every finite-stage enclosure contains the real result. Interval widths tend
+to zero: fixed-point rounding contributes polynomially many units at growing
+precision, while series tails and reduction width tend to zero geometrically.
+For nonzero algebraic angles, sin/cos/tan cannot be algebraic rounding midpoints;
+nonexceptional inverse angles cannot be nonzero algebraic midpoints either,
+by exponential transcendence. Nonzero rational multiples or divisors of pi are
+irrational. Exact zeros/axes are handled directly and hypot uses exact squares.
+Thus refinement terminates in exact arithmetic; no iteration cap manufactures
+an answer. The current absolute scale is costly for subnormal conversions and
+extreme tiny ratios. Resource exhaustion remains possible for large Int work.
 
-Branches depend on exact Int arithmetic/bit classification; output bits are
-constructed explicitly. No host imports, fused operations, extended-precision
-temporaries or target-selected approximations. Correct Wasm engines therefore
-produce identical bits on native Wasmtime, JavaScript's Wasm engine and WASI,
-at O0 and O2. This is reasoning from operations, not a claim those runs happened.
+### 4.4 Determinism, independent vectors and feasibility gate
 
-Generate golden bit vectors with independent directed-rounding MPFR intervals,
-refining until rounding to binary64 is determined. A single 53-bit result or
-Python math is not the oracle. Preserve MPFR version, rounding/exponent handling
-and generation procedure with fixtures; [MPFR's manual](https://www.mpfr.org/mpfr-current/mpfr.html)
-describes those controls. MPFR is a development tool, never a runtime dependency.
-The independent oracle must not reuse i's Machin/Taylor implementation.
+The Float fast path uses only separately rounded binary64 operations and bit
+comparisons. The slow path uses exact Int arithmetic and explicit bit assembly.
+No fused operation, extended precision, host import or target-selected formula
+is permitted. Each path certifies F1, so selecting either path cannot change
+output bits. This is a determinism argument; executed target checks are recorded
+separately in section 11.
 
-Include ±0, subnormal/normal boundaries, ±1 and neighbors, all quadrants,
-binary64 neighbors of multiples of pi/2, largest finite magnitudes, widely
-separated atan2/hypot exponents, deterministic random finite bit patterns and
-oracle-searched midpoint-near values. Run identical fixtures in all three host
-paths at both optimization levels. Approximate equality alone cannot pass.
+`std/test/float_oracle.py` reproduces the review's 331 inputs, using MPFR's own
+functions with directed intervals initially at 4096 bits. Both endpoints must
+round to identical binary64 bits or the oracle increases precision. This oracle
+does not reuse the production Machin/Taylor code or the review's rational model.
+It retains signed zeros, exact hypot ties and checked overflow/domain errors.
+MPFR is only a development dependency. Generated fixtures are committed last.
 
-This baseline is slower than fdlibm and allocates large Ints. Series/reduction
-work grows with precision, including input exponent. There is no libm-throughput
-promise. Measure ordinary/huge angles, tiny inverse arguments and difficult
-rounding cases before landing. If unacceptable, add certified fast paths;
-do not silently weaken the result contract or import host mathematics.
+The coordinator's feasibility gate is binding: at --opt 2, ordinary inputs must
+cost at most 20 native libm calls on this machine, and every input must finish
+under 1 ms. Measure ordinary magnitudes, huge arguments (1e300 and max finite),
+subnormals, hard rounding inputs, and the share selecting interval refinement.
+Failure requires reporting measurements and asking about a deterministic
+algorithm with a stated error bound below one ulp; it does not authorize such
+an alternative, weakening F1, or importing host mathematics. The implementation
+and measurement limitations are recorded in section 11.
 
 ## 5. Additions to `std/string`
 
@@ -620,8 +654,7 @@ last_index_of: (string: String, find: String, from: Int) -> Option(Int)
 count: (string: String, find: String) -> Int
 take_start: (from: String, up_to: Int) -> String
 take_end: (from: String, up_to: Int) -> String
-partition: (string: String, on: String) -> Option((String, String))
-partition_last: (string: String, on: String) -> Option((String, String))
+split_once_last: (string: String, on: String) -> Option((String, String))
 replace_n: (in: String, each: String, with: String, up_to: Int) -> String
 split_when(E, N): (string: String, on: (UtfCodepoint) -> Bool ? E ! N) -> List(String) ? E ! N
 words: (string: String) -> List(String)
@@ -648,11 +681,11 @@ Python's boundary count. replace_n replaces the first max(0,k) nonoverlapping
 matches. Empty each or k<=0 returns input. A sufficient k agrees with existing
 replace. Inserted replacement text is not searched again.
 
-**S4 Taking/partition.** take_start/end clamp counts to [0,n]. partition wraps
-existing split_once behavior; partition_last uses the last full occurrence.
-Both omit the separator and return None for absence or empty on. End separators
-give an empty component. The partition name makes a symmetric pair; it is the
-one intentional alias. No Python three-part tuple: caller already has on.
+**S4 Taking/splitting.** take_start/end clamp counts to [0,n]. Existing
+split_once uses the first full occurrence; split_once_last uses the last. Both
+omit the separator and return None for absence or empty on. End separators give
+an empty component. The coordinator rejected partition as a duplicate of
+split_once: there are 13 additions. No three-part tuple: caller already has on.
 
 **S5 Scalar callbacks.** split_when calls on once per scalar left to right.
 True marks a separator; runs collapse and empty pieces are omitted. Empty input
@@ -790,7 +823,7 @@ CLI failure count, report text and exit status.
 | count("aaaa","aa"); count("abc","") | 2; 0 (S3). |
 | replace_n("aaa","a","aa",2) | "aaaaa", inserted text not searched (S3). |
 | take_start("aé😀",-1); take_end(...,2) | ""; "é😀" (S4). |
-| partition_last("a=b=c","="); partition("x","") | Some(("a=b","c")); None (S4). |
+| split_once_last("a=b=c","="); split_once("x","") | Some(("a=b","c")); None (S4). |
 | words(" a\t\n b "); words("a\u{a0}b") | ["a","b"]; ["a\u{a0}b"] (S5). |
 | Callback error at second scalar | Only first two callbacks run, error propagates (S5). |
 | Empty map/filter/fold | "", "", initial accumulator; no callback (S5). |
