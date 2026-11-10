@@ -64,6 +64,12 @@ i/random.follow : (h: State, bits: List(Int)) -> State
 i/random.derive_path : (g: Generator, path: List(Int)) -> Generator
 i/random.at_path : (g: Generator, path: List(Int)) -> Generator ? RandomError
 i/syntax.definition : (of: Syntax) -> Syntax ? SyntaxError ! Definitions
+i/syntax.raw_definition : (Syntax) -> DefinitionResult
+i/syntax.raw_definition_ok : (DefinitionResult) -> Bool
+i/syntax.raw_definition_value : (DefinitionResult) -> Syntax
+i/syntax.raw_definition_message : (DefinitionResult) -> String
+i/syntax.raw_definition_at : (DefinitionResult) -> Syntax
+i/syntax._definitions : () -> Definitions
 i/syntax._match : (Syntax, Syntax) -> MatchResult
 i/syntax._match_ok : (MatchResult) -> Bool
 i/syntax._match_one : (MatchResult, Int) -> Syntax
