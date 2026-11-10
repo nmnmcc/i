@@ -79,6 +79,7 @@ export function compiledImports(GuestError, printed = [], overrides = {}) {
   return {
     ...imports,
     "app:clock/v1": { ...imports["app:clock/v1"], tick: overrides.tick ?? (async (n) => n + 1n) },
+    ...opaqueImports(overrides.opaque ?? null),
   };
 }
 
@@ -158,4 +159,41 @@ export function gateService({ seed = 0, burst = false, requestSignal = null, fai
   /** The arguments of the released gates whose requests were answered, in order. */
   gates.answered = () => gates.released.filter((gate) => !gate.signal?.aborted).map((gate) => gate.x);
   return gates;
+}
+
+/** The same raw value enters each declared opaque type (spec 4.1, 11.4). */
+export function opaqueImports(reference) {
+  return {
+    "app:opaque/v1": { get: () => reference, echo: (value) => value },
+    "app:opaque-sync/v1": { get_a: () => reference, get_b: () => reference },
+    "app:opaque-async/v1": { get_a: async () => reference, get_b: async () => reference },
+  };
+}
+
+/** Run the compiled nominal-identity matrix in Node.js and browsers. */
+export async function checkOpaque(guest, reference, other) {
+  const call = (name, args = []) => guest.call(`app/opaque.${name}`, args);
+  const results = [];
+  for (const [a, b, same] of [[reference, reference, true], [reference, other, false], [null, null, true], [null, reference, false]]) {
+    for (const name of ["direct_aa", "generic_aa", "alias_aa", "collection_aa", "roundtrip_aa"]) {
+      results.push(call(name, [a, b]) === same);
+    }
+    // Different constructors differ even when the foreign identity is shared.
+    for (const name of ["direct_ab", "generic_ab", "module_ab", "collection_ab"]) {
+      results.push(call(name, [a, b]) === false);
+    }
+  }
+  for (const a of [reference, null]) {
+    const returned = call("echo", [a]);
+    results.push(returned === a, call("generic_aa", [a, returned]) === true);
+    results.push(call("generic_ab", [a, returned]) === false);
+    results.push(call("roundtrip_ab", [a]) === false);
+    results.push(call("hash_aa", [a, a]) === true);
+    results.push(call("inspect_a", [a]) === "//wasm(opaque)");
+  }
+  for (const name of ["import_aa", "sync_aa"]) results.push(call(name) === true);
+  for (const name of ["import_ab", "sync_ab"]) results.push(call(name) === false);
+  results.push(await guest.callAsync("app/opaque.async_aa") === true);
+  results.push(await guest.callAsync("app/opaque.async_ab") === false);
+  return results.every(Boolean);
 }
