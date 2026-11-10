@@ -10,12 +10,24 @@ fn mark_definition_head(definition: Syntax, answer: u64) -> Syntax {
     let Node::Round(parts) = definition.node() else {
         return definition;
     };
+    if let [marker, attribute, inner] = parts.as_slice()
+        && matches!(marker.node(), Node::Symbol(s) if s == "@")
+    {
+        return definition.replace_children(vec![
+            marker.clone(),
+            attribute.clone(),
+            mark_definition_head(inner.clone(), answer),
+        ]);
+    }
     let head = match parts.as_slice() {
         [eq, _, _] if matches!(eq.node(), Node::Symbol(s) if s == "=") => 1,
         [_, body] if matches!(body.node(), Node::Curly(_)) => 0,
         _ => return definition,
     };
-    if !matches!(parts[head].node(), Node::Round(_)) {
+    let Node::Round(head_parts) = parts[head].node() else {
+        return definition;
+    };
+    if !head_parts.iter().skip(1).any(|part| matches!(part.scope_identity(), Some(ScopeIdentity::DefinitionParameter { answer: owner, .. }) if *owner == answer)) {
         return definition;
     }
     let mut parts = parts.clone();
@@ -199,7 +211,47 @@ pub fn freshen_parameters(definition: &Syntax, old_answer: u64, new_answer: u64)
         old_answer, new_answer,
         "a copied definition needs a fresh answer identity"
     );
-    fn walk(syntax: &Syntax, old_answer: u64, new_answer: u64) -> Syntax {
+    use std::collections::HashMap;
+    fn key(s: &Syntax) -> usize {
+        std::ptr::from_ref(s.node()) as usize
+    }
+    let mut seen = HashMap::<usize, Syntax>::new();
+    let mut pending = vec![(definition, false)];
+    while let Some((syntax, finish)) = pending.pop() {
+        let id = key(syntax);
+        if seen.contains_key(&id) {
+            continue;
+        }
+        if !finish {
+            pending.push((syntax, true));
+            match syntax.node() {
+                Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                    for child in xs.iter().rev() {
+                        pending.push((child, false));
+                    }
+                }
+                Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => pending.push((x, false)),
+                _ => {}
+            }
+            continue;
+        }
+        let mapped = |child: &Syntax| {
+            seen.get(&key(child))
+                .expect("definition child was freshened first")
+                .clone()
+        };
+        let children = |xs: &[Syntax]| xs.iter().map(mapped).collect();
+        let node = match syntax.node() {
+            Node::Round(xs) => Node::Round(children(xs)),
+            Node::Square(xs) => Node::Square(children(xs)),
+            Node::Curly(xs) => Node::Curly(children(xs)),
+            Node::Bits(xs) => Node::Bits(children(xs)),
+            Node::Quote(x) => Node::Quote(mapped(x)),
+            Node::Unquote(x) => Node::Unquote(mapped(x)),
+            Node::Splice(x) => Node::Splice(mapped(x)),
+            leaf => leaf.clone(),
+        };
+        let mut rewritten = syntax.with_node(node);
         if let Some(ScopeIdentity::DefinitionParameter {
             answer,
             parameter,
@@ -207,31 +259,19 @@ pub fn freshen_parameters(definition: &Syntax, old_answer: u64, new_answer: u64)
         }) = syntax.scope_identity()
             && *answer == old_answer
         {
-            return syntax.replace_scope_identity(ScopeIdentity::DefinitionParameter {
+            rewritten = rewritten.replace_scope_identity(ScopeIdentity::DefinitionParameter {
                 answer: new_answer,
                 parameter: *parameter,
                 name: name.clone(),
             });
         }
-        let children = |xs: &[Syntax]| xs.iter().map(|s| walk(s, old_answer, new_answer)).collect();
-        let node = match syntax.node() {
-            Node::Round(xs) => Node::Round(children(xs)),
-            Node::Square(xs) => Node::Square(children(xs)),
-            Node::Curly(xs) => Node::Curly(children(xs)),
-            Node::Bits(xs) => Node::Bits(children(xs)),
-            Node::Quote(x) => Node::Quote(walk(x, old_answer, new_answer)),
-            Node::Unquote(x) => Node::Unquote(walk(x, old_answer, new_answer)),
-            Node::Splice(x) => Node::Splice(walk(x, old_answer, new_answer)),
-            leaf => leaf.clone(),
-        };
-        let rewritten = syntax.with_node(node);
         if rewritten.definition_head() == Some(old_answer) {
-            rewritten.with_definition_head(new_answer)
-        } else {
-            rewritten
+            rewritten = rewritten.with_definition_head(new_answer);
         }
+        seen.insert(id, rewritten);
     }
-    walk(definition, old_answer, new_answer)
+    seen.remove(&key(definition))
+        .expect("definition was freshened")
 }
 
 /// The name and optional module of a `definition` query; each atom keeps its
@@ -400,5 +440,56 @@ pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
     } else {
         result[body_index] = ty(&parts[body_index], &binders, answer);
     }
-    Ok(item.with_node(Node::Round(result)).as_answer())
+    Ok(mark_definition_head(
+        item.with_node(Node::Round(result)).as_answer(),
+        answer,
+    ))
+}
+
+/// Freshen repeated copies of a query-provided definition head within one
+/// item result. The caller supplies globally fresh answer identities.
+pub fn freshen_duplicate_heads(result: &Syntax, mut fresh: impl FnMut() -> u64) -> Syntax {
+    use std::collections::HashSet;
+    fn owner(item: &Syntax) -> Option<u64> {
+        let Node::Round(parts) = item.node() else {
+            return None;
+        };
+        match parts.as_slice() {
+            [marker, _, inner] if matches!(marker.node(), Node::Symbol(s) if s == "@") => {
+                owner(inner)
+            }
+            [head, body] if matches!(body.node(), Node::Curly(_)) => head.definition_head(),
+            [marker, head, _] if matches!(marker.node(), Node::Symbol(s) if s == "=") => {
+                head.definition_head()
+            }
+            _ => None,
+        }
+    }
+    let items: Vec<_> = match result.node() {
+        Node::Curly(items) => items.clone(),
+        _ => vec![result.clone()],
+    };
+    let mut reserved: HashSet<_> = items.iter().filter_map(owner).collect();
+    let mut seen = HashSet::new();
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        let Some(id) = owner(&item) else {
+            out.push(item);
+            continue;
+        };
+        if seen.insert(id) {
+            out.push(item);
+            continue;
+        }
+        let next = fresh();
+        assert!(
+            reserved.insert(next),
+            "definition answer identity must be fresh"
+        );
+        out.push(freshen_parameters(&item, id, next));
+    }
+    match result.node() {
+        Node::Curly(_) => result.replace_children(out),
+        _ => out.pop().expect("a single item result is present"),
+    }
 }

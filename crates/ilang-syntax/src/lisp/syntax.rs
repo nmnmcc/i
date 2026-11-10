@@ -283,6 +283,18 @@ impl Syntax {
     /// Rebuild a quoted template node with its evaluated children. The node's
     /// written origin and scope stay intact; each child keeps its own identity.
     pub fn replace_children(&self, children: Vec<Syntax>) -> Self {
+        // The queried type name may change, but its original parameter
+        // binders must remain the same syntax nodes in the same positions.
+        let definition_head = self.definition_head().filter(|_| match self.node() {
+            Node::Round(original) if !original.is_empty() && original.len() == children.len() => {
+                original
+                    .iter()
+                    .skip(1)
+                    .zip(children.iter().skip(1))
+                    .all(|(a, b)| a.same_origin(b))
+            }
+            _ => false,
+        });
         let node = match self.node() {
             Node::Round(_) => Node::Round(children),
             Node::Square(_) => Node::Square(children),
@@ -306,7 +318,7 @@ impl Syntax {
             span: self.span(),
             provenance: self.provenance(),
             identity: self.scope_identity().cloned(),
-            definition_head: self.definition_head(),
+            definition_head,
             origin: self.0.origin.clone(),
             host_identity: Mutex::new(None),
         }))
@@ -652,12 +664,10 @@ impl Syntax {
     }
 }
 
-/// Validate the authority and datum restrictions on one macro result (§4.3).
-/// The inputs must be the syntax arguments of that run. Mark changes preserve
-/// node origins; rebuilding even an identical attribute does not.
-pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), SyntaxError> {
-    use std::collections::{HashMap, HashSet};
-    fn same_origin_tree(a: &Syntax, b: &Syntax) -> bool {
+/// Whether every node still comes from exactly the same source subtree.
+fn same_origin_tree(a: &Syntax, b: &Syntax) -> bool {
+    let mut pending = vec![(a, b)];
+    while let Some((a, b)) = pending.pop() {
         if !a.same_origin(b) {
             return false;
         }
@@ -666,11 +676,14 @@ pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), S
             | (Node::Square(x), Node::Square(y))
             | (Node::Curly(x), Node::Curly(y))
             | (Node::Bits(x), Node::Bits(y)) => {
-                x.len() == y.len() && x.iter().zip(y).all(|(x, y)| same_origin_tree(x, y))
+                if x.len() != y.len() {
+                    return false;
+                }
+                pending.extend(x.iter().zip(y));
             }
             (Node::Quote(x), Node::Quote(y))
             | (Node::Unquote(x), Node::Unquote(y))
-            | (Node::Splice(x), Node::Splice(y)) => same_origin_tree(x, y),
+            | (Node::Splice(x), Node::Splice(y)) => pending.push((x, y)),
             (
                 Node::Round(_)
                 | Node::Square(_)
@@ -680,10 +693,18 @@ pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), S
                 | Node::Unquote(_)
                 | Node::Splice(_),
                 _,
-            ) => false,
-            _ => true,
+            ) => return false,
+            _ => {}
         }
     }
+    true
+}
+
+/// Validate the authority and datum restrictions on one macro result (§4.3).
+/// The inputs must be the syntax arguments of that run. Mark changes preserve
+/// node origins; rebuilding even an identical attribute does not.
+pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), SyntaxError> {
+    use std::collections::{HashMap, HashSet};
     fn restricted(s: &Syntax) -> Option<&str> {
         let Node::Round(xs) = s.node() else {
             return None;
@@ -708,15 +729,16 @@ pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), S
         root: &'a Syntax,
         f: &mut impl FnMut(&'a Syntax) -> Result<(), SyntaxError>,
     ) -> Result<(), SyntaxError> {
-        f(root)?;
-        match root.node() {
-            Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
-                for child in xs {
-                    descend(child, f)?;
+        let mut pending = vec![root];
+        while let Some(current) = pending.pop() {
+            f(current)?;
+            match current.node() {
+                Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                    pending.extend(xs.iter().rev())
                 }
+                Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => pending.push(x),
+                _ => {}
             }
-            Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => descend(x, f)?,
-            _ => {}
         }
         Ok(())
     }
