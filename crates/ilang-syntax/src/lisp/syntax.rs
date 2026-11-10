@@ -8,7 +8,7 @@ use crate::token::TokenKind;
 use num_bigint::BigUint;
 
 /// A module and the marks that determine name resolution.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Scope {
     pub module: u32,
     pub marks: BTreeSet<u64>,

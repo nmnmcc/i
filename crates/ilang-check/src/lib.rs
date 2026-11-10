@@ -53,6 +53,7 @@ pub mod code {
     pub const TYPE_VAR_IS_TYPE: &str = "E0231";
     pub const TYPE_PARAM_FORM: &str = "E0232";
     pub const MACRO_RESERVED: &str = "E0234";
+    pub const MACRO_BINDER: &str = "E0235";
     // E0229, E0233 and E0237 were temporary value-type reservations.
     pub const VALUE_TYPE_CIRCLE: &str = "E0530";
     pub const VALUE_TYPE_PLACE: &str = "E0531";
@@ -126,6 +127,10 @@ pub struct Parsed {
     pub source: SourceId,
     pub kind: ModuleKind,
     pub ast: ast::Module,
+    /// Origins of names introduced by expansion in this module.
+    pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
+    /// This module was built by the compiler and may call compiler internals.
+    pub compiler_generated: bool,
 }
 
 /// Parses every module of the graph. Syntax errors keep their codes.
@@ -151,6 +156,8 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
                 source: m.source,
                 kind: m.kind,
                 ast,
+                scoped: None,
+                compiler_generated: false,
             });
         }
     }

@@ -23,6 +23,7 @@ pub struct ScopedError {
 }
 
 /// Source text with a virtual, append-only suffix for expanded occurrences.
+#[derive(Clone)]
 pub struct ScopedSource {
     text: String,
     original_len: u32,
