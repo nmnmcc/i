@@ -344,6 +344,9 @@ impl Solver {
 
     /// The variances of the parameters of a head (§4.5 rules 6 and 7).
     pub fn variances(&self, h: Head, n: usize) -> ParamModes<Variance> {
+        if n == 0 {
+            return ParamModes::repeated(Variance::Inv, 0);
+        }
         match h {
             Head::Named(TypeRef::Custom(id)) => self.variance.get(&id).map_or_else(
                 || ParamModes::repeated(Variance::Inv, n),

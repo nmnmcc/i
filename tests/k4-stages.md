@@ -271,3 +271,92 @@ it held slots while the verification command was about to request its nested
 snippet-build slot. Only this lane's waiting quiet wrapper and its flock
 child were terminated, releasing the locks. The completed quiet measurement
 is started after the gates and comparisons finish.
+
+The nested-slot issue also occurred when another lane's quiet measurement
+queued behind this lane's last snippet step. The already-completed Rust,
+i/JS, spec and WAT checks were retained, but that final snippet step was
+interrupted. The queued replacement verification had not started and was
+also replaced. The final command runs old-syntax-check outside the outer
+heavy wrapper, allowing its own wrapped Cargo build to acquire a slot. No
+other lane's process, source, or measurement was stopped or modified.
+
+## Principality and termination argument
+
+The former row bounds represented inclusion by ordinary value-variable
+bounds. Following that aggregate back through a service argument could
+invent a constructor cycle although the finite solution is N | S(N).
+Rows now collect their member requirements in the receiving variable while
+retaining equality comparisons on service arguments. The inclusion shortcut
+only removes A - H <: A (also through an already proved inclusion), or
+A <: A | B. Difference obligations are separate scheme constraints, not
+recursive constructor bounds, and are instantiated with the same variable
+mapping as the visible type.
+
+Normalization also uses equality proved by both bounds: T <: v <: T fixes
+v to T. It never discards N <: S(N) or S(N) <: N. Each rewrite either removes
+an entailed bound or fixes one variable to an already present exact type;
+there are no new variables. On a fixed bound component this reaches a finite
+fixed point. Row modes have three ordered states and only increase; the
+parameter-kind pass likewise terminates after finitely many upgrades.
+Constraints retain their existing cache, now including the mode. Handler
+restrictions propagate over finite member-variable reachability and are
+copied under the existing level/generalization discipline. Genuine
+constructor cycles still fail before a successful scheme leaves the checker.
+Coalescing expands a finite graph after alias SCC collapse; completed
+expansions are memoized by representative, polarity and row mode. A cycle
+failure is never memoized as a successful type.
+
+These are checks of interpretation, separate from the implementation tests:
+4.5 rules 2 and 3 require those inclusions for every assignment; 4.5's type
+equality sentence requires mutual inclusion; 4.7 requires principal schemes
+and rejects actual self-containing types. F1 requires the restriction to stay
+in the scheme, and F2 requires the row mode everywhere. The old scheme
+rebuild lost a real obligation and the old constraint-local flag lost a real
+comparison rule; neither was a valid simplification. F3's explicit finite
+handler spellings and 4.8's field/call rules require the same acceptance as
+pattern access. The retained restriction is checked at every instance, even
+when an annotation shows the wider result row.
+
+## Functions changed for merge planning
+
+This inventory compares K4 with merged redesign c2f41b7, excluding T1/T2
+changes inherited by the merges. Test functions are covered by their test
+files above.
+
+| File | Functions |
+| --- | --- |
+| `types/solve.rs` | `Solver::new`, `for_closed_types`, `fresh_at`, `variances`, `fail`, `constrain`, `constrain_env`, `rows`, `mark_row`, `mark_mode`, `is_row`, `mode`, `constrain_row`, `has_obligations`, `handle`, `same_form`, `hidden_handlers` (and its `parts` walker), `constrain_in`, `constrain_by`, `add_bound`, `compare`, `join`, `route`, `diff_left`, `extrude`, `freshen`, `env_union`, `union_mode`, `merge`, `merge_arg`, `diff`, `env_diff`, `diff_mode`, `normalize_mode`, `diff_bound`, `diff_bound_mode`, `occurs`, `normalize_bounds`, `normalize_type`, `normalized`, `occurs_from`; `edge_vars`, `bound_vars`, `env_vars`, `builtin_variance`, `builtin_variance_values`; `ParamModes::{repeated,from_slice,next,size_hint}`. |
+| `types/infer.rs` | `Checker::new`, `run`, `group`, `entry_point`, `exported_type`, `check_occurs`, `report_coalescing`, `add_err`, `add_env`, `pop_effects`, `conv`, `fresh_args`, `function`, `local_binding`, `generalize`, `rebuild`; `row_parameters` and its `walk`. |
+| `types/display.rs` | `scheme_in`, `scheme_names`, `simplify_steps`; `Coalescer::go`; `Norm::{norm,env,union_in,step,walk}`; `record`. |
+| `types/alias.rs` | `Checker::instantiate_alias`; `normalize`. |
+| `types/known.rs` | `Checker::ctor_known` (consume the variance iterator). |
+| `types/value_types.rs` | `closed_equal`, `normalize_closed`, `Checker::closed_written` (preserve row metadata in closed-type scratch solvers). |
+| `types/mod.rs` | `LocalTypes::{show_in,named_types}`, `Typed::{coalescing_errors,lines}` and their diagnostic-state fields. |
+| `ilang-cli/src/commands/package.rs` | `interface_of` (explicit missing-scheme/canonical-tree errors). |
+| `ilang-wasm/src/lower.rs` | `lower_with_bindings` (retained diagnostic guard). |
+
+No type or library name participates in the solver fixes. The built-in
+Continuation/Boundary parameter roles come from their language-defined
+function/error/environment positions. The existing type-parameter variance
+rules continue to apply to value arguments and to the row as a whole.
+
+The q regression loader now requires every fixture to exist (`unwrap`);
+a missing file cannot silently skip a named program. The independent named
+runner already required all twenty files. This test-only tightening is
+rechecked with the CLI K4 test after the full gate.
+
+The first completed quiet final run was effectively flat on std (median CPU
+0.322220 s before and 0.323087 s after, +0.27%; paired-difference bootstrap
+interval included zero). It did not give a clear margin for the strict
+not-worse criterion. A final allocation audit removed the temporary clone
+of every bound before coalescing copied it into the result. The solver is
+immutable during coalescing, so iterating those bounds by reference preserves
+all constraints, traversal order and cycle checks. Variance lookup now skips
+argumentless constructors, and the row-parameter fixed point skips definitions
+without parameters: neither can contribute a parameter property. The final
+measurement and full gate are repeated for these changes.
+
+The CLI boundary tests additionally run the first review's exact annotated
+`@main main(N)` reproducer and its unannotated twin. Both must give E0522.
+Replacing the call with Nil must succeed at both optimization levels: 4.8
+rule 4 says that merely creating the unused function needs no service.

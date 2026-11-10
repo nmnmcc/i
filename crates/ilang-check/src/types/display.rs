@@ -567,23 +567,25 @@ impl Coalescer<'_> {
                 }
                 self.stack.insert(v, depth);
                 let mut parts = Vec::new();
+                let solver = self.s;
                 if mono {
                     // Not generalized: the types that come to it (§4.7).
                     for m in self.members(v) {
-                        let st = &self.s.vars[m.0 as usize];
-                        let mut bounds = st.lower.clone();
-                        bounds.extend(st.from.iter().map(|w| Ty::Var(*w)));
-                        for b in bounds {
-                            parts.push(self.go(&b, true, depth, env));
+                        let st = &solver.vars[m.0 as usize];
+                        for b in &st.lower {
+                            parts.push(self.go(b, true, depth, env));
+                        }
+                        for w in &st.from {
+                            parts.push(self.go(&Ty::Var(*w), true, depth, env));
                         }
                     }
                 } else {
                     parts.push(Ty::Var(v));
                     for m in self.members(v) {
-                        let st = &self.s.vars[m.0 as usize];
+                        let st = &solver.vars[m.0 as usize];
                         let bounds = if pos { &st.lower } else { &st.upper };
-                        for b in bounds.clone() {
-                            parts.push(self.go(&b, pos, depth, env));
+                        for b in bounds {
+                            parts.push(self.go(b, pos, depth, env));
                         }
                     }
                 }

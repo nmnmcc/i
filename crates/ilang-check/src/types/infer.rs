@@ -2624,6 +2624,9 @@ fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
     loop {
         let mut changed = false;
         for (i, t) in p.types.iter().enumerate() {
+            if t.params.is_empty() {
+                continue;
+            }
             let id = TypeId(i as u32);
             let mut acc = table[&id].clone();
             match &t.body {

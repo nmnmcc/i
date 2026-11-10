@@ -97,9 +97,7 @@ fn field_access_has_the_same_finite_type_as_a_pattern() {
     // Install S(Never), whose callback returns 1, and invoke the helper.
     for n in 21..=40 {
         let path = format!("{}/tests/k4/q{n}.i", env!("CARGO_MANIFEST_DIR"));
-        let Ok(mut source) = std::fs::read_to_string(path) else {
-            continue;
-        };
+        let mut source = std::fs::read_to_string(path).unwrap();
         source.push_str("\n@main\nmain = () { ! S(Never) = S(() { 1 }) assert(fw() == 1) }\n");
         check_and_run(&format!("q{n}"), &source, None, "");
     }
@@ -158,6 +156,25 @@ fn generic_handlers_have_finite_types_with_or_without_annotations() {
 fn previous_finite_schemes_reject_missing_providers_before_runtime() {
     // §4.8 preserves requirements across calls, and §10.2 rejects an entry
     // without providers. Exercise the original K4 shapes at the CLI boundary.
+    let exact = "S(N) { S(() -> Nil ! N) }
+use(N) = (s ! S(N)) { S(f) = s f() }
+@main
+main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
+    for inferred in [false, true] {
+        let source = if inferred {
+            exact.replace("local: () -> Nil ! N | S(N)", "local")
+        } else {
+            exact.to_string()
+        };
+        check_and_run("original-entry", &source, Some("E0522"), "");
+        // §4.8 rule 4: merely making an unused closure needs no service.
+        check_and_run(
+            "original-unused-closure",
+            &source.replace("local() }", "Nil }"),
+            None,
+            "",
+        );
+    }
     let sources = [
         "S(N) { S(() -> Nil ! N) }
 use(N) = (s ! S(N)) -> Nil ! N | S(N) { S(f) = s f() }
