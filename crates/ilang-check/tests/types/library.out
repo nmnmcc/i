@@ -40,3 +40,26 @@ i/core.bit_array_to_string : (BitArray) -> Result(String, Nil)
 i/core.bit_array_concat : (List(BitArray)) -> BitArray
 i/core.inspect : (A) -> String
 i/core.hash : (A) -> Int
+i/random.word_size : () -> Int
+i/random.mask : (x: Int) -> Int
+i/random.xor_shift : (x: Int, n: Int) -> Int
+i/random.mix : (x: Int) -> Int
+i/random.variant : (x: Int) -> Int
+i/random.popcount : (x: Int, count: Int) -> Int
+i/random.mix_gamma : (x: Int) -> Int
+i/random.from_seed : (seed: Int) -> Generator
+i/random.word : (g: Generator) -> (Int, Generator)
+i/random.space_for : (below: Int, space: Int) -> Int
+i/random.word_group : (g: Generator, space: Int, scale: Int, value: Int) -> (Int, Generator)
+i/random.bounded : (g: Generator, below: Int, space: Int, limit: Int) -> (Int, Generator)
+i/random.int : (g: Generator, below: Int) -> (Int, Generator) ? RandomError
+i/random.float : (g: Generator) -> (Float, Generator)
+i/random.native_split : (h: State) -> (State, State)
+i/random.edge : (h: State, bit: Int) -> State
+i/random.split : (g: Generator) -> (Generator, Generator)
+i/random.valid_path : (path: List(Int)) -> Bool
+i/random.binary : (n: Int, bits: List(Int), length: Int) -> (List(Int), Int)
+i/random.zeros : (h: State, count: Int) -> State
+i/random.follow : (h: State, bits: List(Int)) -> State
+i/random.derive_path : (g: Generator, path: List(Int)) -> Generator
+i/random.at_path : (g: Generator, path: List(Int)) -> Generator ? RandomError
