@@ -434,3 +434,412 @@ fn compiler_answer_names_keep_their_own_identity() {
     assert!(parameter.same_code(&other_answer));
     assert_ne!(parameter.scope_identity(), other_answer.scope_identity());
 }
+
+#[test]
+fn builtin_definitions_preserve_builtins_and_fresh_parameter_binders() {
+    use ilang_syntax::lisp::definitions::builtin_definition;
+    use ilang_syntax::lisp::syntax::{Node, Position, ScopeIdentity};
+    let like = root("x");
+    for name in ["Bool", "Nil", "Result", "Assert", "AssertionFailure"] {
+        let result = builtin_definition(name, like.scope(), like.span(), 3).unwrap();
+        result.show_as(Position::Item).unwrap();
+    }
+    assert!(builtin_definition("Int", like.scope(), like.span(), 3).is_none());
+    let first = builtin_definition("Result", like.scope(), like.span(), 3).unwrap();
+    let second = builtin_definition("Result", like.scope(), like.span(), 4).unwrap();
+    let Node::Round(parts) = first.node() else {
+        panic!("item")
+    };
+    let Node::Round(head) = parts[0].node() else {
+        panic!("head")
+    };
+    assert!(
+        matches!(head[0].scope_identity(), Some(ScopeIdentity::Builtin { name }) if name == "Result")
+    );
+    assert!(matches!(
+        head[1].scope_identity(),
+        Some(ScopeIdentity::DefinitionParameter {
+            answer: 3,
+            parameter: 0,
+            ..
+        })
+    ));
+    let Node::Curly(constructors) = parts[1].node() else {
+        panic!("constructors")
+    };
+    let Node::Round(ok) = constructors[0].node() else {
+        panic!("constructor")
+    };
+    assert_eq!(head[1].scope_identity(), ok[1].scope_identity());
+    let Node::Round(parts2) = second.node() else {
+        panic!("item")
+    };
+    let Node::Round(head2) = parts2[0].node() else {
+        panic!("head")
+    };
+    assert_ne!(head[1].scope_identity(), head2[1].scope_identity());
+}
+
+#[test]
+fn written_definition_answers_give_parameters_their_own_binder() {
+    use ilang_syntax::lisp::definitions::source_definition;
+    use ilang_syntax::lisp::syntax::{Node, ScopeIdentity};
+    let source = "Pair(A, B) { Pair(left: A, right: List(B)) }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let like = root("x");
+    let result = source_definition(&module.items[0], source, like.scope(), 17);
+    let Node::Round(parts) = result.node() else {
+        panic!("item")
+    };
+    let Node::Round(head) = parts[0].node() else {
+        panic!("head")
+    };
+    let Node::Curly(body) = parts[1].node() else {
+        panic!("body")
+    };
+    let Node::Round(ctor) = body[0].node() else {
+        panic!("constructor")
+    };
+    let Node::Round(field) = ctor[1].node() else {
+        panic!("field")
+    };
+    assert!(matches!(
+        head[1].scope_identity(),
+        Some(ScopeIdentity::DefinitionParameter {
+            answer: 17,
+            parameter: 0,
+            ..
+        })
+    ));
+    assert_eq!(head[1].scope_identity(), field[2].scope_identity());
+    assert!(ctor[0].scope_identity().is_none());
+}
+
+#[test]
+fn copied_definition_freshens_its_binders_and_uses_together() {
+    use ilang_syntax::lisp::definitions::{builtin_definition, freshen_parameters};
+    use ilang_syntax::lisp::syntax::{Node, ScopeIdentity};
+    let like = root("x");
+    let original = builtin_definition("Result", like.scope(), like.span(), 3).unwrap();
+    let copy = freshen_parameters(&original, 3, 8);
+    let Node::Round(parts) = copy.node() else {
+        panic!("item")
+    };
+    let Node::Round(head) = parts[0].node() else {
+        panic!("head")
+    };
+    let Node::Curly(constructors) = parts[1].node() else {
+        panic!("body")
+    };
+    let Node::Round(ok) = constructors[0].node() else {
+        panic!("constructor")
+    };
+    assert!(matches!(
+        head[1].scope_identity(),
+        Some(ScopeIdentity::DefinitionParameter {
+            answer: 8,
+            parameter: 0,
+            ..
+        })
+    ));
+    assert_eq!(head[1].scope_identity(), ok[1].scope_identity());
+    assert!(matches!(
+        head[0].scope_identity(),
+        Some(ScopeIdentity::Builtin { .. })
+    ));
+    assert!(copy.same_code(&original));
+}
+
+#[test]
+fn definition_query_accepts_only_type_names_and_keeps_atom_scopes() {
+    use ilang_syntax::lisp::definitions::type_query;
+    use ilang_syntax::lisp::syntax::{Node, ScopeIdentity, Syntax};
+    let like = root("x");
+    let dot = Syntax::make(Node::Symbol(".".into()), &like).unwrap();
+    let module = root("mod").flip_mark(9);
+    let ty = root("Result").with_scope_identity(ScopeIdentity::Builtin {
+        name: "Result".into(),
+    });
+    let qualified =
+        Syntax::make(Node::Round(vec![dot, module.clone(), ty.clone()]), &like).unwrap();
+    let query = type_query(&qualified).unwrap();
+    assert_eq!(query.module.unwrap().scope(), module.scope());
+    assert_eq!(query.name.scope_identity(), ty.scope_identity());
+    assert!(type_query(&root("(List Int)")).is_err());
+    assert!(type_query(&root("value")).is_err());
+    assert!(type_query(&root("(. mod value)")).is_err());
+}
+
+#[test]
+fn definition_schedule_retries_fresh_runs_after_a_contribution() {
+    use ilang_syntax::lisp::definition_schedule::{Attempt, schedule};
+    use std::collections::BTreeMap;
+    let mut state = BTreeMap::new();
+    let mut attempts = Vec::new();
+    let mut session = ilang_syntax::lisp::expansion::ExpansionSession::default();
+    let mut marks = Vec::new();
+    let like = root("call");
+    let problems: Vec<ilang_syntax::lisp::definition_schedule::Problem<_, _, _, ()>> = schedule(
+        &mut state,
+        ["uses", "defines"],
+        |state, call, _| {
+            attempts.push(*call);
+            session
+                .run(
+                    &[],
+                    &like,
+                    |_, mark| {
+                        marks.push(mark);
+                        Ok(like.clone())
+                    },
+                    |_, result| Ok(result),
+                )
+                .unwrap();
+            match *call {
+                "uses" if !state.contains_key("T") => Attempt::Deferred {
+                    query: "T",
+                    span: ilang_syntax::span::Span::new(4, 5),
+                },
+                "uses" => Attempt::Complete {
+                    product: ("U", 2),
+                    answers: vec![],
+                },
+                _ => Attempt::Complete {
+                    product: ("T", 1),
+                    answers: vec![],
+                },
+            }
+        },
+        |state, _, (name, value)| {
+            state.insert(name, value);
+            vec![]
+        },
+        |state, query| state.get(query).copied(),
+    );
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(attempts, ["uses", "defines", "uses"]);
+    assert_eq!(marks, [0, 1, 2]);
+    assert_eq!(state.get("U"), Some(&2));
+}
+
+#[test]
+fn definition_schedule_reports_waiters_and_changed_fallback_answers() {
+    use ilang_syntax::lisp::definition_schedule::{Attempt, Mode, Problem, schedule};
+    use ilang_syntax::span::Span;
+    use std::collections::BTreeMap;
+    let mut state = BTreeMap::new();
+    let problems: Vec<Problem<_, _, _, ()>> = schedule(
+        &mut state,
+        ["left", "right"],
+        |_, call, _| Attempt::Deferred {
+            query: if *call == "left" { "B" } else { "A" },
+            span: if *call == "left" {
+                Span::new(1, 2)
+            } else {
+                Span::new(3, 4)
+            },
+        },
+        |_, _, ()| vec![],
+        |state: &BTreeMap<&str, i32>, query| state.get(query).copied(),
+    );
+    assert_eq!(
+        problems,
+        vec![
+            Problem::Waiting {
+                call: "left",
+                query: "B",
+                span: Span::new(1, 2)
+            },
+            Problem::Waiting {
+                call: "right",
+                query: "A",
+                span: Span::new(3, 4)
+            }
+        ]
+    );
+    let mut state = BTreeMap::new();
+    let problems: Vec<Problem<_, _, _, ()>> = schedule(
+        &mut state,
+        ["ask", "define"],
+        |_, call, mode| match (*call, mode) {
+            ("ask", Mode::Fallback) => Attempt::Complete {
+                product: None,
+                answers: vec![("T", 1)],
+            },
+            ("define", Mode::Normal) => Attempt::Deferred {
+                query: "T",
+                span: Span::new(5, 6),
+            },
+            ("define", Mode::Fallback) => Attempt::Complete {
+                product: Some(("T", 2)),
+                answers: vec![],
+            },
+            _ => Attempt::Deferred {
+                query: "T",
+                span: Span::new(2, 3),
+            },
+        },
+        |state, _, product| {
+            if let Some((name, value)) = product {
+                state.insert(name, value);
+            }
+            vec![]
+        },
+        |state, query| state.get(query).copied(),
+    );
+    assert_eq!(
+        problems,
+        vec![Problem::Changed {
+            call: "ask",
+            query: "T",
+            before: 1,
+            after: Some(2)
+        }]
+    );
+}
+
+#[test]
+fn definition_schedule_expands_new_items_before_later_siblings() {
+    use ilang_syntax::lisp::definition_schedule::{Attempt, Problem, schedule};
+    let mut state = Vec::new();
+    let problems: Vec<Problem<_, (), (), ()>> = schedule(
+        &mut state,
+        ["outer", "sibling"],
+        |_, call, _| Attempt::Complete {
+            product: *call,
+            answers: vec![],
+        },
+        |state, _, name| {
+            state.push(name);
+            if name == "outer" {
+                vec!["inner1", "inner2"]
+            } else {
+                vec![]
+            }
+        },
+        |_, _| None,
+    );
+    assert!(problems.is_empty());
+    assert_eq!(state, ["outer", "inner1", "inner2", "sibling"]);
+}
+
+#[test]
+fn alias_pattern_query_preserves_the_written_definition() {
+    use ilang_syntax::lisp::definitions::source_definition;
+    use ilang_syntax::lisp::syntax::{Node, Position};
+    let source = "Shape(Left, Right) = value";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let like = root("x");
+    let result = source_definition(&module.items[0], source, like.scope(), 9);
+    let Node::Round(parts) = result.node() else {
+        panic!("alias")
+    };
+    assert!(matches!(parts[0].node(), Node::Symbol(s) if s == "="));
+    let Node::Round(head) = parts[1].node() else {
+        panic!("alias head")
+    };
+    assert!(head[1].scope_identity().is_none());
+    assert!(head[2].scope_identity().is_none());
+    assert!(result.show_as(Position::Item).unwrap().contains("value"));
+}
+
+#[test]
+fn definition_table_distinguishes_waits_catchable_and_compile_errors() {
+    use ilang_syntax::lisp::definition_schedule::Mode;
+    use ilang_syntax::lisp::definition_table::{Definition, DefinitionTable, Lookup, QueryResult};
+    let mut table = DefinitionTable::default();
+    let source = "Box(A) { Box(A) }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty());
+    let of = root("Box");
+    table.insert(
+        1,
+        Definition::Written {
+            item: Box::new(module.items[0].clone()),
+            source: source.into(),
+            scope: of.scope().clone(),
+            ready: false,
+        },
+    );
+    table.insert(2, Definition::Builtin { name: "Int".into() });
+    table.insert(
+        3,
+        Definition::Builtin {
+            name: "Result".into(),
+        },
+    );
+    assert!(matches!(
+        table.query(&of, Mode::Normal, 5, |_, _| Lookup::Found(1)),
+        QueryResult::Deferred { .. }
+    ));
+    table.set_ready(&1, true);
+    assert!(matches!(
+        table.query(&of, Mode::Normal, 6, |_, _| Lookup::Found(1)),
+        QueryResult::Answer { key: 1, .. }
+    ));
+    assert!(matches!(
+        table.query(&root("Int"), Mode::Normal, 7, |_, _| Lookup::Found(2)),
+        QueryResult::Error(_)
+    ));
+    assert!(matches!(
+        table.query(&root("Result"), Mode::Normal, 8, |_, _| Lookup::Found(3)),
+        QueryResult::Answer { key: 3, .. }
+    ));
+    assert!(matches!(
+        table.query(&of, Mode::Normal, 9, |_, _| Lookup::TypeParameter),
+        QueryResult::Error(_)
+    ));
+    assert!(matches!(
+        table.query(&of, Mode::Normal, 10, |_, _| Lookup::ConstructorsHidden),
+        QueryResult::Error(_)
+    ));
+    assert!(matches!(
+        table.query(&of, Mode::Normal, 11, |_, _| Lookup::Missing),
+        QueryResult::CompileError(_)
+    ));
+    assert!(matches!(
+        table.query(&root("1"), Mode::Normal, 12, |_, _| Lookup::Found(1)),
+        QueryResult::Error(_)
+    ));
+}
+
+#[test]
+fn definition_table_keeps_scopes_from_expanded_type_items() {
+    use ilang_syntax::lisp::definition_schedule::Mode;
+    use ilang_syntax::lisp::definition_table::{Definition, DefinitionTable, Lookup, QueryResult};
+    use ilang_syntax::lisp::definitions::builtin_definition;
+    use ilang_syntax::lisp::syntax::{Node, ScopeIdentity};
+    let like = root("Result").flip_mark(11);
+    let syntax = builtin_definition("Result", like.scope(), like.span(), 1).unwrap();
+    let mut table = DefinitionTable::default();
+    table.insert(
+        1,
+        Definition::Expanded {
+            syntax,
+            parameter_answer: Some(1),
+            ready: true,
+        },
+    );
+    let QueryResult::Answer { syntax, .. } =
+        table.query(&like, Mode::Normal, 2, |_, _| Lookup::Found(1))
+    else {
+        panic!("expected answer")
+    };
+    let Node::Round(parts) = syntax.node() else {
+        panic!("item")
+    };
+    let Node::Round(head) = parts[0].node() else {
+        panic!("head")
+    };
+    assert!(head[1].scope().marks.contains(&11));
+    assert!(matches!(
+        head[1].scope_identity(),
+        Some(ScopeIdentity::DefinitionParameter {
+            answer: 2,
+            parameter: 0,
+            ..
+        })
+    ));
+}
