@@ -2,7 +2,7 @@ catch_all : (v: T) -> Never
 named_discard : (v: T) -> T
 first_catch_all : (v: T) -> Never
 type_test : (v: T) -> Never
-nested : (r: Result(T, T)) -> Int
+nested : (r: Result(T, T)) -> 0
 in_tuple : (p: (T, Int)) -> Never
 subject : (v: T) -> Never
 both : (r: Result(T, T)) -> T

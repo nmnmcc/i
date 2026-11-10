@@ -1,9 +1,9 @@
-pair : (String, () -> Int ! Assert)
-identity_pair : ((x: String) -> String, () -> Int ! Assert)
-total_pair : ((Int, Int), () -> Int)
+pair : ("b", () -> 1 ! Assert)
+identity_pair : ((x: A & String) -> A | "b", () -> 1 ! Assert)
+total_pair : ((1, 2), () -> Int)
 f : (s: String) -> Int
-s : String
-top : Int
+s : "b"
+top : 1
 written : () -> Int
 28:3: error[E0501]: this pattern may fail, so it needs `Assert` (§7.3), but `Assert` is not allowed here: `Assert` is not a subtype of `Never`
 34:2: error[E0501]: this pattern may fail, so it needs `Assert` (§7.3), but `Assert` is not allowed here: `Assert` is not a subtype of `Never`

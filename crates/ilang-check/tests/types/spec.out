@@ -7,8 +7,9 @@ collect : (body: () -> Nil ! Yield(A) | N) -> List(A) ! N
 numbers : () -> List(Int)
 my_assert : (c: Bool) -> Nil ! Assert
 catch : (body: () -> A ? E ! N) -> Result(A, AssertionFailure) ? E ! N - Assert
-checked : () -> Result(Int, AssertionFailure)
-checked_library : () -> Result(String, AssertionFailure)
+checked : () -> Result(1, AssertionFailure)
+checked_library : () -> Result("x", AssertionFailure)
 inc : (x: A & Int) -> A
-mixed : List(Int | String)
+mixed : List(1 | "a")
+94:10: error[E0520]: both sides are constants, `1` and `2`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
 101:2: warning[W0502]: this value is not used, and working it out does nothing

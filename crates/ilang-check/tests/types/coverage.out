@@ -1,37 +1,34 @@
-covered : (s: Shape) -> Int
-missing_ctor : (s: Shape) -> Int
-missing_nested : (r: Result(Bool, Nil)) -> Int
-missing_member : (v: Int | String) -> Int
-missing_label : (f: Flags) -> Int
-inferred : (r: Result(Int, A)) -> Int
-guarded : (b: Bool) -> Int
-ints : (n: Int) -> Int
-floats : (x: Float) -> Int
-strings : (s: String) -> Int
+covered : (s: Shape) -> 1 | 2 | 3
+missing_ctor : (s: Shape) -> 1 | 2
+missing_nested : (r: Result(Bool, Nil)) -> 1 | 2
+missing_member : (v: Int | String) -> 1 | 2
+missing_label : (f: Flags) -> 1 | 2
+inferred : (r: Result(1, A)) -> 1 | 2
+guarded : (b: Bool) -> 1 | 2
+ints : (n: 0 | 1) -> 0 | 1
+floats : (x: Float) -> 0
+strings : (s: "a" | "b") -> 0 | 1
 prefixes : (s: String) -> String
 all_strings : (s: String) -> String
 bit_arrays : (b: BitArray) -> Int
-all_bits : (b: BitArray) -> Int
+all_bits : (b: BitArray) -> 1
 no_empty : (xs: List(A)) -> A
-no_long : (xs: List(A)) -> A | Int
+no_long : (xs: List(A)) -> A | 0
 lists : (xs: List(Int)) -> Int
-list_items : (xs: List(Bool)) -> Int
-tuples : (p: (Bool, Bool)) -> Int
+list_items : (xs: List(Bool)) -> 0 | 1
+tuples : (p: (Bool, Bool)) -> 1 | 2
 only_ok : (r: Result(Int, Never)) -> Int
-empty : Int
-any : (x: Int) -> Int
-unknown : (f: () -> Bool ? E ! N) -> Int ? E ! N
-no_error : () -> Int
+empty : 0
+any : (x: Int) -> 1
+unknown : (f: () -> Bool ? E ! N) -> 1 | 2 ? E ! N
+no_error : () -> 1
 22:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Point`
 29:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Ok(False)`
-36:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_: Int`
+36:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `0`
 43:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Flags(admin = False, active = False)`
-51:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Ok(_)`
 59:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `False`
-67:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
 74:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
-81:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
-88:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
+88:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `""`
 103:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
 110:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
 118:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[]`
