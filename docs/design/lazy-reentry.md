@@ -80,6 +80,10 @@ Kinds 0 and 1 are the **code records**; they are the only ones with a slot. The 
 
 **D13. An error or a cancel that leaves the trampoline leaves the shadow stack that eager left.** In eager, an exception goes through code frames without touching `$sp`, and only a handler that takes it restores the depth. If nothing in the list takes it, it reaches the code outside with `$sp` still covering the slots of every frame it went through. A full-trace `$stop` further out (for example `$stop_boundary_inactive` in `$entry_*` or `$async_run`, reached by a `$cancel` that nobody takes) prints those slots. So the trampoline does not restore `d` when it catches an error or a cancel. It notes `$sp` and the first record still pending at that moment, restores `d` only just before it calls a record in mode 1 or 2 (as the eager handler of that record did), and, when it reaches the end of the list in mode 1 or 2, it puts the slots of the code records it went past back in their eager places (`$shadow_insert`, section 5.6) before it throws. *Reason (review):* restoring `d` at once and leaving the trampoline with `$sp = d` drops those slots, and `$control_unpend` cannot add them back, because the trampoline has left `$pend` before the stop runs. Keeping the trampoline in `$pend` on the way out is not possible: no code runs while an exception goes out.
 
+**D14. `$shadow_insert` makes room for all its slots at once.** It counts the n slots it puts in, and if `$sp + n` is more than the length of `$shadow`, it makes one new array of length max(2 × length, `$sp + n`), as `$control_unpend` makes one of length `$sp + n` (section 5.6). *Reason (review):* `$shadow_enter` grows the array by one doubling, which is enough for one push. Under lazy re-entry the array only grows to the depth that was really entered (`d` plus the frames entered since the resume), but the pending list can hold any number of code records, because each re-suspend splices the old pending records after the new ones. So n can be many times the length of the array, and one doubling would leave `array.copy` out of bounds, which traps. Eager pushed the same slots one at a time with `$shadow_enter`, which doubles as often as needed.
+
+**D15. A trace that the spec does not state is checked in `control_lazy.rs`, not in `tests/spec`.** The only place where the shadow stack is seen after an error or a cancel has left a trampoline is a full-trace stop reached by a `$cancel` that nobody takes: a resumed part of a cancel unwind (a final function that suspended during `cancel(k)` and was resumed after `cancel(k)` was captured away) throws `$cancel k` again, it goes out of `resume`, and `$entry_*` stops with `control: boundary is not active` and the full trace. That is what the compiler does at `dcb19df`, but the spec does not say it: §11.7 gives that reason only for "`control.suspend` with a boundary that is not active", and §9.4 rules 3 and 4 do not say what such a cancel does when it reaches its boundary. A case in `tests/spec` would make that output a rule that another compiler must follow. So the checks of D13 and P4 are run tests 12 and 13 of 13.2, with the output of eager at the bench commit written into the test. *Reason (review):* D12 (no spec change); the conformance suite checks only rules that the spec states. Open question 5 asks whether the spec should state this case.
+
 ## 4. Data
 
 ### 4.1 Types in `emit/control.rs` `TYPES`
@@ -293,7 +297,26 @@ C (c, x):
 
 The E and X handlers do not restore the depth. At the moment of the catch, eager's shadow stack is `$shadow[0 .. d) ++ slots(code records from from to the end) ++ $shadow[d .. top)`: the exception has gone through the frames of the record just called, and the pending frames outside it are still on eager's stack. After the catch, the trampoline either skips records (eager: the exception goes through their frames, `$sp` does not change), or restores `d` and calls a record (eager: that handler restores its depth), and a new catch sets `top` and `from` again. So when the list ends in mode 1 or 2, `$sp` is still `top` and `from` is the first record that was pending at the last catch (or the first record of the list, when the trampoline started in mode 2 and nothing was called since; eager had re-entered every frame then).
 
-`$shadow_insert(at, from)` puts the slots of the code records from `from` to the end of the list into the shadow stack at index `at`, outermost lowest, and moves `$shadow[at .. $sp)` up by their number. It grows the array if it is full, as `$shadow_enter` does. It costs O(the records from `from` to the end + `$sp` - `at`), once, on a path that has already walked those records. No i code runs in it, so it cannot throw.
+`$shadow_insert(at, from)` puts the slots of the code records from `from` to the end of the list into the shadow stack at index `at`, outermost lowest, and moves `$shadow[at .. $sp)` up by their number (D14):
+
+```text
+n = number of code records (kind 0 or 1) from `from` to the end of the list
+if n == 0: return
+need = $sp + n
+if need > 2^28: unreachable                 ;; the limit of $shadow_grow (out of stack)
+if need > array.len($shadow):
+  new = array.new_default $frames (max(2 * array.len($shadow), need))
+  copy $shadow[0 .. at) to new[0 .. at)
+  copy $shadow[at .. $sp) to new[at + n .. need)
+  $shadow = new
+else:
+  copy $shadow[at .. $sp) to $shadow[at + n .. need)     ;; one array.copy, which allows overlap
+hi = at + n
+for each code record r from `from` to the end (innermost first): hi -= 1 ; $shadow[hi] = r.frame.slot
+$sp = need
+```
+
+One `$shadow_grow` is not enough: n has no bound from the length of the array (D14). For example, a generator that enters one new frame per round and is resumed 10,000 times from a flat loop has 10,000 pending code records, while `$sp` stays a few entries above where it runs and `$shadow` keeps its first 256 entries. A cancel of it ends in `$shadow_insert` with n = 10,000. The growth rule is the same as the one of `$control_unpend` (5.8), and the two share their copy loop. It costs O(the records from `from` to the end + `$sp` - `at`), once, on a path that has already walked those records, plus at most one new array. No i code runs in it, so it cannot throw; the only trap is the same out-of-stack limit that eager hit in `$shadow_grow` when it pushed the same slots.
 
 The trampoline catches only `$error`, `$cancel` and `$capture`. It has no `catch_all`, so a stop, which traps, runs no handler (§9.5).
 
@@ -373,7 +396,7 @@ This is the same as calling `$shadow_insert(t.depth, t.pending)` for each live `
   - A code record pushes its slot, and its segment pops it on return (`$shadow_leave`, or `$shadow_leave_tail` before a tail call whose callee pops its own).
   - Runtime records and delimiters push nothing.
   - After an error or a cancel, the trampoline restores `d` just before it calls the next record. It does not restore `d` for records it skips (D13).
-- **P4 (leaving).** When an error or a cancel leaves the trampoline at the end of its list, the shadow stack is `$shadow[0 .. d) ++ slots(code records from from to the end) ++ $shadow[d .. top)`, which is eager's stack at that moment (section 5.6). When a value leaves it, `$sp` is `d`, as in eager.
+- **P4 (leaving).** When an error or a cancel leaves the trampoline at the end of its list, the shadow stack is `$shadow[0 .. d) ++ slots(code records from from to the end) ++ $shadow[d .. top)`, which is eager's stack at that moment (section 5.6). `$shadow_insert` makes room for all the slots first (D14), so it never traps where eager's pushes did not. When a value leaves it, `$sp` is `d`, as in eager.
 - **S0 (frames).** Every function that has a point has a frame. At `dcb19df`, `lower.rs` and `control.rs` set `frame: true` for every code function. `point()` and `record()` assert it. A frameless segment could `$shadow_site` into a slot below the trampoline and break the equal-trace argument.
 
 ## 7. Why the behaviour does not change
@@ -400,7 +423,7 @@ Each path:
   - a final record is skipped, as `$final_reenter` let both through;
   - a delimiter runs `$boundary_core` or `$cancel_core`, which switch off or take, as before.
 
-  If no record takes it, the trampoline puts the slots back (D13), pops and throws it. The shadow stack is then eager's (P4), so a full-trace stop further out, such as `$stop_boundary_inactive` in `$entry_*` or `$async_run` for a `$cancel` that nobody takes, prints the same lines. Spec case `stop_lazy_cancel_out` (13.3) checks this.
+  If no record takes it, the trampoline puts the slots back (D13), pops and throws it. The shadow stack is then eager's (P4), so a full-trace stop further out, such as `$stop_boundary_inactive` in `$entry_*` or `$async_run` for a `$cancel` that nobody takes, prints the same lines. Run tests 12 `cancel_out_trace` and 13 `cancel_out_two_trampolines` of 13.2 check this (D15); test 13 has frames still live above `d` and two trampolines that insert in turn. `$shadow_insert` makes room for any number of slots (D14), so it cannot trap here where eager did not; spec case `control_lazy_long_pending` (13.3) runs it with far more pending slots than the array holds.
 - **(K) `cancel`.** It starts the trampoline in mode 2 with nothing running, with `from` the first record and `top = d`. Eager re-entered the outer frames first, but they had no effects apart from shadow pushes and handlers that a cancel passes. Whatever takes the cancel restores its depth, in both. If nothing in the list takes it, the trampoline puts the slots back, which are the pushes eager made.
 - **(C) A capture from X.** In eager, each handler it goes through adds its record, a boundary is switched off and adds `$boundary_reenter`, and the boundary of the capture restores its depth and does `f(k)` in its place. In lazy:
   - The pending code and handler records of the trampoline are spliced in their order. By (d) that is the order eager would add them.
@@ -457,7 +480,7 @@ Costs:
 - `cancel`: O(1 + D + E + P), where P is the number of pending records. The trampoline runs in mode 2 from the start, and the loop visits every pending record: it skips code records with no call, but it still takes each one (state check, `continue`). Only after the last record does it throw `$cancel k` to `$cancel_core`. Eager cancel re-entered all N frames first, so this is the same order as today (D8); B does not make cancel cheaper. The R2 task scheduler cancels tasks with `control.cancel`, so later tracks should not count on O(1) cancel.
 - A suspend after a resume: O(1 + F + D). The splice is O(1), and each delimiter it goes through packs in O(1).
 - `fail.catch` and `resource.ensure` records cost nothing at resume or at a suspend. They cost one call each when an error or a cancel goes through them.
-- An error or a cancel that goes through pending records: O(records it goes through), in a loop with no call for code records. Today it is the same order, as a Wasm unwind. If it leaves the list, `$shadow_insert` adds O(records since the last catch + the shadow entries above `d`), once.
+- An error or a cancel that goes through pending records: O(records it goes through), in a loop with no call for code records. Today it is the same order, as a Wasm unwind. If it leaves the list, `$shadow_insert` adds O(records since the last catch + the shadow entries above `d`), once, and at most one new shadow array of length max(2 × length, `$sp` + n) (D14).
 - The first capture of a frame: O(1), as today.
 - A stop: O(depth), once.
 
@@ -537,10 +560,15 @@ B changes the WAT of every compiled program, also of programs that use no contro
    - in `runtime/stops.rs`: the global `$stop_unpend` and the three lines in `$stop` (5.8);
    - the `(elem declare func …)` line gains `$control_unpend`.
 2. **Per point, in modules whose functions have points.** For each point p, only:
-   - the `struct.new $frame` that `record(p)` builds (the slot is a field, plus the kind and the delta, and the saved values lose the slot);
+   - the text of `record(p)`: the `struct.new $frame` that it builds (the slot is a field, plus the kind and the delta, and the saved values lose the slot). `suspendable()` writes this text inline, as `(call $capture_rethrow (struct.new $frame (ref.func $r{p}) …))`, inside whatever function holds point p: the main body of a function with points, a segment `$s{q}` of an earlier point q, or a join `$j{j}`. So it changes there too;
    - the body of `$r{p}` (5.1).
 
-Nothing else may change. In particular these must be byte for byte the same after the shared patch: the segments `$s{p}`, `suspendable` code at each call (the `try_table` and the call of `$capture_rethrow`), every function with no point, `$site_data` and the site count in `$ilang_start`, data segments, imports, exports, the `host::EFFECTS` text and the custom section. A difference there is a regression.
+**Masking.** Before it compares a function, the audit replaces, on both sides, each record text by `RECORD(p)`. A record text is the S-expression that starts with `(struct.new $frame (ref.func $r{p})` and ends at its matching `)`. It is found by counting brackets, not by a regular expression, because the saved values hold nested S-expressions. The audit then checks three things:
+   - each function is byte for byte the same after masking;
+   - each `RECORD(p)` is at the same place on both sides, so the number of records of each p is the same;
+   - on the B side, each masked text has the form of 5.1: `(ref.func $r{p})`, the values, `(local.get $slot)`, `(i32.const 0)` or `(i32.const 1)`, and `(ref.null $values)` or an `array.new_fixed $values` of pairs. On the baseline side, it is `(ref.func $r{p})` and one `$values` (or null) with `(ref.i31 (local.get $slot))` as its last item.
+
+Nothing else may change. In particular these must be byte for byte the same after the shared patch and the masking: the segments `$s{p}`, the joins `$j{j}`, the bodies of functions with points, `suspendable` code at each call (the `try_table` and the call of `$capture_rethrow`), every function with no point, `$site_data` and the site count in `$ilang_start`, data segments, imports, exports, the `host::EFFECTS` text and the custom section. A difference there is a regression.
 
 `wat_expect.added` (files on one side only): the new programs of B, that is `bench/test/control_test.i` and the spec cases of 13.3, if the WAT dump covers those folders. B removes no program.
 
@@ -687,10 +715,100 @@ The test prints S and the native stack it used.
 9. `counted_frames`: a resume where 3 inner frames return, so outer frames are re-entered; then a suspend, a resume, and at the end a cancel. Each frame counts itself, and every count is 1.
 10. `nested_resume_stack`: a recursive generator composition at `--opt 0`: an in-order walk of a tree of depth L, where each level resumes the generator of the level below inside its own resume. The test runs it with a fixed S (at most half the native stack, as above) and bisects the largest L that finishes. It asserts L_lazy ≥ 0.8 × L_eager, where L_eager is a constant measured on the eager compiler at the bench commit, with the same S (section 14, step 2). On eager code this passes, because L is then L_eager.
 11. `deep_resume_in_recursion`: pause at depth 50,000 and resume from inside a 50,000-deep recursion, with a fixed S11 (at most half the native stack). It asserts that the run finishes. Eager holds about 100,000 frames at once here (the 50,000 `$r` frames rebuilt at resume, on top of the recursion), and lazy about 50,000 plus `$boundary_core`, `$tramp_run` and one record frame at a time. S11 must lie between the two sizes, or the test shows nothing. Step 2 sets S11 to 1.5 times the smallest stack in which the 50,000-deep recursion alone finishes (bisected on eager, with no paused computation), checks that eager stops with S11 with a clean trap (if eager finishes, it lowers the factor to 1.2, then 1.1), and writes S11 into the test as a constant. So this test fails on eager code by design, and stays ignored until the lazy commit (section 14). Tests 10 and 11 together pin how far the "no more stack" point moves (section 7, path M).
+12. `cancel_out_trace` (D13, P4, D15): a `$cancel` goes out of a trampoline at the end of its list and reaches the entry, which stops with `control: boundary is not active` and the full trace. The test compiles each part at `--opt 0` and `--opt 2`, runs it, and compares the whole stop text with a constant: the text that eager prints at the bench commit (section 14, step 2). It is not a spec case (D15). The continuations are kept in nominal types: `suspend(b, (k) { k })` would give `r = Continuation(a, r, e, n)`, a type that holds itself through a type variable, which §4.7 makes a compile error. The source, in the new syntax (its types are checked at step 2, as the bench's are):
+
+    ```i
+    (
+      i/control
+      i/core
+      i/resource
+    )
+
+    // Hands k2 out of the cancel, to the boundary `b0` around it.
+    Out { Out(put: (k2: Inner) -> Nil) }
+    Inner { Inner(Continuation(Nil, Int, Never, Out)) }
+    Outer { Paused(Continuation(Nil, Outer, Never, Out))  Done }
+    Handed { Handed(Inner)  Lost }
+
+    put = (k2, o ! Out) { o.put(k2) }
+
+    // A code frame with a site: it waits for the ensure, so its record is pending.
+    g = (b, b2) {
+      x = resource.ensure(
+        () {
+          control.suspend(b, (k) { Paused(k) })
+          0
+        },
+        () {
+          control.suspend(b2, (k2) {
+            put(Inner(k2))
+            0
+          })
+        },
+      )
+      x + 1
+    }
+
+    @main
+    main = () {
+      k = control.boundary((b) {
+        control.boundary((b2) { g(b, b2) })
+        Done
+      }) |> {
+        Paused(k) -> k
+        Done -> panic("not paused")
+      }
+      handed = control.boundary((b0) {
+        ! Out = Out((k2) { control.suspend(b0, (rest) { Handed(k2) }) })
+        control.cancel(k)
+        Lost
+      })
+      handed |> {
+        Handed(Inner(k2)) -> control.resume(k2, Nil)
+        Lost -> panic("k2 was not handed out")
+      }
+      Nil
+    }
+    ```
+
+    `cancel(k)` re-enters `b2` by descent and runs the final function in mode 2. It suspends to `b2`, so `k2` holds [the rest of the final function, the final record of `k` (kind 5, mode 2), g's record]. `put` suspends to `b0`, which gives `Handed(k2)`; the continuation `rest` is never used, so its final functions are not run (§9.4 rule 6). `resume(k2, Nil)` then runs the final record, which throws `$cancel k`; nothing in k2 takes it, the trampoline skips g's record and inserts its slot at `d` with `$sp == d`, and the entry stops. The trace lists g's site, then the resume site in main, as eager prints it. A second part puts a `fail.catch` around the `resource.ensure` in `g` (`x = fail.catch(() { … })`, then a match on `x`), so a pending kind-4 record lies between the final record and g's record and the cancel skips it.
+13. `cancel_out_two_trampolines` (D13, P4): the same `$cancel k`, but `resume(k2, Nil)` is called from frames that a lazy resume of a third continuation `k3` re-entered, while `k3` still has a pending outer frame. So `$shadow[d .. top)` is not empty when the second trampoline inserts, and two trampolines insert in turn. To the source of test 12 it adds:
+
+    ```i
+    Third { Third(Continuation(Nil, Third, Never, Never))  Over }
+
+    keep = { Over -> Over  t -> t }
+
+    // Not in tail position, so the frame waits.
+    inner = (k2) { control.resume(k2, Nil) + 1 }
+
+    h = (b3, k2) {
+      control.suspend(b3, (k3) { Third(k3) })
+      inner(k2)
+      Over
+    }
+
+    // The pending outer frame of k3.
+    o1 = (b3, k2) { keep(h(b3, k2)) }
+    ```
+
+    and main, after it has `k2`, does:
+
+    ```i
+      k3 = control.boundary((b3) { o1(b3, k2) }) |> {
+        Third(k3) -> k3
+        Over -> panic("not paused")
+      }
+      control.resume(k3, Nil)
+    ```
+
+    The resume of `k3` re-enters only `h`; `o1` stays pending in T(k3). `h` calls `inner`, which resumes `k2`. The `$cancel k` leaves T(k2) after it inserts g's slot at d2, goes through the frames of `inner` and `h` (which have no handler, so their slots stay), and T(k3) catches it with `top = $sp > d3` and `from` at o1's record. At the end of its list, T(k3) inserts the slots of its pending code records (o1's, and the one of the body of `b3` if that call is not a tail call) at d3, under the slots of `h`, `inner` and g. Eager prints g, inner, h, o1, then main's sites, in that order. An implementation that puts the slots at `$sp` instead of at `d` prints o1 before g and fails this test, and test 12 alone would not see it (there `$sp == d`).
 
 ### 13.3 New spec cases
 
 These use the new syntax and are added after A1+A2. Each runs at O0 and O2.
+
+Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `show`, and `Name` with `name = (n ! Name) { n.text }` where a case needs a service. i has no `log`. What runs is recorded in the value that the case checks, as `cancel_runs_final_functions` in `control.i` does: a final function reads what it needs first, then suspends to a boundary further out, whose `f(k)` puts that text in front of the value of `resume(k, Nil)`. Statements are separated by new lines or by spaces (syntax.md §1.7), never by `;`. Every case below is a sketch until it is written and type-checked at step 2 of section 14; its expected value is the one eager gives at the bench commit.
 
 - `tests/spec/9/control_lazy_error.i`: after a resume at depth 50, the innermost frame raises an error, and a pending `fail.catch` near the boundary catches it.
 - `tests/spec/9/control_lazy_ensure.i`: ensures at 3 depths; an error after a resume, and a cancel, run the finals innermost first.
@@ -700,14 +818,111 @@ These use the new syntax and are added after A1+A2. Each runs at O0 and O2.
 - `tests/spec/9/control_lazy_env.i`: environment statements in pending frames, nested two deep, and a service changed at the place of resume.
 - `tests/spec/9/control_lazy_cancel.i`: a cancel at depth 100 with 3 ensures, one of whose final functions suspends and is resumed later.
 - `tests/spec/9/control_lazy_tail.i`: a loop of 1,000,000 tail calls in a resumed computation with 1000 pending frames.
-- `tests/spec/9/control_lazy_env_unwind.i`: the mode 1 and mode 2 path of walk W (lemma Env). With `Name { Name(text: String) }`, `f = (b) { ! Name = Name("in"); resource.ensure(() { control.suspend(b, (k) { ! Name = Name("out"); control.cancel(k); Nil }) }, () { log(name()) }) }` runs under `control.boundary((b) { f(b) })`, with kind-1 frames outside the pending ensure. The final function must log "in", not "out". A second part resumes instead, from a place where `Name` is "out", and the resumed code raises an error with `fail.raise`, so the final function runs in mode 1; it must also log "in". A third part puts two more kind-1 frames with other values between the ensure and `f`, so that `cur` is reset more than once before the ensure is reached.
-- `tests/spec/9/control_lazy_cancel_inner_boundary.i`: a cancel through a pending inner boundary (`$boundary_core` with no body and mode 2). `control.boundary((outer) { control.boundary((inner) { resource.ensure(() { control.suspend(outer, (k) { control.cancel(k); "c" }) }, () { log("final") }) }) })` must log "final" and give "c". A second part has a final function that suspends to `inner`; it must succeed (so `inner` is active during the unwind), and the value goes on into the outer frame as in eager. A third part checks after the cancel that a suspend to `inner` stops with `control: boundary is not active`.
-- `tests/spec/9/control_lazy_skip.i`: a cancel through a pending `fail.catch` (kind 4, skipped in mode 2), and an error and a cancel through a pending final record (kind 5, skipped in both), each with frames around them that log when they end. The logs must be the same as eager's.
+- `tests/spec/9/control_lazy_env_unwind.i`: the mode 1 and mode 2 path of walk W (lemma Env). The first part:
+
+  ```i
+  f = (b, outer) {
+    ! Name = Name("in")
+    resource.ensure(
+      () {
+        control.suspend(b, (k) {
+          ! Name = Name("out")
+          control.cancel(k)
+          "cancelled"
+        })
+      },
+      () {
+        seen = name()
+        control.suspend(outer, (k) { seen <> ", " <> control.resume(k, Nil) })
+      },
+    )
+  }
+
+  @test
+  cancel_keeps_inner_environment = () {
+    ! Name = Name("outside")
+    r = control.boundary((outer) { control.boundary((b) { f(b, outer) }) })
+    check(r, "in, cancelled")
+  }
+  ```
+
+  The call of `resource.ensure` in `f` is under `! Name = Name("in")`, so f's record has kind 1 and lies outside the pending ensure record. The final function must see "in", not "out" (the place of `cancel`) and not "outside". A second part resumes instead, from a place where `Name` is "out", and the resumed code raises an error with `fail.raise` inside a `fail.catch` around `f`, so the final function runs in mode 1; it must also see "in". A third part puts two more kind-1 frames with other values of `Name` between the ensure and `f`, so that `cur` is reset more than once before the ensure is reached, and the final function must see the value of the innermost of them.
+- `tests/spec/9/control_lazy_cancel_inner_boundary.i`: a cancel through a pending inner boundary (`$boundary_core` with no body and mode 2). The first part:
+
+  ```i
+  r = control.boundary((top) {
+    control.boundary((outer) {
+      control.boundary((inner) {
+        resource.ensure(
+          () {
+            control.suspend(outer, (k) {
+              control.cancel(k)
+              "c"
+            })
+          },
+          () { control.suspend(top, (k) { "final, " <> control.resume(k, Nil) }) },
+        )
+      })
+    })
+  })
+  check(r, "final, c")
+  ```
+
+  A second part has a final function that suspends to `inner`; it must succeed (so `inner` is active during the unwind), and the value goes on into the outer frame as in eager. A third part checks after the cancel that a suspend to `inner` stops with `control: boundary is not active`.
+- `tests/spec/9/control_lazy_long_pending.i`: `$shadow_insert` with far more slots than `$shadow` holds (D14). The pending list grows with each re-suspend while `$sp` stays low:
+
+  ```i
+  Gen { More(Continuation(Nil, Gen, Never, Never))  End }
+
+  // One new frame per round: the call is not in tail position.
+  g = (b, i) {
+    control.suspend(b, (k) { More(k) })
+    x = g(b, i + 1)
+    x
+  }
+
+  drive = (step, n) {
+    step |> {
+      End -> Nil
+      More(k) -> n |> {
+        0 -> control.cancel(k)
+        _ -> drive(control.resume(k, Nil), n - 1)
+      }
+    }
+  }
+
+  @test
+  cancel_long_pending = () {
+    check(show(drive(control.boundary((b) { g(b, 0) }), 10_000)), "Nil")
+  }
+  ```
+
+  After 10,000 rounds the list holds about 10,000 code records, and `$shadow` still has its first 256 entries. The cancel skips them all and inserts them at the end of the list. A second part does the same with an error: each step recurses 200 more frames (not in tail position) before it suspends, 50 steps are resumed from a flat loop, and on the last resume the innermost frame does `fail.raise(1)`. A `fail.catch` around that `resume` in the test function must give `Error(1)`. If `$shadow_insert` grew the array only once, both parts would trap. (`x = g(b, i + 1)` then `x` must stay a frame at O2; step 2 checks this in the WAT, and if the optimizer turns it into a tail call, the case uses `keep(g(b, i + 1))` with a clause block as in test 13 of 13.2.)
+- `tests/spec/9/control_lazy_final_mode1.i`: a capture that leaves the trampoline while it is in mode 1, so `$final_reenter` runs later with saved mode 1:
+
+  ```i
+  r = control.boundary((outer) {
+    control.boundary((b) {
+      fail.catch(() {
+        resource.ensure(
+          () {
+            control.suspend(b, (k) { control.resume(k, Nil) })
+            fail.raise(1)
+          },
+          () { control.suspend(outer, (k2) { control.resume(k2, Nil) }) },
+        )
+      })
+    })
+  })
+  check(show(r), "Error(1)")
+  ```
+
+  After the resume of `k`, the error is caught in the trampoline (handler E, mode 1), which calls the ensure record in mode 1. The final function suspends while `top` and `from` are set. The C handler must splice from `node`, the record after the ensure, and leave the mode-1 state behind. The resume of `k2` re-enters `b` by descent; its trampoline runs `$final_reenter` with mode 1, which throws `$error 1` through `$ensure_end` to the pending `fail.catch` record (kind 4). A stale mode or a wrong saved `r` in the final record would give another value.
+- `tests/spec/9/control_lazy_skip.i`: a cancel through a pending `fail.catch` (kind 4, skipped in mode 2), and an error and a cancel through a pending final record (kind 5, skipped in both), each with frames around them whose final functions record their names when they run, as in the note at the top of this section. The recorded text must be the same as eager's.
 - `tests/spec/11/stop_lazy_pending.i`: a panic after a resume at depth 3. The `at:` list is innermost, the 3 pending frames, the place of resume, then main. It is exactly what eager prints at `dcb19df`.
 - `tests/spec/11/stop_lazy_nested.i`: a stop inside a resume that runs inside a resumed computation, with pending frames in both trampolines (P2).
 - `tests/spec/11/stop_lazy_descent.i`: a stop inside a re-entered inner boundary, with two trampolines at the same depth.
 - `tests/spec/11/stop_lazy_tail.i`: a tail call in a resumed segment, then a stop.
-- `tests/spec/11/stop_lazy_cancel_out.i`: a `$cancel` that goes out of a trampoline at the end of its list and reaches main, where the full-trace stop of `$stop_boundary_inactive` prints the stack (D13, P4). main does `k = boundary(b) { boundary(b2) { g(b) } … }`, where `g` (a code frame with a site) calls `resource.ensure(() { suspend(b, (k) { k }) }, () { suspend(b2, (k2) { Out.put(k2); 0 }) })`. `Out` is a service that main sets around the cancel; its implementation suspends to a boundary b0 at the cancel site and hands k2 out. main calls `control.cancel(k)` inside b0, gets k2, and calls `control.resume(k2, Nil)`. k2's records are [with frames, the final record of k, g's record]. The final record throws `$cancel k`, nothing in k2 takes it, and the stop must list g's site, then the resume site in main, as eager does. A second part puts a pending `fail.catch` between the final record and g, which the cancel skips.
 - `tests/spec/9.7/host_lazy_twice.i`: two async imports after a resume while outer frames are pending, and a `fail.catch` around an import that errors.
 
 The expected `at:` lists and logs are taken by running each case on the eager compiler at the bench commit, before the implementation is rebased onto it. The cases are new files, so they appear in `wat_expect.added` (11.4).
@@ -730,7 +945,7 @@ All of `tests/spec/9` and `tests/spec/11` at O0 and O2 pass unchanged, in partic
    - 7 `deep_resume`: about 10^8 eager re-entries and as many capture rethrows, far over a CI time budget;
    - 11 `deep_resume_in_recursion`: S11 is chosen so that eager stops (13.2).
 
-   Tests 4, 5, 8, 9 and 10 pass on eager code and stay on. The coordinator measures the eager baseline at this commit; the expected `at:` lists and logs of 13.3, L_eager of test 10 and S11 of test 11 are taken here. The new spec cases of 13.3 pass on eager code too, since their expected output is eager's.
+   Tests 4, 5, 8, 9, 10, 12 and 13 pass on eager code and stay on (the expected texts of 12 and 13 are eager's). The coordinator measures the eager baseline at this commit; the expected `at:` lists and values of 13.3, the stop texts of tests 12 and 13, L_eager of test 10 and S11 of test 11 are taken here. The new spec cases of 13.3 pass on eager code too, since their expected output is eager's.
 3. Rebase the implementation onto that commit. In the conflict on `control_lazy.rs`, B keeps step 2's file (new syntax) and drops the old-syntax copy of step 1, then turns the ignored tests on. After this step no old-syntax i source of B is left in a Rust string, and B runs `$C/tools/old-syntax-check` on the branch before it lands.
 4. Rebuild `tests/browser/fixtures/compiled.wasm` if B lands after C. If C lands after B, C rebuilds it.
 5. B-RF: the coordinator measures again; `tests/spec/9` and `tests/spec/11` pass at O0 and O2; the scope review checks that `emit/host.rs` has no diff.
@@ -739,7 +954,7 @@ All of `tests/spec/9` and `tests/spec/11` at O0 and O2 pass unchanged, in partic
 
 - **List mutation.** O1 and invariant D are new. A slip would run a frame twice or lose one. The mitigations are the state check (D11), the delimiter check, the run test that counts frames, and the re-suspend, inner-boundary, cancel, skip and environment-unwind spec cases at O0 and O2.
 - **Files outside B's list.** `runtime/stops.rs`, `runtime/mod.rs` and `emit/mod.rs` change a little, and `compiled.wasm` is lane C's file.
-- **Exact traces.** These rest on P2, P3, P4 and S0. P4 depends on the trampoline noting `top` and `from` at every catch and restoring `d` only before a call; `stop_lazy_cancel_out` checks it. A future frameless function with a point would break them, which is why `point()` asserts S0.
+- **Exact traces.** These rest on P2, P3, P4 and S0. P4 depends on the trampoline noting `top` and `from` at every catch and restoring `d` only before a call, and on `$shadow_insert` putting the slots at `d` with room for all of them (D14). Run tests 12 and 13 of 13.2 and the spec case `control_lazy_long_pending` check this. A future frameless function with a point would break them, which is why `point()` asserts S0.
 - **State after a trap.** `$pend` is stale after a trap, as `$sp` is. The spec forbids reusing the instance (Appendix B.5), so only an internal harness could see it. The reset rule is written down for such harnesses (section 5.9).
 - **The shim.** If stream C starts to pass a non-null `rest`, `cancel` or `frame` to `$boundary_run`, the shim traps. The trap is loud, but it is a run-time failure.
 - **Delimiters cost O(D).** Code that resumes inside many nested boundaries keeps a linear cost. The threshold does not cover it, and performance.md says so.
@@ -759,3 +974,4 @@ All of `tests/spec/9` and `tests/spec/11` at O0 and O2 pass unchanged, in partic
 2. **D4.** Is O(D) for resumes inside nested boundaries accepted? The alternative, cutting the pending list at a boundary that a suspend names, makes resume O(1 + E) but adds a new path that the existing boundary code does not cover.
 3. **D11.** Should the list checks stay on in release builds? They cost one read and one write per record. The coordinator's measurement decides.
 4. **Fuel.** If the pinned `wasmtime` CLI cannot run fuel with GC and exceptions, the fallback is a wall-clock check in `control_lazy.rs`: the minimum of 5 runs, a ratio of at most 2.0, and `#[ignore]` by default. Is that acceptable?
+5. **A cancel that leaves a resumed part of a cancel unwind.** The spec does not say what happens when a final function suspends during `cancel(k)`, the continuation of that suspend is resumed after `cancel(k)` was captured away, and the `$cancel` of `k` reaches the boundary of the resume. Today it stops with `control: boundary is not active` and a full trace. B keeps that, and checks it only in `control_lazy.rs` (D15). Should a later spec change add a sentence to §9.4 rule 4 or §11.7 for it? That is outside B, which changes no spec text.
