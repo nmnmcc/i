@@ -286,6 +286,9 @@ fn type_order(
     diags: &mut Vec<Diagnostic>,
     reverse: bool,
 ) -> Vec<Vec<BindingRef>> {
+    if p.of_sites.is_empty() && !reverse {
+        return groups;
+    }
     let mut owners = std::collections::HashMap::new();
     for (i, group) in groups.iter().enumerate() {
         for b in group {
@@ -380,6 +383,19 @@ fn type_order(
                 }
             }
         }
+    }
+    // O4: failed components poison their dependents without another error.
+    // Keep the expression SCCs intact; only recovery readiness is propagated.
+    loop {
+        let dependents = (0..groups.len())
+            .filter(|i| {
+                !bad.contains(i) && graph.neighbors(nodes[*i]).any(|n| bad.contains(&graph[n]))
+            })
+            .collect::<Vec<_>>();
+        if dependents.is_empty() {
+            break;
+        }
+        bad.extend(dependents);
     }
     for i in &bad {
         p.failed_type_groups.extend(groups[*i].iter().copied());

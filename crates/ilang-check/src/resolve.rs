@@ -1301,6 +1301,9 @@ impl<'a> Resolver<'a> {
     }
 
     fn environment_reads(&mut self) {
+        if self.p.of_sites.is_empty() {
+            return;
+        }
         let mut errors = Vec::new();
         let mut visit = |module, t: &Type| {
             walk_type(t, &mut |t| {

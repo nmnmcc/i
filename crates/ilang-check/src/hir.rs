@@ -614,6 +614,9 @@ pub fn walk_type(t: &Type, f: &mut impl FnMut(&Type)) {
 
 /// Whether a type transitively depends on a value. This survives completion.
 pub fn value_dependent(p: &Program, t: &Type) -> bool {
+    if p.of_sites.is_empty() {
+        return false;
+    }
     fn go(p: &Program, t: &Type, seen: &mut std::collections::HashSet<TypeId>) -> bool {
         let mut found = false;
         walk_type(t, &mut |t| match &t.kind {

@@ -841,9 +841,11 @@ impl<'a> Checker<'a> {
         }
         if let Some(fixed) = self.fix_notes.iter().find_map(|v| self.reads.fixed.get(v)) {
             let module = self.p.module(fixed.module);
+            let text = &self.sources.get(module.source).text;
+            let (line, column) = LineIndex::new(text).line_col(fixed.span.start);
             message.push_str(&format!(
-                " (this type was fixed here: {}:{}..{})",
-                module.path, fixed.span.start, fixed.span.end
+                " (this type was fixed here: {}:{line}:{column})",
+                module.path
             ));
         }
         self.fix_notes.clear();

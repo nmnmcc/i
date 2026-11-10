@@ -660,7 +660,7 @@ impl Checker<'_> {
             .of_sites
             .iter()
             .find(|site| {
-                matches!(site.value, ValueRef::Def(d) if defs.contains(&d)) && site.permanent
+                matches!(site.value, ValueRef::Def(d) if d.module == site.module && defs.contains(&d)) && site.permanent
             })
             .map(|site| (site.module, site.span));
         if let Some((module, span)) = provenance {

@@ -572,3 +572,106 @@ fn spec_corpus_reverse_order_and_recovery() {
     assert!(count > 0, "no resolved spec cases");
     eprintln!("Compared all {count} resolved spec cases in normal/reversed recovery inference");
 }
+
+#[test]
+fn alias_exports_preserve_constructor_privacy() {
+    // X1: Alias(..) is the same alias export as Alias, not constructor access.
+    for exports in ["(Public)", "(Public(..))"] {
+        let lib = [
+            exports,
+            "\nSecret { Secret(Int) }\nvalue: Int = 1\nPublic = value",
+        ]
+        .concat();
+        let (_, c) = checked(&[
+            ("src/lib.i", &lib),
+            (
+                "src/main.i",
+                "((Public) = app/lib)\nf = (n: Public) { n + 1 }",
+            ),
+        ]);
+        assert!(!c.diags.iter().any(Diagnostic::is_error), "{:?}", c.diags);
+        assert_eq!(alias(&c, "Public"), "Int");
+        let (_, c) = checked(&[
+            ("src/lib.i", &lib),
+            ("src/main.i", "((Public) = app/lib)\nx = lib.Secret(1)"),
+        ]);
+        assert!(
+            c.diags.iter().any(|d| d.code == code::NOT_EXPORTED),
+            "{:?}",
+            c.diags
+        );
+        let (_, c) = checked(&[
+            ("src/lib.i", &lib),
+            ("src/main.i", "(app/lib)\nPrivate = lib.value"),
+        ]);
+        assert!(
+            c.diags.iter().any(|d| d.code == code::NOT_EXPORTED),
+            "{:?}",
+            c.diags
+        );
+    }
+}
+
+#[test]
+fn invalid_components_fail_dependents_without_cascading_diagnostics() {
+    // O4: downstream annotations/aliases propagate Failed, never infer Never.
+    let src = "a = (x:b) {x}\nb = a(1)\nc: b = 1\nD = c\nanswer: Int = 42";
+    let (g, _) = checked(&[("src/main.i", src)]);
+    let c = query::check_for_queries(&g);
+    assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_CIRCLE));
+    assert!(
+        c.diags
+            .iter()
+            .all(|d| !d.is_error() || d.code == code::VALUE_TYPE_CIRCLE),
+        "{:?}",
+        c.diags
+    );
+    let p = c.program.unwrap();
+    let m = common::module(&p, "app/main");
+    assert_eq!(p.failed_type_groups.len(), 3);
+    assert!(c.types.unwrap().alias_types.is_empty());
+    assert_eq!(p.module(m).bindings.len(), 4);
+}
+
+#[test]
+fn skipped_quantifiers_and_constant_parts_do_not_choose_instances() {
+    // R2/P4: a skip can leave a quantified part alone only at own completion.
+    let (_, c) =
+        good("id = (x) {x}\nPair(A,B) = (A,B)\none: Int = 1\nv = (id,one)\nPair(_,Number) = v");
+    assert_eq!(alias(&c, "Number"), "Int");
+    let lib = "(v)\nid = (x) {x}\nv = (id,1)";
+    let (_, c) = checked(&[
+        ("src/lib.i", lib),
+        (
+            "src/main.i",
+            "(app/lib)\nPair(A,B) = (A,B)\nPair(_,Number) = lib.v",
+        ),
+    ]);
+    assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));
+    let (_, c) = checked(&[
+        ("src/lib.i", lib),
+        (
+            "src/main.i",
+            "(app/lib)\nPair(A,B) = (A,B)\nPair(_,_) = lib.v",
+        ),
+    ]);
+    assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));
+    // P4 cannot discard the Nil alternative to find a convenient named head.
+    bad(
+        "Box(A) {Box(A)}\nv: Box(Int) | Nil = Box(1)\nBox(_) = v",
+        code::TYPE_PATTERN_MISMATCH,
+    );
+    // A constant part introduced by a head alias compares after closing.
+    bad(
+        "Tagged(A) = (Int,A)\nv: (String,Int) = (\"s\",1)\nTagged(_) = v",
+        code::TYPE_PATTERN_MISMATCH,
+    );
+    bad(
+        "id = (x) {x}\nTagged(A) = (Int,A)\nv = id((id(id),1))\nTagged(_) = v",
+        code::VALUE_TYPE_NOT_FIXED,
+    );
+    // A closed function constant is permitted inside an otherwise linear head.
+    let (_, c) =
+        good("Fixed(A) = (() -> Int,A)\nv: (() -> Int,String) = (() {1},\"s\")\nFixed(Text) = v");
+    assert_eq!(alias(&c, "Text"), "String");
+}
