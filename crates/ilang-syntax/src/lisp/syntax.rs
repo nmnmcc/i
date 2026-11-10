@@ -14,6 +14,34 @@ pub struct Scope {
     pub marks: BTreeSet<u64>,
 }
 
+/// A name supplied by a compiler query may identify a binder or builtin
+/// directly, independently of ordinary module scope and expansion marks.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ScopeIdentity {
+    DefinitionParameter {
+        answer: u64,
+        parameter: u32,
+        name: String,
+    },
+    Builtin {
+        name: String,
+    },
+    TypeVariable {
+        variable: u64,
+        name: String,
+    },
+}
+
+impl ScopeIdentity {
+    fn name(&self) -> &str {
+        match self {
+            Self::DefinitionParameter { name, .. }
+            | Self::Builtin { name }
+            | Self::TypeVariable { name, .. } => name,
+        }
+    }
+}
+
 /// An opaque syntax value. Equality of values is identity, not code equality.
 #[derive(Clone, Debug)]
 pub struct Syntax(Arc<SyntaxData>);
@@ -24,6 +52,7 @@ struct SyntaxData {
     scope: Scope,
     span: Span,
     provenance: Provenance,
+    identity: Option<ScopeIdentity>,
     origin: Arc<()>,
 }
 
@@ -103,6 +132,7 @@ impl Syntax {
             scope: scope.clone(),
             span,
             provenance: Provenance::Written,
+            identity: None,
             origin: Arc::new(()),
         }))
     }
@@ -129,6 +159,7 @@ impl Syntax {
             scope: scope.clone(),
             span: d.span,
             provenance: Provenance::Written,
+            identity: None,
             origin: Arc::new(()),
         }))
     }
@@ -144,12 +175,36 @@ impl Syntax {
     pub fn provenance(&self) -> Provenance {
         self.0.provenance
     }
+    pub fn scope_identity(&self) -> Option<&ScopeIdentity> {
+        self.0.identity.as_ref()
+    }
+    /// Assign the query identity of a name in a compiler-provided answer.
+    pub fn with_scope_identity(&self, identity: ScopeIdentity) -> Self {
+        let name = match self.node() {
+            Node::Name(name) | Node::Up(name) => name,
+            _ => panic!("a special scope identity requires a name"),
+        };
+        assert_eq!(
+            name,
+            identity.name(),
+            "special scope identity has a different name"
+        );
+        Self(Arc::new(SyntaxData {
+            node: self.node().clone(),
+            scope: self.scope().clone(),
+            span: self.span(),
+            provenance: Provenance::Answer,
+            identity: Some(identity),
+            origin: Arc::new(()),
+        }))
+    }
     fn with_node(&self, node: Node) -> Self {
         Self(Arc::new(SyntaxData {
             node,
             scope: self.scope().clone(),
             span: self.span(),
             provenance: self.provenance(),
+            identity: self.scope_identity().cloned(),
             origin: Arc::new(()),
         }))
     }
@@ -172,6 +227,7 @@ impl Syntax {
             scope: self.scope().clone(),
             span: self.span(),
             provenance: Provenance::Answer,
+            identity: self.scope_identity().cloned(),
             origin: Arc::new(()),
         }))
     }
@@ -286,6 +342,7 @@ impl Syntax {
                     Provenance::Answer | Provenance::Made { from_answer: true }
                 ),
             },
+            identity: like.scope_identity().cloned(),
             origin: Arc::new(()),
         })))
     }
@@ -516,6 +573,12 @@ pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), S
     }
     let mut used = HashSet::new();
     descend(result, &mut |s| {
+        if let (Provenance::Made { .. }, Some(identity), Node::Name(name) | Node::Up(name)) =
+            (s.provenance(), s.scope_identity(), s.node())
+            && name != identity.name()
+        {
+            return Err(s.error("a made name cannot change a compiler-provided name identity"));
+        }
         if matches!(
             s.node(),
             Node::Quote(_) | Node::Unquote(_) | Node::Splice(_)
@@ -565,6 +628,7 @@ pub fn flip_mark_all(values: &[Syntax], mark: u64) -> Vec<Syntax> {
             scope,
             span: value.span(),
             provenance: value.provenance(),
+            identity: value.scope_identity().cloned(),
             origin: value.0.origin.clone(),
         }));
         seen.insert(key, result.clone());
