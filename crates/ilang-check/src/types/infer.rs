@@ -1038,45 +1038,57 @@ impl<'a> Checker<'a> {
     /// type variable is the variable of its binding. `local` gives the type
     /// parameters of a definition.
     pub fn conv(&mut self, t: &Type, local: &HashMap<TyVarId, Ty>) -> Ty {
-        match &t.kind {
+        self.conv_mode(t, local, Mode::Value)
+    }
+
+    fn conv_mode(&mut self, t: &Type, local: &HashMap<TyVarId, Ty>, mode: Mode) -> Ty {
+        let result = match &t.kind {
             TypeKind::Lit(v) => Ty::literal(v),
             TypeKind::Named { ty, args } => {
                 if let TypeRef::Custom(id) = ty
                     && let TypeBody::Alias(body) = &self.p.ty(*id).body
                 {
                     if self.reads.templates.contains_key(id) || value_dependent(self.p, body) {
-                        let args = args.iter().map(|a| self.conv(a, local)).collect();
-                        return self.instantiate_alias(*id, args);
+                        let modes = self.s.rows(Head::Named(*ty), args.len());
+                        let args = args
+                            .iter()
+                            .zip(modes)
+                            .map(|(a, row)| self.conv_mode(a, local, row))
+                            .collect();
+                        return self.instantiate_alias(*id, args, mode);
                     }
                     if self.alias_depth > 64 {
                         return self.s.fresh();
                     }
                     let params = self.p.ty(*id).params.clone();
                     let mut map = HashMap::new();
-                    for ((_, tv), a) in params.iter().zip(args) {
-                        let a = self.conv(a, local);
+                    let modes = self.s.rows(Head::Named(*ty), args.len());
+                    for (((_, tv), a), row) in params.iter().zip(args).zip(modes) {
+                        let a = self.conv_mode(a, local, row);
                         map.insert(*tv, a);
                     }
                     self.alias_depth += 1;
-                    let r = self.conv(body, &map);
+                    let r = self.conv_mode(body, &map, mode);
                     self.alias_depth -= 1;
                     return r;
                 }
                 if *ty == TypeRef::Builtin(BuiltinType::Never) {
                     return Ty::Never;
                 }
-                let args: Vec<_> = args.iter().map(|a| self.conv(a, local)).collect();
-                let h = Head::Named(*ty);
-                for (a, row) in args.iter().zip(self.s.rows(h, args.len())) {
-                    if row != Mode::Value {
-                        self.s.mark_mode(a, row);
-                    }
-                }
+                let modes = self.s.rows(Head::Named(*ty), args.len());
+                let args = args
+                    .iter()
+                    .zip(modes)
+                    .map(|(a, row)| self.conv_mode(a, local, row))
+                    .collect();
                 Ty::named(*ty, args)
             }
             TypeKind::Var(tv) => {
-                if let Some(t) = local.get(tv).or_else(|| self.tyvars.get(tv)) {
-                    return t.clone();
+                if let Some(t) = local.get(tv).or_else(|| self.tyvars.get(tv)).cloned() {
+                    if mode != Mode::Value {
+                        self.s.mark_mode(&t, mode);
+                    }
+                    return t;
                 }
                 let v = self.s.fresh_input();
                 if let Ty::Var(x) = v {
@@ -1105,10 +1117,12 @@ impl<'a> Checker<'a> {
                     })
                     .collect();
                 let ret = self.conv(ret, local);
-                let err = err.as_ref().map_or(Ty::Never, |e| self.conv(e, local));
-                let env = env.as_ref().map_or(Ty::Never, |e| self.conv(e, local));
-                self.s.mark_mode(&err, Mode::Row);
-                self.s.mark_row(&env);
+                let err = err
+                    .as_ref()
+                    .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Row));
+                let env = env
+                    .as_ref()
+                    .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Env));
                 Ty::Fn(Box::new(FnTy {
                     params,
                     ret,
@@ -1117,19 +1131,21 @@ impl<'a> Checker<'a> {
                 }))
             }
             TypeKind::Union(ts) => {
-                let ms = ts.iter().map(|a| self.conv(a, local)).collect();
-                self.union(ms, t.span)
+                let ms = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
+                let r = self.s.union_mode(ms, mode);
+                self.flush(t.span, None);
+                r
             }
             TypeKind::Inter(ts) => {
-                let ms = ts.iter().map(|a| self.conv(a, local)).collect();
-                let r = self.s.inter(ms);
+                let ms = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
+                let r = self.s.normalize_mode(Ty::Inter(ms), mode);
                 self.flush(t.span, None);
                 r
             }
             TypeKind::Diff(ts) => {
-                let mut a = self.conv(&ts[0], local);
+                let mut a = self.conv_mode(&ts[0], local, mode);
                 for part in &ts[1..] {
-                    let h = self.conv(part, local);
+                    let h = self.conv_mode(part, local, mode);
                     let mut members = Vec::new();
                     super::solve::flatten_union(std::slice::from_ref(&h), &mut members);
                     if members
@@ -1143,12 +1159,16 @@ impl<'a> Checker<'a> {
                         );
                         continue;
                     }
-                    a = self.s.diff(a, members);
+                    a = self.s.normalize_mode(Ty::Diff(Box::new(a), members), mode);
                     self.flush(t.span, None);
                 }
                 a
             }
+        };
+        if mode != Mode::Value {
+            self.s.mark_mode(&result, mode);
         }
+        result
     }
 
     /// `t` with the aliases at its top expanded (§4.3).
@@ -2160,7 +2180,7 @@ impl<'a> Checker<'a> {
                 Stmt::Env { ty, value, span } => {
                     // `! T = e1` and the rest `r`: `A ? E ! N1 | M - T`.
                     self.check_places(ty, Pol::Pos, 0);
-                    let t = self.conv(ty, &HashMap::new());
+                    let t = self.conv_mode(ty, &HashMap::new(), Mode::Env);
                     if let Some(super::Head::Named(r)) = t.head() {
                         self.out.services.insert((self.module, *span), r);
                     }
@@ -2219,7 +2239,7 @@ impl<'a> Checker<'a> {
                 }
                 Param::Env { var, name, ty } => {
                     self.check_places(ty, Pol::Pos, 0);
-                    let t = self.conv(ty, &HashMap::new());
+                    let t = self.conv_mode(ty, &HashMap::new(), Mode::Env);
                     if let Some(super::Head::Named(r)) = t.head() {
                         self.out.services.insert((self.module, name.span), r);
                     }
@@ -2248,11 +2268,11 @@ impl<'a> Checker<'a> {
             let err = r
                 .err
                 .as_ref()
-                .map_or(Ty::Never, |t| self.conv(t, &HashMap::new()));
+                .map_or(Ty::Never, |t| self.conv_mode(t, &HashMap::new(), Mode::Row));
             let env = r
                 .env
                 .as_ref()
-                .map_or(Ty::Never, |t| self.conv(t, &HashMap::new()));
+                .map_or(Ty::Never, |t| self.conv_mode(t, &HashMap::new(), Mode::Env));
             (value, err, env)
         });
         // §4.8: the body of a function with a written `->` part has that

@@ -855,7 +855,7 @@ impl Solver {
                     .partition(|m| matches!(m, Ty::Con(..) | Ty::Fn(_)));
                 let mut tries = Vec::new();
                 if !conc.is_empty() {
-                    tries.push(self.inter(conc));
+                    tries.push(self.normalize_mode(Ty::Inter(conc), env));
                 }
                 tries.extend(vars);
                 let before = self.failures.len();
@@ -1390,6 +1390,14 @@ impl Solver {
                 err: self.extrude(&f.err, pol, level, Mode::Row, cache),
                 env: self.extrude(&f.env, pol, level, Mode::Env, cache),
             })),
+            Ty::Union(ms) if env != Mode::Value || self.is_row(t) => {
+                let mode = env.max(self.mode(t));
+                let ms = ms
+                    .iter()
+                    .map(|m| self.extrude(m, pol, level, mode, cache))
+                    .collect();
+                self.union_mode(ms, mode)
+            }
             _ => self.map_children(t, pol, &mut |s, x, p| s.extrude(x, p, level, env, cache)),
         }
     }
@@ -1421,6 +1429,14 @@ impl Solver {
                 self.set_lower(nv, lower);
                 self.set_upper(nv, upper);
                 Ty::Var(nv)
+            }
+            Ty::Union(ms) if self.is_row(t) => {
+                // Rebuild the row's collector for these fresh variables.
+                // Otherwise generalization can leave its only receiver
+                // behind, losing comparisons of forms instantiated later.
+                let mode = self.mode(t);
+                let ms = ms.iter().map(|m| self.freshen(m, above, map)).collect();
+                self.union_mode(ms, mode)
             }
             _ => self.map_children(t, Pol::Pos, &mut |s, x, _| s.freshen(x, above, map)),
         }
@@ -1475,7 +1491,7 @@ impl Solver {
     /// direction by intersection, and arguments that do not change must be
     /// equal.
     pub fn union(&mut self, ms: Vec<Ty>) -> Ty {
-        self.union_in(ms, false)
+        self.union_mode(ms, Mode::Value)
     }
 
     /// The union of environments (§9.2): two forms of one type constructor
@@ -1485,6 +1501,7 @@ impl Solver {
     }
 
     pub fn union_mode(&mut self, ms: Vec<Ty>, mode: Mode) -> Ty {
+        let mode = mode.max(ms.iter().map(|m| self.mode(m)).max().unwrap_or_default());
         let ms = if mode == Mode::Row {
             join_literals(ms)
         } else {
@@ -1564,7 +1581,7 @@ impl Solver {
     /// `Never`; members with one are put together the other way round
     /// (§4.4). `a & T` with a type variable stays.
     pub fn inter(&mut self, ms: Vec<Ty>) -> Ty {
-        self.inter_in(ms, false)
+        self.normalize_mode(Ty::Inter(ms), Mode::Value)
     }
 
     fn inter_in(&mut self, ms: Vec<Ty>, env: bool) -> Ty {
@@ -1680,9 +1697,9 @@ impl Solver {
                 // The environments of two function types are put together
                 // as environments (§4.4, §9.2).
                 let env = if union {
-                    self.union_in(vec![f.env, g.env], true)
+                    self.union_mode(vec![f.env, g.env], Mode::Env)
                 } else {
-                    self.inter_in(vec![f.env, g.env], true)
+                    self.normalize_mode(Ty::Inter(vec![f.env, g.env]), Mode::Env)
                 };
                 Ty::Fn(Box::new(FnTy {
                     params,
@@ -1700,10 +1717,10 @@ impl Solver {
 
     fn merge_arg(&mut self, x: Ty, y: Ty, v: Variance, union: bool, row: Mode) -> Ty {
         match v {
-            Variance::Co | Variance::Bi if union => self.union_in(vec![x, y], row != Mode::Value),
-            Variance::Co | Variance::Bi => self.inter_in(vec![x, y], row != Mode::Value),
-            Variance::Contra if union => self.inter_in(vec![x, y], row != Mode::Value),
-            Variance::Contra => self.union_in(vec![x, y], row != Mode::Value),
+            Variance::Co | Variance::Bi if union => self.union_mode(vec![x, y], row),
+            Variance::Co | Variance::Bi => self.normalize_mode(Ty::Inter(vec![x, y]), row),
+            Variance::Contra if union => self.normalize_mode(Ty::Inter(vec![x, y]), row),
+            Variance::Contra => self.union_mode(vec![x, y], row),
             Variance::Inv => {
                 self.equal(&x, &y, FailKind::Invariant);
                 x
@@ -1785,6 +1802,7 @@ impl Solver {
     /// Normalize closed or open type algebra without losing the row
     /// mode of constructor arguments or function effects.
     pub fn normalize_mode(&mut self, t: Ty, mode: Mode) -> Ty {
+        let mode = mode.max(self.mode(&t));
         match t {
             Ty::Con(h, values, args) => {
                 let modes = self.rows(h, args.len());

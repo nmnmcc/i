@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 
 FIXTURES = Path(__file__).resolve().parents[2] / 'crates/ilang-cli/tests/k4'
-NEGATIVE = ['row_alias', 'alias_kind_env', 'alias_kind_error', 'x1', 'x2', 'x3', 'x4', 'x6', 'x7', 'x8', 'z1', 'z4', 'g_ann_SDep', 'g_inf_SDep', 'm3', 'm4', 'r6', 'b4', 'b7', 'r2', 'r3']
+NEGATIVE = ['row_alias', 'direct_row', 'effect_row_alias', 'latent_row', 'alias_kind_env', 'alias_kind_error', 'x1', 'x2', 'x3', 'x4', 'x6', 'x7', 'x8', 'z1', 'z4', 'g_ann_SDep', 'g_inf_SDep', 'm3', 'm4', 'r6', 'b4', 'b7', 'r2', 'r3']
 
 
 def cases():
@@ -17,6 +17,8 @@ def cases():
         yield f'q{n}', source + '\n@main\nmain = () { ! S(Never) = S(() { 1 }) assert(fw() == 1) }\n', False, ''
     yield 'r4', (FIXTURES / 'r4.i').read_text(), False, 'four\nthree\n'
     yield 'closed_handler_hole', (FIXTURES / 'closed_handler_hole.i').read_text(), False, ''
+    yield 'latent_row_same', (FIXTURES / 'latent_row_same.i').read_text(), False, ''
+    yield 'error_row_values', (FIXTURES / 'error_row_values.i').read_text(), False, ''
     for n in range(1, 17):
         for row in ['Never', 'Dep']:
             source = (FIXTURES / f'w{n}.i').read_text()

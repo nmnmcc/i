@@ -220,7 +220,12 @@ impl Checker<'_> {
         })
     }
 
-    pub(super) fn instantiate_alias(&mut self, id: TypeId, args: Vec<Ty>) -> Ty {
+    pub(super) fn instantiate_alias(
+        &mut self,
+        id: TypeId,
+        args: Vec<Ty>,
+        mode: super::solve::Mode,
+    ) -> Ty {
         for (arg, mode) in args.iter().zip(
             self.s
                 .rows(super::Head::Named(TypeRef::Custom(id)), args.len()),
@@ -238,8 +243,9 @@ impl Checker<'_> {
         // With no operators in either the template or its arguments,
         // normalization would only copy constructors and variables unchanged.
         if has_algebra {
-            normalize(&mut self.s, ty)
+            self.s.normalize_mode(ty, mode)
         } else {
+            self.s.mark_mode(&ty, mode);
             ty
         }
     }

@@ -168,3 +168,90 @@ wrap(N) = (body: () -> Nil ! N | S(Never), svc: S(Never)) -> Nil ! N {
 }";
     types(never);
 }
+
+#[test]
+fn written_row_algebra_keeps_its_mode_before_normalization() {
+    // F2 requires equal service arguments also before any variables or
+    // instantiation exist. Ordinary value variance must not merge them.
+    let head = "Dep { Dep }
+S(N) { S(() -> Nil ! N) }
+T(N) { T(() -> Nil ! N) }
+Alias(N) = T(N)
+";
+    for op in ["|", "&", "-"] {
+        let row = ["S(Never)", op, "S(Dep)"].join(" ");
+        for written in [
+            format!("T({row})"),
+            format!("Alias({row})"),
+            format!("() -> Nil ! {row}"),
+            format!("() -> Nil ? {row}"),
+        ] {
+            let source = format!(
+                "{head}use = (x: {written}) {{ x }}
+"
+            );
+            let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
+            let checked = ilang_check::check(&graph);
+            assert!(
+                checked.diags.iter().any(|d| d.code == "E0515"),
+                "{source}: {:?}",
+                graph.sources.render_all(&checked.diags)
+            );
+        }
+    }
+    let alias = "Dep { Dep }
+S(N) { S(() -> Nil ! N) }
+Bad = S(Never) | S(Dep)
+use = (body: () -> Nil ! Bad) { body() }";
+    let (graph, _, _) = common::check_files(&[("src/main.i", alias)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    // Value unions keep ordinary variance; distinct row constructors may
+    // also coexist. Neither is a same-form collision under rule 4.
+    types(&format!(
+        "{head}value = (x: S(Never) | S(Dep)) {{ x }}
+"
+    ));
+    types(&format!(
+        "{head}value = (x: T(S(Never) | Dep)) {{ x }}
+"
+    ));
+}
+
+#[test]
+fn instantiated_output_rows_are_checked_even_when_unused() {
+    // §9.2 forbids two S forms in the returned callback's environment,
+    // whether it is invoked or left unused. §4.8 unions the two rows.
+    let source = "S(A) { S(A) }
+T(N) { T(f: () -> Nil ! N) }
+merge(N, M) = (a: T(N), b: T(M)) { T(() { a.f() b.f() }) }
+one = (s ! S(Int)) { Nil }
+two = (s ! S(String)) { Nil }
+@main
+main = () { unused = merge(T(one), T(two)) Nil }";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    let same = types(&source.replace("String", "Int"));
+    assert_eq!(same["app/main.merge"], "(a: T(A), b: T(B)) -> T(A | B)");
+}
+
+#[test]
+fn function_type_joins_preserve_scalar_error_inclusion() {
+    // Rule 8 still governs scalar error value sets when function types
+    // are joined; the row mode must reach merge_arg as well as calls.
+    types(
+        "(i/fail)
+one = () -> Nil ? 1 { fail.raise(1) }
+two = () -> Nil ? 2 { fail.raise(2) }
+pick = (b: Bool) { b |> { True -> one False -> two } }",
+    );
+}

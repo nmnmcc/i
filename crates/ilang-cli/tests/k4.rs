@@ -63,6 +63,9 @@ fn rows_inside_type_arguments_keep_service_arguments_equal() {
     // a different S form or an unprovided Dep; neither may reach runtime.
     for name in [
         "row_alias",
+        "direct_row",
+        "effect_row_alias",
+        "latent_row",
         "alias_kind_env",
         "alias_kind_error",
         "g_ann_SDep",
@@ -267,4 +270,29 @@ fn concrete_handler_holes_have_the_same_runtime_type() {
             check_and_run("closed-handler-hole", &source, None, "");
         }
     }
+}
+
+#[test]
+fn fresh_row_unions_keep_equal_service_forms() {
+    // §9.2 permits one S(Int) form to serve both callbacks. Freshening
+    // must retain this principal T(A | B) result and reject S(String).
+    check_and_run(
+        "latent-row-same",
+        include_str!("k4/latent_row_same.i"),
+        None,
+        "",
+    );
+}
+
+#[test]
+fn scalar_error_rows_keep_literal_set_inclusion() {
+    // §4.5 rule 8: joining error rows 1 and 2 gives 1 | 2; §9.3
+    // reifies the selected literal as Err. Service equality must not
+    // turn those scalar value sets into a conflicting service form.
+    check_and_run(
+        "scalar-error-rows",
+        include_str!("k4/error_row_values.i"),
+        None,
+        "",
+    );
 }

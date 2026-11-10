@@ -378,6 +378,9 @@ fn cycles(s: &Solver, t: &Ty, keep: Option<u32>) -> HashMap<V, V> {
         }
     }
     let n = found.len();
+    if n < 2 {
+        return HashMap::default();
+    }
     let mut edges: Vec<Vec<usize>> = vec![Vec::new(); n];
     for (i, v) in found.iter().enumerate() {
         let st = &s.vars[v.0 as usize];
@@ -1097,6 +1100,9 @@ impl Norm<'_> {
         let mut occ: HashMap<V, Occ> = HashMap::default();
         let mut order = Vec::new();
         self.walk(t, true, &mut occ, &mut order, false);
+        if order.is_empty() {
+            return None;
+        }
         // A handler's arguments constrain input variables even when a
         // result annotation hides that relation. Do not turn an otherwise
         // output-only row into an input merely because it excludes itself.

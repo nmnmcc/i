@@ -326,8 +326,8 @@ files above.
 | File | Functions |
 | --- | --- |
 | `types/solve.rs` | `Solver::new`, `for_closed_types`, `fresh_at`, `variances`, `fail`, `constrain`, `constrain_env`, `rows`, `mark_row`, `mark_mode`, `is_row`, `mode`, `constrain_row`, `has_obligations`, `handle`, `same_form`, `same_form_in`, `hidden_handlers` (and its `parts` walker), `constrain_in`, `constrain_by`, `add_bound`, `compare`, `join`, `route`, `diff_left`, `extrude`, `freshen`, `env_union`, `union_mode`, `merge`, `merge_arg`, `diff`, `env_diff`, `diff_mode`, `normalize_mode`, `diff_bound`, `diff_bound_mode`, `occurs`, `normalize_bounds`, `normalize_type`, `normalized`, `occurs_from`; `edge_vars`, `bound_vars`, `env_vars`, `builtin_variance`, `builtin_variance_values`; `ParamModes::{repeated,from_slice,next,size_hint}`. |
-| `types/infer.rs` | `Checker::new`, `run`, `group`, `entry_point`, `exported_type`, `check_occurs`, `report_coalescing`, `add_err`, `add_env`, `pop_effects`, `conv`, `fresh_args`, `function`, `local_binding`, `generalize`, `rebuild`; `row_parameters` and its `walk`. |
-| `types/display.rs` | `scheme_in`, `scheme_names`, `simplify_steps`; `Coalescer::go`; `Norm::{norm,env,union_in,step,walk}`; `record`, `hide`. |
+| `types/infer.rs` | `Checker::new`, `run`, `group`, `entry_point`, `exported_type`, `check_occurs`, `report_coalescing`, `add_err`, `add_env`, `pop_effects`, `conv`, `conv_mode`, `fresh_args`, `function`, `local_binding`, `generalize`, `rebuild`; `row_parameters` and its `walk`. |
+| `types/display.rs` | `scheme_in`, `scheme_names`, `simplify_steps`, `cycles`; `Coalescer::go`; `Norm::{norm,env,union_in,step,walk}`; `record`, `hide`. |
 | `types/alias.rs` | `Checker::instantiate_alias`; `normalize`. |
 | `types/known.rs` | `Checker::ctor_known` (consume the variance iterator). |
 | `types/value_types.rs` | `closed_equal`, `normalize_closed`, `Checker::closed_written` (preserve row metadata in closed-type scratch solvers). |
@@ -392,3 +392,50 @@ restriction nor a solver bound is removed. The first `proof-final-build` attempt
 implementation was corrected rather than accepting the noncanonical expected
 string. A queued duplicate (`proof-delivery-build`) was superseded before it
 started; the complete targeted run is `final-proof-build`.
+
+
+The F2 audit also checked the direct spelling T(S(Never) | S(Dep)). It
+was incorrectly accepted as T(S(Dep)): written-type conversion used value
+variance before the enclosing constructor identified its parameter as a row.
+`conv_mode` now passes the already determined parameter/effect mode before
+converting algebra. Alias instantiation receives the caller's mode too.
+This covers direct type arguments, function error/environment annotations,
+environment parameters/statements, and alias expansion. Row unions,
+intersections and differences use the same solver normalizer; ordinary
+value unions keep rule 6. The two new unused-code regressions (`direct_row`
+and `effect_row_alias`) must fail E0515 at check and both run optimization
+levels. Their base mains simply return Nil; no runtime failure is claimed
+for unused code. The named corpus now has 77 cases. The previous queued
+quiet run was stopped for this correctness change and is not final evidence.
+
+
+The last common-path optimization skips SCC construction when fewer than two
+variables were reached: `cycles` only returns classes with multiple variables,
+so its result is necessarily empty. The coalescer's constructor-cycle stack
+check is unchanged. An occurrence pass with no variables cannot select a
+substitution, so it also returns immediately. These avoid unnecessary work
+without changing any inferred bound or type.
+
+
+Row algebra also keeps its mode while schemes are freshened or extruded.
+An inferred merge returning T(N | M) previously lost the union's collector
+at generalization. Supplying S(Int) and S(String) then left an invalid latent
+callback type even when the result was unused. Freshening and extrusion
+rebuild the row collector for the copied variables, so both later forms are
+compared. `latent_row` checks this unused result; `latent_row_same` supplies
+one S(Int), invokes the returned callback and succeeds. Rule 9.2 requires
+the former rejection and permits the latter shared form.
+
+All function/constructor row-field merges now use the same mode-aware algebra
+entry points. In particular, merging function error rows uses scalar set
+union under rule 8, rather than environment value-set equality. The
+`error_row_values` runtime regression selects functions raising 1 and 2;
+9.3 requires their reified errors to be Error(1) and Error(2). The named corpus
+has 80 cases. The pending generated files are discarded only to merge the
+new W0503 redesign change, then regenerated with the final compiler.
+
+
+The scalar-error runtime fixture initially used the wrong constructor name
+Err. Its check failed with E0201 (`algebra-final-build`); §9.3 and i/fail
+specify Error. The fixture now checks Error(1) and Error(2), preserving both
+literal expectations. No implementation or diagnostic check was relaxed.
