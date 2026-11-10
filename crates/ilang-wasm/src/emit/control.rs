@@ -17,32 +17,36 @@ use super::*;
 ///
 /// - A boundary is a `$boundary` whose field 8 is 1 while it is active.
 /// - `suspend` throws `$capture` with a `$cap`: the boundary, `f`, and the
-///   frame records so far. Each frame that the exception goes through puts
-///   its record first and throws it again (`$capture_rethrow`), so the list
-///   is outermost first.
-/// - A frame record is a `$frame`: the re-entry function and the values it
-///   needs. A re-entry function (`$refn`) gets its record, the records of
-///   the frames inside it, the environment, and what to do at the innermost
-///   frame: give `v`, or unwind with `$cancel` when `cancel` (the
-///   continuation) is not null. It rebuilds its frame, re-enters the inner
-///   ones (`$reenter_next`) in a `$capture` handler that puts the same record
-///   first again, and goes on.
-/// - Each runtime function that calls i code has a record of its own:
-///   `$catch_reenter` (`fail.catch`), `$ensure_reenter` and
-///   `$final_reenter` (`resource.ensure`, also while its final function
-///   runs), `$boundary_reenter` (a boundary that a capture for another
-///   boundary went through), and `$cancel_reenter` (a final function that
-///   `cancel` runs suspended).
-/// - The boundary takes the `$capture` of its own boundary, makes the
-///   continuation `$cont`, and calls `f(k)` as a tail call in its place.
-///   `resume` re-enters the records inside a boundary that is active again,
-///   so the value at the boundary is the value of `resume`. `cancel`
-///   re-enters them with the `$cancel` of the continuation, and takes it.
+///   frame records so far. Each frame that the exception goes through adds
+///   its record at the end (`$capture_rethrow`), so the list is innermost
+///   first.
+/// - A frame record is a `$frame`: its re-entry function, the values it
+///   needs, its slot on the shadow stack, and its kind. The kind says
+///   whether the record is called when an error or a cancel reaches it:
+///   only when its frame had a handler for it. A frame whose call is under
+///   an environment statement also keeps the statements' services and
+///   values.
+/// - `resume` and `cancel` re-enter only the innermost record. `$tramp_run`
+///   keeps the others, and gives each one what the frames inside it ended
+///   with: a value, an error or a cancel. A record then does what its frame
+///   would have done at that point. Code frames have nothing to do with an
+///   error or a cancel, so they are passed over. When an error or a cancel
+///   goes out of `$tramp_run`, the slots of the frames it passed over are
+///   put back on the shadow stack, where they would have been.
+/// - A capture that leaves `$tramp_run` takes the records that are still
+///   waiting with it, in one step.
+/// - A boundary or a cancel that a capture goes through keeps the records
+///   inside it in one record of its own. `resume` re-enters such records at
+///   once, so their boundaries are active again.
+/// - `$boundary_run` is kept for `host.rs` only; `$boundary_core` does the
+///   work.
 pub(super) const EFFECTS: &str = r#"
 (tag $error (param eqref))
 (tag $cancel (param eqref))
 (tag $capture (param (ref $cap)))
 (global $root_env (mut (ref null $env)) (ref.null $env))
+;; The live trampolines, innermost first.
+(global $pend (mut (ref null $tramp)) (ref.null $tramp))
 
 ;; `env` with `v` in the slot `id` (§9.2): a new array.
 (func $env_with (param $env (ref null $env)) (param $id i32) (param $v eqref) (result (ref null $env))
@@ -51,6 +55,24 @@ pub(super) const EFFECTS: &str = r#"
   (local.set $new (array.new_default $env (local.get $n)))
   (array.copy $env $env (local.get $new) (i32.const 0) (local.get $env) (i32.const 0) (local.get $n))
   (array.set $env (local.get $new) (local.get $id) (local.get $v))
+  (local.get $new))
+
+;; `env` with the pairs `[service, value]` of `delta` set in order, so a
+;; later pair wins, as a chain of `$env_with` does: one new array.
+(func $env_apply (param $env (ref null $env)) (param $delta (ref null $values)) (result (ref null $env))
+  (local $new (ref $env)) (local $pairs (ref $values)) (local $n i32) (local $i i32)
+  (if (ref.is_null (local.get $delta)) (then (return (local.get $env))))
+  (local.set $pairs (ref.as_non_null (local.get $delta)))
+  (local.set $n (array.len (local.get $env)))
+  (local.set $new (array.new_default $env (local.get $n)))
+  (array.copy $env $env (local.get $new) (i32.const 0) (local.get $env) (i32.const 0) (local.get $n))
+  (block $done (loop $each
+    (br_if $done (i32.ge_u (local.get $i) (array.len (local.get $pairs))))
+    (array.set $env (local.get $new)
+      (i31.get_u (ref.cast (ref i31) (array.get $values (local.get $pairs) (local.get $i))))
+      (array.get $values (local.get $pairs) (i32.add (local.get $i) (i32.const 1))))
+    (local.set $i (i32.add (local.get $i) (i32.const 2)))
+    (br $each)))
   (local.get $new))
 
 ;; Calls a computation (§9.1) with the environment.
@@ -63,32 +85,281 @@ pub(super) const EFFECTS: &str = r#"
   (call_ref $fn1 (ref.cast (ref $clo1) (local.get $f)) (local.get $env) (local.get $a)
     (struct.get $clo1 8 (ref.cast (ref $clo1) (local.get $f)))))
 
-;; Puts the frame record `f` first in the capture `c`, and throws `x` again.
+;; Adds the frame record `f` at the end of the capture `c` (the list is
+;; innermost first), and throws `x` again.
 (func $capture_rethrow (param $c (ref $cap)) (param $x exnref) (param $f (ref $frame))
-  (struct.set $cap 2 (local.get $c) (struct.new $flist (local.get $f) (struct.get $cap 2 (local.get $c))))
+  (local $n (ref $flist))
+  (local.set $n (struct.new $flist (local.get $f) (ref.null $flist) (ref.null $flist) (ref.null $env)
+    (i32.const 0)))
+  (if (ref.is_null (struct.get $cap 3 (local.get $c)))
+    (then (struct.set $cap 2 (local.get $c) (local.get $n)))
+    (else (struct.set $flist 1 (ref.as_non_null (struct.get $cap 3 (local.get $c))) (local.get $n))))
+  (struct.set $cap 3 (local.get $c) (local.get $n))
+  (if (i32.eq (struct.get $frame 3 (local.get $f)) (i32.const 1))
+    (then
+      (if (ref.is_null (struct.get $cap 5 (local.get $c)))
+        (then (struct.set $cap 4 (local.get $c) (local.get $n)))
+        (else (struct.set $flist 2 (ref.as_non_null (struct.get $cap 5 (local.get $c))) (local.get $n))))
+      (struct.set $cap 5 (local.get $c) (local.get $n))))
   (throw_ref (local.get $x)))
 
-;; Re-enters the frames `rest`, the outermost first. At the innermost frame,
-;; gives `v`, or unwinds with `$cancel` when `cancel` is not null.
-(func $reenter_next (param $rest (ref null $flist)) (param $env (ref null $env)) (param $v eqref)
-    (param $cancel eqref) (result eqref)
-  (local $f (ref $frame))
-  (if (ref.is_null (local.get $rest))
+;; The records of the capture `c`, or null when it has none.
+(func $capture_sub (param $c (ref $cap)) (result (ref null $sub))
+  (if (ref.is_null (struct.get $cap 2 (local.get $c))) (then (return (ref.null $sub))))
+  (struct.new $sub (struct.get $cap 2 (local.get $c)) (struct.get $cap 3 (local.get $c))
+    (struct.get $cap 4 (local.get $c)) (struct.get $cap 5 (local.get $c))))
+
+;; A capture that goes through a boundary or a cancel: its records go into
+;; one record of kind 3 (re-entry `f`, values `[first, records]`), which is
+;; then the only record of the capture. Throws `x` again.
+(func $capture_pack (param $c (ref $cap)) (param $x exnref) (param $f (ref $refn)) (param $first eqref)
+  (local $n (ref $flist))
+  (local.set $n (struct.new $flist
+    (struct.new $frame (local.get $f)
+      (array.new_fixed $values 2 (local.get $first) (call $capture_sub (local.get $c)))
+      (i32.const -1) (i32.const 3) (ref.null $values))
+    (ref.null $flist) (ref.null $flist) (ref.null $env) (i32.const 0)))
+  (struct.set $cap 2 (local.get $c) (local.get $n))
+  (struct.set $cap 3 (local.get $c) (local.get $n))
+  (struct.set $cap 4 (local.get $c) (ref.null $flist))
+  (struct.set $cap 5 (local.get $c) (ref.null $flist))
+  (throw_ref (local.get $x)))
+
+;; Joins the records `p … last` (kind-1 records `pm … mlast`) after the
+;; records of the capture `c`.
+(func $capture_splice (param $c (ref $cap)) (param $p (ref null $flist)) (param $pm (ref null $flist))
+    (param $last (ref null $flist)) (param $mlast (ref null $flist))
+  (if (i32.eqz (ref.is_null (local.get $p)))
     (then
-      (if (i32.eqz (ref.is_null (local.get $cancel))) (then (throw $cancel (local.get $cancel))))
-      (return (local.get $v))))
-  (local.set $f (struct.get $flist 0 (ref.as_non_null (local.get $rest))))
-  (return_call_ref $refn (local.get $f) (struct.get $flist 1 (ref.as_non_null (local.get $rest)))
-    (local.get $env) (local.get $v) (local.get $cancel) (struct.get $frame 0 (local.get $f))))
+      (if (ref.is_null (struct.get $cap 3 (local.get $c)))
+        (then (struct.set $cap 2 (local.get $c) (local.get $p)))
+        (else (struct.set $flist 1 (ref.as_non_null (struct.get $cap 3 (local.get $c))) (local.get $p))))
+      (struct.set $cap 3 (local.get $c) (local.get $last))))
+  (if (i32.eqz (ref.is_null (local.get $pm)))
+    (then
+      (if (ref.is_null (struct.get $cap 5 (local.get $c)))
+        (then (struct.set $cap 4 (local.get $c) (local.get $pm)))
+        (else (struct.set $flist 2 (ref.as_non_null (struct.get $cap 5 (local.get $c))) (local.get $pm))))
+      (struct.set $cap 5 (local.get $c) (local.get $mlast)))))
+
+;; The number of code records (kind 0 or 1) from `n` to the end of its list.
+(func $code_count (param $n (ref null $flist)) (result i32)
+  (local $k i32)
+  (block $done (loop $each
+    (br_if $done (ref.is_null (local.get $n)))
+    (if (i32.le_u (struct.get $frame 3 (struct.get $flist 0 (ref.as_non_null (local.get $n)))) (i32.const 1))
+      (then (local.set $k (i32.add (local.get $k) (i32.const 1)))))
+    (local.set $n (struct.get $flist 1 (ref.as_non_null (local.get $n))))
+    (br $each)))
+  (local.get $k))
+
+;; Writes the slots of the code records from `n` to the end of its list into
+;; `a`, below `hi`: the innermost highest. Gives the lowest index written.
+(func $code_slots (param $a (ref $frames)) (param $hi i32) (param $n (ref null $flist)) (result i32)
+  (local $f (ref $frame))
+  (block $done (loop $each
+    (br_if $done (ref.is_null (local.get $n)))
+    (local.set $f (struct.get $flist 0 (ref.as_non_null (local.get $n))))
+    (if (i32.le_u (struct.get $frame 3 (local.get $f)) (i32.const 1))
+      (then
+        (local.set $hi (i32.sub (local.get $hi) (i32.const 1)))
+        (array.set $frames (local.get $a) (local.get $hi) (struct.get $frame 2 (local.get $f)))))
+    (local.set $n (struct.get $flist 1 (ref.as_non_null (local.get $n))))
+    (br $each)))
+  (local.get $hi))
+
+;; Puts the slots of the code records from `from` to the end of its list
+;; into the shadow stack at `at`, the outermost lowest, and moves the slots
+;; at `at` and above up by their number. Makes room for all of them at once.
+(func $shadow_insert (param $at i32) (param $from (ref null $flist))
+  (local $n i32) (local $sp i32) (local $need i32) (local $old (ref $frames)) (local $new (ref $frames))
+  (local $size i32)
+  (local.set $n (call $code_count (local.get $from)))
+  (if (i32.eqz (local.get $n)) (then (return)))
+  (local.set $sp (global.get $sp))
+  (local.set $need (i32.add (local.get $sp) (local.get $n)))
+  ;; The limit of $shadow_grow: out of stack.
+  (if (i32.gt_u (local.get $need) (i32.const 268435456)) (then unreachable))
+  (local.set $old (global.get $shadow))
+  (local.set $size (array.len (local.get $old)))
+  (if (i32.gt_u (local.get $need) (local.get $size))
+    (then
+      (local.set $size (i32.shl (local.get $size) (i32.const 1)))
+      (if (i32.gt_u (local.get $need) (local.get $size)) (then (local.set $size (local.get $need))))
+      (local.set $new (array.new_default $frames (local.get $size)))
+      (array.copy $frames $frames (local.get $new) (i32.const 0) (local.get $old) (i32.const 0) (local.get $at))
+      (array.copy $frames $frames (local.get $new) (i32.add (local.get $at) (local.get $n))
+        (local.get $old) (local.get $at) (i32.sub (local.get $sp) (local.get $at)))
+      (global.set $shadow (local.get $new)))
+    (else
+      (array.copy $frames $frames (local.get $old) (i32.add (local.get $at) (local.get $n))
+        (local.get $old) (local.get $at) (i32.sub (local.get $sp) (local.get $at)))))
+  (drop (call $code_slots (global.get $shadow) (i32.add (local.get $at) (local.get $n)) (local.get $from)))
+  (global.set $sp (local.get $need)))
+
+;; Called by `$stop` (runtime/stops.rs) before it prints: a new shadow
+;; stack with the slots of the records that wait in the trampolines of
+;; `$pend`, in the places where eager re-entry would have pushed them.
+(func $control_unpend (type $unpend)
+  (local $sp i32) (local $n i32) (local $top i32) (local $hi i32) (local $len i32)
+  (local $t (ref null $tramp)) (local $new (ref $frames)) (local $old (ref $frames))
+  (if (ref.is_null (global.get $pend)) (then (return)))
+  (local.set $old (global.get $shadow))
+  (local.set $sp (global.get $sp))
+  (if (i32.gt_u (local.get $sp) (array.len (local.get $old)))
+    (then (local.set $sp (array.len (local.get $old)))))
+  ;; A trampoline above the running depth is not live (section 5.9 of the
+  ;; design): it is skipped.
+  (local.set $top (local.get $sp))
+  (local.set $t (global.get $pend))
+  (block $done (loop $each
+    (br_if $done (ref.is_null (local.get $t)))
+    (if (i32.le_u (struct.get $tramp 0 (ref.as_non_null (local.get $t))) (local.get $top))
+      (then
+        (local.set $n (i32.add (local.get $n)
+          (call $code_count (struct.get $tramp 1 (ref.as_non_null (local.get $t))))))
+        (local.set $top (struct.get $tramp 0 (ref.as_non_null (local.get $t))))))
+    (local.set $t (struct.get $tramp 2 (ref.as_non_null (local.get $t))))
+    (br $each)))
+  (if (i32.eqz (local.get $n)) (then (return)))
+  (local.set $new (array.new_default $frames (i32.add (local.get $sp) (local.get $n))))
+  (local.set $hi (i32.add (local.get $sp) (local.get $n)))
+  (local.set $top (local.get $sp))
+  (local.set $t (global.get $pend))
+  (block $done (loop $each
+    (br_if $done (ref.is_null (local.get $t)))
+    (if (i32.le_u (struct.get $tramp 0 (ref.as_non_null (local.get $t))) (local.get $top))
+      (then
+        (local.set $len (i32.sub (local.get $top) (struct.get $tramp 0 (ref.as_non_null (local.get $t)))))
+        (local.set $hi (i32.sub (local.get $hi) (local.get $len)))
+        (array.copy $frames $frames (local.get $new) (local.get $hi)
+          (local.get $old) (struct.get $tramp 0 (ref.as_non_null (local.get $t))) (local.get $len))
+        (local.set $top (struct.get $tramp 0 (ref.as_non_null (local.get $t))))
+        (local.set $hi (call $code_slots (local.get $new) (local.get $hi)
+          (struct.get $tramp 1 (ref.as_non_null (local.get $t)))))))
+    (local.set $t (struct.get $tramp 2 (ref.as_non_null (local.get $t))))
+    (br $each)))
+  (array.copy $frames $frames (local.get $new) (i32.const 0) (local.get $old) (i32.const 0) (local.get $top))
+  (global.set $shadow (local.get $new))
+  (global.set $sp (i32.add (local.get $sp) (local.get $n))))
+
+;; For code that resets `$sp` for a new entry in the same instance.
+(func $control_reset
+  (global.set $pend (ref.null $tramp)))
+
+;; Re-enters the records `s`, innermost first. The innermost one is given
+;; `v` with `mode` (0 a value, 1 an error, 2 a cancel); each next one is
+;; given what the one before it ended with. A code record is called only
+;; with a value, and a runtime record only in the modes its frame had a
+;; handler for. The records not called yet are pending in a `$tramp` in
+;; `$pend`; a capture takes them with it.
+(func $tramp_run (param $s (ref null $sub)) (param $env (ref null $env)) (param $v eqref) (param $mode i32)
+    (result eqref)
+  (local $node (ref null $flist)) (local $nm (ref null $flist)) (local $last (ref null $flist))
+  (local $mlast (ref null $flist)) (local $first (ref null $flist)) (local $from (ref null $flist))
+  (local $m (ref null $flist)) (local $prev (ref null $flist)) (local $next (ref null $flist))
+  (local $this (ref $flist)) (local $fr (ref $frame)) (local $e (ref null $env)) (local $cur (ref null $env))
+  (local $given (ref null $env)) (local $d i32) (local $t (ref $tramp)) (local $c (ref $cap)) (local $x exnref)
+  (if (ref.is_null (local.get $s)) (then (return_call $ensure_end (local.get $mode) (local.get $v))))
+  (local.set $node (struct.get $sub 0 (ref.as_non_null (local.get $s))))
+  (if (ref.is_null (local.get $node)) (then (return_call $ensure_end (local.get $mode) (local.get $v))))
+  (local.set $last (struct.get $sub 1 (ref.as_non_null (local.get $s))))
+  (local.set $nm (struct.get $sub 2 (ref.as_non_null (local.get $s))))
+  (local.set $mlast (struct.get $sub 3 (ref.as_non_null (local.get $s))))
+  ;; The environment each kind-1 record is given, outermost first (§9.4
+  ;; rule 3): reverse the kind-1 chain, walk it, and reverse it back.
+  (local.set $m (local.get $nm))
+  (block $done (loop $each
+    (br_if $done (ref.is_null (local.get $m)))
+    (local.set $next (struct.get $flist 2 (ref.as_non_null (local.get $m))))
+    (struct.set $flist 2 (ref.as_non_null (local.get $m)) (local.get $prev))
+    (local.set $prev (local.get $m))
+    (local.set $m (local.get $next))
+    (br $each)))
+  (local.set $m (local.get $prev))
+  (local.set $prev (ref.null $flist))
+  (local.set $e (local.get $env))
+  (block $done (loop $each
+    (br_if $done (ref.is_null (local.get $m)))
+    (struct.set $flist 3 (ref.as_non_null (local.get $m)) (local.get $e))
+    (local.set $e (call $env_apply (local.get $e)
+      (struct.get $frame 4 (struct.get $flist 0 (ref.as_non_null (local.get $m))))))
+    (local.set $next (struct.get $flist 2 (ref.as_non_null (local.get $m))))
+    (struct.set $flist 2 (ref.as_non_null (local.get $m)) (local.get $prev))
+    (local.set $prev (local.get $m))
+    (local.set $m (local.get $next))
+    (br $each)))
+  (local.set $cur (local.get $e))
+  (local.set $d (call $shadow_depth))
+  (local.set $t (struct.new $tramp (local.get $d) (local.get $node) (global.get $pend)))
+  (global.set $pend (local.get $t))
+  (global.set $stop_unpend (ref.func $control_unpend))
+  (local.set $first (local.get $node))
+  ;; Where the slots of the records passed over go back, if the list ends
+  ;; with an error or a cancel: from the first record still pending at the
+  ;; last catch, at depth `d`.
+  (local.set $from (local.get $node))
+  (block $captured (result (ref $cap) exnref)
+    (loop $step
+      (if (ref.is_null (local.get $node))
+        (then
+          (if (local.get $mode) (then (call $shadow_insert (local.get $d) (local.get $from))))
+          (global.set $pend (struct.get $tramp 2 (local.get $t)))
+          (return_call $ensure_end (local.get $mode) (local.get $v))))
+      (local.set $this (ref.as_non_null (local.get $node)))
+      (local.set $fr (struct.get $flist 0 (local.get $this)))
+      ;; A record is taken once, and a delimiter is only ever the first.
+      (if (struct.get $flist 4 (local.get $this)) (then unreachable))
+      (struct.set $flist 4 (local.get $this) (i32.const 1))
+      (if (i32.and (i32.eq (struct.get $frame 3 (local.get $fr)) (i32.const 3))
+          (i32.eqz (ref.eq (local.get $this) (local.get $first))))
+        (then unreachable))
+      (local.set $node (struct.get $flist 1 (local.get $this)))
+      (struct.set $tramp 1 (local.get $t) (local.get $node))
+      (if (ref.eq (local.get $this) (local.get $nm))
+        (then
+          (local.set $given (struct.get $flist 3 (local.get $this)))
+          (local.set $nm (struct.get $flist 2 (local.get $this)))
+          (local.set $cur (local.get $given)))
+        (else (local.set $given (local.get $cur))))
+      (if (local.get $mode)
+        (then
+          ;; Kinds 2, 3 and 4 take an error; kinds 2 and 3 take a cancel.
+          (br_if $step (i32.eqz (i32.and (i32.const 1)
+            (i32.shr_u
+              (select (i32.const 0x1C) (i32.const 0x0C) (i32.eq (local.get $mode) (i32.const 1)))
+              (struct.get $frame 3 (local.get $fr))))))
+          (call $shadow_restore (local.get $d))))
+      (local.set $v
+        (block $cancelled (result eqref)
+          (local.set $v
+            (block $failed (result eqref)
+              (local.set $v
+                (try_table (result eqref) (catch $error $failed) (catch $cancel $cancelled)
+                    (catch_ref $capture $captured)
+                  (call_ref $refn (local.get $fr) (local.get $given) (local.get $v) (local.get $mode)
+                    (struct.get $frame 0 (local.get $fr)))))
+              (local.set $mode (i32.const 0))
+              (br $step)))
+          (local.set $from (local.get $node))
+          (local.set $mode (i32.const 1))
+          (br $step)))
+      (local.set $from (local.get $node))
+      (local.set $mode (i32.const 2))
+      (br $step))
+    (unreachable))
+  (local.set $x)
+  (local.set $c)
+  (call $capture_splice (local.get $c) (local.get $node) (local.get $nm) (local.get $last) (local.get $mlast))
+  (global.set $pend (struct.get $tramp 2 (local.get $t)))
+  (throw_ref (local.get $x)))
 
 ;; `fail.catch(body)` (§9.3).
 (func $fail_catch (param $body eqref) (param $env (ref null $env)) (result eqref)
-  (return_call $catch_run (local.get $env) (local.get $body) (ref.null $flist) (ref.null eq) (ref.null eq)
-    (ref.null $frame)))
+  (return_call $catch_run (local.get $env) (local.get $body)))
 
-;; Calls `body`, or re-enters `rest` when `body` is null, and takes `$error`.
-(func $catch_run (param $env (ref null $env)) (param $body eqref) (param $rest (ref null $flist))
-    (param $v eqref) (param $cancel eqref) (param $frame (ref null $frame)) (result eqref)
+;; Calls `body`, and takes `$error`.
+(func $catch_run (param $env (ref null $env)) (param $body eqref) (result eqref)
   (local $depth i32) (local $e eqref) (local $r eqref)
   (local.set $depth (call $shadow_depth))
   (block $captured (result (ref $cap) exnref)
@@ -96,33 +367,28 @@ pub(super) const EFFECTS: &str = r#"
       (block $caught (result eqref)
         (local.set $r
           (try_table (result eqref) (catch $error $caught) (catch_ref $capture $captured)
-            (if (result eqref) (ref.is_null (local.get $body))
-              (then (call $reenter_next (local.get $rest) (local.get $env) (local.get $v) (local.get $cancel)))
-              (else (call $call0 (local.get $body) (local.get $env))))))
+            (call $call0 (local.get $body) (local.get $env))))
         (return (call $result_ok (local.get $r)))))
     (call $shadow_restore (local.get $depth))
     (return (call $result_error (local.get $e))))
   (call $capture_rethrow
-    (if (result (ref $frame)) (ref.is_null (local.get $frame))
-      (then (struct.new $frame (ref.func $catch_reenter) (ref.null $values)))
-      (else (ref.as_non_null (local.get $frame)))))
+    (struct.new $frame (ref.func $catch_reenter) (ref.null $values) (i32.const -1) (i32.const 4)
+      (ref.null $values)))
   (unreachable))
 
-(func $catch_reenter (type $refn) (param $frame (ref $frame)) (param $rest (ref null $flist))
-    (param $env (ref null $env)) (param $v eqref) (param $cancel eqref) (result eqref)
-  (return_call $catch_run (local.get $env) (ref.null eq) (local.get $rest) (local.get $v) (local.get $cancel)
-    (local.get $frame)))
+;; The body ended with the value or the error `v`.
+(func $catch_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env)) (param $v eqref)
+    (param $mode i32) (result eqref)
+  (if (i32.eq (local.get $mode) (i32.const 1)) (then (return_call $result_error (local.get $v))))
+  (return_call $result_ok (local.get $v)))
 
 ;; `resource.ensure(body, with)` (§9.5): `with` runs after `body`, also when
 ;; an error or an unwinding goes through, which then goes on. A capture
 ;; does not run it: the computation is paused.
 (func $resource_ensure (param $body eqref) (param $with eqref) (param $env (ref null $env)) (result eqref)
-  (return_call $ensure_run (local.get $with) (local.get $env) (local.get $body) (ref.null $flist)
-    (ref.null eq) (ref.null eq) (ref.null $frame)))
+  (return_call $ensure_run (local.get $with) (local.get $env) (local.get $body)))
 
-(func $ensure_run (param $with eqref) (param $env (ref null $env)) (param $body eqref)
-    (param $rest (ref null $flist)) (param $v eqref) (param $cancel eqref) (param $frame (ref null $frame))
-    (result eqref)
+(func $ensure_run (param $with eqref) (param $env (ref null $env)) (param $body eqref) (result eqref)
   (local $depth i32) (local $r eqref)
   (local.set $depth (call $shadow_depth))
   (block $captured (result (ref $cap) exnref)
@@ -131,9 +397,7 @@ pub(super) const EFFECTS: &str = r#"
         (local.set $r
           (try_table (result eqref) (catch $error $failed) (catch $cancel $cancelled)
               (catch_ref $capture $captured)
-            (if (result eqref) (ref.is_null (local.get $body))
-              (then (call $reenter_next (local.get $rest) (local.get $env) (local.get $v) (local.get $cancel)))
-              (else (call $call0 (local.get $body) (local.get $env))))))
+            (call $call0 (local.get $body) (local.get $env))))
         (return_call $ensure_final (local.get $with) (local.get $env) (i32.const 0) (local.get $r)))
       (local.set $r)
       (call $shadow_restore (local.get $depth))
@@ -142,16 +406,16 @@ pub(super) const EFFECTS: &str = r#"
     (call $shadow_restore (local.get $depth))
     (return_call $ensure_final (local.get $with) (local.get $env) (i32.const 2) (local.get $r)))
   (call $capture_rethrow
-    (if (result (ref $frame)) (ref.is_null (local.get $frame))
-      (then (struct.new $frame (ref.func $ensure_reenter) (array.new_fixed $values 1 (local.get $with))))
-      (else (ref.as_non_null (local.get $frame)))))
+    (struct.new $frame (ref.func $ensure_reenter) (array.new_fixed $values 1 (local.get $with))
+      (i32.const -1) (i32.const 2) (ref.null $values)))
   (unreachable))
 
-(func $ensure_reenter (type $refn) (param $frame (ref $frame)) (param $rest (ref null $flist))
-    (param $env (ref null $env)) (param $v eqref) (param $cancel eqref) (result eqref)
-  (return_call $ensure_run
+;; The body ended with `v` in the mode `mode`: run the final function.
+(func $ensure_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env)) (param $v eqref)
+    (param $mode i32) (result eqref)
+  (return_call $ensure_final
     (array.get $values (ref.as_non_null (struct.get $frame 1 (local.get $frame))) (i32.const 0))
-    (local.get $env) (ref.null eq) (local.get $rest) (local.get $v) (local.get $cancel) (local.get $frame)))
+    (local.get $env) (local.get $mode) (local.get $v)))
 
 ;; Runs the final function, then ends as `body` did: mode 0 gives `r`, 1
 ;; throws the error `r`, 2 goes on unwinding the continuation `r`.
@@ -162,7 +426,8 @@ pub(super) const EFFECTS: &str = r#"
       (call $call0 (local.get $with) (local.get $env))))
     (return_call $ensure_end (local.get $mode) (local.get $r)))
   (call $capture_rethrow (struct.new $frame (ref.func $final_reenter)
-    (array.new_fixed $values 2 (local.get $r) (ref.i31 (local.get $mode)))))
+    (array.new_fixed $values 2 (local.get $r) (ref.i31 (local.get $mode)))
+    (i32.const -1) (i32.const 5) (ref.null $values)))
   (unreachable))
 
 (func $ensure_end (param $mode i32) (param $r eqref) (result eqref)
@@ -170,32 +435,39 @@ pub(super) const EFFECTS: &str = r#"
   (if (i32.eq (local.get $mode) (i32.const 2)) (then (throw $cancel (local.get $r))))
   (local.get $r))
 
-(func $final_reenter (type $refn) (param $frame (ref $frame)) (param $rest (ref null $flist))
-    (param $env (ref null $env)) (param $v eqref) (param $cancel eqref) (result eqref)
+;; The final function returned: end as `body` did.
+(func $final_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env)) (param $v eqref)
+    (param $mode i32) (result eqref)
   (local $saved (ref $values))
   (local.set $saved (ref.as_non_null (struct.get $frame 1 (local.get $frame))))
-  (block $captured (result (ref $cap) exnref)
-    (drop (try_table (result eqref) (catch_ref $capture $captured)
-      (call $reenter_next (local.get $rest) (local.get $env) (local.get $v) (local.get $cancel))))
-    (return_call $ensure_end
-      (i31.get_u (ref.cast (ref i31) (array.get $values (local.get $saved) (i32.const 1))))
-      (array.get $values (local.get $saved) (i32.const 0))))
-  (call $capture_rethrow (local.get $frame))
-  (unreachable))
+  (return_call $ensure_end
+    (i31.get_u (ref.cast (ref i31) (array.get $values (local.get $saved) (i32.const 1))))
+    (array.get $values (local.get $saved) (i32.const 0))))
 
 ;; `control.boundary(body)` (§9.4).
 (func $control_boundary (param $body eqref) (param $env (ref null $env)) (result eqref)
-  (return_call $boundary_run
+  (return_call $boundary_core
     (struct.new $boundary (i32.const 11) (i32.const 0) (i64.const 0) (f64.const 0)
       (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1))
-    (local.get $env) (local.get $body) (ref.null $flist) (ref.null eq) (ref.null eq) (ref.null $frame)))
+    (local.get $env) (local.get $body) (ref.null $sub) (ref.null eq) (i32.const 0)))
 
-;; The active boundary `b`, in the place where `env` is: calls `body(b)`,
-;; or re-enters `rest` when `body` is null. It is not active once the code
-;; inside it is not on the stack (§9.4 rule 1).
+;; Kept with these parameters for `emit/host.rs`. `rest`, `cancel` and
+;; `frame` must be null.
 (func $boundary_run (param $b (ref $boundary)) (param $env (ref null $env)) (param $body eqref)
     (param $rest (ref null $flist)) (param $v eqref) (param $cancel eqref) (param $frame (ref null $frame))
     (result eqref)
+  (if (i32.eqz (ref.is_null (local.get $rest))) (then unreachable))
+  (if (i32.eqz (ref.is_null (local.get $cancel))) (then unreachable))
+  (if (i32.eqz (ref.is_null (local.get $frame))) (then unreachable))
+  (return_call $boundary_core (local.get $b) (local.get $env) (local.get $body) (ref.null $sub) (local.get $v)
+    (i32.const 0)))
+
+;; The active boundary `b`, in the place where `env` is: calls `body(b)`,
+;; or re-enters the records `sub` with `v` in the mode `mode` when `body`
+;; is null. It is not active once the code inside it is not on the stack
+;; (§9.4 rule 1).
+(func $boundary_core (param $b (ref $boundary)) (param $env (ref null $env)) (param $body eqref)
+    (param $sub (ref null $sub)) (param $v eqref) (param $mode i32) (result eqref)
   (local $depth i32) (local $r eqref) (local $c (ref null $cap)) (local $x exnref) (local $f eqref)
   (local.set $depth (call $shadow_depth))
   (block $unwind (result eqref exnref)
@@ -204,7 +476,7 @@ pub(super) const EFFECTS: &str = r#"
         (try_table (result eqref) (catch_ref $capture $captured) (catch_ref $error $unwind)
             (catch_ref $cancel $unwind)
           (if (result eqref) (ref.is_null (local.get $body))
-            (then (call $reenter_next (local.get $rest) (local.get $env) (local.get $v) (local.get $cancel)))
+            (then (call $tramp_run (local.get $sub) (local.get $env) (local.get $v) (local.get $mode)))
             (else (call $call1 (local.get $body) (local.get $b) (local.get $env))))))
       (struct.set $boundary 8 (local.get $b) (i32.const 0))
       (return (local.get $r)))
@@ -219,27 +491,28 @@ pub(super) const EFFECTS: &str = r#"
         (return_call_ref $fn1 (ref.cast (ref $clo1) (local.get $f)) (local.get $env)
           (struct.new $cont (i32.const 12) (i32.const 0) (i64.const 0) (f64.const 0)
             (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)
-            (i32.const 0) (local.get $b) (struct.get $cap 2 (local.get $c)))
+            (i32.const 0) (local.get $b) (call $capture_sub (ref.as_non_null (local.get $c))))
           (struct.get $clo1 8 (ref.cast (ref $clo1) (local.get $f))))))
     ;; A capture for an outer boundary: this one is paused with it.
-    (if (ref.is_null (local.get $frame))
-      (then (local.set $frame
-        (struct.new $frame (ref.func $boundary_reenter) (array.new_fixed $values 1 (local.get $b))))))
-    (call $capture_rethrow (ref.as_non_null (local.get $c)) (local.get $x) (ref.as_non_null (local.get $frame)))
+    (call $capture_pack (ref.as_non_null (local.get $c)) (local.get $x) (ref.func $boundary_reenter)
+      (local.get $b))
     (unreachable))
   (local.set $x)
   (drop)
   (struct.set $boundary 8 (local.get $b) (i32.const 0))
   (throw_ref (local.get $x)))
 
-(func $boundary_reenter (type $refn) (param $frame (ref $frame)) (param $rest (ref null $flist))
-    (param $env (ref null $env)) (param $v eqref) (param $cancel eqref) (result eqref)
-  (local $b (ref $boundary))
-  (local.set $b (ref.cast (ref $boundary)
-    (array.get $values (ref.as_non_null (struct.get $frame 1 (local.get $frame))) (i32.const 0))))
+;; A boundary that a capture for another boundary went through: active
+;; again, around the records inside it.
+(func $boundary_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env)) (param $v eqref)
+    (param $mode i32) (result eqref)
+  (local $saved (ref $values)) (local $b (ref $boundary))
+  (local.set $saved (ref.as_non_null (struct.get $frame 1 (local.get $frame))))
+  (local.set $b (ref.cast (ref $boundary) (array.get $values (local.get $saved) (i32.const 0))))
   (struct.set $boundary 8 (local.get $b) (i32.const 1))
-  (return_call $boundary_run (local.get $b) (local.get $env) (ref.null eq) (local.get $rest) (local.get $v)
-    (local.get $cancel) (local.get $frame)))
+  (return_call $boundary_core (local.get $b) (local.get $env) (ref.null eq)
+    (ref.cast (ref null $sub) (array.get $values (local.get $saved) (i32.const 1)))
+    (local.get $v) (local.get $mode)))
 
 ;; `control.suspend(b, f)`: stops when `b` is not active.
 (func $control_suspend (param $b eqref) (param $f eqref) (result eqref)
@@ -247,7 +520,8 @@ pub(super) const EFFECTS: &str = r#"
   (local.set $boundary (ref.cast (ref $boundary) (local.get $b)))
   (if (i32.eqz (struct.get $boundary 8 (local.get $boundary)))
     (then (call $stop_boundary_inactive) (unreachable)))
-  (throw $capture (struct.new $cap (local.get $boundary) (local.get $f) (ref.null $flist))))
+  (throw $capture (struct.new $cap (local.get $boundary) (local.get $f) (ref.null $flist) (ref.null $flist)
+    (ref.null $flist) (ref.null $flist))))
 
 ;; The continuation `k`, used now: stops when it was already used (rule 5).
 (func $continuation_take (param $k eqref) (result (ref $cont))
@@ -264,43 +538,49 @@ pub(super) const EFFECTS: &str = r#"
   (local.set $c (call $continuation_take (local.get $k)))
   (local.set $b (struct.get $cont 9 (local.get $c)))
   (struct.set $boundary 8 (local.get $b) (i32.const 1))
-  (return_call $boundary_run (local.get $b) (local.get $env) (ref.null eq) (struct.get $cont 10 (local.get $c))
-    (local.get $v) (ref.null eq) (ref.null $frame)))
+  (return_call $boundary_core (local.get $b) (local.get $env) (ref.null eq) (struct.get $cont 10 (local.get $c))
+    (local.get $v) (i32.const 0)))
 
 ;; `control.cancel(k)`: unwinds the paused computation (rule 4). Its
 ;; boundary stays not active.
 (func $control_cancel (param $k eqref) (param $env (ref null $env)) (result eqref)
   (local $c (ref $cont))
   (local.set $c (call $continuation_take (local.get $k)))
-  (return_call $cancel_run (local.get $c) (struct.get $cont 10 (local.get $c)) (local.get $env)
-    (ref.null eq) (local.get $c) (ref.null $frame)))
+  (return_call $cancel_core (local.get $c) (struct.get $cont 10 (local.get $c)) (local.get $env)
+    (local.get $c) (i32.const 2)))
 
-(func $cancel_run (param $k (ref $cont)) (param $rest (ref null $flist)) (param $env (ref null $env))
-    (param $v eqref) (param $cancel eqref) (param $frame (ref null $frame)) (result eqref)
-  (local $depth i32) (local $e eqref) (local $x exnref)
+;; Re-enters the records `sub` of the continuation `k` with `v` in the
+;; mode `mode`, and takes the `$cancel` of `k`.
+(func $cancel_core (param $k (ref $cont)) (param $sub (ref null $sub)) (param $env (ref null $env))
+    (param $v eqref) (param $mode i32) (result eqref)
+  (local $depth i32) (local $e eqref) (local $x exnref) (local $c (ref null $cap))
   (local.set $depth (call $shadow_depth))
   (block $captured (result (ref $cap) exnref)
     (block $cancelled (result eqref exnref)
       (drop (try_table (result eqref) (catch_ref $cancel $cancelled) (catch_ref $capture $captured)
-        (call $reenter_next (local.get $rest) (local.get $env) (local.get $v) (local.get $cancel))))
+        (call $tramp_run (local.get $sub) (local.get $env) (local.get $v) (local.get $mode))))
       (return (ref.null eq)))
     (local.set $x)
     (local.set $e)
     (if (i32.eqz (ref.eq (local.get $e) (local.get $k))) (then (throw_ref (local.get $x))))
     (call $shadow_restore (local.get $depth))
     (return (ref.null eq)))
-  (call $capture_rethrow
-    (if (result (ref $frame)) (ref.is_null (local.get $frame))
-      (then (struct.new $frame (ref.func $cancel_reenter) (array.new_fixed $values 1 (local.get $k))))
-      (else (ref.as_non_null (local.get $frame)))))
+  (local.set $x)
+  (local.set $c)
+  (call $capture_pack (ref.as_non_null (local.get $c)) (local.get $x) (ref.func $cancel_reenter)
+    (local.get $k))
   (unreachable))
 
-(func $cancel_reenter (type $refn) (param $frame (ref $frame)) (param $rest (ref null $flist))
-    (param $env (ref null $env)) (param $v eqref) (param $cancel eqref) (result eqref)
-  (return_call $cancel_run
-    (ref.cast (ref $cont)
-      (array.get $values (ref.as_non_null (struct.get $frame 1 (local.get $frame))) (i32.const 0)))
-    (local.get $rest) (local.get $env) (local.get $v) (local.get $cancel) (local.get $frame)))
+;; A cancel whose final function suspended: it goes on around the records
+;; inside it.
+(func $cancel_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env)) (param $v eqref)
+    (param $mode i32) (result eqref)
+  (local $saved (ref $values))
+  (local.set $saved (ref.as_non_null (struct.get $frame 1 (local.get $frame))))
+  (return_call $cancel_core
+    (ref.cast (ref $cont) (array.get $values (local.get $saved) (i32.const 0)))
+    (ref.cast (ref null $sub) (array.get $values (local.get $saved) (i32.const 1)))
+    (local.get $env) (local.get $v) (local.get $mode)))
 "#;
 
 /// The types of control (§9.4), after `$env`.
@@ -309,13 +589,27 @@ pub(super) const TYPES: &str = r#"
   (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs))
   (field (ref null $call)) (field (mut i32)))))
 (rec
-  (type $frame (struct (field (ref $refn)) (field (ref null $values))))
-  (type $refn (func (param (ref $frame) (ref null $flist) (ref null $env) eqref eqref) (result eqref)))
-  (type $flist (struct (field (ref $frame)) (field (ref null $flist)))))
+  ;; 0 re-entry function, 1 saved values, 2 shadow slot, 3 kind, 4 delta (kind 1 only)
+  (type $frame (struct (field (ref $refn)) (field (ref null $values)) (field i32) (field i32)
+    (field (ref null $values))))
+  ;; record, environment it is given, value, mode (0 value, 1 error, 2 cancel)
+  (type $refn (func (param (ref $frame) (ref null $env) eqref i32) (result eqref)))
+  ;; 0 record, 1 next record outward, 2 next kind-1 record outward,
+  ;; 3 environment given to this record (set at resume), 4 state (0 pending, 1 taken)
+  (type $flist (struct (field (ref $frame)) (field (mut (ref null $flist)))
+    (field (mut (ref null $flist))) (field (mut (ref null $env))) (field (mut i32)))))
+;; The records of a paused computation: first and last record, first and last kind-1 record.
+(type $sub (struct (field (ref null $flist)) (field (ref null $flist))
+  (field (ref null $flist)) (field (ref null $flist))))
 (type $cont (sub final $obj (struct (field i32) (field i32) (field i64) (field f64)
   (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs))
-  (field (ref null $call)) (field (mut i32)) (field (ref $boundary)) (field (ref null $flist)))))
-(type $cap (struct (field (ref $boundary)) (field eqref) (field (mut (ref null $flist)))))
+  (field (ref null $call)) (field (mut i32)) (field (ref $boundary)) (field (ref null $sub)))))
+;; boundary, f, first, last, first kind-1, last kind-1
+(type $cap (struct (field (ref $boundary)) (field eqref)
+  (field (mut (ref null $flist))) (field (mut (ref null $flist)))
+  (field (mut (ref null $flist))) (field (mut (ref null $flist)))))
+;; depth of the shadow stack where it runs, its pending records, the trampoline outside it
+(type $tramp (struct (field i32) (field (mut (ref null $flist))) (field (ref null $tramp))))
 (type $box (struct (field i64)))
 "#;
 
@@ -390,13 +684,17 @@ impl<'p> Emitter<'p> {
     }
 
     /// The frame record of a point (§9.4): its re-entry function, the saved
-    /// locals, then the values of the environment statements it rebuilds,
-    /// then, for a function with a frame, the slot of its frame on the
-    /// shadow stack as an `i31`. Numbers are boxed.
+    /// locals then the values of the environment statements it rebuilds
+    /// (numbers are boxed), the slot of its frame on the shadow stack, its
+    /// kind, and, for kind 1, the pairs `[service, value]` of the
+    /// environment statements between the function's environment and the
+    /// environment of the call, outermost first (`Point::delta`).
     pub(super) fn record(&self, p: PointId) -> String {
         let program: &'p Program = self.p;
         let point = &program.points[p as usize];
-        let locals = &self.func_of(point).locals;
+        let f = self.func_of(point);
+        assert!(f.frame, "a function with a point has a frame");
+        let locals = &f.locals;
         let mut items = Vec::new();
         for l in point.saved(locals) {
             items.push(match locals[l as usize] {
@@ -412,9 +710,6 @@ impl<'p> Emitter<'p> {
                 link.dst, link.service
             ));
         }
-        if self.func_of(point).frame {
-            items.push("(ref.i31 (local.get $slot))".into());
-        }
         let saved = if items.is_empty() {
             "(ref.null $values)".to_string()
         } else {
@@ -424,7 +719,34 @@ impl<'p> Emitter<'p> {
                 items.join(" ")
             )
         };
-        format!("(struct.new $frame (ref.func $r{p}) {saved})")
+        let delta = point
+            .delta()
+            .expect("control.rs checks that the environment of a point is in its links");
+        let (kind, delta) = if delta.is_empty() {
+            (0, "(ref.null $values)".to_string())
+        } else {
+            let pairs: Vec<String> = delta
+                .iter()
+                .map(|link| {
+                    format!(
+                        "(ref.i31 (i32.const {s})) (array.get $env (local.get $l{}) (i32.const {s}))",
+                        link.dst,
+                        s = link.service
+                    )
+                })
+                .collect();
+            (
+                1,
+                format!(
+                    "(array.new_fixed $values {} {})",
+                    2 * pairs.len(),
+                    pairs.join(" ")
+                ),
+            )
+        };
+        format!(
+            "(struct.new $frame (ref.func $r{p}) {saved} (local.get $slot) (i32.const {kind}) {delta})"
+        )
     }
 
     /// A function that goes on with the rest of the function `f`: a
@@ -509,13 +831,14 @@ impl<'p> Emitter<'p> {
             &point.locals,
             &point.segment,
         );
-        // The re-entry: rebuild the frame, re-enter the inner frames in a
-        // handler that adds this record again, and go on with the segment.
+        // The re-entry: rebuild this one frame and go on with the segment.
+        // The frames inside it have returned (`$tramp_run`).
+        assert!(f.frame, "a function with a point has a frame");
         let _ = write!(
             self.out,
-            "(func $r{p} (type $refn) (param $frame (ref $frame)) (param $rest (ref null $flist)) \
-             (param $env (ref null $env)) (param $v eqref) (param $cancel eqref) (result eqref)\n \
-             (local $saved (ref null $values)) (local $res eqref)"
+            "(func $r{p} (type $refn) (param $frame (ref $frame)) (param $env (ref null $env)) \
+             (param $v eqref) (param $mode i32) (result eqref)\n \
+             (local $saved (ref null $values))"
         );
         let saved: Vec<Local> = point.saved(locals).collect();
         let mut declared: BTreeSet<Local> = saved.iter().copied().collect();
@@ -538,7 +861,7 @@ impl<'p> Emitter<'p> {
             let _ = writeln!(self.out, "(local.set $l{l} {v})");
         }
         // §9.4 rule 3: the environment statements of the frame, on the
-        // environment of the place of `resume`.
+        // environment that the frame is given.
         for (k, link) in point.envs.iter().enumerate() {
             let _ = writeln!(
                 self.out,
@@ -553,14 +876,8 @@ impl<'p> Emitter<'p> {
         // The slot of the frame as it was at the point: the site of the
         // call, or the tail site of the tail call that called the function
         // (§11.7).
-        if f.frame {
-            let _ = writeln!(
-                self.out,
-                "(call $shadow_enter (i31.get_s (ref.cast (ref i31) \
-                 (array.get $values (ref.as_non_null (local.get $saved)) (i32.const {})))))",
-                saved.len() + point.envs.len()
-            );
-        }
+        self.out
+            .push_str("(call $shadow_enter (struct.get $frame 2 (local.get $frame)))\n");
         let args: String = point
             .params
             .iter()
@@ -568,13 +885,7 @@ impl<'p> Emitter<'p> {
             .collect();
         let _ = writeln!(
             self.out,
-            "(local.set $res (block $ok (result eqref)\n\
-             (block $cap (result (ref $cap) exnref)\n\
-             (br $ok (try_table (result eqref) (catch_ref $capture $cap)\n\
-             (call $reenter_next (local.get $rest) {} (local.get $v) (local.get $cancel)))))\n\
-             (call $capture_rethrow (local.get $frame)) (unreachable)))\n\
-             (return_call $s{p} (local.get $env){args} (local.get $res)))",
-            env_text(point.env)
+            "(return_call $s{p} (local.get $env){args} (local.get $v)))"
         );
     }
 }

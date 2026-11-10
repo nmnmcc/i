@@ -93,9 +93,12 @@
 //! - Where an exception is caught (`try_table`), restore the depth saved with
 //!   `$shadow_depth` when the handler was entered: `call $shadow_restore`.
 //!   A capture (`$capture`) restores it only at its boundary.
-//! - When a continuation is resumed or cancelled, each frame that is rebuilt
-//!   enters again with the site of the call it was paused at, on top of the
-//!   frames of the place of `resume` (spec §9.4).
+//! - When a continuation is resumed or cancelled, a frame is rebuilt only
+//!   when the frames inside it have returned, and it enters again with the
+//!   site of the call it was paused at. The frames not rebuilt yet wait in
+//!   the trampolines of `$pend` (`emit/control.rs`); a stop puts their sites
+//!   back into the shadow stack through `$stop_unpend` before it prints.
+//!   Code that resets `$sp` for a new entry also calls `$control_reset`.
 //!
 //! Site ids index the site table, installed once at the very start of
 //! `ilang_start` with `$sites_install (param (ref $sites) (ref $values))`:
@@ -240,6 +243,7 @@ pub const TYPES: &str = r#"
 (type $hostref (struct (field externref) (field i64)))
 (type $sites (array i32))
 (type $frames (array (mut i32)))
+(type $unpend (func))
 "#;
 
 /// The runtime imports (spec B.4) on the target of the binary interface.
