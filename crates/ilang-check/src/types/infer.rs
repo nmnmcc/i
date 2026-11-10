@@ -62,10 +62,38 @@ struct Effects {
     env: Vec<Ty>,
 }
 
+fn key_binders(pattern: &Pattern) -> Option<(TyVarId, Vec<VarId>)> {
+    let mut binders = Vec::new();
+    let mut current = pattern;
+    while let PatternKind::Named { binder, pattern } = &current.kind {
+        binders.push(binder.var);
+        current = pattern;
+    }
+    match &current.kind {
+        PatternKind::Typed { binder, ty: Type { kind: TypeKind::Var(var), .. } } => {
+            binders.extend(binder.as_ref().map(|binder| binder.var));
+            Some((*var, binders))
+        }
+        _ => None,
+    }
+}
+
+fn binding_label_vars(binding: &Binding) -> HashSet<TyVarId> {
+    let mut labels = HashSet::new();
+    binding_types(binding, &mut |ty| walk_type(ty, &mut |part| {
+        if let TypeKind::Record { fields, removed, .. } = &part.kind {
+            labels.extend(fields.iter().map(|(label, _)| label).chain(removed).filter_map(|label| label.parameter));
+        }
+    }));
+    labels.retain(|var| binding.ty_vars.contains(var));
+    labels
+}
+
 fn key_slots(binding: &Binding) -> Vec<(TyVarId, usize)> {
     let ExprKind::Fn(function) = &binding.value.kind else {
         return Vec::new();
     };
+    let labels = binding_label_vars(binding);
     function
         .params
         .iter()
@@ -74,23 +102,7 @@ fn key_slots(binding: &Binding) -> Vec<(TyVarId, usize)> {
             Param::Env { .. } => None,
         })
         .enumerate()
-        .filter_map(|(index, pattern)| {
-            let mut pattern = pattern;
-            while let PatternKind::Named { pattern: inner, .. } = &pattern.kind {
-                pattern = inner;
-            }
-            match &pattern.kind {
-                PatternKind::Typed {
-                    ty:
-                        Type {
-                            kind: TypeKind::Var(var),
-                            ..
-                        },
-                    ..
-                } => Some((*var, index)),
-                _ => None,
-            }
-        })
+        .filter_map(|(index, pattern)| key_binders(pattern).filter(|(var, _)| labels.contains(var)).map(|(var, _)| (var, index)))
         .collect()
 }
 
@@ -131,9 +143,11 @@ pub(crate) struct Checker<'a> {
     /// The solver variable of each type variable written in an annotation.
     pub tyvars: HashMap<TyVarId, Ty>,
     label_key_slots: HashMap<VarId, Vec<(TyVarId, usize)>>,
+    label_declared_vars: HashSet<TyVarId>,
     pub(super) label_key_values: HashMap<VarId, super::records::Label>,
     label_callee: bool,
     recursive_bindings: HashSet<VarId>,
+    active_key_parameters: Vec<HashMap<usize, (TyVarId, Vec<VarId>)>>,
     /// The type written at the top of the pattern that binds a name: its
     /// type is shown as written (§2.4).
     pub written: HashMap<VarId, Type>,
@@ -194,9 +208,11 @@ impl<'a> Checker<'a> {
             module: ModuleId(0),
             locals: HashMap::new(),
             label_key_slots: HashMap::new(),
+            label_declared_vars: HashSet::new(),
             label_key_values: HashMap::new(),
             label_callee: false,
             recursive_bindings: HashSet::new(),
+            active_key_parameters: Vec::new(),
             defs: HashMap::new(),
             reads: super::value_types::Reads::default(),
             recovery: false,
@@ -385,6 +401,7 @@ impl<'a> Checker<'a> {
         for b in group {
             self.set_module(b.module);
             let binding = &p.binding(*b).binding;
+            self.label_declared_vars.extend(binding_label_vars(binding));
             self.new_tyvars(&binding.ty_vars);
             self.own_known(binding);
         }
@@ -1431,9 +1448,7 @@ impl<'a> Checker<'a> {
                     None => self.s.fresh_input(),
                 };
                 if !self.label_callee
-                    && t.head() == Some(Head::Fn)
                     && !self.label_slots(e).is_empty()
-                    && !super::records::label_params(&t).is_empty()
                 {
                     self.error(
                         code::LABEL_PARAMETER_VALUE,
@@ -1469,9 +1484,7 @@ impl<'a> Checker<'a> {
                     None => self.s.fresh_input(),
                 };
                 if !self.label_callee
-                    && t.head() == Some(Head::Fn)
                     && !self.label_slots(e).is_empty()
-                    && !super::records::label_params(&t).is_empty()
                 {
                     self.error(
                         code::LABEL_PARAMETER_VALUE,
@@ -1514,7 +1527,14 @@ impl<'a> Checker<'a> {
                         );
                     }
                     let label = Label::name(name.name.as_str());
-                    let (ty, known) = self.infer_k(value, &Ty::Top);
+                    let expected_field = match known::members(expected).as_slice() {
+                        [Ty::Graph(graph)] => match graph.field(&label) {
+                            super::records::Field::Found(ty) => ty,
+                            _ => Ty::Top,
+                        },
+                        _ => Ty::Top,
+                    };
+                    let (ty, known) = self.infer_k(value, &expected_field);
                     labels.push(label.clone());
                     values.push((label.clone(), ty));
                     known_values.push((label, known));
@@ -1691,11 +1711,15 @@ impl<'a> Checker<'a> {
     }
 
     fn label_slots(&self, callee: &Expr) -> Vec<(TyVarId, usize)> {
-        match callee.kind {
-            ExprKind::Name(ValueRef::Local(var)) => {
+        match callee.kind { ExprKind::Name(value) => self.label_slots_ref(value), _ => Vec::new() }
+    }
+
+    pub(super) fn label_slots_ref(&self, value: ValueRef) -> Vec<(TyVarId, usize)> {
+        match value {
+            ValueRef::Local(var) => {
                 self.label_key_slots.get(&var).cloned().unwrap_or_default()
             }
-            ExprKind::Name(ValueRef::Def(def)) => match &self.p.def(def).kind {
+            ValueRef::Def(def) => match &self.p.def(def).kind {
                 DefKind::Binding { binding, .. } => key_slots(
                     &self
                         .p
@@ -1705,29 +1729,94 @@ impl<'a> Checker<'a> {
                         })
                         .binding,
                 ),
-                DefKind::External {
-                    ty:
-                        Type {
-                            kind: TypeKind::Fn { params, .. },
-                            ..
-                        },
-                    ..
-                } => params
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, param)| match param.ty.kind {
-                        TypeKind::Var(var) => Some((var, index)),
+                DefKind::External { ty, .. } => {
+                    let mut labels = HashSet::new();
+                    walk_type(ty, &mut |part| {
+                        if let TypeKind::Record { fields, removed, .. } = &part.kind {
+                            labels.extend(fields.iter().map(|(label, _)| label).chain(removed).filter_map(|label| label.parameter));
+                        }
+                    });
+                    let TypeKind::Fn { params, .. } = &ty.kind else { return Vec::new(); };
+                    params.iter().enumerate().filter_map(|(index, param)| match param.ty.kind {
+                        TypeKind::Var(var) if labels.contains(&var) => Some((var, index)),
                         _ => None,
-                    })
-                    .collect(),
-                _ => Vec::new(),
+                    }).collect()
+                },
             },
-            _ => Vec::new(),
+            ValueRef::Ctor(_) => Vec::new(),
         }
     }
 
     /// Rule 5: `f(a1, …)`. `first` is the left side of `|>`, the first
     /// argument.
+    fn call_label_substitutions(&mut self, callee: &Expr, f: &Ty, to: &[usize], values: &[&Expr], typed: &[Option<(Ty, Ty)>], spans: &[Span]) -> rustc_hash::FxHashMap<super::records::LabelParam, super::records::Label> {
+        let slots = self.label_slots(callee);
+        let recursive = match callee.kind {
+            ExprKind::Name(ValueRef::Def(def)) => self.group_defs.contains(&def),
+            ExprKind::Name(ValueRef::Local(var)) => self.recursive_bindings.contains(&var),
+            _ => false,
+        };
+        if recursive {
+            for (var, slot) in &slots {
+                let expected = self.active_key_parameters.iter().rev().find_map(|scope| scope.get(slot).filter(|(v, _)| v == var).map(|(_, names)| names));
+                if let Some(expected) = expected {
+                    let argument = to.iter().position(|index| index == slot);
+                    if !argument.is_some_and(|i| matches!(values[i].kind, ExprKind::Name(ValueRef::Local(actual)) if expected.contains(&actual))) {
+                        self.error(code::INVALID_LABEL_PARAMETER, argument.map_or(callee.span, |i| spans[i]), "a recursive call must forward its own key parameter by name");
+                    }
+                }
+            }
+        }
+        let params = super::records::label_params(f);
+        let mut labels = rustc_hash::FxHashMap::default();
+        let mut handled = HashSet::new();
+        for (var, _) in &slots {
+            if !handled.insert(*var) { continue; }
+            let key_slots: Vec<_> = slots.iter().filter_map(|(v, slot)| (v == var).then_some(*slot)).collect();
+            let mut selected = None;
+            for slot in key_slots {
+              let argument = to.iter().position(|i| *i == slot);
+              let key = argument.and_then(|i| {
+                let members = typed[i].as_ref().map(|(_, known)| known::members(known)).unwrap_or_default();
+                match members.as_slice() {
+                    [Ty::Con(Head::Named(TypeRef::Builtin(BuiltinType::String)), values, args)]
+                        if args.is_empty() && values.is_finite() && values.items().count() == 1 =>
+                    {
+                        values
+                            .items()
+                            .next()
+                            .cloned()
+                            .map(super::records::Label::name)
+                    }
+                    _ => match values[i].kind {
+                        ExprKind::Name(ValueRef::Local(var)) => {
+                            self.label_key_values.get(&var).cloned()
+                        }
+                        _ => None,
+                    },
+                }
+              });
+              if let Some(key) = key {
+                if selected.as_ref().is_some_and(|old| *old != key) {
+                    self.error(code::INVALID_RECORD_KEY, argument.map_or(callee.span, |i| spans[i]), "keys for one label parameter must be the same");
+                } else { selected = Some(key); }
+              } else {
+                self.error(
+                    code::INVALID_RECORD_KEY,
+                    argument.map_or(callee.span, |i| spans[i]),
+                    "a label parameter needs one known string literal as its key",
+                );
+              }
+            }
+            if let Some(key) = selected {
+                for param in params.iter().filter(|p| super::records::label_var(p) == Some(*var)) {
+                    labels.insert(param.clone(), key.clone());
+                }
+            }
+        }
+        labels
+    }
+
     fn call(&mut self, callee: &Expr, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
         let was_callee = self.label_callee;
         self.label_callee = true;
@@ -1765,7 +1854,7 @@ impl<'a> Checker<'a> {
         // type variables that matching the other arguments fixes. Function
         // expressions with a parameter with no written type are typed after
         // the others, and are left out of that matching.
-        let params: Option<Vec<Ty>> = match (&kfn, &to) {
+        let mut params: Option<Vec<Ty>> = match (&kfn, &to) {
             (Some(k), Some(to)) => Some(
                 to.iter()
                     .map(|i| k.params.get(*i).map_or(Ty::Top, |p| p.1.clone()))
@@ -1777,9 +1866,10 @@ impl<'a> Checker<'a> {
             .into_iter()
             .chain(args.iter().map(|a| &a.value))
             .collect();
+        let spans: Vec<Span> = values.iter().map(|a| a.span).collect();
         let mut typed: Vec<Option<(Ty, Ty)>> = vec![None; n];
         let mut sigma = known::Sigma::new();
-        let hidden = kfn
+        let mut hidden = kfn
             .as_ref()
             .map_or_else(Vec::new, |k| self.hidden_inputs(k));
         for later in [false, true] {
@@ -1799,85 +1889,27 @@ impl<'a> Checker<'a> {
                 }
                 typed[i] = Some((t, k));
             }
+            if !later && let Some(to) = &to {
+                let labels = self.call_label_substitutions(callee, &f, to, &values, &typed, &spans);
+                if !labels.is_empty() {
+                    f = super::records::map_labels(&f, &labels);
+                    kf = super::records::map_labels(&kf, &labels);
+                    kfn = known::one_fn(&kf);
+                    params = kfn.as_ref().map(|k| to.iter().map(|i| k.params.get(*i).map_or(Ty::Top, |p| p.1.clone())).collect());
+                    hidden = kfn.as_ref().map_or_else(Vec::new, |k| self.hidden_inputs(k));
+                    sigma.clear();
+                    if let Some(ps) = &params {
+                        for (i, known) in typed.iter().enumerate().filter_map(|(i, t)| t.as_ref().map(|(_, k)| (i, k))) {
+                            self.match_k(&ps[i], known, &mut sigma, 0);
+                        }
+                    }
+                }
+            }
         }
         let typed: Vec<(Ty, Ty)> = typed.into_iter().flatten().collect();
-        let spans: Vec<Span> = values.iter().map(|a| a.span).collect();
         let Some(to) = to else {
             return (self.s.fresh(), Ty::Top);
         };
-        let slots = self.label_slots(callee);
-        let recursive = match callee.kind {
-            ExprKind::Name(ValueRef::Def(def)) => self.group_defs.contains(&def),
-            ExprKind::Name(ValueRef::Local(var)) => self.recursive_bindings.contains(&var),
-            _ => false,
-        };
-        if recursive {
-            for (var, slot) in &slots {
-                let expected =
-                    self.label_key_values
-                        .iter()
-                        .find_map(|(binder, label)| match label {
-                            super::records::Label::Param(param)
-                                if super::records::label_var(param) == Some(*var) =>
-                            {
-                                Some(*binder)
-                            }
-                            _ => None,
-                        });
-                if let Some(expected) = expected {
-                    let argument = to.iter().position(|index| index == slot);
-                    if !argument.is_some_and(|i| matches!(values[i].kind, ExprKind::Name(ValueRef::Local(actual)) if actual == expected)) {
-                        self.error(code::INVALID_LABEL_PARAMETER, argument.map_or(callee.span, |i| spans[i]), "a recursive call must forward its own key parameter by name");
-                    }
-                }
-            }
-        }
-        let params = super::records::label_params(&f);
-        let mut labels = rustc_hash::FxHashMap::default();
-        for param in params {
-            let slot = super::records::label_var(&param)
-                .and_then(|var| slots.iter().find(|(v, _)| *v == var).map(|(_, slot)| *slot));
-            // A captured outer parameter stays rigid; only labels declared by
-            // this callee have a key slot to substitute at this call.
-            let Some(slot) = slot else {
-                continue;
-            };
-            let argument = to.iter().position(|i| *i == slot);
-            let key = argument.and_then(|i| {
-                let members = known::members(&typed[i].1);
-                match members.as_slice() {
-                    [Ty::Con(Head::Named(TypeRef::Builtin(BuiltinType::String)), values, args)]
-                        if args.is_empty() && values.is_finite() && values.items().count() == 1 =>
-                    {
-                        values
-                            .items()
-                            .next()
-                            .cloned()
-                            .map(super::records::Label::name)
-                    }
-                    _ => match values[i].kind {
-                        ExprKind::Name(ValueRef::Local(var)) => {
-                            self.label_key_values.get(&var).cloned()
-                        }
-                        _ => None,
-                    },
-                }
-            });
-            if let Some(key) = key {
-                labels.insert(param, key);
-            } else {
-                self.error(
-                    code::INVALID_RECORD_KEY,
-                    argument.map_or(callee.span, |i| spans[i]),
-                    "a label parameter needs one known string literal as its key",
-                );
-            }
-        }
-        if !labels.is_empty() {
-            f = super::records::map_labels(&f, &labels);
-            kf = super::records::map_labels(&kf, &labels);
-            kfn = known::one_fn(&kf);
-        }
         // `order[p]` is the argument that goes to the parameter `p`.
         let mut order = vec![0u32; n];
         for (g, p) in to.iter().enumerate() {
@@ -2574,23 +2606,18 @@ impl<'a> Checker<'a> {
                 visit(ty);
             }
         }
+        for param in &f.params {
+            if let Param::Pattern { pattern, .. } = param
+                && let Some((var, _)) = key_binders(pattern)
+                && self.label_declared_vars.contains(&var) { declared_labels.insert(var); }
+        }
         for p in &f.params {
             if let Param::Pattern { pattern, .. } = p
-                && let PatternKind::Typed {
-                    binder: Some(binder),
-                    ty:
-                        Type {
-                            kind: TypeKind::Var(var),
-                            ..
-                        },
-                } = &pattern.kind
-                && declared_labels.contains(var)
+                && let Some((var, binders)) = key_binders(pattern)
+                && declared_labels.contains(&var)
             {
                 let name = &self.p.ty_var_names[var.0 as usize];
-                self.label_key_values.insert(
-                    binder.var,
-                    super::records::variable_label(*var, name, self.s.level),
-                );
+                for binder in binders { self.label_key_values.insert(binder, super::records::variable_label(var, name, self.s.level)); }
             }
         }
         let count = f
@@ -2613,11 +2640,7 @@ impl<'a> Checker<'a> {
                     // The values of a parameter come from the calls.
                     let start = self.s.vars.len();
                     let t = self.param(pattern);
-                    if let PatternKind::Typed {
-                        binder: Some(binder),
-                        ..
-                    } = &pattern.kind
-                        && self.label_key_values.contains_key(&binder.var)
+                    if key_binders(pattern).is_some_and(|(_, binders)| binders.iter().any(|binder| self.label_key_values.contains_key(binder)))
                     {
                         let string = self.prim(BuiltinType::String);
                         self.sub(&t, &string, pattern.span);
@@ -2675,10 +2698,14 @@ impl<'a> Checker<'a> {
             .ret
             .as_ref()
             .map_or(Ty::Top, |r| self.kconv(&r.value, &HashMap::new()));
+        let active_keys = f.params.iter().filter_map(|param| match param { Param::Pattern { pattern, .. } => Some(pattern), Param::Env { .. } => None })
+            .enumerate().filter_map(|(slot, pattern)| key_binders(pattern).filter(|(var, _)| declared_labels.contains(var)).map(|key| (slot, key))).collect();
+        self.active_key_parameters.push(active_keys);
         self.effects.push(Effects::default());
         self.function_depth += 1;
         let (a, body_known) = self.block(&f.body.stmts, f.body.span, &body_expected);
         self.function_depth -= 1;
+        self.active_key_parameters.pop();
         let known = self.fn_known(f, &expected, body_known);
         let (err, env) = self.pop_effects(f.span);
         let assert = Ty::named(self.b.assert, Vec::new());
@@ -2737,6 +2764,7 @@ impl<'a> Checker<'a> {
             self.s.level += 1;
         }
         self.check_pattern_places(&b.pattern, Pol::Pos);
+        self.label_declared_vars.extend(binding_label_vars(b));
         self.new_tyvars(&b.ty_vars);
         let mut binders = Vec::new();
         super::pattern::binders(&b.pattern, &mut binders);

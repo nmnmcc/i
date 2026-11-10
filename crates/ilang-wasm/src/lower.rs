@@ -1820,6 +1820,10 @@ impl<'a> Lowerer<'a> {
         t: Atom,
         list: &[(CtorRef, u32)],
     ) -> Atom {
+        if list.is_empty() {
+            out.push(Stmt::Unreachable);
+            return t;
+        }
         let first = list[0].1;
         if list.iter().all(|(_, i)| *i == first) {
             return let_value(fx, out, Value::Field(t, first), None);

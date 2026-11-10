@@ -590,3 +590,10 @@ head tests. This is still unfinished: complete L1–L9 auditing (including
 all value-derived type and recursive group cases), graph interface codec and
 full validation remain required. The current implementation and its checks
 must not be mistaken for full T3 conformance.
+
+Further T3 work found a source-level schema regression: `t3_record_schema.i`
+currently rejects `result.name` after two field-builder calls. A temporary
+checker type probe showed `user : Schema((age: 36, name: "Ada"))` but
+`result : (age: Int)`, so a record field is lost across the `decode` call.
+This is an open implementation failure, not a known-failure entry or a
+completed track; investigate inference/known-type propagation before landing.

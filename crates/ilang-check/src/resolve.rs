@@ -2366,52 +2366,33 @@ impl<'a> Resolver<'a> {
                 }
             })
         };
-        for param in &function.params {
-            if let Param::Pattern { pattern, .. } = param
-                && let PatternKind::Typed { ty, .. } = &pattern.kind
-            {
-                gather(ty);
-            }
-        }
-        if let Some(ret) = &function.ret {
-            for ty in [Some(&ret.value), ret.err.as_ref(), ret.env.as_ref()]
-                .into_iter()
-                .flatten()
-            {
-                gather(ty);
-            }
-        }
+        binding_types(binding, &mut gather);
         labels.retain(|var| binding.ty_vars.contains(var));
         let mut allowed = HashMap::new();
         for param in &function.params {
-            if let Param::Pattern { pattern, .. } = param
-                && let PatternKind::Typed {
-                    binder: Some(_),
-                    ty:
-                        Type {
-                            kind: TypeKind::Var(var),
-                            span,
-                        },
-                } = &pattern.kind
-                && labels.contains(var)
-            {
-                allowed.entry(*var).or_insert_with(Vec::new).push(*span);
+            if let Param::Pattern { pattern, .. } = param {
+                let mut pattern = pattern;
+                let mut named = false;
+                while let PatternKind::Named { pattern: inner, .. } = &pattern.kind { named = true; pattern = inner; }
+                if let PatternKind::Typed { binder, ty: Type { kind: TypeKind::Var(var), span } } = &pattern.kind
+                    && (named || binder.is_some()) && labels.contains(var) {
+                    allowed.entry(*var).or_insert_with(Vec::new).push(*span);
+                }
             }
         }
         for var in &labels {
-            if allowed.get(var).map_or(0, Vec::len) != 1 {
+            if allowed.get(var).is_none_or(Vec::is_empty) {
                 self.error(
                     code::INVALID_LABEL_PARAMETER,
                     binding.span,
                     format!(
-                        "label parameter `{}` needs exactly one named key parameter",
+                        "label parameter `{}` needs a named key parameter",
                         self.p.ty_var_names[var.0 as usize]
                     ),
                 );
             }
         }
         let mut invalid = Vec::new();
-        let mut undeclared_labels = Vec::new();
         binding_types(binding, &mut |ty| {
             walk_type(ty, &mut |part| {
                 if let TypeKind::Var(var) = part.kind
@@ -2422,19 +2403,6 @@ impl<'a> Resolver<'a> {
                 {
                     invalid.push(part.span);
                 }
-                if let TypeKind::Record {
-                    fields, removed, ..
-                } = &part.kind
-                {
-                    for label in fields.iter().map(|(label, _)| label).chain(removed) {
-                        if let Some(var) = label.parameter
-                            && binding.ty_vars.contains(&var)
-                            && !labels.contains(&var)
-                        {
-                            undeclared_labels.push(label.span);
-                        }
-                    }
-                }
             })
         });
         for span in invalid {
@@ -2442,13 +2410,6 @@ impl<'a> Resolver<'a> {
                 code::INVALID_LABEL_PARAMETER,
                 span,
                 "a label parameter may only be the type of its own key parameter",
-            );
-        }
-        for span in undeclared_labels {
-            self.error(
-                code::INVALID_LABEL_PARAMETER,
-                span,
-                "a label parameter must occur in the binding's written function type",
             );
         }
     }
