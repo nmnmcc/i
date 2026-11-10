@@ -132,6 +132,8 @@ The **path** of a module is the `name` of its package (§2.6), then `/`, then it
 
 Modules in `test/` are checked when their package is checked (§2.6), and compiled as test entries when its tests are run. They may import modules in `src/`, but not the other way.
 
+A test module may be imported only by test modules of the same package. Its exports alone do not make its bindings used (§2.4.1).
+
 In a module, the first part of a module path says which package the module is in. It must be one of these:
 
 - `i`, for the **library modules** (§9, §10, §13, §B.7.1) and kept paths named at the start of this document. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
@@ -231,6 +233,14 @@ ExportItem = name | UpName [ "(" ".." ")" ] .
 - If the type of an exported definition uses a type defined in this module, that type must be exported too. If not, it is a compile error.
 
 A type bound by an alias pattern is an alias with no constructors of its own; exporting it with `(..)` has the same effect as exporting it alone. An exported alias or annotation that depends on a value is checked after its type is complete and must not expose a private nominal type. Its source value need not be exported. Reading from another module never fixes that source’s weak type; a new permanent read requires a wholly closed completed source, or the consumer uses a closed alias exported by the source module (§4.7).
+
+### 2.4.1 Unused top-level bindings
+
+A top-level value name bound by a binding (§2.5) gives warning W0504 when it is not used. Names starting with `_` do not give this warning (§1.3). The warning does not change initialization or make `i check` fail.
+
+A binding is used when one of its names is exported from a module outside `test/`, is an entry of its package (§10.2), is a test, or is named in `[wasm].exports`. A reference from a used binding makes the referenced name and its binding used, including references inside function bodies, patterns, and written types. This rule is transitive across modules: references only from unused bindings, including mutually recursive functions, do not count. Merely importing a name does not use it. In test modules, an export must be reached by such a reference from the same package. Each name in a binding is checked separately; using one name makes the binding's references count, but does not make its other names used. A name starting with `_` suppresses its own warning; it does not by itself make the binding used. A binding with no names has its references checked as used.
+
+This warning does not apply to type definitions, aliases, service definitions, constructors, or declarations (`@external` and `@js`). References in their written types count as uses. For an unused function in a test module, with no value parameters and result type `Nil`, the warning adds: "did you forget `@test`?" Environment parameters do not count as value parameters (§10.2). The hint is not given outside test modules, where `@test` is not allowed (§2.2).
 
 ### 2.5 Top-level bindings
 
