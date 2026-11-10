@@ -1,18 +1,21 @@
-;; Host ABI v2 fixture, written by hand: not compiler output. It tests the
+;; Host ABI v3 fixture, written by hand: not compiler output. It tests the
 ;; Rust and JavaScript hosts against Appendix B of docs/spec.md. Its allocator
 ;; only counts live buffers, so tests can check every free of B.3.
 (module
   (type $box (struct (field i32)))
   (type $unary (func (param i32) (result i32)))
+  (type $i32s (array (mut i32)))
   (tag $fail (param i32))
 
   (import "ilang:host/v1" "panic" (func $panic (param i32 i32)))
   (import "ilang:host/v1" "reference_id" (func $reference_id (param externref) (result i64)))
+  (import "ilang:host/v1" "cancel" (func $cancel (param i32)))
   ;; Host services (spec §9.7): print(text: String) -> Nil,
-  ;; read(key: String) -> String ? String, and the async later(x: Float) -> Float ? String.
+  ;; read(key: String) -> String ? String, and the async later(x: Float) -> Float ? String,
+  ;; which takes the request id first (B.4).
   (import "app:console/v1" "print" (func $print (param i32 i32)))
   (import "app:storage/v1" "read" (func $read (param i32 i32) (result i32 i32 i32 i32 i32)))
-  (import "app:clock/v1" "later" (func $later (param f64)))
+  (import "app:clock/v1" "later" (func $later (param i32 f64)))
   ;; An external function (spec §10.1): hypot(Float, Float) -> Float.
   (import "app:math/v1" "hypot" (func $hypot (param f64 f64) (result f64)))
 
@@ -28,6 +31,12 @@
   (data (i32.const 224) "ok")
   (data (i32.const 232) "bad")
   (data (i32.const 240) "\ff\fe")
+  (data (i32.const 256) "name")
+  (data (i32.const 272) "fixture: bad id")
+  (data (i32.const 288) "fixture: wrong answer")
+  (data (i32.const 320) "fixture: cancelled request answered")
+  (data (i32.const 360) "fixture: starved")
+  (data (i32.const 384) "fixture: stop")
 
   ;; B.1: the host calls this once, before every other export but the allocator.
   ;; Imports may be called here.
@@ -39,9 +48,20 @@
   (func (export "live_allocations") (result i32) (global.get $live))
   (func (export "live_bytes") (result i32) (global.get $bytes))
 
-  ;; Size 0 gives address 0 (B.1), which is never freed.
+  ;; Size 0 gives address 0 (B.1), which is never freed. With `$alloc_mode`
+  ;; set by app/async.nested (1) or app/async.nested_cancel (2), it first
+  ;; starts a request or cancels one, which the host must refuse (B.4).
+  (global $alloc_mode (mut i32) (i32.const 0))
   (func $alloc (export "ilang_alloc") (param $len i32) (result i32)
     (local $ptr i32) (local $end i32) (local $pages i32)
+    (if (i32.eq (global.get $alloc_mode) (i32.const 1))
+      (then
+        (global.set $alloc_mode (i32.const 0))
+        (call $later (i32.const 77) (f64.const 1))))
+    (if (i32.eq (global.get $alloc_mode) (i32.const 2))
+      (then
+        (global.set $alloc_mode (i32.const 0))
+        (call $cancel (global.get $nested_id))))
     (if (i32.eqz (local.get $len)) (then (return (i32.const 0))))
     (if (i32.lt_s (local.get $len) (i32.const 0)) (then unreachable))
     (local.set $ptr (global.get $next))
@@ -169,6 +189,30 @@
     (call $copy (i32.const 240) (i32.const 2)) (i32.const 2))
   (func (export "bad_tag") (result i32 i32 i32) (i32.const 5) (i32.const 0) (i32.const 0))
 
+  ;; The last status that an export of this module gave: ilang_continue
+  ;; traps unless it is 2 (B.5).
+  (global $last_status (mut i32) (i32.const 0))
+  (func $st (param $status i32) (result i32)
+    (global.set $last_status (local.get $status))
+    (local.get $status))
+
+  ;; Which export waits (`$mode`): 0 one request at a time (app/async.later,
+  ;; app/async.deep, app/async_test.waits), and 1 to 9 the exports below that
+  ;; keep many requests outstanding.
+  (global $mode (mut i32) (i32.const 0))
+  (global $next_id (mut i32) (i32.const 0))
+  (func $new_id (result i32)
+    (local $id i32)
+    (local.set $id (global.get $next_id))
+    (global.set $next_id (i32.and (i32.add (local.get $id) (i32.const 1)) (i32.const 0x7fffffff)))
+    (local.get $id))
+
+  ;; Mode 0: the id of the request that is outstanding, or -1.
+  (global $single_id (mut i32) (i32.const -1))
+  (func $later_single (param $x f64)
+    (global.set $single_id (call $new_id))
+    (call $later (global.get $single_id) (local.get $x)))
+
   ;; An async host export (B.5): later(x) twice, the second time with the
   ;; first value plus one. An error ends the waiting at once.
   (global $waits (mut i32) (i32.const 0))
@@ -177,11 +221,24 @@
   (global $later_ptr (mut i32) (i32.const 0))
   (global $later_len (mut i32) (i32.const 0))
   (func (export "app/async.later") (param $x f64) (result i32)
+    (call $begin (i32.const 0))
     (global.set $waits (i32.const 0))
-    (call $later (local.get $x))
-    (i32.const 1))
+    (call $later_single (local.get $x))
+    (call $st (i32.const 1)))
   (func (export "ilang_resume:app:clock/v1:later")
-    (param $tag i32) (param $value f64) (param $ptr i32) (param $len i32) (result i32)
+    (param $id i32) (param $tag i32) (param $value f64) (param $ptr i32) (param $len i32) (result i32)
+    (call $st
+      (if (result i32) (global.get $mode)
+        (then (call $resume_many (local.get $id) (local.get $tag) (local.get $value)))
+        (else (call $resume_single (local.get $id) (local.get $tag) (local.get $value)
+          (local.get $ptr) (local.get $len))))))
+  (func $resume_single
+    (param $id i32) (param $tag i32) (param $value f64) (param $ptr i32) (param $len i32) (result i32)
+    ;; A wrong id is a fault of the host: a bare trap, with no stop message.
+    (if (i32.or (i32.lt_s (local.get $id) (i32.const 0))
+                (i32.ne (local.get $id) (global.get $single_id)))
+      (then unreachable))
+    (global.set $single_id (i32.const -1))
     (if (global.get $deep_after_resume)
       (then
         (global.set $deep_after_resume (i32.const 0))
@@ -190,7 +247,7 @@
     (global.set $waits (i32.add (global.get $waits) (i32.const 1)))
     (if (i32.and (i32.eqz (local.get $tag)) (i32.eq (global.get $waits) (i32.const 1)))
       (then
-        (call $later (f64.add (local.get $value) (f64.const 1)))
+        (call $later_single (f64.add (local.get $value) (f64.const 1)))
         (return (i32.const 1))))
     (global.set $later_tag (local.get $tag))
     (global.set $later_value (local.get $value))
@@ -200,6 +257,259 @@
   (func (export "ilang_result:app/async.later") (result i32 f64 i32 i32)
     (global.get $later_tag) (global.get $later_value)
     (global.get $later_ptr) (global.get $later_len))
+
+  ;; Many outstanding requests (B.4, B.5). For each id below 1024: its state
+  ;; (0 free, 1 outstanding, 2 cancelled) and its argument x. Test hosts
+  ;; answer x with 2x. `$h` folds the arguments in answer order:
+  ;; h = (h * 31 + x) mod (2^31 - 1).
+  (global $state (ref $i32s) (array.new_default $i32s (i32.const 1024)))
+  (global $args (ref $i32s) (array.new_default $i32s (i32.const 1024)))
+  (global $n (mut i32) (i32.const 0))
+  (global $started (mut i32) (i32.const 0))
+  (global $answered (mut i32) (i32.const 0))
+  (global $outstanding (mut i32) (i32.const 0))
+  (global $h (mut i64) (i64.const 0))
+  (global $count (mut i32) (i32.const 0))
+  (global $got (mut i32) (i32.const 0))
+  (global $nested_id (mut i32) (i32.const 0))
+
+  (func $fail (param $ptr i32) (param $len i32)
+    (call $panic (local.get $ptr) (local.get $len))
+    unreachable)
+
+  (func $begin (param $mode i32)
+    (global.set $mode (local.get $mode))
+    (array.fill $i32s (global.get $state) (i32.const 0) (i32.const 0) (i32.const 1024))
+    (global.set $started (i32.const 0))
+    (global.set $answered (i32.const 0))
+    (global.set $outstanding (i32.const 0))
+    (global.set $h (i64.const 0))
+    (global.set $count (i32.const 0))
+    (global.set $got (i32.const 0)))
+
+  ;; Starts later(x) with this id.
+  (func $start (param $id i32) (param $x i32)
+    (array.set $i32s (global.get $state) (local.get $id) (i32.const 1))
+    (array.set $i32s (global.get $args) (local.get $id) (local.get $x))
+    (global.set $outstanding (i32.add (global.get $outstanding) (i32.const 1)))
+    (global.set $started (i32.add (global.get $started) (i32.const 1)))
+    (call $later (local.get $id) (f64.convert_i32_s (local.get $x))))
+
+  ;; Starts n requests with ids k*37+5 and arguments k+1.
+  (func $start_n (param $n f64)
+    (local $k i32)
+    (global.set $n (i32.trunc_f64_s (local.get $n)))
+    (loop $again
+      (if (i32.lt_s (local.get $k) (global.get $n))
+        (then
+          (call $start (i32.add (i32.mul (local.get $k) (i32.const 37)) (i32.const 5))
+            (i32.add (local.get $k) (i32.const 1)))
+          (local.set $k (i32.add (local.get $k) (i32.const 1)))
+          (br $again)))))
+
+  (func $drop (param $id i32)
+    (call $cancel (local.get $id))
+    (array.set $i32s (global.get $state) (local.get $id) (i32.const 2))
+    (global.set $outstanding (i32.sub (global.get $outstanding) (i32.const 1))))
+
+  ;; The outstanding request with the lowest id, or -1.
+  (func $lowest (result i32)
+    (local $id i32)
+    (loop $again
+      (if (i32.lt_s (local.get $id) (i32.const 1024))
+        (then
+          (if (i32.eq (array.get $i32s (global.get $state) (local.get $id)) (i32.const 1))
+            (then (return (local.get $id))))
+          (local.set $id (i32.add (local.get $id) (i32.const 1)))
+          (br $again))))
+    (i32.const -1))
+
+  ;; Checks an answer and folds it into `$h`.
+  (func $take (param $id i32) (param $tag i32) (param $value f64)
+    (local $x i32)
+    (if (i32.or (i32.lt_s (local.get $id) (i32.const 0)) (i32.ge_s (local.get $id) (i32.const 1024)))
+      (then (call $fail (i32.const 272) (i32.const 15))))
+    (if (i32.eq (array.get $i32s (global.get $state) (local.get $id)) (i32.const 2))
+      (then (call $fail (i32.const 320) (i32.const 35))))
+    (if (i32.ne (array.get $i32s (global.get $state) (local.get $id)) (i32.const 1))
+      (then (call $fail (i32.const 272) (i32.const 15))))
+    (local.set $x (array.get $i32s (global.get $args) (local.get $id)))
+    (if (i32.or (local.get $tag)
+          (f64.ne (local.get $value) (f64.convert_i32_s (i32.mul (local.get $x) (i32.const 2)))))
+      (then (call $fail (i32.const 288) (i32.const 21))))
+    (array.set $i32s (global.get $state) (local.get $id) (i32.const 0))
+    (global.set $outstanding (i32.sub (global.get $outstanding) (i32.const 1)))
+    (global.set $answered (i32.add (global.get $answered) (i32.const 1)))
+    (global.set $h (i64.rem_u
+      (i64.add (i64.mul (global.get $h) (i64.const 31)) (i64.extend_i32_u (local.get $x)))
+      (i64.const 2147483647))))
+
+  (func $resume_many (param $id i32) (param $tag i32) (param $value f64) (result i32)
+    (local $low i32)
+    ;; app/async.stop_mid stops on its first answer.
+    (if (i32.eq (global.get $mode) (i32.const 8))
+      (then (call $fail (i32.const 384) (i32.const 13))))
+    (call $take (local.get $id) (local.get $tag) (local.get $value))
+    ;; app/async.many: after each of the first n answers, a new request
+    ;; with the freed id and a new argument, until 2n have been answered.
+    (if (i32.eq (global.get $mode) (i32.const 1))
+      (then
+        (if (i32.le_s (global.get $answered) (global.get $n))
+          (then (call $start (local.get $id) (i32.add (global.get $started) (i32.const 1)))))
+        (return (select (i32.const 0) (i32.const 1)
+          (i32.eq (global.get $answered) (i32.mul (global.get $n) (i32.const 2)))))))
+    ;; app/async.fan: ends after n answers.
+    (if (i32.eq (global.get $mode) (i32.const 2))
+      (then (return (select (i32.const 0) (i32.const 1)
+        (i32.eq (global.get $answered) (global.get $n))))))
+    ;; app/async.cancel: cancels the outstanding request with the lowest id.
+    (if (i32.eq (global.get $mode) (i32.const 3))
+      (then
+        (local.set $low (call $lowest))
+        (if (i32.ge_s (local.get $low) (i32.const 0)) (then (call $drop (local.get $low))))
+        (return (select (i32.const 0) (i32.const 1) (i32.eqz (global.get $outstanding))))))
+    ;; app/async.cancel_reuse: cancels the lowest and at once starts a new
+    ;; request with its id and a new argument, until 2n have started.
+    (if (i32.eq (global.get $mode) (i32.const 4))
+      (then
+        (if (i32.and (i32.ne (global.get $outstanding) (i32.const 0))
+                     (i32.lt_s (global.get $started) (i32.mul (global.get $n) (i32.const 2))))
+          (then
+            (local.set $low (call $lowest))
+            (call $drop (local.get $low))
+            (call $start (local.get $low) (i32.add (global.get $started) (i32.const 1)))))
+        (return (select (i32.const 0) (i32.const 1) (i32.eqz (global.get $outstanding))))))
+    ;; app/async.yielding: the answer came; ilang_continue ends it.
+    (if (i32.eq (global.get $mode) (i32.const 5))
+      (then
+        (global.set $got (i32.const 1))
+        (return (i32.const 2))))
+    ;; app/async.continue_io: runnable until n have started.
+    (if (i32.eq (global.get $mode) (i32.const 6))
+      (then
+        (if (i32.lt_s (global.get $started) (global.get $n)) (then (return (i32.const 2))))
+        (return (select (i32.const 0) (i32.const 1) (i32.eqz (global.get $outstanding))))))
+    ;; app/async.leftover, app/async.result_starts and
+    ;; app/async.result_cancels end after the first answer.
+    (i32.const 0))
+
+  ;; B.5: the host calls it only right after status 2.
+  (func (export "ilang_continue") (result i32)
+    (local $k i32)
+    (if (i32.ne (global.get $last_status) (i32.const 2)) (then unreachable))
+    (if (i32.eq (global.get $mode) (i32.const 5))
+      (then
+        (global.set $count (i32.add (global.get $count) (i32.const 1)))
+        (if (global.get $got) (then (return (call $st (i32.const 0)))))
+        (if (i32.ge_s (global.get $count) (global.get $n))
+          (then (call $fail (i32.const 360) (i32.const 16))))
+        (return (call $st (i32.const 2)))))
+    (if (i32.eq (global.get $mode) (i32.const 6))
+      (then
+        (local.set $k (global.get $started))
+        ;; The second call cancels the first request, which test hosts hold.
+        (if (i32.eq (local.get $k) (i32.const 1)) (then (call $drop (i32.const 5))))
+        (call $start (i32.add (i32.mul (local.get $k) (i32.const 37)) (i32.const 5))
+          (select (i32.const 0) (i32.add (local.get $k) (i32.const 1)) (i32.eqz (local.get $k))))
+        (return (call $st
+          (select (i32.const 2) (i32.const 1) (i32.lt_s (global.get $started) (global.get $n)))))))
+    unreachable)
+
+  (func $result (result f64) (f64.convert_i64_u (global.get $h)))
+  (func (export "app/async.many") (param $n f64) (result i32)
+    (call $begin (i32.const 1)) (call $start_n (local.get $n)) (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.many") (result f64) (call $result))
+  (func (export "app/async.fan") (param $n f64) (result i32)
+    (call $begin (i32.const 2)) (call $start_n (local.get $n)) (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.fan") (result f64) (call $result))
+  (func (export "app/async.cancel") (param $n f64) (result i32)
+    (call $begin (i32.const 3)) (call $start_n (local.get $n)) (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.cancel") (result f64) (call $result))
+  (func (export "app/async.cancel_reuse") (param $n f64) (result i32)
+    (call $begin (i32.const 4)) (call $start_n (local.get $n)) (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.cancel_reuse") (result f64) (call $result))
+  ;; One request, then status 2 until its answer has come; the result is
+  ;; the number of calls of ilang_continue. m calls with no answer starve.
+  (func (export "app/async.yielding") (param $m f64) (result i32)
+    (call $begin (i32.const 5))
+    (global.set $n (i32.trunc_f64_s (local.get $m)))
+    (call $start (i32.const 5) (i32.const 1))
+    (call $st (i32.const 2)))
+  (func (export "ilang_result:app/async.yielding") (result f64)
+    (f64.convert_i32_s (global.get $count)))
+  ;; Status 2 with nothing outstanding; each ilang_continue starts one
+  ;; request (the first with the argument 0), until n have started.
+  (func (export "app/async.continue_io") (param $n f64) (result i32)
+    (call $begin (i32.const 6))
+    (global.set $n (i32.trunc_f64_s (local.get $n)))
+    (call $st (i32.const 2)))
+  (func (export "ilang_result:app/async.continue_io") (result f64) (call $result))
+  ;; Ends with status 0 after the first of 3 answers (B.5).
+  (func (export "app/async.leftover") (result i32)
+    (call $begin (i32.const 7)) (call $start_n (f64.const 3)) (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.leftover") (result f64) (call $result))
+  ;; Stops on the first of 3 answers.
+  (func (export "app/async.stop_mid") (result i32)
+    (call $begin (i32.const 8)) (call $start_n (f64.const 3)) (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.stop_mid") (result f64) (call $result))
+  ;; Status 1 with nothing outstanding (B.5).
+  (func (export "app/async.stuck") (result i32)
+    (call $begin (i32.const 7)) (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.stuck") (result f64) (call $result))
+  ;; Two requests with the same id (B.4).
+  (func (export "app/async.dup") (result i32)
+    (call $begin (i32.const 7))
+    (call $start (i32.const 7) (i32.const 1))
+    (call $start (i32.const 7) (i32.const 2))
+    (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.dup") (result f64) (call $result))
+  ;; A request with the id -1 (B.4).
+  (func (export "app/async.negative") (result i32)
+    (call $begin (i32.const 7))
+    (call $later (i32.const -1) (f64.const 1))
+    (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.negative") (result f64) (call $result))
+  ;; A status that is not 0, 1 or 2 (B.5).
+  (func (export "app/async.bad_status") (result i32) (call $st (i32.const 7)))
+  (func (export "ilang_result:app/async.bad_status") (result f64) (call $result))
+  ;; `cancel` of a request that is not outstanding (B.4).
+  (func (export "app/async.cancel_bad") (result i32)
+    (call $begin (i32.const 7))
+    (call $cancel (i32.const 12345))
+    (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.cancel_bad") (result f64) (call $result))
+  ;; A sync service whose String answer makes the host call ilang_alloc
+  ;; during the import; ilang_alloc then starts a request (B.4).
+  (func (export "app/async.nested") (result i32)
+    (call $begin (i32.const 7))
+    (global.set $alloc_mode (i32.const 1))
+    (drop (drop (drop (drop (drop (call $read (i32.const 256) (i32.const 4)))))))
+    (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.nested") (result f64) (call $result))
+  ;; The same, but ilang_alloc cancels the request that this export started.
+  (func (export "app/async.nested_cancel") (result i32)
+    (call $begin (i32.const 7))
+    (global.set $nested_id (i32.const 5))
+    (call $start (i32.const 5) (i32.const 1))
+    (global.set $alloc_mode (i32.const 2))
+    (drop (drop (drop (drop (drop (call $read (i32.const 256) (i32.const 4)))))))
+    (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.nested_cancel") (result f64) (call $result))
+  ;; One request; then ilang_result starts a request or cancels one, which
+  ;; is not allowed there (B.4).
+  (func (export "app/async.result_starts") (result i32)
+    (call $begin (i32.const 9)) (call $start (i32.const 5) (i32.const 1)) (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.result_starts") (result f64)
+    (call $later (i32.const 6) (f64.const 1))
+    (call $result))
+  (func (export "app/async.result_cancels") (result i32)
+    (call $begin (i32.const 9)) (call $start (i32.const 5) (i32.const 1)) (call $st (i32.const 1)))
+  (func (export "ilang_result:app/async.result_cancels") (result f64)
+    (call $cancel (i32.const 0))
+    (call $result))
+  ;; Sync exports may not start or cancel requests (B.4).
+  (func (export "app/sync.starts") (call $later (i32.const 3) (f64.const 1)))
+  (func (export "app/sync.cancels") (call $cancel (i32.const 0)))
 
   ;; Recursion that is not a tail call, n deep: in a sync call, and in the
   ;; resume of an async call (after later(1.0) is answered).
@@ -213,10 +523,11 @@
   (func (export "app/deep") (param $n f64) (result f64)
     (f64.convert_i32_s (call $deep (i32.trunc_f64_s (local.get $n)))))
   (func (export "app/async.deep") (param $n f64) (result i32)
+    (call $begin (i32.const 0))
     (global.set $deep_n (i32.trunc_f64_s (local.get $n)))
     (global.set $deep_after_resume (i32.const 1))
-    (call $later (f64.const 1))
-    (i32.const 1))
+    (call $later_single (f64.const 1))
+    (call $st (i32.const 1)))
   (func (export "ilang_result:app/async.deep") (result f64)
     (f64.convert_i32_s (global.get $deep_result)))
 
@@ -234,9 +545,10 @@
     (global.set $test_runs (i32.const 1)))
   ;; An async test: with a host that answers x, later(1.0) ends with 2.0.
   (func (export "app/async_test.waits") (result i32)
+    (call $begin (i32.const 0))
     (global.set $waits (i32.const 0))
-    (call $later (f64.const 1))
-    (i32.const 1))
+    (call $later_single (f64.const 1))
+    (call $st (i32.const 1)))
   (func (export "ilang_result:app/async_test.waits")
     (if (i32.or (global.get $later_tag) (f64.ne (global.get $later_value) (f64.const 2)))
       (then unreachable)))
@@ -268,7 +580,7 @@
     (local.get $sum))
 
   (@custom "ilang.abi"
-    "{\"version\":2,"
+    "{\"version\":3,"
     "\"entry\":{\"name\":\"app/main.main\",\"async\":false},"
     "\"tests\":["
       "{\"name\":\"app/test.passing\",\"async\":false},"
@@ -298,6 +610,25 @@
       "\"bad_tag\":{\"params\":[],\"result\":\"nil\",\"errors\":[\"string\"],\"async\":false},"
       "\"app/async.later\":{\"params\":[\"float\"],\"result\":\"float\",\"errors\":[\"string\"],\"async\":true},"
       "\"app/deep\":{\"params\":[\"float\"],\"result\":\"float\",\"errors\":[],\"async\":false},"
+      "\"app/async.many\":{\"params\":[\"float\"],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.fan\":{\"params\":[\"float\"],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.cancel\":{\"params\":[\"float\"],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.cancel_reuse\":{\"params\":[\"float\"],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.yielding\":{\"params\":[\"float\"],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.continue_io\":{\"params\":[\"float\"],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.leftover\":{\"params\":[],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.stop_mid\":{\"params\":[],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.stuck\":{\"params\":[],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.dup\":{\"params\":[],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.negative\":{\"params\":[],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.bad_status\":{\"params\":[],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.cancel_bad\":{\"params\":[],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.nested\":{\"params\":[],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.nested_cancel\":{\"params\":[],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.result_starts\":{\"params\":[],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/async.result_cancels\":{\"params\":[],\"result\":\"float\",\"errors\":[],\"async\":true},"
+      "\"app/sync.starts\":{\"params\":[],\"result\":\"nil\",\"errors\":[],\"async\":false},"
+      "\"app/sync.cancels\":{\"params\":[],\"result\":\"nil\",\"errors\":[],\"async\":false},"
       "\"app/async.deep\":{\"params\":[\"float\"],\"result\":\"float\",\"errors\":[],\"async\":true}},"
     "\"services\":{"
       "\"app:console/v1\":{\"print\":{\"params\":[\"string\"],\"result\":\"nil\",\"errors\":[],\"async\":false}},"
