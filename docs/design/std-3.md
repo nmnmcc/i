@@ -609,7 +609,9 @@ The Float fast path uses only separately rounded binary64 operations and bit
 comparisons. The slow path uses exact Int arithmetic and explicit bit assembly.
 No fused operation, extended precision, host import or target-selected formula
 is permitted. Each path certifies F1, so selecting either path cannot change
-output bits. This is a determinism argument; executed target checks are recorded
+output bits. Pi is deferred by a pure thunk so small atan/atan2 intervals do not compute it
+unnecessarily; changing demand cannot change an enclosure. This is a
+determinism argument; executed target checks are recorded
 separately in section 11.
 
 `std/test/float_oracle.py` reproduces the review's 331 inputs, using MPFR's own
@@ -746,19 +748,20 @@ search bounds and costs. Preserve all current public exports/tests.
 
 ## 7. File plan and implementation gates
 
-Only this note is owned here. Future implementation regions:
+The implementation owns these regions; the coordinator also assigned new test
+and oracle scripts beside the existing tests:
 
 | File/region at baseline | Change |
 |---|---|
 | `std/src/property.i`, new, whole file | Imports/exports/types; tree helpers; generators; checker/replay; formatter/Assert adapter. |
 | `std/test/property_test.i`, new | Deterministic trees, laws, replay, budgets, invalid inputs and reporting. |
-| `std/src/float.i:14–57`, `:630–967`, appended private region | Exports/constants, private sign-mask rename, rational/interval helpers and new math. Preserve existing kernels. |
+| `std/src/float.i:14–57`, `:630–967`, appended private region | Exports/constants, private sign-mask rename, certified Float/fixed-point helpers and new math. Preserve existing kernels. |
 | `std/test/float_test.i:1027–1203`, append | Existing bit tests plus domains, signed zeros, quadrants and independent oracle fixtures. |
-| `std/src/string.i:22–63`, `:142–176`, `:246–308`, `:429–455`, append | Exports/docs, partition wrapper, access/search and scalar traversals. |
+| `std/src/string.i:22–63`, `:142–176`, `:246–308`, `:429–455`, append | Exports/docs, last split, access/search and scalar traversals. |
 | `std/test/string_test.i:2056–2279`, append | Scalar-list models, bounds/empty/callback cases and traversal-cost regressions. |
 
-A development oracle script/extra fixture path needs assignment by the
-coordinator; no runtime dependency. No required edits to std/i.toml, compiler,
+The coordinator assigned oracle and test scripts under std/test; they add no
+runtime dependency. No required edits to std/i.toml, compiler,
 i/random, core, runner, STR or other notes.
 
 Order and gates:
@@ -767,8 +770,8 @@ Order and gates:
    hand-built trees before random generation, then P4 and checker/replay/report.
 2. String additions; run old tests to detect altered negative slices, empty
    split/replace or lines behavior.
-3. Float exact decode/round, including midpoint/overflow boundaries; interval
-   arithmetic, pi/atan, trig, inverse trig, norm and units. Independently review
+3. Float exact decode/round, including midpoint/overflow boundaries; certified
+   Float arithmetic, fixed-point pi/atan, trig, inverse trig, norm and units. Independently review
    bounds/signs before validating oracle bits.
 4. `i check --project std --types`: compare every public label/type/effect.
    `i test --project std`, then changed modules with `--opt 2`. Repeat signatures

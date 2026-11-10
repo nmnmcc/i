@@ -78,7 +78,7 @@ console.log('331 JavaScript known answers passed');
         command([compiler, 'run', '--project', work, '--opt', opt])
         wasm = work / f'host-o{opt}.wasm'
         command([compiler, 'build', '--project', work, '--opt', opt, '--out', wasm])
-        command(['node', '--wasm-exnref', work / 'run.mjs', wasm])
+        command(['node', work / 'run.mjs', wasm])
         wasi = work / f'wasi-o{opt}.wasm'
         command([compiler, 'build', '--project', work, '--opt', opt, '--target', 'wasi', '--out', wasi])
         command(['wasmtime', 'run', '-W', 'exceptions=y', wasi])

@@ -1185,16 +1185,16 @@ small_atan = (z: Fixed, p: Int) -> Fixed {
 }
 
 // z is nonnegative; interval extension of exact inverse/addition identities.
-positive_atan = (z: Fixed, pi_bounds: Fixed, p: Int) -> Fixed {
+positive_atan = (z: Fixed, pi_bounds: () -> Fixed, p: Int) -> Fixed {
 	scale = core.shift_left(1, p)
 	one = Fixed(scale, scale)
 	{ z.lo >= scale } |> {
 		True -> fixed_div(one, z, p) |> {
 			Some(inverse) -> fixed_sub(
-				fixed_div_int(pi_bounds, 2)
+				fixed_div_int(pi_bounds(), 2)
 				positive_atan_small(inverse, p)
 			)
-			None -> Fixed(0, pi_bounds.hi)
+			None -> Fixed(0, pi_bounds().hi)
 		}
 		False -> positive_atan_small(z, p)
 	}
@@ -1449,7 +1449,7 @@ math_bounds = (operation: Math, x: Float, y: Float, p: Int) -> Option(Fixed) {
 			fixed_div(s, c, p)
 		}
 		_ -> {
-			pi_bounds = fixed_pi(p)
+			pi_bounds = () { fixed_pi(p) }
 			operation |> {
 				Arctangent -> {
 					a = positive_atan(
@@ -1469,7 +1469,7 @@ math_bounds = (operation: Math, x: Float, y: Float, p: Int) -> Option(Fixed) {
 						p
 					)
 					quadrant = { x <. 0.0 } |> {
-						True  -> fixed_sub(pi_bounds, a)
+						True  -> fixed_sub(pi_bounds(), a)
 						False -> a
 					}
 					Some(sign_bit(y) |> {
@@ -1506,7 +1506,7 @@ math_bounds = (operation: Math, x: Float, y: Float, p: Int) -> Option(Fixed) {
 						None -> None
 						Some(ratio) -> {
 							a = positive_atan(ratio, pi_bounds, p)
-							half = fixed_div_int(pi_bounds, 2)
+							half = fixed_div_int(pi_bounds(), 2)
 							Some(sign_bit(x) |> {
 								True  -> fixed_add(half, a)
 								False -> fixed_sub(half, a)
@@ -1516,13 +1516,13 @@ math_bounds = (operation: Math, x: Float, y: Float, p: Int) -> Option(Fixed) {
 				}
 				UnitsIn -> Some(
 					fixed_div_int(
-						fixed_mul(fixed_float(x, p), pi_bounds, p)
+						fixed_mul(fixed_float(x, p), pi_bounds(), p)
 						180
 					)
 				)
 				UnitsOut -> fixed_div(
 					fixed_scale(fixed_float(x, p), 180)
-					pi_bounds
+					pi_bounds()
 					p
 				)
 				_ -> Some(Fixed(-scale, scale))

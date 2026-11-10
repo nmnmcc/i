@@ -413,3 +413,119 @@ assertion_adapter_and_clients = () {
 		core.inspect
 	)
 }
+
+@test
+negative_integer_boolean_element_and_list_element_order = () {
+	Ok(negative) = property.int(-10, 0)
+	find = (seed: Int) -> property.Tree(Int) ! Assert {
+		assert(seed < 1000)
+		t = root(negative, 0, seed)
+		{ t.value == -10 } |> {
+			True  -> t
+			False -> find(seed + 1)
+		}
+	}
+	assert(list.map(find(0).children(), (c) { c.value }) == [0, -5, -8, -9])
+	samples = list.map(list.range(0, 49), (seed) {
+		root(property.bool(), 0, seed)
+	})
+	assert(list.any(samples, (t) { t.value }))
+	assert(list.any(samples, (t) { core.not(t.value) }))
+	list.each(samples, (t) {
+		assert(list.map(t.children(), (c) { c.value }) == {
+			t.value |> {
+				True  -> [False]
+				False -> []
+			}
+		})
+	})
+	Ok(choices) = property.element(["first", "second", "first"])
+	list.each(list.range(0, 49), (seed) {
+		t = root(choices, 0, seed)
+		assert(t.value == "first" || t.value == "second")
+		Ok((index, _)) = fail.catch(() {
+			random.int(random.from_seed(seed), 3)
+		})
+		expected = index |> {
+			0 -> []
+			1 -> ["first"]
+			_ -> ["first", "second"]
+		}
+		assert(list.map(t.children(), (c) { c.value }) == expected)
+	})
+	// With fixed length there are no deletions. Retaining per-element trees
+	// gives the first element's children, then the second's, without redrawing.
+	hand = property.make((_, _) {
+		Some(property.tree(1, () { [property.tree(0, () { [] })] }))
+	})
+	Ok(fixed) = property.list(hand, 2, 2)
+	t = root(fixed, 0, 0)
+	assert(list.map(t.children(), (c) { c.value }) == [[0, 1], [1, 0]])
+}
+
+@test
+budget_prefixes_and_discarded_children = () {
+	Ok(ints) = property.int(0, 10)
+	ten = find_ten(ints, 0)
+	gen = property.make((_, _) { Some(ten) })
+	// P7 also counts Discard; it never descends into that child.
+	predicate = (x: Int) -> property.Verdict {
+		{ x >= 6 } |> {
+			True  -> property.Fail(core.inspect(x))
+			False -> property.Discard
+		}
+	}
+	expected = [
+		([], 10)
+		([], 10)
+		([2], 8)
+		([2], 8)
+		([2], 8)
+		([2, 2], 6)
+		([2, 2], 6)
+		([2, 2], 6)
+		([2, 2], 6)
+	]
+	list.index_map(expected, (pair, index) {
+		property.Falsified(f) = property.check(
+			gen
+			property.Config(0, 1, 0, 0, index + 1)
+			predicate
+		)
+		assert(f.checked == index + 1 && f.limited)
+		assert((f.path, f.smallest) == pair)
+	})
+	Nil
+}
+
+@test
+dependent_branch_pruning_and_inner_alternatives = () {
+	outer = property.make((_, _) {
+		Some(property.tree(2, () {
+			[
+				property.tree(1, () { [property.tree(0, () { [] })] })
+				property.tree(0, () { [] })
+			]
+		}))
+	})
+	gen = property.flat_map(outer, (n) {
+		property.make((s, _) {
+			n |> {
+				1 -> None
+				0 -> Some(property.tree(0, () { [] }))
+				_ -> Some(property.tree(20 + s, () {
+					[property.tree(21 + s, () { [] })]
+				}))
+			}
+		})
+	})
+	t = root(gen, 3, 17)
+	assert(t.value == 23)
+	children = t.children()
+	assert(list.map(children, (c) { c.value }) == [0, 24])
+	Some(inner) = list.at(children, 1)
+	assert(list.map(inner.children(), (c) { c.value }) == [0])
+	// The failed n=1 branch's n=0 grandchild is not promoted; only the second
+	// outer child appears. The inner shrink keeps this current outer alternative.
+	assert(list.length(children) == 2)
+}
