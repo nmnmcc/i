@@ -18,7 +18,21 @@ pub fn compile(
     entries: &[(&str, &str)],
 ) -> Result<Built, crate::BuildError> {
     let mut graph = graph.clone();
-    let root = graph.root.expect("compiler program has a root package");
+    let first = entries
+        .first()
+        .expect("a compiler program must have an entry");
+    let root = parsed
+        .iter()
+        .find(|m| m.path == first.0)
+        .expect("compiler entry module must belong to the selected closure")
+        .package;
+    assert!(
+        entries
+            .iter()
+            .all(|(path, _)| parsed.iter().any(|m| m.path == *path && m.package == root)),
+        "compiler program entries must belong to one package"
+    );
+    graph.root = Some(root);
     // User manifest entries are not roots of the compiler program.
     graph.packages[root].wasm_exports.clear();
     graph.packages[root].entries.clear();

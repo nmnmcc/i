@@ -119,6 +119,7 @@ pub mod code {
 }
 
 /// A parsed module of the graph.
+#[derive(Clone)]
 pub struct Parsed {
     pub package: PackageId,
     pub path: String,

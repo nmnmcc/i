@@ -158,8 +158,15 @@ fn prepares_and_executes_a_real_macro_binding() {
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, wrap)\n(@ macro (= wrap (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(wrapped ~x))))\n").unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
-    let (mut parsed, diagnostics) = ilang_check::parse(&graph);
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let macro_source = parsed
+        .iter()
+        .find(|module| module.path == "app/macros")
+        .unwrap()
+        .source;
+    let mut parsed =
+        ilang_cli::macro_prepare::import_closure(&graph, &parsed, macro_source).unwrap();
     let prepared = ilang_cli::macro_prepare::prepare(&graph, &mut parsed).unwrap();
     assert_eq!(prepared.bindings.len(), 1);
     assert_eq!(prepared.bindings[0].name, "wrap");
@@ -174,4 +181,40 @@ fn prepares_and_executes_a_real_macro_binding() {
     )
     .unwrap();
     assert_eq!(result.show(), "(wrapped (f x))");
+    assert_eq!(result.scope().module, macro_source.0);
+}
+
+#[test]
+fn compiler_program_selects_only_the_macro_import_closure() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, id)\n(@ macro (= id (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/unrelated.i"),
+        "@external(\"outside\", \"effect\")\neffect: () -> Int\ninitial = effect()\n",
+    )
+    .unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty());
+    let source = parsed
+        .iter()
+        .find(|m| m.path == "app/macros")
+        .unwrap()
+        .source;
+    let mut selected = ilang_cli::macro_prepare::import_closure(&graph, &parsed, source).unwrap();
+    assert!(!selected.iter().any(|m| m.path == "app/unrelated"));
+    let prepared = ilang_cli::macro_prepare::prepare(&graph, &mut selected).unwrap();
+    let built = ilang_cli::macro_run::compile(&graph, &selected, &[("app/macros", "id")]).unwrap();
+    let original = input();
+    let result = ilang_cli::macro_run::invoke_with_templates(
+        &built,
+        "app/macros.id",
+        &[original.clone()],
+        prepared.templates.into(),
+    )
+    .unwrap();
+    assert!(result.identical(&original));
 }
