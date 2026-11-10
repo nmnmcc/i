@@ -7,6 +7,7 @@ This document is complete in itself. It defines:
 - the source language (§1 to §8);
 - effects, and the library modules `i/fail`, `i/control`, `i/resource`, `i/assertion`, `i/io`, and `i/random` (§9);
 - the library module `i/core`, which has the operations that are not written in i (§13);
+- the library module `i/record`, which reads and sets fields of records (§14);
 - packages, versions, and the files `i.toml` and `i.lock` (§2.1, §2.6 to §2.8);
 - what programs do when they run, and the text form of values (§11);
 - the binary interface between a compiled module and its host (§10 and Appendix B).
@@ -16,7 +17,7 @@ Every compiler must give the seven library modules above. The target modules `i/
 i is small, and every part of it is what it looks like. A thing that looks like a function is a normal function, and a clause block is a function too (§6.12). A binding is a binding wherever it is written, and a clause block with one clause and no guard binds its pattern as a parameter does. Where two forms look the same, they have the same rules, with these exceptions, where the place of a form decides its rules:
 
 - `x: T` in a clause pattern is a type annotation when the clause block has one clause, no guard, and no choices, and a test when not (§7.1). So with `v: Int | String`, `v |> { x: Int -> x }` is a compile error, but `v |> { x: Int -> x  _ -> 0 }` is correct.
-- A `{` that begins an expression is a clause block or a block by its first statement, but the body of a function is always a block (§6.1). So in `make = (n) { (x) -> Int { x + n } }`, the body is a block that gives a function, but `g = { (x) -> Int { x + n } }` is a clause block with the pattern `(x)`.
+- A `{` that begins an expression is first checked for a record (§6.13). Otherwise it is a clause block or a block by its first statement; a function body that is not a record is always a block (§6.1). So in `make = (n) { (x) -> Int { x + n } }`, the body is a block that gives a function, but `g = { (x) -> Int { x + n } }` is a clause block with the pattern `(x)`.
 - In the first statement of a `{`, `n = ( … ) -> T` is the binding of a function when a `{` comes after `T` on the same line, and a clause pattern followed by `->` when not (§6.1).
 
 ## 0. How to read this document
@@ -106,6 +107,7 @@ Comments are not tokens, so the tokens on the two sides of a comment are what co
 A break ends something. What it ends depends on the brackets it is directly inside:
 
 - Directly inside `{ }` (a block, a clause block, or the constructors of a type), and at the top level of a file, a break ends a statement, a clause, a constructor, or an item. Attributes are part of the item after them, so a break after an attribute does not end the item.
+- Directly inside the `{ }` of a record (§6.13) or a record type (§3), a break is a `,`, as inside `( )`.
 - Directly inside a `{ }` that groups a type (§3), a break is a compile error.
 - Directly inside `( )`, `[ ]`, or `<< >>`, a break is the same as a `,`. A `,` at the end of a line may be left out.
 
@@ -134,7 +136,7 @@ Modules in `test/` are checked when their package is checked (§2.6), and compil
 
 In a module, the first part of a module path says which package the module is in. It must be one of these:
 
-- `i`, for the **library modules** (§9, §10, §13, §B.7.1) and kept paths named at the start of this document. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
+- `i`, for the **library modules** (§9, §10, §13, §14, §B.7.1) and kept paths named at the start of this document. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
 - the `name` of the module's own package;
 - a dependency name of the module's own package (§2.6); in a test module, also a dev-dependency name.
 
@@ -539,7 +541,7 @@ Union     = Inter { "|" Inter } .
 Inter     = Diff { "&" Diff } .
 Diff      = Prim { "-" Prim } .
 Prim      = FnType | TupleType | NamedType | TypeCall | [ name "." ] name
-          | Literal | "_" | "{" Type "}" .
+          | Literal | "_" | "{" Type "}" | RecordType .
 FnType    = "(" [ ParamType { "," ParamType } [ "," ] ] ")" "->" Union [ "?" Union ] [ "!" Union ] .
 ParamType = [ name ":" ] Type .
 TupleType = "(" [ Type { "," Type } [ "," ] ] ")" .
@@ -548,6 +550,12 @@ TypeCall  = [ name "." ] name "(" [ TypeArg { "," TypeArg } [ "," ] ] ")" .
 TypeArg   = Type .
 Literal   = int_lit | "-" IntPart | string_lit .
 IntPart   = int_lit | "{" IntPart "}" .
+RecordType = "{" ".." "}"
+           | "{" ".." Type { "," RPart } [ "," ] "}"
+           | "{" FPart { "," FPart } [ "," ] "}" .
+RPart      = Label ":" Type | "-" Label .
+FPart      = Label ":" Type .
+Label      = name | string_lit | UpName .
 ```
 
 - An `UpName` with no module name before it is a type variable when a type variable with that name is declared where the type is written (§4.7, §5), and a type when not. `_` is a hole that type inference fills in.
@@ -562,6 +570,10 @@ IntPart   = int_lit | "{" IntPart "}" .
 - `?` and `!` are part of the nearest `->`. `?` comes before `!`. A `?` or `!` that the nearest `->` cannot take, because it already has one or because `!` came first, is a compile error: in `(A) -> (B) -> C ! N ? E`, the inner function type is put in `{ }` to give `? E` to the outer `->`.
 - In a written function type, a missing `? E` means `? Never`, and a missing `! N` means `! Never`. This is the same in every place where a type is written.
 
+- A `{` in a type begins a record type when followed by `..` or by a label and `:`. Otherwise it groups exactly one type. `{..}` is the type of all records; `{}` is not a type. Breaks in record types separate fields; breaks directly in type groups are errors.
+- A record label is a `name`, a string with no interpolation, or a declared label parameter (§4.9.4). A fixed label starting with a capital letter is written as a string. Labels are compared after decoding escapes: `a`, `"a"`, and `"\u{61}"` are the same label. A label may not occur twice, including as a field and a forgotten label.
+- `{ ..R, f: T }` sets the field type; `{ ..R, -f }` forgets the field; `{ ..R }` is `R & {..}` (§4.9.2).
+
 ## 4. Types
 
 ### 4.1 Types are sets of values
@@ -570,6 +582,7 @@ Every type is a set of values.
 
 - Values of different type constructors are never the same.
 - Values of different forms of one type constructor, such as `List(Int)` and `List(String)`, may not be told apart at run time (§7.1).
+- Records (§4.9) are values of one type constructor.
 - Tuples with different numbers of parts are different. The values of a function type are functions.
 
 A **member** of a type (§4.4) is a type constructor, its type arguments, and a **value set**: the values of that type constructor that are in the member. Only `Int` and `String` may have a value set that is not all of their values (§4.2). For every other type constructor, the value set is all of its values.
@@ -635,8 +648,8 @@ Field       = [ name ":" ] Type .
 ### 4.4 Union, intersection, and difference
 
 - The values of `A | B` are the values of `A` and the values of `B`. Order has no effect, `A | A` is `A`, and `A | Never` is `A`.
-- Members of a union with the same type constructor are put together into one. For `Int` and `String`, the value set of the member is the union of their value sets: `"a" | "b"` is one member, and `"a" | String` is `String`. `T(A1, …) | T(B1, …)` is `T(C1, …)`, where for each parameter of `T` (§4.5 rules 6 and 7), `Ci` is `Ai | Bi` when the parameter goes in the same direction as the type, and `Ai & Bi` when it goes in the other direction. When the parameter does not change, `Ai` and `Bi` must be equal, and `Ci` is that type; if they cannot be equal, it is a compile error. Tuples of the same size count as one type constructor, and so do all function types, whose parameters go in the other direction and whose value, errors, and environment go in the same direction. Function types with different numbers of parameters cannot be put together; that is a compile error. A label is kept only where both have it. So `List(Int) | List(String)` is `List(Int | String)`.
-- The **members** of a type are the types that make it up as a union, after these rules are used. So no two members of a type have the same type constructor. A type variable may be a member.
+- Members of a union with the same type constructor are put together into one. For `Int` and `String`, the value set of the member is the union of their value sets: `"a" | "b"` is one member, and `"a" | String` is `String`. `T(A1, …) | T(B1, …)` is `T(C1, …)`, where for each parameter of `T` (§4.5 rules 6 and 7), `Ci` is `Ai | Bi` when the parameter goes in the same direction as the type, and `Ai & Bi` when it goes in the other direction. When the parameter does not change, `Ai` and `Bi` must be equal, and `Ci` is that type; if they cannot be equal, it is a compile error. Tuples of the same size count as one type constructor, and so do all function types, whose parameters go in the other direction and whose value, errors, and environment go in the same direction. Function types with different numbers of parameters cannot be put together; that is a compile error. A label is kept only where both have it. So `List(Int) | List(String)` is `List(Int | String)`. All records count as one type constructor; record members merge their common fields for union and all their fields for intersection (§4.9). An unresolved spread stays separate from an ordinary record member. Runtime overlap and removal count it as a record, but this does not merge it with that record member.
+- The **members** of a type are the types that make it up as a union, after these rules are used. So no two members of a type have the same type constructor, except that a union may have spread types next to one record type (§4.9.3). A type variable may be a member.
 - The values of `A & B` are the values that are in both `A` and `B`. `{ A | B } & C` is `A & C | B & C`. When `T` and `U` are not type variables, `T & U` is `Never` when they have different type constructors; when they have the same one, it is that type constructor with each pair of arguments put together the other way round: `&` where the parameter goes in the same direction, `|` where it goes in the other direction, and equal where it does not change. For `Int` and `String`, the value set is the values in both; when there are none, `T & U` is `Never`. So `"a" & String` is `"a"`, and `"a" & "b"` is `Never`. `a & T`, with a type variable `a`, stays as it is.
 - Intersections come from inference. `(x) { x + 1  x }` has the type `(x: a & Int) -> a`: the value that comes in is given back, and it must be an `Int`.
 - `A - B` takes out of `A` every member whose type constructor is the type constructor of a member of `B`. For `Int` and `String`, it takes out only the values of the value set of that member of `B` (below). These rules work it out:
@@ -646,7 +659,7 @@ Field       = [ name ":" ] Type .
   - The right side of `-` may not have a type variable as a member. `a - U`, with a type variable `a`, stays as it is until `a` is known.
 - So `{ Int | String | Nil } - String` is `Int | Nil`, `A - A` is `Never`, and `{ Yield(a) | n } - Yield(a)` is `n - Yield(a)`.
 - `{ Int | String | Nil } - "a" - 1` is `Int - 1 | String - "a" | Nil`.
-- Unions, intersections, and differences may be used in every place where a type may be used: values, errors, and environments. In a written type, a union with two or more type variables as members may only be in an output place, and an intersection with a type variable only in an input place (§4.5 rule 6), because inference cannot choose between them in the other places. The parameters of a function are input places; its `->` part, the type at the top of a binding pattern, and the fields of a type are output places.
+- Unions, intersections, and differences may be used in every place where a type may be used: values, errors, and environments. In a written type, a union with two or more type variables as members, or with a spread type as a member (§4.9.3), may only be in an output place, and an intersection with a type variable only in an input place (§4.5 rule 6), because inference cannot choose between them in the other places. The parameters of a function are input places; its `->` part, the type at the top of a binding pattern, and the fields of a type are output places. Record fields and spread bases preserve the direction of their surrounding place. A spread with a field or a forgotten label is not an intersection with a type-variable member, so it may be in any place; `{ ..R }` alone is `R & {..}`, so it may only be in an input place when `R` is a type variable. The spread-union restriction is checked on expanded annotations and shown inferred binding types, including non-generalized bindings. Reading a value’s type cannot hide an illegal place.
 
 ### 4.5 Subtypes
 
@@ -661,6 +674,8 @@ Field       = [ name ":" ] Type .
 7. `List(a)` goes in the same direction as `a`. In `Continuation(a, r, e, n)`, `a` goes in the other direction and `r`, `e`, `n` in the same direction. `Boundary(r, e, n)` does not change.
 
 8. A member of `Int` or `String` is a subtype of a member with the same type constructor when every value of its value set is in the value set of the other. So `"a" <: "a" | "b" <: String`, and `String - "a" <: String`, but `String` is not a subtype of `"a" | "b"`, and `String - "a"` is not a subtype of `"b"`.
+
+9. Records obey the width, intersection, join, and forgetting rules of §4.9.3.
 
 Two types are **equal** when each is a subtype of the other. A value of a subtype may be used in every place where a value of the type is needed.
 
@@ -697,7 +712,8 @@ Types are worked out by inference with subtypes (algebraic subtyping).
 - Parameters (§6.11) and clause patterns (§6.12) are matched like bindings, but they are not generalized. Their values are not known where they are written, so each of their names has one type in the whole body or clause. So `(f) { (f(1), f("a")) }` needs `f` to take both `Int` and `String`.
 - Inside its own value (§6.10), a name of a binding is not general: all its uses there have one type. It becomes general when the binding is generalized.
 - A **group** is a set of top-level bindings that use one another, directly or through other bindings of the group. The bindings of a group are worked out together and then generalized together, after the groups that they use. Inside the group, their names are not general.
-- A type that has itself inside it, through a type variable, is a compile error.
+- A type that has itself inside it, through a type variable, is a compile error. Record fields and spread bases count as places inside a type constructor.
+- Simplification and display preserve type variables affecting invariant arguments, including inside records. Reading a type never generalizes a weak variable. Label parameters alone are rigid labels (§4.9.4).
 - A long union of literal types may be shortened in messages and hovers, as `"a" | "b" | … (40 more)`, but never in a type scheme or in the interface of a package. An inferred type may have literal types in it, also in the interface: an exported constant or an unannotated exported function whose value is a literal has that literal type, so giving one more literal as a value changes the interface. Exported functions should have written types, as the standard library has.
 - Simplification and type display must preserve type variables that affect invariant arguments, even when their input and output forms print alike.
 
@@ -719,9 +735,13 @@ Types are worked out by inference with subtypes (algebraic subtyping).
 
     A clause block with one clause and no guard is not typed by this rule. It is the function `(p) { e }` of rule 4: its pattern is fitted to the type of the parameter (below), it is not checked for coverage, and `S` is `Assert` when the pattern may fail. A match `s |> { p -> e }` with such a clause block is typed as the binding `p = s` followed by `e` (rule 10), with the one difference that `p` is not generalized, as a parameter is not. So the subject `s` gets the expected type that a binding gives its value (below).
 
-12. **Narrowing.** Let a catch-all be at some place in a clause pattern, and let `B` be the type of the values at that place. A type constructor `T` is **taken** at that place when every value that the clause pattern matches, with a value of `T` at that place, is matched by an earlier clause without a guard. In the same way, a value `v` of an earlier `Int` or `String` literal pattern at that place, and a member of the type of an earlier type test at that place, is **taken** when every value that the clause pattern matches with it at that place is matched by an earlier clause without a guard. The catch-all gets the type `B - H`, where `H` is the union of the taken members: each taken type constructor with new type variables as its arguments, the literal type of each taken value, and each taken member of a type test. So in `s |> { "a" -> 0  rest -> f(rest) }` with `s: String`, `rest` gets `String - "a"`. So in §9.3, `other` gets `HttpError`, because the clause before it takes every `Error` with a `ParseError` in it.
-13. **Fields and tuple parts.** For `v.f`, every constructor that may have made `v` (§6.7) must have a field with the label `f`. The inferred result is the union of those field types with the type arguments from the corresponding bound forms, or the constructor-pattern arguments already supplied by §7.5. The inferred type of `v` must fit the bound. With no possible constructors, the result is `Never`. For `v.k`, `v` must have a known type and every member must be a tuple with more than k parts. Its inferred type must fit the bound of that known type, and the result is the union of parts k from those bound forms. If not, it is a compile error. The bound takes all Int and String values at covariant places, removes exclusions of only some of those values there, and takes fresh holes at noncovariant places. Use this bound also when a known function type constrains a call. Known field and tuple results are obtained separately from the original known facts, not by narrowing the inferred result to them. A known type may have fewer values than the inferred type: after `x = "a" = s` with `s: String`, `x` has the type `String` and the known type `"a"`, and `(x, 0).0` is correct.
+12. **Narrowing.** Let a catch-all be at some place in a clause pattern, and let `B` be the type of the values at that place. A type constructor `T` is **taken** at that place when every value that the clause pattern matches, with a value of `T` at that place, is matched by an earlier clause without a guard. In the same way, a value `v` of an earlier `Int` or `String` literal pattern at that place, and a member of the type of an earlier type test at that place, is **taken** when every value that the clause pattern matches with it at that place is matched by an earlier clause without a guard. The catch-all gets the type `B - H`, where `H` is the union of the taken members: each taken type constructor with new type variables as its arguments, the literal type of each taken value, and each taken member of a type test. A taken record or spread member is represented by `{..}`: a record test takes all records, and field types do not form runtime cases. So in `s |> { "a" -> 0  rest -> f(rest) }` with `s: String`, `rest` gets `String - "a"`. So in §9.3, `other` gets `HttpError`, because the clause before it takes every `Error` with a `ParseError` in it.
+13. **Fields and tuple parts.** For `v.f`, when `v` is known to be made by one constructor (§7.5), or `v` has a known type whose members are all custom types (including no members), every constructor that may have made `v` must have field `f`. The inferred result is the union of those field types with the type arguments from the corresponding bound forms, or the constructor-pattern arguments already supplied by §7.5. The inferred type of `v` must fit the bound. With no possible constructors, the result is `Never`.
+    Otherwise, when `v` has no known type, or its known type has at least one member and only record, unknown, or variable members, `v.f` has a fresh type `a` and requires `type(v) <: { f: a }`. Its known type is the guaranteed field type from the conservative record summary, when available. No constraint is added against that known field fact.
+    For `v.k`, `v` must have a known type and every member must be a tuple with more than k parts. Its inferred type must fit the bound of that known type, and the result is the union of parts k from those bound forms. In every other case field or tuple access is a compile error.
+    The bound in the constructor and tuple rules takes all Int and String values at covariant places, removes exclusions of only some of those values there, and takes fresh holes at noncovariant places. Record fields and spread bases are covariant for this operation. Use this bound also when a known function type constrains a call. Known field and tuple results are obtained separately from the original known facts, not by narrowing the inferred result to them. A known type may have fewer values than the inferred type: after `x = "a" = s` with `s: String`, `x` has the type `String` and the known type `"a"`, and `(x, 0).0` is correct.
 14. **Generalization.** A binding whose value is a direct value is generalized (§4.7) after its value is typed. Other bindings, parameters, and clause patterns are not.
+15. **Records.** If every `ei : Ti`, then `{ f1: e1, …, fn: en } : { f1: T1, …, fn: Tn }`. If `r : R`, `R <: {..}`, and every `ei : Ti`, then `{ ..r, f1: e1, … } : { ..R, f1: T1, … }`. `{..} : {..}`.
 
 A **catch-all** is a `name`, a discard, or `x = q` where `q` is a catch-all.
 
@@ -740,19 +760,23 @@ The **pattern type** of a pattern that is not a catch-all, and its parts, are:
 - `x = q`: the pattern type of `q`, and `x` gets that type.
 - `x: T`: `T`, with a new type variable in place of each `_` in it, and `x` gets that type.
 
+Record fields and spread bases are covariant in the hidden-input and whole-literal operations below; invariant arguments inside them still count in both directions. A field written in a literal or after a spread gets its matching expected record field, when guaranteed. The base expression of a spread gets no expected type.
+
 The **known type** `K(e)` of an expression is found from the parts of the expression, left to right, and from the expected type of its place (below). Where no case below gives it, `e` has no known type.
 
+- A record literal has the record of the known types of its fields, with `_` for a field that has none. A spread has the base’s conservative record summary, forgetting equal or possibly equal labels, and the known types of its new fields. An unknown base supplies all records. Only guaranteed fields shared by every possible record alternative survive; non-record and unknown alternatives of an enclosing union remain. Thus `{ ..e }` always has a record known type, and rule 13b reads the guaranteed field known type separately from inference.
 - A literal, also `-` and an integer literal, also inside groups, has its type (§6.3), and a bit array has `BitArray`. A tuple has the tuple of the known types of its parts, with `_` for a part that has none. A list has `List` of the union of the known types of its parts when they all have one, and `List(_)` when not. So `[]` has `List(Never)`.
 - An operator expression has the result type of §6.9; `a |> f(…)` is the call `f(a, …)`.
-- A match `e |> { … }` has the union of the known types of its clause expressions when they all have one. A record update `C(..v, f1: e1, …)` has the known type of the call of `C` with the given fields and the other fields of `v` as its arguments.
+- A match `e |> { … }` has the union of the known types of its clause expressions when they all have one. A constructor update `C(..v, f1: e1, …)` has the known type of the call of `C` with the given fields and the other fields of `v` as its arguments.
 - The names of a parameter get known types as names in patterns (below), but the value of a parameter has no known type. So `x: T` gives `x` the type `T`, and a parameter with no type has no known type. An environment parameter `x ! T` has `T`.
 - A built-in name, an imported name, and a member `m.x` of an imported module have their type scheme. So does the name of a generalized binding (§4.7), local or top-level, where it is used outside its own value and outside its group. A type variable in such a scheme that is not generalized is replaced by the matching part of the known type of the binding's value, or by `_`. A constructor has its function type, with the field labels (§6.3).
 - A function expression has the type made from: the labels of its parameters; for each parameter, the type written at its top (as in `x: T`), or else the type it gets from an expected type (below), or else `_`; and for the result, the written `->` part, or else the known type of its body, or else `_`.
 - A clause block that is not the right side of a match has a known function type with one parameter, made as for a function expression: the label of its parameter (§6.12); for the parameter, `Never` when the block has no clauses, the type written at the top of its pattern when the block has one clause, no guard, and no choices, or else the type it gets from an expected type, or else `_`; and for the result, the union of the known types of its clause expressions when they all have one, or else `_`. When the parameter has a known type `B`, from a written type or from an expected type, every clause pattern is a pattern fitted to a value with the known type `B`, as in a match (the bullet on matches, before **Names in patterns**, below), and the narrowing by earlier clauses of §4.8 rule 12 is used in the same way. So with `opts: List(Option(User))`, `list.map(opts, { Some(u) -> u.name  None -> "" })` is correct, as `list.map(opts, (o) { o |> { Some(u) -> u.name  None -> "" } })` is. In the bullets on expected types, such a clause block counts as a function expression of one parameter.
 - A name used inside the value of its own binding, and a top-level name of the same group, get their known types only from what is written, because their values are not yet known there: from `x: T` at the top of the binding's pattern when it is there, or else from what is written in the value, with `_` for the rest. So, as in TypeScript, a function that uses its own result in `.f`, `.k`, or a call by label needs a written `->` part. Every other name bound by a pattern gets its known type as below.
 - A known type may have `_` in it, for a part that is not known. A part that is `_` has no known type, but the rest of the type is still known. So the labels of a function are known even when its types are not.
+- Before a call of a binding with label parameters, those labels are fixed (§4.9.4) and substituted in both its inferred and known function types before other arguments are matched. Key arguments are inferred once, before the other arguments; this does not change runtime evaluation order (§6.2).
 - A call `f(a1, …)`, also when written with `|>`, has a known type when `f` has a known function type, and every type variable of its result gets a type when its parameter types are matched with the known types of the arguments (below). Then it has the result type with those types put in. A constructor with arguments is a call.
-- To **match** a type `P` with a known type `K`: when `P` is a type variable, `K` is one of its types. When `P` is a named type, a tuple type, or a function type, and `K` has one member with the same type constructor, the parts are matched: the type arguments, the tuple parts, or the parameter and result types. When `P` is a union, each member of `P` that is not a type variable is matched with the member of `K` that has its type constructor, if there is one, and each type variable in `P` is matched with `K` less the other members of `P` (§4.4). A type variable in `P` that is matched with a `_` in `K`, or with a type variable that is generalized in `K`, gets `_`, because that part may be any value. When `P` is an intersection, each of its members is matched with `K`. Before matching, a difference in `K` is replaced by its members (§4.4), and an intersection `a & T` by `T`. When a type variable gets more than one type, it gets their union. So matching `(x: a | Nil)` with `User | Nil` gives `a` the type `User`.
+- To **match** a type `P` with a known type `K`: when `P` is a type variable, `K` is one of its types. When `P` is a named type, a tuple type, or a function type, and `K` has one member with the same type constructor, the parts are matched: the type arguments, the tuple parts, or the parameter and result types. When `P` is a union, each member of `P` that is not a type variable is matched with the member of `K` that has its type constructor, if there is one, and each type variable in `P` is matched with `K` less the other members of `P` (§4.4). A type variable in `P` that is matched with a `_` in `K`, or with a type variable that is generalized in `K`, gets `_`, because that part may be any value. When `P` is a record, each field is matched with the same guaranteed field of the conservative record summary of `K`. A missing field supplies unknown information, including `_` for variables there; it is not proof that no value arrives. When `P` is an intersection, each of its members is matched with `K`. Before matching, a difference in `K` is replaced by its members (§4.4), and an intersection `a & T` by `T`. When a type variable gets more than one type, it gets their union. So matching `(x: a | Nil)` with `User | Nil` gives `a` the type `User`.
 - **Expected types.** An expression may have an **expected type** from its place, as in TypeScript:
   - An argument of a call (also with `|>`) whose callee has a known function type has the type of its parameter there. Its type variables are put in when matching the parameter types with the known types of the arguments before it fixes them. Function expressions that have a parameter with no written type are left out of this matching, and come last: their expected types use all the other arguments. A function given as an argument may give values to the called function that the other arguments do not show: as its result or errors, as the argument of a function it is given (a parameter of a parameter), or to a service of its environment. A service in the called function's own environment gives it values that come from the caller's environment statement. And a function that the called function gives back may get values from a later caller. Walk the type of the called function, also its own environment: its parameters are given to it, its result is given by it, and every type variable in its own environment is given to it (an environment statement of the caller gives it those values), and the direction turns at each parameter of a function type and at each contravariant argument of a constructor; an argument of a constructor that is invariant or bivariant, and an environment, count as both directions. A type variable at a place given to the called function, other than a place in a parameter reached from the top of that parameter only through parts of tuples and covariant arguments of constructors (the argument shows the values there), is matched as usual, and then its type is made whole, both in the expected type of every argument and in the known type of the call (the bullet on a call `f(a1, …)` above): every `Int` and `String` member, also in an argument of a tuple or a constructor, or in the result of a function type, has all its values, `Never` there is `_`, and every other part that is not covariant (a parameter of a function type, an argument of a constructor that is not covariant, an environment) is `_`. So in `list.fold(xs, 0, (n, x) { … })`, `n` has the known type `Int`, not `0`; with `(0, 0)` as the start, `(Int, Int)`; with `[]` as the start, `List(_)`. With `loop(S): (init: S, body: (S, (S) -> Nil) -> Nil) -> Nil`, in `loop(0, (n, again) { … })`, `n` has the known type `Int`. With `make(S): (init: S) -> ((S) -> S) -> S`, `make(0)` has the known type `((Int) -> Int) -> Int`. With `cur(S): (seed: S) -> S ! State(S)`, `cur(0)` has the known type `Int`, so `cur(0) == 5` is correct.
   - The value of a binding whose pattern has `x: T` at its top has `T`. The body of a function with a written `->` part has that type.
@@ -764,7 +788,45 @@ The **known type** `K(e)` of an expression is found from the parts of the expres
 - In a match `e |> { … }`, every clause pattern is a pattern fitted to a value with the known type of `e` (below), also when the clause block has one clause and no guard. So with `opt: Option(User)`, `opt |> { Some(u) -> u.name }` is correct, as `Some(u) = opt` followed by `u.name` is.
 - **Names in patterns**: when a pattern `q` is fitted to a value with a known type `B`: a catch-all gets `B`, less the members that rule 12 takes out. If `q` is not a catch-all, take the one member of `B` with the type constructor of `Q`; for a literal pattern with the value `v`, only that value, if the member has it: `B & v`, with `v` the literal type of the value (not `B & Q`, because where a pattern is fitted `Q` is the whole `Int` or `String`); if there is not exactly one, the names of `q` get no known type. The parts of `q` then have the known part types of that member, with its type arguments put in; the rest `r` of `"lit" <> r` has the known type `String`, all its values, because it is only the end of the value, so the known type of the value says nothing about it. The name `x` of `x = q` gets that member. The name `x` of `x: T` gets `T`, whatever the value. So in `f: (x: Int) -> Int = (y) { … }`, `f` has the label `x`, from its annotation.
 
-So `(u) { u.name }` needs a type, `(u: User) { u.name }`, but with `opt: Option(User)`, `opt |> { Some(u) -> u.name  None -> "" }` is correct.
+So `(u) { u.name }` has the principal type `(u: { name: A }) -> A` and may not be given a `User`. `(u: User) { u.name }` reads the constructor field, but with `opt: Option(User)`, `opt |> { Some(u) -> u.name  None -> "" }` is correct.
+
+### 4.9 Records
+
+#### 4.9.1 Values
+
+A record is a value made of fields. Each field has a label, which is a String, and a value. No label is in a record twice. The order of the fields has no meaning: `{ name: "ada", age: 36 }` and `{ age: 36, name: "ada" }` are the same record.
+
+#### 4.9.2 Types
+
+`{ f1: T1, …, fn: Tn }` is the type of the records that have at least the fields `f1 … fn`, where the value of `fi` is in `Ti`. A record may have more fields than its type says. They are kept, and `==`, `core.inspect` and `core.hash` see them. `{ f1: T1, …, fn: Tn }` is the same as `{ f1: T1 } & … & { fn: Tn }`. `{..}` is the type of all records.
+
+`{ ..R, f1: T1, …, -g1, … }` is `R` with the labels `f1 …` and `g1 …` **forgotten**, and `{ f1: T1, … }`. `R` with the label `f` forgotten is the type of the records that have the same fields as a record of `R` at every other label; at `f` they may have any value, or no field. So `{ ..{ age: Int, name: String }, age: String }` is `{ age: String, name: String }`. Forgetting from an empty type is empty. Dropping a field from a record type is an exact rewrite only when the discarded field is known to be inhabited for every remaining choice of its variables. Otherwise the forgetting form remains. Closing a value-derived type may make this rewrite possible later. Normalization before or after substituting a closed type must describe the same set. When `R` has no values, the spread has none: `{ ..{ a: Never, b: Int }, -a }` has no values, as `{ ..Never, -a }`. Only the records of `R` count, so `{ ..R }` is `R & {..}`, and `{ ..Int, a: Int }` has no values. A spread with a field or a `-` part is one form, in which `R` is in an output place, as in `List(R)`; it is not an intersection that has `R` as a member (§4.4).
+
+#### 4.9.3 Rules
+
+Records are one type constructor. So a record is never a value of a custom type, a tuple, a function type, or a built-in type, and the rules of §4.4 for one type constructor hold:
+
+- `{ fs } <: { gs }` when every label of `gs` is in `fs`, and the field type in `fs` is a subtype of the field type in `gs` (width).
+- `{ fs } & { gs }` has the labels of both. A label in both has the `&` of its two types.
+- `{ fs } | { gs }` is put together into the record of the labels in both, with the `|` of their types. So `{ a: Int, b: Int } | { a: String }` is `{ a: Int | String }`. To tell kinds of records apart, use a custom type.
+- A spread type `{ ..R, … }` whose labels are not all known is not put together with a record type or with another spread type. Its labels are not all known when its base `R` is not a record type (a type variable, or an intersection or difference with one), or when one of its labels may be a label parameter, as `{ ..{ a: Int }, K: String }`, where `K` may be `a`. So `{ ..R, a: Int } | { b: Int }` is a union of two members, and stays one. A union has at most one record type as a member, and may have spread types next to it. Such a union may only be in an output place (§4.4): a record that comes to it goes to the record type, or to the one spread type when there is no record type, and inference does not try the other members. The same holds for the inferred type of a binding: when inference would give such a union to an input place of it, such as a parameter with no written type whose value flows into a written result type with a spread type, it is a compile error, and the parameter's type must be written. When exact forgetting reduces the spread to a record type, the rule above puts it together.
+- In a type test or a clause, a record type that is taken (§4.8 rule 12) is `{..}`.
+- A record type is a type constructor for §4.7: a type may not have itself inside it through a field or through the base of a spread. So `last = (r) { r.next |> { Nil -> r.v  n -> last(n) } }` is a compile error. Recursive data, such as a chain or a tree, is a custom type: `Node(A) { Node(v: A, next: Node(A) | Nil) }`. A function that sets a field in a loop, such as `build = (r, n) { n |> { 0 -> r  _ -> build(record.put(r, "a", n), n - 1) } }`, needs a written type for its parameter: `build = (r: {..}, n: Int) -> {..} { … }`. The same holds for the accumulator of a fold whose callback uses a spread or `record.put` on it: `list.fold(xs, { n: 0, total: 0 }, (acc, x) { { ..acc, n: acc.n + 1 } })` is a compile error, and `(acc: { n: Int, total: Int }, x)` or the full literal `{ n: acc.n + 1, total: acc.total }` is correct. A loop cannot keep the other fields as a type variable: with a written type that is not a type variable, they are only the fields of that type.
+- A type test `x: { … }` in a clause takes every record (§4.8 rule 11). So `x: { a: Int }` on a value of type `{ a: Int } | { a: String }` is a compile error.
+
+Why setting a field forgets it first: if `record.put(r, "age", "old")` had the type `R & { age: String }`, then for `r = { age: 36 }` it would be `{ age: 36 & String }`, which has no values, and `.age + 1` would be correct and add 1 to `"old"`. With `{ ..R, age: String }` it is `{ age: String }`, and `.age + 1` is a compile error.
+
+#### 4.9.4 Label parameters
+
+A type variable declared on a binding or a declaration that is used as a label in a record type anywhere in the binding, also in a type written inside its value, as `K` in `get(K, V): (r: { K: V }, key: K) -> V`, is a **label parameter**. A label that starts with a capital letter is always a label parameter of a binding around it. A declared type variable that is not used as a label anywhere in its binding is not a label parameter, also when it is the whole type of a parameter. A label parameter may be used as a label. As a type, it may only be the whole type of a parameter of the binding's own function, or of a top-level parameter of the written function type of a declaration (as `key: K` in `get` above). It may not be the type of a parameter of an inner function, of a parameter of a function type inside another type, or of a parameter of a function type written for a binding that has a value, and it may not be in another pattern, a result or another type. When the binding's value is a clause block with one clause and no guard, its parameter counts as a parameter of the function (§6.12). Such a parameter is a **key parameter**, and every label parameter must be the type of some key parameter. The binding must be generalized (§4.8 rule 14), it may not be in a recursive group with other bindings (§4.7), and it may not be an entry point (§10.2), because the host gives its keys with no check. A type with the label parameter may not become part of the type of a name from outside the binding, such as a parameter of an outer function; that is a compile error. A type of a value (§3) or an alias pattern may not name a name that refers to a key parameter (below), or a name bound by a binding with label parameters.
+
+At each call of a name whose type has label parameters, each label parameter takes a label from its key arguments. A name **refers to a key parameter** when the pattern of that key parameter binds it at its top: `key` in `key: K`, and `key` and `k2` in the alias parameter `k2 = key: K` (§6.11). Nothing else refers to a key parameter: not a name bound to it by `k2 = key`, and not the parameter of a function or a clause block that it is given to. When the argument is a name that refers to a key parameter of a binding around the call, the label parameter takes that outer label parameter. Otherwise the known type of the argument must be a String type with exactly one value, and the label parameter takes that string; the argument must then have that one-value type. In every other case it is a compile error. So `record.get(r, "name")` is correct, and `record.get(r, s)` with `s: String` is not. When a label parameter is the type of more than one key parameter, all their arguments must give the same label. A name bound by a binding with label parameters may only be called, also inside the binding's own value: it may not be used as a value, given to another name, or passed to a function. Inside its own value, a call of itself gives each label parameter its own key parameter, in the same place: each key argument is a name that refers to one of the binding's own key parameters whose type is the same label parameter as the type of the parameter it is given to.
+
+Inside its binding, a label parameter `K` is one string that is not known. A key parameter `key: K` there has the type `String`. `{ K: A }` and `{ f: B }` have different fields, and `{ ..R, K: V }` forgets every field of `R` that may be `K`. Where a check needs to know that `K` is not `f`, it is a compile error: "the key `K` may be `f`".
+
+#### 4.9.5 The module `i/record`
+
+See §14.
 
 ## 5. Names and scope
 
@@ -789,7 +851,7 @@ Postfix   = Primary { Call | "." name | "." decimal } .
 Call      = "(" [ Arg { "," Arg } [ "," ] ] ")" .
 Arg       = [ name ":" ] Expr .
 Primary   = int_lit | float_lit | string_lit | Name | Tuple | List | BitArray
-          | Block | Clauses | Function | RecordUpdate .
+          | Block | Clauses | Function | CtorUpdate | Record .
 Name      = [ name "." ] ( name | UpName ) .
 Tuple     = "(" [ Expr { "," Expr } [ "," ] ] ")" .
 List      = "[" [ Expr { "," Expr } [ "," ".." Expr ] [ "," ] ] "]" .
@@ -797,20 +859,24 @@ Block     = "{" { Statement } Expr "}" .
 Statement = Pattern "=" Expr | name TypeParams [ ":" Type ] "=" Expr | "!" NamedType "=" Expr | Expr .
 Clauses   = "{" { Clause } "}" .
 Clause    = Pattern { "|" Pattern } [ "?" Expr ] "->" Expr .
-Function  = "(" [ Param { "," Param } [ "," ] ] ")" [ "->" Union [ "?" Union ] [ "!" Union ] ] Block .
+Function  = "(" [ Param { "," Param } [ "," ] ] ")" [ "->" Union [ "?" Union ] [ "!" Union ] ] ( Block | Record ) .
 Param     = Pattern | name "!" NamedType .
-RecordUpdate = Name "(" ".." Expr { "," name ":" Expr } [ "," ] ")" .
+CtorUpdate = Name "(" ".." Expr { "," name ":" Expr } [ "," ] ")" .
+Record    = "{" ".." "}"
+          | "{" ".." Expr { "," RField } [ "," ] "}"
+          | "{" RField { "," RField } [ "," ] "}" .
+RField    = ( name | string_lit ) ":" Expr .
 ```
 
 - `( … )` that is not a call is a function when `{` or `->` comes after it, and a tuple when not (§1.7). So its parts are patterns in a function and expressions in a tuple. In a guard, a `->` that is not inside brackets always ends the clause head. So in `n ? (a) -> 1`, the guard is the tuple `(a)`, which is a compile error because a guard must be a `Bool`, and not a function.
-- A `{` that begins an expression begins a **clause block** when it is `{}`, or when its first statement is a clause (next bullet). When not, it begins a block. So `{ x }` is a block and `{ x -> x }` is a clause block. The body of a function (§6.8) does not begin an expression: it is always a block, and the tests below are not made for it.
+- A `{` that begins an expression or a function body is a record when it is `{..}`, when `..` follows it, or when its first part begins with a `name`, an `UpName`, or a string and then `:`, and either has no `=`, `->`, `?` or `|` outside brackets, or ends with a written `,`. The first part ends at the first `,` or break directly inside the braces, or at `}`. An `UpName` expression label is a compile error: a label is a name or a string. A string label may not have interpolation. A function body that is not a record is a block. Thus `{ f: (x) -> Int { x } }` is a clause block; write `{ f: (x) -> Int { x }, }`. Printers retain the required first-field comma, also over several lines.
+- A `{` that is not a record and begins an expression begins a **clause block** when it is `{}`, or when its first statement is a clause (next bullet). When not, it begins a block. So `{ x }` is a block and `{ x -> x }` is a clause block. The body of a function (§6.8) does not begin an expression: when it is not a record, it is always a block, and the tests below are not made for it.
 - To find whether the first statement is a clause, these tests are made in order. The first that holds decides.
   1. When the statement starts with `name ( UpName { , UpName } )` and then `=` or `:`, it is a binding with type parameters (last bullet), and not a clause, though `f(A)` could also be read as a constructor pattern (§7.1). So `id(A) = (x: A) -> A { x }` is a binding with type parameters, and not a binding with the constructor pattern `id(A)` (§7.1), which test 3 would find, and not a clause.
   2. The longest pattern `p` at the start of the statement is read. A type in it is read as §7.1 says, as far to the right as it goes, with no going back: the pattern is not cut short to end before a `->` or a `|` that the type takes. When `p` is followed by `|`, `?`, or `->`, the statement is a clause, with one exception. The exception is a binding of a function: `p` is `n1 = … = nk = ( … )`, one or more names, each followed by `=`, and then a tuple pattern; after the `->` that follows `p`, the `->` part of a function, `Union [ "?" Union ] [ "!" Union ]` (§6.8), may be read in full; and a `{` comes after it on the same line. Then the statement is the binding of the pattern `n1 = … = nk` to the function that starts at `( … )`.
   3. When the statement starts with a pattern and then `=`, it is a binding (last bullet), and not a clause. When it starts with `!`, it is an environment statement, and not a clause. So a binding of a function needs no exception when the name has a type, as in `f: (Int) -> Int = (n) -> Int { n }`, because its longest pattern, `f: (Int) -> Int`, is followed by `=`. Nor does a function with an environment parameter, as in `go = (n, log ! Log) -> Int { … }`, because `log ! Log` is not a pattern, so the longest pattern is `go`.
-  4. When the statement starts with `name :`, and is not a pattern `name: Type` followed by `=`, `->`, `?`, or `|`, the `{` is kept for records (below), and it is a compile error. The type is read as far to the right as it goes, so in `{ p: (Int, Int) -> e }`, the pattern is `p: (Int, Int) -> e`, which is followed by `}`, and it is the records error. In the same way, `{ x: [1] -> 2 }` is the records error, because no type starts with `[`, so `x: [1]` is not a pattern. But `{ x: 1 -> 2 }` is a clause block, the function `(x: 1) { 2 }`, because `1` is a literal type (§4.2).
-  5. When a `->` that is not inside brackets comes before the next break or the `}`, and the statement either is not a correct expression or has a longest expression that is followed by `->`, the statement is a clause whose pattern is wrong. Then the `{` begins a clause block, and the error is the first error found when the start of the statement, up to that `->`, is read as a pattern followed by `->`. In this reading, the type of a pattern `x: T` is still read as far to the right as it goes, so the `->` that ends the pattern is the first one after it. So `x |> { -y -> 1 }` and `b |> { <<x: Int>> -> 1 }` give an error in the pattern, and not a block with a stray `->`. This test is only made for a statement that the tests before it do not decide, so a `->` in a later statement on the same line, as in `{ k = 2  g = (x) -> Int { x * k }  g(1) }`, does not count.
-  6. When none of these holds, the statement is an expression, and not a clause.
+  4. When a `->` that is not inside brackets comes before the next break or the `}`, and the statement either is not a correct expression or has a longest expression that is followed by `->`, the statement is a clause whose pattern is wrong. Then the `{` begins a clause block, and the error is the first error found when the start of the statement, up to that `->`, is read as a pattern followed by `->`. In this reading, the type of a pattern `x: T` is still read as far to the right as it goes, so the `->` that ends the pattern is the first one after it. So `x |> { -y -> 1 }` and `b |> { <<x: Int>> -> 1 }` give an error in the pattern, and not a block with a stray `->`. This test is only made for a statement that the tests before it do not decide, so a `->` in a later statement on the same line, as in `{ k = 2  g = (x) -> Int { x * k }  g(1) }`, does not count.
+  5. When none of these holds, the statement is an expression, and not a clause.
 
   So these are blocks:
   - `{ go = (n) -> Int { n + 1 }  go(1) }`
@@ -825,16 +891,15 @@ RecordUpdate = Name "(" ".." Expr { "," name ":" Expr } [ "," ] ")" .
   - `{ r = Ok(v) -> v  _ -> 0 }`
   - `{ s = "ab" <> rest -> s  _ -> "" }`
 - So in a first clause whose pattern is `n1 = … = nk = ( … )`, as in test 2, a clause expression that is a function, such as `() { … }` or `(x) -> Int { x }`, would be read as the `->` part of a function and its body. There, a function with no `->` part is put in a group: `{ p = (a, b) -> { () { log(p) } } }` is a clause block whose one clause gives a function with no parameters. The test above does not take `{ () { log(p) } }` as a type, because a type in `{ }` ends at its `}`, and a function in it has a `{` before that. A group alone does not help a function with a `->` part whose parameters are all patterns (next bullet), so it is bound to a name inside the group: `{ p = (a, b) -> { g = (x) -> Int { x + a }  g } }`. By the exception of test 2, the first statement of that group is a binding, so the group is a block. Later clauses, and first clauses with other patterns, need no group: `hs |> { (name, _) -> (x) { log(name, x) }  _ -> (x) { x } }`.
-- A `{` that begins an expression and whose first statement starts with a function that has a `->` part, is not bound to a name, and has only patterns as parameters, such as `{ (x) -> Int { x } … }`, is read as a clause block by test 2, with the pattern `(x)` and the expression `Int`. Such a function is bound to a name first: `g = (x) -> Int { x }`. A group does not help, because `{ (x) -> Int { x } }` is read in the same way. A function with an environment parameter is not read in this way: in `{ (n, log ! Log) -> Int { log.write(n)  n } }`, `(n, log ! Log)` is not a pattern, so tests 1 to 5 do not hold, and by test 6 the `{` is a block whose one statement is the function. A function body is not such a `{`: in `make = (n) { (x) -> Int { x + n } }`, the body is a block whose one statement is a function.
-- A `{` that begins an expression and is followed by `name :` begins a clause block or a block when the pattern `name: Type` is followed by `=`, `->`, `?`, or `|`, as in `{ x: Int -> x }` and `{ x: Int = f()  x }`. When not, as in `{ name: e, … }`, it is kept for records, and is a compile error (test 4 above).
+- A `{` that begins an expression and whose first statement starts with a function that has a `->` part, is not bound to a name, and has only patterns as parameters, such as `{ (x) -> Int { x } … }`, is read as a clause block by test 2, with the pattern `(x)` and the expression `Int`. Such a function is bound to a name first: `g = (x) -> Int { x }`. A group does not help, because `{ (x) -> Int { x } }` is read in the same way. A function with an environment parameter is not read in this way: in `{ (n, log ! Log) -> Int { log.write(n)  n } }`, `(n, log ! Log)` is not a pattern, so tests 1 to 4 do not hold, and by test 5 the `{` is a block whose one statement is the function. A function body is not such a `{`: in `make = (n) { (x) -> Int { x + n } }`, the body is a block whose one statement is a function.
 - In a block, a statement that starts with a pattern and then `=` is a binding. When more than one such pattern may be read, the longest is taken: in `a = (x, y) = e`, the pattern is `a = (x, y)`. A statement that starts with `name ( UpName { , UpName } )` and then `=` or `:` is a binding with type parameters; the parser looks past the `)` to find the `=` or `:`. Such a statement is never read as a binding with a constructor pattern, though `f(A)` could also be read as one (§7.1), and this is the same at the top level (§2.5). So `id(A) = …` and `id(A): (A) -> A = …` are bindings, `wrap(A) = (x: A) { Some(x) }` declares `A`, and `send(Stop)` is an expression. A statement that starts with `!` is an environment statement. Every other statement is an expression.
 
 ### 6.2 Order of evaluation
 
-i is strict. Expressions are worked out from left to right:
+i is strict. Expressions are worked out from left to right. In a record `{ f1: e1, … }`, fields are done in the order written. In `{ ..e, f1: e1, … }`, `e` is done first:
 
 - In a call, first the function, then the arguments from left to right as they are written (also when they have labels), then the call.
-- The parts of tuples, lists, constructor arguments, and bit arrays are done from left to right. In a record update `C(..v, f: e, …)`, `v` is done first, then the fields as they are written.
+- The parts of tuples, lists, constructor arguments, and bit arrays are done from left to right. In a constructor update `C(..v, f: e, …)`, `v` is done first, then the fields as they are written.
 - In a binary operation, first the left side, then the right side. `&&` and `||` do not do the right side when the left side is enough.
 - `a |> f(b)` does `a` first, and then the rest in the order of `f(a, b)`.
 
@@ -864,13 +929,13 @@ The type of `[e1, …, en]` is `List(T)`, where every part has the type `T`. `T`
 
 Selecting a field of a nominal value requires the same constructor visibility as taking it apart by a constructor pattern (§2.4). Exporting `T` without its constructors permits neither field selection nor constructor update outside its module. Structural record fields retain their own rules.
 
-`v.f` gets the field with the label `f` from the value `v`. The constructors that **may have made** `v` are the one constructor that `v` is known to be made by (§7.5), when there is one. If not, every member of the known type of `v` (§4.8) must be a custom type, and they are all the constructors of these types. Each of them must have a field with the label `f`, but it may be in any position and of any type (§4.8 rule 13). So, as in TypeScript, `v.f` is correct on a union when every member has the field, and its type is the union of the field types.
+`v.f` gets the field with the label `f` from the value `v`. The constructors that **may have made** `v` are the one constructor that `v` is known to be made by (§7.5), when there is one. If not, and every member of the known type of `v` (§4.8) is a custom type, they are all the constructors of these types. When `v` has no known type, or a nonempty known type with only record, unknown, or variable members, `v.f` reads a field of a record (§6.13). In every other case it is a compile error. See §4.8 rule 13. Each of them must have a field with the label `f`, but it may be in any position and of any type (§4.8 rule 13). So, as in TypeScript, `v.f` is correct on a union when every member has the field, and its type is the union of the field types.
 
 `C(..v, f1: e1, …)` makes a new value. Its fields are the given fields, and the other fields come from `v`. `v` must be known to be made by `C`: its type has only `C`, or §7.5 says so. The type of the new value comes from `C` and the types of all its fields.
 
 ### 6.8 Functions
 
-`(p1, …, pn) -> A ? E ! N { body }` is a function value. It may use local names from outside. The `->` part may be left out; then the value type, errors, and environment are inferred. When the `->` part is written, it is the type of the function after its parameters, so a missing `?` or `!` in it means `Never` (§3), and `! N` must have the types of the environment parameters, and `Assert` when a parameter may fail (§4.8 rule 4). The body is a block, and the value of the block is the value that the function gives back.
+`(p1, …, pn) -> A ? E ! N { body }` is a function value. It may use local names from outside. The `->` part may be left out; then the value type, errors, and environment are inferred. When the `->` part is written, it is the type of the function after its parameters, so a missing `?` or `!` in it means `Never` (§3), and `! N` must have the types of the environment parameters, and `Assert` when a parameter may fail (§4.8 rule 4). The body is a block or a record (§6.13), and its value is the value that the function gives back.
 
 ### 6.9 Operators
 
@@ -905,7 +970,7 @@ The unary operators `-` (Int) and `-.` (Float) are stronger than all binary oper
 
 The statements of a block are done in order. The value of a block is the value of its last expression. The last statement may not be a binding or an environment statement. A block with only one expression puts it in a group: `{ a + b } * c`.
 
-An expression statement that is not the last, and whose working out can do nothing but make its value, gives a compile warning: its value is not used. These are literals, names, functions, clause blocks, and tuples, lists, constructor calls, `.f`, `.k`, `-`, and Int, Bool, String, and comparison operators made only of these. A call, `|>`, a match, a block, a bit array, and a Float operator, which may stop (§11.3), do not give the warning. So `assert 1 + 1 == 3`, which is the two statements `assert` and `1 + 1 == 3` (§1.7), gives two warnings.
+An expression statement that is not the last, and whose working out can do nothing but make its value, gives a compile warning: its value is not used. These are literals, names, functions, clause blocks, and tuples, lists, records with no `..`, constructor calls, `.f`, `.k`, `-`, and Int, Bool, String, and comparison operators made only of these. A call, `|>`, a match, a block, a bit array, and a Float operator, which may stop (§11.3), do not give the warning. So `assert 1 + 1 == 3`, which is the two statements `assert` and `1 + 1 == 3` (§1.7), gives two warnings.
 
 `p = e` is a binding. It works out `e` and matches it with the pattern `p`. The names in `p` may be used from the next statement. A binding whose pattern is one name, with or without a type, may declare type variables after the name, as in `twice(A) = (f: (A) -> A, x: A) { f(f(x)) }` and `id(A): (A) -> A = (x) { x }` (§4.7).
 
@@ -915,7 +980,7 @@ An expression statement that is not the last, and whose working out can do nothi
 
 `name = pattern` is itself a pattern (§7.1). So `a = (x, y) = e` binds `e` to `a` and to `(x, y)`.
 
-A **direct value** is an expression that is made without running any code: a function expression or a clause block; a literal, also with `-` or `-.` before it, also when the literal is inside groups (`-{1}`, `-.{1.5}`); a name; or a tuple, a list, a constructor call, or a group `{ e }` whose parts are direct values. When the value of a binding is a direct value, the names of the binding may also be used inside the function bodies in that value. This is the same for every binding, local or top-level. So a local function may call itself, and one tuple binding may make functions that call one another:
+A **direct value** is an expression that is made without running any code: a function expression or a clause block; a literal, also with `-` or `-.` before it, also when the literal is inside groups (`-{1}`, `-.{1.5}`); a name; or a tuple, a list, a record with no `..`, a constructor call, or a group `{ e }` whose parts are direct values. When the value of a binding is a direct value, the names of the binding may also be used inside the function bodies in that value. This is the same for every binding, local or top-level. So a local function may call itself, and one tuple binding may make functions that call one another:
 
 ```i
 fact = (n) {
@@ -954,6 +1019,18 @@ A clause block `{ clauses }` is a function of one parameter. When it is called w
 - A clause block is a direct value (§6.10), as every function is. Where §2.5, §5, and §6.10 speak of the function bodies in a value, the guards and clause expressions of a clause block count as function bodies. So `loop = { 0 -> Done  n -> loop(n - 1) }` is correct: `loop` is not among its own needs, and as a local binding it may be used in its clause expressions.
 - Where this document speaks of a function expression, a clause block counts as one, unless the text says otherwise. So a clause block whose value is not used gives a compile warning (§6.10), and each time a clause block is worked out, it makes a new value, which is the same only as itself (§11.4).
 
+### 6.13 Records
+
+`{ f1: e1, …, fn: en }` makes a record (§4.9). A label may not be given twice, also not after `..e`; `a` and `"a"` are the same label. `{ ..e, f1: e1, … }` makes the record `e` with the given fields added or put in place of its fields; `e` must be a record. `{..}` is the record with no fields; `{}` is the clause block with no clauses (§6.12).
+
+`v.f` reads the field `f` (§4.8 rule 13). A field whose label is not a `name` is read with `record.get`. Fields are set and removed with `record.put` and `record.remove` (§14):
+
+```i future-T3
+ada = { name: "ada", age: 36 }
+older = { ..ada, age: ada.age + 1 }
+r = {..} |> record.put("name", "ada") |> record.put("age", 36)
+```
+
 ## 7. Patterns
 
 ### 7.1 Grammar
@@ -977,9 +1054,11 @@ Rest       = ".." [ name | discard ] .
   - The fields with labels are matched by label. Every other part must have a label, the last name in the chain of `=` at its top, that is the label of a field. These parts may be in any order. So with `User { User(name: String, age: Int) }`, `User(name, age)`, `User(age, name)`, and `User(n = name, ..)` are correct, but `User(n, a)` is not.
   - A field may be matched only one time. `..` at the end leaves out the fields that are not matched, and `C(..)` does not look at the fields. With no `..`, every field must be matched.
   - A call of `C` may still give the fields with labels by position (§6.6), but a pattern takes them only by label. A call puts values in, where the order is clear; a pattern takes them out and names them, and the names are the labels. TypeScript does the same: `new User("bob", 3)` and `const { name, age } = user`.
-- The type after `:` goes as far to the right as it can, as every type does (§3). So `x: Int | String` tests for a union, and `f: (Int) -> Int = e` needs no brackets. In a clause, `p: (Int, Int) -> e` is read as a function type, so a tuple type there is put in `{ }`, or a tuple pattern is used. In the same way, a `?` after a function type is part of the type, so a function type before a guard is put in `{ }`: `f: { (Int) -> Int } ? ok -> …`. When the first clause of a clause block starts with `name:`, as in `{ p: (Int, Int) -> e }`, such a pattern has no `->` after it, so the `{` before it is kept for records (§6.1 test 4), and that is the compile error. In other places, as in `{ _: (Int, Int) -> e }` or in a later clause, it is an error in the pattern. In each case, the message also says that a tuple type in a clause pattern is put in `{ }`. A `|` after a type is part of the type, so a type test is written after the other choices: `True | _: Int`. The type is read with no going back: once `( … )` is followed by `->`, it is a function type, and once a `|` follows a type, the next part is a type. When what follows cannot be read as a type, the pattern is wrong; it is not read again as a shorter pattern. So `v |> { p: (Int, Int) -> 0  _ -> 1 }` is a compile error, in the first clause and in any other. In `v |> { x: Int | y -> a  _ -> b }`, `Int | y` is a type; before value types are implemented, `y` is reserved (§3). But `v |> { x: Int | 0 -> a  _ -> b }` is correct, because `0` is a literal type (§4.2) and `Int | 0` is `Int`; so is `_: Int | "a"`.
+- The type after `:` goes as far to the right as it can, as every type does (§3). So `x: Int | String` tests for a union, and `f: (Int) -> Int = e` needs no brackets. In a clause, `p: (Int, Int) -> e` is read as a function type, so a tuple type there is put in `{ }`, or a tuple pattern is used. In the same way, a `?` after a function type is part of the type, so a function type before a guard is put in `{ }`: `f: { (Int) -> Int } ? ok -> …`. When the first clause starts with `name:`, as in `{ p: (Int, Int) -> e }`, the type consumes the arrow, leaving no clause arrow; it is a compile error. A function-valued record field with an arrow needs a comma (§6.1). In other places, as in `{ _: (Int, Int) -> e }` or in a later clause, it is an error in the pattern. In each case, the message also says that a tuple type in a clause pattern is put in `{ }`. A `|` after a type is part of the type, so a type test is written after the other choices: `True | _: Int`. The type is read with no going back: once `( … )` is followed by `->`, it is a function type, and once a `|` follows a type, the next part is a type. When what follows cannot be read as a type, the pattern is wrong; it is not read again as a shorter pattern. So `v |> { p: (Int, Int) -> 0  _ -> 1 }` is a compile error, in the first clause and in any other. In `v |> { x: Int | y -> a  _ -> b }`, `Int | y` is a type; before value types are implemented, `y` is reserved (§3). But `v |> { x: Int | 0 -> a  _ -> b }` is correct, because `0` is a literal type (§4.2) and `Int | 0` is `Int`; so is `_: Int | "a"`.
 
 `x: T` is one thing in every place where it may be written (in a bit array segment, `:` begins a format instead, §8.1). It matches the values of the type `T`, and `x` gets the type `T`. In a binding or a parameter, every value that comes there is in `T` (§4.8 rules 4 and 10), so `x: Int = e` and `(x: Int) { … }` are type annotations. In a clause block with more than one clause or with a guard, and in a pattern with choices, `x: T` tests the value. In a clause block with one clause, no guard, and no choices, the pattern is a parameter (§6.12), so `x: T` there is a type annotation. At run time, a member of `T` is tested by its type constructor; a member of `Int` or `String` whose value set is not all the values is also tested by equality (§11.4) with the values in it. So `x: "a" | "b"` takes the strings `"a"` and `"b"`, and `x: String - "a"` takes every other string, but no Int. So in a test, `T` may not have a type variable as a member. Custom types with no constructors cannot be told apart at run time, so for a type test they all count as one type constructor, as all function types do.
+
+A type test whose type is a record or spread tests only the record head: every possible record there must satisfy the written field requirements (§4.9.3). There are no record patterns.
 
 ### 7.2 What patterns match
 
@@ -1016,6 +1095,8 @@ A literal pattern matches its own value, and `"lit" <> r` matches every string t
 When the values that are not covered are only values of `Int` or `String` that no literal pattern takes, the type of the clause block already says so (§4.8 rule 11: `(n: Int) { n |> { 0 -> "zero"  1 -> "one" } }` needs `Int <: 0 | 1`). In a match whose subject already has such a type, that is reported as this error alone, with a value that no clause matches, such as `2`. A clause block that is not the right side of a match gets these values later, through its parameter, so there it is a type error where the values come and also this error (§4.8 rule 11). When a value that is not covered is at a list item place, or at such a field, where the clauses have only literals, the message also says to write that type, such as `List("a" | "b")` or `Pair("a" | "b")`.
 
 Only a clause block with no clauses, with more than one clause, or with a guard must cover the type of its parameter (§6.12). A clause block with one clause and no guard is not checked for coverage: when its pattern may fail, it reports to `Assert`.
+
+All records count as one type constructor for coverage.
 
 ### 7.5 Known constructors
 
@@ -1100,7 +1181,7 @@ user = () { retry(3, () { load_user("1") }) }
 
 ### 9.2 Environment and services
 
-A **service** is a value of a named type, normally a record of functions. The **environment** `N` in a function type is the union of the service types that the function needs. Services are taken and given with two forms of syntax:
+A **service** is a value of a named type, normally a custom type whose constructor holds functions. A record (§4.9) is not a named type, so a record type, also through an alias, is never a service type. The **environment** `N` in a function type is the union of the service types that the function needs. Services are taken and given with two forms of syntax:
 
 - An **environment parameter** `name ! T` in the parameter list of a function (§6.11) gets the service of type `T` from the environment when the function is called. The caller does not give it as an argument. `T` is in the environment of the function.
 - An **environment statement** `! T = e` in a block (§6.10) puts the value of `e`, which must have the type `T`, in the environment for the rest of the block. `T` is taken out of the environment that the rest of the block needs.
@@ -1564,11 +1645,13 @@ log: (level: "info" | "warn") -> Nil   // correct: i code gives the value
 
 The outer Request and optional Result in a request-mode host declaration describe how work is obtained; they are the declaration forms of [runtime.md §5.2](design/runtime.md), installed by R2, not additional boundary types. IO wrappers over Int and constructed Thrown/Mismatch are not boundary types; their libraries pass Int or opaque Outcome and decode in i. Neither provider plans nor JavaScript value declarations change the value and error lists above.
 
+Records may neither be given to the host nor received from it through this interface. A binding with label parameters (§4.9.4) cannot be an entry point even when its ordinary parameter types would fit the host interface.
+
 ## 11. Run-time behavior
 
 ### 11.1 Values
 
-No value may be changed. The values are integers, floats, strings, codepoints, bit arrays, tuples, lists, values of custom types, functions, boundaries, continuations, and host references.
+No value may be changed. The values are integers, floats, strings, codepoints, bit arrays, tuples, lists, records, values of custom types, functions, boundaries, continuations, and host references.
 
 ### 11.2 Int
 
@@ -1591,6 +1674,7 @@ A Float is a finite IEEE 754 binary64 number. Results are rounded to the nearest
 - Ints are the same when their numbers are equal. Floats are the same when they are equal by IEEE 754, so `0.0 == -0.0`.
 - Strings are the same when their scalar values are equal. Codepoints are the same when their numbers are equal. Bit arrays are the same when their bits are equal.
 - Tuples, lists, and values of custom types are the same when they have the same constructor and their parts are the same, in order. Values with different type constructors, and tuples of different sizes, are never the same.
+- Records are the same when they have the same labels and the values with the same label are the same. Field order has no effect. Additional fields count, also when static types hide them. A record is never the same as a value that is not a record.
 - A function, a boundary, a continuation, and a host reference have no parts that may be looked at, so each is the same only as itself: the value made by one evaluation of a function expression or a clause block, by one call of `control.boundary` or `control.suspend`, or one reference from the host (§B.4). A top-level function is worked out once (§2.5), so all its uses are the same value. In the same way, a constructor, a built-in function, a library function, and each `@external` declaration are each one value; two declarations of one import are two values. So two function expressions that are written the same way give values that are not the same.
 
 ### 11.5 Comparing
@@ -1638,6 +1722,7 @@ The **text form** of a value is given by `core.inspect` (§13):
 | String | `"`, then the characters, then `"`. `"` and `\` are written as `\"` and `\\`. Line feed, carriage return, tab, and form feed are `\n`, `\r`, `\t`, `\f`. Other characters from U+0000 to U+001F, U+007F, and U+0080 to U+009F are `\u{XXXX}`, with four upper-case hex digits. All other characters are written as they are. |
 | List | `[`, the text forms of the parts with `, ` between them, `]` |
 | Tuple | `(`, the text forms of the parts with `, ` between them, `)` |
+| Record | `{ `, then fields sorted by the UTF-8 bytes of their labels, with `, ` between fields, then ` }`. Each field is its label, `: `, and the text form of its value. A label that is a `name` is written as it is; every other label uses the String text form. The empty record is `{..}`. |
 | Value of a custom type | The constructor name. If it has fields: `(`, the text forms of the fields in order with `, ` between them, `)`. Labels are not written. So `True`, `Nil`, `Ok(1)`. |
 | BitArray | `<<`, the whole bytes as decimal numbers with `, ` between them, `>>`. If the number of bits is not a multiple of 8, the last k bits come last, written as `value:uk`: `<<82, 2:u2>>` |
 | UtfCodepoint | `//utfcodepoint(`, the character, `)` |
@@ -1664,7 +1749,7 @@ These names may be used in every module. Other names may cover them.
 | `panic` | `(message: String) -> Never` | §11.7 |
 | `assert` | `(c: Bool) -> Nil ! Assert` | §9.6 |
 
-These are normal functions and types. The modules `i/fail` (§9.3), `i/control` (§9.4), `i/resource` (§9.5), `i/assertion` (§9.6), `i/io` (§9.7), and `i/core` (§13) have the other functions and types.
+These are normal functions and types. The modules `i/fail` (§9.3), `i/control` (§9.4), `i/resource` (§9.5), `i/assertion` (§9.6), `i/io` (§9.7), `i/core` (§13), and `i/record` (§14) have the other functions and types.
 
 ## 13. The module `i/core`
 
@@ -1699,6 +1784,22 @@ These are normal functions: they are called, given, and compared like any other 
 | `bit_array_concat` | `(List(BitArray)) -> BitArray` | The bit arrays one after the other. Their sizes may be any number of bits. |
 | `inspect` | `(a) -> String` | The text form of the value (§11.8) |
 | `hash` | `(a) -> Int` | A number from 0 to 2^32 − 1. Values that are the same (§11.4) give the same number. Which number is not fixed. |
+
+## 14. The module `i/record`
+
+These are ordinary library functions, using the label parameters of §4.9.4. They have no errors and need no environment. Keys for `get`, `put`, and `remove` must be one known string, or an enclosing key parameter passed by its own name. There is no privilege for this module in inference.
+
+| Function | Type | What it gives |
+|---|---|---|
+| `get(K, V)` | `(r: { K: V }, key: K) -> V` | The field `key` of `r` |
+| `put(R, K, V)` | `(r: R & {..}, key: K, value: V) -> { ..R, K: V }` | A record with the field added or replaced |
+| `remove(R, K)` | `(r: R & {..}, key: K) -> { ..R, -K }` | A record without the field, if it has one |
+| `has` | `(r: {..}, key: String) -> Bool` | Whether the record has the field, including fields hidden by its static type |
+| `keys` | `(r: {..}) -> List(String)` | The labels, sorted by UTF-8 bytes |
+| `size` | `(r: {..}) -> Int` | The number of fields |
+| `texts` | `(r: {..}) -> List((String, String))` | Each label with its value's text form (§11.8), sorted by label bytes |
+
+There is no `empty` function: `{..}` is the empty record. `has` and `keys` do not change any type. There is no operation returning all fields as values of one type: fields may have different types. Code that knows their types reads them by label; code that shows them uses `texts`.
 
 ## Appendix A. Choices
 

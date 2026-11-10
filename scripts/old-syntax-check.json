@@ -1705,5 +1705,15 @@
     "diagnostics": [
       "E0101: expected an integer literal after `-` in a type, found `-`"
     ]
+  },
+  "docs/spec.md:67dfa849ad3a2c17": {
+    "track": "T3",
+    "diagnostics": [
+      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
+      "E0101: expected `->`, found `,`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`"
+    ],
+    "reason": "records §16 step 1 installs the specification before the stage 7 parser; remove when records parse"
   }
 }
