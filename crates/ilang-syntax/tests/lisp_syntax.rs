@@ -343,6 +343,9 @@ fn macro_declarations_have_a_lisp_binding_and_named_parameters() {
     assert_eq!(found[0].name, "m");
     assert_eq!(found[0].parameters, ["x", "y"]);
     assert!(definitions(&module, false).is_err());
+    let (typed, errors) = parse_source("(@ macro (= (: m (-> (Syntax) Syntax)) (-> (x) _ x)))");
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(definitions(&typed, true).unwrap()[0].name, "m");
     for source in [
         "(@ macro (= m 1))",
         "(@ macro (= m (-> ((, x y)) _ x)))",

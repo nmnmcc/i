@@ -83,12 +83,16 @@ pub fn definitions(
             errors.push(error("@macro needs a binding", item.span));
             continue;
         };
-        let PatternKind::Var(name) = &binding.pattern.kind else {
-            errors.push(error(
-                "a macro binding needs one name",
-                binding.pattern.span,
-            ));
-            continue;
+        let name = match &binding.pattern.kind {
+            PatternKind::Var(name) => name,
+            PatternKind::Typed { binder, .. } if !binder.discard => &binder.name,
+            _ => {
+                errors.push(error(
+                    "a macro binding needs one name",
+                    binding.pattern.span,
+                ));
+                continue;
+            }
         };
         if !binding.type_params.is_empty() {
             errors.push(error(
