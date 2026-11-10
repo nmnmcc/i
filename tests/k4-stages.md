@@ -784,3 +784,58 @@ Per-case actual.json files are diagnostic scratch, now ignored and removed
 from tracking in the derived-files commit. No expectation is removed: every
 expected.json stays checked, censored raw observations stay in those files,
 and the original QA revision retains the historical diagnostic scratch.
+
+
+## QA integration results and remaining observations
+
+All 119 K4 known-failure entries are promoted individually: 14 F1, 10 F2,
+40 F3, one original annotated-entry regression, 38 other retained-service
+entries, and 16 stress completions. The complete list, source sentence and
+fixing finding for each is generated in tests/review/k4-integration.json/md.
+There is no remaining K4 known-failure entry. Removing the already-passing
+T1 nested-50 marker leaves three T3 held projects and two T1 runtime-test
+stress observations; both of those have completed checker results.
+
+The audit accounts for 976 changed observations against d655684b: 118
+baseline-accepted programs now reject for incompatible/unprovided services;
+other changes are finite inference, restored missing schemes, canonical
+rows, named diagnostics, entry-run coverage and completion of censored phases.
+Every new rejection has an explicit semantic requirement. All 14 changed
+entries outside the K4 reviews are listed separately: JS4 settings only
+reorders Await/Fs/Owner; nine Std-2 cases gain finite acceptance or a formerly
+missing example scheme, two Std-2 negatives retain rejection with improved
+service diagnostics; two T1 scalar-key cases complete previously censored
+runtime phases. T1 error_rows is restored to its unchanged baseline.
+
+The long QA generation command is scripts/test-generation --mode long
+--seed 412 --count 180. It passes 720 model programs (504 accepted, 216
+rejected by the coverage model), 1,440 declaration permutations and 720
+annotation removals, with no failure. Its optional external model replay
+was not requested or run. The stored long-run comparison is in the audit.
+
+The stored QA benchmark catalogue is run under cache/quiet, five samples
+per workload, with its ten-second observation budget. All 31 workloads
+complete. The 100-function service ring now has median wall 0.393885 s,
+CPU 0.37 s and peak RSS 17,588,224 bytes; the stored baseline times out at
+10.167917 s and 4,065,640,448 bytes. No completed-cost ratio is assigned to
+that censored baseline. Every wall/CPU/RSS difference and output hash is
+retained in bench-k4.json, bench-k4-comparison.jsonl and the integration audit.
+
+The stored snapshot comparison is not uniformly faster: wide-union-1024
+is 0.865795 -> 1.105737 s wall (+27.7%), CPU 0.84 -> 1.07 s; std is
+0.305605 -> 0.330411 s wall (+8.1%). These historical differences are
+reported without attributing them all to noise or claiming a speedup.
+A separate 30-pair interleaved std comparison against the actual redesign
+compiler gives 0.328205 -> 0.324563 s wall, CPU 0.31 -> 0.31 s and RSS
+55,252,992 -> 54,837,248 bytes: no std regression in that contemporary
+control. The benchmark has no numeric gate. The wide-union cost remains
+a measured performance follow-up; this integration makes no claim that
+all checker workloads became faster.
+
+Redesign d655684b has exactly the same crates, lib, std, tests/spec, spec
+and Cargo input blobs as 82375c0. The isolated 82375c0 binary is therefore
+the actual redesign compiler for the paired comparison, not a substitute
+ring baseline (qa-baseline-equivalence.json records every tree/blob ID and
+the binary hash). Std, hello and bench still have 2,197/5/23 bindings,
+with exactly the same three std row-order permutations and no missing or
+added bindings (types-qa-comparison.json).

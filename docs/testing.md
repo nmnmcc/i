@@ -171,3 +171,12 @@ main output at both optimization levels, independently of expected.json.
 Per-case actual.json files are ignored diagnostic scratch; committed
 expected.json retains bounded observations, and the historical baseline
 remains available at its recorded revision.
+
+
+`UPDATE=1 scripts/review-corpus audit-k4` reconstructs the pre-K4 QA
+observations from pinned revision d655684b, accounts for every changed case
+and promotion, rejects unexplained changes outside the K4 reviews, and
+records every benchmark row and changed output hash. It writes
+k4-integration.json and a readable report with the full flipped-case list.
+The semantic requirements remain the oracle; the audit does not turn
+observed acceptance or equal optimization-level outputs into a requirement.

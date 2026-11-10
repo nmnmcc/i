@@ -670,6 +670,7 @@ def main():
     sub.add_parser('parse-register')
     migration = sub.add_parser('migrate-k4')
     migration.add_argument('--binary', type=Path, default=ROOT / 'target/release/i')
+    sub.add_parser('audit-k4')
     reporting = sub.add_parser('report')
     reporting.add_argument('--verification-log', type=Path)
     snap = sub.add_parser('snapshot')
@@ -682,7 +683,10 @@ def main():
     salvage = sub.add_parser('snapshot-tools')
     salvage.add_argument('--source', default='/tmp')
     args = parser.parse_args()
-    if args.mode == 'migrate-k4':
+    if args.mode == 'audit-k4':
+        from k4_audit import audit
+        audit()
+    elif args.mode == 'migrate-k4':
         from k4_migrate import migrate
         migrate(args.binary)
     elif args.mode == 'import':
