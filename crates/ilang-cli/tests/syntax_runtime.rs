@@ -19,6 +19,8 @@ source: () -> syntax.Syntax
 @test
 exercise = () -> Nil ^ syntax.SyntaxError ! Assert {
   value = source()
+  ! syntax.Definitions = syntax.Definitions((of) { of })
+  assert(syntax.definition(value) == value)
   assert(syntax.show(value) == "(f x)")
   syntax.node(value).{
     syntax.Round([first, second]) -> {
@@ -157,6 +159,28 @@ show = () { syntax.show(source()) }
     )
     .unwrap();
     ilang_cli::build(dir.path(), options).unwrap();
+    std::fs::write(
+        &main,
+        r#"
+(syntax = i/syntax)
+@external("test:syntax", "source")
+source: () -> syntax.Syntax
+main = () -> Nil ^ syntax.SyntaxError {
+  ! syntax.Definitions = syntax.Definitions((s) { s })
+  syntax.definition(source())
+  Nil
+}
+"#,
+    )
+    .unwrap();
+    let error = match ilang_cli::build(dir.path(), options) {
+        Ok(_) => panic!("ordinary entry called a compiler-only helper"),
+        Err(e) => e,
+    };
+    assert!(
+        matches!(&error, ilang_cli::BuildError::Program { codes, .. } if codes.contains(&"E0322")),
+        "{error}"
+    );
     std::fs::write(
         &main,
         "@external(\"i:compiler/syntax/v1\", \"show\")\nforged: () -> String\nmain = () { Nil }\n",

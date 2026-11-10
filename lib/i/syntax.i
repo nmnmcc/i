@@ -8,6 +8,8 @@
 	Node(..)
 	Position(..)
 	SyntaxError(..)
+	Definitions(..)
+	definition
 	node
 	make
 	same_code
@@ -63,6 +65,16 @@ Position {
 SyntaxError {
 	SyntaxError(message: String, at: Syntax)
 }
+
+Definitions {
+	Definitions(definition: (of: Syntax) -> Syntax ^ SyntaxError)
+}
+
+/// Asks the installed definition service for a type's written definition.
+definition = (
+	of: Syntax
+	service ! Definitions
+) -> Syntax ^ SyntaxError ! Definitions { service.definition(of) }
 
 @external("i:compiler/syntax/v1", "kind")
 raw_kind: (Syntax) -> Int
