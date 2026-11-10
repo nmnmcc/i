@@ -278,6 +278,14 @@ pub fn module_order(program: &Program) -> Vec<ModuleId> {
     out
 }
 
+#[derive(Clone)]
+struct TypeRead {
+    site: OfId,
+    reader: BindingRef,
+    annotation: ilang_syntax::span::Span,
+    aliases: Vec<TypeId>,
+}
+
 /// Value-type edges order already computed expression SCCs. They never
 /// change SCC membership, runtime needs, or initialization (§2.5, §4.7).
 fn type_order(
@@ -295,7 +303,7 @@ fn type_order(
             owners.insert(*b, i);
         }
     }
-    let mut graph = petgraph::graph::DiGraph::<usize, Option<OfId>>::new();
+    let mut graph = petgraph::graph::DiGraph::<usize, Option<TypeRead>>::new();
     let nodes = (0..groups.len())
         .map(|i| graph.add_node(i))
         .collect::<Vec<_>>();
@@ -308,13 +316,14 @@ fn type_order(
                     index,
                 }) && i != j
                 {
-                    graph.update_edge(nodes[i], nodes[j], None);
+                    // Keep any parallel type edge and its written provenance.
+                    graph.add_edge(nodes[i], nodes[j], None);
                 }
             }
             binding_types(&p.binding(*b).binding, &mut |t| {
                 let mut sources = Vec::new();
-                type_sources(p, t, &mut BTreeSet::new(), &mut sources);
-                for (site, source) in sources {
+                type_paths(p, t, &mut BTreeSet::new(), &mut Vec::new(), &mut sources);
+                for (site, source, aliases) in sources {
                     let ValueRef::Def(d) = source else { continue };
                     let DefKind::Binding { binding, .. } = p.def(d).kind else {
                         continue;
@@ -326,7 +335,16 @@ fn type_order(
                         continue;
                     };
                     has_reads = true;
-                    graph.add_edge(nodes[i], nodes[j], Some(site));
+                    graph.add_edge(
+                        nodes[i],
+                        nodes[j],
+                        Some(TypeRead {
+                            site,
+                            reader: *b,
+                            annotation: t.span,
+                            aliases,
+                        }),
+                    );
                 }
             });
         }
@@ -353,9 +371,9 @@ fn type_order(
                 if !members.contains(&edge.target()) {
                     continue;
                 }
-                if let Some(site) = edge.weight() {
-                    let info = &p.of_sites[site.0 as usize];
-                    let from = groups[graph[*n]][0];
+                if let Some(read) = edge.weight() {
+                    let info = &p.of_sites[read.site.0 as usize];
+                    let from = read.reader;
                     let reader = p
                         .binding(from)
                         .defs
@@ -366,10 +384,14 @@ fn type_order(
                         ValueRef::Def(d) => p.def(d).name.as_str(),
                         _ => "this value",
                     };
-                    let chain = scc
-                        .iter()
+                    let goal = *n;
+                    let (_, path) =
+                        petgraph::algo::astar(&graph, edge.target(), |n| n == goal, |_| 1, |_| 0)
+                            .expect("an edge inside an SCC has a return path");
+                    let chain = std::iter::once(*n)
+                        .chain(path)
                         .map(|n| {
-                            groups[graph[*n]]
+                            groups[graph[n]]
                                 .iter()
                                 .flat_map(|b| &p.binding(*b).defs)
                                 .map(|d| p.def(*d).name.as_str())
@@ -378,8 +400,20 @@ fn type_order(
                         })
                         .collect::<Vec<_>>()
                         .join(" -> ");
-                    diags.push(Diagnostic::error(code::VALUE_TYPE_CIRCLE,Some(p.module(info.module).source),info.span,
-                        format!("the type of {source} is needed to type {reader}, but the dependencies form a circle ({chain}); write the type instead")));
+                    let via = if read.aliases.is_empty() {
+                        String::new()
+                    } else {
+                        format!(
+                            " through {}",
+                            read.aliases
+                                .iter()
+                                .map(|id| p.ty(*id).name.as_str())
+                                .collect::<Vec<_>>()
+                                .join(" -> ")
+                        )
+                    };
+                    diags.push(Diagnostic::error(code::VALUE_TYPE_CIRCLE,Some(p.module(from.module).source),read.annotation,
+                        format!("the type of {source} is needed to type {reader}{via}, but the dependencies form a circle ({chain}); write the type instead")));
                 }
             }
         }
@@ -443,14 +477,28 @@ pub(crate) fn type_sources(
     seen: &mut BTreeSet<TypeId>,
     out: &mut Vec<(OfId, ValueRef)>,
 ) {
+    let mut paths = Vec::new();
+    type_paths(p, t, seen, &mut Vec::new(), &mut paths);
+    out.extend(paths.into_iter().map(|(site, value, _)| (site, value)));
+}
+
+fn type_paths(
+    p: &Program,
+    t: &Type,
+    seen: &mut BTreeSet<TypeId>,
+    chain: &mut Vec<TypeId>,
+    out: &mut Vec<(OfId, ValueRef, Vec<TypeId>)>,
+) {
     walk_type(t, &mut |t| match &t.kind {
-        TypeKind::Of { site, value, .. } => out.push((*site, *value)),
+        TypeKind::Of { site, value, .. } => out.push((*site, *value, chain.clone())),
         TypeKind::Named {
             ty: TypeRef::Custom(id),
             ..
         } if seen.insert(*id) => {
             if let TypeBody::Alias(body) = &p.ty(*id).body {
-                type_sources(p, body, seen, out);
+                chain.push(*id);
+                type_paths(p, body, seen, chain, out);
+                chain.pop();
             }
         }
         _ => {}

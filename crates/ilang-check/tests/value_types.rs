@@ -689,3 +689,18 @@ fn skipped_quantifiers_and_constant_parts_do_not_choose_instances() {
         good("Fixed(A) = (() -> Int,A)\nv: (() -> Int,String) = (() {1},\"s\")\nFixed(Text) = v");
     assert_eq!(alias(&c, "Text"), "String");
 }
+
+#[test]
+fn dependency_diagnostics_keep_reader_span_alias_chain_and_return_path() {
+    // O3: preserve the annotation and a real dependency path through aliases.
+    let src = "Alias = b\na = (x: Alias) {x}\nb = a(1)";
+    let (_, c) = checked(&[("src/main.i", src)]);
+    let d = c
+        .diags
+        .iter()
+        .find(|d| d.code == code::VALUE_TYPE_CIRCLE)
+        .unwrap();
+    assert_eq!(d.span.start as usize, src.find("x: Alias").unwrap() + 3);
+    assert!(d.message.contains("through Alias"), "{}", d.message);
+    assert!(d.message.contains("a -> b -> a"), "{}", d.message);
+}
