@@ -519,8 +519,8 @@ struct Lowerer<'a> {
     lines: HashMap<ModuleId, LineIndex<'a>>,
     /// The service id of each service type constructor (§9.2).
     services: HashMap<TypeRef, u32>,
-    /// The function that calls each import (B.4).
-    import_funcs: HashMap<ImportId, FuncId>,
+    /// The function that calls each import with its declared result decoder (B.4).
+    import_funcs: HashMap<(ImportId, AbiType), FuncId>,
     /// Where each import is declared first, by its index in `out.imports`.
     import_sites: Vec<(ModuleId, Span)>,
     /// The function of each external function outside the library (§10.1),
@@ -1080,7 +1080,7 @@ impl<'a> Lowerer<'a> {
                     self.out.imports[import as usize].request_result = hf.request_result
                         || (host.is_async && !host.is_request && !hf.errors.is_empty());
                     self.out.imports[import as usize].awaited = host.is_async;
-                    let f = self.import_func(import);
+                    let f = self.import_func(import, hf.result);
                     self.constants.insert(f);
                     fields.push(f);
                 }
@@ -1131,7 +1131,7 @@ impl<'a> Lowerer<'a> {
                 // §11.4: each declaration is one value, so two declarations
                 // of one import have two functions, which call the same
                 // import.
-                Some(self.make_import_func(import))
+                Some(self.make_import_func(import, abi_type(hf.result)))
             }
             Err((module, span, message)) => {
                 self.error(module, span, message);
@@ -1177,7 +1177,13 @@ impl<'a> Lowerer<'a> {
             .position(|x| x.module == module && x.name == name)
         {
             let x = &self.out.imports[i];
-            if x.abi == abi && x.kind == kind {
+            // B.4 coalesces wire signatures. The calling declaration keeps
+            // its own nominal result decoder in HostCall or HostStart.
+            if names(&x.abi.params) == names(&abi.params)
+                && x.abi.result.name() == abi.result.name()
+                && names(&x.abi.errors) == names(&abi.errors)
+                && x.kind == kind
+            {
                 return Ok(i as ImportId);
             }
             let first = self.import_sites[i];
@@ -1210,12 +1216,13 @@ impl<'a> Lowerer<'a> {
     /// The function that calls an import: its parameters go to the host
     /// encoded as in B.2, and its value or error comes back. An async
     /// import waits for the host at the root boundary (B.4, B.5).
-    fn import_func(&mut self, import: ImportId) -> FuncId {
-        if let Some(&f) = self.import_funcs.get(&import) {
+    fn import_func(&mut self, import: ImportId, result: HostType) -> FuncId {
+        let result = abi_type(result);
+        if let Some(&f) = self.import_funcs.get(&(import, result)) {
             return f;
         }
-        let f = self.make_import_func(import);
-        self.import_funcs.insert(import, f);
+        let f = self.make_import_func(import, result);
+        self.import_funcs.insert((import, result), f);
         f
     }
 
@@ -1239,7 +1246,7 @@ impl<'a> Lowerer<'a> {
         })
     }
 
-    fn make_import_func(&mut self, import: ImportId) -> FuncId {
+    fn make_import_func(&mut self, import: ImportId, abi_result: AbiType) -> FuncId {
         let x = self.out.imports[import as usize].clone();
         let n = x.abi.params.len() as u32;
         let args: Vec<Atom> = (0..n).map(Atom::Local).collect();
@@ -1278,9 +1285,17 @@ impl<'a> Lowerer<'a> {
         body.push(Stmt::Let {
             dst: value,
             value: if asynchronous {
-                Value::HostStart { import, args }
+                Value::HostStart {
+                    import,
+                    args,
+                    result: abi_result,
+                }
             } else {
-                Value::HostCall { import, args }
+                Value::HostCall {
+                    import,
+                    args,
+                    result: abi_result,
+                }
             },
             site: None,
         });
@@ -2792,7 +2807,7 @@ fn abi_type(t: HostType) -> AbiType {
         HostType::Float => AbiType::Float,
         HostType::String => AbiType::String,
         HostType::BitArray => AbiType::BitArray,
-        HostType::Opaque(_) => AbiType::Externref,
+        HostType::Opaque(id) => AbiType::Externref(id.0),
     }
 }
 

@@ -11,8 +11,21 @@ fn checked(
     ilang_check::Checked,
     tempfile::TempDir,
 ) {
+    checked_with_exports(source, &[])
+}
+
+fn checked_with_exports(
+    source: &str,
+    exports: &[&str],
+) -> (
+    ilang_package::PackageGraph,
+    ilang_check::Checked,
+    tempfile::TempDir,
+) {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    let mut manifest = "name = \"app\"\n".to_owned();
+    manifest.push_str(&format!("[wasm]\n{} = {exports:?}\n", "exports"));
+    std::fs::write(dir.path().join("i.toml"), manifest).unwrap();
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/main.i"), source).unwrap();
     let (graph, diags) = ilang_package::load(dir.path());
@@ -265,4 +278,254 @@ fn segments_grow_linearly() {
     let start = std::time::Instant::now();
     wasm(&many_points(200)).unwrap();
     assert!(start.elapsed().as_secs() < 30);
+}
+
+/// Spec 4.1/11.4: opaque constructors remain distinct through a shared
+/// wire import. B.2/B.6 still describe each of them as one externref.
+#[test]
+fn opaque_decoders_keep_the_declared_type_on_both_targets() {
+    let source = r#"
+(A, B, same, repeated, different, same_a, echo)
+A {}
+B {}
+Alias = A
+@external("opaque", "get")
+get_a: () -> A
+@external("opaque", "get")
+get_alias: () -> Alias
+@external("opaque", "get")
+get_b: () -> B
+equal = (a, b) { a == b }
+same = (a: A, b: B) { equal(a, b) && equal(get_a(), get_b()) }
+repeated = () { equal(get_a(), get_alias()) }
+different = () { equal(get_a(), get_b()) }
+same_a = (a: A, b: Alias) { equal(a, b) }
+echo = (a: A) { a }
+@main
+main = () { Nil }
+"#;
+    let (graph, checked, _dir) = checked_with_exports(
+        source,
+        &[
+            "app/main.same",
+            "app/main.repeated",
+            "app/main.different",
+            "app/main.same_a",
+            "app/main.echo",
+        ],
+    );
+    for target in [ilang_wasm::Target::Ilang, ilang_wasm::Target::Wasi] {
+        let text = compile_wat(
+            &graph,
+            checked.program.as_ref().unwrap(),
+            checked.types.as_ref().unwrap(),
+            Options {
+                target,
+                ..Options::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(text.matches("(import \"opaque\" \"get\"").count(), 1);
+        let decoders: Vec<_> = text
+            .lines()
+            .filter(|line| line.contains("(call $abi_ref_in (global.get $hr"))
+            .map(|line| {
+                line.split("(i32.const ")
+                    .nth(1)
+                    .unwrap()
+                    .trim_end_matches(')')
+            })
+            .collect();
+        assert_eq!(decoders.len(), 3, "{decoders:?}");
+        let tags: std::collections::BTreeSet<_> = decoders.iter().collect();
+        assert_eq!(
+            tags.len(),
+            2,
+            "A and Alias share a constructor; B differs: {decoders:?}"
+        );
+        assert!(text.contains("(param externref)"));
+        // Validate the generated module, including the WASI reference_id import.
+        let bytes = compile(
+            &graph,
+            checked.program.as_ref().unwrap(),
+            checked.types.as_ref().unwrap(),
+            Options {
+                target,
+                ..Options::default()
+            },
+        )
+        .unwrap();
+        wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all())
+            .validate_all(&bytes)
+            .unwrap();
+        run_opaque_target(&bytes);
+    }
+}
+
+/// Spec 4.1/11.4 and runtime 5.3: an answer keeps the initiating
+/// declaration's nominal type, even when delivered out of order.
+#[test]
+fn opaque_request_answers_keep_the_declared_type() {
+    let source = r#"
+(i/request, i/core)
+(A, B, Source, probe)
+A {}
+B {}
+Alias = A
+@host("opaque", "request")
+Source { Source(a: () -> Request(A), b: () -> Request(B), alias: () -> Request(Alias)) }
+equal = (a, b) { a == b }
+probe = (source ! Source) {
+  a = source.a()
+  b = source.b()
+  alias = source.alias()
+  x = request.await_owned(a)
+  y = request.await_owned(b)
+  z = request.await_owned(alias)
+  equal(x, z) && core.not(equal(x, y))
+}
+"#;
+    let (graph, checked, _dir) = checked_with_exports(source, &["app/main.probe"]);
+    let bytes = compile(
+        &graph,
+        checked.program.as_ref().unwrap(),
+        checked.types.as_ref().unwrap(),
+        Options::default(),
+    )
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let guest = directory.path().join("guest.wasm");
+    let host = directory.path().join("host.wasm");
+    let driver = directory.path().join("driver.wasm");
+    std::fs::write(&guest, bytes).unwrap();
+    std::fs::write(
+        &host,
+        wat::parse_str(
+            r#"(module
+      (func (export "a") (param i32))
+      (func (export "b") (param i32))
+      (func (export "alias") (param i32))
+      (func (export "cancel") (param i32))
+      (func (export "panic") (param i32 i32) unreachable)
+      (func (export "reference_id") (param externref) (result i64) (i64.const 0)))"#,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    std::fs::write(
+        &driver,
+        wat::parse_str(
+            r#"(module
+      (import "guest" "ilang_start" (func $start))
+      (import "guest" "app/main.probe" (func $probe (result i32)))
+      (import "guest" "ilang_result:app/main.probe" (func $result (result i32)))
+      (import "guest" "ilang_resume:opaque:a" (func $a (param i32 externref) (result i32)))
+      (import "guest" "ilang_resume:opaque:b" (func $b (param i32 externref) (result i32)))
+      (import "guest" "ilang_resume:opaque:alias" (func $alias (param i32 externref) (result i32)))
+      (func (export "_start")
+        (call $start)
+        (if (i32.ne (call $probe) (i32.const 1)) (then unreachable))
+        (if (i32.ne (call $b (i32.const 1) (ref.null extern)) (i32.const 1)) (then unreachable))
+        (if (i32.ne (call $a (i32.const 0) (ref.null extern)) (i32.const 1)) (then unreachable))
+        (if (call $alias (i32.const 2) (ref.null extern)) (then unreachable))
+        (if (i32.eqz (call $result)) (then unreachable))))"#,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let wasmtime = std::env::var_os("WASMTIME").unwrap_or_else(|| "wasmtime".into());
+    let output = std::process::Command::new(wasmtime)
+        .args([
+            "run",
+            "-W",
+            "gc=y",
+            "-W",
+            "exceptions=y",
+            "-W",
+            "tail-call=y",
+            "--preload",
+        ])
+        .arg(format!("opaque={}", host.display()))
+        .arg("--preload")
+        .arg(format!("{}={}", "ilang:host/v1", host.display()))
+        .arg("--preload")
+        .arg(format!("guest={}", guest.display()))
+        .arg(&driver)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// Run both generated targets with real externrefs, including their null
+/// value. The preloaded host gives the same foreign value through A and B.
+fn run_opaque_target(bytes: &[u8]) {
+    let directory = tempfile::tempdir().unwrap();
+    let guest = directory.path().join("guest.wasm");
+    let host = directory.path().join("host.wasm");
+    let driver = directory.path().join("driver.wasm");
+    std::fs::write(&guest, bytes).unwrap();
+    let driver_wat = r#"(module
+        (import "opaque" "get" (func $get (result externref)))
+        (import "opaque" "other" (func $other (result externref)))
+        (import "guest" "ilang_start" (func $start))
+        (import "guest" "app/main.same" (func $ab (param externref externref) (result i32)))
+        (import "guest" "app/main.same_a" (func $aa (param externref externref) (result i32)))
+        (import "guest" "app/main.echo" (func $echo (param externref) (result externref)))
+        (import "guest" "app/main.repeated" (func $repeated (result i32)))
+        (import "guest" "app/main.different" (func $different (result i32)))
+        (func (export "_start")
+          (call $start)
+          (if (i32.eqz (call $repeated)) (then unreachable))
+          (if (call $different) (then unreachable))
+          (if (call $ab (call $get) (call $get)) (then unreachable))
+          (if (i32.eqz (call $aa (call $get) (call $get))) (then unreachable))
+          (if (call $aa (call $get) (call $other)) (then unreachable))
+          (if (i32.eqz (call $aa (call $get) (call $echo (call $get)))) (then unreachable))
+          (if (call $ab (call $get) (call $echo (call $get))) (then unreachable))))"#;
+    std::fs::write(&driver, wat::parse_str(driver_wat).unwrap()).unwrap();
+    for reference in [
+        "(ref.null extern)",
+        "(extern.convert_any (ref.i31 (i32.const 7)))",
+    ] {
+        let host_wat = format!(
+            r#"(module
+            (global $value externref {reference})
+            (func (export "get") (result externref) (global.get $value))
+            (func (export "other") (result externref) (extern.convert_any (ref.i31 (i32.const 8))))
+            (func (export "panic") (param i32 i32) unreachable)
+            (func (export "reference_id") (param $r externref) (result i64)
+              (if (ref.is_null (local.get $r)) (then (return (i64.const 0))))
+              (i64.extend_i32_u (i31.get_u (ref.cast (ref i31) (any.convert_extern (local.get $r)))))))"#
+        );
+        std::fs::write(&host, wat::parse_str(host_wat).unwrap()).unwrap();
+        let wasmtime = std::env::var_os("WASMTIME").unwrap_or_else(|| "wasmtime".into());
+        let output = std::process::Command::new(wasmtime)
+            .args([
+                "run",
+                "-W",
+                "gc=y",
+                "-W",
+                "exceptions=y",
+                "-W",
+                "tail-call=y",
+                "--preload",
+            ])
+            .arg(format!("{}={}", "opaque", host.display()))
+            .arg("--preload")
+            .arg(format!("{}={}", "ilang:host/v1", host.display()))
+            .arg("--preload")
+            .arg(format!("{}={}", "guest", guest.display()))
+            .arg(&driver)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{reference}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 }

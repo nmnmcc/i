@@ -3,8 +3,15 @@
 mod inspect;
 mod strings;
 
-pub fn wat() -> String {
+pub fn wat(references: bool) -> String {
     let mut source = String::from(CORE);
+    if references {
+        source = source
+            .replace(HOST_NEW, NOMINAL_HOST_NEW)
+            .replace(HOST_ID, NOMINAL_HOST_ID)
+            .replace(HOST_COMPARE, NOMINAL_HOST_COMPARE)
+            .replace(HOST_HASH, NOMINAL_HOST_HASH);
+    }
     source.push_str(&strings::wat());
     source.push_str(&inspect::wat());
     source
@@ -459,3 +466,25 @@ const CORE: &str = r#"
     (br $walk)))
   (global.get $value_true))
 "#;
+
+const HOST_NEW: &str = r#"(func $host_ref_new (param $r externref) (result eqref)
+  (struct.new $hostref (local.get $r) (call $host_reference_id (local.get $r))))"#;
+const NOMINAL_HOST_NEW: &str = r#"(func $host_ref_new (param $r externref) (param $type i32) (result eqref)
+  (struct.new $hostref (local.get $r) (local.get $type) (call $host_reference_id (local.get $r))))"#;
+
+const HOST_COMPARE: &str = r#"        (local.set $c (call $compare_i64 (call $host_id (local.get $a)) (call $host_id (local.get $b))))"#;
+const NOMINAL_HOST_COMPARE: &str = r#"        (local.set $c (call $compare_i32
+          (struct.get $hostref 1 (ref.cast (ref $hostref) (local.get $a)))
+          (struct.get $hostref 1 (ref.cast (ref $hostref) (local.get $b)))))
+        (if (local.get $c) (then (return (local.get $c))))
+        (local.set $c (call $compare_i64 (call $host_id (local.get $a)) (call $host_id (local.get $b))))"#;
+
+const HOST_HASH: &str = r#"      (local.set $word (call $host_id (local.get $v)))"#;
+const NOMINAL_HOST_HASH: &str = r#"      (local.set $h (call $hash_mix (local.get $h)
+        (struct.get $hostref 1 (ref.cast (ref $hostref) (local.get $v)))))
+      (local.set $word (call $host_id (local.get $v)))"#;
+
+const HOST_ID: &str = r#"(func $host_id (param $v eqref) (result i64)
+  (struct.get $hostref 1 (ref.cast (ref $hostref) (local.get $v))))"#;
+const NOMINAL_HOST_ID: &str = r#"(func $host_id (param $v eqref) (result i64)
+  (struct.get $hostref 2 (ref.cast (ref $hostref) (local.get $v))))"#;

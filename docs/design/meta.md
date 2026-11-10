@@ -368,7 +368,7 @@ A **macro call** is written in one of these ways, in both surfaces. `m` is a nam
 - Before a **type definition**, the macro cannot change the item. The type definition stays in the module as it is written, and the result of the macro, an item or a `Curly` of zero or more items, is added after it. So a type definition that is written is always the definition of its type.
 - Before a **binding or a declaration**, the result, an item or a `Curly` of zero or more items, takes the place of the item. To keep the item, the macro puts it in its result.
 - The item is given to the macro with the attributes that are written after the macro. The item always goes to the last parameter, also when another argument has a label.
-- A built-in attribute before a macro, as in `@test @m f = …`, is a compile error; write it after the macro, so that it is a part of the item. An attribute whose name is one of the built-in attributes (`external`, `host`, `main`, `test`, `deprecated`, `macro`) is that attribute; a macro with such a name is used with its module name.
+- A built-in attribute before a macro, as in `@test @m f = …`, is a compile error; write it after the macro, so that it is a part of the item. An attribute whose name is one of the built-in attributes (`external`, `js`, `host`, `main`, `test`, `deprecated`, `macro`) is that attribute; a macro with such a name is used with its module name.
 - With more than one macro before an item, the first is expanded first, and it gets the item with the other macros still on it.
 - The rule of spec §2.2 that an attribute is not given two times is for built-in attributes only.
 - The documentation comment of the item stays on the type definition, or goes to the first item of the result that defines the same name.
@@ -376,7 +376,7 @@ A **macro call** is written in one of these ways, in both surfaces. `m` is a nam
 **Limits on what a result may have.**
 
 - Imports and exports cannot be in a result.
-- The attributes `@external`, `@host`, `@main`, and `@test` may be in a result only when the attribute came from the code of the caller (it has no marks, §5). So a macro of a package that the program depends on cannot add a host import or an entry point that the caller did not write.
+- The attributes `@external`, `@js`, `@host`, `@main`, and `@test` may be in a result only when the attribute came from the code of the caller (it has no marks, §5). So a macro of a package that the program depends on cannot add a host import or an entry point that the caller did not write.
 - A `Curly` directly inside the `Curly` of a result of items is a compile error.
 
 ### 4.4 Expanding
@@ -493,7 +493,7 @@ A **typed macro** is a declaration and a binding with the same name in a `.is` f
 
 - The declaration is the **signature**. It is a full function type, with its type variables declared after the name. It may have errors and an environment. It may not have `_`. The rules for written types (spec §4.4) and for types in exported items (spec §2.4) are used for it.
 - The binding is the **implementation**. It follows the rules of §4.1, with these changes: it has one parameter for each parameter of the signature, in the same order, and it is checked against `(Syntax, …) -> Syntax ? SyntaxError ! Types | Definitions | Assert`.
-- This is the only case where two items have one name, and the only use of a declaration other than `@external`.
+- This is the only case where two items have one name, and the only use of a declaration other than `@external` or `@js`.
 - The documentation comment of the macro is on the declaration.
 
 ### 7.2 Checking a call
@@ -578,6 +578,7 @@ A type is given to a macro, and taken from a macro, as the `Syntax` of a written
 - `Syntax` values go between the compiler and the macro program in a form that the compiler defines. It is not seen in i.
 - The entry point gets `Definitions`, `Types` for a typed macro, and an `Assert` whose `fail` stops the run. These are services of the compiler, not host services (spec §9.7). It gets no other service, so a macro cannot read a file, use the network, or read the time.
 - It is a compile error when an `@external` function that is not of the library package `i` is in the full needs (spec §2.5, here also through other modules) of a macro, or of a top-level value of the macro program that is not a direct value. The functions of the library are given by the compiler, as the runtime gives them to a program.
+- A macro program contains no executable `@js` binding, value getter, Js/JsRequests provider or JS initializer. Compute executable needs through the macro entries and all ordinary top-level initializers, including through other modules. If they need one, reject before instantiation, even when no macro entry needs Target. Unused runtime functions containing such declarations may be excluded from the macro program, but may not leave an initializer behind. A quoted declaration is syntax data and does not execute JS; the caller-origin checks of §4.3 still apply when it becomes an expansion. No file-reading/d.ts import tool, callback bridge or JS evaluator is part of the macro sandbox.
 - The macro program is not for a target. It always runs in the compiler, whatever the program is compiled for.
 
 **The same result everywhere.**

@@ -441,8 +441,8 @@ fn equality_is_structural_with_identity_for_functions_and_references() {
         ),
         (
             "host references with one reference_id",
-            "(struct.new $hostref (ref.null extern) (i64.const 7))".to_owned(),
-            "(struct.new $hostref (ref.null extern) (i64.const 7))".to_owned(),
+            "(struct.new $hostref (ref.null extern) (i32.const 41) (i64.const 7))".to_owned(),
+            "(struct.new $hostref (ref.null extern) (i32.const 41) (i64.const 7))".to_owned(),
         ),
         (
             "bools",
@@ -490,8 +490,8 @@ fn equality_is_structural_with_identity_for_functions_and_references() {
         ),
         (
             "host references",
-            "(struct.new $hostref (ref.null extern) (i64.const 7))".to_owned(),
-            "(struct.new $hostref (ref.null extern) (i64.const 8))".to_owned(),
+            "(struct.new $hostref (ref.null extern) (i32.const 41) (i64.const 7))".to_owned(),
+            "(struct.new $hostref (ref.null extern) (i32.const 41) (i64.const 8))".to_owned(),
         ),
         (
             "functions from two evaluations",
@@ -534,7 +534,7 @@ fn equality_is_structural_with_identity_for_functions_and_references() {
     checks.check("a function is itself", "(call $same_function)");
     checks.check(
         "a host reference is made with its reference_id",
-        "(call $both_equal (call $host_ref_new (ref.null extern)) (struct.new $hostref (ref.null extern) (i64.const 0)))",
+        "(call $both_equal (call $host_ref_new (ref.null extern) (i32.const 41)) (struct.new $hostref (ref.null extern) (i32.const 41) (i64.const 0)))",
     );
     for value in [
         int(-1),

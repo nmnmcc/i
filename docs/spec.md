@@ -11,7 +11,7 @@ This document is complete in itself. It defines:
 - what programs do when they run, and the text form of values (§11);
 - the binary interface between a compiled module and its host (§10 and Appendix B).
 
-Every compiler must give the seven library modules above. The paths `i/task`, `i/clock`, `i/fs`, `i/process`, `i/net`, and `i/stdio` are kept for library modules that are not defined yet: each is a module with no names, and a program may not define a module with one of these paths. Other library modules, the command-line tools, and the way test results are shown are not part of the language.
+Every compiler must give the seven library modules above. The target modules `i/target`, `i/js`, and `i/wasi` have the contracts of §9.7, §10.1 and §B.7.1. The paths `i/task`, `i/clock`, `i/fs`, `i/process`, `i/net`, and `i/stdio` are kept for planned library modules: only the capability requirements stated in §9.7 are defined here until their operation APIs are installed. A program may not define a module with one of these paths. Other library modules, command-line behavior not specified in §2.6, and the way test results are shown are not part of the language.
 
 i is small, and every part of it is what it looks like. A thing that looks like a function is a normal function, and a clause block is a function too (§6.12). A binding is a binding wherever it is written, and a clause block with one clause and no guard binds its pattern as a parameter does. Where two forms look the same, they have the same rules, with these exceptions, where the place of a form decides its rules:
 
@@ -64,7 +64,7 @@ char    = (* any Unicode scalar value but '"' and "\" *) .
 
 i has no keywords. Every word is a `name`, an `UpName`, or a discard (§1.3), and any `name` may be used as a name. The forms that other languages make with keywords are made with brackets and symbols: imports and exports are groups at the start of a file (§2.2), matching is a call of a clause block (§6.12), and a guard is written with `?`.
 
-Some forms are kept for macros, which are not yet part of i: an attribute that is not built in, such as `@m` or `@m(args)` before an item (§2.2); a top-level item that is a call, `m(args)` or `a.m(args)` (§2.2); a declaration with no `@external` (§2.2); and, in a type, a lowercase name or `a.m` followed by `(` (§3). The parser reads each of them in full, and each is a compile error whose message says that the form is kept for macros.
+Some forms are kept for macros, which are not yet part of i: an attribute that is not built in, such as `@m` or `@m(args)` before an item (§2.2); a top-level item that is a call, `m(args)` or `a.m(args)` (§2.2); a declaration with neither `@external` nor `@js` (§2.2); and, in a type, a lowercase name or `a.m` followed by `(` (§3). The parser reads each of them in full, and each is a compile error whose message says that the form is kept for macros.
 
 ### 1.5 Symbols
 
@@ -130,11 +130,11 @@ A **package** is a directory with an `i.toml` file in it (§2.6). Every `.i` fil
 
 The **path** of a module is the `name` of its package (§2.6), then `/`, then its path under `src/` or `test/`, without `.i`, with `/` between the parts. In the package named `app`, the path of `src/users/admin.i` is `app/users/admin`. Every part of a path must be a `name`. Two modules of one package with the same path are a compile error.
 
-Modules in `test/` are only compiled when the tests of their package are run. They may import modules in `src/`, but not the other way.
+Modules in `test/` are checked when their package is checked (§2.6), and compiled as test entries when its tests are run. They may import modules in `src/`, but not the other way.
 
 In a module, the first part of a module path says which package the module is in. It must be one of these:
 
-- `i`, for the seven **library modules** (§9, §13), which every compiler gives, and the kept paths named at the start of this document. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
+- `i`, for the **library modules** (§9, §10, §13, §B.7.1) and kept paths named at the start of this document. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
 - the `name` of the module's own package;
 - a dependency name of the module's own package (§2.6); in a test module, also a dev-dependency name.
 
@@ -175,12 +175,13 @@ An item that is a `name`, with or without type parameters (§2.5), then `:` and 
 
 A `MacroItem` is kept for macros. It is a compile error, and the message says that a call at the top level is kept for macros.
 
-A declaration with `@external` names a value of the host (§10.1). A declaration with no `@external` is kept for macros, where it goes with a binding of the same name. It is a compile error, and the message says that a declaration with no `@external` is kept for macros.
+A declaration requires `@external` or `@js` (§10.1), or expansion by a macro. A declaration with neither attribute is kept for macros, where it goes with a binding of the same name. Until that expansion is defined, it is a compile error, and the message says that the declaration is kept for macros.
 
 In one module, every top-level name is defined one time only. Two bindings may not bind the same name, two type definitions may not define the same type, and two constructors may not have the same name. A constructor and a top-level binding may not have the same name either, because they are in one space of names (§2.3).
 
 These are the attributes. An attribute whose name is one of them, with no module name before it, is that attribute. Its arguments must be string literals, given by position, with no labels, and an attribute that takes no arguments is written with no `( )`, as in `@main`. Any other argument, such as `@external("env" <> "", "f")`, `@external(module: "env", "f")`, or `@main()`, is a compile error. Any other attribute, such as `@m`, `@m(args)`, or `@a.m(args)`, is a macro before an item. It is kept for macros, and it is a compile error whose message says so. An attribute in another place, or one attribute given two times on one item, is a compile error.
 
+- `@js("expression")`: on a declaration of a closed opaque type (§10.1.1). A declaration cannot have both `@js` and `@external`.
 - `@external("module", "function")`: on a declaration (§10.1). The module may not start with `ilang:`, which is kept for the runtime (§B.4).
 - `@host("namespace")` and `@host("namespace", "async")`: on a type definition (§9.7). The namespace may not start with `ilang:`.
 - `@main`: on a binding whose pattern binds one name and whose value is a function expression (§10.2).
@@ -225,7 +226,7 @@ ExportItem = name | UpName [ "(" ".." ")" ] .
 ```
 
 - A top-level name that is not in the exports may only be used in its module.
-- `T` exports the type `T` but not its constructors. Other modules may use the type, but they may not make or take apart its values. `T(..)` exports the type and all its constructors.
+- `T` exports the type `T` but not its constructors. Other modules may use the type, but they may not make or take apart its values, including by field selection or constructor update (§6.7). `T(..)` exports the type and all its constructors.
 - Every exported name must be defined in this module.
 - If the type of an exported definition uses a type defined in this module, that type must be exported too. If not, it is a compile error.
 
@@ -243,7 +244,7 @@ An item that starts with `name ( UpName { , UpName } )` and then `=` or `:` is a
 
 An item that is a call, `m(args)` or `a.m(args)`, and has no `=` or `:` after its `)`, is not a binding. It is kept for macros (§2.2).
 
-An item `name [ TypeParams ] : Type` with no `=` after the type is a declaration, whatever its attributes. A declaration with no `@external` is kept for macros, and is a compile error (§2.2).
+An item `name [ TypeParams ] : Type` with no `=` after the type is a declaration, whatever its attributes. A declaration requires `@external` or `@js`, or expansion by a macro (§2.2). A `@js` declaration has the closed opaque type and foreign link semantics of §10.1. It is initialized once during start only if retained by the target link pass; ordinary bindings retain this section's initialization rules.
 
 A top-level binding has the same rules as a binding in a block (§6.10). Only these things are different, and they come from its place:
 
@@ -263,7 +264,7 @@ A binding may not be among its own needs. If it is, it is a compile error: `x = 
 
 ### 2.6 The package file
 
-The file `i.toml` is in TOML. These keys have a meaning; other keys are not used:
+The file `i.toml` is in TOML. These keys and the provider keys below have a meaning; other root keys are not used. Unknown keys inside a provider plan are errors (§2.6.1):
 
 ```toml
 name = "app"                                   # required: the first part of the paths of this package's modules
@@ -287,6 +288,220 @@ exports = ["app/math.add"]                     # host exports (§10.2): module p
 - `{ path = "…" }` is a package in a directory on this computer. Only the package that is compiled, and the packages that it gets by path, may have path dependencies. A package that is got by location may not have them.
 - The packages that a package uses, directly or through other packages, may not be in a circle.
 - The `dev-dependencies` of a package are only used when its own tests are compiled. The `dev-dependencies` of other packages are not used.
+
+#### 2.6.1 Target provider plans
+
+A target provider plan maps resolved service type identities to ordinary i factory functions or host registrations. Infer source types first. For each entry, supply every service left in its inferred environment and all dependencies of the chosen factories. Supply whole services, never selected fields. Missing required services and dependency cycles are compile errors naming the target, service and requiring entry. Catching operation errors, including `unsupported`, does not remove a requirement. A target with no default for a standard capability and no explicit provider is therefore a compile error even when all its operation errors are caught.
+
+Every factory has an ordinary checked type, returns its service and has no uncaught typed errors. Construction may stop, but cannot add an error to the source entry's ABI error row. All source factories are type-checked; only the chosen factories' needs are provisioned. A reference to an unchosen factory in executable source still follows §10.1.2. Construct each graph node once per entry invocation, after top-level initialization. Captured services do not change when another service is later substituted (§9.2).
+
+This is the full version-1 schema; string cells are its nullary shorthand. A service key or factory value is a fully qualified module path, a dot and its type or binding name, resolved through the package graph.
+The package plan is data, not executable macro code. The root package selects target cells over the shipped plan; dependency packages cannot override its selections. There is no wildcard or implicit service discovery. The shipped capability registry is plan data: a registered row without a cell for this target is unsupplied, including user-registered capabilities. An absent root cell inherits the shipped cell when one exists. A plan is resolved with
+its declaring package's authority: it may name that package's private bindings;
+references into dependencies must be exported. Inherited cells keep their
+original declaring authority. Copying a dependency's private path into a root
+cell is an access error. This gives every package the same plan-only access,
+without making a private factory callable from ordinary outside source. It
+preserves private root-runner construction. The rule does not change source visibility (§2.4).
+Unknown keys, duplicate resolved rows/cells, unknown
+targets, ill-kinded type arguments and unresolved names are errors. The five
+columns are js, nodejs, native, wasi and host; ilang is a CLI alias only.
+
+```text
+providers."<resolved service type constructor>":
+  role = "none" | "scheduler" | "runner"                 # default none
+  adapter = "<accessible ordinary function>"               # iff role != none
+  discriminant = {js=C, nodejs=C, native=C, wasi=C, host=C} # optional
+  <target> = "<factory>"                                 # compact form
+           | {factory="<factory>", arguments=[...], seed_required=false}
+           | {host=true}
+provider_adapters."<accessible ordinary function>":
+  supplies = ["<closed service type>", ...]
+  requires = ["<closed service type>", ...]
+wasm.exports = ["<exported entry>", ...]
+wasm.synchronous = ["<member of wasm.exports>", ...]
+```
+
+Exactly one variant occupies a target cell. `arguments` defaults to []; its
+only elements are `"seed"` and `"entry-root-key"`, each at most once, in the
+factory's argument order. A string is `{factory=..., arguments=[]}`.
+`seed_required` defaults to false and is legal only with a seed argument.
+A host cell is legal only for a declared host service; §9.7's open
+custom-host registration is its implicit cell. A registered ordinary row
+never falls through to host registration. A discriminant row may omit cells;
+its default cell constructs `discriminant[current_target]`, provisioning
+constructor fields as services. Each constructor must belong to that row's
+type, and each field type must be a closed valid service type. Constructor
+aliases resolve before validation; maps must cover all five targets but need
+not be injective. An explicit cell replaces generation and disables §10.1.2's
+certification for that row. Generated payloads are dependency edges too.
+
+A row key is a nominal service constructor identity, not its spelling. A
+parameterized row's factory scheme is instantiated at each required set of
+type arguments, by ordinary type checking; no holes or free variables may
+remain in a chosen instance. Distinct `Cell(Int)`/`Cell(String)` nodes stay
+distinct. Each factory invocation binds only its own checked environment in
+its lexical scope. It does not union incompatible instantiations into one
+environment; §9.2's same-constructor restrictions still apply to each
+actual function environment. This changes no source inference.
+
+A factory for service S has type `(generated arguments) -> S ? Never ! R`,
+with R its ordinary inferred environment. The selected arguments have these
+exact types and meanings. `Key(Nil)` and the request/task services below refer to the accepted R2 contracts in [runtime.md §§5–6](design/runtime.md); their definitions are installed by that track. This plan does not give them host-reference representations:
+
+| Argument | Type | Value and dependency |
+|---|---|---|
+| seed | `List(S)` | [] outside the adapter; inside it, [s] when supplies contains S, otherwise []; a nonempty list depends on the adapter entering |
+| entry-root-key | `Key(Nil)` | The initial registered root key of this entry's primitive context, available before factories; no service dependency |
+
+`seed_required=true` requires exactly [s] at this construction site, or the
+plan is rejected; it is not a runtime missing-service fallback. A seed is an
+ordinary value; the factory decides how to use it. It may return it, wrap it,
+or ignore it. Even with a seed, **the selected factory is called** and its
+result is the chosen S. A nullary override receives no seed and still replaces
+the chosen value. This prevents an adapter from silently undoing an Await,
+Root or user-service override. Supplying a seed is not a second provider row.
+
+The root-key argument serializes the narrow initial-root bootstrap:
+open the primitive entry registry, register its initial key when this argument
+is present in the graph, then let an ordinary factory construct the nominal
+Root value. A graph needing no key registers no initial root. It is not a public unscoped root allocator. Any ordinary factory with this argument type can receive the
+key; no rule recognizes Root or its module. All uses in one entry receive the
+same initial key. The registry exists for synchronous fake-only entries too;
+only entries classified async by §10.2 have async admission. The primitive opening is fixed,
+dependency-free and constructs no replaceable service value. On every exit
+it retires the entry's registered roots/groups, even after a stop.
+
+The **role belongs to the row**. A root-package target cell replaces only the
+provider cell; the inherited role, adapter and discriminant are unchanged.
+Redeclaring inherited metadata identically is allowed; changing it is an
+error. New application rows may declare any role with the same rules. A row
+with a role must name a declared adapter, and a row with role none must not.
+An override must still type-check as a provider of S; supplying a pure fake
+does not erase its role. Request mode likewise remains the declared host mode.
+All row/adapter declarations are schema-checked in a target plan; only chosen
+factory dependencies need supplies. Source-only check does no plan validation.
+
+An adapter declaration names an accessible ordinary generalized function with
+this checked type (schema notation, R and S are the declared service unions):
+
+```text
+adapter(A,E,N): (body: () -> A ? E ! N) -> A ? E ! R | N - S
+```
+
+It is generalized over arbitrary A, E and N; no extra result/error restriction
+or requirement is permitted. The declared closed supplies and requires lists
+each form a valid ordinary environment. They may overlap **across** lists:
+the required outer Runner and supplied inner Runner, for example, are different
+lexical values. A candidate's inferred scheme must satisfy this entire type,
+not only the current entry instantiation. There is no rank-two field or new
+function kind: the plan names an ordinary top-level generalized function.
+The adapter supplies S by calling body under ordinary environment bindings;
+those bindings are captured as seeds by the generated continuation. It must
+not assume its seeds are the final services used by the source entry.
+
+The continuation has entry lifetime. Generated guards allow exactly one
+invocation, wholly within the adapter invocation's dynamic extent. Re-entry
+or a second invocation stops with `provider: body already called`; invocation
+after adapter exit stops with `provider: body is not active`; returning normally
+without a completed invocation stops with `provider: body was not completed`.
+A stop may abandon the invocation; it runs no i finals and the primitive
+context still retires. Suspension is not exit. Adapters may use ordinary
+structured control and resource.ensure around body; they cannot detach it.
+The guard is required for every adapter, not trusted library code. Ordinary
+service values can escape normally; their later operations obey their own
+lifetime rules. This is not a new linear type system.
+
+Resolve and validate the graph as follows, before linking or optimization:
+
+1. Resolve body providers transitively from the entry's full inferred needs.
+   Each service uses its one target cell. Include all factory requirements,
+   generated-constructor payloads and declared request modes, whether used at
+   runtime or not. Choose roles from these rows, not their factories' names.
+   Expansion must be finite: on any dependency path within one scope,
+   revisiting a service constructor is rejected even at different type
+   arguments (`provider: recursive dependency`). This conservative rule also
+   rejects a finitely decreasing chain such as Box(Box(Config)) -> Box(Config)
+   -> Config. Independent sibling instances remain legal. It prevents an
+   expanding Cell(A) -> Cell(List(A)) plan from hanging the compiler, without
+   adding type-level termination analysis. Completed nodes may be shared;
+   sharing must not hide a repeated constructor on any graph path.
+2. If a role is reached, include its adapter and resolve that adapter's required
+   services in an **outer** scope using the same target cells. Include all roles
+   and requirements reached there too. Repeat until closed. No adapter means
+   no outer scope. More than one resolved adapter identity is an error naming
+   the entry and both originating service rows and their adapter names. Repeated
+   references to the same adapter are shared. Adapter references must resolve
+   to a top-level function binding, allowing only direct lexical binding
+   aliases; arbitrary computed function values cannot be plan adapter names.
+   There is no nested composition.
+3. Make one node per (outer/body scope, fully instantiated service). An edge
+   to each required service stays in that scope. An adapter-enter node depends
+   on all outer requires. Seed nodes depend on adapter-enter; a body factory
+   with a seed argument depends on the appropriate seed if one is supplied.
+   Outer factories always receive []; an unsatisfied required seed is an error.
+   The primitive context/key is a leaf, never a service-provider dependency.
+   Two scopes do not share provider instances, even if their factories match.
+4. Check all supplied/required types, missing cells and cycles over this **one**
+   graph, including adapter and seed edges. A factory cannot obtain an inner
+   seed while constructing an outer prerequisite. Such a requirement is a
+   plan error, not permission for a temporary default service. Source factories
+   and adapters have already undergone ordinary type checking.
+5. Execute a stable topological order. First materialize primitive arguments
+   and host-registration leaves in canonical order; these run no i factory.
+   Then, among ready service nodes, order lexicographically by canonical
+   package/module/type path and normalized type arguments, then outer before
+   body. Expand aliases and sort/deduplicate union members recursively when
+   serializing closed type arguments; never sort by allocated TypeIds. Prefer
+   all ready provider nodes to adapter-enter. Enter the adapter
+   once its prerequisites are ready; finish the same order in its guarded
+   continuation, then invoke the source entry with its chosen body services.
+   No provider may execute before primitive admission is opened when async.
+
+This ordering may construct a body service independent of seeds before adapter
+entry; it is then an ordinary lexical capture in the continuation. It constructs
+seed-dependent providers after entry. This is still one topological order, not
+Root/Owner/Await followed by another sort. No second provider is substituted
+to break a cycle. Classification includes both scopes and the adapter's
+requirements; linkage includes the adapter and all chosen factory bodies.
+A generated wrapper reference is not a *source* reference in §10.1.2's certification.
+
+Shipped task rows use the same schema: scheduler/runner roles select one
+ordinary adapter with the structured run type and supplied
+Scheduler/Runner/Await/Owner/Root, requiring outer Runner. Seed-aware ordinary
+factories return the supplied values inside that adapter; outside it they
+construct the accepted default Runner through its private ordinary constructor
+and the direct context services. The plan names that constructor with its
+own package authority, never via a public root-runner API. The outer
+Runner factory has no required seed and no dependency cycle. Root's direct
+factory takes entry-root-key; Owner's direct factory needs Root. Seed-aware
+factories still declare their full ordinary environments on both paths; those
+requirements are provisioned even when a seed is present. The seeded default
+run remains FIFO, path [], seed 0, with no entropy draw. No special factory
+elision, role erasure or hidden context provider is permitted.
+
+#### 2.6.2 Synchronous exports and commands
+
+`wasm.synchronous` is a list of host exports and must be a subset of `wasm.exports`. A listed export whose complete chosen provider graph classifies async (§10.2) is a compile error showing a qualifying dependency path. Otherwise the caller uses the async entry protocol when the metadata says async, even if the first call returns status 0. No source type promises synchronous host calling, and no implicit blocking adapter changes that contract. WASI retains §B.7's blocking ABI.
+
+The target columns are `js`, `nodejs`, `native`, `wasi` and `host`. `--target ilang` is an alias of `--target host`, with no removal scheduled. Legacy host artifacts keep Appendix B's format. The native provider column does not require an AOT executable: execution location and provider selection are separate.
+
+| Command | Provider column / Target value | Validation and execution |
+|---|---|---|
+| `i run` | native / Native | Validate the selected entry plan; execute in process |
+| `i test` | native / Native | Validate test entry plans; execute in process with the normal fresh test instances |
+| `i build` | selected target; default native | Validate that target's entry plans; emit its artifacts |
+| `i check` | none | Parse, resolve and infer all source, including test bodies; no target plan selection |
+| `i check --target t` | t, with ilang normalized to host | Check source and the plans for that target's main, configured exports and eligible tests; emit and execute nothing |
+
+WASI has no compiled test entries under §B.7: its check still checks test source,
+but constructs no test wrapper/plan. Targeted checking validates supplies,
+adapter types/conflicts, cycles, synchronous contracts and §10.1.2's foreign
+availability. Untargeted checking promises none of these: success does not
+promise that any target can build or run the program. Neither check form
+promises actual host grants, engine features, successful initializers, or
+runtime results. Malformed manifest syntax is still a package-load error.
+The target-independent source checker retains entry arity and ABI checks, but does not reject an entry merely for requiring an ordinary service. These command rules concern provider selection; native packaging remains a runner plus an embedded compiled program, requires main, and rejects only required imports that runner cannot supply. A package with only host exports uses host (or its ilang alias).
 
 ### 2.7 Versions
 
@@ -388,7 +603,7 @@ Field       = [ name ":" ] Type .
 ```
 
 - `T { C1 C2 … }` is a custom type. Every constructor has zero or more fields. A field may have a label.
-- `T {}` is a type with no constructors. i code may not make its values. They only come from the host (§10).
+- `T {}` is a type with no constructors. i code may not make its values. They only come from the host (§10), including `@js` declarations with the full closed nominal annotation of §10.1.1.
 - `T = Type` is a type alias. `T` is the same as the type on the right. An alias may not use itself, directly or through other aliases.
 - The head `( … )` is a **list of type parameters** when every part of it is an `UpName` with no module name and no arguments, and none of them is a type that may be written with no module name in the module: a type of the module, an imported `UpName`, or a built-in type. Its parts are then the **type parameters**, as in `TypeParams` of §2.5.
 - An alias whose head is not a list of type parameters, as in `Schema(User, _) = user`, or `Schema(User) = user` with a type `User`, is kept for a later use, alias patterns, and is a compile error whose message says so. The rule that tells an alias pattern from a generic alias is not yet given.
@@ -444,7 +659,8 @@ A parameter of a function type may have a **label**. Labels are not part of the 
 
 Types are worked out by inference with subtypes (algebraic subtyping).
 
-- Type annotations may be left out everywhere for inference, but not on `@external` declarations. Some uses of a name need a known type, which may need an annotation (§4.8).
+- Type annotations may be left out everywhere for inference, but not on `@external` or `@js` declarations. Some uses of a name need a known type, which may need an annotation (§4.8).
+- Target provider selection and foreign linking (§2.6, §10.1.2) do not change inferred source types or remove inferred requirements.
 - For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance. MLsub (Dolan and Mycroft, POPL 2017) and MLstruct (Parreaux and Chau, OOPSLA 2022) give ways to do this.
 - A type is made simpler before it is shown: equal parts are put together, and type variables that have no effect on the meaning are taken out. This never changes which programs are correct or what they do. A type scheme that is used as a known type (§4.8) is in this simpler form. A type variable that is not generalized is shown as the union of the types that come to it.
 - Annotations are used in inference, and the inferred type must agree with them. A type variable in an annotation may become a more exact type.
@@ -622,6 +838,8 @@ The type of `[e1, …, en]` is `List(T)`, where every part has the type `T`. `T`
 ### 6.7 Constructors and fields
 
 `C(a1, …, an)` makes a value. It is a call (§6.6); the labels are the field labels.
+
+Selecting a field of a nominal value requires the same constructor visibility as taking it apart by a constructor pattern (§2.4). Exporting `T` without its constructors permits neither field selection nor constructor update outside its module. Structural record fields retain their own rules.
 
 `v.f` gets the field with the label `f` from the value `v`. The constructors that **may have made** `v` are the one constructor that `v` is known to be made by (§7.5), when there is one. If not, every member of the known type of `v` (§4.8) must be a custom type, and they are all the constructors of these types. Each of them must have a field with the label `f`, but it may be in any position and of any type (§4.8 rule 13). So, as in TypeScript, `v.f` is correct on a union when every member has the field, and its type is the union of the field types.
 
@@ -884,6 +1102,22 @@ Replacing a host service in i uses an environment statement as for any
 service. Replacing a random seed with task.top keeps the run route of the
 current Runner. Entry defaults do not change call-site service lookup.
 
+A provider can capture a service value. Replacing the service later changes calls that take it from their caller, not the captured value. This is the same rule for shipped and user providers:
+
+```i
+Clock { Clock(now: () -> Int) }
+Reading { Reading(read: () -> Int) }
+make = (clock ! Clock) { Reading(read: () { clock.now() }) }
+now = (clock ! Clock) { clock.now() }
+example = () {
+  ! Clock = Clock(now: () { 1 })
+  saved = make()
+  ! Clock = Clock(now: () { 2 })
+  (saved.read(), now())
+}
+// example() gives (1, 2).
+```
+
 ### 9.3 Errors
 
 The `E` part of a function type is the set of errors the function may give. An error may be a value of any type. Errors come together by union (§4.4): when a function calls functions with the errors `A` and `B`, its errors are `A | B`. The module `i/fail` has these functions:
@@ -1028,9 +1262,51 @@ Storage { Storage(read: (key: String) -> String ? String) }
 
 - It has exactly one constructor. Every field has a label and a function type. The parameters, values, and errors of these functions must be types that the host can take (§10.3), and they may not have an environment. Two host services may not have the same namespace and a field with the same label.
 - With `@host("namespace", "async")`, the host does the functions **later**: the program waits at the call, and goes on from the call when the host gives a value or an error. In i code, such a call is a normal call.
-- A host service in the environment of an entry point (§10.2) is given by the host. Every field is the Wasm import with the import module `namespace` and the field label as its name, encoded as in Appendix B.
+- A host service supplied by a host-registration cell in the entry provider plan (§2.6) is given by the host. Every field is the Wasm import with the import module `namespace` and the field label as its name, encoded as in Appendix B. An ordinary chosen factory may supply the same service without that import. Unregistered custom host services retain open host registrations; a registered capability with no default or explicit provider does not fall through to one. WASI keeps required custom imports (§B.7). Generated JS/NodeJS artifacts must supply all required imports or fail the build; arbitrary embedding uses Host. Native builds reject only required imports their runner cannot supply.
 - i code may also give a host service with an environment statement, for example to put a fake in its place in a test.
-- The library module `i/io` declares and exports the **standard service**: `@host("i:io/v1") Io { Io(print: (text: String) -> Nil) }`. `print` writes the text and a line feed to the standard output. A program that prints imports it, for example `((Io) = i/io)`, and takes it from the environment of an entry point like any host service. `i run` and `i test` give it to every program, and on the WASI target the module gives it itself (§B.7). Any other host, such as an embedder or the JavaScript SDK, gives it like any other host service, or the program cannot run there. A host service declared in another module with the namespace `i:io/v1` is a normal host service, and the rule above about namespaces and labels is true for it as for any other: with a field `print`, it is a compile error.
+- The library module `i/io` declares and exports the **standard service**: `@host("i:io/v1") Io { Io(print: (text: String) -> Nil) }`. `print` writes the text and a line feed to the standard output. A program that prints imports it, for example `((Io) = i/io)`, and takes it from the environment of an entry point like any host service. `i run` and `i test` provide it. The WASI target chooses an ordinary provider using the checked Wasi adapter (§B.7), and generated JS/NodeJS builds choose their ordinary provider. It gives `Nil`, including after an output error. A Host embedder must explicitly supply it, like any other required standard service. A host service declared in another module with the namespace `i:io/v1` is a normal host service, and the rule above about namespaces and labels is true for it as for any other: with a field `print`, it is a compile error.
+
+**Target services and defaults.**
+
+The ordinary module `i/target` exports this nominal service and its constructors. The modules `i/js` and `i/wasi` export the roots named in it (§10.1, §B.7.1). These are ordinary module types, not built-in names:
+
+```i
+(js = i/js, wasi = i/wasi)
+(Target(..))
+Target {
+  Js(js: js.Js)
+  NodeJS(js: js.Js)
+  Wasi(wasi: wasi.Wasi)
+  Native
+  Host
+}
+```
+
+The shipped plan constructs the actual target through §2.6's discriminant map. Native and Host have no root payload. A Js or Wasi payload can be bound by an ordinary environment statement; a tag cannot discharge any other service requirement. A program may construct a replacement Target. Only §10.1.2's certified entry binding is known to contain the build default.
+
+The initial synchronous JS milestone supplies Io, Target and its root. Further defaults apply only when their implementations and tests ship:
+
+| Target | Defaults after IO integration |
+|---|---|
+| js | Io, Clock, Entropy |
+| nodejs | Io, Clock, Entropy, Arguments, Environment, WorkingDirectory, Fs, Net, Process, Stdio |
+| wasi | Io; Clock, Entropy, Arguments, Environment, Fs and Stdio need separately approved preview-1 adapters |
+| native | The native runner's ordinary standard registrations, split by capability below |
+| host | An explicit embedder/provider plan; no arbitrary default services |
+
+The JS loader checks the required feature profile before starting: WasmGC, tail calls, exception handling, console and clocks/timers, and secure entropy at the IO milestone. There is no insecure random fallback. Generated targets omit absent capabilities; they do not install automatic `unsupported` stubs. An explicit Host SDK embedder may choose such stubs. Resource services use the same granted factories in generated Node builds and the SDK; an arbitrary Js value cannot manufacture authority over their private resource numbers.
+
+The process module separates its capabilities as follows, keeping its existing operation arguments, results, ProcessError values and cancellation rules. Each public wrapper requires only the service in its row, plus Await and Owner when it waits. Clock, Fs, Net, Stdio and Io remain separate:
+
+| Service | Namespace | Raw fields |
+|---|---|---|
+| Entropy | `i:entropy/v1` | entropy |
+| Arguments | `i:arguments/v1` | args |
+| Environment | `i:environment/v1` | env |
+| WorkingDirectory | `i:working-directory/v1` | cwd |
+| Process | `i:process/v1` | spawn, wait, terminate, close |
+
+The first four have public constructors for ordinary fakes. Process keeps private raw fields and a private nominal Child wrapper over Int. The same private Int representation is used for other IO resources. Neither these wrappers nor their constructed errors add a boundary type (§10.3). Request ownership and raw signatures are the accepted [runtime.md §§5/7](design/runtime.md) contract, installed by R2/IO; this split adds no new field or error.
 
 ### 9.8 Keys
 
@@ -1668,53 +1944,158 @@ name: (T1, …, Tn) -> R
 
 This declares a function that the host gives. It is the Wasm import `function` in the import module `module`, encoded as in Appendix B. The full type must be written. Parameters and the value must be types that the host can take (§10.3), with no errors and no environment. Every call of an external function is done when it is reached, like all calls. An external function should have no side effects that i code may see; work with side effects on the host uses host services (§9.7).
 
+#### 10.1.1 JavaScript value declarations
+
+The form is
+`@js("expression") name: T`, where T expands to one closed nominal type with
+no constructors. No holes, type variables, unions, functions or constructed
+resource types. The annotation is required. It creates no i constructor or
+cast between nominal types. `i/js.Value {}` is one ordinary use; packages can
+define `Element {}` or other opaque types. JS is specific to this attribute;
+it is not a target-neutral foreign language feature.
+
+For example, an opaque type defined by a package needs no library rule:
+
+```i
+Element {}
+@js("globalThis.document.body")
+body: Element
+```
+
+Each retained declaration becomes a zero-argument value import returning
+`externref`, with a cache in the loader, rather than an imported mutable
+global. Its first and only initialization call is emitted in `ilang_start`,
+in §2.5 dependency/module/source order alongside ordinary initializers.
+The host parses the text as one parenthesized expression in strict ESM scope.
+It may name globals but not generated loader locals, other declarations or i
+bindings. The compiler does not type-check JS. Syntax failure is a loader
+error before startup; an initializer exception stops startup and no entry
+runs. Initializers may have host side effects. Use function expressions to defer work to an explicit Js
+call. A retained declaration is available only on js and nodejs. On any other target, it is a compile error under §10.1.2.
+No initializer or synchronous bridge call may re-enter i. Callback re-entry is not defined.
+
+#### 10.1.2 Foreign linking
+
+This rule defines acceptance and foreign initializer execution. Run it after ordinary type
+checking and provider selection, before optimization, with the same result
+at O0/O2/O3. There is no per-input specialization, constructor propagation,
+constant folding, Boolean evaluation, type-directed branch elimination or
+implementation-chosen widening. There is exactly one clause-pruning rule below.
+
+The finite graph has one node for each ordinary binding's initializer, each
+source function/clause-block body, each chosen provider body/terminal, and each
+foreign declaration. References are resolved lexical definition identities.
+Start with all ordinary top-level initializers, emitted entries/exports/tests,
+and chosen provider factories. Scanning an initializer preserves §2.5: making
+a function literal does not scan its body. A reference to an existing binding,
+including an alias or a function passed as data, follows its definition and
+activates all function bodies syntactically contained in that definition.
+Scanning an activated body visits all expressions and guards, both sides of
+conditionals/Boolean operators and every clause except this section's sole pruning case.
+A function literal reached in an activated body is itself activated, even if
+it is never called. A non-direct initializer scans its nested function bodies
+too, since it may execute them. Reads of foreign declarations retain them.
+
+Iterate these fixed reference edges to the least fixed point. Every source
+body has one node shared by all callers; a second call adds no specialized
+copy. Recursion and mutually recursive aliases terminate by marking nodes
+once. References to aggregate bindings activate all function literals in their
+definitions, not only a selected field. Higher-order parameters add no inferred
+callee set: all supplied function expressions/aliases are already activated
+where they are referenced, stored, returned or passed. This closed program
+cannot receive an i function from the host (§10.3). Function values supplied
+by chosen providers are traversed in the same way. Thus an unknown function
+parameter cannot hide an unvisited source closure. No function-value analysis
+or optimizer discovery changes this graph.
+
+**The only pruning case.** The provider plan may designate a nominal service
+as a build-discriminant service by giving a constructor map for every target.
+Its default provider is a generated constructor application from that map,
+with independently provisioned payloads. Target is one ordinary instance of
+this general mechanism. The compiler uses resolved type/constructor identities
+from the map, never the spelling Target, Js, Wasi, or a module name.
+
+A subject is certified only when it is the environment parameter of an actual
+emitted entry with that generated default provider, or a lexical alias made
+solely by `alias = certified_name` (an annotation/group does not change this).
+The entry binding must have **no source value reference anywhere in the
+compiled program**, including as a higher-order value or recursive call,
+and cannot also be selected as a provider factory. Import/export lists and
+entry configuration are declarations, not source value references. Only its
+emitted entry designation may invoke it. This syntactic restriction prevents
+an ordinary i call from supplying another environment to the same entry body.
+An explicit provider override, ordinary parameter, function result, tuple/field
+projection or constructor expression is unknown. A helper's own environment
+parameter is unknown, even if every apparent caller uses the default. There
+is no propagation through actual parameters or return values.
+
+A closure's direct lexical capture of a certified name or alias remains
+certified. A newly bound/shadowing name is a different definition and gains
+certification only through the alias rule. `! D = value` does not mutate a
+previously bound D value; the captured old name remains certified, but later
+calls fetching D see the substitution and their own environment parameters
+are unknown. `keep_env(f)` activates f by ordinary reference reachability;
+it grants no certification to f's environment parameters. A direct capture
+of the original certified value remains a capture, including inside keep_env.
+These rules use lexical identity, not runtime environment/value analysis.
+
+For the source form `certified_name |> { clauses }` (allowing a one-expression
+`{ }` group around the subject), omit a clause's guard and body only
+if its pattern selects resolved constructor C and
+`C != map[current_target]`, allowing field subpatterns and `name = pattern`.
+For a choice, this inequality must hold for **every** alternative, recursively;
+any other alternative prevents pruning. Compare resolved constructor identities,
+not names or target labels. Maps need not be injective: mapping js and nodejs
+to the same Web constructor retains Web on both. A wildcard, type
+pattern or any other pattern is retained. A matching-target guarded clause
+is always possibly executed, even if its guard is literally False; retain
+later clauses too. A constructor unequal to the actual mapped constructor cannot match
+regardless of its guard. No first-match or exhaustiveness reasoning removes any other clause.
+Calling a named clause block or passing the subject to a function gives no
+pruning, even if that function is an alias. Type-check all clauses first.
+Suppressing an impossible clause's references does not remove pattern-failure
+Assert behavior for a one-clause binding, or any other source semantics.
+This rule changes no inferred requirements. The compiler preserves this
+source match marker until the analysis is done; optimizer-introduced matches
+cannot gain certification.
+
+Every retained foreign declaration is initialized exactly once in §10.1.1 order,
+even if an optimizer removes its reads. An unretained declaration is never
+initialized. On an unavailable target a retained declaration is a compile
+error at its declaration and a requiring reference, never null or a late trap.
+Ordinary top-level `forced = foreign` always retains it. Two retained
+`@js("({})")` declarations produce distinct objects; reads of one preserve
+its identity within its nominal type (§4.1, §11.4).
+
+Passing Target to a helper, fetching it in a helper's environment, or manufacturing the correct
+constructor also gives no pruning. An uncalled closure referenced in retained
+code still retains its foreign reads. This loss is deliberate and predictable.
+A direct entry match remains expressible under the certified-entry rule.
+An ordinary environment-bound Target may hold a substituted value. It is not certified by its type or name, and helpers are not specialized.
+
+The generated artifact and loader metadata are specified in §B.6.1. Host exports always use the fixed ABI conversions, never a dynamically replaced Js converter.
+
 ### 10.2 Entry points
 
-The program entry is the @main function of the compiled package. It has no
-ordinary parameters and its value is ignored. More than one is a compile
-error; dependencies' @main attributes do not add entries. Tests are @test
-functions in test/ of the compiled package; each has no ordinary parameters
-and returns Nil. A test passes by returning Nil and fails on a stop. Each
-runs in its own freshly started instance. Host exports are the functions
-named in the compiled package's wasm.exports; they must be exported by
-their module and take/return only the types of §10.3, including their errors.
+These functions are **entry points**:
 
-Entry environment parameters and needs may contain host services, Assert,
-request.Await, request.Root, request.Owner, task.Scheduler, and task.Runner.
-No other unsupplied service is allowed. The runtime binds only the defaults
-requested by the ordinary inferred environment. Inferred Scheduler or Runner
-needs request the default structured FIFO run, fresh identity/path [], seed
-random.from_seed(0), and its internal request context. Async/request host
-needs without task needs get a direct request context/Await handler, without
-a task scheduler. Await/Root/Owner-only needs may use completed fakes in a
-synchronous entry. These resolved standard-service entry defaults are the
-one narrow library provision; another library gets no implicit bootstrap.
+- **The program entry**: the function marked `@main` in the package that is compiled. It has no parameters. Its value is not used. More than one `@main` in a package is a compile error. `@main` in other packages is not used.
+- **Tests**: the functions marked `@test` in the modules under `test/` of the package that is compiled. Each has no parameters and gives `Nil`. A test **passes** when it gives `Nil`. It **fails** when it stops (§11.7). Tests run one at a time, each in a new instance of the module that has been started (§B.1), so one test cannot change another.
+- **Host exports**: the functions named in `[wasm].exports` (§2.6) of the package that is compiled. The `[wasm]` of other packages is not used. They must be in the exports of their module. Their parameters, value, and errors must be types that the host can take (§10.3).
 
-Entry wrapping does not change a function's principal type. The default
-values can be replaced by ordinary environment statements. task.top(seed)
-changes a Runner's seed while retaining its route and prefix. An unsupplied
-user State service remains an entry error. Main/test errors stop after
-cleanup; host-export errors reach the host after cleanup. Stops run no finals.
+"No parameters" here does not count environment parameters. An entry may also require any ordinary named service supplied by its explicit target provider plan (§2.6). The plan constructs ordinary service values; missing required standard capabilities are build errors, including when all operation errors are caught. Providers do not alter inferred source types. Source-only checking retains the signature rules above without checking target supplies.
 
-On the ilang target, let N be the entry's inferred environment: the entry is
-async exactly when N contains an async or request-mode host service, or
-task.Scheduler or task.Runner. Otherwise it is a synchronous export, including
-a pure comparator usable by a synchronous host callback. No body-reachability
-analysis or universal async wrapping is used. Even an async entry may finish
-with status 0 on its first call. Scheduler progress polling yields to the host only for actual host waiters,
-including nested waiters; idle waits also count unawaited work. Pure task
-switches alone do not yield there.
-On WASI, all entry calls and host imports remain synchronous (§B.7).
+An error that comes to the program entry or a test stops the program. An error that comes to a host export is given to the host (Appendix B).
+
+On targets using the v3 asynchronous entry protocol, an entry is **async** exactly when its complete chosen provider graph (§2.6.1), including both scopes and adapter requirements, contains a request-mode service provider, a scheduler role or a runner role. Normalize an async host declaration to its request-and-await provider first. A service node's declared request/async mode counts even when a factory supplies a completed fake. A pure bundle with no such dependency may be synchronous. Await, Owner and Root alone do not qualify. No source-body reachability or selected-field analysis changes this classification. Metadata and wrapper shape follow the graph before linking and optimization; a requested synchronous export that classifies async is a compile error (§2.6.2). The host waits through Appendix B's protocol. WASI instead keeps blocking imports, synchronous metadata and no async hand-off (§B.7).
+
+Open the dependency-free primitive entry context before chosen factories, enabling async admission exactly for an async entry. It constructs no replaceable service. Construct all services in §2.6.1's one topological order, enter the sole adapter at its place in that order, and invoke the unchanged source entry with the chosen body services. Finish structured cleanup before delivering the result or error; retire the primitive context on every exit. A stop runs no i finals. Synchronous fake-only contexts cannot hand off: a low-level wait needing hand-off or poll stops with `request: no active entry`. An async entry may return status 0 on its first call; pure scheduler switches alone do not yield to the host.
 
 ### 10.3 Types the host can take
 
 `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, and custom types with no constructors (§4.3). Values of custom types with no constructors go to the host as opaque references. No other type may go to the host. An error type that the host can take is a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`, with no two the same.
 
-The outer Request/Result types in a request-mode host field describe how
-host work is obtained (§9.7); they do not add ABI parameter/result types.
-Requests, tickets, tasks, scopes, channels and events cannot cross the ABI.
-Custom IO wrappers with Int fields are not ABI types; raw resource services
-pass only Int. No library-specific exception is added.
+The outer Request and optional Result in a request-mode host declaration describe how work is obtained; they are the declaration forms of [runtime.md §5.2](design/runtime.md), installed by R2, not additional boundary types. Requests, tickets, tasks, scopes, channels and events cannot cross the ABI. IO wrappers over Int and constructed Thrown/Mismatch are not boundary types; their libraries pass Int or opaque Outcome and decode in i. Neither provider plans nor JavaScript value declarations change the value and error lists above. No library-specific exception is added.
 
 ## 11. Run-time behavior
 
@@ -1774,6 +2155,8 @@ The program stops in these cases:
 | Making a bit array fails (§8.3) | `bit array: value is too short`, `bit array: length is negative`, `bit array: bytes are not whole`, or `bit array: float is not finite` |
 | A value from the host is not correct (Appendix B) | `host: value is not correct` |
 | There is no more memory or stack | none |
+
+A JS bridge call that does not expose exceptions uses `panic("js: call threw")` for a thrown exception. Malformed raw outcomes, argument builders or typed host replies use `host: value is not correct`. These stops are not Mismatch errors; explicit checked conversions may return Mismatch. Provider adapter guards use the panic messages of §2.6.1. Memory and stack exhaustion remain stops.
 
 Before the program stops, the host gets a **stop message**, in one call of `panic` (Appendix B): the reason, then one line for each source position, with a line feed between lines. The first position is that of the innermost expression in the program source that was being worked out: a call, an operator, a `<<`, or a binding. Then come the positions of the calls in the program source that were running, the innermost first. Calls that were replaced by tail calls are gone, but the first position is always given, also when that expression is a call in tail position: in `f = (n) { assert(n > 0) }`, the stop shows the position of `assert(n > 0)`. A call of a library function, such as `fail.catch` or `resource.ensure`, counts as a tail call when it is in tail position. For an error at an entry point, there is only the position of the entry point's binding.
 
@@ -1886,6 +2269,8 @@ A compiled program is one Wasm module. It needs the Wasm features garbage collec
 - `ilang_free(address: i32, size: i32)`: frees a buffer made by `ilang_alloc`.
 - `ilang_start()`: starts the program by working out the top-level values (§2.5). It has no parameters and no results. The host calls it one time, after it makes the instance and before it calls any other export but `ilang_alloc` and `ilang_free`. During `ilang_start`, imports may be called as at any other time.
 
+Checked Wasi buffers are separate table-owned allocations (§B.3, §B.7.1); they do not change these host allocation exports.
+
 The module has no Wasm start function, so that imports called while top-level values are worked out may call `ilang_alloc`. The module has one custom section named `ilang.abi` with the metadata of §B.6.
 
 This version runs one instance for each run of the program. Workers (§11.9) come with a later version of this interface.
@@ -1919,10 +2304,13 @@ When the host gives a value that is not correct (a `String` that is not UTF-8, a
 - A buffer given as a **parameter** belongs to the caller. It may only be used during the call. The callee makes a copy if it needs one.
 - A buffer given as a **result** is made with `ilang_alloc` and belongs to the receiver, which frees it with `ilang_free`.
 
+Checked Wasi buffers (§B.7.1) are separate table-owned allocations and are not addresses supplied to `ilang_free` by i code. The allocation exports remain host machinery; checked tokens cannot name ABI buffers.
+
 So for an export, the host makes the parameter buffers with `ilang_alloc`, frees them after the call, and frees the result buffers. For an import, the module makes and frees the parameter buffers, and the host makes the result buffers by calling `ilang_alloc` before it returns. During an import, the host may only call `ilang_alloc` and `ilang_free`.
 
 ### B.4 Imports
 
+- **Retained JavaScript value getters** (§10.1.1): zero-argument target imports returning `externref`, described in §B.6.1. They are not new `ilang:host/v1` runtime imports.
 - **External functions** (§10.1): the import module and name of the `@external` attribute, encoded as in §B.2.
 - **Functions of host services** (§9.7): the import module is the namespace and the name is the field label, encoded as in §B.2.
 - **Async functions of host services**: the import has an `i32` **request id** first, then the parameters of §B.2, and no results. The host copies the parameters, keeps the request, and returns at once. The answer comes later through `ilang_resume` (§B.5). Until then the request is **outstanding**.
@@ -1976,20 +2364,111 @@ The custom section `ilang.abi` is UTF-8 JSON in this form:
 - `version` is 3. A host refuses a module with another version, so a module of an older version must be built again. Version 3 differs from version 2 in these ways: an async function has a request id; status 1 means one or more outstanding requests, not exactly one, and the host may answer them in any order; status 2 and the export `ilang_continue` are new, and `ilang_continue` is a reserved export name; the runtime import `cancel` is new; outstanding requests are dropped when the entry point ends, on a trap, and when the work fails in the host; and an async function may only be called during an async entry point, a resume or `ilang_continue` (§B.4). A runtime import, status or export that a host must handle is added only with a new version.
 - Type names are `nil`, `bool`, `int`, `float`, `string`, `bit_array`, and `externref`. `errors` is in the canonical order (§B.2).
 - `entry` is `null` when the program has no `@main`. `tests` is empty unless tests were compiled.
-- `services` lists every host service function that the entry points need, and `externals` every external function.
+- `services` lists every required host-registration function left by the chosen provider graph, and `externals` every required external function. A service supplied internally by an ordinary provider is not a required host import. Entry async flags and status/result exports follow §10.2, before linking and optimization.
 - The host must give every import in `services`, `externals`, and `ilang:host/v1` before it makes an instance of the module. If not, making the instance fails.
-- A module of the WASI target (§B.7) also has `"target": "wasi"`. Other modules have no `target`. A host of this appendix does not run a module with a `target`.
+- A module of the WASI target (§B.7) also has `"target": "wasi"`. JS targets have `"target": "js"` or `"target": "nodejs"` (§B.6.1). Host modules have no `target`. A host of this appendix does not run a module with a `target`.
+
+#### B.6.1 JavaScript target artifacts
+
+`name.wasm`, `name.mjs` and `name.d.ts` are
+the generated JS artifact. The mjs contains the fixed bridge, retained source
+expressions and loader; each instance has its own declaration caches and
+entry resource contexts. It starts the module once, then calls main or the
+requested host export. JS source may use `import("node:...")` inside a
+function and await its opaque promise through the request protocol. There are no static import
+declarations inside an expression, implicit Node module variables, or
+compiler-generated user callbacks. Standard Node factories may use their
+own ESM imports. Their source is fixed support code, not user handwritten JS.
+
+Keep the v3 wire for ordinary service/request calls. Put foreign declaration
+text, stable package/module/name identity, generated import name, nominal type
+identity, source span and availability in a separate versioned target section
+`ilang.js` (initial version 1). A matching generated loader requires that
+section and `target: "js"` or `"nodejs"`; old Appendix B hosts reject the
+non-host target instead of accidentally loading it. This target metadata does not add a v3 runtime export. Mandatory changes to runtime imports, statuses or host-called exports still require a version bump (§B.6).
+The value getters are target imports listed there, not additions to v3's
+`ilang:host/v1`. A digest binds the JS manifest to its Wasm artifact; it is
+not self-authenticating permission for raw IO (trusted declaration grants still apply).
+
+`bindings/javascript` remains the Host SDK. Generated-target and explicit SDK
+usage share encoding and request lifecycle code. Host exports always use the
+real SDK conversions and d.ts representations, never a dynamically replaced
+Js service; a custom outgoing converter cannot change an export's ABI.
 
 ### B.7 The WASI target
 
 `i build --target wasi` makes the module a WASI preview 1 command, which a WASI host such as `wasmtime run` or Node's `node:wasi` runs with no other step. It is the module of §B.1 to §B.6 with these changes:
 
 - It imports `fd_write` and `proc_exit` from `wasi_snapshot_preview1`, and not `panic` from `ilang:host/v1`. The stop message (§11.7) and a line feed are written to file descriptor 2, then the process ends with exit code 1. `reference_id` is imported from `ilang:host/v1` only when a type of an import or export is a custom type with no constructors, because only the host can make such a value.
-- `print` of the standard service, `Io` of `i/io` (§9.7), is not an import: the module writes the text and a line feed to file descriptor 1. A write that fails is given up. The metadata does not list it. Another host service with the namespace `i:io/v1` is an import like any other.
-- Because the runtime imports `fd_write` and `proc_exit`, an import (§B.4) with the import module `wasi_snapshot_preview1` and one of these names is a compile error. Such an import is an external function, or a field of a host service in the environment of an entry point (§9.7). Other functions of `wasi_snapshot_preview1` may be imported.
-- Every other host service and external function is an import as in §B.4, so a host that has them can give them. A module that the host makes before the program, such as one given with `wasmtime run --preload`, cannot use the program's `memory` or `ilang_alloc`, so it can only give functions whose parameters, values, and errors are `Nil`, `Bool`, or `Float`. An import with an `Int`, `String`, or `BitArray` needs a host that defines it with the exports of the instance, such as an embedder, or a module linked in statically. An import with a host reference needs such a host too, because only the host makes host references, and the module then imports `reference_id`.
+- The target's ordinary Io provider writes UTF-8 text plus LF to file descriptor 1 through the checked Wasi adapter (§B.7.1). Positive short writes are retried; zero progress or errors give up that write; print gives `Nil`. It attempts the text first, then LF even if writing the text gave up, and frees buffers on every returning path. It is absent from required-import metadata because it is internally provided. Another host service with the namespace `i:io/v1` is an import like any other.
+- Because the runtime imports `fd_write` and `proc_exit`, an import (§B.4) with the import module `wasi_snapshot_preview1` and one of these names is a compile error. Such an import is an external function, or a required host-registration field in the entry provider graph (§9.7). Other functions of `wasi_snapshot_preview1` may be imported.
+- Every other required host-registration function and external function is an import as in §B.4, so a host that has them can give them. A module that the host makes before the program, such as one given with `wasmtime run --preload`, cannot use the program's `memory` or `ilang_alloc`, so it can only give functions whose parameters, values, and errors are `Nil`, `Bool`, or `Float`. An import with an `Int`, `String`, or `BitArray` needs a host that defines it with the exports of the instance, such as an embedder, or a module linked in statically. An import with a host reference needs such a host too, because only the host makes host references, and the module then imports `reference_id`.
 - A function of an async host service is a blocking import, with the results of a function that is not async (§B.2). Nothing is async, and there are no `ilang_resume:…` and `ilang_result:…` exports.
 - It exports `_start`, which calls `ilang_start` and then the program entry. The program must have a `@main`; if not, it is a compile error. When `_start` returns, the exit code is 0.
 - Tests are not compiled: a test needs a new instance (§10.2), and a command runs one entry.
 
 When the program runs out of memory or stack (§11.7), there is no stop message: the host gives its own error. The host also decides how deep the stack may be, so ordinary recursion that is not in tail position may stop earlier than in another host.
+
+#### B.7.1 Checked Wasi adapter
+
+The ordinary Wasi service's
+memory fields below are synchronous. Token is an Int internally naming a live
+allocation in this instance's dedicated checked-buffer table. The table never
+contains ABI argument/result buffers, runtime scratch, GC data or allocator
+metadata. Export no operation giving a token's address. Allocation produces
+zeroed bytes and a fresh positive token, never reusing one in that instance.
+End of entry/startup failure/stop frees remaining checked buffers. A token
+from another instance is not a portable memory reference; no library IO value
+wraps it. Root APIs expose operations, not the table.
+
+| Field | Type |
+|---|---|
+| alloc | `(size: Int) -> Int ? String` |
+| free | `(token: Int) -> Nil ? String` |
+| store | `(token: Int, offset: Int, bytes: BitArray) -> Nil ? String` |
+| load | `(token: Int, offset: Int, size: Int) -> BitArray ? String` |
+| fd_write | `(fd: Int, token: Int, offset: Int, size: Int) -> Int ? String` |
+| proc_exit | `(code: Int) -> Nil ? String` |
+
+`Wasi` is an ordinary service type with this checked signature. Its implementation is a checked adapter, not generic Int ABI lowering. Library helpers
+may wrap buffer tokens privately and add structured cleanup, as ordinary code.
+Possession of the root grants use of its buffer table; tokens are not secrets.
+
+Validation order is fixed: validate scalar ranges/whole-byte inputs, then
+look up a live token, then check its extent. Negative sizes/offsets, an fd or
+exit code outside unsigned 32 bits, and non-whole-byte store input give
+`invalid`. Unknown/nonpositive/freed tokens (including double free) give
+`closed`. A valid token with offset or size outside its allocation gives
+`bounds`. Use mathematical checked addition, never wrapping pointer arithmetic.
+For empty loads/stores require `0 <= offset <= allocation size`; they do not
+bypass liveness. An allocation size above memory32's addressable range gives
+`invalid`; exhaustion within that range stops for memory exhaustion.
+Successful free removes exactly one table entry before freeing its allocation;
+there is no size argument or interior-pointer free. Load returns a copy.
+
+Tokens are identifiers, so `token + 1` is **not** a pointer into token. It may
+name another allocation only if that token is live in this authorized table;
+there is no promise of unforgeability. To access a subrange pass token and
+checked offset. Stale tokens cannot become valid after allocator address
+reuse. A call pins its allocation until it returns. These synchronous fields
+do not yield; no i callback can free a pinned buffer inside a host call.
+For future async adapters, retain a lease or copy before returning; they
+cannot inherit raw addresses from this synchronous contract.
+
+**Checked layouts.** For fd_write, validate
+the inputs above; allocate private scratch for one iovec and a u32 count; translate
+the checked slice to the real pointer; call the runtime-owned preview-1 import;
+then free scratch on every returning path. On errno != 0, raise String
+`errno:<unsigned decimal>`. On success return the number of bytes written,
+0..size; a larger count is an invalid host value and stops. No user-controlled
+pointer-bearing bytes are ever passed as an iovec. Other preview-1 functions require separately specified pointer/length/output layouts and raw signatures before an adapter is added.
+
+proc_exit validates its unsigned code, runs context teardown, then calls the
+existing raw `(i32) -> ()` import. Its i signature is Nil because §10.3 has no
+Never result; successful execution never returns an i Nil. If the host returns
+unexpectedly, trap and retire the instance. Invalid code raises `invalid`
+before teardown or exit. There is no fabricated errno/result from a void
+Wasm call. Teardown does not run i finals; explicit process exit is termination,
+not a way to detach work. WASI resource cleanup must finish before this call.
+
+The adapter reuses the runtime-owned fd_write/proc_exit imports; it does not declare duplicates. The independent runtime stop path, including startup stops, source positions, partial-write retries, LF and exit code 1, cannot call a replaceable Io. Replacing Io leaves this stop path intact.

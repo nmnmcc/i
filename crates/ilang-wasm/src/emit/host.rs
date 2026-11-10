@@ -121,9 +121,10 @@ pub(super) const TYPES: &str = r#"(type $waiting (struct (field i32)))
   (field (ref null $bytes)) (field (ref null $values))
   (field (ref null $limbs)) (field (ref null $call))
   ;; state, answer, slot, generation, owner, observer kind, observer target
+  ;; initiating trace, nominal result identity
   (field (mut i32)) (field (mut eqref)) (field (mut i32)) (field eqref)
   (field (mut (ref null $request_owner))) (field (mut i32)) (field (mut eqref))
-  (field (mut (ref null $frames))))))
+  (field (mut (ref null $frames))) (field (mut i32)))))
 (type $request_slot (struct (field (mut i32)) (field (mut eqref))
   (field (mut (ref null $request))) (field (mut i32))))
 (type $request_slots (array (mut (ref null $request_slot))))
@@ -152,7 +153,7 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
   (struct.new $request (i32.const 17) (i32.const 0) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)
     (local.get $state) (local.get $answer) (i32.const -1) (call $key_new)
-    (ref.null $request_owner) (i32.const 0) (ref.null eq) (ref.null $frames)))
+    (ref.null $request_owner) (i32.const 0) (ref.null eq) (ref.null $frames) (i32.const 0)))
 (func $request_ready (param $value eqref) (result eqref)
   (call $request_new (i32.const 1) (local.get $value)))
 (func $request_ticket (param $value eqref) (result eqref)
@@ -337,7 +338,7 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
   (global.set $req_total (i32.add (global.get $req_total) (i32.const 1)))
   (local.get $index))
 
-(func $req_start (param $import i32) (param $owner eqref) (result (ref $request))
+(func $req_start (param $import i32) (param $owner eqref) (param $nominal i32) (result (ref $request))
   (local $o (ref null $request_owner)) (local $root (ref $request_root)) (local $r (ref $request))
   (if (i32.eqz (global.get $async_live)) (then (call $request_fail (i32.const 4)) unreachable))
   (local.set $o (call $request_find_owner (call $field (local.get $owner) (i32.const 0))))
@@ -346,6 +347,7 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
   (local.set $r (call $request_new (i32.const 0) (ref.null eq)))
   (struct.set $request 12 (local.get $r) (local.get $o))
   (struct.set $request 15 (local.get $r) (call $shadow_snapshot))
+  (struct.set $request 16 (local.get $r) (local.get $nominal))
   (drop (call $request_slot_new (local.get $r) (local.get $import)))
   (struct.set $request_owner 2 (ref.as_non_null (local.get $o))
     (i32.add (struct.get $request_owner 2 (ref.as_non_null (local.get $o))) (i32.const 1)))
@@ -572,12 +574,21 @@ pub(super) fn effects() -> String {
 impl<'p> Emitter<'p> {
     /// Starts an import of an async host service (B.4) with a new request
     /// id from the request table, returning the cell immediately.
-    pub(super) fn host_start(&mut self, import: ImportId, args: &[Atom]) -> String {
+    pub(super) fn host_start(
+        &mut self,
+        import: ImportId,
+        args: &[Atom],
+        result: AbiType,
+    ) -> String {
+        let nominal = match result {
+            AbiType::Externref(id) => id,
+            _ => 0,
+        };
         let owner = self.p.request_owner.expect("request Owner is registered");
         let id = " (struct.get $request 10 (ref.as_non_null (global.get $host_start_cell)))";
         let call = self.host_call_with(import, id, args);
         format!(
-            "(block (result eqref)\n(global.set $host_start_cell (call $req_start (i32.const {import}) (array.get $env (local.get $env) (i32.const {owner}))))\n{call}\n(call $host_start_done (global.get $host_start_cell)))"
+            "(block (result eqref)\n(global.set $host_start_cell (call $req_start (i32.const {import}) (array.get $env (local.get $env) (i32.const {owner})) (i32.const {nominal})))\n{call}\n(call $host_start_done (global.get $host_start_cell)))"
         )
     }
 
@@ -632,10 +643,16 @@ impl<'p> Emitter<'p> {
     /// The value of the results of an import in the globals `$hr…` (B.2):
     /// the value, or the error thrown. The result buffers are freed (B.3);
     /// a value that is not correct stops.
-    pub(super) fn host_reply(&self, i: ImportId) -> String {
+    pub(super) fn host_reply(&self, i: ImportId, result: AbiType) -> String {
         let x = &self.p.imports[i as usize];
         if x.awaited {
-            return self.host_answer(i);
+            return self.host_answer(
+                i,
+                &match result {
+                    AbiType::Externref(id) => format!("(i32.const {id})"),
+                    _ => "(i32.const 0)".into(),
+                },
+            );
         }
         let take = |t: AbiType, k: usize| -> String {
             let g = |j: usize| format!("(global.get $hr{i}_{})", k + j);
@@ -646,15 +663,15 @@ impl<'p> Emitter<'p> {
                 AbiType::Int => format!("(call $abi_int_take {} {} {})", g(0), g(1), g(2)),
                 AbiType::String => format!("(call $abi_string_take {} {})", g(0), g(1)),
                 AbiType::BitArray => format!("(call $abi_bits_take {} {})", g(0), g(1)),
-                AbiType::Externref => format!("(call $abi_ref_in {})", g(0)),
+                AbiType::Externref(ty) => format!("(call $abi_ref_in {} (i32.const {ty}))", g(0)),
             }
         };
         if x.abi.errors.is_empty() {
-            return take(x.abi.result, 0);
+            return take(result, 0);
         }
         let mut offsets = Vec::new();
         let mut k = 1;
-        for t in std::iter::once(x.abi.result).chain(x.abi.errors.iter().copied()) {
+        for t in std::iter::once(result).chain(x.abi.errors.iter().copied()) {
             offsets.push((t, k));
             k += abi_in(t).0.len();
         }
@@ -675,7 +692,7 @@ impl<'p> Emitter<'p> {
         )
     }
 
-    fn host_answer(&self, i: ImportId) -> String {
+    fn host_answer(&self, i: ImportId, nominal: &str) -> String {
         let x = &self.p.imports[i as usize];
         let decode = |t: AbiType, k: usize| -> String {
             let g = |j: usize| format!("(global.get $hr{i}_{})", k + j);
@@ -686,7 +703,7 @@ impl<'p> Emitter<'p> {
                 AbiType::Int => format!("(call $abi_int_in {} {} {})", g(0), g(1), g(2)),
                 AbiType::String => format!("(call $abi_string_in {} {})", g(0), g(1)),
                 AbiType::BitArray => format!("(call $abi_bits_in {} {})", g(0), g(1)),
-                AbiType::Externref => format!("(call $abi_ref_in {})", g(0)),
+                AbiType::Externref(_) => format!("(call $abi_ref_in {} {nominal})", g(0)),
             }
         };
         let mut offsets = Vec::new();
@@ -810,7 +827,8 @@ impl<'p> Emitter<'p> {
             let sets: String = (0..types.len())
                 .map(|j| format!(" (global.set $hr{i}_{j} (local.get {}))", j + 1))
                 .collect();
-            let answer = self.host_answer(i as ImportId);
+            let answer =
+                self.host_answer(i as ImportId, "(struct.get $request 16 (local.get $cell))");
             let _ = writeln!(
                 self.out,
                 "(func (export \"ilang_resume:{}:{}\") (param $id i32){params} (result i32) (local $cell (ref $request)) (local $old_shadow (ref $frames)) (local $old_sp i32) (local $answer eqref)\n\

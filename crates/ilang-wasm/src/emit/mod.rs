@@ -95,7 +95,21 @@ pub fn wat(p: &Program) -> String {
     e.exports();
     e.resume_exports();
     let mut m = String::from("(module\n");
-    m.push_str(runtime::TYPES);
+    // A host reference can come into the program only through an import or
+    // an export whose types have one (B.2).
+    let references = p
+        .imports
+        .iter()
+        .map(|x| &x.abi)
+        .chain(p.exports.iter().filter_map(|e| e.abi.as_ref()))
+        .any(|abi| {
+            abi.params
+                .iter()
+                .chain(&abi.errors)
+                .chain([&abi.result])
+                .any(|t| matches!(t, AbiType::Externref(_)))
+        });
+    m.push_str(&runtime::types_for_host_references(references));
     m.push_str("(type $env (array (mut eqref)))\n");
     m.push_str(control::TYPES);
     m.push_str(host::TYPES);
@@ -110,20 +124,6 @@ pub fn wat(p: &Program) -> String {
         );
     }
     let wasi = p.target == Target::Wasi;
-    // A host reference can come into the program only through an import or
-    // an export whose types have one (B.2).
-    let references = p
-        .imports
-        .iter()
-        .map(|x| &x.abi)
-        .chain(p.exports.iter().filter_map(|e| e.abi.as_ref()))
-        .any(|abi| {
-            abi.params
-                .iter()
-                .chain(&abi.errors)
-                .chain([&abi.result])
-                .any(|t| *t == AbiType::Externref)
-        });
     if wasi {
         m.push_str(runtime::WASI_HOST);
         if references {
@@ -190,7 +190,7 @@ pub fn wat(p: &Program) -> String {
     if !p.imports.iter().any(|x| x.kind == ImportKind::AsyncService) {
         m.push_str("(func $host_cancel (param i32) unreachable)\n");
     }
-    m.push_str(runtime::wat());
+    m.push_str(runtime::wat_for_host_references(references));
     m.push_str(SUPPORT);
     m.push_str(control::EFFECTS);
     m.push_str(&host::effects());
@@ -696,13 +696,21 @@ impl<'p> Emitter<'p> {
                 num(start),
                 num(length)
             ),
-            Value::HostCall { import, args } => {
+            Value::HostCall {
+                import,
+                args,
+                result,
+            } => {
                 let call = self.host_call(*import, args);
-                let reply = self.host_reply(*import);
+                let reply = self.host_reply(*import, *result);
                 format!("(block (result eqref)\n{call}\n{reply})")
             }
-            Value::HostStart { import, args } => self.host_start(*import, args),
-            Value::HostReply(import) => self.host_reply(*import),
+            Value::HostStart {
+                import,
+                args,
+                result,
+            } => self.host_start(*import, args, *result),
+            Value::HostReply(reply) => self.host_reply(reply.import, reply.result),
         }
     }
 
@@ -972,6 +980,9 @@ fn export_params(abi: &ExportAbi) -> (String, Vec<String>) {
             let _ = write!(gets, " (local.get {k})");
             k += 1;
         }
+        if let AbiType::Externref(ty) = p {
+            let _ = write!(gets, " (i32.const {ty})");
+        }
         converted.push(format!("(call {convert}{gets})"));
     }
     (sig, converted)
@@ -1013,7 +1024,7 @@ fn abi_in(t: AbiType) -> (&'static [&'static str], &'static str) {
         AbiType::Float => (&["f64"], "$abi_float_in"),
         AbiType::String => (&["i32", "i32"], "$abi_string_in"),
         AbiType::BitArray => (&["i32", "i32"], "$abi_bits_in"),
-        AbiType::Externref => (&["externref"], "$abi_ref_in"),
+        AbiType::Externref(_) => (&["externref"], "$abi_ref_in"),
     }
 }
 
@@ -1028,7 +1039,7 @@ fn abi_out(t: AbiType, v: &str) -> (Vec<&'static str>, String) {
         AbiType::Float => format!("(call $abi_float_out {v})"),
         AbiType::String => format!("(call $abi_string_out {v})"),
         AbiType::BitArray => format!("(call $abi_bits_out {v})"),
-        AbiType::Externref => format!("(call $abi_ref_out {v})"),
+        AbiType::Externref(_) => format!("(call $abi_ref_out {v})"),
     };
     (types, out)
 }
@@ -1086,7 +1097,7 @@ fn value_tag(t: AbiType) -> u32 {
         AbiType::String => 3,
         AbiType::Int => 8,
         AbiType::BitArray => 9,
-        AbiType::Externref => 10,
+        AbiType::Externref(_) => 10,
     }
 }
 
