@@ -1,0 +1,785 @@
+{
+  "source_revision": "9695b32a2a4f180511202c0dbe5812bf1b778586",
+  "cases": [
+    {
+      "name": "row_alias",
+      "case": "review-k4-lane/row_alias",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "direct_row",
+      "case": "review-k4-lane/direct_row",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "effect_row_alias",
+      "case": "review-k4-lane/effect_row_alias",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "latent_row",
+      "case": "review-k4-lane/latent_row",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "alias_kind_env",
+      "case": "review-k4-lane/alias_kind_env",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "alias_kind_error",
+      "case": "review-k4-lane/alias_kind_error",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "x1",
+      "case": "review-k4d/proj/x1",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "x2",
+      "case": "review-k4d/proj/x2",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "x3",
+      "case": "review-k4d/proj/x3",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "x4",
+      "case": "review-k4d/proj/x4",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "x6",
+      "case": "review-k4d/proj/x6",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "x7",
+      "case": "review-k4d/proj/x7",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "x8",
+      "case": "review-k4d/proj/x8",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "z1",
+      "case": "review-k4d/proj/z1",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "z4",
+      "case": "review-k4d/proj/z4",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "g_ann_SDep",
+      "case": "review-k4d/proj/g_ann_SDep",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "g_inf_SDep",
+      "case": "review-k4d/proj/g_inf_SDep",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "m3",
+      "case": "review-k4d/proj/m3",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "m4",
+      "case": "review-k4d/proj/m4",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "r6",
+      "case": "review-k4d/proj/r6",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ]
+    },
+    {
+      "name": "b4",
+      "case": "review-k4d/proj/b4",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "b7",
+      "case": "review-k4d/proj/b7",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "r2",
+      "case": "review-k4d/proj/r2",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "r3",
+      "case": "review-k4d/proj/r3",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "q21",
+      "case": "review-k4-lane/q21",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q22",
+      "case": "review-k4-lane/q22",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q23",
+      "case": "review-k4-lane/q23",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q24",
+      "case": "review-k4-lane/q24",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q25",
+      "case": "review-k4-lane/q25",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q26",
+      "case": "review-k4-lane/q26",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q27",
+      "case": "review-k4-lane/q27",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q28",
+      "case": "review-k4-lane/q28",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q29",
+      "case": "review-k4-lane/q29",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q30",
+      "case": "review-k4-lane/q30",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q31",
+      "case": "review-k4-lane/q31",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q32",
+      "case": "review-k4-lane/q32",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q33",
+      "case": "review-k4-lane/q33",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q34",
+      "case": "review-k4-lane/q34",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q35",
+      "case": "review-k4-lane/q35",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q36",
+      "case": "review-k4-lane/q36",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q37",
+      "case": "review-k4-lane/q37",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q38",
+      "case": "review-k4-lane/q38",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q39",
+      "case": "review-k4-lane/q39",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "q40",
+      "case": "review-k4-lane/q40",
+      "outcome": "accept",
+      "run_stdout": "",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ]
+    },
+    {
+      "name": "r4",
+      "case": "review-k4d/proj/r4",
+      "outcome": "accept",
+      "run_stdout": "four\nthree\n"
+    },
+    {
+      "name": "closed_handler_hole",
+      "case": "review-k4-lane/closed_handler_hole",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "latent_row_same",
+      "case": "review-k4-lane/latent_row_same",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "error_row_values",
+      "case": "review-k4-lane/error_row_values",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w1-Never",
+      "case": "review-k4-lane/w1-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w1-Dep",
+      "case": "review-k4-lane/w1-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w2-Never",
+      "case": "review-k4-lane/w2-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w2-Dep",
+      "case": "review-k4-lane/w2-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w3-Never",
+      "case": "review-k4-lane/w3-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w3-Dep",
+      "case": "review-k4-lane/w3-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w4-Never",
+      "case": "review-k4-lane/w4-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w4-Dep",
+      "case": "review-k4-lane/w4-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w5-Never",
+      "case": "review-k4-lane/w5-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w5-Dep",
+      "case": "review-k4-lane/w5-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w6-Never",
+      "case": "review-k4-lane/w6-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w6-Dep",
+      "case": "review-k4-lane/w6-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w7-Never",
+      "case": "review-k4-lane/w7-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w7-Dep",
+      "case": "review-k4-lane/w7-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w8-Never",
+      "case": "review-k4-lane/w8-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w8-Dep",
+      "case": "review-k4-lane/w8-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w9-Never",
+      "case": "review-k4-lane/w9-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w9-Dep",
+      "case": "review-k4-lane/w9-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w10-Never",
+      "case": "review-k4-lane/w10-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w10-Dep",
+      "case": "review-k4-lane/w10-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w11-Never",
+      "case": "review-k4-lane/w11-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w11-Dep",
+      "case": "review-k4-lane/w11-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w12-Never",
+      "case": "review-k4-lane/w12-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w12-Dep",
+      "case": "review-k4-lane/w12-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w13-Never",
+      "case": "review-k4-lane/w13-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w13-Dep",
+      "case": "review-k4-lane/w13-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w14-Never",
+      "case": "review-k4-lane/w14-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w14-Dep",
+      "case": "review-k4-lane/w14-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w15-Never",
+      "case": "review-k4-lane/w15-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w15-Dep",
+      "case": "review-k4-lane/w15-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w16-Never",
+      "case": "review-k4-lane/w16-Never",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "w16-Dep",
+      "case": "review-k4-lane/w16-Dep",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "entry-False",
+      "case": "review-k4d/proj/a3",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "unused-False",
+      "case": "review-k4-lane/unused-False",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "entry-True",
+      "case": "review-k4s/soundness_unannotated",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "unused-True",
+      "case": "review-k4-lane/unused-True",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "previous-0-False",
+      "case": "review-k4-lane/previous-0-False",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-0-True",
+      "case": "review-k4-lane/previous-0-True",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-1-False",
+      "case": "review-k4-lane/previous-1-False",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-1-True",
+      "case": "review-k4-lane/previous-1-False",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-2-False",
+      "case": "review-k4-lane/previous-2-False",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-2-True",
+      "case": "review-k4-lane/previous-2-True",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-3-False",
+      "case": "review-k4-lane/previous-3-False",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-3-True",
+      "case": "review-k4-lane/previous-3-True",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-4-False",
+      "case": "review-k4-lane/previous-4-False",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-4-True",
+      "case": "review-k4-lane/previous-4-True",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-5-False",
+      "case": "review-k4-lane/previous-5-False",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-5-True",
+      "case": "review-k4-lane/previous-5-True",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-6-False",
+      "case": "review-k4-lane/previous-6-False",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-6-True",
+      "case": "review-k4-lane/previous-6-True",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "previous-chain-64",
+      "case": "review-k4-lane/previous-chain-64",
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ]
+    },
+    {
+      "name": "handler-hole-False-False",
+      "case": "review-k4-lane/handler-hole-False-False",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "handler-hole-False-True",
+      "case": "review-k4-lane/closed_handler_hole",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "handler-hole-True-False",
+      "case": "review-k4-lane/handler-hole-True-False",
+      "outcome": "accept",
+      "run_stdout": ""
+    },
+    {
+      "name": "handler-hole-True-True",
+      "case": "review-k4-lane/handler-hole-True-True",
+      "outcome": "accept",
+      "run_stdout": ""
+    }
+  ]
+}

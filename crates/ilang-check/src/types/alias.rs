@@ -250,7 +250,18 @@ impl Checker<'_> {
         })
     }
 
-    pub(super) fn instantiate_alias(&mut self, id: TypeId, args: Vec<Ty>) -> Ty {
+    pub(super) fn instantiate_alias(
+        &mut self,
+        id: TypeId,
+        args: Vec<Ty>,
+        mode: super::solve::Mode,
+    ) -> Ty {
+        for (arg, mode) in args.iter().zip(
+            self.s
+                .rows(super::Head::Named(TypeRef::Custom(id)), args.len()),
+        ) {
+            self.s.mark_mode(arg, mode);
+        }
         let Some(template) = self.reads.templates.get(&id) else {
             if !self.recovery && !self.reads.aliases.contains_key(&id) {
                 panic!("pending alias {id:?}");
@@ -262,8 +273,9 @@ impl Checker<'_> {
         // With no operators in either the template or its arguments,
         // normalization would only copy constructors and variables unchanged.
         if has_algebra {
-            normalize(&mut self.s, ty)
+            self.s.normalize_mode(ty, mode)
         } else {
+            self.s.mark_mode(&ty, mode);
             ty
         }
     }
@@ -308,30 +320,5 @@ impl Checker<'_> {
 }
 
 pub(super) fn normalize(s: &mut super::solve::Solver, t: Ty) -> Ty {
-    let mut go = |t| normalize(s, t);
-    match t {
-        Ty::Graph(g) => g.normalize(s),
-        Ty::Union(ts) => {
-            let ts = ts.into_iter().map(&mut go).collect();
-            s.union(ts)
-        }
-        Ty::Inter(ts) => {
-            let ts = ts.into_iter().map(&mut go).collect();
-            s.inter(ts)
-        }
-        Ty::Diff(t, ts) => {
-            let t = go(*t);
-            let ts = ts.into_iter().map(&mut go).collect();
-            s.diff(t, ts)
-        }
-        Ty::Con(h, values, ts) => Ty::Con(h, values, ts.into_iter().map(&mut go).collect()),
-        Ty::Fn(g) => Ty::Fn(Box::new(FnTy {
-            params: g.params.into_iter().map(|(n, t)| (n, go(t))).collect(),
-            ret: go(g.ret),
-            err: go(g.err),
-            env: go(g.env),
-        })),
-        Ty::Both(a, b) => Ty::Both(Box::new(go(*a)), Box::new(go(*b))),
-        Ty::Var(_) | Ty::Top | Ty::Never => t,
-    }
+    s.normalize_mode(t, super::solve::Mode::Value)
 }

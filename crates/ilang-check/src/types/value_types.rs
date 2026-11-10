@@ -386,7 +386,7 @@ fn closed_equal(s: &Solver, a: &Ty, b: &Ty) -> bool {
     if a == b {
         return true;
     }
-    let mut scratch = Solver::new(s.variance.clone(), Vec::new());
+    let mut scratch = s.for_closed_types();
     scratch.constrain(a, b);
     scratch.constrain(b, a);
     scratch.failures.is_empty()
@@ -428,7 +428,7 @@ fn normalize_closed(s: &Solver, t: Ty) -> Result<Ty, &'static str> {
     if contains_var(&t) {
         return Err(code::VALUE_TYPE_NOT_FIXED);
     }
-    let mut scratch = Solver::new(s.variance.clone(), Vec::new());
+    let mut scratch = s.for_closed_types();
     let t = super::alias::normalize(&mut scratch, t);
     if scratch.failures.is_empty() {
         Ok(t)
@@ -1366,7 +1366,7 @@ impl Checker<'_> {
                     .iter()
                     .map(|t| self.closed_written(t, map, seen))
                     .collect::<Result<Vec<_>, _>>()?;
-                let mut scratch = Solver::new(self.s.variance.clone(), self.s.type_names.clone());
+                let mut scratch = self.s.for_closed_types();
                 let t = if matches!(t.kind, TypeKind::Union(_)) {
                     scratch.union(parts)
                 } else {
@@ -1387,7 +1387,7 @@ impl Checker<'_> {
                     return Err(code::TYPE_PATTERN_FORM);
                 }
                 let first = parts.remove(0);
-                let mut scratch = Solver::new(self.s.variance.clone(), self.s.type_names.clone());
+                let mut scratch = self.s.for_closed_types();
                 let t = scratch.diff(first, parts);
                 if scratch.failures.is_empty() && !contains_var(&t) {
                     Ok(t)

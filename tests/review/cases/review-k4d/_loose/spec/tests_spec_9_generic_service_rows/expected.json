@@ -1,17 +1,37 @@
 {
-  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
-  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
+  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 3.0,
+  "bound_seconds": 10.0,
   "outcome": {
     "check": {
       "command": [
         "check",
         "--types"
       ],
-      "exit": 1,
-      "stdout": "spec/generic_service_rows.use : () -> Nil ! N | S(N)\nspec/generic_service_rows.run : (body: () -> A ? E ! N) -> A ? E ! N\nspec/generic_service_rows.get : () -> Int ! Dependency\nspec/generic_service_rows.read : () -> Int ! N | Inner(N)\nspec/generic_service_rows.make : (send: (Entry) -> Nil ? E ! N) -> Sink(E, N)\nspec/generic_service_rows.write : (entry: Entry) -> Nil ? E ! N | Sink(E, N)\n",
-      "stderr": "test/generic_service_rows.i:8:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/generic_service_rows.i:13:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/generic_service_rows.i:24:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/generic_service_rows.i:28:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/generic_service_rows.i:50:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/generic_service_rows.i:58:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\n6 errors\n"
+      "exit": 0,
+      "stdout": "spec/generic_service_rows.use : () -> Nil ! N | S(N)\nspec/generic_service_rows.annotated : () -> Nil ! N | S(N)\nspec/generic_service_rows.run : (body: () -> A ? E ! N) -> A ? E ! N\nspec/generic_service_rows.finite : () -> Nil ! Assert\nspec/generic_service_rows.get : () -> Int ! Dependency\nspec/generic_service_rows.read : () -> Int ! N | Inner(N)\nspec/generic_service_rows.read_outer : () -> Int ! N | Outer(N)\nspec/generic_service_rows.nested : () -> Nil ! Assert\nspec/generic_service_rows.make : (send: (Entry) -> Nil ? E ! N) -> Sink(E, N)\nspec/generic_service_rows.write : (entry: Entry) -> Nil ? E ! N | Sink(E, N)\nspec/generic_service_rows.write_annotated : (entry: Entry) -> Nil ? E ! N | Sink(E, N)\nspec/generic_service_rows.logging : () -> Nil ! Assert\n",
+      "stderr": ""
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass spec/generic_service_rows.finite\npass spec/generic_service_rows.nested\npass spec/generic_service_rows.logging\npass spec/qa_corpus_runtime_test.qa_startup\n4 passed, 0 failed\n",
+      "stderr": ""
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass spec/generic_service_rows.finite\npass spec/generic_service_rows.nested\npass spec/generic_service_rows.logging\npass spec/qa_corpus_runtime_test.qa_startup\n4 passed, 0 failed\n",
+      "stderr": ""
     }
   }
 }
