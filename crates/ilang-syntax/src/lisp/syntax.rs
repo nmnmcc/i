@@ -96,6 +96,14 @@ pub struct Capture {
 }
 
 impl Syntax {
+    pub(super) fn written(node: Node, scope: &Scope, span: Span) -> Self {
+        Self(Arc::new(SyntaxData {
+            node,
+            scope: scope.clone(),
+            span,
+            provenance: Provenance::Written,
+        }))
+    }
     pub fn from_datum(d: &Datum, scope: &Scope) -> Self {
         let children = |xs: &[Datum]| xs.iter().map(|x| Self::from_datum(x, scope)).collect();
         let node = match &d.kind {

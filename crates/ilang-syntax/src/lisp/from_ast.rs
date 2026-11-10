@@ -323,6 +323,7 @@ fn expr(e: &Expr) -> String {
                 .map(expr)
                 .chain(rest.iter().flat_map(|r| ["..".into(), expr(r)])),
         ),
+        ExprKind::BitArray(xs) if xs.is_empty() => "<<>>".into(),
         ExprKind::BitArray(xs) => braced("<< ", " >>", xs.iter().map(|s| segment(s, expr))),
         ExprKind::Block(b) => match b.stmts.as_slice() {
             [Stmt::Expr(e)] => expr(e),
@@ -453,6 +454,7 @@ fn pattern(p: &Pattern) -> String {
                 std::iter::once("..".into()).chain(r.iter().map(|b| b.name.clone()))
             })),
         ),
+        PatternKind::BitArray(xs) if xs.is_empty() => "<<>>".into(),
         PatternKind::BitArray(xs) => braced("<< ", " >>", xs.iter().map(|s| segment(s, pattern))),
     }
 }

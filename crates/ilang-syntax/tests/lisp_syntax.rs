@@ -1,5 +1,5 @@
 use ilang_syntax::lisp::{
-    parse,
+    expression_syntax, item_syntax, parse,
     syntax::{Node, Position, Provenance, Scope, Substitution, Syntax},
 };
 use std::collections::BTreeSet;
@@ -53,6 +53,102 @@ fn show_as_checks_the_requested_syntactic_position() {
     );
     assert!(root("`(f x)").show_as(Position::Expression).is_err());
     assert!(root("(,)").show_as(Position::Type).is_err());
+}
+
+#[test]
+fn normal_source_encodes_to_syntax_with_original_leaf_spans() {
+    let source = "f = (x) { x + 2 }\n";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let ilang_syntax::ast::ItemKind::Binding(binding) = &module.items[0].kind else {
+        panic!()
+    };
+    let syntax = expression_syntax(
+        &binding.value,
+        &Scope {
+            module: 9,
+            marks: BTreeSet::new(),
+        },
+        source,
+    );
+    assert_eq!(syntax.show(), "(-> (x) _ {(+ x 2)})");
+    let Node::Round(function) = syntax.node() else {
+        panic!()
+    };
+    let Node::Curly(body) = function[3].node() else {
+        panic!()
+    };
+    let Node::Round(sum) = body[0].node() else {
+        panic!()
+    };
+    let x = &sum[1];
+    assert_eq!(&source[x.span().start as usize..x.span().end as usize], "x");
+    assert_eq!(x.scope().module, 9);
+    assert_eq!(
+        &source[sum[0].span().start as usize..sum[0].span().end as usize],
+        "+"
+    );
+}
+
+#[test]
+fn normal_library_bindings_encode_without_reparsing_the_source() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut dirs = vec![root.join("lib"), root.join("std")];
+    let scope = Scope {
+        module: 0,
+        marks: BTreeSet::new(),
+    };
+    while let Some(dir) = dirs.pop() {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                dirs.push(path);
+                continue;
+            }
+            if path.extension().is_none_or(|ext| ext != "i") {
+                continue;
+            }
+            let source = std::fs::read_to_string(&path).unwrap();
+            let (module, errors) = ilang_syntax::parse_module(&source);
+            assert!(errors.is_empty(), "{}: {errors:?}", path.display());
+            for item in module.items {
+                let mut clean = item.clone();
+                clean.doc.clear();
+                let expected_item = ilang_syntax::ast::Module {
+                    items: vec![clean],
+                    ..Default::default()
+                };
+                assert_eq!(
+                    item_syntax(&item, &scope, &source).show(),
+                    ilang_syntax::lisp::print_module(&expected_item).trim_end(),
+                    "{}",
+                    path.display()
+                );
+                let ilang_syntax::ast::ItemKind::Binding(binding) = &item.kind else {
+                    continue;
+                };
+                let syntax = expression_syntax(&binding.value, &scope, &source);
+                let datum = parse(&syntax.show()).unwrap();
+                let decoded = ilang_syntax::lisp::parse_expression(&datum[0]).unwrap();
+                let expected = ilang_syntax::ast::Module {
+                    items: vec![item.clone()],
+                    ..Default::default()
+                };
+                let mut actual = expected.clone();
+                let ilang_syntax::ast::ItemKind::Binding(b) = &mut actual.items[0].kind else {
+                    unreachable!()
+                };
+                b.value = decoded;
+                assert_eq!(
+                    ilang_syntax::shape::canon(&expected),
+                    ilang_syntax::shape::canon(&actual),
+                    "{}: {}",
+                    path.display(),
+                    syntax.show()
+                );
+            }
+        }
+    }
 }
 
 #[test]
