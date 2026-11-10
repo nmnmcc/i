@@ -248,9 +248,7 @@ impl Solver {
         }
         // §4.5 rule 2: these are inclusions, not recursive bounds such as
         // `n <: n | S(n)`. Recording them would invent an occurs cycle.
-        if matches!(r, Ty::Union(ms) if ms.contains(l))
-            || matches!(l, Ty::Inter(ms) if ms.contains(r))
-        {
+        if matches!(l, Ty::Var(_)) && matches!(r, Ty::Union(ms) if ms.contains(l)) {
             return;
         }
         if (matches!(l, Ty::Var(_)) || matches!(r, Ty::Var(_)))
