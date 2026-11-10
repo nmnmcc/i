@@ -58,6 +58,22 @@ impl Hook for TestHook {
             Ok(expression("0"))
         }
     }
+    fn is_type_macro(
+        &mut self,
+        _: &ilang_syntax::ast::TypeExpr,
+        _: &[Local],
+        _: u32,
+    ) -> Result<bool, Self::Error> {
+        Ok(false)
+    }
+    fn expand_type(
+        &mut self,
+        _: &ilang_syntax::ast::TypeExpr,
+        _: &[Local],
+        _: u32,
+    ) -> Result<ilang_syntax::ast::TypeExpr, Self::Error> {
+        unreachable!()
+    }
     fn depth_error(&mut self, _: Span) -> Self::Error {
         "depth"
     }
@@ -108,4 +124,63 @@ fn direct_recursive_bindings_shadow_macros_only_in_function_bodies() {
     // The only macro is the non-direct binding's right-hand side; its own
     // binder does not cover an earlier definition until after that value.
     assert_eq!(hook.calls, ["m"]);
+}
+
+#[test]
+fn type_macros_are_expanded_outside_in_in_body_annotations() {
+    use ilang_syntax::ast::{TypeExpr, TypeKind};
+    #[derive(Default)]
+    struct Types(Vec<String>);
+    impl Hook for Types {
+        type Error = &'static str;
+        fn is_macro(&mut self, _: &Expr, _: &[Local], _: u32) -> Result<bool, Self::Error> {
+            Ok(false)
+        }
+        fn expand(&mut self, _: &Expr, _: &[Local], _: u32) -> Result<Expr, Self::Error> {
+            unreachable!()
+        }
+        fn is_type_macro(
+            &mut self,
+            t: &TypeExpr,
+            _: &[Local],
+            _: u32,
+        ) -> Result<bool, Self::Error> {
+            Ok(
+                matches!(&t.kind, TypeKind::Call { name, .. } if name.name == "outer" || name.name == "inner"),
+            )
+        }
+        fn expand_type(
+            &mut self,
+            t: &TypeExpr,
+            _: &[Local],
+            _: u32,
+        ) -> Result<TypeExpr, Self::Error> {
+            let TypeKind::Call { name, .. } = &t.kind else {
+                unreachable!()
+            };
+            self.0.push(name.name.clone());
+            let source = if name.name == "outer" {
+                "inner(Int)"
+            } else {
+                "Int"
+            };
+            let (module, errors) = ilang_syntax::parse_module(&format!("x: {source}"));
+            assert!(errors.is_empty(), "{errors:?}");
+            let ItemKind::Declaration { ty, .. } = &module.items[0].kind else {
+                panic!()
+            };
+            Ok(ty.clone())
+        }
+        fn depth_error(&mut self, _: Span) -> Self::Error {
+            "depth"
+        }
+        fn is_direct(&mut self, _: &Expr, _: &[Local], _: u32) -> bool {
+            false
+        }
+    }
+    let (mut module, errors) = ilang_syntax::parse_module("x: outer(inner(Int))");
+    assert!(errors.is_empty(), "{errors:?}");
+    let mut hook = Types::default();
+    body_walk::expressions(&mut module, &mut hook).unwrap();
+    assert_eq!(hook.0, ["outer", "inner"]);
 }

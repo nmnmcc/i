@@ -28,6 +28,18 @@ pub trait Hook {
         locals: &[Local],
         fn_depth: u32,
     ) -> Result<Expr, Self::Error>;
+    fn is_type_macro(
+        &mut self,
+        ty: &ast::TypeExpr,
+        locals: &[Local],
+        fn_depth: u32,
+    ) -> Result<bool, Self::Error>;
+    fn expand_type(
+        &mut self,
+        ty: &ast::TypeExpr,
+        locals: &[Local],
+        fn_depth: u32,
+    ) -> Result<ast::TypeExpr, Self::Error>;
     fn depth_error(&mut self, span: Span) -> Self::Error;
     /// Whether a binding has a direct value (§6.10); module-qualified names
     /// require the same scope-aware lookup used by name resolution.
@@ -44,11 +56,42 @@ pub fn expressions<H: Hook>(module: &mut ast::Module, hook: &mut H) -> Result<()
     };
     for item in &mut module.items {
         match &mut item.kind {
-            ast::ItemKind::Binding(binding) => walker.expr(&mut binding.value, 0)?,
+            ast::ItemKind::Binding(binding) => {
+                walker.pattern(&mut binding.pattern, 0)?;
+                walker.expr(&mut binding.value, 0)?;
+            }
             ast::ItemKind::MacroItem { .. } => {
                 panic!("item expansion must finish before body expansion")
             }
-            ast::ItemKind::TypeDef(_) | ast::ItemKind::Declaration { .. } => {}
+            ast::ItemKind::Declaration { ty, .. } => walker.ty(ty, 0)?,
+            ast::ItemKind::TypeDef(_) => {}
+        }
+    }
+    Ok(())
+}
+
+/// Expand type-position macros in one written type definition during the item
+/// phase. Bindings, declarations and their type positions are left for bodies.
+pub fn type_definition<H: Hook>(
+    definition: &mut ast::TypeDef,
+    hook: &mut H,
+) -> Result<(), H::Error> {
+    let mut walker = Walker {
+        hook,
+        locals: Vec::new(),
+        fn_depth: 0,
+    };
+    for head in &mut definition.head {
+        walker.ty(head, 0)?;
+    }
+    match &mut definition.body {
+        ast::TypeBody::Alias(ty) => walker.ty(ty, 0)?,
+        ast::TypeBody::Custom(constructors) => {
+            for constructor in constructors {
+                for field in &mut constructor.fields {
+                    walker.ty(&mut field.ty, 0)?;
+                }
+            }
         }
     }
     Ok(())
@@ -104,8 +147,18 @@ impl<H: Hook> Walker<'_, H> {
                 // scope; earlier segments of one bit pattern are handled by
                 // `pattern` itself.
                 for param in &mut function.params {
-                    if let ast::Param::Pattern(pattern) = param {
-                        self.pattern(pattern, depth)?;
+                    match param {
+                        ast::Param::Pattern(pattern) => self.pattern(pattern, depth)?,
+                        ast::Param::Env { ty, .. } => self.ty(ty, depth)?,
+                    }
+                }
+                if let Some(ret) = &mut function.ret {
+                    self.ty(&mut ret.value, depth)?;
+                    if let Some(err) = &mut ret.err {
+                        self.ty(err, depth)?;
+                    }
+                    if let Some(env) = &mut ret.env {
+                        self.ty(env, depth)?;
                     }
                 }
                 self.fn_depth += 1;
@@ -179,7 +232,11 @@ impl<H: Hook> Walker<'_, H> {
                     self.locals.truncate(before);
                     binders(&binding.pattern, &mut self.locals, None);
                 }
-                Stmt::Env { value, .. } | Stmt::Expr(value) => self.expr(value, depth)?,
+                Stmt::Env { ty, value, .. } => {
+                    self.ty(ty, depth)?;
+                    self.expr(value, depth)?;
+                }
+                Stmt::Expr(value) => self.expr(value, depth)?,
             }
         }
         self.locals.truncate(start);
@@ -211,6 +268,46 @@ impl<H: Hook> Walker<'_, H> {
         }
         Ok(())
     }
+    fn ty(&mut self, ty: &mut ast::TypeExpr, depth: u16) -> Result<(), H::Error> {
+        if self.hook.is_type_macro(ty, &self.locals, self.fn_depth)? {
+            if depth == 256 {
+                return Err(self.hook.depth_error(ty.span));
+            }
+            *ty = self.hook.expand_type(ty, &self.locals, self.fn_depth)?;
+            return self.ty(ty, depth + 1);
+        }
+        match &mut ty.kind {
+            ast::TypeKind::Named { args, .. }
+            | ast::TypeKind::Call { args, .. }
+            | ast::TypeKind::Tuple(args)
+            | ast::TypeKind::Union(args)
+            | ast::TypeKind::Inter(args)
+            | ast::TypeKind::Diff(args) => {
+                for arg in args {
+                    self.ty(arg, depth)?;
+                }
+            }
+            ast::TypeKind::Fn {
+                params,
+                ret,
+                err,
+                env,
+            } => {
+                for param in params {
+                    self.ty(&mut param.ty, depth)?;
+                }
+                self.ty(ret, depth)?;
+                if let Some(err) = err {
+                    self.ty(err, depth)?;
+                }
+                if let Some(env) = env {
+                    self.ty(env, depth)?;
+                }
+            }
+            ast::TypeKind::Lit(_) | ast::TypeKind::ValueOf { .. } | ast::TypeKind::Hole => {}
+        }
+        Ok(())
+    }
     fn pattern(&mut self, pattern: &mut Pattern, depth: u16) -> Result<(), H::Error> {
         match &mut pattern.kind {
             PatternKind::Named { pattern, .. } => self.pattern(pattern, depth)?,
@@ -237,10 +334,10 @@ impl<H: Hook> Walker<'_, H> {
                 }
                 self.locals.truncate(start);
             }
+            PatternKind::Typed { ty, .. } => self.ty(ty, depth)?,
             PatternKind::Quote(_)
             | PatternKind::Var(_)
             | PatternKind::Discard(_)
-            | PatternKind::Typed { .. }
             | PatternKind::Int { .. }
             | PatternKind::Float { .. }
             | PatternKind::String(_)
