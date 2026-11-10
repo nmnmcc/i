@@ -772,3 +772,150 @@ had only sampled busy windows (up to 98%). This interrupts a waiting
 measurement gate, not an executing language/Rust test. It will be restarted
 against the merged sources and final binary. No process outside this
 lane's sampler was signalled; no environment setting was changed.
+
+### Final upstream integration
+
+Merged refs/heads/redesign through 50c44a9, including Std-2 and the JS/WASI
+source amendments, at 4472a97. The sole conflict was the shared insertion
+point in spec §10.3. Both T1's directional scalar paragraph/example and
+the upstream request-declaration paragraph are retained, in that order.
+This was a merge conflict, not a language contradiction. Git's automatic
+conflict footer initially followed the co-author trailer; the merge
+message was immediately amended to restore the required final trailer.
+
+Before merging, 33 generated outputs were archived as an ignored patch
+and restored to their tracked versions. UPDATE=1 then regenerated them
+through the checker/syntax generation commands; no golden was hand-edited.
+The final audit compares against source checkpoint 4472a97, and assigns a
+rule to every one of 419 changed lines across 33 outputs. The only parser
+recovery change is consuming literal 1 before expecting its arrow.
+
+Merged full dev-verify: exit 0, 219 spec cases at O0/O2, 1446 std tests
+per level, 36 browser tests; fmt, Clippy -D warnings and all Rust targets
+pass. Logs: final-full.log, final-generated.log, final-old-syntax.log.
+old-syntax-check parses 1298 snippets with exact diagnostics and 17
+other-track futures, none T1. WAT export passes (832 files); the separate
+wat-review.md gives exact byte counts, provenance and residual classes.
+The optional slow Python std unified-diff analysis was terminated and
+replaced with GNU diff; the complete byte inventory was already done,
+and no actual test or WAT generation was interrupted.
+
+Final corpus audit: 316 cases, 265 kept, 50 new, one lost pre-existing
+checker fixture, types/spec.i's `assert(1 == 2)` (the required E0520).
+The actual before binary is the archived pre-stage-7 checkpoint. The
+four original runtime fixtures have their separately verified §8 E0520
+changes; all parameter-based replacements run. The supplied 1df2fe0
+binary also checks the expanded current std, so the final performance
+comparison can keep the same source tree for both binaries.
+
+A lower-priority source still has stale prose: syntax.md §6.1 says
+`{ x: 1 -> 2 }` is a records error. Literal-types §6.1 expressly replaces
+that sentence; spec §6.1 and the parser implement the replacement. The
+accepted note wins under this task's source order. This design-note
+cleanup is outside T1's assigned implementation/spec paths and is left
+for its owner; it requires no compiler or normative-spec change.
+
+Upstream moved during final verification. Binding grants (99a030e) were
+merged cleanly at 5f53999; its full gate passed 219 spec cases, 1446 std
+tests per level and 51 browser tests. Std/property and string additions
+(94789e6) then merged cleanly at dae12ce. The final full gate again passes:
+219 spec cases at O0/O2, 1465 std tests at each level, 51 browser tests,
+fmt/Clippy/all Rust targets. Log: final-std3-full.log. All T1 code and
+K1's invariant traversal are preserved across the automatic lower merge.
+The upstream Cargo.lock change is retained as part of binding grants;
+T1 did not update dependency versions or global configuration.
+
+Final old-syntax scan: 1309 snippets, exact diagnostics, 17 other-track
+futures, none T1. Final sanctioned regeneration after binding grants is
+green, with the same 33 golden outputs; their audit now compares dae12ce.
+The temporary relative WAT export directory under the CLI crate was moved
+unchanged into the ignored root target directory and its empty parents
+removed. The repeated absolute-path WAT export passes; both have 832
+files. Final byte counts and all source-inventory differences are recorded
+in wat-review.md. No untracked artifact directory remains in a crate.
+
+The first reserved-window timing attempt met the numeric std gate (+6.8%)
+but failed the independent quiet gate (17–19% background CPU). A second
+attempt after binding grants likewise met the numeric std gate and failed
+the quiet gate (~14%). Reports are retained; neither is final performance
+evidence. The second retry wait was cancelled before the Std-3a merge,
+with no perf.py/cargo child active. The next original-baseline warm-up
+correctly failed: 1df2fe0 lacks the i/random Generator/split/at_path API
+that the new property module imports. The harness recorded all 28 E0203
+errors and returned nonzero; it did not time this failed check.
+
+The compatible before binary is a copy of the other lane's pre-T1
+94789e6 release build. All 910 tracked blobs of its source tree match
+that revision; the binary is newer than those sources and its SHA-256
+is preserved. Its control `x = 1` shows Int (T1 is off) and it checks the
+same latest std. This borrowed build is an explicitly labelled substitute
+for 1865366/1df2fe0, not a build performed by this lane. It includes none
+of T1's latent representation changes, unlike the stage-6b binary.
+Provenance and verification are saved in borrowed-baseline-provenance.json
+and final-compatible-baseline.log under the continuation target directory.
+
+The compatible-baseline corpus audit agrees: 316 cases, 265 kept, 50 new,
+only the required types/spec.i E0520 lost. Std has 2197 type lines; exactly
+ten constants change to their literal types and all 2187 other lines are
+byte-identical. Source: no widening / literal expression rule (§4.2),
+exactly the ten constants listed by §8. All four ignored stresses were
+also rerun after integration and passed at peak two bounds/head/side.
+
+### Final performance gate: met on the compatible pre-T1 baseline
+
+The unchanged aggregate gate passed on attempt 18, using the verified
+94789e6 before binary and the final T1 release binary, pinned equally to
+CPU 6. Each binary has one warm-up and eleven samples per case. The
+coordinator's quiet wrapper reserves all three heavy slots; the separate
+background-CPU measurement also passed (std maximum 2.421%, stress maximum
+3.407% of machine capacity). The extra 5% measurement threshold was never
+relaxed. Original comparison to 1865366 is not claimed: 94789e6 is the
+explicit compatible substitute, for the reasons/provenance above.
+
+| Case | Before median ms | T1 median ms | Required ratio / result |
+|---|---:|---:|---|
+| std | 283.351 | 307.156 | 1.08401, +8.401%: within +10% and +18% ceiling |
+| keys 250 | 6.310 | 7.262 | recorded sample size |
+| keys 500 | 6.262 | 8.570 | recorded sample size |
+| keys 1000 | 6.495 | 10.025 | 1.54357× before, doubling 1.16979× |
+| pick 250 | 12.991 | 8.923 | recorded sample size |
+| pick 500 | 31.867 | 11.511 | recorded sample size |
+| pick 1000 | 106.633 | 20.714 | 0.194253× before, doubling 1.79951× |
+| local calls 2500 | 12.720 | 20.523 | shared monotype verified by counter test |
+| local calls 5000 | 19.060 | 36.883 | doubling 1.79713×, within 2.5× |
+
+All four ignored tests then passed through the heavy wrapper, at peak
+two bounds per head per side. Complete samples, binary hashes, background
+measurements and test log are in
+`target/t1/continued/final-verified-performance-18/{std.json,stress.json,ignored.log}`.
+The script command is `tests/t1/perf-gate.sh BEFORE AFTER REPORT_DIR 6`
+through the dev shell. It releases the quiet locks before the Rust tests.
+
+Attempts 1–17 with this baseline were rejected measurement windows, with
+all reports retained. Some numeric ratios also fluctuated in those busy
+windows; none is substituted for the valid experiment. A separate early
+stress run met every numeric limit but failed its quiet gate (8.195%).
+The final pass meets both quality and numeric gates together. The earlier
+async request for quiet-window availability is resolved; no user action
+is needed. A read-only before/during/after diagnostic was queued while
+investigating the background load; it changes no measurement condition.
+
+Every implementation stage is now complete, with full functional gates
+at its checkpoint, followed by latest-upstream verification. Final source
+head before the report/derived commits is dae12ce, containing redesign
+94789e6. All stages keep their independent interpretation tests. The final
+coordinator follow-ups are the stale syntax.md example, the required later
+rule-13 language question, existing callback-family question 8, baseline
+call-scaling ticket T1-P1 and upstream K3 metadata cost. No action outside
+T1's owned paths was taken for those follow-ups.
+
+The read-only load diagnostic completed: its before/during/after CPU
+fractions were about 8.1/7.2/7.0%, confirming that the surrounding workload
+varies between windows. It did not change the estimator or threshold.
+The accepted attempt 18 is a separate, actually quiet experiment. Final
+verification and generation sessions all returned exit 0. The final
+report-only old-syntax scan also checks the completed audit documents.
+No global environment changes remain; build/audit artifacts stay in the
+lane's ignored target directory, and upstream dependency changes stay as
+intended merged changes. Only the documented waits/optional diff analysis
+were interrupted; every required implementation and runtime check finished.
