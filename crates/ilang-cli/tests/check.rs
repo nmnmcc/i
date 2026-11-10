@@ -192,3 +192,38 @@ fn migration_flags_are_removed() {
         assert!(String::from_utf8_lossy(&out.stderr).contains("unexpected argument"));
     }
 }
+
+#[test]
+fn disjoint_comparisons_are_warnings_in_check_and_test() {
+    // W520/§6.9: warning-only programs succeed; both comparisons have Bool.
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir_all(dir.path().join("test")).unwrap();
+    std::fs::write(
+        dir.path().join("test/comparison.i"),
+        "value = 1 == 2\n@test\ncomparison = () { assert(1 != 2) }\n",
+    )
+    .unwrap();
+    for args in [
+        vec!["check", "--types"],
+        vec!["test", "--opt", "0"],
+        vec!["test", "--opt", "2"],
+    ] {
+        let out = Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(&args)
+            .arg("--project")
+            .arg(dir.path())
+            .output()
+            .unwrap();
+        let err = String::from_utf8(out.stderr).unwrap();
+        assert!(out.status.success(), "{args:?}: {err}");
+        assert_eq!(err.matches("warning[W0503]").count(), 2, "{err}");
+        assert!(!err.contains("error["), "{err}");
+        let stdout = String::from_utf8(out.stdout).unwrap();
+        if args[0] == "check" {
+            assert!(stdout.contains("app/comparison.value : Bool"), "{stdout}");
+        } else {
+            assert!(stdout.contains("1 passed"), "{stdout}");
+        }
+    }
+}

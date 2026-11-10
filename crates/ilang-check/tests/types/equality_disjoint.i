@@ -1,8 +1,8 @@
 // §6.9: `==` and `!=` on two values whose known types are disjoint
-// (§4.5 rule 3) are a compile error. A member that is `_` or a type
+// (§4.5 rule 3) give a warning. A member that is `_` or a type
 // variable is never disjoint from anything.
 
-// The examples of the spec: errors.
+// The examples of the spec: warnings.
 literals = 1 == "a"
 
 typed = (s: String) { s == 1 }

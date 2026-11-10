@@ -3,7 +3,7 @@ prefix : (v: A) -> Bool
 float : (v: A) -> Bool
 lit_known : (v: Int | String) -> Bool
 prefix_known : (v: String) -> Bool
-6:12: error[E0520]: both sides are constants, `1` and `"s"`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
-13:29: error[E0520]: the two sides have the known types `String` and `1`, which are disjoint, so the result would always be the same (§6.9)
-28:12: error[E0520]: both sides are constants, `1` and `"s"`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
-35:19: error[E0520]: the two sides have the known types `String` and `1`, which are disjoint, so the result would always be the same (§6.9)
+6:12: warning[W0503]: both sides are constants, `1` and `"s"`, which can never be equal, so `==` is always `False` (§6.9)
+13:29: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+28:12: warning[W0503]: both sides are constants, `1` and `"s"`, which can never be equal, so `==` is always `False` (§6.9)
+35:19: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
