@@ -53,15 +53,15 @@ fn agrees(name: &str, source: &str) -> (bool, bool) {
 fn both_agrees_with_old() {
     let sources = common::corpus();
     assert!(sources.len() > 500);
-    let baseline = common::baseline_paths();
     eprintln!("comparing {} corpus sources", sources.len());
-    let mut exceptions = (0, 0);
     for (name, source) in sources {
+        agrees(&name, &source);
+    }
+    let mut exceptions = (0, 0);
+    for (name, source) in common::baseline_corpus() {
         let (ambiguous, joined) = agrees(&name, &source);
-        if baseline.contains(name.split(':').next().unwrap()) {
-            exceptions.0 += usize::from(ambiguous);
-            exceptions.1 += usize::from(joined);
-        }
+        exceptions.0 += usize::from(ambiguous);
+        exceptions.1 += usize::from(joined);
     }
     assert_eq!(exceptions, (0, 0), "D4 and J1 have no corpus hits at base");
 }

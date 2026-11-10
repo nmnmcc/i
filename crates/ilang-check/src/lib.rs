@@ -45,6 +45,13 @@ pub mod code {
     pub const TYPE_PARAM_TWICE: &str = "E0226";
     pub const EXPORT_HIDDEN_TYPE: &str = "E0227";
     pub const ENV_PARAMS_SAME: &str = "E0228";
+    pub const TYPE_OF_VALUE_RESERVED: &str = "E0229";
+    pub const TYPE_VAR_ARGS: &str = "E0230";
+    pub const TYPE_VAR_IS_TYPE: &str = "E0231";
+    pub const TYPE_PARAM_FORM: &str = "E0232";
+    pub const ALIAS_PATTERN_RESERVED: &str = "E0233";
+    pub const MACRO_RESERVED: &str = "E0234";
+    pub const TYPE_VAR_MIXED: &str = "E0236";
     pub const CHOICES_ONE_CLAUSE: &str = "E0235";
     // Attributes and entry points.
     pub const UNKNOWN_ATTRIBUTE: &str = "E0301";
@@ -174,3 +181,7 @@ pub fn check(graph: &PackageGraph) -> Checked {
         diags,
     }
 }
+
+/// Only for the E2 equivalence audit. A3 removes this feature.
+pub const ONE_CLAUSE_AS_CASE: bool = cfg!(feature = "one-clause-as-case");
+const _: () = assert!(!(ONE_CLAUSE_AS_CASE && !cfg!(debug_assertions)));

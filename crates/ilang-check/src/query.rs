@@ -531,7 +531,7 @@ impl<'a> Query<'a> {
         let found = w
             .occ
             .iter()
-            .filter(|(s, _)| s.start <= offset && offset <= s.end)
+            .filter(|(s, _)| s.start < s.end && s.start <= offset && offset <= s.end)
             .min_by_key(|(s, _)| s.end - s.start)
             .cloned();
         // `m` in `m.x`: the HIR has one name for `m.x`.
@@ -1161,6 +1161,9 @@ struct Walk<'q> {
 
 impl Walk<'_> {
     fn binder(&mut self, b: &Binder) {
+        if b.name.starts_with('%') {
+            return;
+        }
         self.binders.entry(b.var).or_insert(b.span);
         self.occ.push((b.span, Target::Local(b.var)));
     }
@@ -1266,6 +1269,9 @@ impl Walk<'_> {
                 .occ
                 .push((e.span, Target::Literal(BuiltinType::String))),
             ExprKind::Name(v) => {
+                if e.span.start == e.span.end {
+                    return;
+                }
                 let span = last_word(self.text, e.span);
                 let t = match v {
                     ValueRef::Local(v) => Target::Local(*v),
@@ -1395,6 +1401,7 @@ fn pattern_binders(p: &Pattern, out: &mut Vec<Binder>) {
         PatternKind::BitArray(segs) => segs.iter().for_each(|s| pattern_binders(&s.value, out)),
         _ => {}
     }
+    out.retain(|b| !b.name.starts_with('%'));
 }
 
 impl Scope<'_> {
@@ -1411,7 +1418,10 @@ impl Scope<'_> {
     fn block(&mut self, b: &Block) {
         for s in &b.stmts {
             let span = match s {
-                Stmt::Bind(b) => b.span,
+                Stmt::Bind(b) => Span::new(
+                    b.span.start.min(b.value.span.start),
+                    b.span.end.max(b.value.span.end),
+                ),
                 Stmt::Env { span, .. } => *span,
                 Stmt::Expr(e) => e.span,
             };

@@ -576,3 +576,33 @@ fn completions_after_any_expression() {
     let cs = f.completions("app/main", "make().x", 8);
     assert_eq!(labels(&cs), vec!["x", "y"]);
 }
+
+#[test]
+fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
+    // A1 §3.12: the made-up binding covers the subject too, and its names
+    // enter scope only in the body. Synthetic parameters never appear.
+    let source = "main = () { local = 4\n (x) { local + x } |> { f -> f(local) } }\nmany = { 0 -> 1  _ -> 2 }\nuse_many = () { apply(1,{ 0 -> 1  _ -> 2 }) }\napply = (x, f) { f(x) }";
+    let fixture = Fixture::new(&[("src/main.i", source)]);
+    let subject = fixture.completions("app/main", "local + x", 0);
+    assert!(subject.iter().any(|(n, _)| n == "local"), "{subject:?}");
+    assert!(subject.iter().any(|(n, _)| n == "x"), "{subject:?}");
+    assert!(!subject.iter().any(|(n, _)| n == "f"), "{subject:?}");
+    let body = fixture.completions("app/main", "f(local)", 0);
+    assert!(body.iter().any(|(n, _)| n == "f"), "{body:?}");
+    for needle in ["{ 0 ->", ",{ 0 ->"] {
+        let at = fixture.at("app/main", needle, 0, 0);
+        let query = fixture.query();
+        let module = fixture.module("app/main");
+        assert!(
+            !query
+                .completions_at(module, at)
+                .iter()
+                .any(|c| c.label.starts_with('%'))
+        );
+        if let Some(hover) = query.type_at(module, at) {
+            assert!(!hover.code.contains("%arg"), "{}", hover.code);
+        }
+        assert!(query.definition_at(module, at).is_none());
+    }
+    assert!(fixture.hover("app/main", "many", 0).contains("(a) -> Int"));
+}

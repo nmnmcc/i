@@ -14,3 +14,6 @@ rustc-hash.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[features]
+one-clause-as-case = []

@@ -13,10 +13,23 @@ pub fn shape(module: &Module) -> String {
 /// Rust literals (including the A2 list). Frozen old inputs remain here
 /// after A2. Include new test inputs while they are still untracked.
 pub fn corpus() -> Vec<(String, String)> {
+    corpus_revision(None)
+}
+
+/// Read the actual base texts, rather than treating new literals added to
+/// an existing test file as if they had already been present at base.
+pub fn baseline_corpus() -> Vec<(String, String)> {
+    corpus_revision(Some("b28fca5"))
+}
+
+fn corpus_revision(revision: Option<&str>) -> Vec<(String, String)> {
     use std::{fs, path::Path, process::Command};
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let files = Command::new("git")
-        .args([
+    let mut git = Command::new("git");
+    if let Some(revision) = revision {
+        git.args(["ls-tree", "-r", "--name-only", revision]);
+    } else {
+        git.args([
             "ls-files",
             "--cached",
             "--others",
@@ -25,10 +38,9 @@ pub fn corpus() -> Vec<(String, String)> {
             "*.i",
             "*.md",
             "*.rs",
-        ])
-        .current_dir(&root)
-        .output()
-        .unwrap();
+        ]);
+    }
+    let files = git.current_dir(&root).output().unwrap();
     assert!(files.status.success());
     let mut out = Vec::new();
     let mut paths: Vec<_> = String::from_utf8(files.stdout)
@@ -39,7 +51,23 @@ pub fn corpus() -> Vec<(String, String)> {
     paths.sort();
     paths.dedup();
     for path in paths {
-        let text = fs::read_to_string(root.join(&path)).unwrap();
+        if ![".i", ".md", ".rs"]
+            .iter()
+            .any(|suffix| path.ends_with(suffix))
+        {
+            continue;
+        }
+        let text = if let Some(revision) = revision {
+            let output = Command::new("git")
+                .args(["show", &format!("{revision}:{path}")])
+                .current_dir(&root)
+                .output()
+                .unwrap();
+            assert!(output.status.success());
+            String::from_utf8(output.stdout).unwrap()
+        } else {
+            fs::read_to_string(root.join(&path)).unwrap()
+        };
         if path.ends_with(".i") {
             out.push((path, text));
         } else if path.ends_with(".md") {

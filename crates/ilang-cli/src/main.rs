@@ -335,6 +335,16 @@ fn check(project: &Path, offline: bool, types: bool) -> ExitCode {
             }
         }
     }
+    for diagnostic in &mut diags {
+        if diagnostic.is_error()
+            && diagnostic.code.starts_with("E01")
+            && let Some(source) = diagnostic.source
+            && let Some(hint) = ilang_syntax::old_syntax_hint(&graph.sources.get(source).text)
+        {
+            diagnostic.message.push_str("; ");
+            diagnostic.message.push_str(hint);
+        }
+    }
     for line in graph.sources.render_all(&diags) {
         eprintln!("{line}");
     }
