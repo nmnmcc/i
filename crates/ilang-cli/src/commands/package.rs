@@ -1465,12 +1465,19 @@ impl<'a> TypeShow<'a> {
                 if let Some(base) = base {
                     parts.push(format!("..{}", self.ty(base, 0)));
                 }
-                parts.extend(
-                    fields
-                        .iter()
-                        .map(|(label, ty)| format!("{}: {}", label.name, self.ty(ty, 0))),
-                );
-                parts.extend(removed.iter().map(|label| format!("-{}", label.name)));
+                parts.extend(fields.iter().map(|(label, ty)| {
+                    format!(
+                        "{}: {}",
+                        ilang_syntax::print::record_label(&label.name, label.parameter.is_some()),
+                        self.ty(ty, 0)
+                    )
+                }));
+                parts.extend(removed.iter().map(|label| {
+                    format!(
+                        "-{}",
+                        ilang_syntax::print::record_label(&label.name, label.parameter.is_some())
+                    )
+                }));
                 format!("({})", parts.join(", "))
             }
             TypeKind::Fn {

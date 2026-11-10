@@ -230,14 +230,14 @@ pub(crate) fn boundary_type(
                 let mut labels = Vec::new();
                 let mut resolved = Vec::new();
                 for (name, ty) in fields {
-                    let label = records::Label::name(name.name.as_str());
+                    let label = records::written_label(name, s.level);
                     labels.push(label.clone());
                     resolved.push((label, convert(s, ty, p, expand)?));
                 }
                 labels.extend(
                     removed
                         .iter()
-                        .map(|name| records::Label::name(name.name.as_str())),
+                        .map(|name| records::written_label(name, s.level)),
                 );
                 let record = s.record(resolved);
                 match base {

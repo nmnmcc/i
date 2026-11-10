@@ -280,3 +280,9 @@ impl Walk for TypeKind {
         }
     }
 }
+
+impl Walk for RecordLabel {
+    fn walk(&mut self, v: &mut impl Visitor) {
+        self.ident.walk(v);
+    }
+}

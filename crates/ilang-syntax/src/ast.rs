@@ -10,6 +10,20 @@ pub struct Ident {
     pub span: Span,
 }
 
+/// A record type label is either a literal string or a declared label parameter.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RecordLabel {
+    pub ident: Ident,
+    pub parameter: bool,
+}
+
+impl std::ops::Deref for RecordLabel {
+    type Target = Ident;
+    fn deref(&self) -> &Ident {
+        &self.ident
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Module {
     /// The `////` comments of the file (§1.2), one entry per line.
@@ -433,8 +447,8 @@ pub enum TypeKind {
     Tuple(Vec<TypeExpr>),
     Record {
         base: Option<Box<TypeExpr>>,
-        fields: Vec<(Ident, TypeExpr)>,
-        removed: Vec<Ident>,
+        fields: Vec<(RecordLabel, TypeExpr)>,
+        removed: Vec<RecordLabel>,
     },
     Fn {
         params: Vec<FnParamType>,

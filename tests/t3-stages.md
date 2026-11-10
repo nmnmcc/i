@@ -578,3 +578,15 @@ rules and tests are outstanding. The source-level t3_record spec cases pass at
 O0 and O2, the 29 graph tests pass, and record_ir passes at both optimization
 levels. Existing syntax goldens for the removed empty tuple were adjusted under
 the user's SYN2 rule; pattern coverage uses Nil where it had an empty tuple.
+
+Label parameter source work: syntax now retains the difference between quoted
+labels and declared parameters; record types resolve parameter identity and
+construct rigid graph labels. Calls substitute one known literal key or a
+forwarded enclosing key before constraining their arguments. The seven
+`i/record` operations are connected to the Wasm runtime. Focused O0/O2 cases
+cover literal and forwarded keys, dynamic-key rejection, missing fields,
+write/remove, nested type and value uses, recursive key changes, and record
+head tests. This is still unfinished: complete L1–L9 auditing (including
+all value-derived type and recursive group cases), graph interface codec and
+full validation remain required. The current implementation and its checks
+must not be mistaken for full T3 conformance.

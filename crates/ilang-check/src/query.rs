@@ -449,12 +449,19 @@ impl<'a> Query<'a> {
                 if let Some(base) = base {
                     parts.push(format!("..{}", self.show_type(base)));
                 }
-                parts.extend(
-                    fields
-                        .iter()
-                        .map(|(name, ty)| format!("{}: {}", name.name, self.show_type(ty))),
-                );
-                parts.extend(removed.iter().map(|name| format!("-{}", name.name)));
+                parts.extend(fields.iter().map(|(name, ty)| {
+                    format!(
+                        "{}: {}",
+                        ilang_syntax::print::record_label(&name.name, name.parameter.is_some()),
+                        self.show_type(ty)
+                    )
+                }));
+                parts.extend(removed.iter().map(|name| {
+                    format!(
+                        "-{}",
+                        ilang_syntax::print::record_label(&name.name, name.parameter.is_some())
+                    )
+                }));
                 format!("({})", parts.join(", "))
             }
             TypeKind::Fn {

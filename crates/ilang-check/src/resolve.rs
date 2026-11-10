@@ -1800,16 +1800,26 @@ impl<'a> Resolver<'a> {
             } => {
                 let mut labels = HashSet::new();
                 for label in fields.iter().map(|(label, _)| label).chain(removed.iter()) {
-                    if !labels.insert(&label.name) {
-                        self.error(code::DUPLICATE_RECORD_LABEL, label.span, format!("the record label `{}` is repeated", label.name));
+                    if !labels.insert((label.parameter, &label.name)) {
+                        self.error(
+                            code::DUPLICATE_RECORD_LABEL,
+                            label.span,
+                            format!("the record label `{}` is repeated", label.name),
+                        );
                     }
                 }
                 TypeKind::Record {
                     base: base.as_ref().map(|b| Box::new(self.ty(b))),
-                    fields: fields.iter().map(|(label, ty)| (label.clone(), self.ty(ty))).collect(),
-                    removed: removed.clone(),
+                    fields: fields
+                        .iter()
+                        .map(|(label, ty)| (self.record_label(label), self.ty(ty)))
+                        .collect(),
+                    removed: removed
+                        .iter()
+                        .map(|label| self.record_label(label))
+                        .collect(),
                 }
-            },
+            }
             T::Union(ts) => TypeKind::Union(ts.iter().map(|x| self.ty(x)).collect()),
             T::Inter(ts) => TypeKind::Inter(ts.iter().map(|x| self.ty(x)).collect()),
             T::Diff(ts) => TypeKind::Diff(ts.iter().map(|x| self.ty(x)).collect()),
@@ -1832,6 +1842,30 @@ impl<'a> Resolver<'a> {
             },
         };
         Type { kind, span: t.span }
+    }
+
+    fn record_label(&mut self, label: &ast::RecordLabel) -> RecordLabel {
+        let parameter = if label.parameter {
+            let var = self
+                .ty_frames
+                .iter()
+                .rev()
+                .find_map(|frame| frame.names.get(&label.name).copied());
+            if var.is_none() {
+                self.error(
+                    code::INVALID_LABEL_PARAMETER,
+                    label.span,
+                    format!("`{}` is not a declared label parameter", label.name),
+                );
+            }
+            var
+        } else {
+            None
+        };
+        RecordLabel {
+            ident: label.ident.clone(),
+            parameter,
+        }
     }
 
     /// The type that the alias `t` stands for, with its arguments put in
@@ -2306,7 +2340,117 @@ impl<'a> Resolver<'a> {
             ty_vars,
             span: b.span,
         };
+        self.check_label_binding(&binding);
         (binding, binders)
+    }
+
+    /// Label parameters may occur as ordinary types only on their own key parameter.
+    fn check_label_binding(&mut self, binding: &Binding) {
+        let ExprKind::Fn(function) = &binding.value.kind else {
+            return;
+        };
+        let mut labels = HashSet::new();
+        let mut gather = |ty: &Type| {
+            walk_type(ty, &mut |part| {
+                if let TypeKind::Record {
+                    fields, removed, ..
+                } = &part.kind
+                {
+                    labels.extend(
+                        fields
+                            .iter()
+                            .map(|(label, _)| label)
+                            .chain(removed)
+                            .filter_map(|label| label.parameter),
+                    );
+                }
+            })
+        };
+        for param in &function.params {
+            if let Param::Pattern { pattern, .. } = param
+                && let PatternKind::Typed { ty, .. } = &pattern.kind
+            {
+                gather(ty);
+            }
+        }
+        if let Some(ret) = &function.ret {
+            for ty in [Some(&ret.value), ret.err.as_ref(), ret.env.as_ref()]
+                .into_iter()
+                .flatten()
+            {
+                gather(ty);
+            }
+        }
+        labels.retain(|var| binding.ty_vars.contains(var));
+        let mut allowed = HashMap::new();
+        for param in &function.params {
+            if let Param::Pattern { pattern, .. } = param
+                && let PatternKind::Typed {
+                    binder: Some(_),
+                    ty:
+                        Type {
+                            kind: TypeKind::Var(var),
+                            span,
+                        },
+                } = &pattern.kind
+                && labels.contains(var)
+            {
+                allowed.entry(*var).or_insert_with(Vec::new).push(*span);
+            }
+        }
+        for var in &labels {
+            if allowed.get(var).map_or(0, Vec::len) != 1 {
+                self.error(
+                    code::INVALID_LABEL_PARAMETER,
+                    binding.span,
+                    format!(
+                        "label parameter `{}` needs exactly one named key parameter",
+                        self.p.ty_var_names[var.0 as usize]
+                    ),
+                );
+            }
+        }
+        let mut invalid = Vec::new();
+        let mut undeclared_labels = Vec::new();
+        binding_types(binding, &mut |ty| {
+            walk_type(ty, &mut |part| {
+                if let TypeKind::Var(var) = part.kind
+                    && labels.contains(&var)
+                    && !allowed
+                        .get(&var)
+                        .is_some_and(|spans| spans.contains(&part.span))
+                {
+                    invalid.push(part.span);
+                }
+                if let TypeKind::Record {
+                    fields, removed, ..
+                } = &part.kind
+                {
+                    for label in fields.iter().map(|(label, _)| label).chain(removed) {
+                        if let Some(var) = label.parameter
+                            && binding.ty_vars.contains(&var)
+                            && !labels.contains(&var)
+                        {
+                            undeclared_labels.push(label.span);
+                        }
+                    }
+                }
+            })
+        });
+        for span in invalid {
+            self.error(
+                code::INVALID_LABEL_PARAMETER,
+                span,
+                "a label parameter may only be the type of its own key parameter",
+            );
+        }
+        for span in undeclared_labels {
+            self.error(
+                code::INVALID_LABEL_PARAMETER,
+                span,
+                "a label parameter must occur in the binding's written function type",
+            );
+        }
     }
 
     /// §6.10: a direct value is made without running code.

@@ -1692,10 +1692,10 @@ impl<'a> Formatter<'a> {
                             return cat(vec![text(".."), f.ty(b)]);
                         }
                         if let Some((label, ty)) = fields.get(i - offset) {
-                            return cat(vec![text(label.name.as_str()), text(": "), f.ty(ty)]);
+                            return cat(vec![text(f.slice(label.span)), text(": "), f.ty(ty)]);
                         }
                         let label = &removed[i - offset - fields.len()];
-                        cat(vec![text("-"), text(label.name.as_str())])
+                        cat(vec![text("-"), text(f.slice(label.span))])
                     },
                 );
             }

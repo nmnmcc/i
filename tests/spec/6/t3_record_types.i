@@ -10,5 +10,7 @@ main = () {
   assert(name_of(x) == "Ada")
   assert(keep(x) == x)
   assert(keep(()) == ())
+  y: ("Other key": Int) = ("Other key": 5)
+  assert(keep(y) == y)
   Nil
 }

@@ -284,6 +284,19 @@ pub struct Type {
 }
 
 #[derive(Clone, Debug)]
+pub struct RecordLabel {
+    pub ident: Ident,
+    pub parameter: Option<TyVarId>,
+}
+
+impl std::ops::Deref for RecordLabel {
+    type Target = Ident;
+    fn deref(&self) -> &Ident {
+        &self.ident
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum TypeKind {
     Lit(crate::types::LitValue),
     Of {
@@ -303,8 +316,8 @@ pub enum TypeKind {
     Tuple(Vec<Type>),
     Record {
         base: Option<Box<Type>>,
-        fields: Vec<(Ident, Type)>,
-        removed: Vec<Ident>,
+        fields: Vec<(RecordLabel, Type)>,
+        removed: Vec<RecordLabel>,
     },
     Fn {
         params: Vec<FnParamType>,

@@ -222,17 +222,19 @@ impl Checker<'_> {
                 let pool = super::records::Pool::default();
                 let labels: Vec<_> = fields
                     .iter()
-                    .map(|(name, _)| super::records::Label::name(name.name.as_str()))
+                    .map(|(name, _)| super::records::written_label(name, self.s.level))
                     .chain(
                         removed
                             .iter()
-                            .map(|name| super::records::Label::name(name.name.as_str())),
+                            .map(|name| super::records::written_label(name, self.s.level)),
                     )
                     .collect();
                 let record = pool.record(
                     fields
                         .iter()
-                        .map(|(name, ty)| (super::records::Label::name(name.name.as_str()), go(ty)))
+                        .map(|(name, ty)| {
+                            (super::records::written_label(name, self.s.level), go(ty))
+                        })
                         .collect(),
                 );
                 match base {

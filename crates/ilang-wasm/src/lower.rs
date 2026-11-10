@@ -1486,9 +1486,14 @@ impl<'a> Lowerer<'a> {
             },
             "ilang:record" => {
                 let name = match function.as_str() {
-                    "get" => "record_get", "put" => "record_put", "remove" => "record_remove",
-                    "has" => "record_has", "keys" => "record_keys", "size" => "record_size",
-                    "texts" => "record_texts", _ => return Err(format!("`record.{function}` is not known")),
+                    "get" => "record_get",
+                    "put" => "record_put",
+                    "remove" => "record_remove",
+                    "has" => "record_has",
+                    "keys" => "record_keys",
+                    "size" => "record_size",
+                    "texts" => "record_texts",
+                    _ => return Err(format!("`record.{function}` is not known")),
                 };
                 Ok((Op::Runtime { name, arity }, arity))
             }

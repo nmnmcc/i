@@ -317,6 +317,39 @@ impl Graph {
     pub fn pool(&self) -> &Pool {
         &self.pool
     }
+    /// Label parameters in the graph, visited once per shared node.
+    pub fn label_params(&self) -> FxHashSet<super::graph::LabelParam> {
+        let arena = self.pool.0.read().expect("type pool");
+        let mut seen = FxHashSet::default();
+        let mut params = FxHashSet::default();
+        let mut todo = vec![self.id];
+        while let Some(id) = todo.pop() {
+            if !seen.insert(id) {
+                continue;
+            }
+            let node = arena.node(id);
+            match node {
+                Node::Rec(fields) => {
+                    for (label, _) in fields {
+                        if let Label::Param(p) = label {
+                            params.insert(p.clone());
+                        }
+                    }
+                }
+                Node::Without(_, labels) => {
+                    for label in labels {
+                        if let Label::Param(p) = label {
+                            params.insert(p.clone());
+                        }
+                    }
+                }
+                _ => {}
+            }
+            todo.extend(node.children());
+        }
+        params
+    }
+
     pub fn node(&self) -> Node {
         self.node_at(self.id)
     }
@@ -427,7 +460,11 @@ impl Graph {
         self.map_binders(f, &FxHashMap::default())
     }
 
-    pub fn map_binders(&self, f: &mut impl FnMut(V) -> Ty, labels: &FxHashMap<super::graph::LabelParam, Label>) -> Ty {
+    pub fn map_binders(
+        &self,
+        f: &mut impl FnMut(V) -> Ty,
+        labels: &FxHashMap<super::graph::LabelParam, Label>,
+    ) -> Ty {
         // Never hold the pool lock across a caller that can recursively inspect
         // bounds or import another graph into this pool.
         let replacements: FxHashMap<_, _> =

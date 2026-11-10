@@ -611,13 +611,33 @@ impl Checker<'_> {
     }
 
     pub(super) fn read_annotation(&mut self, value: ValueRef, site: OfId) -> Ty {
+        if let ValueRef::Local(var) = value
+            && self.label_key_values.contains_key(&var)
+        {
+            let span = self.p.of_sites[site.0 as usize].span;
+            self.error(
+                code::INVALID_LABEL_PARAMETER,
+                span,
+                "a key parameter may not be named in a value-derived type",
+            );
+        }
         if let Some(read) = self.reads.sites.get(&site) {
-            return match read {
+            let result = match read {
                 Read::Ready(t) => t.clone(),
                 Read::Failed => Ty::Never,
                 Read::Projected if self.recovery => Ty::Never,
                 Read::Projected => panic!("projection source read as an annotation"),
             };
+            if result.head() == Some(Head::Fn) && !super::records::label_params(&result).is_empty()
+            {
+                let span = self.p.of_sites[site.0 as usize].span;
+                self.error(
+                    code::LABEL_PARAMETER_VALUE,
+                    span,
+                    "a binding with label parameters may only be called",
+                );
+            }
+            return result;
         }
         let scheme = match value {
             ValueRef::Local(v) => self.locals.get(&v),
@@ -642,7 +662,16 @@ impl Checker<'_> {
                 }
             }
         }
-        self.instantiate(&scheme)
+        let result = self.instantiate(&scheme);
+        if result.head() == Some(Head::Fn) && !super::records::label_params(&result).is_empty() {
+            let span = self.p.of_sites[site.0 as usize].span;
+            self.error(
+                code::LABEL_PARAMETER_VALUE,
+                span,
+                "a binding with label parameters may only be called",
+            );
+        }
+        result
     }
 
     fn read_error(&mut self, site: OfId, c: &'static str) {
@@ -1303,14 +1332,14 @@ impl Checker<'_> {
                 let mut labels = Vec::new();
                 let mut resolved = Vec::new();
                 for (name, ty) in fields {
-                    let label = super::records::Label::name(name.name.as_str());
+                    let label = super::records::written_label(name, self.s.level);
                     labels.push(label.clone());
                     resolved.push((label, self.closed_written(ty, map, seen)?));
                 }
                 labels.extend(
                     removed
                         .iter()
-                        .map(|name| super::records::Label::name(name.name.as_str())),
+                        .map(|name| super::records::written_label(name, self.s.level)),
                 );
                 let record = pool.record(resolved);
                 Ok(match base {
@@ -1608,11 +1637,11 @@ impl Checker<'_> {
                     let pool = super::records::Pool::default();
                     let labels: Vec<_> = fields
                         .iter()
-                        .map(|(name, _)| super::records::Label::name(name.name.as_str()))
+                        .map(|(name, _)| super::records::written_label(name, c.s.level))
                         .chain(
                             removed
                                 .iter()
-                                .map(|name| super::records::Label::name(name.name.as_str())),
+                                .map(|name| super::records::written_label(name, c.s.level)),
                         )
                         .collect();
                     let record = pool.record(
@@ -1620,7 +1649,7 @@ impl Checker<'_> {
                             .iter()
                             .map(|(name, ty)| {
                                 (
-                                    super::records::Label::name(name.name.as_str()),
+                                    super::records::written_label(name, c.s.level),
                                     written(c, ty, map, seen),
                                 )
                             })

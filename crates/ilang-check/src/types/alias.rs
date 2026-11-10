@@ -207,14 +207,14 @@ impl Checker<'_> {
                 let mut labels = Vec::new();
                 let mut resolved = Vec::new();
                 for (name, ty) in fields {
-                    let label = super::records::Label::name(name.name.as_str());
+                    let label = super::records::written_label(name, self.s.level);
                     labels.push(label.clone());
                     resolved.push((label, go(ty)?));
                 }
                 labels.extend(
                     removed
                         .iter()
-                        .map(|name| super::records::Label::name(name.name.as_str())),
+                        .map(|name| super::records::written_label(name, self.s.level)),
                 );
                 let record = pool.record(resolved);
                 match base {

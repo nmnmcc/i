@@ -106,6 +106,9 @@ pub mod code {
     pub const TYPE_RESOURCE_LIMIT: &str = "E0546";
     pub const LABEL_MAY_BE: &str = "E0544";
     pub const DUPLICATE_RECORD_LABEL: &str = "E0540";
+    pub const INVALID_LABEL_PARAMETER: &str = "E0543";
+    pub const INVALID_RECORD_KEY: &str = "E0541";
+    pub const LABEL_PARAMETER_VALUE: &str = "E0542";
     pub const LABEL_ESCAPES: &str = "E0545";
     pub const BIT_PATTERN: &str = "E0519";
     // E0520 became warning W0503: disjoint equality is well defined (§6.9).

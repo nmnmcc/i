@@ -62,6 +62,38 @@ struct Effects {
     env: Vec<Ty>,
 }
 
+fn key_slots(binding: &Binding) -> Vec<(TyVarId, usize)> {
+    let ExprKind::Fn(function) = &binding.value.kind else {
+        return Vec::new();
+    };
+    function
+        .params
+        .iter()
+        .filter_map(|p| match p {
+            Param::Pattern { pattern, .. } => Some(pattern),
+            Param::Env { .. } => None,
+        })
+        .enumerate()
+        .filter_map(|(index, pattern)| {
+            let mut pattern = pattern;
+            while let PatternKind::Named { pattern: inner, .. } = &pattern.kind {
+                pattern = inner;
+            }
+            match &pattern.kind {
+                PatternKind::Typed {
+                    ty:
+                        Type {
+                            kind: TypeKind::Var(var),
+                            ..
+                        },
+                    ..
+                } => Some((*var, index)),
+                _ => None,
+            }
+        })
+        .collect()
+}
+
 /// The custom types of §4.2 and §9.6 that the rules use.
 pub(super) struct Builtins {
     pub bool_: TypeRef,
@@ -98,6 +130,10 @@ pub(crate) struct Checker<'a> {
     pub(super) recovery: bool,
     /// The solver variable of each type variable written in an annotation.
     pub tyvars: HashMap<TyVarId, Ty>,
+    label_key_slots: HashMap<VarId, Vec<(TyVarId, usize)>>,
+    pub(super) label_key_values: HashMap<VarId, super::records::Label>,
+    label_callee: bool,
+    recursive_bindings: HashSet<VarId>,
     /// The type written at the top of the pattern that binds a name: its
     /// type is shown as written (§2.4).
     pub written: HashMap<VarId, Type>,
@@ -157,6 +193,10 @@ impl<'a> Checker<'a> {
             diags: Vec::new(),
             module: ModuleId(0),
             locals: HashMap::new(),
+            label_key_slots: HashMap::new(),
+            label_key_values: HashMap::new(),
+            label_callee: false,
+            recursive_bindings: HashSet::new(),
             defs: HashMap::new(),
             reads: super::value_types::Reads::default(),
             recovery: false,
@@ -279,6 +319,38 @@ impl<'a> Checker<'a> {
     /// One group of top-level bindings (§4.7): typed together, then
     /// generalized together when every value is a direct value.
     fn group(&mut self, group: &[BindingRef]) {
+        if group.len() > 1 {
+            for reference in group {
+                let binding = &self.p.binding(*reference).binding;
+                let mut has_label_parameter = false;
+                binding_types(binding, &mut |ty| {
+                    walk_type(ty, &mut |part| {
+                        if let TypeKind::Record {
+                            fields, removed, ..
+                        } = &part.kind
+                        {
+                            has_label_parameter |= fields
+                                .iter()
+                                .map(|(label, _)| label)
+                                .chain(removed)
+                                .any(|label| {
+                                    label
+                                        .parameter
+                                        .is_some_and(|v| binding.ty_vars.contains(&v))
+                                });
+                        }
+                    })
+                });
+                if has_label_parameter {
+                    self.set_module(reference.module);
+                    self.error(
+                        code::INVALID_LABEL_PARAMETER,
+                        binding.span,
+                        "a binding with label parameters cannot belong to a mutual recursion group",
+                    );
+                }
+            }
+        }
         if group.iter().any(|b| self.p.failed_type_groups.contains(b)) {
             // O4: a dependency-cycle component is Failed before query inference.
             // Never is only recovery data; no fresh inferred alias is published.
@@ -493,6 +565,14 @@ impl<'a> Checker<'a> {
         let Some(scheme) = self.defs.get(&d) else {
             return;
         };
+        if !super::records::label_params(&scheme.ty).is_empty() {
+            self.error(
+                code::HOST_TYPE,
+                span,
+                format!("`{name}` is an entry point, so it cannot have label parameters"),
+            );
+            return;
+        }
         let opts = display::Opts {
             mono: true,
             written: false,
@@ -1132,18 +1212,18 @@ impl<'a> Checker<'a> {
             } => {
                 let labels: Vec<_> = fields
                     .iter()
-                    .map(|(label, _)| super::records::Label::name(label.name.as_str()))
+                    .map(|(label, _)| super::records::written_label(label, self.s.level))
                     .chain(
                         removed
                             .iter()
-                            .map(|label| super::records::Label::name(label.name.as_str())),
+                            .map(|label| super::records::written_label(label, self.s.level)),
                     )
                     .collect();
                 let fields = fields
                     .iter()
                     .map(|(label, ty)| {
                         (
-                            super::records::Label::name(label.name.as_str()),
+                            super::records::written_label(label, self.s.level),
                             self.conv(ty, local),
                         )
                     })
@@ -1350,6 +1430,17 @@ impl<'a> Checker<'a> {
                     Some(s) => self.instantiate(&s),
                     None => self.s.fresh_input(),
                 };
+                if !self.label_callee
+                    && t.head() == Some(Head::Fn)
+                    && !self.label_slots(e).is_empty()
+                    && !super::records::label_params(&t).is_empty()
+                {
+                    self.error(
+                        code::LABEL_PARAMETER_VALUE,
+                        e.span,
+                        "a binding with label parameters may only be used as the callee of a call",
+                    );
+                }
                 (t, self.kvars.get(v).cloned().unwrap_or(Ty::Top))
             }
             ExprKind::Name(ValueRef::Def(d)) => {
@@ -1377,6 +1468,17 @@ impl<'a> Checker<'a> {
                     Some(s) => self.instantiate(&s),
                     None => self.s.fresh_input(),
                 };
+                if !self.label_callee
+                    && t.head() == Some(Head::Fn)
+                    && !self.label_slots(e).is_empty()
+                    && !super::records::label_params(&t).is_empty()
+                {
+                    self.error(
+                        code::LABEL_PARAMETER_VALUE,
+                        e.span,
+                        "a binding with label parameters may only be used as the callee of a call",
+                    );
+                }
                 (t, k)
             }
             ExprKind::Name(ValueRef::Ctor(c)) => {
@@ -1588,11 +1690,50 @@ impl<'a> Checker<'a> {
         (result.clone(), result)
     }
 
+    fn label_slots(&self, callee: &Expr) -> Vec<(TyVarId, usize)> {
+        match callee.kind {
+            ExprKind::Name(ValueRef::Local(var)) => {
+                self.label_key_slots.get(&var).cloned().unwrap_or_default()
+            }
+            ExprKind::Name(ValueRef::Def(def)) => match &self.p.def(def).kind {
+                DefKind::Binding { binding, .. } => key_slots(
+                    &self
+                        .p
+                        .binding(BindingRef {
+                            module: def.module,
+                            index: *binding,
+                        })
+                        .binding,
+                ),
+                DefKind::External {
+                    ty:
+                        Type {
+                            kind: TypeKind::Fn { params, .. },
+                            ..
+                        },
+                    ..
+                } => params
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, param)| match param.ty.kind {
+                        TypeKind::Var(var) => Some((var, index)),
+                        _ => None,
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            },
+            _ => Vec::new(),
+        }
+    }
+
     /// Rule 5: `f(a1, …)`. `first` is the left side of `|>`, the first
     /// argument.
     fn call(&mut self, callee: &Expr, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
-        let (f, kf) = self.infer_k(callee, &Ty::Top);
-        let kfn = known::one_fn(&kf);
+        let was_callee = self.label_callee;
+        self.label_callee = true;
+        let (mut f, mut kf) = self.infer_k(callee, &Ty::Top);
+        self.label_callee = was_callee;
+        let mut kfn = known::one_fn(&kf);
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
         // §6.6: the parameter that each argument goes to.
@@ -1664,6 +1805,79 @@ impl<'a> Checker<'a> {
         let Some(to) = to else {
             return (self.s.fresh(), Ty::Top);
         };
+        let slots = self.label_slots(callee);
+        let recursive = match callee.kind {
+            ExprKind::Name(ValueRef::Def(def)) => self.group_defs.contains(&def),
+            ExprKind::Name(ValueRef::Local(var)) => self.recursive_bindings.contains(&var),
+            _ => false,
+        };
+        if recursive {
+            for (var, slot) in &slots {
+                let expected =
+                    self.label_key_values
+                        .iter()
+                        .find_map(|(binder, label)| match label {
+                            super::records::Label::Param(param)
+                                if super::records::label_var(param) == Some(*var) =>
+                            {
+                                Some(*binder)
+                            }
+                            _ => None,
+                        });
+                if let Some(expected) = expected {
+                    let argument = to.iter().position(|index| index == slot);
+                    if !argument.is_some_and(|i| matches!(values[i].kind, ExprKind::Name(ValueRef::Local(actual)) if actual == expected)) {
+                        self.error(code::INVALID_LABEL_PARAMETER, argument.map_or(callee.span, |i| spans[i]), "a recursive call must forward its own key parameter by name");
+                    }
+                }
+            }
+        }
+        let params = super::records::label_params(&f);
+        let mut labels = rustc_hash::FxHashMap::default();
+        for param in params {
+            let slot = super::records::label_var(&param)
+                .and_then(|var| slots.iter().find(|(v, _)| *v == var).map(|(_, slot)| *slot));
+            // A captured outer parameter stays rigid; only labels declared by
+            // this callee have a key slot to substitute at this call.
+            let Some(slot) = slot else {
+                continue;
+            };
+            let argument = to.iter().position(|i| *i == slot);
+            let key = argument.and_then(|i| {
+                let members = known::members(&typed[i].1);
+                match members.as_slice() {
+                    [Ty::Con(Head::Named(TypeRef::Builtin(BuiltinType::String)), values, args)]
+                        if args.is_empty() && values.is_finite() && values.items().count() == 1 =>
+                    {
+                        values
+                            .items()
+                            .next()
+                            .cloned()
+                            .map(super::records::Label::name)
+                    }
+                    _ => match values[i].kind {
+                        ExprKind::Name(ValueRef::Local(var)) => {
+                            self.label_key_values.get(&var).cloned()
+                        }
+                        _ => None,
+                    },
+                }
+            });
+            if let Some(key) = key {
+                labels.insert(param, key);
+            } else {
+                self.error(
+                    code::INVALID_RECORD_KEY,
+                    argument.map_or(callee.span, |i| spans[i]),
+                    "a label parameter needs one known string literal as its key",
+                );
+            }
+        }
+        if !labels.is_empty() {
+            f = super::records::map_labels(&f, &labels);
+            kf = super::records::map_labels(&kf, &labels);
+            kfn = known::one_fn(&kf);
+        }
         // `order[p]` is the argument that goes to the parameter `p`.
         let mut order = vec![0u32; n];
         for (g, p) in to.iter().enumerate() {
@@ -2328,6 +2542,57 @@ impl<'a> Checker<'a> {
     /// type written at its top gets the known type of the matching
     /// parameter.
     fn function(&mut self, f: &Function, expected: &Ty) -> (Ty, Ty) {
+        let mut declared_labels = HashSet::new();
+        let mut visit = |ty: &Type| {
+            walk_type(ty, &mut |part| {
+                if let TypeKind::Record {
+                    fields, removed, ..
+                } = &part.kind
+                {
+                    declared_labels.extend(
+                        fields
+                            .iter()
+                            .map(|(label, _)| label)
+                            .chain(removed)
+                            .filter_map(|label| label.parameter),
+                    );
+                }
+            })
+        };
+        for p in &f.params {
+            if let Param::Pattern { pattern, .. } = p
+                && let Some(ty) = known::top_written(pattern)
+            {
+                visit(ty);
+            }
+        }
+        if let Some(ret) = &f.ret {
+            for ty in [Some(&ret.value), ret.err.as_ref(), ret.env.as_ref()]
+                .into_iter()
+                .flatten()
+            {
+                visit(ty);
+            }
+        }
+        for p in &f.params {
+            if let Param::Pattern { pattern, .. } = p
+                && let PatternKind::Typed {
+                    binder: Some(binder),
+                    ty:
+                        Type {
+                            kind: TypeKind::Var(var),
+                            ..
+                        },
+                } = &pattern.kind
+                && declared_labels.contains(var)
+            {
+                let name = &self.p.ty_var_names[var.0 as usize];
+                self.label_key_values.insert(
+                    binder.var,
+                    super::records::variable_label(*var, name, self.s.level),
+                );
+            }
+        }
         let count = f
             .params
             .iter()
@@ -2348,6 +2613,15 @@ impl<'a> Checker<'a> {
                     // The values of a parameter come from the calls.
                     let start = self.s.vars.len();
                     let t = self.param(pattern);
+                    if let PatternKind::Typed {
+                        binder: Some(binder),
+                        ..
+                    } = &pattern.kind
+                        && self.label_key_values.contains_key(&binder.var)
+                    {
+                        let string = self.prim(BuiltinType::String);
+                        self.sub(&t, &string, pattern.span);
+                    }
                     self.s.mark_inputs(start);
                     fails |= self.binding_may_fail(pattern, &t);
                     let k = match known::top_written(pattern) {
@@ -2466,6 +2740,13 @@ impl<'a> Checker<'a> {
         self.new_tyvars(&b.ty_vars);
         let mut binders = Vec::new();
         super::pattern::binders(&b.pattern, &mut binders);
+        let key_slots = key_slots(b);
+        for binder in &binders {
+            self.label_key_slots.insert(*binder, key_slots.clone());
+        }
+        if direct {
+            self.recursive_bindings.extend(binders.iter().copied());
+        }
         let mut holders = Vec::new();
         if direct {
             // §6.10: inside its own value, a name is not general, and it is
@@ -2479,6 +2760,11 @@ impl<'a> Checker<'a> {
         }
         let expected = self.binding_expected(b);
         let (a, k) = self.infer_k(&b.value, &expected);
+        if direct {
+            for binder in &binders {
+                self.recursive_bindings.remove(binder);
+            }
+        }
         self.fit(&b.pattern, &a);
         self.binding_failure(&b.pattern, &a);
         for (v, h) in holders {
