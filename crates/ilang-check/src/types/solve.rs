@@ -358,9 +358,6 @@ impl Solver {
     }
 
     fn fail(&mut self, kind: FailKind, lhs: &Ty, rhs: &Ty) {
-        if std::env::var_os("K4_TRACE").is_some() {
-            eprintln!("{kind:?} {lhs:?} {rhs:?}\n{}", std::backtrace::Backtrace::force_capture());
-        }
         if self
             .failures
             .iter()
