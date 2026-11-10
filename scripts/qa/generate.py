@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import random
+import re
 import tempfile
 
 from corpus import ROOT, CORPUS, dump, git, invoke, sha
@@ -122,7 +123,21 @@ def minimize(case, property_fails):
     """Deletion-minimal for the generating grammar, with model recomputation."""
     current = dict(case)
     if 'rows' not in case:
-        return current, 'already bounded family; declaration shrinking not implemented'
+        declarations = list(case['declarations'])
+        changed = True
+        while changed:
+            changed = False
+            for i in range(len(declarations)):
+                provided = re.search(r'(?m)^([a-zA-Z][a-zA-Z_0-9]*)\b[^\n]*(?:=|\{)', declarations[i])
+                if provided and any(re.search(r'\b' + provided[1] + r'\b', d) for j, d in enumerate(declarations) if j != i):
+                    continue
+                candidate = dict(current, declarations=declarations[:i] + declarations[i + 1:])
+                if property_fails(candidate):
+                    declarations = candidate['declarations']
+                    current = candidate
+                    changed = True
+                    break
+        return current, '1-minimal under top-level declaration deletion, preserving failure diagnostics'
     rows = list(case['rows'])
     changed = True
     while changed and len(rows) > 2:
@@ -155,8 +170,21 @@ def rebuild(case, rows):
 
 
 def save_failure(args, case, reason, observation, project):
+    primitive_reason = reason.rsplit(':', 1)[-1]
+    def fingerprint(output):
+        if isinstance(output, list):
+            return [fingerprint(x) for x in output]
+        errors = re.findall(r'error\[([^]]+)\]', output.get('stderr', ''))
+        if errors:
+            return errors
+        # Do not replace a runtime regression with a missing-main or unrelated stop.
+        lines = output.get('stderr', '').splitlines()
+        relevant = [line for line in lines if 'trap:' in line or 'panicked at' in line]
+        return [re.sub(r':\d+:\d+:', ':<position>:', line) for line in (relevant or lines)[:1]]
+    signature = fingerprint(observation)
     def reproduces(candidate):
-        return validate(args.binary, project, candidate, args.timeout)[0] == reason
+        actual_reason, output = validate(args.binary, project, candidate, args.timeout)
+        return actual_reason == primitive_reason and fingerprint(output) == signature
     minimal, label = minimize(case, reproduces)
     source = '\n'.join(minimal['declarations']) + '\n'
     path = CORPUS / 'generated-failures' / (reason + '-' + sha(source.encode())[:12])
@@ -176,6 +204,10 @@ def main():
     parser.add_argument('--count', type=int)
     parser.add_argument('--timeout', type=float, default=10)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--models', action='store_true')
+    parser.add_argument('--mpfr-python', type=Path)
+    parser.add_argument('--model-timeout', type=float, default=120)
+    parser.add_argument('--model-filter', default='')
     args = parser.parse_args()
     args.binary = args.binary.resolve()
     count = args.count if args.count is not None else (8 if args.mode == 'short' else 180)
@@ -229,11 +261,16 @@ def main():
                         'source': 'docs/spec.md §4.7: Write a wider annotation at the source when needed.',
                         'exits': [x['exit'] for x in outcomes], 'classification': 'permitted difference; report only',
                         'outcomes': outcomes})
-    report = {'compiler': git('rev-parse', 'HEAD'), 'binary_sha256': sha(args.binary.read_bytes()), 'seed': args.seed, 'count': count, 'mode': args.mode, 'counts': dict(counts), 'failures': failures, 'report_only': reports, 'rules': RULES}
+    models = []
+    if args.models:
+        from models import run_models
+        models = run_models(args.mpfr_python.absolute() if args.mpfr_python else None,
+                            args.model_timeout, args.model_filter)
+    report = {'compiler': git('rev-parse', 'HEAD'), 'binary_sha256': sha(args.binary.read_bytes()), 'seed': args.seed, 'count': count, 'mode': args.mode, 'counts': dict(counts), 'failures': failures, 'report_only': reports, 'rules': RULES, 'models': models}
     if args.output:
         dump(args.output, report)
     print(json.dumps(report, indent=2))
-    if failures:
+    if failures or any(not m['matched'] for m in models):
         raise SystemExit(1)
 
 
