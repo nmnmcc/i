@@ -1,0 +1,31 @@
+{
+  "check": {
+    "command": [
+      "check",
+      "--types"
+    ],
+    "exit": 0,
+    "stdout": "app/main.ua : () -> Int ! N | A(N)\napp/main.ub : () -> Int ! N | B(N)\napp/main.bad1 : () -> 1\napp/main.mk : () -> A(B(A(Never)))\napp/main.bad2 : () -> 2\napp/main.bad3 : () -> Int\n",
+    "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `ua` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `ub` is not used\nsrc/main.i:11:1: warning[W0504]: top-level binding `bad1` is not used\nsrc/main.i:15:1: warning[W0504]: top-level binding `mk` is not used\nsrc/main.i:16:1: warning[W0504]: top-level binding `bad2` is not used\nsrc/main.i:21:1: warning[W0504]: top-level binding `bad3` is not used\n"
+  },
+  "test0": {
+    "command": [
+      "test",
+      "--opt",
+      "0"
+    ],
+    "exit": 0,
+    "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+    "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `ua` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `ub` is not used\nsrc/main.i:11:1: warning[W0504]: top-level binding `bad1` is not used\nsrc/main.i:15:1: warning[W0504]: top-level binding `mk` is not used\nsrc/main.i:16:1: warning[W0504]: top-level binding `bad2` is not used\nsrc/main.i:21:1: warning[W0504]: top-level binding `bad3` is not used\n"
+  },
+  "test2": {
+    "command": [
+      "test",
+      "--opt",
+      "2"
+    ],
+    "exit": 0,
+    "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+    "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `ua` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `ub` is not used\nsrc/main.i:11:1: warning[W0504]: top-level binding `bad1` is not used\nsrc/main.i:15:1: warning[W0504]: top-level binding `mk` is not used\nsrc/main.i:16:1: warning[W0504]: top-level binding `bad2` is not used\nsrc/main.i:21:1: warning[W0504]: top-level binding `bad3` is not used\n"
+  }
+}

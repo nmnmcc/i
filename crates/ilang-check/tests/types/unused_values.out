@@ -10,3 +10,6 @@ not_warned : (x: Int, y: Float) -> Nil
 15:2: warning[W0502]: this value is not used, and working it out does nothing
 16:2: warning[W0502]: this value is not used, and working it out does nothing
 17:2: warning[W0502]: this value is not used, and working it out does nothing
+6:1: warning[W0504]: top-level binding `f` is not used
+8:1: warning[W0504]: top-level binding `warned` is not used
+23:1: warning[W0504]: top-level binding `not_warned` is not used

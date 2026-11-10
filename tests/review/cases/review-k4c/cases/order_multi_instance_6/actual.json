@@ -1,0 +1,31 @@
+{
+  "check": {
+    "command": [
+      "check",
+      "--types"
+    ],
+    "exit": 0,
+    "stdout": "app/main.run : (body: () -> A ! N) -> A ! N\napp/main.use : (x: A) -> A ! N | S(A, N)\n",
+    "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `wrap` is not used\nsrc/main.i:4:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:5:1: warning[W0504]: top-level binding `texts` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `ints` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `use` is not used\n"
+  },
+  "test0": {
+    "command": [
+      "test",
+      "--opt",
+      "0"
+    ],
+    "exit": 0,
+    "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+    "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `wrap` is not used\nsrc/main.i:4:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:5:1: warning[W0504]: top-level binding `texts` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `ints` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `use` is not used\n"
+  },
+  "test2": {
+    "command": [
+      "test",
+      "--opt",
+      "2"
+    ],
+    "exit": 0,
+    "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+    "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `wrap` is not used\nsrc/main.i:4:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:5:1: warning[W0504]: top-level binding `texts` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `ints` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `use` is not used\n"
+  }
+}
