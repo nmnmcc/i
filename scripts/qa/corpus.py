@@ -221,32 +221,51 @@ def invoke(binary, project, command, bound):
     return {'command': command, 'exit': code, 'stdout': normalize(stdout), 'stderr': normalize(stderr)}, time.monotonic() - started
 
 
+def materialize(case, runtime):
+    project = ROOT / case['project']
+    manifest = (project / 'i.toml').read_text()
+    def dependency(match):
+        return match[1] + json.dumps(str((project / match[2]).resolve()))
+    manifest = re.sub(r'(\bpath\s*=\s*)[\"\']([^\"\']+)[\"\']', dependency, manifest)
+    (runtime / 'i.toml').write_text(manifest)
+    for name in case['files']:
+        target = runtime / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source = project / case.get('stored', {}).get(name, name)
+        target.write_bytes(source.read_bytes())
+    return runtime
+
+
 def observe(binary, case, bound):
+    work = CORPUS / '.work'
+    work.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='corpus-', dir=work) as temporary:
+        return observe_in(binary, case, bound, Path(temporary))
+
+
+def observe_in(binary, case, bound, runtime):
     project = ROOT / case['project']
     if case.get('stored'):
-        # Only parser-negative raw files live outside the formatter's source walk.
-        # Materialize the unchanged package for the existing public CLI.
-        runtime = project / '.work'
-        runtime.mkdir(exist_ok=True)
-        manifest = (project / 'i.toml').read_text()
-        def dependency(match):
-            return match[1] + json.dumps(str((project / match[2]).resolve()))
-        manifest = re.sub(r'(\bpath\s*=\s*)[\"\']([^\"\']+)[\"\']', dependency, manifest)
-        (runtime / 'i.toml').write_text(manifest)
-        for name in case['files']:
-            target = runtime / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            source = project / case.get('stored', {}).get(name, name)
-            target.write_bytes(source.read_bytes())
-        project = runtime
+        project = materialize(case, runtime)
     check, elapsed = invoke(binary, project, ['check', '--types'], bound)
     result = {'check': check}
     if check['exit'] == 0:
         text = '\n'.join((project / f).read_text() for f in case['files'])
+        has_main = bool(re.search(r'(?m)^\s*@main\b', text))
+        # This guarantees startup is exercised, including for checker-only libraries.
+        # The original check above still reports only the original top-level types.
+        if project != runtime:
+            project = materialize(case, runtime)
+        name = 'qa_corpus_runtime_test'
+        while any(f in case['files'] for f in [f'src/{name}.i', f'test/{name}.i']):
+            name += '_again'
+        entry = project / 'test' / (name + '.i')
+        entry.parent.mkdir(parents=True, exist_ok=True)
+        entry.write_text('@test\nqa_startup = () { Nil }\n')
         for opt in [0, 2]:
             test, _ = invoke(binary, project, ['test', '--opt', str(opt)], bound)
             result['test' + str(opt)] = test
-            if re.search(r'(?m)^\s*@main\b', text):
+            if has_main:
                 run, _ = invoke(binary, project, ['run', '--opt', str(opt)], bound)
                 result['run' + str(opt)] = run
     return result, elapsed
@@ -477,7 +496,7 @@ def audit_w520(args):
     if os.environ.get('UPDATE') != '1':
         raise SystemExit('audit-w520 requires UPDATE=1')
     baseline = json.loads((CORPUS / 'baselines/pre-w520.json').read_text())['observations']
-    changes, censored, failures = [], [], []
+    changes, censored, startup, failures = [], [], [], []
     location = r'(?m)^(.+\.i):(\d+):(\d+): (?:error|warning)\[%s\]:'
     for case in select(args):
         path = ROOT / case['project'] / 'expected.json'
@@ -499,10 +518,12 @@ def audit_w520(args):
         elif old != new:
             if any(value['exit'] == 'timeout' for value in [*old.values(), *new.values()]):
                 censored.append(case['id'])
+            elif old['check'] == new['check'] and any('qa_corpus_runtime_test.qa_startup' in value['stdout'] for key, value in new.items() if key.startswith('test')):
+                startup.append(case['id'])
             else:
                 failures.append(case['id'] + ': unrelated full outcome changed')
-    dump(CORPUS / 'w520-audit.json', {'source': 'docs/spec.md §6.9: the compiler gives warning W0503, showing both types; the comparison is well defined and has type Bool; literal types are not widened; the warning adds no narrowing fact', 'changes': changes, 'censored_changes': censored, 'failures': failures})
-    print(f'W520: {len(changes)} marked cases, {len(censored)} censored changes, {len(failures)} unexplained changes')
+    dump(CORPUS / 'w520-audit.json', {'source': 'docs/spec.md §6.9: the compiler gives warning W0503, showing both types; the comparison is well defined and has type Bool; literal types are not widened; the warning adds no narrowing fact', 'changes': changes, 'censored_changes': censored, 'startup_harness_changes': startup, 'startup_source': 'docs/spec.md §2.5: Its value is worked out once, when the program starts, before any entry point runs. An added Nil test now exercises startup; this is a harness change, not a W520 runtime-equivalence assertion.', 'failures': failures})
+    print(f'W520: {len(changes)} marked cases, {len(censored)} censored changes, {len(startup)} startup harness changes, {len(failures)} unexplained changes')
     if failures:
         raise SystemExit(1)
 
