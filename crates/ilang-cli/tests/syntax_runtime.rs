@@ -19,6 +19,7 @@ source: () -> syntax.Syntax
 @test
 exercise = () -> Nil ^ syntax.SyntaxError ! Assert {
   value = source()
+  assert(source() == value)
   ! syntax.Definitions = syntax.Definitions((of) { of })
   assert(syntax.definition(value) == value)
   assert(syntax.show(value) == "(f x)")
