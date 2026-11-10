@@ -379,7 +379,7 @@ A **syntax macro** is a top-level binding in a `.is` file with the attribute `@m
 ```
 
 - The pattern of the binding is one name, with no type variables. The value is a function expression `(-> …)`. Each parameter is a name or an environment parameter.
-- The value is checked against the type `(Syntax, …) -> Syntax ^ SyntaxError ! Definitions | Items | Assert`, with one `Syntax` for each parameter. If it does not have a subtype of this type, it is a compile error.
+- The value is checked against the type `(Syntax, …) -> Syntax ^ SyntaxError ! Definitions | Items | Diagnostics | Assert`, with one `Syntax` for each parameter. If it does not have a subtype of this type, it is a compile error.
 - `@macro` in a `.i` file is a compile error. An item with `@macro` in the result of an expansion is a compile error.
 - A macro is exported and imported by its name, as a value is. It is in the space of value names.
 - The name of a macro may only be used in these ways: in the imports and the exports, and as the macro of a macro call (§4.3). Any other use is a compile error.
@@ -575,8 +575,9 @@ and source chain, including those stored in journal entries. Revalidate all
 query dependencies (including negative/fallback answers in §6). Reusing a
 partially expanded subtree is not a cache hit. `note(String)` is a buffered
 compiler diagnostic, replayed once with the successful invocation; it never
-becomes program output. It is a field of the general compiler diagnostic
-service, available in both syntax and typed macro runs.
+becomes program output. It is the `note` field of `i/syntax.Diagnostics`,
+whose definition is `Diagnostics { Diagnostics(note: (String) -> Nil) }`.
+This ordinary service is available in syntax and typed macro runs.
 
 C8. No macro may generate another macro definition. Items may generate normal
 types, aliases, bindings, permitted declarations, more item calls, export
