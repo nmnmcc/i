@@ -393,3 +393,90 @@ plan follows in a separate Regenerate derived files commit.
 The entry-specialization syntax gate also passed: 1,226 extracted blocks, exact
 expected diagnostics and 19 future parser entries. The JP semantic marker does
 not add a parser exception, because that example already parses.
+
+## Stage 4: i scheduler, task interfaces and first laws
+
+The loop, scopes, task starts, cancellation delimiters, channel/event registration,
+shares, combinators, path allocation and request routing are now ordinary i code
+in i/task. The compiler wraps only entries whose inferred needs request those
+services, through ordinary i task.entry inside request.entry. It stores no
+scheduler queue in Rust. Nested runs use the caller's allocator and wait route.
+This checkpoint covers the first laws; the later cancellation/nesting and host
+stress stages still have independent obligations.
+
+Source-based interpretation checks:
+
+- tasks/nested_paths: D10 and §6.1 say nested runs take an index from the same
+  counter as go. Scope bodies run in the opener. Two initial children, two in
+  both, three in map_concurrently and two in race make the following run index
+  10. This expectation is counted from those source rules, not generated output.
+- lifetimes follows R3's wait-for-every-child requirement. channel_fifo and
+  events follow §6.4's source-order alternatives, FIFO partners, one commit,
+  fresh event identity and winner-only map execution.
+- cancel_cleanup follows R2/R4: wait for finals and their fresh cleanup scopes;
+  inherited cancellation cannot cancel that cleanup work.
+- join_cancelled_final is review test S/R4a: go on a cancelling scope returns a
+  dropped handle to the shielded final, whose join must stop immediately.
+- kept_services follows §6.3 and S7 D4: keep all services, replace only routing,
+  and preserve services through the third resume. A portable task handle does
+  not retain the child's go captures; its scope is its portability witness.
+  task.keep inside that child independently exposes retention of the unused
+  Marker service, after detaching routing.
+- local_values, body_value_local and the nonportable cases follow D7's exact
+  crossing points. A scope body's successful result need not be portable.
+  Public Task/Scope/Channel/Shared invariance and Event covariance follow §6.1.
+- async_tasks follows D3/§5.4 for an ordinary non-IO async namespace. It also
+  checks that a status-2 polling handoff accepts a host answer.
+- scripted/test_needs_fake follow §6.5: absolute script paths, FIFO fallback,
+  structured NotRunnable cleanup, and no real-IO polling under test.
+- self_select/never follow §6.4's no-self-rendezvous and quiescence rule.
+  Gone/another-run/outside-scope cases follow R1/R3 and prevalidation of losing
+  alternatives. Shared handles remain portable for local scopes (§6.1).
+
+Corrected intermediate failures:
+
+- The draft type checker rejected six selectors through an alias of a matched
+  Runner. Binding the subject before the match preserves its known narrowed
+  constructor; no Assert requirement or checker rule was weakened.
+- An initial scratch counter assertion incorrectly treated a nested run as
+  fresh. The source count above requires index 10; O0/O2 then passed.
+- The first 14 spec cases exposed one implementation error: children created
+  by a shielded final in an already-cancelling scope inherited an exemption
+  and ran. Spawn now records them dropped immediately, independently of that
+  exemption. The R4a stop now passes at both optimization levels.
+- Three portability probes accidentally returned their own boundary or a share
+  of it, creating infinite types (E0505). The probes now keep a finite outer
+  Nil-returning boundary and test the specified crossing point. A separate
+  incorrect Task-handle portability assertion was replaced with the scope-
+  witness rule and an independent unused-service retention check.
+- Scope setup originally suspended before keep_env, losing unused services at a
+  tail-called scope. Retention now surrounds the first scope/run/event suspend.
+  The Marker probe passes without a compiler special case.
+- Invalid-script cleanup dropped an unstarted root, then checked deadlock before
+  completion. The loop now rechecks completion after that transition.
+- Async siblings exposed a resume guard using bitwise 1 & status, rejecting
+  status 2. It now compares status > 0 before testing async-live. A direct WAT
+  driver isolated the export guard; the real Rust-host regression and spec case
+  replace that substitute diagnosis.
+- The first Rust-host test draft had one unmatched parenthesis and assumed a
+  nonexistent BuildOptions::default. Both compilation failures were corrected.
+- Library assertions still called i/task reserved and expected no functions.
+  Their exact list now comes from §6.1; only the five IO modules remain reserved.
+
+Focused result: all 33 task cases pass at O0/O2 (r2-task-spec5.log). Remaining
+stages include nested cancellation through retained outer callbacks, completion-
+gated Rust/JS probes, all remaining traces, full public-interface and WAT audits,
+and scheduler/channel cost measurements.
+The first stage-4 full gate reached codegen and rejected Clock's old slot 4.
+Scheduler and Runner add two preceding service slots, so the exact representation
+assertion is now 6. Behavioral environment cases remain unchanged. Local/portable
+paths query core.portable on the ordinary boundary witness; no compiler local flag
+or special-case portability operation was added.
+Stage-4 final gate passed, exit 0 (target/r2-stage4-verify2.log): Rust fmt,
+clippy and workspace tests including the new real-host status-2 regression;
+228/228 spec cases at O0/O2; 1,446 std tests per level, hello and bench, WASI
+smoke, 76 Node and 51 browser tests. old-syntax-check passed 1,259 extracted
+blocks with exact diagnostics and the same 19 future parser entries.
+Library schemes and the browser fixture/plan were generated by their normal
+commands and form the following separate regeneration commit. No performance
+claim or complete WAT-audit claim is made by this functional checkpoint.

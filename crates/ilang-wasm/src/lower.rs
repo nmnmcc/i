@@ -940,18 +940,34 @@ impl<'a> Lowerer<'a> {
     }
 
     fn entry_callee(&mut self, d: DefId, n: u32) -> Callee {
-        let callee = self.def_callee(d);
-        let needs = self.typed.entry_services.get(&d).is_some_and(|ts| {
-            ts.iter().any(|id| {
-                let t = self.program.ty(*id);
-                t.host.as_ref().is_some_and(|h| h.is_async)
-                    || (self.program.module(t.module).path == "i/request"
-                        && matches!(t.name.as_str(), "Root" | "Owner" | "Await"))
-            })
+        let mut callee = self.def_callee(d);
+        let services = self
+            .typed
+            .entry_services
+            .get(&d)
+            .cloned()
+            .unwrap_or_default();
+        let tasks = services.iter().any(|id| {
+            let t = self.program.ty(*id);
+            self.program.module(t.module).path == "i/task"
+                && matches!(t.name.as_str(), "Scheduler" | "Runner")
         });
-        if !needs {
-            return callee;
+        let requests = tasks
+            || services.iter().any(|id| {
+                let t = self.program.ty(*id);
+                t.host.as_ref().is_some_and(|h| h.is_async || h.is_request)
+                    || self.program.module(t.module).path == "i/request"
+            });
+        if tasks {
+            callee = self.wrap_entry(callee, n, "i/task");
         }
+        if requests {
+            callee = self.wrap_entry(callee, n, "i/request");
+        }
+        callee
+    }
+
+    fn wrap_entry(&mut self, callee: Callee, n: u32, module: &str) -> Callee {
         let thunk = self.new_func();
         let mut thunk_body = Vec::new();
         for i in 0..n {
@@ -968,16 +984,16 @@ impl<'a> Lowerer<'a> {
             site: None,
         });
         self.out.funcs[thunk.0 as usize] = FuncKind::Code(Func {
-            name: "request entry body".into(),
+            name: format!("{module} entry body"),
             arity: 0,
             locals: vec![LocalType::Value; n as usize],
             body: thunk_body,
             frame: true,
         });
         let wrapper = self.new_func();
-        let entry = self.library_callee("i/request", "entry");
+        let entry = self.library_callee(module, "entry");
         self.out.funcs[wrapper.0 as usize] = FuncKind::Code(Func {
-            name: "request entry".into(),
+            name: format!("{module} entry"),
             arity: n,
             locals: vec![LocalType::Value; n as usize + 1],
             body: vec![

@@ -153,7 +153,39 @@ fn library_names() {
         ),
         ("i/prelude", &["panic", "assert"]),
         ("i/io", &[]),
-        ("i/task", &[]),
+        (
+            "i/task",
+            &[
+                "top",
+                "run",
+                "test",
+                "scope",
+                "local_scope",
+                "go",
+                "join",
+                "yield",
+                "path",
+                "random",
+                "keep",
+                "channel",
+                "local_channel",
+                "send",
+                "receive",
+                "send_event",
+                "receive_event",
+                "join_event",
+                "always",
+                "never",
+                "choose",
+                "map",
+                "sync",
+                "share",
+                "get",
+                "both",
+                "race",
+                "map_concurrently",
+            ],
+        ),
         ("i/clock", &[]),
         (
             "i/random",
@@ -279,7 +311,7 @@ fn hello_example_checks() {
     assert!(checked.program.is_some() && checked.types.is_some());
 }
 
-const RESERVED: [&str; 6] = ["i/task", "i/clock", "i/fs", "i/process", "i/net", "i/stdio"];
+const RESERVED: [&str; 5] = ["i/clock", "i/fs", "i/process", "i/net", "i/stdio"];
 
 /// User code imports every reserved module with no problems.
 ///

@@ -206,17 +206,17 @@ fn environments() {
          f = (c ! Clock) { c.now() }\n\
          g = () {\n  ! Clock = Clock(() { 1 })\n  f()\n}\n\
          @main\nmain = () { g() }\n");
-    // An environment parameter reads its slot (§9.2); `Assert` is slot 0; the three request services precede Clock.
+    // An environment parameter reads its slot (§9.2); `Assert` is slot 0; the request and task services precede Clock.
     let f = function(&text, "app/main.f");
     assert!(
-        f.contains("(array.get $env (local.get $env) (i32.const 4))"),
+        f.contains("(array.get $env (local.get $env) (i32.const 6))"),
         "{f}"
     );
     // An environment statement makes a new environment for the rest of
     // the block, and the tail call passes it.
     let g = function(&text, "app/main.g");
     assert!(
-        g.contains("(call $env_with (local.get $env) (i32.const 4)"),
+        g.contains("(call $env_with (local.get $env) (i32.const 6)"),
         "{g}"
     );
     assert!(g.contains("(return_call $f"), "{g}");

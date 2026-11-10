@@ -179,25 +179,32 @@ pub fn check(graph: &PackageGraph) -> Checked {
     if let (Some(p), Some(t)) = (&mut program, &types)
         && !diags.iter().any(Diagnostic::is_error)
     {
-        let dependency = p
-            .modules
-            .iter()
-            .position(|m| m.path == "i/request")
-            .map(|i| hir::ModuleId(i as u32));
         let mut changed = false;
         for (entry, services) in &t.entry_services {
-            let needed = services.iter().any(|id| {
+            let tasks = services.iter().any(|id| {
                 let service = p.ty(*id);
-                service.host.as_ref().is_some_and(|h| h.is_async)
-                    || p.module(service.module).path == "i/request"
+                p.module(service.module).path == "i/task"
+                    && matches!(service.name.as_str(), "Scheduler" | "Runner")
             });
-            if needed
-                && let Some(dep) = dependency
-                && dep != entry.module
-                && !p.modules[entry.module.0 as usize].imports.contains(&dep)
-            {
-                p.modules[entry.module.0 as usize].imports.push(dep);
-                changed = true;
+            let requests = tasks
+                || services.iter().any(|id| {
+                    let service = p.ty(*id);
+                    service
+                        .host
+                        .as_ref()
+                        .is_some_and(|h| h.is_async || h.is_request)
+                        || p.module(service.module).path == "i/request"
+                });
+            for (path, needed) in [("i/request", requests), ("i/task", tasks)] {
+                if needed && let Some(index) = p.modules.iter().position(|m| m.path == path) {
+                    let dep = hir::ModuleId(index as u32);
+                    if dep != entry.module
+                        && !p.modules[entry.module.0 as usize].imports.contains(&dep)
+                    {
+                        p.modules[entry.module.0 as usize].imports.push(dep);
+                        changed = true;
+                    }
+                }
             }
         }
         if changed {

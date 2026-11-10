@@ -412,10 +412,15 @@ impl<'a> Checker<'a> {
                     let service = self.p.ty(*id);
                     let request = self.p.module(service.module).path == "i/request"
                         && matches!(service.name.as_str(), "Root" | "Owner" | "Await");
-                    if request {
+                    let task = self.p.module(service.module).path == "i/task"
+                        && matches!(service.name.as_str(), "Scheduler" | "Runner");
+                    if request || task {
                         services.push(*id);
                     }
-                    service.host.is_some() || TypeRef::Custom(*id) == self.b.assert || request
+                    service.host.is_some()
+                        || TypeRef::Custom(*id) == self.b.assert
+                        || request
+                        || task
                 }
                 _ => false,
             };

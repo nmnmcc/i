@@ -832,7 +832,7 @@ impl<'p> Emitter<'p> {
             let _ = writeln!(
                 self.out,
                 "(func (export \"ilang_resume:{}:{}\") (param $id i32){params} (result i32) (local $cell (ref $request)) (local $old_shadow (ref $frames)) (local $old_sp i32) (local $answer eqref)\n\
-                 (if (i32.eqz (i32.and (global.get $async_live) (global.get $host_last_status))) (then unreachable))\n\
+                 (if (i32.eqz (i32.and (global.get $async_live) (i32.gt_s (global.get $host_last_status) (i32.const 0)))) (then unreachable))\n\
                  (local.set $cell (call $req_answer (i32.const {i}) (local.get $id))){sets}\n\
                  (local.set $old_shadow (global.get $shadow)) (local.set $old_sp (global.get $sp))\n\
                  (global.set $shadow (ref.as_non_null (struct.get $request 15 (local.get $cell))))\n\
