@@ -276,7 +276,6 @@ impl Checker<'_> {
                 .s
                 .variances(Head::Named(TypeRef::Custom(c.ty)), vars.len());
             let args = vs
-                .iter()
                 .map(|v| match v {
                     super::Variance::Co | super::Variance::Bi => Ty::Never,
                     _ => Ty::Top,

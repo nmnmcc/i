@@ -11,13 +11,14 @@ app/main.twice_error : () -> Int ? Handle
 app/main.number : 1
 app/main.with_host : () -> 1 ! Assert | Storage
 app/main.with_clock : () -> Int ! Clock
-app/main.main : () -> Nil ! Storage | Clock
+app/main.main : () -> Nil ! Clock | Storage
 app/main.core_text : (n: Int) -> "x"
 app/main_test.passes : () -> Nil ! Assert
 app/main_test.host : () -> Nil ! Assert | Storage
 app/main_test.gives_int : () -> 1
 app/main_test.needs_clock : () -> Nil ! Assert | Clock
 app/main_test.never : () -> Never
+src/main.i:65:37: error[E0515]: `1` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 65:26 needs it)
 src/main.i:81:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `Clock`, which must be given before it gets to the entry point
 test/main_test.i:14:1: error[E0521]: `gives_int` is a test, so it gives `Nil` (§10.2), but it gives `1`
 test/main_test.i:17:1: error[E0522]: `needs_clock` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `Clock`, which must be given before it gets to the entry point

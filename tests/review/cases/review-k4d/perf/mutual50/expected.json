@@ -1,16 +1,36 @@
 {
-  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
-  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
+  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 3.0,
+  "bound_seconds": 10.0,
   "outcome": {
     "check": {
       "command": [
         "check",
         "--types"
       ],
-      "exit": "timeout",
-      "stdout": "",
+      "exit": 0,
+      "stdout": "app/main.use : () -> Int ! N | S(N)\napp/main.get : () -> Int ! Dep\napp/main.m0 : (k: Int) -> Int ! N | S(N)\napp/main.m1 : (k: Int) -> Int ! N | S(N)\napp/main.m2 : (k: Int) -> Int ! N | S(N)\napp/main.m3 : (k: Int) -> Int ! N | S(N)\napp/main.m4 : (k: Int) -> Int ! N | S(N)\napp/main.m5 : (k: Int) -> Int ! N | S(N)\napp/main.m6 : (k: Int) -> Int ! N | S(N)\napp/main.m7 : (k: Int) -> Int ! N | S(N)\napp/main.m8 : (k: Int) -> Int ! N | S(N)\napp/main.m9 : (k: Int) -> Int ! N | S(N)\napp/main.m10 : (k: Int) -> Int ! N | S(N)\napp/main.m11 : (k: Int) -> Int ! N | S(N)\napp/main.m12 : (k: Int) -> Int ! N | S(N)\napp/main.m13 : (k: Int) -> Int ! N | S(N)\napp/main.m14 : (k: Int) -> Int ! N | S(N)\napp/main.m15 : (k: Int) -> Int ! N | S(N)\napp/main.m16 : (k: Int) -> Int ! N | S(N)\napp/main.m17 : (k: Int) -> Int ! N | S(N)\napp/main.m18 : (k: Int) -> Int ! N | S(N)\napp/main.m19 : (k: Int) -> Int ! N | S(N)\napp/main.m20 : (k: Int) -> Int ! N | S(N)\napp/main.m21 : (k: Int) -> Int ! N | S(N)\napp/main.m22 : (k: Int) -> Int ! N | S(N)\napp/main.m23 : (k: Int) -> Int ! N | S(N)\napp/main.m24 : (k: Int) -> Int ! N | S(N)\napp/main.m25 : (k: Int) -> Int ! N | S(N)\napp/main.m26 : (k: Int) -> Int ! N | S(N)\napp/main.m27 : (k: Int) -> Int ! N | S(N)\napp/main.m28 : (k: Int) -> Int ! N | S(N)\napp/main.m29 : (k: Int) -> Int ! N | S(N)\napp/main.m30 : (k: Int) -> Int ! N | S(N)\napp/main.m31 : (k: Int) -> Int ! N | S(N)\napp/main.m32 : (k: Int) -> Int ! N | S(N)\napp/main.m33 : (k: Int) -> Int ! N | S(N)\napp/main.m34 : (k: Int) -> Int ! N | S(N)\napp/main.m35 : (k: Int) -> Int ! N | S(N)\napp/main.m36 : (k: Int) -> Int ! N | S(N)\napp/main.m37 : (k: Int) -> Int ! N | S(N)\napp/main.m38 : (k: Int) -> Int ! N | S(N)\napp/main.m39 : (k: Int) -> Int ! N | S(N)\napp/main.m40 : (k: Int) -> Int ! N | S(N)\napp/main.m41 : (k: Int) -> Int ! N | S(N)\napp/main.m42 : (k: Int) -> Int ! N | S(N)\napp/main.m43 : (k: Int) -> Int ! N | S(N)\napp/main.m44 : (k: Int) -> Int ! N | S(N)\napp/main.m45 : (k: Int) -> Int ! N | S(N)\napp/main.m46 : (k: Int) -> Int ! N | S(N)\napp/main.m47 : (k: Int) -> Int ! N | S(N)\napp/main.m48 : (k: Int) -> Int ! N | S(N)\napp/main.m49 : (k: Int) -> Int ! N | S(N)\n",
+      "stderr": ""
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": ""
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
       "stderr": ""
     }
   }
