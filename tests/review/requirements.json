@@ -753,18 +753,536 @@
       "origin": "review-k4d/p/q24.i; criteria C2/C5"
     },
     {
-      "pattern": "^review-(?:k4/cases/provision_(?:closure|direct|helper|inferred)_False|k4c/cases/(?:closure_statement|missing_(?:0|2|3)_(?:0_0_2|1_0_[012]|2_0_2|7_0_[012]))|k4d/(?:proj|_loose/p)/(?:b4|b7|r2|r3)|k4s/min_main_6_0)$",
-      "known_failure": true,
+      "pattern": "^review\\-k4/cases/provision_closure_False$",
+      "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0501",
+        "E0515"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4/cases/provision_direct_False$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4/cases/provision_helper_False$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4/cases/provision_inferred_False$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/closure_statement$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
         "E0522"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
       "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
       "phase": "entry",
-      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute."
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_0_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_1_0_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_1_0_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_1_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_2_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_7_0_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_7_0_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_7_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_0_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_1_0_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_1_0_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_1_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_2_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_7_0_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_7_0_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_7_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_0_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_1_0_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_1_0_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_1_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_2_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_7_0_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_7_0_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_7_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/b4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/b7$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/r2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/r3$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/b4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/b7$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/r2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/r3$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4s/min_main_6_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
     },
     {
       "pattern": "^review-(?:k4/perf/(?:generic_chain_2048|wide_generic_(?:512|1024|2048))|k4c/cases/stress_wide_open_(?:512|1024)|k4d/perf/(?:mutual(?:50|100|150|200|300)|runchain4000|wideann(?:80|200))|k4s/wide_plain_(?:512|1024)|t1/stress-(?:keys-(?:5000|10000)|nested-50))$",
