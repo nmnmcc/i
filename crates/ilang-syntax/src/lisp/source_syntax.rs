@@ -165,10 +165,10 @@ fn item(s: &Syntax) -> Syntax {
                     ),
                     _ => constructor.clone(),
                 });
-                s.replace_children(vec![head.clone(), constructors])
+                s.replace_children(vec![ty(head), constructors])
             }
             [eq, head, value] if symbol(eq, "=") => {
-                s.replace_children(vec![eq.clone(), head.clone(), ty(value)])
+                s.replace_children(vec![eq.clone(), ty(head), ty(value)])
             }
             _ => unreachable!("type definition shape"),
         },
