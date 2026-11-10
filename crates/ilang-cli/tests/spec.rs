@@ -38,6 +38,9 @@ use ilang_host::{HostOptions, Outcome, Program, TestResult};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+#[path = "common/single_file.rs"]
+mod single_file;
+
 #[path = "common/spec_header.rs"]
 mod spec_header;
 
@@ -152,9 +155,7 @@ fn cases(root: &Path) -> Vec<Result<Case, String>> {
                     |(expect, output)| {
                         let dir = tempfile::tempdir().unwrap();
                         std::fs::write(dir.path().join("i.toml"), "name = \"spec\"\n").unwrap();
-                        std::fs::create_dir_all(dir.path().join("test")).unwrap();
-                        std::fs::write(dir.path().join("test").join(format!("{stem}.i")), &text)
-                            .unwrap();
+                        single_file::write(dir.path(), &stem, &text);
                         Case {
                             name,
                             header_path: path.clone(),

@@ -351,7 +351,58 @@ impl<'a> Resolver<'a> {
         let ast = &parsed[m.0 as usize].ast;
         let placeholder_var = VarId(u32::MAX);
         for item in &ast.items {
-            let attrs = self.attributes(item);
+            let mut attrs = self.attributes(item);
+            let here = self.p.module(m);
+            let root = self.graph.root == Some(here.package);
+            if root && let ast::ItemKind::Binding(b) = &item.kind {
+                let mut names = Vec::new();
+                ast_binders(&b.pattern, &mut names);
+                let pkg = &self.graph.packages[here.package];
+                let default = here.kind == ModuleKind::Src
+                    && here.path == format!("{}/main", pkg.name)
+                    && names.iter().any(|(n, _)| n == "main");
+                let declared = pkg
+                    .entries
+                    .iter()
+                    .filter(|(_, e)| {
+                        e.module == here.path && names.iter().any(|(n, _)| *n == e.function)
+                    })
+                    .collect::<Vec<_>>();
+                let legacy = parsed
+                    .iter()
+                    .filter(|p| self.graph.root == Some(p.package))
+                    .any(|p| {
+                        p.ast.items.iter().any(|i| {
+                            i.attributes
+                                .iter()
+                                .any(|a| a.module.is_none() && a.name.name == "main")
+                        })
+                    });
+                let selected = match &self.graph.entry {
+                    Some(name) => declared.iter().any(|(n, _)| n == name),
+                    None => default && !legacy,
+                };
+                if (default || !declared.is_empty())
+                    && !item
+                        .attributes
+                        .iter()
+                        .any(|a| a.module.is_none() && a.name.name == "main")
+                {
+                    self.entry_form("entry", b.pattern.span, b, true);
+                }
+                if self.graph.entry.is_some() {
+                    attrs.main = selected;
+                } else if selected {
+                    attrs.main = true;
+                }
+                if attrs.main && attrs.test {
+                    self.error(
+                        code::EXPORT_NAME_TWICE,
+                        b.pattern.span,
+                        "a function cannot be both the program entry and a test",
+                    );
+                }
+            }
             let slot = match &item.kind {
                 ast::ItemKind::TypeDef(def) if def.alias_pattern => {
                     let pid = ProjectionId(self.p.alias_patterns.len() as u32);
@@ -641,11 +692,17 @@ impl<'a> Resolver<'a> {
             }
             match name {
                 "external" | "host" => {
-                    if args[0].starts_with("ilang:") && !self.in_library() {
+                    if (args[0].starts_with("ilang:") || args[0].starts_with("i:compiler/"))
+                        && !self.in_library()
+                    {
                         self.error(
                             code::RESERVED_ILANG,
                             a.args[0].1,
-                            "names that start with `ilang:` are kept for the runtime",
+                            if args[0].starts_with("ilang:") {
+                                "names that start with `ilang:` are kept for the runtime"
+                            } else {
+                                "names that start with `i:compiler/` are kept for the compiler"
+                            },
                         );
                     }
                     if name == "external" {
@@ -724,11 +781,16 @@ impl<'a> Resolver<'a> {
     fn entry_form(&mut self, name: &str, span: Span, b: &ast::Binding, compiled: bool) -> bool {
         let mut names = Vec::new();
         ast_binders(&b.pattern, &mut names);
+        let written = if name == "entry" {
+            "a program entry".to_string()
+        } else {
+            format!("`@{name}`")
+        };
         let ast::ExprKind::Fn(f) = &ungroup(&b.value).kind else {
             self.error(
                 code::ENTRY_FORM,
                 span,
-                format!("`@{name}` is on a binding whose value is a function expression"),
+                format!("{written} is on a binding whose value is a function expression"),
             );
             return false;
         };
@@ -736,7 +798,7 @@ impl<'a> Resolver<'a> {
             self.error(
                 code::ENTRY_FORM,
                 span,
-                format!("`@{name}` is on a binding whose pattern binds one name"),
+                format!("{written} is on a binding whose pattern binds one name"),
             );
             return false;
         }
@@ -744,7 +806,7 @@ impl<'a> Resolver<'a> {
             self.error(
                 code::ENTRY_PARAMS,
                 span,
-                format!("an entry point has no parameters but environment parameters, so `@{name}` may not be on this function"),
+                format!("an entry point has no parameters but environment parameters, so {written} may not be on this function"),
             );
             return false;
         }
@@ -1479,11 +1541,16 @@ impl<'a> Resolver<'a> {
                 Some(t)
             }
             None => {
-                self.error(
-                    code::UNKNOWN_TYPE,
-                    name.span,
-                    format!("the type `{}` is not defined", name.name),
-                );
+                if name.name == "Record" {
+                    self.error(ilang_syntax::Code::RecordReserved.as_str(), name.span,
+                        "the built-in record type `Record` is kept for T3; it is an ordinary shadowable type name");
+                } else {
+                    self.error(
+                        code::UNKNOWN_TYPE,
+                        name.span,
+                        format!("the type `{}` is not defined", name.name),
+                    );
+                }
                 None
             }
         }
@@ -2165,9 +2232,14 @@ impl<'a> Resolver<'a> {
                     let vars = self.push_declared_frame(type_params);
                     let t = self.ty(ty);
                     self.ty_frames.pop();
-                    // The operations of the library are not host imports
-                    // (§2.1), so their types are not limited.
-                    if !self.in_library() {
+                    // Reserved `ilang:` library operations lower inside the
+                    // runtime; other externals use the ordinary host ABI.
+                    let runtime_operation = self.in_library()
+                        && matches!(
+                            &self.p.modules[m.0 as usize].defs[d as usize].kind,
+                            DefKind::External { module, .. } if module.starts_with("ilang:")
+                        );
+                    if !runtime_operation {
                         let before = self.diags.len();
                         self.external_type(&t);
                         if self.diags.len() == before
@@ -2491,6 +2563,14 @@ impl<'a> Resolver<'a> {
     fn expr(&mut self, e: &ast::Expr) -> Expr {
         use ast::ExprKind as E;
         let kind = match &e.kind {
+            E::Quote(_) => {
+                self.error(
+                    code::MACRO_RESERVED,
+                    e.span,
+                    "a quote must be evaluated inside a macro",
+                );
+                ExprKind::Error
+            }
             E::Int(n) => ExprKind::Int(n.clone()),
             E::Float(f) => ExprKind::Float(*f),
             E::String(s) => ExprKind::String(s.clone()),
@@ -2918,6 +2998,14 @@ impl<'a> Resolver<'a> {
     ) -> Pattern {
         use ast::PatternKind as P;
         let kind = match &p.kind {
+            P::Quote(_) => {
+                self.error(
+                    code::MACRO_RESERVED,
+                    p.span,
+                    "a quote pattern must be evaluated inside a macro",
+                );
+                PatternKind::Error(Vec::new())
+            }
             P::Var(n) => PatternKind::Var(self.bind(n, p.span, binders, shared)),
             P::Discard(_) => PatternKind::Discard,
             P::Typed { binder, ty } => {
@@ -3120,6 +3208,47 @@ impl<'a> Resolver<'a> {
                 span,
                 "the compiled package has more than one `@main`",
             );
+        }
+        if let Some(root) = self.graph.root {
+            let pkg = &self.graph.packages[root];
+            let mut bad = Vec::new();
+            for (name, e) in &pkg.entries {
+                let valid = self
+                    .by_path
+                    .get(&(root, e.module.clone()))
+                    .is_some_and(|m| {
+                        self.defs_by_name[m.0 as usize]
+                            .get(&e.function)
+                            .is_some_and(|i| {
+                                matches!(
+                                    self.p.module(*m).defs[*i as usize].kind,
+                                    DefKind::Binding { .. }
+                                )
+                            })
+                    });
+                if !valid {
+                    bad.push((
+                        e.span,
+                        format!("entry `{name}` must name a top-level function of this package"),
+                    ));
+                }
+            }
+            if let Some(name) = &self.graph.entry
+                && !pkg.entries.iter().any(|(n, _)| n == name)
+            {
+                bad.push((
+                    Span::default(),
+                    format!("unknown entry `{name}`; declare it in `[entries]`"),
+                ));
+            }
+            for (span, message) in bad {
+                self.diags.push(Diagnostic::error(
+                    code::ENTRY_FORM,
+                    pkg.manifest_source,
+                    span,
+                    message,
+                ));
+            }
         }
         self.host_fns();
         // §9.7: two host services may not have the same namespace and a

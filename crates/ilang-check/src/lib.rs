@@ -4,8 +4,11 @@
 //!
 //! The only authority is `docs/spec.md`; section numbers refer to it.
 
+mod capabilities;
 pub mod hir;
+pub mod hygiene;
 pub mod identity;
+pub mod macro_sandbox;
 pub mod order;
 pub mod query;
 pub mod resolve;
@@ -79,6 +82,7 @@ pub mod code {
     pub const EXTERNAL_TYPE_VAR: &str = "E0317";
     pub const EXTERNAL_HOST_TYPE: &str = "E0318";
     pub const EXTERNAL_EFFECTS: &str = "E0319";
+    pub const COMPILER_CAPABILITY: &str = "E0322";
     pub const HOST_TYPE: &str = "E0320";
     pub const EXPORT_NAME_TWICE: &str = "E0321";
     pub const DEPRECATED: &str = "W0301";
@@ -115,6 +119,7 @@ pub mod code {
 }
 
 /// A parsed module of the graph.
+#[derive(Clone)]
 pub struct Parsed {
     pub package: PackageId,
     pub path: String,
@@ -129,7 +134,12 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
     let mut diags = Vec::new();
     for (package, p) in graph.packages.iter().enumerate() {
         for m in &p.modules {
-            let (ast, errors) = ilang_syntax::parse_module(&graph.sources.get(m.source).text);
+            let source = graph.sources.get(m.source);
+            let (ast, errors) = if source.display.ends_with(".is") {
+                ilang_syntax::lisp::parse_source(&source.text)
+            } else {
+                ilang_syntax::parse_module(&source.text)
+            };
             diags.extend(
                 errors
                     .into_iter()
@@ -151,14 +161,96 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
 /// when a module has a syntax error, so that one mistake is not reported
 /// many times.
 pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagnostic>) {
-    let (parsed, mut diags) = parse(graph);
+    let (parsed, diags) = parse(graph);
     if diags.iter().any(Diagnostic::is_error) {
         return (None, diags);
     }
-    let (mut program, more) = resolve::resolve(graph, &parsed);
+    let (program, more) = resolve_parsed(graph, &parsed);
+    (program, diags.into_iter().chain(more).collect())
+}
+
+/// Resolve an already parsed module set. The expansion driver uses this entry
+/// point after transforming syntax, keeping source identities and spans intact.
+pub fn resolve_parsed(
+    graph: &PackageGraph,
+    parsed: &[Parsed],
+) -> (Option<hir::Program>, Vec<Diagnostic>) {
+    let mut diags = Vec::new();
+    let (mut program, more) = resolve::resolve(graph, parsed);
     diags.extend(more);
     order::order(&mut program, &mut diags);
+    capabilities::check(&program, graph, &mut diags);
     (Some(program), diags)
+}
+
+/// Resolve a compiler-owned program from the exact import closure of a macro
+/// module. The supplied entries are compiler-generated wrappers: they expose
+/// host-compatible Syntax values and install the allowed compiler services.
+/// Ordinary program capability checks do not apply to these wrappers; the
+/// complete dependency closure is checked for foreign externals instead.
+pub fn check_compiler_exports(
+    graph: &PackageGraph,
+    parsed: &[Parsed],
+    entries: &[(&str, &str)],
+) -> Checked {
+    let (mut program, mut diags) = resolve::resolve(graph, parsed);
+    order::order(&mut program, &mut diags);
+    for module in &mut program.modules {
+        for binding in &mut module.bindings {
+            binding.main = false;
+            binding.test = false;
+        }
+    }
+    program.host_exports.clear();
+    for &(path, name) in entries {
+        let (module, m) = program
+            .modules
+            .iter()
+            .enumerate()
+            .find(|(_, m)| m.path == path)
+            .expect("compiler export module must be in the selected import closure");
+        let index = m
+            .defs
+            .iter()
+            .position(|d| d.name == name)
+            .expect("compiler export must be a resolved wrapper binding");
+        program.host_exports.push(hir::DefId {
+            module: hir::ModuleId(module as u32),
+            index: index as u32,
+        });
+    }
+    let modules = (0..program.modules.len())
+        .map(|i| hir::ModuleId(i as u32))
+        .collect::<Vec<_>>();
+    for id in
+        macro_sandbox::foreign_externals(&program, graph.library, &modules, &program.host_exports)
+    {
+        let def = program.def(id);
+        diags.push(Diagnostic::error(
+            code::COMPILER_CAPABILITY,
+            Some(program.module(id.module).source),
+            def.span,
+            "a macro program cannot execute an external declaration outside package i (§8)",
+        ));
+    }
+    let mut checked = check_resolved(graph, Some(program), diags);
+    if let (Some(program), Some(typed)) = (&checked.program, &checked.types) {
+        for &entry in &program.host_exports {
+            if typed
+                .entry_services
+                .get(&entry)
+                .is_some_and(|services| !services.is_empty())
+            {
+                checked.diags.push(Diagnostic::error(
+                    code::COMPILER_CAPABILITY,
+                    Some(program.module(entry.module).source),
+                    program.def(entry).span,
+                    "a compiler wrapper must install its allowed services and cannot request a host service (§8)",
+                ));
+            }
+        }
+    }
+    checked
 }
 
 /// The result of `check`.
@@ -175,7 +267,21 @@ pub struct Checked {
 /// only inferred when resolution found no errors, so that one mistake is
 /// not reported many times.
 pub fn check(graph: &PackageGraph) -> Checked {
-    let (program, mut diags) = resolve_program(graph);
+    let (program, diags) = resolve_program(graph);
+    check_resolved(graph, program, diags)
+}
+
+/// Resolve and type-check the parsed modules after syntax expansion.
+pub fn check_parsed(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
+    let (program, diags) = resolve_parsed(graph, parsed);
+    check_resolved(graph, program, diags)
+}
+
+fn check_resolved(
+    graph: &PackageGraph,
+    program: Option<hir::Program>,
+    mut diags: Vec<Diagnostic>,
+) -> Checked {
     let types = match &program {
         Some(p) if !diags.iter().any(Diagnostic::is_error) => {
             let (typed, more) = types::check(p, &graph.sources);

@@ -45,6 +45,8 @@ function createClient() {
     documentSelector: [
       { scheme: "file", language: "i" },
       { scheme: "untitled", language: "i" },
+      { scheme: "file", language: "i-lisp" },
+      { scheme: "untitled", language: "i-lisp" },
     ],
     synchronize: {
       fileEvents: [

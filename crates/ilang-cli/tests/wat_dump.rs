@@ -9,6 +9,9 @@
 //! ```
 use std::path::{Path, PathBuf};
 
+#[path = "common/single_file.rs"]
+mod single_file;
+
 fn dump(project: &Path, name: &str, out: &Path) {
     for (target, tag) in [
         (ilang_wasm::Target::Ilang, "ilang"),
@@ -69,9 +72,9 @@ fn wat_dump() {
             } else if path.extension().is_some_and(|e| e == "i") {
                 let dir = tempfile::tempdir().unwrap();
                 std::fs::write(dir.path().join("i.toml"), "name = \"spec\"\n").unwrap();
-                std::fs::create_dir_all(dir.path().join("test")).unwrap();
+
                 let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
-                std::fs::copy(&path, dir.path().join("test").join(format!("{stem}.i"))).unwrap();
+                single_file::write(dir.path(), &stem, &std::fs::read_to_string(&path).unwrap());
                 dump(dir.path(), &name, &out);
             }
         }
