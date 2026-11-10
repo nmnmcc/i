@@ -148,3 +148,136 @@ Outstanding gates: implementation and all T3 compiler/runtime/spec probes,
 principal-type and order probes, scale timings, WAT comparison, std +10% gate,
 no-T3-future-entry gate, and the Schema/Codec integration example. No timing or
 WAT result is claimed for T3. Redesign remained f6f9cc3 at the last check.
+
+
+## Resumption at 0d0ce19: accepted exact-record contract
+
+The lane was clean on resumption. Its compiler includes T1 and T2; redesign
+is 1a8fee2 and is already an ancestor. The old conflict above is historical:
+records §§20–21 replace the common-field union with exact alternatives and
+N2. The original failing model is retained as a negative control, not a
+requirement for the new compiler to reproduce its old failure.
+
+Read before this stage: revised records.md, including the change/rejection
+lists and reference-first hand-off; the type study at 3beae77 and compiler
+study at 3cc1def; the reference INDEX's type/records, coverage, diagnostics
+and interface routes; shared.md's “Prior art first” instructions. The two
+study files are absent from this checkout. Both were read with git show at
+the accepted revisions, rather than silently substituting another file.
+Records §21.1 documents the same checkout provenance. No reference tree was
+edited, built or copied verbatim.
+
+Models rerun successfully through the dev shell:
+
+- t3-record-substitution.py: 4,994,560 substitutions, zero new-rule failures;
+  33,344 independent set checks; 78,040 union-order and 1,024 label checks.
+  The old rules still show 32,235 semantic commutation failures.
+- t3-record-demand.py: 874,752 compact commutations; 133,120 inclusion checks;
+  15,876 extended substitutions and 4,202 independent set checks. Both
+  20-step model families passed; these are model timings, not compiler timings.
+- t3-record-bdd.py: 38,400 Boolean pairs with caches on/off, 133,120 map
+  inclusions and 16,384 negative projections, zero oracle disagreements;
+  reordered atoms, substitution, sharing and resource retry checks passed.
+
+The coordinator allocated E0546 to resource exhaustion and assigned the
+versioned graph codec to T3. Arbitrary heterogeneous traversal stays deferred;
+fixed-schema mapping is required. New tests will not require E0520 to be an
+error; W520 owns that policy change.
+
+## Stage 2: label order and the bounded Boolean kernel
+
+Reference code read before implementing these mechanisms:
+
+| File / function | Taken | Required difference in i |
+|---|---|---|
+| ilang-wasm runtime/values/strings.rs, string_compare and string_from_bytes | Byte comparison followed by length | Verify against Rust str order for all pairs of labels; record source order remains evaluation order |
+| ref/elixir/lib/elixir/lib/module/types/descr.ex, bdd_node_new, bdd_union, bdd_intersection, bdd_difference, bdd_negation | Ternary decision meaning (p & C) union U union (not p & D), shallow hash-consing and completed apply results | Safe integer handles; iterative evaluation; no closed-map, gradual-type, recursive-type or library rules |
+| Same file, subtype_static?, map_bdd_empty?, init_map_line_empty?, map_line_meet_empty?, map_split_key_line, map_remove_negative | Uncovered-set emptiness, required-empty-field pruning, first-difference products and shared-witness projection | Map/field theory is a later integration stage; do not claim Boolean truth assignments establish record inclusion |
+| ref/tsrs/crates/tsrs_checker/src/unioncache.rs, UnionCacheMode and cache contract | Cache-off/shadow validation; completed pure results only | No mutable-bound result cache; one demand budget charges distinct logical states independently of memo hits |
+| ref/ghc/compiler/GHC/HsToCore/Pmc/Check.hs, throttle | Resource status separate from logical result | Never return GHC's approximation as a subtype result; use ResourceLimit and eventually E0546 |
+| ref/typescript-go/internal/checker/checker.go, removeSubtypes | Early identities, cached reductions and explicit complexity refusal | Use i's fixed 65,536-state budget, not TypeScript's thresholds or a false inclusion verdict |
+| ref/elixir/lib/elixir/lib/module/types/descr.ex, bdd_map | Visit Boolean children while changing atoms | Memoize by handle and replace atoms through Boolean apply to restore order, rather than reusing the old decision order after substitution, as §21.2 requires |
+
+The label-order test executes the production runtime in Wasmtime. Its expected
+order comes independently from Rust str::cmp, as records §4.1/§16 step 2
+requires. The Boolean kernel will first compile only for unit tests, as T1's
+pure-algebra stage did. Production type behavior remains unchanged until the
+exact graph and solver consumers are connected. Differential tests use the
+accepted Python BDD model as an oracle; frontend/compiler differential tests
+remain required after syntax and inference are connected.
+
+The kernel uses shallow intern keys and explicit work stacks. The accepted
+Python BDD model supplies 19,200 Boolean operation verdicts in each cache
+mode; Rust checks each on all eight independent assignments. Substitution
+tests change atom order and replace atoms by empty or compound predicates.
+A 20,000-decision chain checks native-stack independence. Budget exhaustion
+and a successful fresh retry are separate from false Boolean results.
+These are kernel checks, not claims about the unfinished frontend, graph
+interfaces, field theory, or the real-checker branch-growth/Fan gates.
+
+Stage checks, before merging W520:
+
+- `heavy direnv exec /home/agent/Programming/i cargo test -p ilang-check
+  --lib records::bdd --locked`: exit 0, all five tests passed in 0.38s.
+  The earlier four-test run also passed, before substitution was added.
+- `heavy direnv exec /home/agent/Programming/i cargo test -p ilang-wasm
+  --test record_labels --locked`: exit 0, all 225 pair comparisons passed
+  in the production runtime; Wasm validation and execution passed.
+- `heavy direnv exec /home/agent/Programming/i env
+  ILANG_BROWSER_PORT=4181 ./scripts/dev-verify`: exit 0. Formatting, Clippy
+  with warnings denied, workspace tests, all 239 existing spec cases at
+  O0/O2, 1,465 std tests, two example tests and 12 bench tests at both levels,
+  WASI smoke, SDK tests and 51 browser tests passed.
+- `direnv exec /home/agent/Programming/i ./scripts/old-syntax-check`:
+  exit 0, 1,621 snippets, 25 T3 future entries. A preflight with the existing
+  parser binary (a substitute inventory, not the rebuilt-parser gate) found
+  seven missing registrations for the newly accepted record examples. They
+  now have exact future-track errors, as old-syntax-check.md requires:
+  “Their owning track must remove the entry when its syntax lands.” No
+  record syntax has landed in this stage. A Rust assertion's message was
+  reworded to avoid falsely looking like an i binding to the extractor.
+- `direnv exec /home/agent/Programming/i python3 -I
+  scripts/old-syntax-check-test`: exit 0, all eight extractor regressions.
+- `heavy direnv exec /home/agent/Programming/i env
+  WAT_DUMP=/home/agent/Programming/i/.rd/a/target/t3b-wat-baseline
+  cargo test -p ilang-cli --test wat_dump --locked`: exit 0, 898 files.
+  This is the pre-W520 baseline export, not a before/after byte comparison.
+- `git diff --check`: passed. No golden or generated file changed. No cargo
+  or gate check failed or was interrupted in this stage. Shared heavy slots
+  delayed checks; no slot settings or other worker's processes were changed.
+  Environment variables were command-scoped; no persistent setting changed.
+
+Redesign moved from 1a8fee2 to 82375c0 (W520) during verification. The stage
+checkpoint precedes that merge; the merged tree must pass the full gate
+again. No new test requires disjoint comparisons to be errors.
+
+## Head-test fixture conflict found during stage 2
+
+The revised change table (§20.5, §§6–11 and §§13–16) says: “The remaining
+pass/reject tests in §15.1 therefore keep their stated behavior, subject to
+existing joint corrections.” Joint J5 keeps head-only tests. This leaves a
+separate contradictory required pass fixture in §15.1:
+
+`f(K) = (r: {..}, key: K) -> Int { r |> { y: { ..{ a: Int }, K: Int } -> 0  _ -> 1 } }`
+
+Records §15.1 puts this under “Correct programs (`// expect: pass`)”. But
+records §7 says “every record that can come to that place must be in
+`{ name: String }`” for a field-requiring record head test. Spec §7.1 says:
+“A type test whose type is a record or spread tests only the record head:
+every possible record there must satisfy the written field requirements”.
+Spec §4.8 rule 11 requires `B <: T | r - T`; subtraction removes the record
+head, not a field-sensitive complement (records §20.5).
+
+Instantiate K with `"a"`. T is `{ a: Int }`. The empty record is in the
+annotated input `{..}` but not in T, and the fallback cannot recover it
+because the first clause takes every record. Thus the definition must be
+rejected by the normative rule and accepted by the required fixture. The
+fact that y is unused does not exempt the test from rule 11. For the listed
+removal variant, K = `"b"` leaves the same required a field and witness.
+
+`direnv exec /home/agent/Programming/i python3
+tests/t3-head-test-conflict.py` checks both refutations using the accepted
+BDD map model and proves both field-constrained repairs. It exits 0. This
+is a substitute interpretation check, not a compiler acceptance test and
+not an assignment of a diagnostic number. No production record compiler
+behavior has been chosen against the contradictory pass requirement.

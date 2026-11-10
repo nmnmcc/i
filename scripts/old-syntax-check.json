@@ -1716,6 +1716,63 @@
     ],
     "reason": "records §16 step 1 installs the specification before the stage 7 parser; remove when records parse"
   },
+  "docs/design/records.md:da22dc22a623392c": {
+    "track": "T3",
+    "reason": "Exact-record substitution witness in accepted records §20.1; remove when record types parse",
+    "diagnostics": [
+      "E0101: expected a type, found `..`",
+      "E0101: expected a type, found `..`"
+    ]
+  },
+  "docs/design/records.md:9d4021269e557daf": {
+    "track": "T3",
+    "reason": "Closed record-union input probe in accepted records §20.3; remove when record types parse",
+    "diagnostics": [
+      "E0101: expected `}`, found `:`",
+      "E0101: expected `}`, found `:`"
+    ]
+  },
+  "docs/design/records.md:e8ba7f2daf2dcd5e": {
+    "track": "T3",
+    "reason": "Record bound-proof probe in accepted records §20.3; remove when record types parse",
+    "diagnostics": [
+      "E0101: expected a type, found `..`"
+    ]
+  },
+  "docs/design/records.md:ed1b31d1aa6d82e0": {
+    "track": "T3",
+    "reason": "Branch-derived schema input probe in accepted records §20.3; remove when records parse",
+    "diagnostics": [
+      "E0101: expected an expression, found `:`",
+      "E0101: expected an expression, found `:`"
+    ]
+  },
+  "docs/design/records.md:10b07e7a040f4565": {
+    "track": "T3",
+    "reason": "Record-union annotation probe in accepted records §20.3; remove when records parse",
+    "diagnostics": [
+      "E0101: expected `}`, found `:`",
+      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
+      "E0101: expected `->`, found `}`"
+    ]
+  },
+  "docs/design/records.md:55d79debb3e6c47d": {
+    "track": "T3",
+    "reason": "Fixed-schema field mapping in accepted records §20.5; remove when record literals parse",
+    "diagnostics": [
+      "E0101: expected an expression, found `:`"
+    ]
+  },
+  "docs/design/records.md:129c4789b2b41f04": {
+    "track": "T3",
+    "reason": "Shared scheme-binder record probe in accepted records §21.5; remove when record literals parse",
+    "diagnostics": [
+      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
+      "E0101: expected `->`, found `}`",
+      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
+      "E0101: expected `->`, found `}`"
+    ]
+  },
   "crates/ilang-check/tests/value_types.rs:d46aee08cc49f6d1": {
     "not_source": "Diagnostic message substring, not i source"
   }

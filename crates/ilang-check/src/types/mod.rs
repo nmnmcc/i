@@ -25,6 +25,8 @@ mod infer;
 mod known;
 mod lits;
 mod pattern;
+#[cfg(test)]
+mod records;
 mod shown;
 mod solve;
 mod value_types;
