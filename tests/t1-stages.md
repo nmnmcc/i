@@ -605,3 +605,46 @@ accepted before and rejected with E0520 after, exactly as §8 lists:
 11/equality, 11/stop_tail_service, 6/blocks and 6/strings. Their current
 runtime versions still pass. Artifact: original-runtime.json under the
 continuation target directory.
+
+### Mandatory fitted choices
+
+Joint J5 says “A one-clause block with choices is fitted and can need
+Assert; it does not become an exhaustive match.” Spec §4.8 fitting says
+“choices with the same type constructor use the same new type variables”,
+and §6.12 says their parameter has no label. The ordinary case visitor
+therefore shares places and unions binder types, with a fitted flag:
+scalar patterns keep their whole head; failures are ordinary constraints;
+coverage and original-subject constructor flow do not apply. The union of
+choice rows goes through the existing deferred binding decision in its
+own effect frame. Lowering uses the same AssertionFailure path as a fitted
+binding and the whole choices span, beginning at its first pattern.
+
+The old E0235 path is removed. The required pending Result unwrapping
+case is now a passing spec case. Independent checks require `(Int) -> 2
+! Assert` for `{ 0 | 1 -> 2 }`, unioned binders, monomorphic fitted
+binders, no constructor flow, and rejection of opaque Box(Int) tests on
+Box(Int | String). Runtime cases cover both successes, deferred groups,
+inner/outer handlers, written no-Assert rejection and the exact default
+failure text and positions. A two-clause equivalent still needs coverage.
+
+Development failures: the first interpretation/old-syntax checks found
+malformed test choices with two type tests. Spec §7.1 says “A `|` after a
+type is part of the type, so a type test is written after the other
+choices”; the fixtures now put a literal before the test. Two focused
+runtime runs expected a caller position for a tail call. §11.7 says “Calls
+that were replaced by tail calls are gone”; the position fixture now makes
+the call non-tail to verify both the pattern position and caller position.
+These were expectation errors; no compiler check was weakened.
+
+The old-syntax run also saw a concurrent dev-shell enterShell failure:
+`.devenv/load-exports` disappeared during chmod in the shared environment.
+The slot's subsequent dev-shell entry succeeded and the parser scan
+returned 0 (1177 snippets, 17 other-track futures). No environment or
+configuration was changed by this lane. Focused interpretation checks:
+23/23 pass after the syntax correction.
+
+Final fitted-choices full gate: exit 0, 198 spec cases at O0/O2,
+1422 std tests at each level, 33 browser tests; fmt, Clippy -D warnings
+and every workspace Rust target pass. Log: choices-full.log under the
+continuation target directory. No golden changes beyond the held stage
+7/8 outputs; no check was interrupted.

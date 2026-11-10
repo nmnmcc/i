@@ -104,6 +104,7 @@ pub(crate) struct PendingCase {
 
 /// What a clause pass needs while it visits patterns.
 struct Visit<'p> {
+    fitted: bool,
     clause: usize,
     choice: usize,
     unguarded: bool,
@@ -423,6 +424,7 @@ impl Checker<'_> {
         span: Span,
         expected: &Ty,
     ) -> (Ty, Ty) {
+        let fitted = clauses.len() == 1 && clauses[0].guard.is_none();
         let (a, subject_known) = self.infer_k(subject, &Ty::Top);
         let mut places = vec![Place {
             ty: a.clone(),
@@ -439,6 +441,7 @@ impl Checker<'_> {
         }];
         let mut rows: Vec<Vec<Pat>> = Vec::new();
         let mut v = Visit {
+            fitted,
             clause: 0,
             choice: 0,
             unguarded: true,
@@ -475,7 +478,12 @@ impl Checker<'_> {
                 p
             };
             let b = places[i].ty.clone();
-            held.extend(self.sub_case(&b, &want, if i == 0 { subject.span } else { span }));
+            let at = if i == 0 { subject.span } else { span };
+            if fitted {
+                self.sub(&b, &want, at);
+            } else {
+                held.extend(self.sub_case(&b, &want, at));
+            }
         }
         // Rule 12: each catch-all gets `B - H`, and its known type less the
         // members that are taken (§4.8).
@@ -506,7 +514,7 @@ impl Checker<'_> {
         let mut knowns = Vec::new();
         for c in clauses {
             // Every choice of the clause has `C` at its top.
-            let known = subject_var.and_then(|x| {
+            let known = subject_var.filter(|_| !fitted).and_then(|x| {
                 let mut ctors = c.patterns.iter().map(top_ctor);
                 let first = ctors.next()??;
                 ctors.all(|o| o == Some(first)).then_some((x, first))
@@ -542,26 +550,37 @@ impl Checker<'_> {
             }
         }
         let module = self.module;
-        self.cases.push(PendingCase {
-            module,
-            held,
-            subject: a,
-            span: subject.span,
-            clauses: rows
-                .into_iter()
-                .zip(clauses)
-                .map(|(choices, c)| {
-                    let span = match (c.patterns.first(), c.patterns.last()) {
-                        (Some(f), Some(l)) => Span {
-                            start: f.span.start,
-                            end: l.span.end,
-                        },
-                        _ => c.span,
-                    };
-                    (Pat::Or(choices), c.guard.is_some(), span)
-                })
-                .collect(),
-        });
+        if fitted {
+            let clause = &clauses[0];
+            let at = clause
+                .patterns
+                .first()
+                .unwrap()
+                .span
+                .to(clause.patterns.last().unwrap().span);
+            self.defer_failure(Pat::Or(rows[0].clone()), a, at);
+        } else {
+            self.cases.push(PendingCase {
+                module,
+                held,
+                subject: a,
+                span: subject.span,
+                clauses: rows
+                    .into_iter()
+                    .zip(clauses)
+                    .map(|(choices, c)| {
+                        let span = match (c.patterns.first(), c.patterns.last()) {
+                            (Some(f), Some(l)) => Span {
+                                start: f.span.start,
+                                end: l.span.end,
+                            },
+                            _ => c.span,
+                        };
+                        (Pat::Or(choices), c.guard.is_some(), span)
+                    })
+                    .collect(),
+            });
+        }
         (r, self.kunion(knowns))
     }
 
@@ -1040,7 +1059,7 @@ impl Checker<'_> {
                 (list, coverage::list(pats, rest.is_some()))
             }
             _ => {
-                let t = self.leaf(q, true, !places[at].shared);
+                let t = self.leaf(q, true, !v.fitted && !places[at].shared);
                 let k = places[at].known.clone();
                 self.fit_known(q, &k, true);
                 let pat = match coverage::literal(q) {

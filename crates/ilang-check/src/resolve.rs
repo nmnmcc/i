@@ -2154,37 +2154,37 @@ impl<'a> Resolver<'a> {
             E::Block(b) => ExprKind::Block(self.block(b)),
             E::Fn(f) => ExprKind::Fn(Box::new(self.function(f, e.span))),
             E::Clauses(clauses) => self.clause_function(clauses, e.span),
-            E::Case { subject, clauses } if clauses.len() == 1 && clauses[0].guard.is_none() => {
+            E::Case { subject, clauses }
+                if clauses.len() == 1
+                    && clauses[0].guard.is_none()
+                    && clauses[0].patterns.len() == 1 =>
+            {
                 let clause = &clauses[0];
-                if clause.patterns.len() != 1 {
-                    self.one_clause_choices(e.span)
-                } else {
-                    // §3.9: the subject precedes the new scope; no type frame,
-                    // no generalization, and the binding stops at the pattern.
-                    let value = self.expr(subject);
-                    let mut binders = Vec::new();
-                    let pattern = self.pattern(&clause.patterns[0], &mut binders, None);
-                    self.locals.push(Frame {
-                        names: binders.into_iter().map(|b| (b.name, b.var)).collect(),
-                        fn_only: None,
-                    });
-                    let body = self.expr(&clause.body);
-                    self.locals.pop();
-                    let span = pattern.span;
-                    ExprKind::Block(Block {
-                        stmts: vec![
-                            Stmt::Bind(Binding {
-                                pattern,
-                                value,
-                                direct: false,
-                                ty_vars: vec![],
-                                span,
-                            }),
-                            Stmt::Expr(body),
-                        ],
-                        span: e.span,
-                    })
-                }
+                // §3.9: the subject precedes the new scope; no type frame,
+                // no generalization, and the binding stops at the pattern.
+                let value = self.expr(subject);
+                let mut binders = Vec::new();
+                let pattern = self.pattern(&clause.patterns[0], &mut binders, None);
+                self.locals.push(Frame {
+                    names: binders.into_iter().map(|b| (b.name, b.var)).collect(),
+                    fn_only: None,
+                });
+                let body = self.expr(&clause.body);
+                self.locals.pop();
+                let span = pattern.span;
+                ExprKind::Block(Block {
+                    stmts: vec![
+                        Stmt::Bind(Binding {
+                            pattern,
+                            value,
+                            direct: false,
+                            ty_vars: vec![],
+                            span,
+                        }),
+                        Stmt::Expr(body),
+                    ],
+                    span: e.span,
+                })
             }
             E::Case {
                 subject, clauses, ..
@@ -2273,16 +2273,9 @@ impl<'a> Resolver<'a> {
         Expr { kind, span: e.span }
     }
 
-    fn one_clause_choices(&mut self, span: Span) -> ExprKind {
-        self.error(code::CHOICES_ONE_CLAUSE, span, "a clause block with one clause and choices is not supported yet; write one clause for each choice");
-        ExprKind::Error
-    }
-
     fn clause_function(&mut self, clauses: &[ast::Clause], span: Span) -> ExprKind {
-        let single = clauses.len() == 1 && clauses[0].guard.is_none();
-        if single && clauses[0].patterns.len() != 1 {
-            return self.one_clause_choices(span);
-        }
+        let single =
+            clauses.len() == 1 && clauses[0].guard.is_none() && clauses[0].patterns.len() == 1;
         let synthetic = Span::new(span.start, span.start);
         let (param, body) = if single {
             (clauses[0].patterns[0].clone(), clauses[0].body.clone())

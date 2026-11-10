@@ -434,3 +434,36 @@ q = apply("a", { "a" -> 1  "b" -> 2 }).1
     let (ds, _) = check(&source.replace("s.put(\"GET\")", "s.put(\"x\")"));
     assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
 }
+
+#[test]
+fn one_clause_choices_are_fitted_and_never_constructor_flow() {
+    // Spec §4.8 fitting / §6.12: literals stay whole; choices have no label.
+    let (ds, lines) = check("f = { 0 | 1 -> 2 }\n");
+    assert!(ds.is_empty(), "{ds:?}");
+    assert!(
+        lines.iter().any(|l| l.ends_with("f : (Int) -> 2 ! Assert")),
+        "{lines:?}"
+    );
+    // §7.5: fitting does not narrow the original subject to a constructor.
+    let (ds, _) =
+        check("T { Yes(value: Int) No }\nf = (r: T) { r |> { Yes(_) | Yes(_) -> r.value } }\n");
+    assert!(ds.iter().any(|d| d.0 == "E0512"), "{ds:?}");
+    // §4.8 / §6.12: opaque tests still constrain all values of that head.
+    let (ds, _) = check(
+        "Box(A) { Box(A) }\nf = (r: Box(Int | String) | Int) { r |> { 0 | _: Box(Int) -> Nil } }\n",
+    );
+    assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
+    // §6.12: fitting binds a monotype, without the binding's generalization.
+    let (ds, _) = check(
+        "id(A) = (x: A) { x }\nf = () { id |> { g | g -> (g(1) + 1, g(\"a\") <> \"b\") } }\n",
+    );
+    assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
+}
+
+#[test]
+fn fitted_choices_keep_the_deferred_binding_error() {
+    // Joint J4/J5: deferred Assert failure is E0501 at this binding, not E0516.
+    let (ds, _) = check("s = \"b\"\nf = () -> Int { s |> { \"a\" | \"c\" -> 1 } }\n");
+    assert_eq!(ds.len(), 1, "{ds:?}");
+    assert_eq!(ds[0].0, "E0501");
+}

@@ -157,15 +157,10 @@ fn clause_function_labels_and_synthetic_spans_follow_the_rule() {
 }
 
 #[test]
-fn temporary_choices_error_and_kept_form_messages_are_independent_checks() {
+fn kept_form_messages_are_independent_checks() {
     // D7 and §3.11 supply these codes and message fragments; no generated
     // expected output defines them.
     for (src, code, message) in [
-        (
-            "f = { Ok(v) | Error(v) -> v }",
-            "E0235",
-            "write one clause for each choice",
-        ),
         ("f(A) = (x: A(Int)) { x }", "E0230", "takes no arguments"),
         ("f(A, A) = 1", "E0226", "declared more than once"),
         ("f(Int) = 1", "E0231", "name of a type"),
