@@ -481,13 +481,6 @@ ask = (own: Scheduler, command: Command) -> Keyed {
 	}
 }
 
-need = (own: Scheduler) -> Scheduler {
-	own |> {
-		DetachedScheduler -> panic("task: no scheduler")
-		Scheduler(..)     -> own
-	}
-}
-
 check_run = (actual: Key(Nil), wanted: Key(Nil)) {
 	{ actual == wanted } |> {
 		True  -> Nil
@@ -3456,7 +3449,7 @@ test(A, E, N) = (
 	}
 }
 
-entry(A, E, N) = (
+_entry(A, E, N) = (
 	body: () -> A ? E ! N
 	root ! request.Root
 ) -> A ? E ! request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root {

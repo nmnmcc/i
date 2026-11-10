@@ -994,7 +994,7 @@ impl<'a> Lowerer<'a> {
             frame: true,
         });
         let wrapper = self.new_func();
-        let entry = self.library_callee(module, "entry");
+        let entry = self.library_callee(module, "_entry");
         self.out.funcs[wrapper.0 as usize] = FuncKind::Code(Func {
             name: format!("{module} entry"),
             arity: n,

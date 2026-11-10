@@ -176,7 +176,7 @@ entry_root: () -> Key(Nil)
 @external("ilang:request", "entry_end")
 entry_end: () -> Nil
 
-entry = (body) {
+_entry = (body) {
 	root = Root(entry_root())
 	owner = Owner(new_owner(root.key), root)
 	resource.ensure(() {
