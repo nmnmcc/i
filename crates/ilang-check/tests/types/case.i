@@ -82,10 +82,10 @@ named = (r) {
   }
 }
 // A type variable in a type test is a compile error.
-bad = (v) {
+bad = (v: a) {
   case v {
-    x: a -> x
-  }
+    x: a if True -> x
+   _ -> panic("unreachable") }
 }
 // A catch-all next to a pattern whose parts are tested.
 first_one = (p) {

@@ -58,7 +58,7 @@ ints = (n) {
 floats = (x) {
   case x {
     0.0 -> 0
-  }
+   _ if False -> panic("unreachable") }
 }
 strings = (s) {
   case s {
@@ -88,13 +88,13 @@ bit_arrays = (b) {
 all_bits = (b) {
   case b {
     <<rest:bits>> -> 1
-  }
+   _ if False -> panic("unreachable") }
 }
 // Lists: the empty list, and a cons of an element and the rest.
 no_empty = (xs) {
   case xs {
     [x, ..] -> x
-  }
+   _ if False -> panic("unreachable") }
 }
 no_long = (xs) {
   case xs {

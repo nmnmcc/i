@@ -66,6 +66,6 @@ no_field = (s: Shape) {
 }
 choice_field = (s: Shape) {
   case s {
-    c = Circle(..) | c = Square(..) -> c.radius
-  }
+    c = Circle(..) | c = Square(..) if True -> c.radius
+   _ -> panic("unreachable") }
 }

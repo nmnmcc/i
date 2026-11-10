@@ -139,8 +139,8 @@ pattern_list = (xs: List(String)) {
 }
 pattern_case_part = (b: Box(Int | String)) {
   case b {
-    Box(value) -> value == 1.0
-  }
+    Box(value) if True -> value == 1.0
+   _ -> panic("unreachable") }
 }
 // A catch-all gets `B` less the members that rule 12 takes out.
 pattern_narrowed = (x: Int | String | Nil) {

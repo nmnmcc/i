@@ -6,5 +6,5 @@ Color { Red Green }
 name = (c: Color) {
   case c {
     Red -> "red"
-  }
+   Green if False -> "green" }
 }
