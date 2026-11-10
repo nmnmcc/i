@@ -25,13 +25,13 @@ mod infer;
 mod known;
 mod lits;
 mod pattern;
-#[cfg(test)]
 mod records;
 mod shown;
 mod solve;
 mod value_types;
 
 pub use lits::{LitValue, TestValues};
+pub use records::ShownGraph;
 pub use shown::{ShownFn, ShownType};
 
 use crate::hir::{BindingRef, CtorRef, DefId, ModuleId, Program, TypeRef};
@@ -50,6 +50,7 @@ pub enum Head {
     Named(TypeRef),
     Tuple(u32),
     Fn,
+    Record,
 }
 
 /// A runtime type test, including the values of an Int or String member.
@@ -63,6 +64,8 @@ pub struct TestMember {
 /// type variable that has no effect, in an input place.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Ty {
+    /// Shared exact graph, including every record field and suspended operation.
+    Graph(records::Graph),
     Var(V),
     /// A named type or a tuple, with its arguments or parts.
     Con(Head, lits::ValueSet, Vec<Ty>),
@@ -138,6 +141,7 @@ impl Ty {
     }
     pub fn head(&self) -> Option<Head> {
         match self {
+            Ty::Graph(g) => g.head(),
             Ty::Con(h, _, _) => Some(*h),
             Ty::Fn(_) => Some(Head::Fn),
             _ => None,
@@ -156,10 +160,22 @@ impl Ty {
     /// any type constructor may go to.
     pub fn is_varlike(&self) -> bool {
         match self {
+            Ty::Graph(g) => matches!(g.node(), records::Node::Without(..)),
             Ty::Var(_) => true,
             Ty::Diff(a, _) => a.is_varlike(),
             _ => false,
         }
+    }
+
+    pub fn value_head(&self) -> Option<Head> {
+        match self {
+            Ty::Graph(g) if g.record_only() => Some(Head::Record),
+            _ => self.head(),
+        }
+    }
+
+    pub fn is_headed(&self) -> bool {
+        self.head().is_some()
     }
 }
 

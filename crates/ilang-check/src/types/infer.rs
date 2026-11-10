@@ -77,6 +77,14 @@ struct PendingFailure {
     span: Span,
 }
 
+struct PendingUnion {
+    failure: super::solve::Failure,
+    module: ModuleId,
+    span: Span,
+    other: Option<Span>,
+    fix_notes: Vec<super::V>,
+}
+
 pub(crate) struct Checker<'a> {
     pub p: &'a Program,
     sources: &'a Sources,
@@ -124,6 +132,7 @@ pub(crate) struct Checker<'a> {
     function_depth: usize,
     group_level: Option<u32>,
     pending_failures: Vec<PendingFailure>,
+    pending_unions: Vec<PendingUnion>,
     pub shared_fields: HashMap<CtorRef, Vec<bool>>,
 }
 
@@ -169,6 +178,7 @@ impl<'a> Checker<'a> {
             function_depth: 0,
             group_level: None,
             pending_failures: Vec::new(),
+            pending_unions: Vec::new(),
             shared_fields: HashMap::new(),
         }
     }
@@ -386,6 +396,35 @@ impl<'a> Checker<'a> {
                 }
             }
         }
+        // A completion candidate is a read-only view of the principal type,
+        // not a generalized scheme. T2 can generate its ordinary batch
+        // constraints from this view before the U3 publication barrier.
+        let candidates = types
+            .iter()
+            .map(|(d, _, t, _)| {
+                let ty = if direct {
+                    let simple =
+                        display::simplify(&self.s, t, Some(0)).unwrap_or_else(|()| t.clone());
+                    if has_both(&simple) { t.clone() } else { simple }
+                } else {
+                    t.clone()
+                };
+                (
+                    *d,
+                    Scheme {
+                        level: if direct { 0 } else { u32::MAX },
+                        ty,
+                    },
+                )
+            })
+            .collect();
+        // Coverage can add ordinary constraints too. It precedes both T2's
+        // completion batch and the final discharge of union obligations.
+        for c in std::mem::take(&mut self.cases) {
+            self.check_case(c);
+        }
+        self.finish_reads(group, &candidates);
+        self.discharge_union_proofs();
         self.group_level = None;
         for (d, _, t, _) in types {
             self.set_module(d.module);
@@ -423,11 +462,6 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        // §7.4: coverage, with the types of the group.
-        for c in std::mem::take(&mut self.cases) {
-            self.check_case(c);
-        }
-        self.finish_reads(group);
     }
 
     /// §10.2: the entry points of the compiled package: the program entry,
@@ -872,6 +906,22 @@ impl<'a> Checker<'a> {
 
     /// Reports the first problem the solver found since the last flush.
     pub fn flush(&mut self, span: Span, other: Option<Span>) {
+        if self.group_level.is_some() {
+            let failures = std::mem::take(&mut self.s.failures);
+            for failure in failures {
+                if failure.kind == FailKind::UnionProof {
+                    self.pending_unions.push(PendingUnion {
+                        failure,
+                        module: self.module,
+                        span,
+                        other,
+                        fix_notes: self.fix_notes.clone(),
+                    });
+                } else {
+                    self.s.failures.push(failure);
+                }
+            }
+        }
         if self.s.failures.is_empty() {
             self.fix_notes.clear();
             return;
@@ -882,7 +932,16 @@ impl<'a> Checker<'a> {
             display::show(&self.s, &f.lhs),
             display::show(&self.s, &f.rhs),
         );
-        let (code, mut message) = match f.kind {
+        let (code, mut message) = match (&f.kind, &f.record) {
+            (_, Some(super::solve::RecordFailure::Missing(label))) => (code::NO_FIELD, format!("the record has no field `{}`", label.text())),
+            (_, Some(super::solve::RecordFailure::Removed(label))) => (code::NO_FIELD, format!("the field `{}` may be missing here", label.text())),
+            (_, Some(super::solve::RecordFailure::MayBe { key, required })) => (code::LABEL_MAY_BE, format!("the key `{}` may be `{}`; it is not known here", key.text(), required.text())),
+            (kind, None) => match kind {
+            FailKind::NoField => (code::NO_FIELD, format!("the record `{l}` has no required field of `{r}`")),
+            FailKind::LabelMayBe => (code::LABEL_MAY_BE, format!("a key of `{l}` may be a required field of `{r}`; it is not known here")),
+            FailKind::LabelEscapes => (code::LABEL_ESCAPES, "a label parameter reaches a type variable outside its declaring binding".to_string()),
+            FailKind::UnionProof => (code::TYPE_MISMATCH, "cannot prove the result fits this union from the established bounds; annotate the updated value or omit the result annotation".to_string()),
+            FailKind::ResourceLimit => (code::TYPE_RESOURCE_LIMIT, "type too large to check here; write a local annotation for only the fields you need, or simplify the source".to_string()),
             FailKind::Mismatch | FailKind::Values => (
                 code::TYPE_MISMATCH,
                 format!("`{l}` is not a subtype of `{r}`"),
@@ -907,6 +966,7 @@ impl<'a> Checker<'a> {
                 code::TYPE_AMBIGUOUS,
                 format!("a value of `{l}` could go to more than one type variable of `{r}` (§4.4)"),
             ),
+            },
         };
         if let Some(o) = other {
             message.push_str(&format!(" (the type at {} needs it)", self.position(o)));
@@ -922,6 +982,41 @@ impl<'a> Checker<'a> {
         }
         self.fix_notes.clear();
         self.error(code, span, message);
+    }
+
+    /// U3 obligations never become exported qualified constraints. Each retry
+    /// reads a fresh, immutable snapshot after ordinary group/T2 propagation.
+    pub(super) fn discharge_union_proofs(&mut self) -> bool {
+        self.discharge_union_proofs_from(0)
+    }
+
+    fn discharge_union_proofs_from(&mut self, start: usize) -> bool {
+        let level = self.group_level.take();
+        let mut valid = true;
+        for pending in self.pending_unions.split_off(start) {
+            let mut demand = super::records::Demand::new(super::records::Demand::LIMIT, true);
+            let kind = match super::records::prove(
+                &self.s,
+                &pending.failure.lhs,
+                &pending.failure.rhs,
+                &mut demand,
+            ) {
+                super::records::Verdict::Proven => continue,
+                super::records::Verdict::Refuted => FailKind::Mismatch,
+                super::records::Verdict::Unknown => FailKind::UnionProof,
+                super::records::Verdict::ResourceLimit => FailKind::ResourceLimit,
+            };
+            valid = false;
+            self.set_module(pending.module);
+            self.fix_notes = pending.fix_notes;
+            self.s.failures.push(super::solve::Failure {
+                kind,
+                ..pending.failure
+            });
+            self.flush(pending.span, pending.other);
+        }
+        self.group_level = level;
+        valid
     }
 
     pub fn union(&mut self, ms: Vec<Ty>, span: Span) -> Ty {
@@ -1829,12 +1924,20 @@ impl<'a> Checker<'a> {
         // is not changed, because outside the clause it may have values of
         // other types.
         let narrowed = known_ctor.and_then(|_| self.known_ctor_args(target));
+        let mut demand = super::records::Demand::new(super::records::Demand::LIMIT, true);
         let mut forms: Vec<Ty> = match kv {
             Ty::Top => Vec::new(),
-            _ => known::members(&kv)
+            _ => match known::members(&kv)
                 .iter()
-                .map(|m| self.known_bound(m))
-                .collect(),
+                .map(|m| self.known_bound(m, &mut demand))
+                .collect::<Result<_, _>>()
+            {
+                Ok(forms) => forms,
+                Err(_) => {
+                    self.type_resource_limit(name.span);
+                    return (self.s.fresh(), Ty::Top);
+                }
+            },
         };
         let mut parts = Vec::new();
         for (c, i) in &found {
@@ -1881,10 +1984,17 @@ impl<'a> Checker<'a> {
         let mut forms = Vec::new();
         let mut parts = Vec::new();
         let mut kparts = Vec::new();
+        let mut demand = super::records::Demand::new(super::records::Demand::LIMIT, true);
         for m in known::members(&kv) {
             match &m {
                 Ty::Con(Head::Tuple(n), _, xs) if k < *n => {
-                    let form = self.known_bound(&m);
+                    let form = match self.known_bound(&m, &mut demand) {
+                        Ok(form) => form,
+                        Err(_) => {
+                            self.type_resource_limit(index_span);
+                            return (self.s.fresh(), Ty::Top);
+                        }
+                    };
                     if let Ty::Con(_, _, ys) = &form {
                         parts.push(ys[k as usize].clone());
                     }
@@ -2241,6 +2351,7 @@ impl<'a> Checker<'a> {
     /// Rule 10 for a binding in a block, and rule 14.
     fn local_binding(&mut self, b: &Binding) {
         let mark = self.occurs_mark();
+        let union_mark = self.pending_unions.len();
         let direct = b.direct;
         if direct {
             self.s.level += 1;
@@ -2272,6 +2383,7 @@ impl<'a> Checker<'a> {
         self.check_occurs(mark, b.pattern.span);
         self.fit_known(&b.pattern, &k, false);
         if direct {
+            self.discharge_union_proofs_from(union_mark);
             self.s.level -= 1;
             let level = self.s.level;
             for v in &binders {
@@ -2334,6 +2446,10 @@ impl<'a> Checker<'a> {
     /// form (§4.7): the bounds of its variables are coalesced and simplified
     /// once, so that each use copies only the simplified type. Variables at
     /// `level` or below are not generalized and are kept as they are.
+    pub(super) fn type_resource_limit(&mut self, span: Span) {
+        self.error(code::TYPE_RESOURCE_LIMIT, span, "type too large to check here; write a local annotation for only the fields you need, or simplify the source");
+    }
+
     fn generalize(&mut self, t: &Ty, level: u32) -> Ty {
         let simple = match display::simplify(&self.s, t, Some(level)) {
             Ok(simple) => simple,
@@ -2355,6 +2471,7 @@ impl<'a> Checker<'a> {
     fn rebuild(&mut self, t: &Ty, level: u32, map: &mut HashMap<super::V, Ty>, in_h: bool) -> Ty {
         let mut go = |c: &mut Self, x: &Ty| c.rebuild(x, level, map, in_h);
         match t {
+            Ty::Graph(g) => g.map_vars(&mut |v| self.rebuild(&Ty::Var(v), level, map, in_h)),
             Ty::Var(v)
                 if self
                     .s
@@ -2448,6 +2565,10 @@ fn uses_types(t: &Ty, out: &mut Vec<TypeId>) {
 
 fn has_both(t: &Ty) -> bool {
     match t {
+        Ty::Graph(g) => g
+            .nodes()
+            .iter()
+            .any(|(_, node)| matches!(node, super::records::Node::Both(a, b) if a != b)),
         Ty::Both(..) => true,
         Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().any(has_both),
         Ty::Fn(f) => {

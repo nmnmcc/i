@@ -2339,6 +2339,7 @@ impl<'a> Lowerer<'a> {
 
     fn head_cond(&self, v: Atom, h: Head) -> Cond {
         match h {
+            Head::Record => Cond::IsRec(v),
             Head::Tuple(n) => Cond::Tuple(v, n),
             Head::Fn => Cond::Tag(v, 7),
             Head::Named(TypeRef::Builtin(b)) => Cond::Tag(

@@ -50,6 +50,7 @@
 //! | 11 | Boundary | an `$obj` with tag 11; the other fields belong to the code generator |
 //! | 12 | Continuation | an `$obj` with tag 12; the other fields belong to the code generator |
 //! | 13 | UtfCodepoint | field 1: the scalar value |
+//! | 14 | Record | field 5: labels and values, interleaved, sorted by the UTF-8 bytes of the labels |
 //!
 //! Code outside `values.rs` goes through lists only with `$list_is_empty`,
 //! `$list_head` and `$list_tail`. A list cell is a lean `$cons`, one small

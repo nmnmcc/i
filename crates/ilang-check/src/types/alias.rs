@@ -17,6 +17,7 @@ pub(super) struct Template {
 
 fn has_algebra(t: &Ty) -> bool {
     match t {
+        Ty::Graph(_) => true,
         Ty::Union(_) | Ty::Inter(_) | Ty::Diff(_, _) => true,
         Ty::Con(_, _, ts) => ts.iter().any(has_algebra),
         Ty::Fn(f) => {
@@ -38,6 +39,7 @@ impl Template {
 
 pub(super) fn map_vars(t: &Ty, f: &mut impl FnMut(V) -> Ty) -> Ty {
     match t {
+        Ty::Graph(g) => g.map_vars(f),
         Ty::Var(v) => f(*v),
         Ty::Con(h, values, ts) => Ty::Con(
             *h,
@@ -251,6 +253,7 @@ impl Checker<'_> {
     fn normalize_known_alias(&self, t: Ty) -> Ty {
         let go = |t| self.normalize_known_alias(t);
         match t {
+            Ty::Graph(_) => t,
             Ty::Con(h, values, ts) => Ty::Con(h, values, ts.into_iter().map(go).collect()),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
                 params: f.params.into_iter().map(|(n, t)| (n, go(t))).collect(),
@@ -279,6 +282,7 @@ impl Checker<'_> {
 pub(super) fn normalize(s: &mut super::solve::Solver, t: Ty) -> Ty {
     let mut go = |t| normalize(s, t);
     match t {
+        Ty::Graph(g) => g.normalize(s),
         Ty::Union(ts) => {
             let ts = ts.into_iter().map(&mut go).collect();
             s.union(ts)

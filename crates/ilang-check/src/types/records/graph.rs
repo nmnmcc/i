@@ -5,11 +5,13 @@
 
 use super::super::{Head, V, lits::ValueSet};
 use crate::hir::{BindingRef, BuiltinType, TypeRef};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
+#[cfg(test)]
+use rustc_hash::FxHashSet;
 use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(super) struct Id(pub u32);
+pub(crate) struct Id(pub u32);
 
 impl Id {
     pub const NEVER: Self = Self(0);
@@ -18,20 +20,54 @@ impl Id {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(super) struct LabelParam {
-    pub owner: BindingRef,
+pub(crate) struct LabelParam {
+    pub owner: LabelOwner,
     pub index: u32,
     pub level: u32,
     pub name: Arc<str>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum LabelOwner {
+    Binding(BindingRef),
+    Artifact(u64),
+}
+
+impl From<BindingRef> for LabelOwner {
+    fn from(binding: BindingRef) -> Self { Self::Binding(binding) }
+}
+
+impl LabelOwner {
+    pub fn artifact() -> Self {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        Self::Artifact(NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(super) enum Label {
+pub(crate) enum Label {
     Name(Arc<str>),
     Param(LabelParam),
 }
 
 impl Label {
+    pub fn text(&self) -> String {
+        match self {
+            Self::Name(s)
+                if s.strip_prefix('_')
+                    .unwrap_or(s)
+                    .as_bytes()
+                    .first()
+                    .is_some_and(u8::is_ascii_lowercase)
+                    && s.bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_') =>
+            {
+                s.to_string()
+            }
+            Self::Name(s) => ilang_syntax::print::string_literal(s),
+            Self::Param(p) => p.name.to_string(),
+        }
+    }
     pub fn name(s: impl Into<Arc<str>>) -> Self {
         Self::Name(s.into())
     }
@@ -42,7 +78,7 @@ impl Label {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub(super) struct Function {
+pub(crate) struct Function {
     pub params: Vec<(Option<Arc<str>>, Id)>,
     pub ret: Id,
     pub err: Id,
@@ -50,7 +86,7 @@ pub(super) struct Function {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub(super) enum Node {
+pub(crate) enum Node {
     Never,
     Top,
     Var(V),
@@ -63,6 +99,14 @@ pub(super) enum Node {
     /// Source head subtraction; never an internal Boolean complement.
     Diff(Id, Vec<Id>),
     Both(Id, Id),
+}
+
+/// U5 metadata only: never a replacement for the exact source node.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum Known {
+    Empty,
+    Other,
+    Record(Vec<(Label, Id)>),
 }
 
 impl Node {
@@ -87,10 +131,16 @@ impl Node {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct Arena {
+pub(crate) struct Arena {
     nodes: Vec<Node>,
     unique: FxHashMap<Node, Id>,
     inhabited: Vec<bool>,
+    record_domain: Vec<bool>,
+    label_level: Vec<u32>,
+    plain_empty: Vec<bool>,
+    known_holes: Vec<bool>,
+    record_alternatives: Vec<u8>,
+    known: Vec<Option<Known>>,
 }
 
 impl Default for Arena {
@@ -99,6 +149,12 @@ impl Default for Arena {
             nodes: Vec::new(),
             unique: FxHashMap::default(),
             inhabited: Vec::new(),
+            record_domain: Vec::new(),
+            label_level: Vec::new(),
+            plain_empty: Vec::new(),
+            known_holes: Vec::new(),
+            record_alternatives: Vec::new(),
+            known: Vec::new(),
         };
         assert_eq!(graph.intern(Node::Never), Id::NEVER);
         assert_eq!(graph.intern(Node::Top), Id::TOP);
@@ -112,11 +168,12 @@ impl Arena {
         &self.nodes[id.0 as usize]
     }
 
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.nodes.len()
     }
 
-    fn intern(&mut self, node: Node) -> Id {
+    pub(super) fn intern(&mut self, node: Node) -> Id {
         if let Some(id) = self.unique.get(&node) {
             return *id;
         }
@@ -134,15 +191,176 @@ impl Arena {
             Node::Union(a, b) => self.inhabited(*a) || self.inhabited(*b),
             _ => false,
         };
+        let plain_empty = match &node {
+            Node::Never => true,
+            Node::Rec(fields) => fields.iter().any(|(_, t)| self.plain_empty(*t)),
+            Node::Con(Head::Tuple(_), _, parts) => parts.iter().any(|t| self.plain_empty(*t)),
+            _ => false,
+        };
         let id = Id(u32::try_from(self.nodes.len()).expect("type graph handle overflow"));
+        let known_holes = match &node {
+            Node::Var(_) | Node::Top | Node::Fn(_) | Node::Both(..) => true,
+            Node::Con(Head::Named(TypeRef::Custom(_)), _, parts) if !parts.is_empty() => true,
+            Node::Con(Head::Named(TypeRef::Builtin(b)), _, parts)
+                if !parts.is_empty() && !matches!(b, BuiltinType::List) =>
+            {
+                true
+            }
+            _ => node.children().into_iter().any(|t| self.known_holes(t)),
+        };
+        let record_domain = match &node {
+            Node::Never | Node::Rec(_) | Node::Without(..) => true,
+            Node::Union(a, b) | Node::Both(a, b) => {
+                self.record_domain(*a) && self.record_domain(*b)
+            }
+            Node::Inter(a, b) => self.record_domain(*a) || self.record_domain(*b),
+            Node::Diff(base, _) => self.record_domain(*base),
+            _ => false,
+        };
+        let count = |id: Id| self.record_alternatives[id.0 as usize];
+        let record_alternatives = match &node {
+            Node::Never | Node::Con(..) | Node::Fn(_) => 0,
+            Node::Top | Node::Var(_) | Node::Rec(_) => 1,
+            Node::Union(a, b) => (count(*a) + count(*b)).min(2),
+            Node::Inter(a, b) => (count(*a) * count(*b)).min(2),
+            Node::Without(base, _) => count(*base),
+            Node::Diff(base, heads) => {
+                if heads.iter().any(|h| matches!(self.node(*h), Node::Rec(_))) {
+                    0
+                } else {
+                    count(*base)
+                }
+            }
+            Node::Both(a, b) => count(*a).max(count(*b)),
+        };
+        let own_level = match &node {
+            Node::Rec(fs) => fs.iter().map(|(l, _)| l).collect::<Vec<_>>(),
+            Node::Without(_, ls) => ls.iter().collect(),
+            _ => Vec::new(),
+        }
+        .into_iter()
+        .map(|l| match l {
+            Label::Name(_) => 0,
+            Label::Param(p) => p.level,
+        })
+        .max()
+        .unwrap_or(0);
+        let label_level = node
+            .children()
+            .into_iter()
+            .map(|t| self.label_level(t))
+            .max()
+            .unwrap_or(0)
+            .max(own_level);
         self.unique.insert(node.clone(), id);
         self.nodes.push(node);
         self.inhabited.push(inhabited);
+        self.record_domain.push(record_domain);
+        self.label_level.push(label_level);
+        self.plain_empty.push(plain_empty);
+        self.known_holes.push(known_holes);
+        self.record_alternatives.push(record_alternatives);
+        self.known.push(None);
         id
     }
 
     pub fn inhabited(&self, id: Id) -> bool {
         self.inhabited[id.0 as usize]
+    }
+
+    pub fn record_domain(&self, id: Id) -> bool {
+        self.record_domain[id.0 as usize]
+    }
+    pub fn record_alternatives(&self, id: Id) -> u8 {
+        self.record_alternatives[id.0 as usize]
+    }
+    fn known_at(&self, id: Id) -> &Known {
+        self.known[id.0 as usize]
+            .as_ref()
+            .expect("completed known summary")
+    }
+
+    pub(super) fn known(&mut self, root: Id) -> Known {
+        let mut pending = vec![(root, false)];
+        while let Some((id, finish)) = pending.pop() {
+            if self.known[id.0 as usize].is_some() {
+                continue;
+            }
+            if !finish {
+                pending.push((id, true));
+                let children = match self.node(id) {
+                    Node::Union(a, b) | Node::Inter(a, b) => vec![*a, *b],
+                    Node::Without(base, _) | Node::Diff(base, _) => vec![*base],
+                    Node::Both(_, b) => vec![*b],
+                    _ => Vec::new(),
+                };
+                pending.extend(children.into_iter().map(|id| (id, false)));
+                continue;
+            }
+            let known = match self.node(id).clone() {
+                Node::Never => Known::Empty,
+                Node::Rec(fields) => Known::Record(fields),
+                Node::Union(a, b) => match (self.known_at(a).clone(), self.known_at(b).clone()) {
+                    (Known::Empty, other) | (other, Known::Empty) => other,
+                    (Known::Record(a), Known::Record(b)) => {
+                        let mut fields = Vec::new();
+                        for (label, ty) in a {
+                            if let Ok(i) = b.binary_search_by(|(key, _)| key.cmp(&label)) {
+                                fields.push((label, self.union(ty, b[i].1)));
+                            }
+                        }
+                        Known::Record(fields)
+                    }
+                    _ => Known::Other,
+                },
+                Node::Inter(a, b) => match (self.known_at(a).clone(), self.known_at(b).clone()) {
+                    (Known::Empty, _) | (_, Known::Empty) => Known::Empty,
+                    (Known::Record(mut a), Known::Record(b)) => {
+                        for (label, ty) in b {
+                            match a.binary_search_by(|(key, _)| key.cmp(&label)) {
+                                Ok(i) => a[i].1 = self.inter(a[i].1, ty),
+                                Err(i) => a.insert(i, (label, ty)),
+                            }
+                        }
+                        if a.iter().any(|(_, t)| self.plain_empty(*t)) {
+                            Known::Empty
+                        } else {
+                            Known::Record(a)
+                        }
+                    }
+                    (record @ Known::Record(_), _) | (_, record @ Known::Record(_)) => record,
+                    _ => Known::Other,
+                },
+                Node::Without(base, labels) => match self.known_at(base).clone() {
+                    Known::Empty => Known::Empty,
+                    Known::Record(mut fields) => {
+                        fields.retain(|(l, _)| !labels.iter().any(|k| k == l || k.may_equal(l)));
+                        Known::Record(fields)
+                    }
+                    Known::Other => Known::Record(Vec::new()),
+                },
+                Node::Diff(base, heads) => {
+                    if heads.iter().any(|h| matches!(self.node(*h), Node::Rec(_))) {
+                        Known::Empty
+                    } else {
+                        self.known_at(base).clone()
+                    }
+                }
+                Node::Both(_, b) => self.known_at(b).clone(),
+                _ => Known::Other,
+            };
+            self.known[id.0 as usize] = Some(known);
+        }
+        self.known_at(root).clone()
+    }
+    pub fn label_level(&self, id: Id) -> u32 {
+        self.label_level[id.0 as usize]
+    }
+    pub fn plain_empty(&self, id: Id) -> bool {
+        self.plain_empty[id.0 as usize]
+    }
+    pub fn known_holes(&self, id: Id) -> bool {
+        self.known_holes[id.0 as usize]
     }
 
     pub fn var(&mut self, v: V) -> Id {
@@ -165,11 +383,11 @@ impl Arena {
                 && *old == label
             {
                 *value = self.inter(*value, ty);
-                if *value == Id::NEVER {
+                if self.plain_empty(*value) {
                     return Id::NEVER;
                 }
             } else {
-                if ty == Id::NEVER {
+                if self.plain_empty(ty) {
                     return Id::NEVER;
                 }
                 out.push((label, ty));
@@ -196,6 +414,55 @@ impl Arena {
     }
 
     pub fn inter(&mut self, a: Id, b: Id) -> Id {
+        if a == b || !matches!((self.node(a), self.node(b)), (Node::Rec(_), Node::Rec(_))) {
+            return self.inter_atom(a, b);
+        }
+        let pair = |a: Id, b: Id| if a < b { (a, b) } else { (b, a) };
+        let root = pair(a, b);
+        let mut pending = vec![(root, false)];
+        let mut done = FxHashMap::default();
+        while let Some(((a, b), finish)) = pending.pop() {
+            if done.contains_key(&(a, b)) {
+                continue;
+            }
+            let (Node::Rec(mut left), Node::Rec(right)) =
+                (self.node(a).clone(), self.node(b).clone())
+            else {
+                let out = self.inter_atom(a, b);
+                done.insert((a, b), out);
+                continue;
+            };
+            if a == b {
+                done.insert((a, b), a);
+                continue;
+            }
+            if !finish {
+                pending.push(((a, b), true));
+                for (label, ty) in &left {
+                    if let Ok(i) = right.binary_search_by(|(key, _)| key.cmp(label)) {
+                        pending.push((pair(*ty, right[i].1), false));
+                    }
+                }
+                continue;
+            }
+            for (label, ty) in &mut left {
+                if let Ok(i) = right.binary_search_by(|(key, _)| key.cmp(label)) {
+                    *ty = done[&pair(*ty, right[i].1)];
+                }
+            }
+            for (label, ty) in right {
+                if left.binary_search_by(|(key, _)| key.cmp(&label)).is_err() {
+                    let i = left.partition_point(|(key, _)| key < &label);
+                    left.insert(i, (label, ty));
+                }
+            }
+            let out = self.record(left);
+            done.insert((a, b), out);
+        }
+        done[&root]
+    }
+
+    fn inter_atom(&mut self, a: Id, b: Id) -> Id {
         if a == b || b == Id::TOP {
             return a;
         }
@@ -205,11 +472,18 @@ impl Arena {
         if a == Id::NEVER || b == Id::NEVER {
             return Id::NEVER;
         }
+        if b == Id::RECORD && self.record_domain(a) {
+            return a;
+        }
+        if a == Id::RECORD && self.record_domain(b) {
+            return b;
+        }
+        if (self.record_domain(a) && matches!(self.node(b), Node::Con(..) | Node::Fn(_)))
+            || (self.record_domain(b) && matches!(self.node(a), Node::Con(..) | Node::Fn(_)))
+        {
+            return Id::NEVER;
+        }
         match (self.node(a).clone(), self.node(b).clone()) {
-            (Node::Rec(mut a), Node::Rec(b)) => {
-                a.extend(b);
-                self.record(a)
-            }
             (Node::Rec(_), Node::Con(..) | Node::Fn(_))
             | (Node::Con(..) | Node::Fn(_), Node::Rec(_)) => Id::NEVER,
             (Node::Con(..), Node::Fn(_)) | (Node::Fn(_), Node::Con(..)) => Id::NEVER,
@@ -270,6 +544,9 @@ impl Arena {
     }
 
     pub fn both(&mut self, a: Id, b: Id) -> Id {
+        if a == b {
+            return a;
+        }
         self.intern(Node::Both(a, b))
     }
 
@@ -331,6 +608,7 @@ impl Arena {
         done[&root]
     }
 
+    #[cfg(test)]
     pub fn reachable(&self, root: Id) -> usize {
         let mut seen = FxHashSet::default();
         let mut pending = vec![root];
@@ -361,7 +639,7 @@ mod tests {
             owner: BindingRef {
                 module: ModuleId(0),
                 index: 0,
-            },
+            }.into(),
             index: 0,
             level: 1,
             name: "K".into(),
@@ -378,6 +656,12 @@ mod tests {
             Vec::new(),
         );
         assert_eq!(g.record(vec![(Label::name("a"), Id::NEVER)]), Id::NEVER);
+        let empty_tuple = g.con(Head::Tuple(1), ValueSet::ALL, vec![Id::NEVER]);
+        assert!(matches!(
+            g.node(empty_tuple),
+            Node::Con(Head::Tuple(1), _, _)
+        ));
+        assert_eq!(g.record(vec![(Label::name("a"), empty_tuple)]), Id::NEVER);
         assert_eq!(
             g.record(vec![(Label::name("a"), int), (Label::name("a"), text)]),
             Id::NEVER

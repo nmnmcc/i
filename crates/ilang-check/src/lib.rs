@@ -103,6 +103,9 @@ pub mod code {
     pub const CASE_NOT_COVERED: &str = "E0516";
     pub const NOT_KNOWN_CTOR: &str = "E0517";
     pub const TYPE_PLACE: &str = "E0518";
+    pub const TYPE_RESOURCE_LIMIT: &str = "E0546";
+    pub const LABEL_MAY_BE: &str = "E0544";
+    pub const LABEL_ESCAPES: &str = "E0545";
     pub const BIT_PATTERN: &str = "E0519";
     // E0520 became warning W0503: disjoint equality is well defined (§6.9).
     pub const ENTRY_TYPE: &str = "E0521";

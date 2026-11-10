@@ -41,15 +41,17 @@ pub(super) struct Decision {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct ResourceLimit;
+pub(crate) struct ResourceLimit;
 
 /// One operation owns this budget, including every recursive suboperation.
 /// Memoization does not refund or skip a logical state. Completed results are
 /// scoped to this demand; no mutable-bound answer survives into another one.
-pub(super) struct Demand {
+pub(crate) struct Demand {
     limit: usize,
-    states: FxHashSet<Goal>,
-    completed: Option<FxHashMap<Goal, Bdd>>,
+    states: FxHashSet<(u64, Goal)>,
+    completed: Option<FxHashMap<(u64, Goal), Bdd>>,
+    external: FxHashSet<Vec<u64>>,
+    next_scope: u64,
 }
 
 impl Demand {
@@ -60,12 +62,14 @@ impl Demand {
             limit,
             states: FxHashSet::default(),
             completed: cache.then(FxHashMap::default),
+            external: FxHashSet::default(),
+            next_scope: 0,
         }
     }
 
-    fn charge(&mut self, goal: Goal) -> Result<(), ResourceLimit> {
+    fn charge(&mut self, goal: (u64, Goal)) -> Result<(), ResourceLimit> {
         if !self.states.contains(&goal) {
-            if self.states.len() == self.limit {
+            if self.work() == self.limit {
                 return Err(ResourceLimit);
             }
             self.states.insert(goal);
@@ -74,15 +78,41 @@ impl Demand {
     }
 
     pub fn work(&self) -> usize {
-        self.states.len()
+        self.states.len() + self.external.len()
+    }
+
+    pub fn new_scope(&mut self) -> u64 {
+        self.next_scope += 1;
+        self.next_scope
+    }
+
+    pub fn charge_state(&mut self, state: &[u64]) -> Result<(), ResourceLimit> {
+        if !self.external.contains(state) {
+            if self.work() == self.limit {
+                return Err(ResourceLimit);
+            }
+            self.external.insert(state.to_vec());
+        }
+        Ok(())
     }
 }
 
-#[derive(Default)]
 pub(super) struct Kernel {
+    id: u64,
     // Handles 0 and 1 are terminals; decisions start at 2.
     nodes: Vec<Decision>,
     unique: FxHashMap<Decision, Bdd>,
+}
+
+impl Default for Kernel {
+    fn default() -> Self {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        Self {
+            id: NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            nodes: Vec::new(),
+            unique: FxHashMap::default(),
+        }
+    }
 }
 
 // These recipes have bounded depth (one apply expansion), independently of
@@ -155,8 +185,12 @@ impl Kernel {
         while let Some(task) = tasks.pop() {
             match task {
                 Task::Goal(goal @ Goal(op, a, b)) => {
-                    demand.charge(goal)?;
-                    if let Some(t) = demand.completed.as_ref().and_then(|m| m.get(&goal)) {
+                    demand.charge((self.id, goal))?;
+                    if let Some(t) = demand
+                        .completed
+                        .as_ref()
+                        .and_then(|m| m.get(&(self.id, goal)))
+                    {
                         values.push(*t);
                         continue;
                     }
@@ -203,7 +237,7 @@ impl Kernel {
                 }
                 Task::Save(goal) => {
                     if let Some(memo) = &mut demand.completed {
-                        memo.insert(goal, *values.last().expect("completed apply"));
+                        memo.insert((self.id, goal), *values.last().expect("completed apply"));
                     }
                 }
             }
@@ -324,6 +358,7 @@ impl Kernel {
         )
     }
 
+    #[cfg(test)]
     pub fn truth(&self, root: Bdd, assignment: impl Fn(u32) -> bool) -> bool {
         let mut pending = vec![root];
         let mut seen = FxHashSet::default();
@@ -343,6 +378,7 @@ impl Kernel {
 
     /// Rebuild changed predicates through apply, rather than retaining an old
     /// decision order after replacement (records §21.2; Elixir bdd_map differs).
+    #[cfg(test)]
     pub fn substitute(
         &mut self,
         root: Bdd,
@@ -375,6 +411,7 @@ impl Kernel {
         Ok(done[&root])
     }
 
+    #[cfg(test)]
     pub fn reachable(&self, root: Bdd) -> usize {
         let mut pending = vec![root];
         let mut seen = FxHashSet::default();

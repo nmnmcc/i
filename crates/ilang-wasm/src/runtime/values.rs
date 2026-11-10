@@ -1,6 +1,7 @@
 //! Shared, boxed WasmGC values. The generated functions never expose GC addresses.
 
 mod inspect;
+mod record;
 mod strings;
 
 pub fn wat(references: bool) -> String {
@@ -14,6 +15,7 @@ pub fn wat(references: bool) -> String {
     }
     source.push_str(&strings::wat());
     source.push_str(&inspect::wat());
+    source.push_str(record::WAT);
     source
 }
 

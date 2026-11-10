@@ -389,3 +389,179 @@ Ty::Con/Ty::Fn/head/Head search, saved in target/t3-ty-audit-before.txt.
 The audit must cover graph children and labels as well as record heads.
 Redesign is still 82375c0 and is an ancestor. This checkpoint continues
 directly into production graph/solver integration under the standing rule.
+
+## Stage 4: production graph consumers and constraints
+
+### Stage order after the coordinator's surface study
+
+The coordinator's instruction of 2026-11-11 changes implementation order,
+not record semantics. Keep all 21 modified or new files from the interrupted
+run. Continue the shared type/value representation, pure U3 proofs and
+completion barrier, inference, coverage, labels/Without, graph interfaces,
+lowering/runtime, host checks and queries first. Keep record display behind
+one printing function.
+
+The provisional source layer uses the current brace forms, with one record
+expression parser, one record type parser, one printer for each and one
+formatter location. Source record fixtures belong in dedicated files so a
+mechanical rewrite can convert them. Do not implement brace-specific
+disambiguation refinements, formatter comma insertion or polished brace
+diagnostics while the parentheses proposal is under study. Do not remove T3
+future-syntax entries or migrate documentation examples. A later ruling
+will choose the final surface; open records, exact unions, label parameters,
+Without and the bounded Boolean kernel retain records.md's rules.
+
+References before this stage: MLstruct ConstraintSolver.scala freshenAbove
+and the RecordType constraint arm; TypeSimplifier.scala simplifyType's
+invariant occurrence analysis and bound-preserving transform; tsrs types.rs
+Type and Type::alloc. Keep stable shared handles and one binder map, while
+using safe Arc/RwLock ownership instead of tsrs's static pointers. i keeps
+the ordinary constraints of invariant arguments and exact suspended record
+expressions. Elixir descr.ex map_bdd_empty?, map_line_meet_empty?,
+map_split_key_line and map_remove_negative were reread for the pure proof
+and projection bridge; no recursive seen-as-empty shortcut is permitted.
+
+The production bridge exposes only one graph step to legacy structural
+rules. Whole graph visitors must memoize handles instead of unfolding shared
+branches. Source construction and substitution do not run Boolean apply.
+
+The pure coverage evaluator follows Elixir descr.ex map_bdd_empty? and
+map_line_meet_empty?: carry a positive product and excluded products, then
+partition by the first differing field. Projection follows map_split_key_line
+and map_remove_negative, retaining one source witness before erasing labels.
+Its evaluator uses an explicit suspension stack; unlike Elixir's recursive
+seen shortcut, an active inference-variable goal is Unknown. The four U3
+results are distinct, and resource failure is E0546, never a mismatch.
+TS Go relater.go unionOrIntersectionRelatedTo and typeRelatedToSomeType
+provide the cheap whole-source/whole-alternative paths. GHC Gen/Bind.hs
+tcPolyInfer and Tc/Solver.hs emitResidualConstraints provide the lifecycle
+pattern: solve the group before publishing anything. i cannot retain a U3
+residual in a generic scheme, so its barrier must discharge or diagnose it.
+
+Five production proof probes passed: exact scalar residual coverage and
+wrap_union, presence and nested tuple cells, sound bound direction without
+bound mutation, common-witness forgetting, and budget exhaustion/retry.
+Both cache modes returned equal verdicts and equal distinct-state counts.
+The first full differential run was interrupted with SIGINT after three
+minutes: the test recomputed every old product's denotation after each new
+projection. The harness now evaluates each immutable product once; the
+compiler algorithm and all expected model verdicts are unchanged. This run
+is not a passing result. A follow-up poll found that the coordinator's
+interruption had already closed the tool session, while the owned test
+process remained; SIGINT stopped that process. No shared environment changed.
+
+The optimized differential run passed all 133,120 inclusion and 16,384
+negative-map projection comparisons in 43.51 seconds. This exercises the
+production proof engine, not the frontend; it is not a substitute for the
+later source-level schema/codec or warmed-checker performance gates.
+The subsequent complete checker unit suite passed 52 tests, with four
+pre-existing ignored tests, in 48.39 seconds. A spec-suite attempt then
+failed to compile two new display visitor branches (a Box comparison and
+an unspecified map value type); both were corrected. The next record-only
+attempt found an unspecified error type in the new whole-row enclosure
+visitor; its Result type was made explicit. Neither attempt is a spec-suite
+pass. Workspace checking before that enclosure visitor passed with six
+unfinished-integration warnings; clippy/full gates remain outstanding.
+
+Known-field summaries follow MLstruct TyperHelpers.scala recordUnion's
+common-key merge only for U5, with Elixir descr.ex map_dnf_fetch_static as
+the static presence reference. Unlike Elixir's list-producing DNF path,
+the source graph caches a summary on demand with a handle work stack.
+Summary field unions remain shared nodes. The exact inferred node is kept
+unchanged. T1 whole_lits and hidden_inputs now traverse record fields and
+Without bases, including invariant and function-environment positions.
+Remaining stage work includes visitor-budget integration for known summaries,
+the closed leaf inhabitance cases, exact diagnostic details, and completing
+the graph codec rather than treating the current output scaffold as a codec.
+
+The later record-only run passed all 25 tests in 42.19 seconds, including
+whole-row upper-bound coverage through forgetting and the U5/exact-union
+separation probe. The spec suite then passed all 241 cases at both --opt 0
+and --opt 2 after the completion-order change. The barrier uses a read-only
+candidate type for T2 before generalization, retries on the checked ordinary
+completion batch, and blocks permanent publication when U3 fails. Local
+generalization discharges obligations owned by that local binding too.
+
+For the next closed-leaf work, GHC HsToCore/Pmc/Solver.hs inhabitationTest,
+instantiate, instCompleteSets and instCompleteSet were read. Take the lazy
+constructor-witness search, not its lifted-bottom witness or fuel-zero
+inhabited approximation: i's strict fields and U6 require a real witness,
+Unknown, or ResourceLimit. Elixir descr.ex fun_line_empty? was reread for
+the positive-function inhabitation case; i still keeps E4's fixed syntactic
+predicate false for functions and nominal constructors.
+
+Runtime work within this unfinished checkpoint uses the local values.rs
+$tuple/$field and strings.rs $string_compare representation hand-off, plus
+OTP erl_map.c erts_maps_get and the flat-map merge at lines 1290–1390, Rust
+core/src/slice/mod.rs binary_search_by, and alloc/collections/btree/merge_iter.rs
+MergeIterInner::nexts. Take sorted two-cursor merging and a right-hand value
+on equal keys. i keeps one interleaved GC array, compares UTF-8 String bytes,
+and uses binary lookup at every size; it does not adopt OTP's small-map/hash
+switch or mutable key-tuple reuse. Unlike Rust's fixed-iteration search, §9.3
+requires the early ref.eq label hit. The merge counts its output first, then
+copies each surviving pair once into an exactly sized array. These runtime
+definitions add a WAT block under §9.3; any existing WAT export differences
+must be checked against that exact block, not accepted without comparison.
+
+Initial runtime verification failed first during WAT parsing (one extra
+closing parenthesis in record_remove), then during Wasm validation (a
+nondefaultable record_put destination assigned only inside conditional
+branches). Corrected both; record_put now has a dominating initialization
+before either branch allocates its fresh destination. The next existing
+runtime oracle passed in 1.56 seconds. That pass validated all new function
+bodies but did not yet call the record APIs. The subsequent oracle extension
+adds 128 construction/update subsets, 256 right-wins merges, all seven
+externals, missing-key traps, label identity/fallback and deep-record
+equality/hash/inspection. Expected results come from §9.1–§9.5 and spec §1.3;
+the provisional inspect spelling has one expectation function.
+
+The expanded runtime oracle passed in 13.19 seconds. This validates and
+executes the production record functions and the record inspect task path,
+including 10,000 nested records without native recursion. It is an internal
+runtime check, not a substitute for source-level O0/O2, host or codegen gates.
+Workspace checking after the small-type printer and detailed record failure
+reasons passed. Small record types use one provisional printing function;
+types whose expanded text would duplicate shared nodes use the graph output
+scaffold, whose decoder and retained metadata are still unfinished.
+
+Merged redesign 2d1cfc56 (the Syntax 2 feasibility study) as 40279d24 without
+touching the in-progress implementation. Its status explicitly says “study,
+not approval or an implementation contract”; it does not change the
+provisional brace surface or authorize migration. The record-family unit
+probes passed all ten tests in under the displayed 0.01-second resolution;
+they construct, check and display branch/Fan graphs but do not yet satisfy
+the required codec round trip. Their threshold is one second. The branch
+fixture was then adjusted from Int fields to the exact literal-1 spelling
+specified by §20.3a; that minor fixture change still needs its next run.
+
+The surface-independent IR now has LabelConst/Atom::Label, RecNew/RecGet/
+RecWith and IsRec. The emitter uses numbered immutable label globals below
+the 10,000-operand limit, mutable globals initialized during start for larger
+labels, and a fresh array/local/set sequence for larger pair lists. Control
+segments declare the same scratch local when needed, and liveness visits
+each record operand. Existing string construction and runtime type-test
+support are the local reference hand-off; source evaluation stays in ANF
+before the emitter sorts the already evaluated atoms.
+
+The new CLI record_ir test passed in 13.96 seconds at both O0 and O2 using
+the production Binaryen optimizer and Wasmtime. It checks a 10,001-byte label,
+5,001 fields, sorted construction, update/read, IsRec, label reference
+identity and equality/hash/inspect against put-built records. This checks
+IR/emit/runtime independently of the still-unconnected provisional parser.
+Binaryen printed three “unknown name subsection with id 3” warnings while
+optimizing the test modules; validation and execution succeeded. No tool or
+environment configuration was changed.
+
+The graph codec is being built as a type-graph component first, then a scheme
+wrapper carrying retained bounds and key slots. It uses the compact model's
+topological node table and shared references, with tsrs's stable-handle and
+MLstruct freshenAbove's one-binder-map discipline. Unlike the model's JSON
+tree tags, the component uses a versioned binary table, explicit scalar sets,
+nominal name references and scoped label identities. Decoding gives each
+artifact's label scopes fresh opaque identities; it cannot fabricate a
+BindingRef into the current HIR or capture an unrelated local binding.
+This is an internal representation choice under §20.3a's scoped-identity
+contract. Level and spelling metadata stay separate from the artifact scope.
+The type-graph component alone is not a complete scheme interface; no claim
+of the retained-constraint/interface criterion is made until its wrapper is
+connected and tested.

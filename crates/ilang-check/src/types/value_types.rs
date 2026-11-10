@@ -153,6 +153,15 @@ impl<'a> Closure<'a> {
 
     fn close(&mut self, t: &Ty) -> Result<Ty, &'static str> {
         match t {
+            Ty::Graph(g) => {
+                if g.nodes()
+                    .iter()
+                    .any(|(_, node)| matches!(node, super::records::Node::Top))
+                {
+                    return Err(code::VALUE_TYPE_OPEN);
+                }
+                g.try_map_vars(&mut |v| self.close(&Ty::Var(v)))
+            }
             Ty::Var(v) => {
                 if let Some(f) = self.fixed.get(v) {
                     return Ok(f.ty.clone());
@@ -236,6 +245,7 @@ impl<'a> Closure<'a> {
     /// completion demands; their candidates use the same immutable snapshot.
     fn annotation(&mut self, t: &Ty) -> Result<Ty, &'static str> {
         Ok(match t {
+            Ty::Graph(g) => g.try_map_vars(&mut |v| self.annotation(&Ty::Var(v)))?,
             Ty::Var(v) if self.s.vars[v.0 as usize].level > self.level => t.clone(),
             Ty::Var(_) => self.close(t)?,
             Ty::Con(h, values, ts) => Ty::Con(
@@ -354,6 +364,12 @@ impl<'a> Closure<'a> {
 
 fn contains_var(t: &Ty) -> bool {
     match t {
+        Ty::Graph(g) => {
+            !g.variables().is_empty()
+                || g.nodes()
+                    .iter()
+                    .any(|(_, node)| matches!(node, super::records::Node::Top))
+        }
         Ty::Var(_) | Ty::Top => true,
         Ty::Con(_, _, ts) | Ty::Union(ts) | Ty::Inter(ts) => ts.iter().any(contains_var),
         Ty::Fn(f) => {
@@ -380,6 +396,7 @@ fn closed_equal(s: &Solver, a: &Ty, b: &Ty) -> bool {
 /// have no known shape, including variables narrowed by expected/flow facts.
 fn shape(t: &Ty, fixed: &HashMap<V, Fixed>) -> Ty {
     match t {
+        Ty::Graph(g) => g.map_vars(&mut |v| shape(&Ty::Var(v), fixed)),
         Ty::Var(v) => fixed.get(v).map_or(Ty::Top, |f| f.ty.clone()),
         Ty::Con(h, values, ts) => Ty::Con(
             *h,
@@ -442,6 +459,15 @@ fn completed_in(
     level: u32,
 ) -> Result<Ty, &'static str> {
     match t {
+        Ty::Graph(g) => {
+            if g.nodes()
+                .iter()
+                .any(|(_, node)| matches!(node, super::records::Node::Top))
+            {
+                return Err(code::VALUE_TYPE_OPEN);
+            }
+            g.try_map_vars(&mut |v| completed_in(&Ty::Var(v), s, fixed, level))
+        }
         Ty::Var(v) if !fixed.contains_key(v) => Err(if s.vars[v.0 as usize].level > level {
             code::VALUE_TYPE_OPEN
         } else {
@@ -712,7 +738,11 @@ impl Checker<'_> {
         }
     }
 
-    pub(super) fn finish_reads(&mut self, group: &[BindingRef]) {
+    pub(super) fn finish_reads(
+        &mut self,
+        group: &[BindingRef],
+        candidates: &HashMap<DefId, super::infer::Scheme>,
+    ) {
         if self.p.of_sites.is_empty() {
             return;
         }
@@ -773,11 +803,15 @@ impl Checker<'_> {
             .iter()
             .any(|site| self.p.of_sites[site.0 as usize].module == group[0].module);
         if !has_demands {
+            if !self.discharge_union_proofs() {
+                self.fail_group_reads(&defs, &sites, &pattern_ids);
+                return;
+            }
             for d in defs {
                 if !self.reads.sources.contains(&d) {
                     continue;
                 }
-                if let Some(scheme) = self.defs.get(&d) {
+                if let Some(scheme) = candidates.get(&d) {
                     self.reads.completed.insert(
                         d,
                         completed(&scheme.ty, &self.s, &self.reads.fixed, scheme.level),
@@ -794,7 +828,7 @@ impl Checker<'_> {
         let mut shapes = Vec::new();
         let mut results = Vec::new();
         let mut patterns = Vec::new();
-        for pid in pattern_ids {
+        for &pid in &pattern_ids {
             let pattern = &self.p.alias_patterns[pid.0 as usize];
             if self.reads.patterns.contains(&pid) {
                 continue;
@@ -817,7 +851,7 @@ impl Checker<'_> {
                 continue;
             }
             self.set_module(pattern.module);
-            let Some(scheme) = self.defs.get(&d) else {
+            let Some(scheme) = candidates.get(&d) else {
                 continue;
             };
             let mut closure =
@@ -855,7 +889,7 @@ impl Checker<'_> {
                 }
             }
         }
-        for id in sites {
+        for &id in &sites {
             let info = &self.p.of_sites[id.0 as usize];
             if info.projection.is_some() || self.reads.sites.contains_key(&id) {
                 continue;
@@ -866,7 +900,7 @@ impl Checker<'_> {
             if d.module != info.module || !defs.contains(&d) {
                 continue;
             }
-            let Some(scheme) = self.defs.get(&d) else {
+            let Some(scheme) = candidates.get(&d) else {
                 continue;
             };
             let mut closure =
@@ -917,7 +951,12 @@ impl Checker<'_> {
             checked_batch(&snapshot, &equations, &shapes, self.reads.boundary, &fixed)
         };
         if let Some(trial) = trial {
-            self.s = trial;
+            let original = std::mem::replace(&mut self.s, trial);
+            if !self.discharge_union_proofs() {
+                self.s = original;
+                self.fail_group_reads(&defs, &sites, &pattern_ids);
+                return;
+            }
             for (site, t) in results {
                 if self.p.of_sites[site.0 as usize].permanent {
                     self.reads.set(site, Read::Ready(t));
@@ -967,9 +1006,31 @@ impl Checker<'_> {
             if !self.reads.sources.contains(&d) {
                 continue;
             }
-            if let Some(scheme) = self.defs.get(&d) {
+            if let Some(scheme) = candidates.get(&d) {
                 let t = completed(&scheme.ty, &self.s, &self.reads.fixed, scheme.level);
                 self.reads.completed.insert(d, t);
+            }
+        }
+        self.complete_ready_reads();
+    }
+
+    fn fail_group_reads(
+        &mut self,
+        defs: &HashSet<DefId>,
+        sites: &[OfId],
+        patterns: &[ProjectionId],
+    ) {
+        for &site in sites {
+            self.reads.set(site, Read::Failed);
+        }
+        for &pattern in patterns {
+            self.fail_pattern(pattern);
+        }
+        for &def in defs {
+            if self.reads.sources.contains(&def) {
+                self.reads
+                    .completed
+                    .insert(def, Err(code::VALUE_TYPE_NOT_FIXED));
             }
         }
         self.complete_ready_reads();
@@ -1342,6 +1403,7 @@ fn fixed_scheme(
     level: u32,
 ) -> Result<Ty, &'static str> {
     match t {
+        Ty::Graph(g) => g.try_map_vars(&mut |v| fixed_scheme(&Ty::Var(v), s, fixed, level)),
         Ty::Var(v) if s.vars[v.0 as usize].level > level => Ok(t.clone()),
         Ty::Var(v) => fixed
             .get(v)
@@ -1405,6 +1467,7 @@ impl Checker<'_> {
 
 pub(super) fn replace_vars(t: &Ty, map: &HashMap<V, Ty>) -> Ty {
     match t {
+        Ty::Graph(g) => g.map_vars(&mut |v| map.get(&v).cloned().unwrap_or(Ty::Var(v))),
         Ty::Var(v) => map.get(v).cloned().unwrap_or_else(|| t.clone()),
         Ty::Con(h, values, ts) => Ty::Con(
             *h,
@@ -1545,6 +1608,7 @@ impl Checker<'_> {
         fn invalid(s: &Solver, t: &Ty, pol: super::solve::Pol) -> bool {
             use super::solve::Pol;
             match t {
+                Ty::Graph(g) => g.invalid_places(s, pol),
                 Ty::Union(ts) => {
                     let variables = ts
                         .iter()
@@ -1627,6 +1691,7 @@ impl Checker<'_> {
     pub(super) fn fixed_reached(&self, l: &Ty, r: &Ty) -> Vec<V> {
         fn collect(t: &Ty, out: &mut Vec<V>) {
             match t {
+                Ty::Graph(g) => out.extend(g.variables()),
                 Ty::Var(v) => out.push(*v),
                 Ty::Con(_, _, ts) | Ty::Union(ts) | Ty::Inter(ts) => {
                     for t in ts {
