@@ -127,7 +127,12 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
     let mut diags = Vec::new();
     for (package, p) in graph.packages.iter().enumerate() {
         for m in &p.modules {
-            let (ast, errors) = ilang_syntax::parse_module(&graph.sources.get(m.source).text);
+            let source = graph.sources.get(m.source);
+            let (ast, errors) = if source.display.ends_with(".is") {
+                ilang_syntax::lisp::parse_source(&source.text)
+            } else {
+                ilang_syntax::parse_module(&source.text)
+            };
             diags.extend(
                 errors
                     .into_iter()

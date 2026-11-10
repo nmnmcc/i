@@ -128,7 +128,7 @@ fn export(d: &Datum) -> Result<String> {
 fn item(d: &Datum) -> Result<String> {
     let xs = round(d).ok_or_else(|| bad(d, "an item"))?;
     match xs {
-        [h, attr, it] if symbol(h, "@") => Ok(format!("@{} {}", attribute(attr)?, item(it)?)),
+        [h, attr, it] if symbol(h, "@") => Ok(format!("@{}\n{}", attribute(attr)?, item(it)?)),
         [h, left, right] if symbol(h, "=") => Ok(format!(
             "{} = {}",
             item_head(left)?,
@@ -242,6 +242,12 @@ fn typ(d: &Datum) -> Result<String> {
                     return_type(result)?
                 ));
             }
+            [head]
+                if matches!(head.kind, K::Name(_))
+                    || matches!(round(head), Some([h, _, n]) if symbol(h, ".") && matches!(n.kind, K::Name(_))) =>
+            {
+                return Ok(format!("{}()", callee_name(head)?));
+            }
             [head, args @ ..] if !args.is_empty() => {
                 return Ok(format!(
                     "{}({})",
@@ -262,6 +268,11 @@ fn typ(d: &Datum) -> Result<String> {
 fn return_type(d: &Datum) -> Result<String> {
     if let Some([h, r, e]) = round(d) {
         if symbol(h, "^") {
+            if matches!(&r.kind, K::Discard(s) if s == "_")
+                && matches!(&e.kind, K::UpName(s) if s == "Never")
+            {
+                return Ok("_".into());
+            }
             return Ok(format!("{} ? {}", typ(r)?, typ(e)?));
         }
         if symbol(h, "!") {
@@ -310,10 +321,25 @@ fn expr(d: &Datum) -> Result<String> {
                     "({}){} {}",
                     joined(ps, parameter, ", ")?,
                     ret,
-                    block(body)?
+                    if matches!(body.kind, K::Curly(_)) {
+                        block(body)?
+                    } else {
+                        format!("{{ {} }}", expr(body)?)
+                    }
                 ))
             }
-            [h, a] if symbol(h, "-") || symbol(h, "-.") => Ok(format!("{}{}", show(h), expr(a)?)),
+            [h, a] if symbol(h, "-") || symbol(h, "-.") => {
+                let inner = expr(a)?;
+                Ok(format!(
+                    "{}{}",
+                    show(h),
+                    if inner.starts_with('-') || is_match(a) {
+                        format!("{{ {inner} }}")
+                    } else {
+                        inner
+                    }
+                ))
+            }
             [h, a, b] if is_binop(h) => Ok(format!(
                 "{} {} {}",
                 binary_operand(a)?,
@@ -322,7 +348,7 @@ fn expr(d: &Datum) -> Result<String> {
             )),
             [head, spread, base, fields @ ..] if symbol(spread, "..") => Ok(format!(
                 "{}(..{}{})",
-                expr(head)?,
+                field_target(head)?,
                 expr(base)?,
                 fields
                     .iter()
@@ -331,10 +357,9 @@ fn expr(d: &Datum) -> Result<String> {
             )),
             [head, args @ ..] => Ok(format!(
                 "{}({})",
-                expr(head)?,
+                field_target(head)?,
                 joined(args, argument, ", ")?
             )),
-            _ => Err(bad(d, "an expression")),
         },
         K::Square(xs) => Ok(format!("[{}]", sequence(xs, expr)?)),
         K::Bits(xs) => Ok(format!("<<{}>>", joined(xs, expression_segment, ", ")?)),
@@ -346,6 +371,7 @@ fn expr(d: &Datum) -> Result<String> {
 fn field_target(d: &Datum) -> Result<String> {
     let s = expr(d)?;
     if matches!(d.kind, K::Int(_) | K::Float(_))
+        || is_match(d)
         || matches!(round(d), Some([h, _, _]) if is_binop(h))
     {
         Ok(format!("{{ {s} }}"))
@@ -353,9 +379,12 @@ fn field_target(d: &Datum) -> Result<String> {
         Ok(s)
     }
 }
+fn is_match(d: &Datum) -> bool {
+    matches!(round(d), Some([h, _, b]) if symbol(h, ".") && matches!(b.kind, K::Curly(_)))
+}
 fn binary_operand(d: &Datum) -> Result<String> {
     let value = expr(d)?;
-    if matches!(round(d), Some([h, _, _]) if is_binop(h)) {
+    if matches!(round(d), Some([h, _, _]) if is_binop(h)) || is_match(d) {
         Ok(format!("{{ {value} }}"))
     } else {
         Ok(value)
@@ -458,6 +487,7 @@ fn pattern(d: &Datum) -> Result<String> {
     }
     match &d.kind {
         K::Round(xs) => match xs.as_slice() {
+            [] => Ok("()".into()),
             [h, n, t] if symbol(h, ":") => Ok(format!(
                 "{}: {}",
                 atom(n).ok_or_else(|| bad(n, "a binder"))?,
@@ -479,7 +509,6 @@ fn pattern(d: &Datum) -> Result<String> {
                 Ok(format!("({})", joined(ps, pattern, ", ")?))
             }
             [h, ps @ ..] => Ok(format!("{}({})", callee_name(h)?, sequence(ps, pattern)?)),
-            _ => Err(bad(d, "a pattern")),
         },
         K::Square(xs) => Ok(format!("[{}]", sequence(xs, pattern)?)),
         K::Bits(xs) => Ok(format!("<<{}>>", joined(xs, pattern_segment, ", ")?)),

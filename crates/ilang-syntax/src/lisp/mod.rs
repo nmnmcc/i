@@ -10,8 +10,10 @@ use crate::{Code, Diagnostic};
 use num_bigint::BigUint;
 
 mod from_ast;
+mod to_ast;
 mod to_source;
 pub use from_ast::print_module;
+pub use to_ast::{parse_expression, parse_module, parse_pattern, parse_type};
 pub use to_source::normal_source;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -89,6 +91,14 @@ pub fn parse(source: &str) -> Result<Document, Vec<Diagnostic>> {
         datums: result,
         trailing_docs: docs.collect(),
     })
+}
+
+/// Parse a Lisp-surface source file into the common core tree.
+pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
+    match parse(source).and_then(|d| parse_module(&d).map_err(|e| vec![e])) {
+        Ok(module) => (module, Vec::new()),
+        Err(diags) => (crate::ast::Module::default(), diags),
+    }
 }
 
 struct Parser<'a> {

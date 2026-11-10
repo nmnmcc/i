@@ -143,10 +143,13 @@ fn binding(b: &Binding) -> String {
 }
 fn result(r: &RetType) -> String {
     let value = typ(&r.value);
-    let value = r
-        .err
-        .as_ref()
-        .map_or(value.clone(), |e| form("^", [value, typ(e)]));
+    let value = if matches!(r.value.kind, TypeKind::Hole) && r.err.is_none() {
+        form("^", [value, "Never".into()])
+    } else {
+        r.err
+            .as_ref()
+            .map_or(value.clone(), |e| form("^", [value, typ(e)]))
+    };
     r.env
         .as_ref()
         .map_or(value.clone(), |e| form("!", [value, typ(e)]))
@@ -360,6 +363,7 @@ fn pattern(p: &Pattern) -> String {
                 )
             }
         }
+        PatternKind::Tuple(ps) if ps.is_empty() => "()".into(),
         PatternKind::Tuple(ps) => form(",", ps.iter().map(pattern)),
         PatternKind::List { items, rest } => braced(
             "[",

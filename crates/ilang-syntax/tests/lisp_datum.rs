@@ -26,6 +26,34 @@ fn quote_rules_are_checked() {
 }
 
 #[test]
+fn direct_decode_accepts_expression_function_bodies() {
+    let source = "(= plus_one (-> (x) _ (+ x 1)))";
+    let document = parse(source).unwrap();
+    let module = ilang_syntax::lisp::parse_module(&document).unwrap();
+    assert_eq!(module.items[0].span.start, 0);
+    let normal = normal_source(&document).unwrap();
+    let (again, errors) = ilang_syntax::parse_module(&normal);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(
+        ilang_syntax::shape::canon(&module),
+        ilang_syntax::shape::canon(&again)
+    );
+}
+
+#[test]
+fn written_return_hole_is_not_inferred_return() {
+    let (module, errors) = ilang_syntax::parse_module("f = (x) -> _ { x }\n");
+    assert!(errors.is_empty(), "{errors:?}");
+    let lisp = print_module(&module);
+    assert!(lisp.contains("(^ _ Never)"), "{lisp}");
+    let back = ilang_syntax::lisp::parse_module(&parse(&lisp).unwrap()).unwrap();
+    assert_eq!(
+        ilang_syntax::shape::canon(&module),
+        ilang_syntax::shape::canon(&back)
+    );
+}
+
+#[test]
 fn dots_and_spreads_are_separate_datums() {
     let xs = parse("(. a 12) [1 .. x] <<1 (: 2 u8)>>").unwrap();
     let DatumKind::Round(parts) = &xs[0].kind else {
@@ -71,6 +99,12 @@ fn libraries_have_a_lisp_round_trip() {
     check_corpus(&root.join("std"));
 }
 
+#[test]
+fn spec_programs_have_a_lisp_round_trip() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    check_corpus(&root.join("tests/spec"));
+}
+
 fn check_corpus(dir: &std::path::Path) {
     let mut failures = Vec::new();
     let mut dirs = vec![dir.to_owned()];
@@ -85,11 +119,30 @@ fn check_corpus(dir: &std::path::Path) {
                 continue;
             }
             let source = std::fs::read_to_string(&path).unwrap();
+            if source
+                .lines()
+                .any(|line| line.trim_start().starts_with("// expect: compile-error"))
+            {
+                continue;
+            }
             let (module, diagnostics) = ilang_syntax::parse_module(&source);
             if !diagnostics.is_empty() {
                 continue;
             }
             let lisp = print_module(&module);
+            match parse(&lisp)
+                .and_then(|d| ilang_syntax::lisp::parse_module(&d).map_err(|e| vec![e]))
+            {
+                Ok(back)
+                    if ilang_syntax::shape::canon(&module) == ilang_syntax::shape::canon(&back) => {
+                }
+                Ok(back) => failures.push(format!(
+                    "{}: direct tree differs\n{lisp}\nBACK:\n{}",
+                    path.display(),
+                    print_module(&back)
+                )),
+                Err(e) => failures.push(format!("{}: direct decode {e:?}\n{lisp}", path.display())),
+            }
             let converted = parse(&lisp)
                 .map_err(|e| format!("datum: {e:?}"))
                 .and_then(|ds| normal_source(&ds).map_err(|e| format!("conversion: {e:?}")));
