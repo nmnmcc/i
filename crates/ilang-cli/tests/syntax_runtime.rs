@@ -248,3 +248,68 @@ fn syntax_values_cross_export_boundary() {
             .same_code(&input)
     );
 }
+
+#[test]
+fn compiler_templates_rebuild_through_wasm() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("test")).unwrap();
+    std::fs::write(
+        dir.path().join("test/main.i"),
+        r#"
+(syntax = i/syntax)
+@test
+exercise = () {
+  template = syntax._template(0)
+  first = syntax._template(1)
+  replacement = syntax._template(2)
+  result = syntax._rebuild(template, [first, replacement])
+  assert(syntax.show(result) == "(f y)")
+  syntax.node(result).{
+    syntax.Round([_, child]) -> assert(child == replacement)
+    _ -> panic("unexpected template")
+  }
+  Nil
+}
+"#,
+    )
+    .unwrap();
+    let parsed = parse("(f x) y").unwrap();
+    let scope = Scope {
+        module: 8,
+        marks: BTreeSet::new(),
+    };
+    let template = Syntax::from_datum(&parsed[0], &scope);
+    let ilang_syntax::lisp::syntax::Node::Round(children) = template.node() else {
+        panic!("template")
+    };
+    let templates: std::sync::Arc<[Syntax]> = vec![
+        template.clone(),
+        children[0].clone(),
+        Syntax::from_datum(&parsed[1], &scope),
+    ]
+    .into();
+    let built = ilang_cli::build(
+        dir.path(),
+        ilang_cli::BuildOptions {
+            tests: true,
+            opt: ilang_cli::Level::O0,
+            offline: true,
+            target: ilang_cli::Target::Ilang,
+        },
+    )
+    .unwrap();
+    let mut options = ilang_cli::standard_options();
+    ilang_host::syntax::install_with_templates(&mut options.imports, templates).unwrap();
+    options
+        .imports
+        .grant_package(&built.binding_plan, &built.trusted_package);
+    let result = built
+        .host_program()
+        .unwrap()
+        .run_test_with("app/main.exercise", options);
+    assert!(
+        matches!(result, ilang_host::TestResult::Passed),
+        "{result:?}"
+    );
+}

@@ -1,5 +1,5 @@
 //! Definitions synthesized by the compiler for the language's built-in types.
-use super::syntax::{Node, Scope, ScopeIdentity, Syntax};
+use super::syntax::{Node, Scope, ScopeIdentity, Syntax, SyntaxError};
 use super::{Datum, DatumKind, parse};
 use crate::span::Span;
 
@@ -230,4 +230,128 @@ pub fn type_query(of: &Syntax) -> Result<TypeQuery, super::syntax::SyntaxError> 
         message: "definition expects a type name or a qualified type name".into(),
         span: of.span(),
     })
+}
+
+/// Turn an expanded type item into a definition answer without losing the
+/// distinct scopes of template and caller atoms. The item must already be
+/// syntactically valid; malformed items are reported at their source span.
+pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxError> {
+    use crate::ast::ItemKind;
+    let parsed = super::parse_item(&item.to_datum()).map_err(|error| SyntaxError {
+        message: error.message,
+        span: error.span,
+    })?;
+    let ItemKind::TypeDef(def) = parsed.kind else {
+        return Err(SyntaxError {
+            message: "definition expects a type definition".into(),
+            span: item.span(),
+        });
+    };
+    let Node::Round(parts) = item.node() else {
+        unreachable!("type definition item is round")
+    };
+    let (head_index, body_index, custom) = match parts.as_slice() {
+        [head, body] if matches!(body.node(), Node::Curly(_)) => {
+            let _ = head;
+            (0, 1, true)
+        }
+        [eq, _, _] if matches!(eq.node(), Node::Symbol(s) if s == "=") => (1, 2, false),
+        _ => unreachable!("parsed type definition has an item shape"),
+    };
+    let mut binders = Vec::new();
+    if !def.params.is_empty() {
+        let Node::Round(head) = parts[head_index].node() else {
+            unreachable!("parameterized type has a round head")
+        };
+        for (index, binder) in head.iter().skip(1).enumerate() {
+            let Node::Up(name) = binder.node() else {
+                unreachable!("parsed type parameter is an upper name")
+            };
+            binders.push((
+                name.clone(),
+                binder.scope().clone(),
+                binder.scope_identity().cloned(),
+                index as u32,
+            ));
+        }
+    }
+    fn named(
+        s: &Syntax,
+        binders: &[(String, Scope, Option<ScopeIdentity>, u32)],
+        answer: u64,
+    ) -> Syntax {
+        if let Node::Up(name) = s.node()
+            && let Some((_, _, _, parameter)) = binders.iter().find(|(text, scope, identity, _)| {
+                text == name && scope == s.scope() && identity.as_ref() == s.scope_identity()
+            })
+        {
+            return s.with_scope_identity(ScopeIdentity::DefinitionParameter {
+                answer,
+                parameter: *parameter,
+                name: name.clone(),
+            });
+        }
+        s.clone()
+    }
+    fn ty(
+        s: &Syntax,
+        binders: &[(String, Scope, Option<ScopeIdentity>, u32)],
+        answer: u64,
+    ) -> Syntax {
+        match s.node() {
+            Node::Up(_) => named(s, binders, answer),
+            Node::Round(xs) if matches!(xs.as_slice(), [dot, _, _] if matches!(dot.node(), Node::Symbol(x) if x == ".")) => {
+                s.clone()
+            }
+            Node::Round(xs) => s.with_node(Node::Round(
+                xs.iter().map(|x| ty(x, binders, answer)).collect(),
+            )),
+            Node::Square(xs) => s.with_node(Node::Square(
+                xs.iter().map(|x| ty(x, binders, answer)).collect(),
+            )),
+            Node::Curly(xs) => s.with_node(Node::Curly(
+                xs.iter().map(|x| ty(x, binders, answer)).collect(),
+            )),
+            Node::Bits(xs) => s.with_node(Node::Bits(
+                xs.iter().map(|x| ty(x, binders, answer)).collect(),
+            )),
+            _ => s.clone(),
+        }
+    }
+    let mut result = parts.clone();
+    if !binders.is_empty() {
+        let Node::Round(head) = parts[head_index].node() else {
+            unreachable!()
+        };
+        let mut transformed = head.clone();
+        for (index, node) in transformed.iter_mut().enumerate().skip(1) {
+            *node = node.with_scope_identity(ScopeIdentity::DefinitionParameter {
+                answer,
+                parameter: (index - 1) as u32,
+                name: binders[index - 1].0.clone(),
+            });
+        }
+        result[head_index] = parts[head_index].with_node(Node::Round(transformed));
+    }
+    if custom {
+        let Node::Curly(constructors) = parts[body_index].node() else {
+            unreachable!()
+        };
+        let mut converted = Vec::new();
+        for constructor in constructors {
+            let Node::Round(fields) = constructor.node() else {
+                converted.push(constructor.clone());
+                continue;
+            };
+            let mut fields = fields.clone();
+            for field in fields.iter_mut().skip(1) {
+                *field = ty(field, &binders, answer);
+            }
+            converted.push(constructor.with_node(Node::Round(fields)));
+        }
+        result[body_index] = parts[body_index].with_node(Node::Curly(converted));
+    } else {
+        result[body_index] = ty(&parts[body_index], &binders, answer);
+    }
+    Ok(item.with_node(Node::Round(result)).as_answer())
 }

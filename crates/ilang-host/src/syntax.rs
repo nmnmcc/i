@@ -149,6 +149,16 @@ fn invoke(name: &str, args: &[Value]) -> Result<Value> {
             _ => bail!("syntax node is not a bracket"),
         },
         ("child", [value, index]) => Ok(encode(child(get(value)?, number(index)?)?.clone())),
+        ("rebuild", [template, list]) => {
+            let mut children = Vec::new();
+            let mut link = get::<List>(list)?.0.as_deref();
+            while let Some(current) = link {
+                children.push(current.value.clone());
+                link = current.previous.as_deref();
+            }
+            children.reverse();
+            Ok(encode(get::<Syntax>(template)?.replace_children(children)))
+        }
         ("list_new", []) => Ok(opaque(List(None))),
         ("list_push", [list, value]) => Ok(opaque(List(Some(Arc::new(Link {
             value: get::<Syntax>(value)?.clone(),
@@ -268,6 +278,11 @@ fn invoke(name: &str, args: &[Value]) -> Result<Value> {
 
 /// Install only the compiler's syntax operations into an otherwise empty host.
 pub fn install(imports: &mut HostImports) -> Result<()> {
+    install_with_templates(imports, Arc::from([]))
+}
+
+/// Install syntax operations with the templates belonging to this instance.
+pub fn install_with_templates(imports: &mut HostImports, templates: Arc<[Syntax]>) -> Result<()> {
     const NAMES: &[&str] = &[
         "kind",
         "text",
@@ -277,6 +292,7 @@ pub fn install(imports: &mut HostImports) -> Result<()> {
         "child",
         "list_new",
         "list_push",
+        "rebuild",
         "make_text",
         "make_int",
         "make_float",
@@ -296,6 +312,16 @@ pub fn install(imports: &mut HostImports) -> Result<()> {
     for &name in NAMES {
         imports.external("i:compiler/syntax/v1", name, move |args| invoke(name, args))?;
     }
+    imports.external("i:compiler/syntax/v1", "template", move |args| {
+        let [index] = args else {
+            bail!("syntax template expects one index")
+        };
+        let index = number(index)?;
+        let syntax = templates
+            .get(index)
+            .context("syntax template index is out of range")?;
+        Ok(encode(syntax.clone()))
+    })?;
     Ok(())
 }
 
