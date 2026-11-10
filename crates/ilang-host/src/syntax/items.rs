@@ -1,5 +1,6 @@
 //! Transactional item contributions for one compiler-managed macro run.
-use super::{DefinitionAbort, DefinitionContext, encode, get, opaque, text};
+use super::{DefinitionAbort, DefinitionContext, charge_tree, encode, get, opaque, text};
+use crate::macro_budget::MacroBudget;
 use crate::{HostImports, Value};
 use anyhow::{Result, bail};
 use ilang_syntax::lisp::syntax::{Node, Syntax};
@@ -39,16 +40,20 @@ impl ItemContext {
     }
     fn owns_location(&self, at: &Syntax) -> bool {
         fn contains(syntax: &Syntax, at: &Syntax) -> bool {
-            if syntax.span() == at.span() && syntax.scope().module == at.scope().module {
-                return true;
-            }
-            match syntax.node() {
-                Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
-                    xs.iter().any(|s| contains(s, at))
+            let mut pending = vec![syntax];
+            while let Some(syntax) = pending.pop() {
+                if syntax.span() == at.span() && syntax.scope().module == at.scope().module {
+                    return true;
                 }
-                Node::Quote(s) | Node::Unquote(s) | Node::Splice(s) => contains(s, at),
-                _ => false,
+                match syntax.node() {
+                    Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                        pending.extend(xs)
+                    }
+                    Node::Quote(s) | Node::Unquote(s) | Node::Splice(s) => pending.push(s),
+                    _ => {}
+                }
             }
+            false
         }
         contains(&self.call_site, at) || self.arguments.iter().any(|s| contains(s, at))
     }
@@ -90,31 +95,58 @@ fn unavailable(run: &Option<Arc<DefinitionContext>>, at: &Syntax) -> anyhow::Err
     anyhow::anyhow!("Items used outside item expansion")
 }
 
+fn charge_text(budget: &MacroBudget, text: &str) -> Result<()> {
+    let bytes = text.len() as u64;
+    budget.charge(bytes, 4 + bytes.div_ceil(8))?;
+    Ok(())
+}
+
+fn operation(
+    imports: &mut HostImports,
+    name: &str,
+    budget: Option<MacroBudget>,
+    call: impl Fn(&[Value], Option<&MacroBudget>) -> Result<Value> + Send + Sync + 'static,
+) -> Result<()> {
+    imports.external("i:compiler/syntax/v1", name, move |args| {
+        if let Some(budget) = &budget {
+            budget.charge(1, 8)?;
+        }
+        call(args, budget.as_ref())
+    })
+}
+
 pub(super) fn install(
     imports: &mut HostImports,
     context: Option<Arc<ItemContext>>,
     run: Option<Arc<DefinitionContext>>,
+    budget: Option<MacroBudget>,
 ) -> Result<()> {
-    const NS: &str = "i:compiler/syntax/v1";
-    imports.external(NS, "metadata_new", |args| {
+    operation(imports, "metadata_new", budget.clone(), |args, _| {
         if !args.is_empty() {
             bail!("metadata_new takes no arguments")
         }
         Ok(opaque(Metadata(None)))
     })?;
-    imports.external(NS, "metadata_push", |args| {
+    operation(imports, "metadata_push", budget.clone(), |args, budget| {
         let [list, key, value] = args else {
             bail!("metadata_push expects a list, key and value")
         };
+        let key = text(key)?;
+        let value = text(value)?;
+        if let Some(budget) = budget {
+            charge_text(budget, key)?;
+            charge_text(budget, value)?;
+            budget.charge(1, 4)?;
+        }
         Ok(opaque(Metadata(Some(Arc::new(MetadataLink {
-            key: text(key)?.into(),
-            value: text(value)?.into(),
+            key: key.into(),
+            value: value.into(),
             previous: get::<Metadata>(list)?.0.clone(),
         })))))
     })?;
     let add_context = context.clone();
     let add_run = run.clone();
-    imports.external(NS, "items_add", move |args| {
+    operation(imports, "items_add", budget.clone(), move |args, budget| {
         let [collection, target, data, at] = args else {
             bail!("items_add expects four arguments")
         };
@@ -130,6 +162,12 @@ pub(super) fn install(
         if !is_value_name(target) {
             return Ok(item_error("target must be a value name", target));
         }
+        if let Some(budget) = budget {
+            charge_tree(budget, &context.call_site, false)?;
+            for argument in context.arguments.iter() {
+                charge_tree(budget, argument, false)?;
+            }
+        }
         if !context.owns_location(at) {
             return Ok(item_error(
                 "the location must come from this call or its arguments",
@@ -140,6 +178,11 @@ pub(super) fn install(
         let mut keys = HashSet::new();
         let mut current = get::<Metadata>(data)?.0.as_deref();
         while let Some(link) = current {
+            if let Some(budget) = budget {
+                budget.charge(1, 4)?;
+                charge_text(budget, &link.key)?;
+                charge_text(budget, &link.value)?;
+            }
             if !keys.insert(link.key.clone()) {
                 return Ok(item_error("metadata keys must be unique", at));
             }
@@ -159,7 +202,7 @@ pub(super) fn install(
             });
         Ok(result(Ok(())))
     })?;
-    imports.external(NS, "items_expose", move |args| {
+    operation(imports, "items_expose", budget.clone(), move |args, _| {
         let [name] = args else {
             bail!("items_expose expects one argument")
         };
@@ -177,26 +220,27 @@ pub(super) fn install(
             .push(ItemRequest::Expose { name: name.clone() });
         Ok(result(Ok(())))
     })?;
-    imports.external(NS, "items_ok", |args| {
+    operation(imports, "items_ok", budget.clone(), |args, _| {
         let [value] = args else {
             bail!("items_ok expects one argument")
         };
         Ok(Value::Bool(get::<ItemResult>(value)?.0.is_ok()))
     })?;
-    imports.external(NS, "items_message", |args| {
+    operation(imports, "items_message", budget.clone(), |args, budget| {
         let [value] = args else {
             bail!("items_message expects one argument")
         };
-        Ok(Value::String(
-            get::<ItemResult>(value)?
-                .0
-                .as_ref()
-                .expect_err("item result must be an error")
-                .0
-                .clone(),
-        ))
+        let message = &get::<ItemResult>(value)?
+            .0
+            .as_ref()
+            .expect_err("item result must be an error")
+            .0;
+        if let Some(budget) = budget {
+            charge_text(budget, message)?;
+        }
+        Ok(Value::String(message.clone()))
     })?;
-    imports.external(NS, "items_at", |args| {
+    operation(imports, "items_at", budget, |args, _| {
         let [value] = args else {
             bail!("items_at expects one argument")
         };

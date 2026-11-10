@@ -742,3 +742,101 @@ fn committed_item_requests_flip_marks_without_losing_shared_identity() {
     assert!(output.identical(target));
     assert!(output.identical(name));
 }
+
+#[test]
+fn compiler_service_budgets_stop_before_observable_contributions() {
+    use ilang_host::macro_budget::{Limit, Limits, MacroBudget};
+    use ilang_host::syntax::{DefinitionContext, DefinitionReply, ItemContext};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("test")).unwrap();
+    std::fs::write(
+        dir.path().join("test/main.i"),
+        r#"
+(syntax = i/syntax)
+@test
+note = () {
+  diagnostics = syntax._diagnostics()
+  diagnostics.note("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz")
+  Nil
+}
+@test
+query = () -> Nil ^ syntax.SyntaxError {
+  ! syntax.Definitions = syntax._definitions()
+  syntax.definition(syntax._template(0))
+  Nil
+}
+@test
+item = () -> Nil ^ syntax.SyntaxError {
+  service = syntax._items()
+  service.add(syntax._template(1), syntax._template(2), [], syntax._template(2))
+  Nil
+}
+"#,
+    )
+    .unwrap();
+    let parsed =
+        parse("(Large a b c d e f g h i j k l m n o p q r s t) collection target").unwrap();
+    let scope = Scope {
+        module: 7,
+        marks: BTreeSet::new(),
+    };
+    let templates: Arc<[Syntax]> = parsed
+        .iter()
+        .map(|d| Syntax::from_datum(d, &scope))
+        .collect::<Vec<_>>()
+        .into();
+    let built = ilang_cli::build(
+        dir.path(),
+        ilang_cli::BuildOptions {
+            tests: true,
+            opt: ilang_cli::Level::O0,
+            offline: true,
+            target: ilang_cli::Target::Ilang,
+        },
+    )
+    .unwrap();
+    let program = built.host_program().unwrap();
+    for name in ["note", "query", "item"] {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let callback_calls = calls.clone();
+        let context = Arc::new(DefinitionContext::new(move |s| {
+            callback_calls.fetch_add(1, Ordering::SeqCst);
+            DefinitionReply::Answer(s.clone())
+        }));
+        let items = Arc::new(ItemContext::new(
+            vec![templates[0].clone(), templates[2].clone()].into(),
+            templates[2].clone(),
+        ));
+        let budget = MacroBudget::new(Limits {
+            work: 20,
+            allocation: 1_000_000,
+            frames: 10_000,
+        });
+        let mut options = ilang_cli::standard_options();
+        ilang_host::syntax::install_with_budget(
+            &mut options.imports,
+            templates.clone(),
+            Some(context.clone()),
+            Some(items.clone()),
+            budget.clone(),
+        )
+        .unwrap();
+        options
+            .imports
+            .grant_package(&built.binding_plan, &built.trusted_package);
+        let result = program.run_test_with(&format!("app/main.{name}"), options);
+        assert!(
+            !matches!(result, ilang_host::TestResult::Passed),
+            "{name}: {result:?}"
+        );
+        assert_eq!(budget.exceeded(), Some(Limit::Work), "{name}");
+        assert_eq!(calls.load(Ordering::SeqCst), 0, "{name}");
+        assert!(context.take_notes().is_empty());
+        assert!(items.take_requests().is_empty());
+    }
+}
