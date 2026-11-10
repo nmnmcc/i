@@ -122,6 +122,29 @@ main(A, B) = () { local: () -> Nil ! A | B | S(A, B) = () { use() } local() }";
 }
 
 #[test]
+fn a_captured_row_annotation_can_contain_the_service() {
+    // §4.7 allows N to become the more exact finite row A | S(A).
+    // Merely making an unused function needs nothing (§4.8 rule 4).
+    let source = "S(N) { S(() -> Nil ! N) }
+use(N) = (s ! S(N)) { S(f) = s f() }
+@main
+main(N) = () { local: () -> Nil ! N = () { use() } local() }";
+    entry(source);
+    let unused = source.replace("local() }", "Nil }");
+    let (graph, _, _) = common::check_files(&[("src/main.i", &unused)]);
+    for checked in [
+        ilang_check::check(&graph),
+        ilang_check::query::check_for_queries(&graph),
+    ] {
+        assert!(
+            !checked.diags.iter().any(|d| d.is_error()),
+            "{:?}",
+            graph.sources.render_all(&checked.diags)
+        );
+    }
+}
+
+#[test]
 fn finite_exported_schemes_survive_module_boundaries() {
     // §2.4 and §4.7: the text and interface tree must both contain the
     // complete scheme. Reading it in another module must retain S(N).
