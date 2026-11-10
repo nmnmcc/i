@@ -1,4 +1,4 @@
-//! Wasmtime embedding of the i binary interface, version 2 (spec Appendix B).
+//! Wasmtime embedding of the i binary interface, version 3 (spec Appendix B).
 //!
 //! A [`Program`] is a compiled module with its `ilang.abi` metadata. Every
 //! [`Instance`] runs `ilang_start` once before anything else. Calls give an
@@ -9,6 +9,15 @@
 //! Buffers follow B.3: the host makes the buffers of export parameters with
 //! `ilang_alloc` and frees them after the call, and it frees the result
 //! buffers after copying them. For imports, the host makes the result buffers.
+//!
+//! # Requests
+//!
+//! An async export may keep many requests of async host functions
+//! outstanding (B.4, B.5). The host keeps their work in the store, keyed by
+//! the request id that the module chose, and answers them one at a time in
+//! the order their work finishes. When the entry point ends, traps or a
+//! host function fails, the requests that are left are dropped, and so is
+//! their work.
 //!
 //! # Stack
 //!
@@ -63,6 +72,7 @@
 //! peaked at 310 MB). `ILANG_GC` and `ILANG_GC_HEAP` (in MiB) choose another
 //! collector or size, to measure them.
 
+mod requests;
 mod run;
 pub mod services;
 #[cfg(test)]
@@ -80,6 +90,7 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail, ensure};
 pub use num_bigint::BigInt;
 use num_bigint::Sign;
+use requests::{Request, Requests};
 pub use run::block_on;
 use serde::{Deserialize, Serialize};
 use wasmtime::{
@@ -87,7 +98,7 @@ use wasmtime::{
     Instance as WasmInstance, Linker, Memory, Module, RootScope, Store, Val, ValType,
 };
 
-pub const ABI_VERSION: u32 = 2;
+pub const ABI_VERSION: u32 = 3;
 pub const HOST_MODULE: &str = "ilang:host/v1";
 /// The stop reason for a value from the host that is not correct (B.2).
 pub const HOST_VALUE_REASON: &str = "host: value is not correct";
@@ -265,8 +276,13 @@ impl Abi {
 
     pub fn validate(&self) -> Result<()> {
         ensure!(
-            self.version == ABI_VERSION,
-            "unsupported i ABI version {} (expected {ABI_VERSION})",
+            self.version >= ABI_VERSION,
+            "the module uses i ABI version {}; build it again with this version of i",
+            self.version
+        );
+        ensure!(
+            self.version <= ABI_VERSION,
+            "the module uses i ABI version {}, but this host reads version {ABI_VERSION}; update the host",
             self.version
         );
         for (name, signature) in &self.exports {
@@ -321,7 +337,7 @@ impl Abi {
 fn is_reserved_export(name: &str) -> bool {
     matches!(
         name,
-        "memory" | "ilang_alloc" | "ilang_free" | "ilang_start"
+        "memory" | "ilang_alloc" | "ilang_free" | "ilang_start" | "ilang_continue"
     ) || name.starts_with("ilang_resume:")
         || name.starts_with("ilang_result:")
 }
@@ -492,6 +508,15 @@ pub type ServiceFunction =
 /// The work of an async host service function (B.4).
 pub type ServiceFuture =
     Pin<Box<dyn Future<Output = Result<std::result::Result<Value, Value>>> + Send>>;
+/// A function of an async host service: it starts the work of one request.
+///
+/// The start closure runs during the import, and the future is first polled
+/// when the host waits; so work out deadlines and copy inputs in the start
+/// closure, and do not spawn tasks. When a request is dropped, its future is
+/// dropped at once; work handed to `spawn_blocking` (also inside `tokio::fs`
+/// or `tokio::io::stdin`) is detached, not cancelled: it runs to its end and
+/// its result is thrown away, so it must not hold anything the program still
+/// needs.
 pub type AsyncServiceFunction = Arc<dyn Fn(&[Value]) -> ServiceFuture + Send + Sync>;
 /// An external function (spec §10.1).
 pub type ExternalFunction = Arc<dyn Fn(&[Value]) -> Result<Value> + Send + Sync>;
@@ -539,7 +564,8 @@ impl HostImports {
     }
 
     /// A function of an async host service (`@host("…", "async")`). It starts
-    /// the work and gives a future of its value; see [`Instance::call_async`].
+    /// the work and gives a future of its value; see [`Instance::call_async`]
+    /// and [`AsyncServiceFunction`].
     pub fn async_service<F>(
         &mut self,
         namespace: impl Into<String>,
@@ -603,14 +629,6 @@ impl HostOptions {
     }
 }
 
-/// An async host function that has been started and not answered yet.
-struct Pending {
-    namespace: String,
-    label: String,
-    signature: Signature,
-    work: ServiceFuture,
-}
-
 struct State {
     references: HashMap<usize, (Weak<dyn Any + Send + Sync>, i64)>,
     next_reference: i64,
@@ -618,7 +636,8 @@ struct State {
     stop_message: Option<String>,
     /// A failure of the host or an incorrect guest value inside an import.
     failure: Option<anyhow::Error>,
-    pending: Vec<Pending>,
+    /// The requests of async host functions that are outstanding (B.4).
+    requests: Requests,
 }
 
 /// A compiled program. Reuse it to make independent instances, for example
@@ -723,7 +742,7 @@ impl Program {
                 next_reference: 1,
                 stop_message: None,
                 failure: None,
-                pending: Vec::new(),
+                requests: Requests::default(),
             },
         );
         let instance = {
@@ -866,6 +885,50 @@ impl Instance {
         self.settle(invoked)
     }
 
+    /// `invoke` for a call in which the module may start and cancel
+    /// requests (B.4).
+    fn invoke_accepting(
+        &mut self,
+        function: Func,
+        params: &[Val],
+        results: &mut [Val],
+    ) -> Result<Option<Stop>> {
+        let invoked = {
+            let mut scope = RootScope::new(&mut self.store);
+            invoke_accepting(&mut scope, function, params, results)
+        };
+        self.settle(invoked)
+    }
+
+    /// A fault of the module: the instance is not used again (B.5).
+    fn fault(&mut self, text: String) -> anyhow::Error {
+        self.unusable = Some(text.clone());
+        anyhow!(text)
+    }
+
+    /// The export `name` with these Wasm types, or a fault of the module
+    /// with `text` when it is missing or has other types.
+    fn export_or_fault(
+        &mut self,
+        name: &str,
+        params: &[ValType],
+        results: &[ValType],
+        text: impl FnOnce() -> String,
+    ) -> Result<Func> {
+        let function = self.instance.get_func(&mut self.store, name);
+        let fits = function.as_ref().is_some_and(|function| {
+            let ty = function.ty(&self.store);
+            let same = |a: &mut dyn ExactSizeIterator<Item = ValType>, b: &[ValType]| {
+                a.len() == b.len() && a.zip(b).all(|(a, b)| ValType::eq(&a, b))
+            };
+            same(&mut ty.params(), params) && same(&mut ty.results(), results)
+        });
+        match function {
+            Some(function) if fits => Ok(function),
+            _ => Err(self.fault(text())),
+        }
+    }
+
     /// A trap makes the instance unusable. It gives `Some(stop)`, or the
     /// failure of a host function as an error.
     fn settle(&mut self, invoked: Invoked) -> Result<Option<Stop>> {
@@ -979,6 +1042,10 @@ impl Instance {
     /// `block_on` and `Program::run_*` give such a runtime.
     pub async fn call_async(&mut self, name: &str, arguments: &[Value]) -> Result<Outcome> {
         self.usable()?;
+        ensure!(
+            self.store.data().requests.is_empty(),
+            "internal error: a request is outstanding before an async call"
+        );
         let signature = self.signature(name, arguments)?;
         ensure!(signature.is_async, "export {name} is not async; use call");
         if !correct_arguments(&signature, arguments) {
@@ -998,7 +1065,7 @@ impl Instance {
                 arguments,
                 &mut allocations,
             ) {
-                Ok(params) => invoke_in(&mut scope, function, &params, &mut status),
+                Ok(params) => invoke_accepting(&mut scope, function, &params, &mut status),
                 Err(invoked) => invoked,
             }
         };
@@ -1033,10 +1100,14 @@ impl Instance {
     /// Run an async program entry or test by its export name.
     pub async fn run_async(&mut self, name: &str) -> Result<Outcome> {
         self.usable()?;
+        ensure!(
+            self.store.data().requests.is_empty(),
+            "internal error: a request is outstanding before an async call"
+        );
         let function = self.export(name)?;
         let result = self.export(&format!("ilang_result:{name}"))?;
         let mut status = [Val::I32(0)];
-        if let Some(stop) = self.invoke(function, &[], &mut status)? {
+        if let Some(stop) = self.invoke_accepting(function, &[], &mut status)? {
             return Ok(Outcome::Stop(stop));
         }
         if let Some(stop) = self.wait(name, status).await? {
@@ -1048,50 +1119,87 @@ impl Instance {
         }
     }
 
-    /// Answer the async host functions that the module waits for until the
-    /// status is 0 (B.5).
-    async fn wait(&mut self, name: &str, mut status: [Val; 1]) -> Result<Option<Stop>> {
+    /// Answer the requests of the module until the status is 0 (B.5). Every
+    /// return drops the requests that are left, and so does dropping the
+    /// future while it waits, which also makes the instance unusable.
+    async fn wait(&mut self, name: &str, status: [Val; 1]) -> Result<Option<Stop>> {
+        let guard = WaitGuard {
+            instance: self,
+            armed: true,
+        };
+        let outcome = guard.instance.wait_inner(name, status).await;
+        guard.finish();
+        outcome
+    }
+
+    async fn wait_inner(&mut self, name: &str, mut status: [Val; 1]) -> Result<Option<Stop>> {
         loop {
-            match status[0].i32() {
+            let (id, request, reply) = match status[0].i32() {
                 Some(0) => return Ok(None),
-                Some(1) => {}
-                _ => {
-                    self.unusable = Some("the module gave a wrong status".into());
-                    bail!("export {name} gave a status that is not 0 or 1");
+                Some(1) => match self.store.data_mut().requests.next().await {
+                    Some(done) => done,
+                    None => {
+                        return Err(
+                            self.fault("the module waits, but no host function is running".into())
+                        );
+                    }
+                },
+                Some(2) => {
+                    // Let the timers and IO of the runtime run once, then
+                    // give an answer that is done, or go on without one.
+                    tokio::task::yield_now().await;
+                    match self.store.data_mut().requests.ready() {
+                        Some(done) => done,
+                        None => {
+                            let resume = self.export_or_fault(
+                                "ilang_continue",
+                                &[],
+                                &[ValType::I32],
+                                || "the module is runnable, but has no ilang_continue".into(),
+                            )?;
+                            if let Some(stop) = self.invoke_accepting(resume, &[], &mut status)? {
+                                return Ok(Some(stop));
+                            }
+                            continue;
+                        }
+                    }
                 }
-            }
-            let pending = std::mem::take(&mut self.store.data_mut().pending);
-            let count = pending.len();
-            let Ok([pending]) = <[Pending; 1]>::try_from(pending) else {
-                self.unusable =
-                    Some("the module waits for a wrong number of host functions".into());
-                bail!("the module waits for {count} host functions instead of one");
+                _ => {
+                    let text = format!(
+                        "export {name} gave the status {:?}, which is not 0, 1 or 2",
+                        status[0].i32()
+                    );
+                    return Err(self.fault(text));
+                }
             };
-            let reply = match pending.work.await {
-                Ok(reply) => reply,
+            let answer = match reply {
+                Ok(answer) => answer,
                 Err(failure) => {
                     self.unusable = Some(format!("{failure:#}"));
                     return Err(failure);
                 }
             };
-            let resume = self.export(&format!(
-                "ilang_resume:{}:{}",
-                pending.namespace, pending.label
-            ))?;
+            let resume_name = format!("ilang_resume:{}:{}", request.namespace, request.label);
+            let mut params = vec![ValType::I32];
+            params.extend(request.signature.result_types());
+            let resume = self.export_or_fault(&resume_name, &params, &[ValType::I32], || {
+                format!("the module does not export {resume_name}")
+            })?;
             let bridge = Bridge::from_instance(&self.instance, &mut self.store);
             let checked = self.checked;
             let invoked = {
                 let mut scope = RootScope::new(&mut self.store);
-                let mut values = Vec::new();
+                // Result buffers are made just before the resume (B.5).
+                let mut values = vec![Val::I32(id as i32)];
                 match lower_reply(
                     &mut scope,
                     bridge,
-                    &pending.signature,
-                    reply,
+                    &request.signature,
+                    answer,
                     &mut values,
                     checked,
                 ) {
-                    Ok(true) => Some(invoke_in(&mut scope, resume, &values, &mut status)),
+                    Ok(true) => Some(invoke_accepting(&mut scope, resume, &values, &mut status)),
                     Ok(false) => None,
                     Err(error) => Some(Invoked::Failed(error)),
                 }
@@ -1126,6 +1234,31 @@ impl Instance {
     pub fn collect_garbage(&mut self) -> Result<()> {
         self.store.gc(None)?;
         Ok(())
+    }
+}
+
+/// Holds an instance while `wait` runs. Every return of `wait` goes
+/// through `finish`, which drops the requests that are left. When the future
+/// of the call is dropped while it waits, `Drop` drops them and makes the
+/// instance unusable.
+struct WaitGuard<'a> {
+    instance: &'a mut Instance,
+    armed: bool,
+}
+
+impl WaitGuard<'_> {
+    fn finish(mut self) {
+        self.instance.store.data_mut().requests.drop_all();
+        self.armed = false;
+    }
+}
+
+impl Drop for WaitGuard<'_> {
+    fn drop(&mut self) {
+        if self.armed {
+            self.instance.unusable = Some("an async call was dropped while it waited".into());
+            self.instance.store.data_mut().requests.drop_all();
+        }
     }
 }
 
@@ -1208,7 +1341,7 @@ fn invoke_in(
     let error = anyhow::Error::from(error);
     let mut context = context.as_context_mut();
     let state = context.data_mut();
-    state.pending.clear();
+    state.requests.drop_all();
     if let Some(failure) = state.failure.take() {
         return Invoked::Failed(failure);
     }
@@ -1216,6 +1349,28 @@ fn invoke_in(
         message: state.stop_message.take(),
         trap: error.root_cause().to_string(),
     })
+}
+
+/// `invoke_in` for a call in which the module may start and cancel requests
+/// (B.4): an async entry point, a resume or `ilang_continue`.
+fn invoke_accepting(
+    context: &mut (impl AsContextMut<Data = State> + Send),
+    function: Func,
+    params: &[Val],
+    results: &mut [Val],
+) -> Invoked {
+    context
+        .as_context_mut()
+        .data_mut()
+        .requests
+        .set_accepting(true);
+    let invoked = invoke_in(context, function, params, results);
+    context
+        .as_context_mut()
+        .data_mut()
+        .requests
+        .set_accepting(false);
+    invoked
 }
 
 /// Lower the arguments into new buffers. A trap of `ilang_alloc` ends the call.
@@ -1290,44 +1445,45 @@ fn guest_fault(what: impl fmt::Display) -> anyhow::Error {
     anyhow!("the module gave a value that is not correct: {what}")
 }
 
+/// Runs the body of an import wrapper with requests refused, and gives it
+/// whether a request could start when the import was called (B.4).
+fn guarded<T>(
+    caller: &mut Caller<'_, State>,
+    body: impl FnOnce(&mut Caller<'_, State>, bool) -> T,
+) -> T {
+    let admitted = caller.data_mut().requests.take_accepting();
+    let result = body(caller, admitted);
+    caller.data_mut().requests.set_accepting(admitted);
+    result
+}
+
+/// A failure of the host inside an import: the import traps. The first
+/// failure of a call is kept, so an outer import that only sees the trap of
+/// an inner one does not hide its text.
+fn host_failure(caller: &mut Caller<'_, State>, error: anyhow::Error) -> wasmtime::Error {
+    caller.data_mut().failure.get_or_insert(error);
+    wasmtime::Error::from_anyhow(anyhow!("a host function failed"))
+}
+
 fn define_builtins(linker: &mut Linker<State>) -> Result<()> {
+    // Drops an outstanding request (B.4).
+    linker.func_wrap(
+        HOST_MODULE,
+        "cancel",
+        |mut caller: Caller<'_, State>, id: i32| -> wasmtime::Result<()> {
+            guarded(&mut caller, |caller, admitted| {
+                match caller.data_mut().requests.cancel(admitted, id) {
+                    Ok(()) => Ok(()),
+                    Err(error) => Err(host_failure(caller, error)),
+                }
+            })
+        },
+    )?;
     linker.func_wrap(
         HOST_MODULE,
         "reference_id",
         |mut caller: Caller<'_, State>, reference: Option<wasmtime::Rooted<ExternRef>>| {
-            (|| -> Result<i64> {
-                let Some(reference) = reference else {
-                    return Ok(0);
-                };
-                let value = reference
-                    .data(&caller)?
-                    .context("host reference has no data")?
-                    .downcast_ref::<HostReference>()
-                    .context("externref was not created by this i host")?
-                    .clone();
-                let address = Arc::as_ptr(&value.0) as *const () as usize;
-                let state = caller.data_mut();
-                if let Some((weak, id)) = state.references.get(&address)
-                    && let Some(existing) = weak.upgrade()
-                    && Arc::ptr_eq(&existing, &value.0)
-                {
-                    return Ok(*id);
-                }
-                let id = state.next_reference;
-                state.next_reference = id
-                    .checked_add(1)
-                    .context("host reference identity space exhausted")?;
-                if id % 256 == 0 {
-                    state
-                        .references
-                        .retain(|_, (weak, _)| weak.strong_count() != 0);
-                }
-                state
-                    .references
-                    .insert(address, (Arc::downgrade(&value.0), id));
-                Ok(id)
-            })()
-            .map_err(wasmtime::Error::from_anyhow)
+            guarded(&mut caller, |caller, _| reference_id(caller, reference))
         },
     )?;
     // The module traps right after this call (B.4). Only the first message of
@@ -1336,15 +1492,56 @@ fn define_builtins(linker: &mut Linker<State>) -> Result<()> {
         HOST_MODULE,
         "panic",
         |mut caller: Caller<'_, State>, address: i32, length: i32| {
-            let bridge = Bridge::from_caller(&mut caller);
-            let message = match bridge.read(&caller, address as u32, length as u32) {
-                Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
-                Err(error) => format!("(the stop message is outside memory: {error})"),
-            };
-            caller.data_mut().stop_message.get_or_insert(message);
+            guarded(&mut caller, |caller, _| {
+                let bridge = Bridge::from_caller(caller);
+                let message = match bridge.read(&*caller, address as u32, length as u32) {
+                    Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+                    Err(error) => format!("(the stop message is outside memory: {error})"),
+                };
+                caller.data_mut().stop_message.get_or_insert(message);
+            })
         },
     )?;
     Ok(())
+}
+
+fn reference_id(
+    caller: &mut Caller<'_, State>,
+    reference: Option<wasmtime::Rooted<ExternRef>>,
+) -> wasmtime::Result<i64> {
+    (|| -> Result<i64> {
+        let Some(reference) = reference else {
+            return Ok(0);
+        };
+        let value = reference
+            .data(&caller)?
+            .context("host reference has no data")?
+            .downcast_ref::<HostReference>()
+            .context("externref was not created by this i host")?
+            .clone();
+        let address = Arc::as_ptr(&value.0) as *const () as usize;
+        let state = caller.data_mut();
+        if let Some((weak, id)) = state.references.get(&address)
+            && let Some(existing) = weak.upgrade()
+            && Arc::ptr_eq(&existing, &value.0)
+        {
+            return Ok(*id);
+        }
+        let id = state.next_reference;
+        state.next_reference = id
+            .checked_add(1)
+            .context("host reference identity space exhausted")?;
+        if id % 256 == 0 {
+            state
+                .references
+                .retain(|_, (weak, _)| weak.strong_count() != 0);
+        }
+        state
+            .references
+            .insert(address, (Arc::downgrade(&value.0), id));
+        Ok(id)
+    })()
+    .map_err(wasmtime::Error::from_anyhow)
 }
 
 fn define_import(
@@ -1356,66 +1553,86 @@ fn define_import(
     function: HostFunction,
     checked: bool,
 ) -> Result<()> {
-    let results = if signature.is_async {
-        Vec::new()
+    // An async import takes the request id first, and has no results (B.4).
+    let (params, results) = if signature.is_async {
+        let mut params = vec![ValType::I32];
+        params.extend(signature.param_types());
+        (params, Vec::new())
     } else {
-        signature.result_types()
+        (signature.param_types(), signature.result_types())
     };
-    let ty = FuncType::new(engine, signature.param_types(), results);
+    let ty = FuncType::new(engine, params, results);
     let signature = signature.clone();
     let (module_name, label) = (module.to_owned(), name.to_owned());
     linker.func_new(module, name, ty, move |mut caller, parameters, results| {
-        let bridge = Bridge::from_caller(&mut caller);
-        let fail = |caller: &mut Caller<'_, State>, error: anyhow::Error| {
-            caller.data_mut().failure = Some(error);
-            wasmtime::Error::from_anyhow(anyhow!("a host function failed"))
-        };
-        let mut offset = 0;
-        let mut arguments = Vec::new();
-        for kind in &signature.params {
-            match lift(&mut caller, bridge, *kind, parameters, &mut offset, None) {
-                Ok(value) => arguments.push(value),
-                Err(error) => {
-                    return Err(fail(
-                        &mut caller,
-                        error.context(format!("a parameter of {module_name} {label}")),
-                    ));
+        guarded(&mut caller, |caller, admitted| {
+            let mut offset = 0;
+            // The request id is checked before the service runs (B.4).
+            let id = if signature.is_async {
+                let id = parameters[0].i32().unwrap_or(-1);
+                offset = 1;
+                match caller.data().requests.admit(admitted, id) {
+                    Ok(id) => Some(id),
+                    Err(error) => return Err(host_failure(caller, error)),
+                }
+            } else {
+                None
+            };
+            let bridge = Bridge::from_caller(caller);
+            let mut arguments = Vec::new();
+            for kind in &signature.params {
+                match lift(&mut *caller, bridge, *kind, parameters, &mut offset, None) {
+                    Ok(value) => arguments.push(value),
+                    Err(error) => {
+                        return Err(host_failure(
+                            caller,
+                            error.context(format!("a parameter of {module_name} {label}")),
+                        ));
+                    }
                 }
             }
-        }
-        let reply = match &function {
-            HostFunction::AsyncService(start) => {
-                let work = start(&arguments);
-                caller.data_mut().pending.push(Pending {
-                    namespace: module_name.clone(),
-                    label: label.clone(),
-                    signature: signature.clone(),
-                    work,
-                });
-                return Ok(());
+            let reply = match &function {
+                HostFunction::AsyncService(start) => {
+                    let work = start(&arguments);
+                    let request = Request {
+                        namespace: module_name.clone(),
+                        label: label.clone(),
+                        signature: signature.clone(),
+                    };
+                    let id = id.expect("an async import has a request id");
+                    caller.data_mut().requests.insert(id, request, work);
+                    return Ok(());
+                }
+                HostFunction::Service(service) => service(&arguments),
+                HostFunction::External(external) => external(&arguments).map(Ok),
+            };
+            let reply = match reply {
+                Ok(reply) => reply,
+                Err(error) => return Err(host_failure(caller, error)),
+            };
+            let mut values = Vec::new();
+            match lower_reply(
+                &mut *caller,
+                bridge,
+                &signature,
+                reply,
+                &mut values,
+                checked,
+            ) {
+                Ok(true) => {
+                    results.clone_from_slice(&values);
+                    Ok(())
+                }
+                Ok(false) => {
+                    caller
+                        .data_mut()
+                        .stop_message
+                        .get_or_insert(HOST_VALUE_REASON.into());
+                    Err(wasmtime::Error::from_anyhow(anyhow!(HOST_VALUE_REASON)))
+                }
+                Err(error) => Err(host_failure(caller, error)),
             }
-            HostFunction::Service(service) => service(&arguments),
-            HostFunction::External(external) => external(&arguments).map(Ok),
-        };
-        let reply = match reply {
-            Ok(reply) => reply,
-            Err(error) => return Err(fail(&mut caller, error)),
-        };
-        let mut values = Vec::new();
-        match lower_reply(&mut caller, bridge, &signature, reply, &mut values, checked) {
-            Ok(true) => {
-                results.clone_from_slice(&values);
-                Ok(())
-            }
-            Ok(false) => {
-                caller
-                    .data_mut()
-                    .stop_message
-                    .get_or_insert(HOST_VALUE_REASON.into());
-                Err(wasmtime::Error::from_anyhow(anyhow!(HOST_VALUE_REASON)))
-            }
-            Err(error) => Err(fail(&mut caller, error)),
-        }
+        })
     })?;
     Ok(())
 }

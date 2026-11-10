@@ -17,6 +17,23 @@
 //! (B.6), so a program that does not declare a service does not need it. To
 //! put a fake in the place of a host service in a test, i code uses an
 //! environment statement (§9.7); a Rust host gives its own [`HostImports`].
+//!
+//! Rules for the services written here (B.4):
+//!
+//! - The start closure of an async service runs during the import, and its
+//!   future is first polled when the host waits. So work out anything that
+//!   depends on the time of the call, such as a deadline, and copy the
+//!   inputs, in the start closure: `let deadline = Instant::now() + d;
+//!   Box::pin(async move { sleep_until(deadline).await; ... })`.
+//! - Do not spawn tasks. The host owns every future, so dropping a request
+//!   drops its future at once. Work handed to `spawn_blocking` (also inside
+//!   `tokio::fs` or `tokio::io::stdin`) is detached, not cancelled: it runs
+//!   to its end and its result is thrown away. Such work must not hold
+//!   anything the program still needs, and it must be safe to leave it
+//!   running. [`block_on`](crate::block_on) does not wait for it.
+//! - A sync service runs inside the tokio runtime of `block_on`. It must not
+//!   start or block on a runtime of its own; write it as an async service,
+//!   or do that work on a thread of its own and join it.
 
 use crate::{BigInt, HostImports, Value};
 use anyhow::bail;
