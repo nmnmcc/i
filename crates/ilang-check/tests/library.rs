@@ -255,9 +255,8 @@ fn reserved_modules_import_cleanly() {
     let imports: String = RESERVED.iter().map(|p| format!("  {p}\n")).collect();
     let main = format!("(\n{imports})\n\nx = 1\n");
     assert!(ilang_syntax::parse_module(&main).1.is_empty());
-    let (graph, program, diags) = common::check_files(&[("src/main.i", &main)]);
-    let rendered = graph.sources.render_all(&diags);
-    assert!(rendered.is_empty(), "{rendered:#?}");
+    let (_, program, diags) = common::check_files(&[("src/main.i", &main)]);
+    common::expect_unused(&diags, &["x"]);
     assert!(program.is_some());
 }
 

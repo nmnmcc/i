@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "app/main.marker : Nil\napp/cases.get : () -> Int ! Dep\napp/cases.use : (x: A) -> A ? E ! N | S(A, E, N)\napp/cases.run : (body: () -> A ? E ! N) -> A ? E ! N\napp/cases.forward : (x: A & B) -> B ? E ! N | S(A & B, E, N)\napp/cases.left : (b: Bool) -> Int ! N | S(Int, Never, N)\napp/cases.right : (b: Bool) -> Int ! N | S(Int, Never, N)\napp/cases.integer : () -> Nil\napp/cases.string : () -> Nil\napp/cases.error : () -> Nil\napp/cases.mutual : () -> Nil\napp/cases.make : (x: Int) -> () -> Int\napp/cases.installed_in_closure : () -> Nil\n",
-      "stderr": ""
+      "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `marker` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/cases.integer\npass app/cases.string\npass app/cases.error\npass app/cases.mutual\npass app/cases.installed_in_closure\npass app/qa_corpus_runtime_test.qa_startup\n6 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `marker` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/cases.integer\npass app/cases.string\npass app/cases.error\npass app/cases.mutual\npass app/cases.installed_in_closure\npass app/qa_corpus_runtime_test.qa_startup\n6 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `marker` is not used\n"
     }
   }
 }

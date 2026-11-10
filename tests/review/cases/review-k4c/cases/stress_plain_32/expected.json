@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "app/main.f_0 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_1 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_2 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_3 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_4 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_5 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_6 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_7 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_8 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_9 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_10 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_11 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_12 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_13 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_14 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_15 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_16 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_17 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_18 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_19 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_20 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_21 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_22 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_23 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_24 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_25 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_26 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_27 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_28 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_29 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_30 : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f_31 : (f: () -> A ? E ! N) -> A ? E ! N\n",
-      "stderr": ""
+      "stderr": "src/main.i:32:1: warning[W0504]: top-level binding `f_31` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:32:1: warning[W0504]: top-level binding `f_31` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:32:1: warning[W0504]: top-level binding `f_31` is not used\n"
     }
   }
 }

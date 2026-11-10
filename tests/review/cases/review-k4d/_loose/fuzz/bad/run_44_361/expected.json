@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "app/main.get : () -> Int ! Dep\napp/main.ask : () -> A ! Svc(A)\napp/main.askc : () -> A ! Cov(B & A)\napp/main.call : (c: Cb(A)) -> Int ! A\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.twice : (body: () -> Int ! N) -> Int ! N\napp/main.with_int : (body: () -> A ? E ! N) -> A ? E ! N - Svc(Int)\napp/main.with_dep : (body: () -> A ? E ! N) -> A ? E ! N - Dep\napp/main.with_cov : (body: () -> A ? E ! N, v: B) -> A ? E ! N - Cov(B)\napp/main.pick : (a: A, b: A) -> List(A)\napp/main.h0 : () -> Never\napp/main.h1 : () -> Int ! Dep\napp/main.main : () -> Nil\n",
-      "stderr": ""
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `ask` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `askc` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `twice` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `with_int` is not used\nsrc/main.i:18:1: warning[W0504]: top-level binding `with_dep` is not used\nsrc/main.i:22:1: warning[W0504]: top-level binding `with_cov` is not used\nsrc/main.i:26:1: warning[W0504]: top-level binding `pick` is not used\nsrc/main.i:28:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `ask` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `askc` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `twice` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `with_int` is not used\nsrc/main.i:18:1: warning[W0504]: top-level binding `with_dep` is not used\nsrc/main.i:22:1: warning[W0504]: top-level binding `with_cov` is not used\nsrc/main.i:26:1: warning[W0504]: top-level binding `pick` is not used\nsrc/main.i:28:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     "run0": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": "timeout",
       "stdout": "",
-      "stderr": ""
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `ask` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `askc` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `twice` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `with_int` is not used\nsrc/main.i:18:1: warning[W0504]: top-level binding `with_dep` is not used\nsrc/main.i:22:1: warning[W0504]: top-level binding `with_cov` is not used\nsrc/main.i:26:1: warning[W0504]: top-level binding `pick` is not used\nsrc/main.i:28:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     "test2": {
       "command": [
@@ -41,7 +41,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `ask` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `askc` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `twice` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `with_int` is not used\nsrc/main.i:18:1: warning[W0504]: top-level binding `with_dep` is not used\nsrc/main.i:22:1: warning[W0504]: top-level binding `with_cov` is not used\nsrc/main.i:26:1: warning[W0504]: top-level binding `pick` is not used\nsrc/main.i:28:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     "run2": {
       "command": [
@@ -51,7 +51,7 @@
       ],
       "exit": "timeout",
       "stdout": "",
-      "stderr": ""
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `ask` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `askc` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `twice` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `with_int` is not used\nsrc/main.i:18:1: warning[W0504]: top-level binding `with_dep` is not used\nsrc/main.i:22:1: warning[W0504]: top-level binding `with_cov` is not used\nsrc/main.i:26:1: warning[W0504]: top-level binding `pick` is not used\nsrc/main.i:28:1: warning[W0504]: top-level binding `h1` is not used\n"
     }
   }
 }
