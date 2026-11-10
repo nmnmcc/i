@@ -531,3 +531,136 @@ compile_error = () -> Nil ! Assert {
         }
     }
 }
+
+#[test]
+fn compiler_items_service_buffers_valid_requests_and_rejects_bad_ones() {
+    use ilang_host::syntax::{
+        DefinitionAbort, DefinitionContext, DefinitionReply, ItemContext, ItemRequest,
+    };
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("test")).unwrap();
+    std::fs::write(
+        dir.path().join("test/main.i"),
+        r#"
+(i/fail, syntax = i/syntax)
+@test
+item = () -> Nil ^ syntax.SyntaxError ! Assert {
+  service = syntax._items()
+  collection = syntax._template(0)
+  target = syntax._template(1)
+  at = syntax._template(2)
+  service.add(collection, target, [("group", "bench"), ("size", "large")], at)
+  service.expose(target)
+  fail.catch(() { service.add(collection, target, [("x", "1"), ("x", "2")], at) }).{
+    Error(syntax.SyntaxError(message, at)) -> { assert(message != "") assert(at == syntax._template(2)) }
+    Ok(_) -> panic("duplicate metadata was accepted")
+  }
+  fail.catch(() { service.add(collection, target, [], syntax._template(3)) }).{
+    Error(_) -> Nil
+    Ok(_) -> panic("unrelated source location was accepted")
+  }
+  Nil
+}
+@test
+not_item = () -> Nil ! Assert {
+  service = syntax._items()
+  fail.catch(() { service.expose(syntax._template(1)) })
+  Nil
+}
+"#,
+    )
+    .unwrap();
+    let parsed = parse("(. registry anchor) entry call other").unwrap();
+    let caller_scope = Scope {
+        module: 12,
+        marks: BTreeSet::new(),
+    };
+    let other_scope = Scope {
+        module: 99,
+        marks: BTreeSet::new(),
+    };
+    let templates: Arc<[Syntax]> = parsed
+        .iter()
+        .enumerate()
+        .map(|(i, d)| Syntax::from_datum(d, if i == 3 { &other_scope } else { &caller_scope }))
+        .collect::<Vec<_>>()
+        .into();
+    for opt in [ilang_cli::Level::O0, ilang_cli::Level::O2] {
+        let built = ilang_cli::build(
+            dir.path(),
+            ilang_cli::BuildOptions {
+                tests: true,
+                opt,
+                offline: true,
+                target: ilang_cli::Target::Ilang,
+            },
+        )
+        .unwrap();
+        let program = built.host_program().unwrap();
+        let run = Arc::new(DefinitionContext::new(|_| -> DefinitionReply {
+            panic!("unexpected definition query")
+        }));
+        let items = Arc::new(ItemContext::new(
+            vec![templates[2].clone()].into(),
+            templates[2].clone(),
+        ));
+        let mut options = ilang_cli::standard_options();
+        ilang_host::syntax::install_with_items(
+            &mut options.imports,
+            templates.clone(),
+            Some(run.clone()),
+            Some(items.clone()),
+        )
+        .unwrap();
+        options
+            .imports
+            .grant_package(&built.binding_plan, &built.trusted_package);
+        let result = program.run_test_with("app/main.item", options);
+        assert!(
+            matches!(result, ilang_host::TestResult::Passed),
+            "{result:?}"
+        );
+        let requests = items.take_requests();
+        assert_eq!(requests.len(), 2);
+        match &requests[0] {
+            ItemRequest::Add {
+                collection,
+                target,
+                data,
+                at,
+            } => {
+                assert_eq!(collection.show(), "(. registry anchor)");
+                assert_eq!(target.show(), "entry");
+                assert_eq!(
+                    data,
+                    &[
+                        ("group".into(), "bench".into()),
+                        ("size".into(), "large".into())
+                    ]
+                );
+                assert!(at.identical(&templates[2]));
+            }
+            _ => panic!("expected add request"),
+        }
+        assert!(matches!(&requests[1], ItemRequest::Expose { name } if name.show() == "entry"));
+        assert!(items.take_requests().is_empty());
+        let mut options = ilang_cli::standard_options();
+        ilang_host::syntax::install_with_items(
+            &mut options.imports,
+            templates.clone(),
+            Some(run.clone()),
+            None,
+        )
+        .unwrap();
+        options
+            .imports
+            .grant_package(&built.binding_plan, &built.trusted_package);
+        let result = program.run_test_with("app/main.not_item", options);
+        assert!(!matches!(result, ilang_host::TestResult::Passed));
+        assert!(
+            matches!(run.take_abort(), Some(DefinitionAbort::CompileError { at, .. }) if at.show() == "entry")
+        );
+    }
+}

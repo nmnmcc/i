@@ -1,4 +1,6 @@
 //! Compiler syntax services carried over the ordinary opaque-reference ABI.
+mod items;
+pub use items::{ItemContext, ItemRequest};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
@@ -398,6 +400,17 @@ pub fn install_with_context(
     templates: Arc<[Syntax]>,
     definition: Option<Arc<DefinitionContext>>,
 ) -> Result<()> {
+    install_with_items(imports, templates, definition, None)
+}
+
+/// Install compiler syntax operations with a per-run item journal.
+pub fn install_with_items(
+    imports: &mut HostImports,
+    templates: Arc<[Syntax]>,
+    definition: Option<Arc<DefinitionContext>>,
+    items: Option<Arc<ItemContext>>,
+) -> Result<()> {
+    items::install(imports, items, definition.clone())?;
     const NAMES: &[&str] = &[
         "kind",
         "text",

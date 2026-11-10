@@ -1024,3 +1024,22 @@ fn definition_errors_retain_the_exact_name_node_and_scope() {
     assert!(error.at.identical(&name));
     assert_eq!(error.at.scope(), name.scope());
 }
+
+#[test]
+fn scoped_virtual_source_uses_utf8_byte_boundaries() {
+    use ilang_syntax::ast::ExprKind;
+    use ilang_syntax::lisp::scoped::ScopedSource;
+    let call = root("call");
+    let syntax = root("(f \"你好\")");
+    let mut source = ScopedSource::new("// 原文件".into());
+    let expr = source.expression(&syntax, &call).unwrap();
+    let ExprKind::Call { args, .. } = expr.kind else {
+        panic!("call")
+    };
+    let span = args[0].value.span;
+    assert_eq!(
+        source.text().get(span.start as usize..span.end as usize),
+        Some("\"你好\"")
+    );
+    assert_eq!(source.origin(span).unwrap().syntax.show(), "\"你好\"");
+}

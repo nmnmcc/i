@@ -25,6 +25,8 @@
 	_match_many
 	_definitions
 	_report_error
+	Items(..)
+	_items
 )
 
 Syntax {}
@@ -38,6 +40,10 @@ TextResult {}
 MatchResult {}
 
 DefinitionResult {}
+
+ItemMetadata {}
+
+ItemResult {}
 
 Node {
 	Name(String)
@@ -89,6 +95,78 @@ definition = (
 	of: Syntax
 	service ! Definitions
 ) -> Syntax ^ SyntaxError ! Definitions { service.definition(of) }
+
+Items {
+	Items(
+		add: (
+			collection: Syntax
+			target:     Syntax
+			data:       List((String, String))
+			at:         Syntax
+		) -> Nil ^ SyntaxError
+		expose: (name: Syntax) -> Nil ^ SyntaxError
+	)
+}
+
+@external("i:compiler/syntax/v1", "metadata_new")
+raw_metadata_new: () -> ItemMetadata
+
+@external("i:compiler/syntax/v1", "metadata_push")
+raw_metadata_push: (ItemMetadata, String, String) -> ItemMetadata
+
+@external("i:compiler/syntax/v1", "items_add")
+raw_items_add: (Syntax, Syntax, ItemMetadata, Syntax) -> ItemResult
+
+@external("i:compiler/syntax/v1", "items_expose")
+raw_items_expose: (Syntax) -> ItemResult
+
+@external("i:compiler/syntax/v1", "items_ok")
+raw_items_ok: (ItemResult) -> Bool
+
+@external("i:compiler/syntax/v1", "items_message")
+raw_items_message: (ItemResult) -> String
+
+@external("i:compiler/syntax/v1", "items_at")
+raw_items_at: (ItemResult) -> Syntax
+
+build_metadata = (
+	data: List((String, String))
+	result: ItemMetadata
+) -> ItemMetadata {
+	data.{
+		[] -> result
+		[(key, value), ..rest] -> build_metadata(
+			rest
+			raw_metadata_push(result, key, value)
+		)
+	}
+}
+
+item_result = (result: ItemResult) -> Nil ^ SyntaxError {
+	raw_items_ok(result).{
+		True -> Nil
+		False -> fail.raise(
+			SyntaxError(raw_items_message(result), raw_items_at(result))
+		)
+	}
+}
+
+/// Constructs the compiler's transactional item service for one macro run.
+_items = () -> Items {
+	Items(
+		(collection, target, data, at) -> Nil ^ SyntaxError {
+			item_result(
+				raw_items_add(
+					collection
+					target
+					build_metadata(data, raw_metadata_new())
+					at
+				)
+			)
+		}
+		(name) -> Nil ^ SyntaxError { item_result(raw_items_expose(name)) }
+	)
+}
 
 @external("i:compiler/syntax/v1", "report_error")
 _report_error: (String, Syntax) -> Syntax
