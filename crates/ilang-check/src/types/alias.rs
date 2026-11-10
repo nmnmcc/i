@@ -277,29 +277,5 @@ impl Checker<'_> {
 }
 
 pub(super) fn normalize(s: &mut super::solve::Solver, t: Ty) -> Ty {
-    let mut go = |t| normalize(s, t);
-    match t {
-        Ty::Union(ts) => {
-            let ts = ts.into_iter().map(&mut go).collect();
-            s.union(ts)
-        }
-        Ty::Inter(ts) => {
-            let ts = ts.into_iter().map(&mut go).collect();
-            s.inter(ts)
-        }
-        Ty::Diff(t, ts) => {
-            let t = go(*t);
-            let ts = ts.into_iter().map(&mut go).collect();
-            s.diff(t, ts)
-        }
-        Ty::Con(h, values, ts) => Ty::Con(h, values, ts.into_iter().map(&mut go).collect()),
-        Ty::Fn(g) => Ty::Fn(Box::new(FnTy {
-            params: g.params.into_iter().map(|(n, t)| (n, go(t))).collect(),
-            ret: go(g.ret),
-            err: go(g.err),
-            env: go(g.env),
-        })),
-        Ty::Both(a, b) => Ty::Both(Box::new(go(*a)), Box::new(go(*b))),
-        Ty::Var(_) | Ty::Top | Ty::Never => t,
-    }
+    s.normalize_mode(t, super::solve::Mode::Value)
 }

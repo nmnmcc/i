@@ -125,5 +125,28 @@ fn generic_handlers_have_finite_types_with_or_without_annotations() {
         };
         source.push_str(&"\n@main\nmain = () { assert(CALL == 1) }\n".replace("CALL", &call));
         check_and_run(&format!("w{n}"), &source, None, "");
+        let prefix = source.split("@main").next().unwrap();
+        let dependency = "Dep { Dep(value: Int) }\nget = (d ! Dep) { d.value }\n";
+        let service = if n >= 9 {
+            "provided = S(() { get() }, (_: Dep) { Nil })"
+        } else {
+            "provided = S(() { get() })"
+        };
+        let service = service.strip_prefix("provided = ").unwrap();
+        let call = match n {
+            1 | 2 | 9 | 10 => "wrap(() { use() })".to_string(),
+            3 | 4 | 5 | 11 | 12 | 13 => "wrap(() { use() }, VALUE)".replace("VALUE", service),
+            _ => "wrap(VALUE)".replace("VALUE", service),
+        };
+        let expected = if [1, 2, 9, 10].contains(&n) { "1" } else { "7" };
+        let main = "\n@main\nmain = () { ! Dep = Dep(7) assert(CALL == EXPECTED) }\n"
+            .replace("CALL", &call)
+            .replace("EXPECTED", expected);
+        check_and_run(
+            &format!("w{n}-dependency"),
+            &format!("{dependency}{prefix}{main}"),
+            None,
+            "",
+        );
     }
 }

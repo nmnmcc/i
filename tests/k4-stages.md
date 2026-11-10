@@ -12,7 +12,9 @@ The F2 ruling, quoted verbatim:
 - F1: "the obligation of an environment statement is part of the scheme."
   A handler restriction is stored separately from ordinary type bounds,
   copied during instantiation and extrusion, and checked against concrete
-  forms. Generalization retains bounded schemes carrying restrictions.
+  forms. Restrictions propagate to member rows before generalization; a
+  reverse inclusion link cannot be their only owner. A constructor without
+  parameters has just one form, so its obligation is universally true. Generalization retains bounded schemes carrying restrictions.
   A shown scheme that hides a restriction without a difference or a
   correlated row form is rejected with E0515, naming the service.
 - Spec 4.5 rule 3: "A - B <: A." Recording that inclusion, also through

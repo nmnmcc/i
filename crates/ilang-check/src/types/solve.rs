@@ -397,6 +397,12 @@ impl Solver {
     }
 
     pub fn mark_mode(&mut self, t: &Ty, mode: Mode) {
+        if mode == Mode::Value
+            || matches!(t, Ty::Var(v) if self.var(*v).row >= mode)
+            || matches!(t, Ty::Con(..) | Ty::Fn(_) | Ty::Never | Ty::Top)
+        {
+            return;
+        }
         let mut todo = vec![t.clone()];
         let mut added = Vec::new();
         while let Some(t) = todo.pop() {
@@ -476,6 +482,28 @@ impl Solver {
         false
     }
 
+    /// An obligation on a row also constrains each of its member rows.
+    /// Store it there, so generalizing a member cannot lose a restriction
+    /// that was reached only through a reverse inclusion link.
+    fn handle(&mut self, v: V, h: &Ty) {
+        self.has_handlers = true;
+        for w in self.reach(vec![v], true).0 {
+            if self.var(w).handled.contains(h) {
+                continue;
+            }
+            self.observe(w);
+            self.var_mut(w).difference = true;
+            self.var_mut(w).handled.push(h.clone());
+            let mut bounds = self.reach(vec![w], true).1;
+            bounds.extend(self.reach(vec![w], false).1);
+            for b in bounds {
+                if b.head() == h.head() {
+                    self.equal(&b, h, FailKind::EnvForms);
+                }
+            }
+        }
+    }
+
     /// A shown scheme must express every handler restriction. A visible
     /// difference or a row containing both the variable and the supplied
     /// form expresses it. A form tied to that variable, as S(N) in a
@@ -530,6 +558,13 @@ impl Solver {
             let is_var = |t: &Ty| matches!(t, Ty::Var(w) if aliases.contains(w));
             for w in &above {
                 for h in &self.var(*w).handled {
+                    // A non-scalar constructor with no parameters has only
+                    // one form, so this obligation holds for every row.
+                    if matches!(h, Ty::Con(_, values, args) if values.is_all() && args.is_empty())
+                        && h.scalar().is_none()
+                    {
+                        continue;
+                    }
                     let witnessed = all.iter().any(|part| match part {
                         Ty::Diff(a, hs) => is_var(a) && hs.contains(h),
                         Ty::Union(ms) => ms.iter().any(&is_var) && ms.contains(h),
@@ -829,7 +864,22 @@ impl Solver {
                 }
             }
         }
-        if !new.is_empty() && self.has_handlers {
+        if env != Mode::Value
+            && lower
+            && self.has_handlers
+            && let Ty::Var(u) = &t
+        {
+            let handlers: Vec<_> = self
+                .reach(vec![v], false)
+                .0
+                .into_iter()
+                .flat_map(|w| self.var(w).handled.clone())
+                .collect();
+            for h in handlers {
+                self.handle(*u, &h);
+            }
+        }
+        if env != Mode::Value && !new.is_empty() && self.has_handlers {
             let mut handlers = Vec::new();
             for w in self.reach(vec![v], false).0 {
                 handlers.extend(self.var(w).handled.clone());
@@ -1269,9 +1319,19 @@ impl Solver {
     /// The union of environments (§9.2): two forms of one type constructor
     /// must have equal arguments, whatever their variance.
     pub fn env_union(&mut self, ms: Vec<Ty>) -> Ty {
+        self.union_mode(ms, Mode::Env)
+    }
+
+    pub fn union_mode(&mut self, ms: Vec<Ty>, mode: Mode) -> Ty {
+        let ms = if mode == Mode::Row {
+            join_literals(ms)
+        } else {
+            ms
+        };
         let before = self.failures.len();
-        let t = self.union_in(ms, true);
-        if let Ty::Union(ms) = &t
+        let t = self.union_in(ms, mode != Mode::Value);
+        if mode != Mode::Value
+            && let Ty::Union(ms) = &t
             && self.failures.len() == before
             && ms.iter().any(Ty::is_varlike)
             && (ms.iter().filter(|m| m.is_varlike()).take(2).count() > 1
@@ -1286,7 +1346,7 @@ impl Solver {
             // no unequal pair can be introduced by this union.
             let row = self.fresh();
             for m in ms {
-                self.constrain_env(m, &row);
+                self.constrain_in(m, &row, mode);
             }
         }
         t
@@ -1492,16 +1552,18 @@ impl Solver {
     /// `a - h1 - h2 - …` (§4.4). A member of `a` whose type constructor is
     /// in `h` is taken out, and it must be a subtype of that member of `h`.
     pub fn diff(&mut self, a: Ty, h: Vec<Ty>) -> Ty {
-        self.diff_in(a, h, false)
+        self.diff_mode(a, h, Mode::Value)
     }
 
     /// `M - T` for an environment `M` (§4.8 rule 9): the member of `M` that
     /// is taken out must be equal to its member of `T` (§9.2).
     pub fn env_diff(&mut self, a: Ty, h: Vec<Ty>) -> Ty {
-        self.diff_in(a, h, true)
+        self.diff_mode(a, h, Mode::Env)
     }
 
-    fn diff_in(&mut self, a: Ty, h: Vec<Ty>, env: bool) -> Ty {
+    fn diff_mode(&mut self, a: Ty, h: Vec<Ty>, mode: Mode) -> Ty {
+        let mode = mode.max(self.mode(&a));
+        let env = mode != Mode::Value;
         let mut hs = Vec::new();
         flatten_union(&h, &mut hs);
         hs.retain(|m| !matches!(m, Ty::Never));
@@ -1513,11 +1575,11 @@ impl Solver {
             Ty::Union(ms) => {
                 let parts = ms
                     .into_iter()
-                    .map(|m| self.diff_in(m, hs.clone(), env))
+                    .map(|m| self.diff_mode(m, hs.clone(), mode))
                     .collect();
                 self.union_in(parts, env)
             }
-            Ty::Con(..) if a.scalar().is_some() && !env => {
+            Ty::Con(..) if a.scalar().is_some() && mode != Mode::Env => {
                 let sets: Vec<_> = hs
                     .iter()
                     .filter(|m| m.head() == a.head())
@@ -1543,7 +1605,7 @@ impl Solver {
                 None => a,
             },
             Ty::Diff(b, mut h0) => {
-                self.diff_bound(&b, &hs, env);
+                self.diff_bound_mode(&b, &hs, mode);
                 for m in hs {
                     if !h0.contains(&m) {
                         h0.push(m);
@@ -1552,9 +1614,65 @@ impl Solver {
                 Ty::Diff(b, h0)
             }
             a => {
-                self.diff_bound(&a, &hs, env);
+                self.diff_bound_mode(&a, &hs, mode);
                 Ty::Diff(Box::new(a), hs)
             }
+        }
+    }
+
+    /// Normalize closed or open type algebra without losing the row
+    /// mode of constructor arguments or function effects.
+    pub fn normalize_mode(&mut self, t: Ty, mode: Mode) -> Ty {
+        match t {
+            Ty::Con(h, values, args) => {
+                let modes = self.rows(h, args.len());
+                Ty::Con(
+                    h,
+                    values,
+                    args.into_iter()
+                        .zip(modes)
+                        .map(|(t, mode)| self.normalize_mode(t, mode))
+                        .collect(),
+                )
+            }
+            Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+                params: f
+                    .params
+                    .into_iter()
+                    .map(|(n, t)| (n, self.normalize_mode(t, Mode::Value)))
+                    .collect(),
+                ret: self.normalize_mode(f.ret, Mode::Value),
+                err: self.normalize_mode(f.err, Mode::Row),
+                env: self.normalize_mode(f.env, Mode::Env),
+            })),
+            Ty::Union(ms) => {
+                let ms = ms
+                    .into_iter()
+                    .map(|t| self.normalize_mode(t, mode))
+                    .collect();
+                self.union_mode(ms, mode)
+            }
+            Ty::Inter(ms) => {
+                let ms: Vec<_> = ms
+                    .into_iter()
+                    .map(|t| self.normalize_mode(t, mode))
+                    .collect();
+                let scalar = ms.iter().any(|t| t.scalar().is_some());
+                self.inter_in(ms, mode != Mode::Value && !(mode == Mode::Row && scalar))
+            }
+            Ty::Diff(t, hs) => {
+                let t = self.normalize_mode(*t, mode);
+                let hs = hs
+                    .into_iter()
+                    .map(|t| self.normalize_mode(t, mode))
+                    .collect();
+                self.diff_mode(t, hs, mode)
+            }
+            Ty::Both(a, b) => Ty::Both(
+                Box::new(self.normalize_mode(*a, mode)),
+                Box::new(self.normalize_mode(*b, mode)),
+            ),
+            t => t,
         }
     }
 
@@ -1571,34 +1689,27 @@ impl Solver {
     /// is a constraint as soon as the difference is made: `a <: H | r`,
     /// with a new variable `r` for the other values.
     pub fn diff_bound(&mut self, a: &Ty, hs: &[Ty], env: bool) {
+        self.diff_bound_mode(a, hs, if env { Mode::Env } else { Mode::Value });
+    }
+
+    fn diff_bound_mode(&mut self, a: &Ty, hs: &[Ty], mode: Mode) {
+        let mode = mode.max(self.mode(a));
         if !matches!(a, Ty::Var(_)) {
             return;
         }
         if let Ty::Var(v) = a
-            && env
+            && mode != Mode::Value
         {
-            self.observe(*v);
-            self.var_mut(*v).difference = true;
-            self.has_handlers = true;
-            self.mark_row(a);
+            self.mark_mode(a, mode);
             for h in hs {
-                if !self.var(*v).handled.contains(h) {
-                    self.var_mut(*v).handled.push(h.clone());
-                }
-                let mut bounds = self.reach(vec![*v], true).1;
-                bounds.extend(self.reach(vec![*v], false).1);
-                for b in bounds {
-                    if b.head() == h.head() {
-                        self.equal(&b, h, FailKind::EnvForms);
-                    }
-                }
+                self.handle(*v, h);
             }
             return;
         }
         let r = Ty::Var(self.fresh_at(self.level_of(a)));
         let mut ms = hs.to_vec();
         ms.push(r);
-        self.constrain_in(a, &Ty::Union(ms), if env { Mode::Env } else { Mode::Value });
+        self.constrain_in(a, &Ty::Union(ms), mode);
     }
 }
 

@@ -1026,7 +1026,8 @@ impl<'a> Checker<'a> {
     /// The errors and the environment of an entry of the effect stack.
     fn pop_effects(&mut self, span: Span) -> (Ty, Ty) {
         let e = self.effects.pop().unwrap_or_default();
-        let err = self.union(e.err, span);
+        let err = self.s.union_mode(e.err, Mode::Row);
+        self.flush(span, None);
         let env = self.env_union(e.env, span);
         (err, env)
     }
@@ -2554,7 +2555,7 @@ fn host_builtin(b: BuiltinType) -> bool {
 }
 
 /// A parameter used as an environment or error row stays a row through
-/// other constructors and aliases (§4.5). The finite boolean table grows
+/// other constructors and aliases (§4.5). The finite mode table grows
 /// to a fixed point, independently of declaration order.
 fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
     fn walk(

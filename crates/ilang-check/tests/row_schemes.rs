@@ -61,3 +61,39 @@ wrap(N) = (body: () -> Int ! N, svc: Svc(String)) -> Int ! N {
         graph.sources.render_all(&checked.diags)
     );
 }
+
+#[test]
+fn a_constructor_with_one_form_has_no_hidden_form_restriction() {
+    // §9.2: a constructor without parameters has only one service form.
+    // Omitting its subtraction cannot hide an argument equality.
+    types(
+        "Only { Only }
+wrap(N) = (body: () -> Nil ! N) -> Nil ! N { ! Only = Only body() }
+example = () { wrap(() { Nil }) }",
+    );
+}
+
+#[test]
+fn closed_row_aliases_check_forms_before_merging_arguments() {
+    // F2's rule applies before normalization can combine S's arguments.
+    // Ordinary covariance must not turn these two service forms into one.
+    let source = "Dep { Dep }
+S(N) { S(() -> Nil ! N) }
+T(N) { T(() -> Nil ! N) }
+Bad = T(S(Never) | S(Dep))
+use = (x: Bad) { x }";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    // Variance still applies to the row as a whole, as F2 explicitly says.
+    types(
+        "Other { Other }
+S(A) { S(A) }
+T(N) { T(() -> Nil ! N) }
+widen = (x: T(S(Int))) -> T(S(Int) | Other) { x }",
+    );
+}
