@@ -261,6 +261,106 @@ fn pattern_vars(p: &Pattern, out: &mut HashSet<VarId>) {
     out.extend(w.bound);
 }
 
+/// A source-level bound on values simultaneously pending while evaluating
+/// an expression. Unlike Wasm locals this is independent of code generation
+/// and optimization. Earlier call arguments remain pending while later ones
+/// (including a recursive call) are evaluated.
+fn pending_values<'a>(values: impl IntoIterator<Item = &'a Expr>) -> usize {
+    let mut held = 0;
+    let mut peak = 1;
+    for value in values {
+        peak = peak.max(held + expression_values(value));
+        held += 1;
+    }
+    peak.max(held)
+}
+
+fn pattern_values(p: &Pattern) -> usize {
+    match &p.kind {
+        PatternKind::Named { pattern, .. } => 1 + pattern_values(pattern),
+        PatternKind::Constructor { args, .. }
+        | PatternKind::Tuple(args)
+        | PatternKind::Error(args) => 1 + args.iter().map(pattern_values).sum::<usize>(),
+        PatternKind::List { items, .. } => 1 + items.iter().map(pattern_values).sum::<usize>(),
+        PatternKind::BitArray(segments) => {
+            1 + segments
+                .iter()
+                .map(|s| {
+                    pattern_values(&s.value)
+                        + s.format
+                            .as_ref()
+                            .and_then(|f| f.arg.as_deref())
+                            .map_or(0, expression_values)
+                })
+                .sum::<usize>()
+        }
+        PatternKind::Var(_)
+        | PatternKind::Discard
+        | PatternKind::Typed { .. }
+        | PatternKind::Int { .. }
+        | PatternKind::Float { .. }
+        | PatternKind::String(_)
+        | PatternKind::Prefix { .. } => 1,
+    }
+}
+
+fn block_values(block: &hir::Block) -> usize {
+    block
+        .stmts
+        .iter()
+        .map(|stmt| match stmt {
+            hir::Stmt::Bind(binding) => {
+                expression_values(&binding.value).max(pattern_values(&binding.pattern))
+            }
+            hir::Stmt::Env { value, .. } | hir::Stmt::Expr(value) => expression_values(value),
+        })
+        .max()
+        .unwrap_or(1)
+}
+
+fn expression_values(e: &Expr) -> usize {
+    match &e.kind {
+        ExprKind::Int(_)
+        | ExprKind::Float(_)
+        | ExprKind::String(_)
+        | ExprKind::Name(_)
+        | ExprKind::Error
+        | ExprKind::Fn(_) => 1,
+        ExprKind::Tuple(items) => pending_values(items),
+        ExprKind::List { items, rest } => pending_values(items.iter().chain(rest.as_deref())),
+        ExprKind::BitArray(segments) => pending_values(segments.iter().flat_map(|s| {
+            std::iter::once(&s.value).chain(s.format.as_ref().and_then(|f| f.arg.as_deref()))
+        })),
+        ExprKind::Block(block) => block_values(block),
+        ExprKind::Case { subject, clauses } => expression_values(subject).max(
+            1 + clauses
+                .iter()
+                .map(|clause| {
+                    clause
+                        .patterns
+                        .iter()
+                        .map(pattern_values)
+                        .max()
+                        .unwrap_or(1)
+                        .max(clause.guard.as_ref().map_or(1, expression_values))
+                        .max(expression_values(&clause.body))
+                })
+                .max()
+                .unwrap_or(1),
+        ),
+        ExprKind::Call { callee, args } => {
+            pending_values(std::iter::once(callee.as_ref()).chain(args.iter().map(|a| &a.value)))
+        }
+        ExprKind::Field { target, .. }
+        | ExprKind::TupleIndex { target, .. }
+        | ExprKind::Unary { expr: target, .. } => expression_values(target),
+        ExprKind::RecordUpdate { base, fields, .. } => pending_values(
+            std::iter::once(base.as_ref()).chain(fields.iter().map(|(_, value)| value)),
+        ),
+        ExprKind::Binary { lhs, rhs, .. } => pending_values([lhs.as_ref(), rhs.as_ref()]),
+    }
+}
+
 /// Collects the names used and bound in a part of the program.
 #[derive(Default)]
 struct Walk {
@@ -804,6 +904,7 @@ impl<'a> Lowerer<'a> {
     fn start(&mut self) {
         let mut fx = Fx::new(ModuleId(0), false);
         let mut out = Vec::new();
+        let mut pending = 1;
         for &b in &self.program.order.init {
             if !self.included(b.module) {
                 continue;
@@ -812,6 +913,9 @@ impl<'a> Lowerer<'a> {
             if tb.defs.len() == 1 && self.known.contains_key(&tb.defs[0]) {
                 continue;
             }
+            pending = pending
+                .max(expression_values(&tb.binding.value))
+                .max(pattern_values(&tb.binding.pattern));
             fx.module = b.module;
             fx.library = self.is_library(b.module);
             let value = self.expr(&mut fx, &mut out, &tb.binding.value);
@@ -834,7 +938,8 @@ impl<'a> Lowerer<'a> {
         self.out.start = Some(Func {
             name: "ilang_start".into(),
             arity: 0,
-            budget_frame: 1 + fx.vars.len() as u32,
+            budget_frame: u32::try_from(1 + fx.vars.len() + pending)
+                .expect("source frame exceeds u32"),
             locals: fx.locals,
             body: out,
             frame: true,
@@ -1407,10 +1512,19 @@ impl<'a> Lowerer<'a> {
             }
         }
         self.block(&mut fx, &mut out, &f.body, true);
+        let pending = f
+            .params
+            .iter()
+            .filter_map(|p| match p {
+                Param::Pattern { pattern, .. } => Some(pattern_values(pattern)),
+                Param::Env { .. } => None,
+            })
+            .fold(block_values(&f.body), usize::max);
         Func {
             name,
             arity,
-            budget_frame: 1 + arity + (fx.vars.len() - captures.len()) as u32,
+            budget_frame: u32::try_from(1 + arity as usize + fx.vars.len() + pending)
+                .expect("source frame exceeds u32"),
             locals: fx.locals,
             body: out,
             frame: true,

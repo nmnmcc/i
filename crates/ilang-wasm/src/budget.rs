@@ -17,25 +17,26 @@ const HELPERS: &str = r#"
 ;; Return the original length after charging, so the argument is evaluated
 ;; exactly once and the charge precedes the allocation/copy.
 (func $macro_array_words (param $n i32) (result i32)
-  (call $macro_charge (i64.const 0) (i64.add (i64.const 4) (i64.extend_i32_u (local.get $n))))
+  (call $macro_charge (i64.extend_i32_u (local.get $n)) (i64.add (i64.const 4) (i64.extend_i32_u (local.get $n))))
   (local.get $n))
 (func $macro_array_halves (param $n i32) (result i32)
-  (call $macro_charge (i64.const 0) (i64.add (i64.const 4)
+  (call $macro_charge (i64.extend_i32_u (local.get $n)) (i64.add (i64.const 4)
     (i64.shr_u (i64.add (i64.extend_i32_u (local.get $n)) (i64.const 1)) (i64.const 1))))
   (local.get $n))
 (func $macro_array_quarters (param $n i32) (result i32)
-  (call $macro_charge (i64.const 0) (i64.add (i64.const 4)
+  (call $macro_charge (i64.extend_i32_u (local.get $n)) (i64.add (i64.const 4)
     (i64.shr_u (i64.add (i64.extend_i32_u (local.get $n)) (i64.const 3)) (i64.const 2))))
   (local.get $n))
 (func $macro_array_bytes (param $n i32) (result i32)
-  (call $macro_charge (i64.const 0) (i64.add (i64.const 4)
+  (call $macro_charge (i64.extend_i32_u (local.get $n)) (i64.add (i64.const 4)
     (i64.shr_u (i64.add (i64.extend_i32_u (local.get $n)) (i64.const 7)) (i64.const 3))))
   (local.get $n))
 (func $macro_copy_units (param $n i32) (result i32)
   (call $macro_charge (i64.extend_i32_u (local.get $n)) (i64.const 0))
   (local.get $n))
 (func $macro_memory_pages (param $n i32) (result i32)
-  (call $macro_charge (i64.const 0) (i64.mul (i64.extend_i32_u (local.get $n)) (i64.const 8192)))
+  (call $macro_charge (i64.mul (i64.extend_i32_u (local.get $n)) (i64.const 65536))
+    (i64.mul (i64.extend_i32_u (local.get $n)) (i64.const 8192)))
   (local.get $n))
 "#;
 
@@ -215,26 +216,38 @@ fn charge_constants(node: &Node, text: &str, types: &Types, charge: &mut StaticC
         return;
     }
     let head = node.head(text).unwrap_or("");
-    let words = match head {
-        "struct.new" => 4 + (node.children.len() - 2) as u64,
-        "struct.new_default" => 4 + types.structures[node.children[1].atom(text)],
+    let (work, words) = match head {
+        "struct.new" => {
+            let fields = (node.children.len() - 2) as u64;
+            (1 + fields, 4 + fields)
+        }
+        "struct.new_default" => {
+            let fields = types.structures[node.children[1].atom(text)];
+            (1 + fields, 4 + fields)
+        }
         "array.new_fixed" => {
             let count = node.children[2]
                 .atom(text)
                 .parse::<u64>()
                 .expect("array fixed size");
-            4 + (count * types.arrays[node.children[1].atom(text)]).div_ceil(8)
+            (
+                1 + count,
+                4 + (count * types.arrays[node.children[1].atom(text)]).div_ceil(8),
+            )
         }
         "array.new" | "array.new_default" | "array.new_data" | "array.new_elem" => {
             let count = constant_i32(node.children.last().expect("array length"), text);
-            4 + (count * types.arrays[node.children[1].atom(text)]).div_ceil(8)
+            (
+                1 + count,
+                4 + (count * types.arrays[node.children[1].atom(text)]).div_ceil(8),
+            )
         }
-        _ => 0,
+        _ => (0, 0),
     };
     if words != 0 {
         charge.work = charge
             .work
-            .checked_add(1)
+            .checked_add(work)
             .expect("static macro work overflow");
         charge.allocation = charge
             .allocation
@@ -263,6 +276,27 @@ pub fn static_charge(text: &str) -> StaticCharge {
         .filter(|n| n.head(text) == Some("global"))
     {
         charge_constants(global, text, &types, &mut result);
+    }
+    for memory in module
+        .children
+        .iter()
+        .filter(|n| n.head(text) == Some("memory"))
+    {
+        let pages = memory
+            .children
+            .iter()
+            .skip(1)
+            .filter(|n| !n.list)
+            .find_map(|n| n.atom(text).parse::<u64>().ok())
+            .expect("memory has no initial size");
+        result.work = result
+            .work
+            .checked_add(pages.checked_mul(65536).expect("memory work overflow"))
+            .expect("static macro work overflow");
+        result.allocation = result
+            .allocation
+            .checked_add(pages.checked_mul(8192).expect("memory size overflow"))
+            .expect("static macro allocation overflow");
     }
     result
 }
@@ -334,23 +368,28 @@ fn walk(node: &Node, text: &str, edits: &mut Inserts, types: &Types) {
         ),
         "struct.new" | "struct.new_default" | "array.new_fixed" => {
             let ty = node.children[1].atom(text);
-            let fields = if head == "array.new_fixed" {
+            let (work, fields) = if head == "array.new_fixed" {
                 let count = node.children[2]
                     .atom(text)
                     .parse::<u64>()
                     .expect("array fixed size");
-                (count * types.arrays.get(ty).expect("missing array storage type")).div_ceil(8)
+                (
+                    count,
+                    (count * types.arrays.get(ty).expect("missing array storage type")).div_ceil(8),
+                )
             } else if head == "struct.new" {
-                (node.children.len() - 2) as u64
+                let n = (node.children.len() - 2) as u64;
+                (n, n)
             } else {
-                *types.structures.get(ty).expect("missing structure type")
+                let n = *types.structures.get(ty).expect("missing structure type");
+                (n, n)
             };
             insert(
                 edits,
                 node.start,
                 2,
                 format!(
-                    "(block (result (ref {ty})) (call $macro_charge (i64.const 0) (i64.const {})) ",
+                    "(block (result (ref {ty})) (call $macro_charge (i64.const {work}) (i64.const {})) ",
                     fields + 4
                 ),
             );
@@ -395,9 +434,9 @@ fn walk(node: &Node, text: &str, edits: &mut Inserts, types: &Types) {
     }
 }
 
-/// Instrument the complete generated WAT, before Binaryen sees the module.
-/// Initializer constants are excluded: they are fixed by compilation, not by
-/// the macro's input or computation, and Wasm constant expressions cannot call.
+/// Instrument the complete generated WAT before Binaryen sees the module.
+/// Constant initializers are accounted separately by `static_charge`, before
+/// instantiation, because Wasm constant expressions cannot call a hook.
 pub fn instrument(text: &str) -> String {
     let mut p = Parser { text, at: 0 };
     let module = p.node();
@@ -490,12 +529,19 @@ mod tests {
         assert_eq!(
             static_charge(text),
             StaticCharge {
-                work: 1,
+                work: 10,
                 allocation: 6
             }
         );
         let output = instrument(text);
-        assert!(output.contains("(i64.const 6)) (struct.new_default $s)"));
+        assert!(output.contains("(i64.const 2) (i64.const 6)) (struct.new_default $s)"));
         wat::parse_str(output).unwrap();
+        assert_eq!(
+            static_charge("(module (memory (export \"memory\") 2))"),
+            StaticCharge {
+                work: 131072,
+                allocation: 16384
+            }
+        );
     }
 }
