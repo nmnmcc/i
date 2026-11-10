@@ -149,7 +149,7 @@ fn old_forms_have_helpful_errors_without_reserving_names() {
             /* old-syntax-check: E0111,E0101 */ "x = 1 |> { n if True -> n }",
             "? condition",
         ),
-        ("id = (x: a) { x }", "type of a value"),
+        ("id = (x: a) { x }", "error[E0201]: `a` is not defined"),
     ] {
         let dir = front_end_project(source);
         let out = Command::new(env!("CARGO_BIN_EXE_i"))

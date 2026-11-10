@@ -36,7 +36,7 @@ pub fn check_for_queries(graph: &PackageGraph) -> Checked {
     if diags.iter().any(Diagnostic::is_error) {
         // Inference is only a best effort on a program with errors.
         let types = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            types::check_keeping_locals(&program, &graph.sources).0
+            types::check_keeping_locals_with_errors(&program, &graph.sources, true).0
         }))
         .ok();
         return Checked {
@@ -342,6 +342,25 @@ impl<'a> Query<'a> {
     fn type_definition(&self, t: TypeId) -> String {
         let def = self.program.ty(t);
         let head = self.type_head(t);
+        if let Some(shown) = self.types.and_then(|types| types.alias_types.get(&t)) {
+            return format!(
+                "{head} = {}",
+                shown.text(&types::type_names(self.program, def.module))
+            );
+        }
+        if let Some(pattern) = self
+            .program
+            .alias_patterns
+            .iter()
+            .find(|p| p.binders.contains(&t))
+        {
+            let source = &self
+                .graph
+                .sources
+                .get(self.program.module(pattern.module).source)
+                .text;
+            return source[pattern.span.start as usize..pattern.span.end as usize].to_string();
+        }
         match &def.body {
             TypeBody::Alias(ty) => format!("{head} = {}", self.show_type(ty)),
             TypeBody::Custom(cs) if cs.is_empty() => format!("{head} {{}}"),
@@ -408,6 +427,14 @@ impl<'a> Query<'a> {
             }
             TypeKind::Lit(v) => v.text(),
             TypeKind::Var(v) => self.ty_var_name(*v),
+            TypeKind::Of { site, .. } => {
+                let s = &self.program.of_sites[site.0 as usize];
+                self.graph
+                    .sources
+                    .get(self.program.module(s.module).source)
+                    .text[s.span.start as usize..s.span.end as usize]
+                    .to_string()
+            }
             TypeKind::Hole | TypeKind::Error => "_".into(),
             TypeKind::Tuple(parts) => {
                 let parts: Vec<String> = parts.iter().map(|a| self.show_type(a)).collect();
@@ -603,6 +630,15 @@ impl<'a> Query<'a> {
         for b in &module.bindings {
             w.pattern(&b.binding.pattern);
             w.expr(&b.binding.value);
+        }
+        for pattern in &p.alias_patterns {
+            if pattern.module != m {
+                continue;
+            }
+            for (span, head) in &pattern.heads {
+                w.occ.push((*span, Target::Type(*head)));
+            }
+            w.ty(&pattern.source);
         }
         for (i, d) in module.defs.iter().enumerate() {
             let id = DefId {
@@ -1021,6 +1057,24 @@ impl<'a> Query<'a> {
             let within = |s: Span| item.span.start <= s.start && s.end <= item.span.end;
             match &item.kind {
                 ast::ItemKind::MacroItem { .. } => {}
+                ast::ItemKind::TypeDef(def) if def.alias_pattern => {
+                    for pattern in &p.alias_patterns {
+                        if pattern.module != m || pattern.span != item.span {
+                            continue;
+                        }
+                        for id in &pattern.binders {
+                            let t = p.ty(*id);
+                            out.push(Symbol {
+                                name: t.name.clone(),
+                                kind: SymbolKind::Type,
+                                span: item.span,
+                                name_span: t.span,
+                                detail: Some(self.type_definition(*id)),
+                                children: Vec::new(),
+                            });
+                        }
+                    }
+                }
                 ast::ItemKind::TypeDef(def) => {
                     let Some(&t) = module
                         .types
@@ -1251,6 +1305,14 @@ impl Walk<'_> {
                 args.iter().for_each(|a| self.ty(a));
             }
             TypeKind::Var(v) => self.occ.push((t.span, Target::TyVar(*v))),
+            TypeKind::Of { value, .. } => {
+                let target = match value {
+                    ValueRef::Local(v) => Target::Local(*v),
+                    ValueRef::Def(d) => Target::Def(*d),
+                    ValueRef::Ctor(c) => Target::Ctor(*c),
+                };
+                self.occ.push((last_word(self.text, t.span), target));
+            }
             TypeKind::Lit(_) | TypeKind::Hole | TypeKind::Error => {}
             TypeKind::Tuple(ts)
             | TypeKind::Union(ts)
