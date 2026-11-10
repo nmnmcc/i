@@ -53,6 +53,7 @@ struct SyntaxData {
     span: Span,
     provenance: Provenance,
     identity: Option<ScopeIdentity>,
+    definition_head: Option<u64>,
     origin: Arc<()>,
     host_identity: Mutex<Option<Weak<dyn std::any::Any + Send + Sync>>>,
 }
@@ -134,6 +135,7 @@ impl Syntax {
             span,
             provenance: Provenance::Written,
             identity: None,
+            definition_head: None,
             origin: Arc::new(()),
             host_identity: Mutex::new(None),
         }))
@@ -162,6 +164,7 @@ impl Syntax {
             span: d.span,
             provenance: Provenance::Written,
             identity: None,
+            definition_head: None,
             origin: Arc::new(()),
             host_identity: Mutex::new(None),
         }))
@@ -180,6 +183,26 @@ impl Syntax {
     }
     pub fn scope_identity(&self) -> Option<&ScopeIdentity> {
         self.0.identity.as_ref()
+    }
+    /// Identity of the query answer whose original definition head this is.
+    /// Only compiler-produced answers can assign it; `make` never copies it.
+    pub fn definition_head(&self) -> Option<u64> {
+        self.0.definition_head
+    }
+    pub(super) fn with_definition_head(&self, answer: u64) -> Self {
+        assert!(
+            matches!(self.node(), Node::Round(_)),
+            "a definition head is a round node"
+        );
+        Self(Arc::new(SyntaxData {
+            node: self.node().clone(),
+            scope: self.scope().clone(),
+            span: self.span(),
+            provenance: self.provenance(),
+            identity: self.scope_identity().cloned(),
+            definition_head: Some(answer),
+            origin: self.0.origin.clone(),
+        }))
     }
     /// Whether a made name remains compatible with a compiler-owned identity.
     /// A false result is a compile error, not a catchable SyntaxError.
@@ -208,6 +231,7 @@ impl Syntax {
             span: self.span(),
             provenance: Provenance::Answer,
             identity: Some(identity),
+            definition_head: self.definition_head(),
             origin: Arc::new(()),
             host_identity: Mutex::new(None),
         }))
@@ -219,6 +243,7 @@ impl Syntax {
             span: self.span(),
             provenance: self.provenance(),
             identity: self.scope_identity().cloned(),
+            definition_head: self.definition_head(),
             origin: Arc::new(()),
             host_identity: Mutex::new(None),
         }))
@@ -250,6 +275,7 @@ impl Syntax {
             span: self.span(),
             provenance: self.provenance(),
             identity: self.scope_identity().cloned(),
+            definition_head: self.definition_head(),
             origin: self.0.origin.clone(),
             host_identity: Mutex::new(None),
         }))
@@ -274,6 +300,7 @@ impl Syntax {
             span: self.span(),
             provenance: Provenance::Answer,
             identity: self.scope_identity().cloned(),
+            definition_head: self.definition_head(),
             origin: Arc::new(()),
             host_identity: Mutex::new(None),
         }))
@@ -304,6 +331,7 @@ impl Syntax {
             span: self.span(),
             provenance: self.provenance(),
             identity: Some(identity),
+            definition_head: self.definition_head(),
             origin: Arc::new(()),
             host_identity: Mutex::new(None),
         }))
@@ -413,6 +441,7 @@ impl Syntax {
                 ),
             },
             identity: like.scope_identity().cloned(),
+            definition_head: None,
             origin: Arc::new(()),
             host_identity: Mutex::new(None),
         })))
@@ -728,6 +757,7 @@ pub fn flip_mark_all(values: &[Syntax], mark: u64) -> Vec<Syntax> {
             span: value.span(),
             provenance: value.provenance(),
             identity: value.scope_identity().cloned(),
+            definition_head: value.definition_head(),
             origin: value.0.origin.clone(),
             host_identity: Mutex::new(None),
         }));
