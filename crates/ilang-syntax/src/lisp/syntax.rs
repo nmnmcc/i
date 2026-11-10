@@ -288,28 +288,7 @@ impl Syntax {
 
     /// Flip one expansion mark on this node and every child.
     pub fn flip_mark(&self, mark: u64) -> Self {
-        let map = |xs: &[Syntax]| xs.iter().map(|x| x.flip_mark(mark)).collect();
-        let node = match self.node() {
-            Node::Round(xs) => Node::Round(map(xs)),
-            Node::Square(xs) => Node::Square(map(xs)),
-            Node::Curly(xs) => Node::Curly(map(xs)),
-            Node::Bits(xs) => Node::Bits(map(xs)),
-            Node::Quote(x) => Node::Quote(x.flip_mark(mark)),
-            Node::Unquote(x) => Node::Unquote(x.flip_mark(mark)),
-            Node::Splice(x) => Node::Splice(x.flip_mark(mark)),
-            leaf => leaf.clone(),
-        };
-        let mut scope = self.scope().clone();
-        if !scope.marks.insert(mark) {
-            scope.marks.remove(&mark);
-        }
-        Self(Arc::new(SyntaxData {
-            node,
-            scope,
-            span: self.span(),
-            provenance: self.provenance(),
-            origin: self.0.origin.clone(),
-        }))
+        flip_mark_all(std::slice::from_ref(self), mark).remove(0)
     }
 
     /// Whether two nodes are the same written or constructed node across mark changes.
@@ -550,4 +529,46 @@ pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), S
         }
         Ok(())
     })
+}
+
+/// Flip one expansion mark on a set of values, preserving shared value identity.
+pub fn flip_mark_all(values: &[Syntax], mark: u64) -> Vec<Syntax> {
+    use std::collections::HashMap;
+    fn flip(value: &Syntax, mark: u64, seen: &mut HashMap<usize, Syntax>) -> Syntax {
+        let key = Arc::as_ptr(&value.0) as usize;
+        if let Some(result) = seen.get(&key) {
+            return result.clone();
+        }
+        let map = |items: &[Syntax], seen: &mut HashMap<usize, Syntax>| {
+            items.iter().map(|item| flip(item, mark, seen)).collect()
+        };
+        let node = match value.node() {
+            Node::Round(xs) => Node::Round(map(xs, seen)),
+            Node::Square(xs) => Node::Square(map(xs, seen)),
+            Node::Curly(xs) => Node::Curly(map(xs, seen)),
+            Node::Bits(xs) => Node::Bits(map(xs, seen)),
+            Node::Quote(x) => Node::Quote(flip(x, mark, seen)),
+            Node::Unquote(x) => Node::Unquote(flip(x, mark, seen)),
+            Node::Splice(x) => Node::Splice(flip(x, mark, seen)),
+            leaf => leaf.clone(),
+        };
+        let mut scope = value.scope().clone();
+        if !scope.marks.insert(mark) {
+            scope.marks.remove(&mark);
+        }
+        let result = Syntax(Arc::new(SyntaxData {
+            node,
+            scope,
+            span: value.span(),
+            provenance: value.provenance(),
+            origin: value.0.origin.clone(),
+        }));
+        seen.insert(key, result.clone());
+        result
+    }
+    let mut seen = HashMap::new();
+    values
+        .iter()
+        .map(|value| flip(value, mark, &mut seen))
+        .collect()
 }

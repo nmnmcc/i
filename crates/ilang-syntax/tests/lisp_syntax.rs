@@ -218,3 +218,16 @@ fn expansion_cannot_create_or_duplicate_foreign_authority() {
     assert!(validate_expansion(&root("`x"), &[]).is_err());
     assert!(validate_expansion(&root("(@ macro (= f x))"), &[]).is_err());
 }
+
+#[test]
+fn marking_preserves_shared_value_identity_across_arguments() {
+    use ilang_syntax::lisp::syntax::{Node, Syntax, flip_mark_all};
+    let shared = root("x");
+    let pair = Syntax::make(Node::Round(vec![shared.clone(), shared.clone()]), &shared).unwrap();
+    let marked = flip_mark_all(&[pair, shared], 99);
+    let Node::Round(parts) = marked[0].node() else {
+        panic!("expected round")
+    };
+    assert!(parts[0].identical(&parts[1]));
+    assert!(parts[0].identical(&marked[1]));
+}
