@@ -35,6 +35,12 @@
 //!   start or block on a runtime of its own; write it as an async service,
 //!   or do that work on a thread of its own and join it.
 
+mod clock;
+mod fs;
+mod net;
+mod process;
+mod stdio;
+
 use crate::{BigInt, HostImports, Value};
 use anyhow::bail;
 use std::sync::{Arc, Mutex};
