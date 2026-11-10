@@ -69,6 +69,14 @@ pub(super) struct Builtins {
     pub assert: TypeRef,
 }
 
+struct PendingFailure {
+    module: ModuleId,
+    row: super::coverage::Pat,
+    ty: Ty,
+    env: Ty,
+    span: Span,
+}
+
 pub(crate) struct Checker<'a> {
     pub p: &'a Program,
     sources: &'a Sources,
@@ -109,6 +117,9 @@ pub(crate) struct Checker<'a> {
     /// With `keep_locals`: for each `v.f`, by its span, the constructors
     /// that may have made `v` (`LocalTypes::field_ctors`).
     field_ctors: HashMap<(ModuleId, Span), Vec<CtorRef>>,
+    function_depth: usize,
+    group_level: Option<u32>,
+    pending_failures: Vec<PendingFailure>,
 }
 
 impl<'a> Checker<'a> {
@@ -147,6 +158,9 @@ impl<'a> Checker<'a> {
             cases: Vec::new(),
             keep_locals: false,
             field_ctors: HashMap::new(),
+            function_depth: 0,
+            group_level: None,
+            pending_failures: Vec::new(),
         }
     }
 
@@ -234,6 +248,7 @@ impl<'a> Checker<'a> {
         let p = self.p;
         let direct = group.iter().all(|b| p.binding(*b).binding.direct);
         self.s.level = u32::from(direct);
+        self.group_level = Some(self.s.level);
         let mut holders = Vec::new();
         self.group_defs = group
             .iter()
@@ -312,6 +327,29 @@ impl<'a> Checker<'a> {
             self.set_module(d.module);
             self.check_occurs(mark, *span);
         }
+        // Literal-types §5.3: settle every fitted binding with all group
+        // values, in its original effect frame, before generalization.
+        for pending in std::mem::take(&mut self.pending_failures) {
+            self.set_module(pending.module);
+            let fails = self
+                .useful(
+                    &[vec![pending.row]],
+                    &[super::coverage::Pat::Wild(None)],
+                    &[super::coverage::Col::of(pending.ty)],
+                )
+                .is_some();
+            self.out
+                .may_fail
+                .insert((pending.module, pending.span), fails);
+            if fails {
+                self.s
+                    .constrain(&Ty::named(self.b.assert, Vec::new()), &pending.env);
+                if let Some(f) = std::mem::take(&mut self.s.failures).into_iter().next() {
+                    self.error(code::TYPE_MISMATCH, pending.span, format!("this pattern may fail, so it needs `Assert` (§7.3), but `Assert` is not allowed here: `Assert` is not a subtype of `{}`",display::show(&self.s,&f.rhs)));
+                }
+            }
+        }
+        self.group_level = None;
         for (d, _, t, _) in types {
             self.set_module(d.module);
             let scheme = if direct {
@@ -2000,7 +2038,9 @@ impl<'a> Checker<'a> {
             .as_ref()
             .map_or(Ty::Top, |r| self.kconv(&r.value, &HashMap::new()));
         self.effects.push(Effects::default());
+        self.function_depth += 1;
         let (a, body_known) = self.block(&f.body.stmts, f.body.span, &body_expected);
+        self.function_depth -= 1;
         let known = self.fn_known(f, &expected, body_known);
         let (err, env) = self.pop_effects(f.span);
         let assert = Ty::named(self.b.assert, Vec::new());
@@ -2075,9 +2115,7 @@ impl<'a> Checker<'a> {
         let expected = self.binding_expected(b);
         let (a, k) = self.infer_k(&b.value, &expected);
         self.fit(&b.pattern, &a);
-        if self.binding_may_fail(&b.pattern, &a) {
-            self.add_env(Ty::named(self.b.assert, Vec::new()));
-        }
+        self.binding_failure(&b.pattern, &a);
         for (v, h) in holders {
             if let Some(s) = self.locals.get(&v).cloned() {
                 self.sub(&s.ty, &h, b.pattern.span);
@@ -2099,6 +2137,47 @@ impl<'a> Checker<'a> {
                     self.kvars.insert(*v, known);
                     self.locals.insert(*v, Scheme { level, ty });
                 }
+            }
+        }
+    }
+
+    /// A fitted failure is decided in its own frame after holder linking.
+    fn binding_failure(&mut self, pattern: &Pattern, ty: &Ty) {
+        if self.function_depth > 0
+            && self.group_level.is_some()
+            && !super::pattern::catch_all(pattern)
+        {
+            let row = super::coverage::fit_pat(self.p, pattern);
+            self.defer_failure(row, ty.clone(), pattern.span);
+        } else if self.binding_may_fail(pattern, ty) {
+            self.add_env(Ty::named(self.b.assert, Vec::new()));
+        }
+    }
+
+    pub fn defer_failure(&mut self, row: super::coverage::Pat, ty: Ty, span: Span) {
+        if let Some(level) = self.group_level
+            && self.function_depth > 0
+        {
+            let env = Ty::Var(self.s.fresh_at(level));
+            self.add_env(env.clone());
+            self.pending_failures.push(PendingFailure {
+                module: self.module,
+                row,
+                ty,
+                env,
+                span,
+            });
+        } else {
+            let fails = self
+                .useful(
+                    &[vec![row]],
+                    &[super::coverage::Pat::Wild(None)],
+                    &[super::coverage::Col::of(ty)],
+                )
+                .is_some();
+            self.out.may_fail.insert((self.module, span), fails);
+            if fails {
+                self.add_env(Ty::named(self.b.assert, Vec::new()));
             }
         }
     }

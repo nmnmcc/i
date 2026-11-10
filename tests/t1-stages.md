@@ -326,3 +326,30 @@ goldens, 159 spec cases at O0/O2, 1399 std tests per level, 33 browser
 tests). old-syntax-check passed 1078 snippets and 20 pending entries.
 The initial partial unit run failed the raw-difference regression above;
 the final full run passes. No golden was regenerated in this stage.
+
+### Stage 6a: deferred fitted failures
+
+Every non-catch-all local binding inside a function in a group gets its
+own group-level effect variable in its current effect frame. After holder
+linking and before generalization, coverage decides the saved row and
+adds Assert only to that variable. Parameters and top-level patterns keep
+their immediate decisions. Source: literal-types §5.3's “one fresh
+variable e for that binding” and “after the holder link ... and before the
+group is generalized”. Deferred rejection is E0501 at the pattern.
+
+The note's immediate-call spelling `(() { ... })()` conflicts with §6.4's
+“(x) is a tuple with one part, not a group” (also literal-types decision 5).
+That expression first fails by calling a tuple. The regression instead
+uses `{ () { ... } }()`, following §6.10's brace-group rule. This corrects
+the example spelling and does not change tuple or binding semantics.
+
+Gate: full dev-verify exited 0, 169 spec cases at O0/O2, 1399 std tests
+per level and 33 browser tests. All 10 new may_fail_group cases passed;
+old-syntax-check passed 1089 snippets. No existing golden changed.
+The new may_fail_group.out is generated and reserved for the last commit.
+Its first two effect lines are required by the holder and indirect-call
+examples in §5.3; total_pair and f omit Assert by the total-pattern and
+per-frame rules there. s/top retain whole String/Int until stage 7; written
+keeps its annotation (§4.8 rule 4). Both diagnostic lines are exactly the
+deferred E0501 required by §5.3, at the literal patterns, with Never from
+the top-level and written function environment restrictions.
