@@ -123,3 +123,38 @@ fn check_old_joined_type_call_explains_the_migration_path() {
             .contains("i fmt --from-old")
     );
 }
+
+#[test]
+fn migration_flags_check_before_writing_and_keep_layout() {
+    let source = "// heading\nexport (id)\nid = (x: a) { x } // tail\n";
+    let dir = front_end_project(source);
+    let file = dir.path().join("src/main.i");
+    let out = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--from-old", "--check", "--report"])
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), source);
+    let out = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--keep-layout"])
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let result = std::fs::read_to_string(&file).unwrap();
+    assert!(result.contains("id(A) = (x: A) { x } // tail"));
+    assert!(result.starts_with("// heading\n"));
+    assert!(!result.contains("export"));
+    let out = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--from-old"])
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), result);
+}

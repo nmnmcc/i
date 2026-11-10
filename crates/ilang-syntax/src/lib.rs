@@ -5,6 +5,7 @@
 pub mod ast;
 pub mod format;
 pub mod lexer;
+pub mod migrate;
 pub mod parser;
 pub mod print;
 #[doc(hidden)]

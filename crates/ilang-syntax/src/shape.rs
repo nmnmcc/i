@@ -24,3 +24,22 @@ pub fn shape(module: &Module) -> String {
     out.push_str(rest);
     out
 }
+
+/// The shape after removing expression groups, for the migration write
+/// check. No binding, parameter, annotation, or clause is erased.
+pub fn canon(module: &Module) -> String {
+    struct Canon;
+    impl crate::migrate::Visit for Canon {
+        fn expr(&mut self, e: &mut crate::ast::Expr, enter: bool) {
+            if !enter
+                && let crate::ast::ExprKind::Block(b) = &e.kind
+                && let [crate::ast::Stmt::Expr(inner)] = &b.stmts[..]
+            {
+                *e = inner.clone();
+            }
+        }
+    }
+    let mut module = module.clone();
+    crate::migrate::visit_module(&mut module, &mut Canon);
+    shape(&module)
+}

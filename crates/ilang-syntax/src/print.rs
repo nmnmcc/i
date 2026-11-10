@@ -112,6 +112,12 @@ pub(crate) fn leading_fn(e: &Expr) -> Option<&Function> {
 /// (§6.1): (1) a lone clause block whose first pattern starts with `(`
 /// (until stream A3, E0113), and (2) a first pattern `n1 = … = ( … )`.
 pub(crate) fn first_clause_needs_group(clauses: &[Clause], lone: bool) -> bool {
+    if clauses
+        .first()
+        .is_some_and(|c| c.guard.is_some() || c.patterns.len() != 1)
+    {
+        return false;
+    }
     let Some(first) = clauses.first().and_then(|c| c.patterns.first()) else {
         return false;
     };

@@ -91,6 +91,18 @@ enum Command {
         /// Write nothing; list the files that would change, and fail if any.
         #[arg(long)]
         check: bool,
+        /// Read the old grammar and check the migration before writing.
+        #[arg(long)]
+        from_old: bool,
+        /// Migrate tokens while preserving bytes outside the edits.
+        #[arg(long, conflicts_with = "from_old")]
+        keep_layout: bool,
+        /// Print migration entries on standard error.
+        #[arg(long)]
+        report: bool,
+        /// Keep choices together in parser-only fixtures.
+        #[arg(long)]
+        no_choices_split: bool,
         /// Files or directories to format instead.
         paths: Vec<PathBuf>,
     },
@@ -129,8 +141,22 @@ fn main() -> ExitCode {
         Command::Fmt {
             project,
             check,
+            from_old,
+            keep_layout,
+            report,
+            no_choices_split,
             paths,
-        } => commands::fmt::run(&project, check, &paths),
+        } => commands::fmt::run(
+            &project,
+            check,
+            &paths,
+            commands::fmt::Options {
+                from_old,
+                keep_layout,
+                report,
+                choices_split: !no_choices_split,
+            },
+        ),
     };
     match result {
         Ok(code) => code,

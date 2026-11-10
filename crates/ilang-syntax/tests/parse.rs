@@ -255,6 +255,10 @@ fn new_forms_need_both_mode_and_joined_parentheses() {
 
 #[test]
 fn guards_and_pipe_binding_strength() {
+    // §6.1 tests 1a/2 need an immediate arrow after the first pattern.
+    // Choices or a guard prevent the function reading of that head.
+    module("f = { n = (x) | n = (x) -> (y) { y } }");
+    module("f = { (x) ? True -> (y) { y } }");
     // §3.6, including the `if` token in brace test 2.
     for src in [
         "a = v |> { x if c -> 1 }",
