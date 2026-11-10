@@ -7,3 +7,8 @@ app/main.imported : Int
 app/main.generalized : String
 app/main.call : String
 app/main.list : String
+src/main.i:8:1: warning[W0504]: top-level binding `member` is not used
+src/main.i:10:1: warning[W0504]: top-level binding `imported` is not used
+src/main.i:12:1: warning[W0504]: top-level binding `generalized` is not used
+src/main.i:14:1: warning[W0504]: top-level binding `call` is not used
+src/main.i:16:1: warning[W0504]: top-level binding `list` is not used

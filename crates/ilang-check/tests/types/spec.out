@@ -13,3 +13,11 @@ inc : (x: A & Int) -> A
 mixed : List(1 | "a")
 94:10: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False` (§6.9)
 101:2: warning[W0502]: this value is not used, and working it out does nothing
+21:1: warning[W0504]: top-level binding `user` is not used
+32:1: warning[W0504]: top-level binding `fixed` is not used
+54:1: warning[W0504]: top-level binding `numbers` is not used
+62:1: warning[W0504]: top-level binding `my_assert` is not used
+85:1: warning[W0504]: top-level binding `checked` is not used
+92:1: warning[W0504]: top-level binding `checked_library` is not used
+100:1: warning[W0504]: top-level binding `inc` is not used
+108:1: warning[W0504]: top-level binding `mixed` is not used

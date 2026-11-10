@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "app/main.use : (x: A) -> A ! N | S(A, N)\napp/main.ints : () -> Int\napp/main.wrap : (x: A & B) -> B ! N | S(C & B, N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.texts : () -> String\n",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `ints` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `texts` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `ints` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `texts` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `ints` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `texts` is not used\n"
     }
   }
 }

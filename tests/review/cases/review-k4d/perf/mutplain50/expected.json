@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "app/main.use : () -> Int ! N | S(N)\napp/main.get : () -> Int ! Dep\napp/main.m0 : (k: Int) -> 1\napp/main.m1 : (k: Int) -> 1\napp/main.m2 : (k: Int) -> 1\napp/main.m3 : (k: Int) -> 1\napp/main.m4 : (k: Int) -> 1\napp/main.m5 : (k: Int) -> 1\napp/main.m6 : (k: Int) -> 1\napp/main.m7 : (k: Int) -> 1\napp/main.m8 : (k: Int) -> 1\napp/main.m9 : (k: Int) -> 1\napp/main.m10 : (k: Int) -> 1\napp/main.m11 : (k: Int) -> 1\napp/main.m12 : (k: Int) -> 1\napp/main.m13 : (k: Int) -> 1\napp/main.m14 : (k: Int) -> 1\napp/main.m15 : (k: Int) -> 1\napp/main.m16 : (k: Int) -> 1\napp/main.m17 : (k: Int) -> 1\napp/main.m18 : (k: Int) -> 1\napp/main.m19 : (k: Int) -> 1\napp/main.m20 : (k: Int) -> 1\napp/main.m21 : (k: Int) -> 1\napp/main.m22 : (k: Int) -> 1\napp/main.m23 : (k: Int) -> 1\napp/main.m24 : (k: Int) -> 1\napp/main.m25 : (k: Int) -> 1\napp/main.m26 : (k: Int) -> 1\napp/main.m27 : (k: Int) -> 1\napp/main.m28 : (k: Int) -> 1\napp/main.m29 : (k: Int) -> 1\napp/main.m30 : (k: Int) -> 1\napp/main.m31 : (k: Int) -> 1\napp/main.m32 : (k: Int) -> 1\napp/main.m33 : (k: Int) -> 1\napp/main.m34 : (k: Int) -> 1\napp/main.m35 : (k: Int) -> 1\napp/main.m36 : (k: Int) -> 1\napp/main.m37 : (k: Int) -> 1\napp/main.m38 : (k: Int) -> 1\napp/main.m39 : (k: Int) -> 1\napp/main.m40 : (k: Int) -> 1\napp/main.m41 : (k: Int) -> 1\napp/main.m42 : (k: Int) -> 1\napp/main.m43 : (k: Int) -> 1\napp/main.m44 : (k: Int) -> 1\napp/main.m45 : (k: Int) -> 1\napp/main.m46 : (k: Int) -> 1\napp/main.m47 : (k: Int) -> 1\napp/main.m48 : (k: Int) -> 1\napp/main.m49 : (k: Int) -> 1\n",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `get` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `get` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `get` is not used\n"
     }
   }
 }

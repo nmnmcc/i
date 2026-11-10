@@ -9,13 +9,9 @@ fn check(source: &str) -> (ilang_package::PackageGraph, Checked) {
     (graph, checked)
 }
 
-fn accepts(source: &str, name: &str, expected: &str) {
-    let (graph, checked) = check(source);
-    assert!(
-        checked.diags.is_empty(),
-        "{:?}",
-        graph.sources.render_all(&checked.diags)
-    );
+fn accepts(source: &str, name: &str, expected: &str, unused: &[&str]) {
+    let (_, checked) = check(source);
+    common::expect_unused(&checked.diags, unused);
     let program = checked.program.unwrap();
     let types = checked.types.unwrap();
     let module = common::module(&program, "app/main");
@@ -70,6 +66,7 @@ fn annotated_and_inferred_service_rows() {
                 .replace("-> Nil ! N | S(N)", annotation),
             "use",
             "() -> Nil ! N | S(N)",
+            &["use"],
         );
     }
 }
@@ -87,6 +84,7 @@ example = () {
 }",
         "example",
         "() -> Nil",
+        &["example"],
     );
 }
 
@@ -103,6 +101,7 @@ forward(N) = (s ! S(N)) -> Nil ! N | S(N) { run(() { use() }) }"
                 .replace("-> Nil ! N | S(N)", annotation),
             "forward",
             "() -> Nil ! N | S(N)",
+            &["forward"],
         );
     }
 }
@@ -129,9 +128,14 @@ boolean = () {
   run(() { use(True) })
 }"
         .replace("-> A ? E ! N | Outer(A, E, N)", annotation);
-        accepts(&source, "integer", "() -> Int");
-        accepts(&source, "boolean", "() -> Bool");
-        accepts(&source, "use", "(x: A) -> A ? E ! N | Outer(A, E, N)");
+        accepts(&source, "integer", "() -> Int", &["integer", "boolean"]);
+        accepts(&source, "boolean", "() -> Bool", &["integer", "boolean"]);
+        accepts(
+            &source,
+            "use",
+            "(x: A) -> A ? E ! N | Outer(A, E, N)",
+            &["integer", "boolean"],
+        );
     }
 }
 
@@ -155,6 +159,7 @@ example = () {
 }",
         "example",
         "() -> Int",
+        &["example"],
     );
 }
 
@@ -181,6 +186,7 @@ example = () {
             .replace("-> Nil ? E ! N | Sink(E, N)", annotation),
             "example",
             "() -> Result(Nil, String)",
+            &["example"],
         );
     }
 }
@@ -263,5 +269,10 @@ forward_0 = () { run(() { use() }) }\n",
                 .replace("forward_previous", &format!("forward_{}", n - 1)),
         );
     }
-    accepts(&source, "forward_63", "() -> Nil ! N | S(N)");
+    accepts(
+        &source,
+        "forward_63",
+        "() -> Nil ! N | S(N)",
+        &["forward_63"],
+    );
 }
