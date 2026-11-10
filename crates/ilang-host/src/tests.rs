@@ -3,29 +3,18 @@ use std::sync::Mutex;
 
 const FIXTURE: &[u8] = include_bytes!("../../../tests/browser/fixtures/host-abi.wasm");
 const CUSTOM: &[u8] = include_bytes!("../../../tests/browser/fixtures/custom-imports.wasm");
+const ONE_THREAD: &[u8] = include_bytes!("../../../tests/browser/fixtures/one-thread.wasm");
 
 type Log = Arc<Mutex<Vec<String>>>;
 
 /// The host functions of host-abi.wasm. `print` writes to the log, `read`
 /// answers from a small table, `later` answers its argument, `hypot` works.
 fn imports(log: &Log) -> HostImports {
-    let mut imports = HostImports::default();
     let printed = Arc::clone(log);
-    imports
-        .service("app:console/v1", "print", move |arguments| {
-            let [Value::String(text)] = arguments else {
-                bail!("print takes one String")
-            };
-            printed.lock().unwrap().push(text.clone());
-            Ok(Ok(Value::Nil))
-        })
-        .unwrap();
-    imports
-        .service("app:storage/v1", "read", |arguments| {
-            let [Value::String(key)] = arguments else {
-                bail!("read takes one String")
-            };
-            Ok(match key.as_str() {
+    imports_with(
+        move |text| printed.lock().unwrap().push(text.to_owned()),
+        |key| {
+            Ok(match key {
                 "name" => Ok(Value::String("i".into())),
                 "fail" => bail!("the storage is gone"),
                 "int" => Err(Value::Int(BigInt::from(1))),
@@ -33,19 +22,47 @@ fn imports(log: &Log) -> HostImports {
                 "nan" => Err(Value::Float(f64::NAN)),
                 _ => Err(Value::String(format!("no {key}"))),
             })
-        })
-        .unwrap();
-    imports
-        .async_service("app:clock/v1", "later", |arguments| {
+        },
+        |arguments| {
             let value = arguments[0].clone();
-            async move {
+            Box::pin(async move {
                 match value {
                     Value::Float(x) if x < 0.0 => Ok(Err(Value::String("negative".into()))),
                     Value::Float(x) if x > 100.0 => bail!("the clock is broken"),
                     value => Ok(Ok(value)),
                 }
-            }
+            })
+        },
+    )
+}
+
+/// The host functions of host-abi.wasm, with these `print`, `read` and
+/// `later`.
+fn imports_with(
+    print: impl Fn(&str) + Send + Sync + 'static,
+    read: impl Fn(&str) -> Result<std::result::Result<Value, Value>> + Send + Sync + 'static,
+    later: impl Fn(&[Value]) -> ServiceFuture + Send + Sync + 'static,
+) -> HostImports {
+    let mut imports = HostImports::default();
+    imports
+        .service("app:console/v1", "print", move |arguments| {
+            let [Value::String(text)] = arguments else {
+                bail!("print takes one String")
+            };
+            print(text);
+            Ok(Ok(Value::Nil))
         })
+        .unwrap();
+    imports
+        .service("app:storage/v1", "read", move |arguments| {
+            let [Value::String(key)] = arguments else {
+                bail!("read takes one String")
+            };
+            read(key)
+        })
+        .unwrap();
+    imports
+        .async_service("app:clock/v1", "later", later)
         .unwrap();
     imports
         .external("app:math/v1", "hypot", |arguments| {
@@ -100,7 +117,7 @@ fn stop(outcome: Outcome) -> Stop {
 #[test]
 fn metadata_is_read_from_the_custom_section() {
     let abi = program().abi().clone();
-    assert_eq!(abi.version, 2);
+    assert_eq!(abi.version, ABI_VERSION);
     assert_eq!(abi.entry, Some(EntryPoint::new("app/main.main")));
     assert_eq!(abi.tests.len(), 6);
     assert!(abi.tests[5].is_async);
@@ -133,23 +150,25 @@ fn metadata_is_read_from_the_custom_section() {
 fn metadata_that_does_not_follow_b6_is_refused() {
     let parse = |json: &str| Abi::from_json(json.as_bytes());
     let empty =
-        r#"{"version":2,"entry":null,"tests":[],"exports":{},"services":{},"externals":{}}"#;
+        r#"{"version":3,"entry":null,"tests":[],"exports":{},"services":{},"externals":{}}"#;
     assert!(parse(empty).is_ok());
     for json in [
         r#"{"version":1,"entry":null,"tests":[],"exports":{},"services":{},"externals":{}}"#,
-        r#"{"version":2,"entry":null,"tests":[],"exports":{},"services":{}}"#,
-        r#"{"version":2,"tests":[],"exports":{},"services":{},"externals":{}}"#,
-        r#"{"version":2,"entry":null,"tests":[],"exports":{},"services":{},"externals":{},"imports":{}}"#,
-        r#"{"version":2,"entry":"main","tests":[],"exports":{},"services":{},"externals":{}}"#,
-        r#"{"version":2,"entry":null,"tests":[],"exports":{"f":{"params":[],"result":"nil","errors":["string","int"],"async":false}},"services":{},"externals":{}}"#,
-        r#"{"version":2,"entry":null,"tests":[],"exports":{"f":{"params":[],"result":"nil","errors":["int","int"],"async":false}},"services":{},"externals":{}}"#,
-        r#"{"version":2,"entry":null,"tests":[],"exports":{"f":{"params":[],"result":"nil","errors":["externref"],"async":false}},"services":{},"externals":{}}"#,
-        r#"{"version":2,"entry":null,"tests":[],"exports":{"f":{"params":["list"],"result":"nil","errors":[],"async":false}},"services":{},"externals":{}}"#,
-        r#"{"version":2,"entry":null,"tests":[],"exports":{"ilang_start":{"params":[],"result":"nil","errors":[],"async":false}},"services":{},"externals":{}}"#,
-        r#"{"version":2,"entry":{"name":"f","async":false},"tests":[],"exports":{"f":{"params":[],"result":"nil","errors":[],"async":false}},"services":{},"externals":{}}"#,
-        r#"{"version":2,"entry":null,"tests":[],"exports":{},"services":{"ilang:host/v1":{}},"externals":{}}"#,
-        r#"{"version":2,"entry":null,"tests":[],"exports":{},"services":{},"externals":{"m":{"f":{"params":[],"result":"nil","errors":["nil"]}}}}"#,
-        r#"{"version":2,"entry":null,"tests":[],"exports":{},"services":{"m":{"f":{"params":[],"result":"nil"}}},"externals":{"m":{"f":{"params":[],"result":"nil"}}}}"#,
+        r#"{"version":3,"entry":null,"tests":[],"exports":{},"services":{}}"#,
+        r#"{"version":3,"tests":[],"exports":{},"services":{},"externals":{}}"#,
+        r#"{"version":3,"entry":null,"tests":[],"exports":{},"services":{},"externals":{},"imports":{}}"#,
+        r#"{"version":3,"entry":"main","tests":[],"exports":{},"services":{},"externals":{}}"#,
+        r#"{"version":3,"entry":null,"tests":[],"exports":{"f":{"params":[],"result":"nil","errors":["string","int"],"async":false}},"services":{},"externals":{}}"#,
+        r#"{"version":3,"entry":null,"tests":[],"exports":{"f":{"params":[],"result":"nil","errors":["int","int"],"async":false}},"services":{},"externals":{}}"#,
+        r#"{"version":3,"entry":null,"tests":[],"exports":{"f":{"params":[],"result":"nil","errors":["externref"],"async":false}},"services":{},"externals":{}}"#,
+        r#"{"version":3,"entry":null,"tests":[],"exports":{"f":{"params":["list"],"result":"nil","errors":[],"async":false}},"services":{},"externals":{}}"#,
+        r#"{"version":3,"entry":null,"tests":[],"exports":{"ilang_start":{"params":[],"result":"nil","errors":[],"async":false}},"services":{},"externals":{}}"#,
+        r#"{"version":3,"entry":null,"tests":[],"exports":{"ilang_continue":{"params":[],"result":"nil","errors":[],"async":false}},"services":{},"externals":{}}"#,
+        r#"{"version":3,"entry":{"name":"ilang_continue","async":true},"tests":[],"exports":{},"services":{},"externals":{}}"#,
+        r#"{"version":3,"entry":{"name":"f","async":false},"tests":[],"exports":{"f":{"params":[],"result":"nil","errors":[],"async":false}},"services":{},"externals":{}}"#,
+        r#"{"version":3,"entry":null,"tests":[],"exports":{},"services":{"ilang:host/v1":{}},"externals":{}}"#,
+        r#"{"version":3,"entry":null,"tests":[],"exports":{},"services":{},"externals":{"m":{"f":{"params":[],"result":"nil","errors":["nil"]}}}}"#,
+        r#"{"version":3,"entry":null,"tests":[],"exports":{},"services":{"m":{"f":{"params":[],"result":"nil"}}},"externals":{"m":{"f":{"params":[],"result":"nil"}}}}"#,
     ] {
         assert!(parse(json).is_err(), "{json}");
     }
@@ -378,6 +397,31 @@ fn entry_and_tests_run_by_name_each_test_in_a_new_instance() {
             "app/async_test.waits passed".to_owned(),
         ]
     );
+}
+
+/// The runtime of `block_on` has IO when tokio is built with it (the dev
+/// dependency turns on `net`), so an async service may use tokio IO.
+#[test]
+fn block_on_gives_services_tokio_io() {
+    let later = |arguments: &[Value]| -> ServiceFuture {
+        let value = arguments[0].clone();
+        Box::pin(async move {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+            let address = listener.local_addr()?;
+            let _client = tokio::net::TcpStream::connect(address).await?;
+            listener.accept().await?;
+            Ok(Ok(value))
+        })
+    };
+    let mut instance = program()
+        .instantiate(HostOptions::new(imports_with(
+            |_| {},
+            |_| Ok(Ok(Value::Nil)),
+            later,
+        )))
+        .unwrap();
+    let value = ok(block_on(instance.call_async("app/async.later", &[Value::Float(1.5)])).unwrap());
+    assert!(matches!(value, Value::Float(2.5)));
 }
 
 #[test]
@@ -663,4 +707,1503 @@ fn a_stop_in_ilang_start_is_reported_and_the_start_is_required() {
         .err()
         .unwrap();
     assert!(format!("{error:#}").contains("ilang_start"));
+}
+
+/// Deep enough for any recursion of `app/deep` to pass [`WASM_STACK`].
+const TOO_DEEP: f64 = 100_000_000.0;
+
+#[test]
+fn deep_recursion_after_a_resume_stops_like_a_sync_call() {
+    let depth = 100_000.0;
+    let (mut instance, _) = fixture();
+    let value = ok(instance.call("app/deep", &[Value::Float(depth)]).unwrap());
+    assert!(matches!(value, Value::Float(x) if x == depth));
+    let value =
+        ok(block_on(instance.call_async("app/async.deep", &[Value::Float(depth)])).unwrap());
+    assert!(matches!(value, Value::Float(x) if x == depth));
+
+    let (mut instance, _) = fixture();
+    let on_its_own_thread = stop(
+        instance
+            .call("app/deep", &[Value::Float(TOO_DEEP)])
+            .unwrap(),
+    );
+    let (mut instance, _) = fixture();
+    let on_ilang =
+        stop(block_on(async { instance.call("app/deep", &[Value::Float(TOO_DEEP)]) }).unwrap());
+    let (mut instance, _) = fixture();
+    let resumed =
+        stop(block_on(instance.call_async("app/async.deep", &[Value::Float(TOO_DEEP)])).unwrap());
+    assert!(
+        on_its_own_thread.trap.contains("call stack exhausted"),
+        "{}",
+        on_its_own_thread.trap
+    );
+    assert_eq!(on_its_own_thread.message, None);
+    for other in [&on_ilang, &resumed] {
+        assert_eq!(other.trap, on_its_own_thread.trap);
+        assert_eq!(other.message, None);
+    }
+    assert!(instance.unusable().is_some());
+}
+
+/// `later` that answers its argument after a tokio timer of 1 ms. The timer
+/// is made in the start closure, so it needs a tokio runtime there.
+fn timer_later(arguments: &[Value]) -> ServiceFuture {
+    let value = arguments[0].clone();
+    let sleep = tokio::time::sleep(std::time::Duration::from_millis(1));
+    Box::pin(async move {
+        sleep.await;
+        Ok(Ok(value))
+    })
+}
+
+#[test]
+fn block_on_works_inside_a_tokio_runtime() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
+    let (mut instance, _) = fixture();
+    let value = runtime
+        .block_on(async { block_on(instance.call_async("app/async.later", &[Value::Float(1.5)])) });
+    assert!(matches!(ok(value.unwrap()), Value::Float(2.5)));
+    // Awaited on the caller's own runtime: every Wasm call takes the
+    // fallback path.
+    let value = runtime.block_on(instance.call_async("app/async.later", &[Value::Float(3.0)]));
+    assert!(matches!(ok(value.unwrap()), Value::Float(4.0)));
+
+    let mut instance = program()
+        .instantiate(HostOptions::new(imports_with(
+            |_| {},
+            |_| Ok(Ok(Value::Nil)),
+            timer_later,
+        )))
+        .unwrap();
+    let value = runtime.block_on(instance.call_async("app/async.later", &[Value::Float(1.5)]));
+    assert!(matches!(ok(value.unwrap()), Value::Float(2.5)));
+    let value = block_on(instance.call_async("app/async.later", &[Value::Float(5.0)]));
+    assert!(matches!(ok(value.unwrap()), Value::Float(6.0)));
+
+    // Many timers on the fallback path: the reactor of the caller's runtime
+    // answers them, the shortest first. Its clock is paused, so the order
+    // does not depend on how fast the threads of the fallback start.
+    let order = Order::default();
+    let mut instance = program()
+        .instantiate(HostOptions::new(imports_with(
+            |_| {},
+            |_| Ok(Ok(Value::Nil)),
+            timers(4, &order),
+        )))
+        .unwrap();
+    let value = runtime.block_on(async {
+        tokio::time::pause();
+        instance
+            .call_async("app/async.fan", &[Value::Float(4.0)])
+            .await
+    });
+    assert_eq!(*order.lock().unwrap(), [4, 3, 2, 1]);
+    assert!(matches!(ok(value.unwrap()), Value::Float(h) if h == fold(&[4, 3, 2, 1])));
+}
+
+type Threads = Arc<Mutex<Vec<(&'static str, std::thread::ThreadId)>>>;
+
+/// `print` and the start of `later` record the thread they run on.
+fn thread_imports(threads: &Threads) -> HostImports {
+    let mut imports = HostImports::default();
+    let printed = Arc::clone(threads);
+    imports
+        .service("app:console/v1", "print", move |_| {
+            printed
+                .lock()
+                .unwrap()
+                .push(("print", std::thread::current().id()));
+            Ok(Ok(Value::Nil))
+        })
+        .unwrap();
+    let started = Arc::clone(threads);
+    imports
+        .async_service("app:clock/v1", "later", move |arguments| {
+            started
+                .lock()
+                .unwrap()
+                .push(("later", std::thread::current().id()));
+            let value = arguments[0].clone();
+            async move { Ok(Ok(value)) }
+        })
+        .unwrap();
+    imports
+}
+
+#[test]
+fn run_entry_uses_one_thread() {
+    let threads = Threads::default();
+    let options = HostOptions::new(thread_imports(&threads));
+    let program = Program::from_bytes(ONE_THREAD).unwrap();
+    let check = |threads: &Threads| {
+        let recorded = std::mem::take(&mut *threads.lock().unwrap());
+        let count = |name| recorded.iter().filter(|(kind, _)| *kind == name).count();
+        assert_eq!((count("print"), count("later")), (4, 3), "{recorded:?}");
+        let first = recorded[0].1;
+        assert_ne!(first, std::thread::current().id());
+        assert!(recorded.iter().all(|(_, id)| *id == first), "{recorded:?}");
+    };
+    assert!(matches!(
+        program.run_entry(options.clone()).unwrap(),
+        Outcome::Ok(Value::Nil)
+    ));
+    check(&threads);
+    assert!(matches!(
+        program.run_test_with("app/test.waits", options.clone()),
+        TestResult::Passed
+    ));
+    check(&threads);
+    let reports = program.run_tests(&options);
+    assert_eq!(reports.len(), 1);
+    assert!(reports[0].passed());
+    check(&threads);
+}
+
+#[test]
+fn futures_are_send() {
+    fn send<T: Send>(_: &T) {}
+    fn send_type<T: Send>() {}
+    let (mut instance, _) = fixture();
+    {
+        let future = instance.run_async("app/async_test.waits");
+        send(&future);
+    }
+    {
+        let future = instance.call_async("app/async.later", &[Value::Float(1.0)]);
+        send(&future);
+    }
+    send_type::<ServiceFuture>();
+    send_type::<Outcome>();
+    send_type::<TestResult>();
+    send_type::<Value>();
+    send_type::<Instance>();
+}
+
+#[test]
+fn a_nested_store_gets_its_own_thread() {
+    let (mut top, _) = fixture();
+    let expected = stop(top.call("app/deep", &[Value::Float(TOO_DEEP)]).unwrap());
+
+    let inner_threads = Threads::default();
+    let recorded = Arc::clone(&inner_threads);
+    let inner = program()
+        .instantiate(HostOptions::new(imports_with(
+            move |_| {
+                recorded
+                    .lock()
+                    .unwrap()
+                    .push(("print", std::thread::current().id()));
+            },
+            |_| Ok(Ok(Value::Nil)),
+            |_| Box::pin(async { Ok(Ok(Value::Nil)) }),
+        )))
+        .unwrap();
+    inner_threads.lock().unwrap().clear();
+    let inner = Mutex::new(inner);
+    let outer_thread = Arc::new(Mutex::new(None));
+    let inner_trap = Arc::new(Mutex::new(None));
+    let (outer_seen, trap_seen) = (Arc::clone(&outer_thread), Arc::clone(&inner_trap));
+    let mut outer = program()
+        .instantiate(HostOptions::new(imports_with(
+            |_| {},
+            move |_| {
+                let current = std::thread::current();
+                *outer_seen.lock().unwrap() =
+                    Some((current.name().map(str::to_owned), current.id()));
+                let mut inner = inner.lock().unwrap();
+                ensure!(matches!(inner.run("app/main.main")?, Outcome::Ok(_)));
+                let Outcome::Stop(stop) = inner.call("app/deep", &[Value::Float(TOO_DEEP)])? else {
+                    bail!("the inner call did not stop")
+                };
+                *trap_seen.lock().unwrap() = Some(stop);
+                Ok(Ok(Value::String("i".into())))
+            },
+            |_| Box::pin(async { Ok(Ok(Value::Nil)) }),
+        )))
+        .unwrap();
+    let value = ok(
+        block_on(async { outer.call("read_through", &[Value::String("name".into())]) }).unwrap(),
+    );
+    assert!(matches!(value, Value::String(text) if text == "i"));
+    let (name, outer_id) = outer_thread.lock().unwrap().clone().unwrap();
+    assert_eq!(name.as_deref(), Some("ilang"));
+    let inner_prints = inner_threads.lock().unwrap().clone();
+    assert_eq!(inner_prints.len(), 1);
+    assert_ne!(inner_prints[0].1, outer_id);
+    let trap = inner_trap.lock().unwrap().take().unwrap();
+    assert!(
+        expected.trap.contains("call stack exhausted"),
+        "{}",
+        expected.trap
+    );
+    assert_eq!(trap.trap, expected.trap);
+    assert_eq!(trap.message, None);
+}
+
+const NO_CONTINUE: &[u8] = include_bytes!("../../../tests/browser/fixtures/no-continue.wasm");
+const WRONG_TYPES: &[u8] = include_bytes!("../../../tests/browser/fixtures/wrong-types.wasm");
+const COMPILED: &[u8] = include_bytes!("../../../tests/browser/fixtures/compiled.wasm");
+
+/// The hash that host-abi.wasm folds over the arguments of the answers, in
+/// the order they came: h = (h * 31 + x) mod (2^31 - 1).
+fn fold(arguments: &[i64]) -> f64 {
+    let mut h: i64 = 0;
+    for x in arguments {
+        h = (h * 31 + x) % 2_147_483_647;
+    }
+    h as f64
+}
+
+/// The arguments of `later`, in the order their answers were given.
+type Order = Arc<Mutex<Vec<i64>>>;
+
+/// `later` that answers 2x after a tokio timer of (n + 1 - x) ms, made in
+/// the start closure, and records x when it answers.
+fn timers(n: i64, order: &Order) -> impl Fn(&[Value]) -> ServiceFuture + Send + Sync + 'static {
+    let order = Arc::clone(order);
+    move |arguments| {
+        let [Value::Float(x)] = arguments else {
+            panic!("later takes one Float")
+        };
+        let x = *x;
+        let delay = (n + 1) as f64 - x;
+        assert!(delay >= 1.0, "a delay of at least 1 ms");
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(delay as u64);
+        let order = Arc::clone(&order);
+        Box::pin(async move {
+            tokio::time::sleep_until(deadline).await;
+            order.lock().unwrap().push(x as i64);
+            Ok(Ok(Value::Float(2.0 * x)))
+        })
+    }
+}
+
+/// A test service for `later` whose order of answers a seeded random choice
+/// decides, with no timers. Each request is a gate. When a gate is polled
+/// and no gate is released, one gate (two with `burst`) among the live ones
+/// is released; a released gate answers 2x when it is polled. A gate whose
+/// argument is 0 is held: it is never released.
+#[derive(Default)]
+struct GateState {
+    rng: u64,
+    burst: bool,
+    /// Release nothing at all.
+    hold_all: bool,
+    /// The argument whose gate fails in the host.
+    fail: Option<i64>,
+    /// The first answer is a String, not a Float.
+    wrong_type_first: bool,
+    next: u64,
+    live: Vec<u64>,
+    released: Vec<u64>,
+    wakers: HashMap<u64, std::task::Waker>,
+    starts: usize,
+    /// The arguments of the gates that answered, in order.
+    completed: Vec<i64>,
+    drops: usize,
+    /// The gates dropped before they answered: the argument, and how many
+    /// gates had answered then.
+    unfinished: Vec<(i64, usize)>,
+    /// Gates dropped while they were released and had not answered.
+    dropped_released: usize,
+}
+
+impl GateState {
+    fn random(&mut self) -> usize {
+        self.rng ^= self.rng << 13;
+        self.rng ^= self.rng >> 7;
+        self.rng ^= self.rng << 17;
+        self.rng as usize
+    }
+
+    fn wake_all(&mut self) {
+        for (_, waker) in self.wakers.drain() {
+            waker.wake();
+        }
+    }
+}
+
+type Gates = Arc<Mutex<GateState>>;
+
+fn gates(seed: u64) -> Gates {
+    Arc::new(Mutex::new(GateState {
+        rng: seed.wrapping_mul(0x9e37_79b9_7f4a_7c15) | 1,
+        ..GateState::default()
+    }))
+}
+
+struct Gate {
+    key: u64,
+    x: i64,
+    state: Gates,
+    done: bool,
+}
+
+impl Future for Gate {
+    type Output = Result<std::result::Result<Value, Value>>;
+
+    fn poll(
+        mut self: Pin<&mut Self>,
+        context: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let state = Arc::clone(&self.state);
+        let mut state = state.lock().unwrap();
+        if state.released.is_empty() && !state.live.is_empty() && !state.hold_all {
+            let count = if state.burst { 2 } else { 1 }.min(state.live.len());
+            for _ in 0..count {
+                let index = state.random() % state.live.len();
+                let key = state.live.remove(index);
+                state.released.push(key);
+                if let Some(waker) = state.wakers.remove(&key) {
+                    waker.wake();
+                }
+            }
+        }
+        let Some(index) = state.released.iter().position(|key| *key == self.key) else {
+            state.wakers.insert(self.key, context.waker().clone());
+            return std::task::Poll::Pending;
+        };
+        state.released.remove(index);
+        self.done = true;
+        let first = state.completed.is_empty();
+        state.completed.push(self.x);
+        if state.released.is_empty() {
+            state.wake_all();
+        }
+        std::task::Poll::Ready(if state.fail == Some(self.x) {
+            Err(anyhow!("the gate failed"))
+        } else if first && state.wrong_type_first {
+            Ok(Ok(Value::String("wrong".into())))
+        } else {
+            Ok(Ok(Value::Float(2.0 * self.x as f64)))
+        })
+    }
+}
+
+impl Drop for Gate {
+    fn drop(&mut self) {
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        state.drops += 1;
+        state.wakers.remove(&self.key);
+        if self.done {
+            return;
+        }
+        let answered = state.completed.len();
+        state.unfinished.push((self.x, answered));
+        state.live.retain(|key| *key != self.key);
+        if let Some(index) = state.released.iter().position(|key| *key == self.key) {
+            state.released.remove(index);
+            state.dropped_released += 1;
+            if state.released.is_empty() {
+                state.wake_all();
+            }
+        }
+    }
+}
+
+/// The host functions of host-abi.wasm, with gates for `later`.
+fn gate_imports(gates: &Gates) -> HostImports {
+    let state = Arc::clone(gates);
+    imports_with(
+        |_| {},
+        |key| {
+            Ok(match key {
+                "name" => Ok(Value::String("i".into())),
+                _ => Err(Value::String(format!("no {key}"))),
+            })
+        },
+        move |arguments| {
+            let x = match arguments {
+                [Value::Float(x)] => *x as i64,
+                _ => -1,
+            };
+            let mut locked = state.lock().unwrap();
+            locked.starts += 1;
+            let key = locked.next;
+            locked.next += 1;
+            if x != 0 {
+                locked.live.push(key);
+            }
+            Box::pin(Gate {
+                key,
+                x,
+                state: Arc::clone(&state),
+                done: false,
+            })
+        },
+    )
+}
+
+fn gated(program: &Program, gates: &Gates) -> Instance {
+    program
+        .instantiate(HostOptions::new(gate_imports(gates)))
+        .unwrap()
+}
+
+fn float(outcome: Outcome) -> f64 {
+    match ok(outcome) {
+        Value::Float(x) => x,
+        other => panic!("expected a Float, got {other:?}"),
+    }
+}
+
+fn error_text(result: Result<Outcome>) -> String {
+    match result {
+        Ok(outcome) => panic!("expected an error, got {outcome:?}"),
+        Err(error) => format!("{error:#}"),
+    }
+}
+
+#[test]
+fn many_requests_complete_out_of_order() {
+    let program = program();
+    for seed in 0..200 {
+        let n = 1 + seed % 16;
+        let gates = gates(seed);
+        let mut instance = gated(&program, &gates);
+        let h = float(
+            block_on(instance.call_async("app/async.many", &[Value::Float(n as f64)])).unwrap(),
+        );
+        {
+            let state = gates.lock().unwrap();
+            assert_eq!(h, fold(&state.completed), "seed {seed}");
+            assert_eq!(state.starts, 2 * n as usize, "seed {seed}");
+            assert_eq!(state.drops, 2 * n as usize, "seed {seed}");
+            assert!(state.unfinished.is_empty(), "seed {seed}");
+        }
+        // The ids are used again in a second call.
+        gates.lock().unwrap().completed.clear();
+        let h =
+            float(block_on(instance.call_async("app/async.many", &[Value::Float(2.0)])).unwrap());
+        assert_eq!(h, fold(&gates.lock().unwrap().completed), "seed {seed}");
+        assert!(instance.unusable().is_none());
+    }
+}
+
+#[test]
+fn timers_answer_through_the_reactor() {
+    let program = program();
+    let n = 8;
+    for _ in 0..200 {
+        let order = Order::default();
+        let mut instance = program
+            .instantiate(HostOptions::new(imports_with(
+                |_| {},
+                |_| Ok(Ok(Value::Nil)),
+                timers(n, &order),
+            )))
+            .unwrap();
+        let h = float(
+            block_on(async {
+                tokio::time::pause();
+                instance
+                    .call_async("app/async.fan", &[Value::Float(n as f64)])
+                    .await
+            })
+            .unwrap(),
+        );
+        let expected: Vec<i64> = (1..=n).rev().collect();
+        assert_eq!(*order.lock().unwrap(), expected);
+        assert_eq!(h, fold(&expected));
+    }
+}
+
+#[test]
+fn a_stop_drops_outstanding_requests() {
+    let gates = gates(7);
+    let mut instance = gated(&program(), &gates);
+    let stop = stop(block_on(instance.call_async("app/async.stop_mid", &[])).unwrap());
+    assert_eq!(stop.message.as_deref(), Some("fixture: stop"));
+    {
+        let state = gates.lock().unwrap();
+        assert_eq!(
+            (state.starts, state.drops, state.unfinished.len()),
+            (3, 3, 2)
+        );
+    }
+    assert!(instance.call("nil_roundtrip", &[]).is_err());
+}
+
+#[test]
+fn a_host_failure_drops_the_others() {
+    let gates = gates(3);
+    gates.lock().unwrap().fail = Some(2);
+    let mut instance = gated(&program(), &gates);
+    let text = error_text(block_on(
+        instance.call_async("app/async.fan", &[Value::Float(5.0)]),
+    ));
+    assert_eq!(text, "the gate failed");
+    {
+        let state = gates.lock().unwrap();
+        assert_eq!(state.drops, 5);
+        assert_eq!(state.starts, 5);
+        assert_eq!(state.unfinished.len(), 5 - state.completed.len());
+    }
+    assert!(instance.unusable().is_some());
+    assert!(instance.call("nil_roundtrip", &[]).is_err());
+}
+
+#[test]
+fn status_one_with_nothing_outstanding_is_a_fault() {
+    let gates = gates(1);
+    let mut instance = gated(&program(), &gates);
+    let text = error_text(block_on(instance.call_async("app/async.stuck", &[])));
+    assert_eq!(text, "the module waits, but no host function is running");
+    assert_eq!(instance.unusable(), Some(text.as_str()));
+}
+
+#[test]
+fn duplicate_or_negative_id_traps() {
+    for (name, text, starts) in [
+        ("app/async.dup", "the module started request 7 twice", 1),
+        (
+            "app/async.negative",
+            "the module started request -1, which is below 0",
+            0,
+        ),
+    ] {
+        let gates = gates(1);
+        let mut instance = gated(&program(), &gates);
+        assert_eq!(error_text(block_on(instance.call_async(name, &[]))), text);
+        assert!(instance.unusable().is_some());
+        let state = gates.lock().unwrap();
+        assert_eq!(state.starts, starts, "{name}");
+        assert_eq!(state.drops, starts, "{name}");
+    }
+}
+
+#[test]
+fn a_sync_call_may_not_start_requests() {
+    let program = program();
+    let started = |id: i32| format!("the module started request {id} outside an async call");
+    let cancelled = |id: i32| format!("the module cancelled request {id} outside an async call");
+    // Sync exports, and imports made from ilang_alloc during an import.
+    for (name, text, starts) in [
+        ("app/sync.starts", started(3), 0),
+        ("app/sync.cancels", cancelled(0), 0),
+        ("app/async.nested", started(77), 0),
+        ("app/async.nested_cancel", cancelled(5), 1),
+        ("app/async.result_starts", started(6), 1),
+        ("app/async.result_cancels", cancelled(0), 1),
+    ] {
+        let gates = gates(1);
+        let mut instance = gated(&program, &gates);
+        let result = if name.starts_with("app/sync.") {
+            instance.call(name, &[])
+        } else {
+            block_on(instance.call_async(name, &[]))
+        };
+        assert_eq!(error_text(result), text, "{name}");
+        assert_eq!(instance.unusable(), Some(text.as_str()), "{name}");
+        assert_eq!(gates.lock().unwrap().starts, starts, "{name}");
+    }
+    // ilang_start.
+    let bytes = wat::parse_str(
+        r#"(module
+        (import "app:clock/v1" "later" (func $later (param i32 f64)))
+        (func (export "ilang_start") (call $later (i32.const 0) (f64.const 1))))"#,
+    )
+    .unwrap();
+    let mut abi = Abi::default();
+    abi.services.insert(
+        "app:clock/v1".into(),
+        BTreeMap::from([(
+            "later".to_owned(),
+            Signature::new([AbiType::Float], AbiType::Float).asynchronous(),
+        )]),
+    );
+    let gates = gates(1);
+    let error = Program::from_bytes(&bytes)
+        .unwrap()
+        .with_abi(abi)
+        .unwrap()
+        .instantiate(HostOptions::new(gate_imports(&gates)))
+        .err()
+        .unwrap();
+    assert_eq!(format!("{error:#}"), started(0));
+    assert_eq!(gates.lock().unwrap().starts, 0);
+}
+
+#[test]
+fn leftovers_are_dropped_at_status_zero() {
+    let program = program();
+    let gates = gates(5);
+    let mut instance = gated(&program, &gates);
+    let h = float(block_on(instance.call_async("app/async.leftover", &[])).unwrap());
+    {
+        let state = gates.lock().unwrap();
+        assert_eq!(state.completed.len(), 1);
+        assert_eq!(h, fold(&state.completed));
+        assert_eq!(
+            (state.starts, state.drops, state.unfinished.len()),
+            (3, 3, 2)
+        );
+    }
+    assert!(instance.unusable().is_none());
+    gates.lock().unwrap().completed.clear();
+    let h = float(block_on(instance.call_async("app/async.many", &[Value::Float(3.0)])).unwrap());
+    assert_eq!(h, fold(&gates.lock().unwrap().completed));
+}
+
+/// Calls an async export of an instance directly, as if the host ran it,
+/// so that a test can then make calls that a host never makes.
+fn raw_async(instance: &mut Instance, name: &str, params: &[Val]) -> i32 {
+    instance.store.data_mut().requests.set_accepting(true);
+    let function = instance
+        .instance
+        .get_func(&mut instance.store, name)
+        .unwrap();
+    let mut status = [Val::I32(0)];
+    function
+        .call(&mut instance.store, params, &mut status)
+        .unwrap();
+    instance.store.data_mut().requests.set_accepting(false);
+    status[0].unwrap_i32()
+}
+
+#[test]
+fn a_wrong_resume_traps() {
+    let resume = "ilang_resume:app:clock/v1:later";
+    let call = |instance: &mut Instance, name: &str, params: &[Val]| {
+        let function = instance
+            .instance
+            .get_func(&mut instance.store, name)
+            .unwrap();
+        let mut status = [Val::I32(0)];
+        let error = function
+            .call(&mut instance.store, params, &mut status)
+            .unwrap_err();
+        assert!(format!("{error:?}").contains("unreachable"), "{error:?}");
+        assert_eq!(instance.store.data().stop_message, None);
+    };
+    let answer = |id: i32| {
+        [
+            Val::I32(id),
+            Val::I32(0),
+            Val::F64(2_f64.to_bits()),
+            Val::I32(0),
+            Val::I32(0),
+        ]
+    };
+    // An id that is not outstanding.
+    let gates = gates(1);
+    let mut instance = gated(&program(), &gates);
+    assert_eq!(
+        raw_async(
+            &mut instance,
+            "app/async.later",
+            &[Val::F64(1_f64.to_bits())]
+        ),
+        1
+    );
+    call(&mut instance, resume, &answer(9));
+    // An id that was answered already.
+    let mut instance = gated(&program(), &gates);
+    assert_eq!(
+        raw_async(
+            &mut instance,
+            "app/async.later",
+            &[Val::F64(1_f64.to_bits())]
+        ),
+        1
+    );
+    instance.store.data_mut().requests.set_accepting(true);
+    let function = instance
+        .instance
+        .get_func(&mut instance.store, resume)
+        .unwrap();
+    let mut status = [Val::I32(0)];
+    function
+        .call(&mut instance.store, &answer(0), &mut status)
+        .unwrap();
+    instance.store.data_mut().requests.set_accepting(false);
+    assert_eq!(status[0].unwrap_i32(), 1);
+    call(&mut instance, resume, &answer(0));
+    // A module built by the compiler, answered for another import.
+    let mut imports = gate_imports(&gates);
+    imports
+        .async_service("app:clock/v1", "tick", |_| async {
+            Ok(Ok(Value::Int(1.into())))
+        })
+        .unwrap();
+    let mut compiled = Program::from_bytes(COMPILED)
+        .unwrap()
+        .instantiate(HostOptions::new(imports))
+        .unwrap();
+    let two = [Val::F64(1_f64.to_bits()), Val::F64(2_f64.to_bits())];
+    assert_eq!(raw_async(&mut compiled, "app/app.wait_sum", &two), 1);
+    call(
+        &mut compiled,
+        "ilang_resume:app:clock/v1:tick",
+        &[Val::I32(0), Val::I32(1), Val::I32(0), Val::I32(0)],
+    );
+}
+
+#[test]
+fn dropping_a_waiting_call_makes_the_instance_unusable() {
+    let gates = gates(1);
+    gates.lock().unwrap().hold_all = true;
+    let mut instance = gated(&program(), &gates);
+    {
+        let mut call = Box::pin(instance.call_async("app/async.many", &[Value::Float(3.0)]));
+        let polled = call
+            .as_mut()
+            .poll(&mut std::task::Context::from_waker(std::task::Waker::noop()));
+        assert!(polled.is_pending());
+        assert_eq!(gates.lock().unwrap().drops, 0);
+    }
+    {
+        let state = gates.lock().unwrap();
+        assert_eq!(
+            (state.starts, state.drops, state.unfinished.len()),
+            (3, 3, 3)
+        );
+    }
+    assert_eq!(
+        instance.unusable(),
+        Some("an async call was dropped while it waited")
+    );
+    assert!(instance.call("nil_roundtrip", &[]).is_err());
+}
+
+#[test]
+fn old_and_new_versions_are_refused() {
+    let json = |version: u32| {
+        format!(
+            r#"{{"version":{version},"entry":null,"tests":[],"exports":{{}},"services":{{}},"externals":{{}}}}"#
+        )
+    };
+    for version in [1, ABI_VERSION - 1] {
+        let error = Abi::from_json(json(version).as_bytes()).unwrap_err();
+        assert_eq!(
+            format!("{error:#}"),
+            format!(
+                "the module uses i ABI version {version}; build it again with this version of i"
+            )
+        );
+    }
+    let error = Abi::from_json(json(ABI_VERSION + 1).as_bytes()).unwrap_err();
+    assert_eq!(
+        format!("{error:#}"),
+        format!(
+            "the module uses i ABI version {}, but this host reads version {ABI_VERSION}; update the host",
+            ABI_VERSION + 1
+        )
+    );
+    assert!(Abi::from_json(json(ABI_VERSION).as_bytes()).is_ok());
+}
+
+#[test]
+fn a_sync_service_may_block_on_its_own_thread() {
+    let program = Program::from_bytes(ONE_THREAD).unwrap();
+    let options = |own_thread: bool| {
+        let mut imports = HostImports::default();
+        imports
+            .service("app:console/v1", "print", move |_| {
+                let work = || {
+                    tokio::runtime::Builder::new_current_thread()
+                        .build()
+                        .unwrap()
+                        .block_on(async { 1 })
+                };
+                let value = if own_thread {
+                    std::thread::spawn(work).join().unwrap()
+                } else {
+                    work()
+                };
+                ensure!(value == 1);
+                Ok(Ok(Value::Nil))
+            })
+            .unwrap();
+        imports
+            .async_service("app:clock/v1", "later", |arguments| {
+                let value = arguments[0].clone();
+                async move { Ok(Ok(value)) }
+            })
+            .unwrap();
+        HostOptions::new(imports)
+    };
+    assert!(matches!(
+        program.run_entry(options(true)).unwrap(),
+        Outcome::Ok(Value::Nil)
+    ));
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        program.run_entry(options(false))
+    }))
+    .unwrap_err();
+    let text = panic
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| panic.downcast_ref::<&str>().map(|text| text.to_string()))
+        .unwrap();
+    assert!(
+        text.contains("Cannot start a runtime from within a runtime"),
+        "{text}"
+    );
+}
+
+#[test]
+fn cancel_drops_one_request() {
+    let program = program();
+    for seed in 0..200 {
+        let n = 2 + seed % 15;
+        let gates = gates(seed);
+        let mut instance = gated(&program, &gates);
+        let h = float(
+            block_on(instance.call_async("app/async.cancel", &[Value::Float(n as f64)])).unwrap(),
+        );
+        let state = gates.lock().unwrap();
+        assert_eq!(h, fold(&state.completed), "seed {seed}");
+        assert_eq!((state.starts, state.drops), (n as usize, n as usize));
+        let cancelled = n as usize / 2;
+        assert_eq!(state.completed.len(), n as usize - cancelled, "seed {seed}");
+        // Each was dropped inside the resume of the answer that cancelled it.
+        let answered_then: Vec<usize> = state.unfinished.iter().map(|(_, at)| *at).collect();
+        assert_eq!(
+            answered_then,
+            (1..=cancelled).collect::<Vec<_>>(),
+            "seed {seed}"
+        );
+        assert!(instance.unusable().is_none());
+    }
+    let gates = gates(1);
+    let mut instance = gated(&program, &gates);
+    assert_eq!(
+        error_text(block_on(instance.call_async("app/async.cancel_bad", &[]))),
+        "the module cancelled request 12345, which is not outstanding"
+    );
+    assert!(instance.unusable().is_some());
+}
+
+#[test]
+fn status_two_gives_ready_answers() {
+    let program = program();
+    let mut imports = imports(&Log::default());
+    imports = {
+        let mut ready = HostImports::default();
+        for ((module, name), function) in imports.0 {
+            if name != "later" {
+                ready.insert(module, name, function).unwrap();
+            }
+        }
+        ready
+            .async_service("app:clock/v1", "later", |arguments| {
+                let [Value::Float(x)] = arguments else {
+                    panic!("later takes one Float")
+                };
+                let answer = Value::Float(2.0 * x);
+                async move { Ok(Ok(answer)) }
+            })
+            .unwrap();
+        ready
+    };
+    let mut instance = program.instantiate(HostOptions::new(imports)).unwrap();
+    let count = float(
+        block_on(instance.call_async("app/async.yielding", &[Value::Float(1000.0)])).unwrap(),
+    );
+    assert!((1.0..1000.0).contains(&count), "{count}");
+    // A timer in real time: the yield lets the timer driver run.
+    let order = Order::default();
+    let mut instance = program
+        .instantiate(HostOptions::new(imports_with(
+            |_| {},
+            |_| Ok(Ok(Value::Nil)),
+            timers(1, &order),
+        )))
+        .unwrap();
+    let count =
+        float(block_on(instance.call_async("app/async.yielding", &[Value::Float(1e7)])).unwrap());
+    assert!((1.0..1e7).contains(&count), "{count}");
+    assert_eq!(*order.lock().unwrap(), [1]);
+}
+
+#[test]
+fn every_return_from_wait_drops_the_requests() {
+    let gates = gates(2);
+    gates.lock().unwrap().wrong_type_first = true;
+    let mut instance = gated(&program(), &gates);
+    let stop = stop(block_on(instance.call_async("app/async.fan", &[Value::Float(3.0)])).unwrap());
+    assert_eq!(stop.message.as_deref(), Some(HOST_VALUE_REASON));
+    {
+        let state = gates.lock().unwrap();
+        assert_eq!(
+            (state.starts, state.drops, state.unfinished.len()),
+            (3, 3, 2)
+        );
+    }
+    assert_eq!(instance.unusable(), Some(HOST_VALUE_REASON));
+}
+
+#[test]
+fn cancel_and_reuse_with_a_finished_answer() {
+    let program = program();
+    let mut dropped_released = 0;
+    for seed in 0..200 {
+        let n = 2 + seed % 15;
+        let gates = gates(seed);
+        gates.lock().unwrap().burst = true;
+        let mut instance = gated(&program, &gates);
+        let outcome =
+            block_on(instance.call_async("app/async.cancel_reuse", &[Value::Float(n as f64)]))
+                .unwrap();
+        let h = float(outcome);
+        let state = gates.lock().unwrap();
+        assert_eq!(h, fold(&state.completed), "seed {seed}");
+        assert_eq!(state.drops, state.starts, "seed {seed}");
+        assert_eq!(state.completed.len() + state.unfinished.len(), state.starts);
+        dropped_released += state.dropped_released;
+    }
+    assert!(dropped_released > 0);
+}
+
+#[test]
+fn requests_from_ilang_continue() {
+    let program = program();
+    for seed in 0..200 {
+        let n = 2 + seed % 8;
+        let gates = gates(seed);
+        let mut instance = gated(&program, &gates);
+        let h = float(
+            block_on(instance.call_async("app/async.continue_io", &[Value::Float(n as f64)]))
+                .unwrap(),
+        );
+        let state = gates.lock().unwrap();
+        assert_eq!(h, fold(&state.completed), "seed {seed}");
+        assert_eq!(state.starts, n as usize);
+        assert_eq!(state.completed.len(), n as usize - 1);
+        // The held request was cancelled inside the second ilang_continue.
+        assert_eq!(state.unfinished.len(), 1);
+        assert_eq!(state.unfinished[0].0, 0);
+        assert!(!state.completed.contains(&0));
+    }
+}
+
+fn fault_imports(gates: &Gates) -> HostImports {
+    let mut imports = gate_imports(gates);
+    imports
+        .async_service("app:clock/v1", "ready", |_| async { Ok(Ok(Value::Nil)) })
+        .unwrap();
+    imports
+}
+
+/// B.5 requires exports when a request starts or status 2 is returned,
+/// even when an answer is ready, the entry ends, or the request is cancelled.
+#[test]
+fn required_exports_are_checked_before_delivery_or_drop() {
+    for (bytes, bad_resume) in [(NO_CONTINUE, "no_resume"), (WRONG_TYPES, "bad_resume")] {
+        let program = Program::from_bytes(bytes).unwrap();
+        for suffix in [
+            "runnable_ready".to_owned(),
+            format!("{bad_resume}_done"),
+            format!("{bad_resume}_cancel"),
+        ] {
+            let gates = gates(1);
+            let mut instance = program
+                .instantiate(HostOptions::new(fault_imports(&gates)))
+                .unwrap();
+            let text = error_text(block_on(
+                instance.call_async(&format!("app/async.{suffix}"), &[]),
+            ));
+            let expected = if suffix == "runnable_ready" {
+                "the module is runnable, but has no ilang_continue"
+            } else {
+                "the module does not export ilang_resume:app:clock/v1:later"
+            };
+            assert_eq!(text, expected, "{suffix}");
+            assert_eq!(instance.unusable(), Some(expected), "{suffix}");
+            assert!(instance.call("app/sync.nil", &[]).is_err(), "{suffix}");
+            // Neither an answer, a result export, nor the refused sync call ran.
+            assert_eq!(raw(&mut instance, "calls"), 0, "{suffix}");
+            assert!(instance.store.data().requests.is_empty());
+            if suffix != "runnable_ready" {
+                let state = gates.lock().unwrap();
+                assert_eq!(state.starts, 1);
+                assert_eq!(state.drops, 1);
+                assert!(state.completed.is_empty());
+            }
+        }
+    }
+}
+
+#[test]
+fn bad_statuses_are_faults() {
+    let gates = gates(1);
+    let mut instance = gated(&program(), &gates);
+    let text = error_text(block_on(instance.call_async("app/async.bad_status", &[])));
+    assert_eq!(
+        text,
+        "export app/async.bad_status gave the status Some(7), which is not 0, 1 or 2"
+    );
+    assert!(instance.unusable().is_some());
+
+    let no_continue = Program::from_bytes(NO_CONTINUE).unwrap();
+    let mut instance = no_continue
+        .instantiate(HostOptions::new(fault_imports(&gates)))
+        .unwrap();
+    let text = error_text(block_on(instance.call_async("app/async.runnable", &[])));
+    assert_eq!(text, "the module is runnable, but has no ilang_continue");
+    assert_eq!(instance.unusable(), Some(text.as_str()));
+
+    let gates = self::gates(1);
+    let mut instance = no_continue
+        .instantiate(HostOptions::new(fault_imports(&gates)))
+        .unwrap();
+    let text = error_text(block_on(instance.call_async("app/async.no_resume", &[])));
+    assert_eq!(
+        text,
+        "the module does not export ilang_resume:app:clock/v1:later"
+    );
+    assert_eq!(instance.unusable(), Some(text.as_str()));
+    assert!(instance.call("app/sync.nil", &[]).is_err());
+    assert_eq!(raw(&mut instance, "calls"), 0);
+    assert_eq!(gates.lock().unwrap().drops, 1);
+
+    // ilang_continue right after status 1 traps.
+    let mut instance = gated(&program(), &gates);
+    assert_eq!(
+        raw_async(
+            &mut instance,
+            "app/async.later",
+            &[Val::F64(1_f64.to_bits())]
+        ),
+        1
+    );
+    assert!(
+        instance
+            .instance
+            .get_typed_func::<(), i32>(&mut instance.store, "ilang_continue")
+            .unwrap()
+            .call(&mut instance.store, ())
+            .is_err()
+    );
+}
+
+/// `ilang_continue` and `ilang_resume:…` exports of the wrong type are
+/// faults (B.5), like missing ones, and the host never calls them.
+#[test]
+fn exports_of_the_wrong_type_are_faults() {
+    let wrong = Program::from_bytes(WRONG_TYPES).unwrap();
+    for (name, text, drops) in [
+        (
+            "app/async.runnable",
+            "the module is runnable, but has no ilang_continue",
+            0,
+        ),
+        (
+            "app/async.bad_resume",
+            "the module does not export ilang_resume:app:clock/v1:later",
+            1,
+        ),
+    ] {
+        let gates = gates(1);
+        let mut instance = wrong
+            .instantiate(HostOptions::new(fault_imports(&gates)))
+            .unwrap();
+        let error = error_text(block_on(instance.call_async(name, &[])));
+        assert_eq!(error, text, "{name}");
+        assert_eq!(instance.unusable(), Some(text), "{name}");
+        assert!(instance.call("app/sync.nil", &[]).is_err(), "{name}");
+        assert_eq!(raw(&mut instance, "calls"), 0, "{name}");
+        assert_eq!(gates.lock().unwrap().drops, drops, "{name}");
+    }
+}
+
+#[test]
+fn a_finished_program_does_not_wait_for_blocking_work() {
+    for name in ["app/async.leftover", "app/async.stop_mid"] {
+        let running = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let starts = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let (seen, counted) = (Arc::clone(&running), Arc::clone(&starts));
+        let options = HostOptions::new(imports_with(
+            |_| {},
+            |_| Ok(Ok(Value::Nil)),
+            move |arguments| {
+                let answer = match arguments {
+                    [Value::Float(x)] => Value::Float(2.0 * x),
+                    _ => Value::Nil,
+                };
+                let running = Arc::clone(&seen);
+                if counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+                    // The first request answers once both blocking closures run.
+                    return Box::pin(async move {
+                        while running.load(std::sync::atomic::Ordering::SeqCst) < 2 {
+                            tokio::task::yield_now().await;
+                        }
+                        Ok(Ok(answer))
+                    });
+                }
+                let blocking = tokio::task::spawn_blocking(move || {
+                    running.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    std::thread::sleep(std::time::Duration::from_secs(30));
+                });
+                Box::pin(async move {
+                    blocking.await?;
+                    Ok(Ok(answer))
+                })
+            },
+        ));
+        let mut instance = program().instantiate(options).unwrap();
+        let begin = std::time::Instant::now();
+        let outcome = block_on(instance.call_async(name, &[])).unwrap();
+        assert!(
+            begin.elapsed() < std::time::Duration::from_secs(5),
+            "{name}"
+        );
+        assert_eq!(
+            running.load(std::sync::atomic::Ordering::SeqCst),
+            2,
+            "{name}"
+        );
+        match (name, outcome) {
+            ("app/async.leftover", Outcome::Ok(Value::Float(_))) => {}
+            ("app/async.stop_mid", Outcome::Stop(stop)) => {
+                assert_eq!(stop.message.as_deref(), Some("fixture: stop"));
+            }
+            (_, other) => panic!("{name}: {other:?}"),
+        }
+    }
+}
+
+/// Finding C-1-1: a request whose work wakes itself during its own poll
+/// must not be polled again in the same call; the wait must give the
+/// executor a turn first.
+mod self_waking_work {
+    use crate::requests::{Request, Requests};
+    use crate::{AbiType, ServiceFuture, Signature, Value};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    };
+    use std::task::Poll;
+
+    /// How many times the busy work may be polled before it gives up.
+    const LIMIT: usize = 1_000_000;
+
+    fn request(label: &str) -> Request {
+        Request {
+            namespace: "test".into(),
+            label: label.into(),
+            signature: Signature::new([], AbiType::Nil),
+        }
+    }
+
+    /// Work that wakes itself and stays pending until `flag` is set. It
+    /// gives up after LIMIT polls and records that in `gave_up`.
+    fn busy(
+        flag: Arc<AtomicBool>,
+        polls: Arc<AtomicUsize>,
+        gave_up: Arc<AtomicBool>,
+    ) -> ServiceFuture {
+        Box::pin(std::future::poll_fn(move |context| {
+            let n = polls.fetch_add(1, Ordering::SeqCst) + 1;
+            if flag.load(Ordering::SeqCst) {
+                return Poll::Ready(Ok(Ok(Value::Nil)));
+            }
+            if n >= LIMIT {
+                gave_up.store(true, Ordering::SeqCst);
+                return Poll::Ready(Ok(Ok(Value::Nil)));
+            }
+            context.waker().wake_by_ref();
+            Poll::Pending
+        }))
+    }
+
+    #[test]
+    fn ready_polls_self_waking_work_once_per_call() {
+        let flag = Arc::new(AtomicBool::new(false));
+        let polls = Arc::new(AtomicUsize::new(0));
+        let gave_up = Arc::new(AtomicBool::new(false));
+        let mut requests = Requests::default();
+        requests.insert(
+            0,
+            request("busy"),
+            busy(flag, Arc::clone(&polls), Arc::clone(&gave_up)),
+        );
+        let done = requests.ready();
+        assert!(
+            done.is_none(),
+            "ready() should give nothing for work that is still pending, \
+             but the work was polled {} times until it gave up",
+            polls.load(Ordering::SeqCst)
+        );
+        assert_eq!(
+            polls.load(Ordering::SeqCst),
+            1,
+            "one call of ready() polls the work once"
+        );
+        assert!(!gave_up.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn next_lets_a_timer_fire_while_other_work_spins() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+        let flag = Arc::new(AtomicBool::new(false));
+        let polls = Arc::new(AtomicUsize::new(0));
+        let gave_up = Arc::new(AtomicBool::new(false));
+        let mut requests = Requests::default();
+        requests.insert(
+            0,
+            request("busy"),
+            busy(Arc::clone(&flag), Arc::clone(&polls), Arc::clone(&gave_up)),
+        );
+        let setter = Arc::clone(&flag);
+        requests.insert(
+            1,
+            request("timer"),
+            Box::pin(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+                setter.store(true, Ordering::SeqCst);
+                Ok(Ok(Value::Nil))
+            }),
+        );
+        let mut order = Vec::new();
+        runtime.block_on(async {
+            while let Some((id, _, reply)) = requests.next().await {
+                reply.unwrap().unwrap();
+                order.push(id);
+            }
+        });
+        assert!(
+            !gave_up.load(Ordering::SeqCst),
+            "the busy work spun {} polls inside one wait and the timer never fired \
+             (answers in order {order:?})",
+            polls.load(Ordering::SeqCst)
+        );
+        assert_eq!(order, [1, 0]);
+    }
+}
+
+/// H8 and H11a apply to traps during buffer allocation too. The first
+/// request is ready; the other two stay pending until the host drops them.
+fn allocation_fault_program(allocation: &str) -> Program {
+    let bytes = wat::parse_str(format!(
+        r#"(module
+        (import "ilang:host/v1" "panic" (func $panic (param i32 i32)))
+        (import "test:work/v1" "work" (func $work (param i32)))
+        (memory (export "memory") 1)
+        (data (i32.const 0) "allocator stop")
+        (func (export "ilang_start"))
+        (func (export "ilang_alloc") (param i32) (result i32)
+          {allocation} (i32.const 32))
+        (func (export "ilang_free") (param i32 i32))
+        (func (export "app/reply") (result i32)
+          (call $work (i32.const 0))
+          (call $work (i32.const 1))
+          (call $work (i32.const 2)) (i32.const 1))
+        (func (export "ilang_resume:test:work/v1:work") (param i32 i32 i32) (result i32)
+          (i32.const 0))
+        (func (export "ilang_result:app/reply"))
+        (func (export "app/params") (param i32 i32) (result i32) (i32.const 0))
+        (func (export "ilang_result:app/params")))"#
+    ))
+    .unwrap();
+    let mut abi = Abi::default();
+    abi.exports.insert(
+        "app/reply".into(),
+        Signature::new([], AbiType::Nil).asynchronous(),
+    );
+    abi.exports.insert(
+        "app/params".into(),
+        Signature::new([AbiType::String], AbiType::Nil).asynchronous(),
+    );
+    abi.services.insert(
+        "test:work/v1".into(),
+        BTreeMap::from([(
+            "work".into(),
+            Signature::new([], AbiType::String).asynchronous(),
+        )]),
+    );
+    Program::from_bytes(&bytes).unwrap().with_abi(abi).unwrap()
+}
+
+#[test]
+fn allocation_traps_preserve_stops_and_the_first_failure() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct Dropped(Arc<AtomicUsize>);
+    impl Drop for Dropped {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    for allocation in [
+        "unreachable",
+        "(call $panic (i32.const 0) (i32.const 14)) unreachable",
+        "(call $work (i32.const 99))",
+    ] {
+        let program = allocation_fault_program(allocation);
+        for name in ["app/reply", "app/params"] {
+            let starts = Arc::new(AtomicUsize::new(0));
+            let drops = Arc::new(AtomicUsize::new(0));
+            let (started, dropped) = (Arc::clone(&starts), Arc::clone(&drops));
+            let mut imports = HostImports::default();
+            imports
+                .async_service("test:work/v1", "work", move |_| {
+                    let first = started.fetch_add(1, Ordering::SeqCst) == 0;
+                    let guard = Dropped(Arc::clone(&dropped));
+                    async move {
+                        let _guard = guard;
+                        if !first {
+                            std::future::pending::<()>().await;
+                        }
+                        Ok(Ok(Value::String("answer".into())))
+                    }
+                })
+                .unwrap();
+            let mut instance = program.instantiate(HostOptions::new(imports)).unwrap();
+            let args = if name == "app/params" {
+                vec![Value::String("input".into())]
+            } else {
+                vec![]
+            };
+            let outcome = block_on(instance.call_async(name, &args));
+            if allocation.contains("$work") {
+                assert_eq!(
+                    error_text(outcome),
+                    "the module started request 99 outside an async call",
+                    "{name}"
+                );
+            } else {
+                let stopped = stop(outcome.unwrap());
+                assert_eq!(
+                    stopped.message.as_deref(),
+                    allocation.contains("$panic").then_some("allocator stop"),
+                    "{name}"
+                );
+            }
+            let expected_starts = if name == "app/reply" { 3 } else { 0 };
+            assert_eq!(starts.load(Ordering::SeqCst), expected_starts, "{name}");
+            assert_eq!(drops.load(Ordering::SeqCst), expected_starts, "{name}");
+            assert!(instance.unusable().is_some());
+            assert!(instance.store.data().requests.is_empty());
+        }
+    }
+}
+
+/// Design §10.1's countdown work wakes itself for a seeded number of
+/// polls. Unlike a gate, it makes no promise about completion order.
+#[test]
+fn countdown_requests_match_the_observed_answer_order() {
+    let program = program();
+    for seed in 0..200_u64 {
+        let order = Order::default();
+        let recorded = Arc::clone(&order);
+        let countdown = move |arguments: &[Value]| -> ServiceFuture {
+            let [Value::Float(x)] = arguments else {
+                panic!("later takes one Float")
+            };
+            let x = *x as i64;
+            let mut polls = (seed ^ (x as u64).wrapping_mul(37)) % 11;
+            let recorded = Arc::clone(&recorded);
+            Box::pin(std::future::poll_fn(move |context| {
+                if polls > 0 {
+                    polls -= 1;
+                    context.waker().wake_by_ref();
+                    return std::task::Poll::Pending;
+                }
+                recorded.lock().unwrap().push(x);
+                std::task::Poll::Ready(Ok(Ok(Value::Float(2.0 * x as f64))))
+            }))
+        };
+        let mut instance = program
+            .instantiate(HostOptions::new(imports_with(
+                |_| {},
+                |_| Ok(Ok(Value::Nil)),
+                countdown,
+            )))
+            .unwrap();
+        let n = 1 + seed % 16;
+        let h = float(
+            block_on(instance.call_async("app/async.many", &[Value::Float(n as f64)])).unwrap(),
+        );
+        let order = order.lock().unwrap();
+        assert_eq!(order.len(), 2 * n as usize, "seed {seed}");
+        assert_eq!(h, fold(&order), "seed {seed}");
+        assert!(instance.unusable().is_none());
+    }
+}
+
+/// D5's nested-store rule also applies while the host calls ilang_alloc or
+/// ilang_free outside the entry export itself (parameter/result buffers).
+#[test]
+fn a_nested_store_in_the_allocator_gets_its_own_thread() {
+    let threads = Threads::default();
+    let recorded = Arc::clone(&threads);
+    let inner = program()
+        .instantiate(HostOptions::new(imports_with(
+            move |_| {
+                recorded
+                    .lock()
+                    .unwrap()
+                    .push(("print", std::thread::current().id()));
+            },
+            |_| Ok(Ok(Value::Nil)),
+            |_| Box::pin(async { Ok(Ok(Value::Nil)) }),
+        )))
+        .unwrap();
+    threads.lock().unwrap().clear();
+    let inner = Mutex::new(inner);
+    let bytes = wat::parse_str(
+        r#"(module
+        (import "test:allocation/v1" "touch" (func $touch))
+        (memory (export "memory") 1)
+        (func (export "ilang_start"))
+        (func (export "ilang_alloc") (param i32) (result i32)
+          (call $touch) (i32.const 32))
+        (func (export "ilang_free") (param i32 i32) (call $touch))
+        (func (export "app/buffer") (param i32 i32) (result i32) (i32.const 0))
+        (func (export "ilang_result:app/buffer")))"#,
+    )
+    .unwrap();
+    let mut abi = Abi::default();
+    abi.exports.insert(
+        "app/buffer".into(),
+        Signature::new([AbiType::String], AbiType::Nil).asynchronous(),
+    );
+    abi.services.insert(
+        "test:allocation/v1".into(),
+        BTreeMap::from([("touch".into(), Signature::new([], AbiType::Nil))]),
+    );
+    let mut imports = HostImports::default();
+    imports
+        .service("test:allocation/v1", "touch", move |_| {
+            ensure!(matches!(
+                inner.lock().unwrap().run("app/main.main")?,
+                Outcome::Ok(_)
+            ));
+            Ok(Ok(Value::Nil))
+        })
+        .unwrap();
+    let mut instance = Program::from_bytes(&bytes)
+        .unwrap()
+        .with_abi(abi)
+        .unwrap()
+        .instantiate(HostOptions::new(imports))
+        .unwrap();
+    let outer = block_on(async {
+        assert!(matches!(
+            instance
+                .call_async("app/buffer", &[Value::String("input".into())])
+                .await
+                .unwrap(),
+            Outcome::Ok(Value::Nil)
+        ));
+        std::thread::current().id()
+    });
+    let recorded = threads.lock().unwrap();
+    assert_eq!(
+        recorded.len(),
+        2,
+        "both allocation and free enter the inner store"
+    );
+    assert!(recorded.iter().all(|(_, id)| *id != outer), "{recorded:?}");
 }

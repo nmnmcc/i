@@ -132,12 +132,15 @@ pub fn wat(p: &Program) -> String {
         if x.kind == ImportKind::WasiStdout {
             continue;
         }
-        let params: Vec<&str> = x
+        let mut params: Vec<&str> = x
             .abi
             .params
             .iter()
             .flat_map(|t| abi_in(*t).0.iter().copied())
             .collect();
+        if x.kind == ImportKind::AsyncService {
+            params.insert(0, "i32");
+        }
         let results = if x.kind == ImportKind::AsyncService {
             String::new()
         } else {
