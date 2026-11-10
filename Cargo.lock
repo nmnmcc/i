@@ -694,6 +694,7 @@ dependencies = [
  "num-bigint",
  "serde",
  "serde_json",
+ "tokio",
  "wasmparser 0.262.0",
  "wasmtime",
  "wat",
@@ -1222,6 +1223,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "tokio"
+version = "1.53.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e"
+dependencies = [
+ "pin-project-lite",
 ]
 
 [[package]]

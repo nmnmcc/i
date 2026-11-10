@@ -135,8 +135,26 @@ starts the work and gives a future. `Instance::call_async` and
 `Instance::run_async` call an async export: while the status is 1, they await
 the future of the one host function that the module started, give its value to
 `ilang_resume:namespace:label`, and at status 0 read the results from
-`ilang_result:name`. `ilang_host::block_on` drives such a call without an
-executor.
+`ilang_result:name`.
+
+`ilang_host::block_on` runs such a call on one new thread named `ilang`, with a
+stack of `THREAD_STACK` bytes and a tokio `current_thread` runtime with time
+enabled; every Wasm call of the future runs directly on that thread. It needs a
+`Send` future; with a future that is not `Send`, await `call_async` on your own
+executor. `Program::run_entry`, `Program::run_test_with` and
+`Program::run_tests` run each program or test inside one `block_on`.
+
+Called from a thread that `block_on` did not start, each Wasm call starts its
+own thread with a stack of `THREAD_STACK` bytes, and the futures of the
+services are polled where the call is awaited. Await it inside a tokio runtime
+with time and IO enabled when a service uses tokio; otherwise such a service
+panics with tokio's message. A Wasm call made from inside a host function, for
+example into a second instance, also gets a thread of its own.
+
+A sync service runs inside the tokio runtime of `block_on`. It must not start or
+block on a runtime of its own (for example `Runtime::block_on` or
+`reqwest::blocking`); write it as an async service, or do that work on a thread
+of its own and join it.
 
 ## Host references
 

@@ -3,29 +3,18 @@ use std::sync::Mutex;
 
 const FIXTURE: &[u8] = include_bytes!("../../../tests/browser/fixtures/host-abi.wasm");
 const CUSTOM: &[u8] = include_bytes!("../../../tests/browser/fixtures/custom-imports.wasm");
+const ONE_THREAD: &[u8] = include_bytes!("../../../tests/browser/fixtures/one-thread.wasm");
 
 type Log = Arc<Mutex<Vec<String>>>;
 
 /// The host functions of host-abi.wasm. `print` writes to the log, `read`
 /// answers from a small table, `later` answers its argument, `hypot` works.
 fn imports(log: &Log) -> HostImports {
-    let mut imports = HostImports::default();
     let printed = Arc::clone(log);
-    imports
-        .service("app:console/v1", "print", move |arguments| {
-            let [Value::String(text)] = arguments else {
-                bail!("print takes one String")
-            };
-            printed.lock().unwrap().push(text.clone());
-            Ok(Ok(Value::Nil))
-        })
-        .unwrap();
-    imports
-        .service("app:storage/v1", "read", |arguments| {
-            let [Value::String(key)] = arguments else {
-                bail!("read takes one String")
-            };
-            Ok(match key.as_str() {
+    imports_with(
+        move |text| printed.lock().unwrap().push(text.to_owned()),
+        |key| {
+            Ok(match key {
                 "name" => Ok(Value::String("i".into())),
                 "fail" => bail!("the storage is gone"),
                 "int" => Err(Value::Int(BigInt::from(1))),
@@ -33,19 +22,47 @@ fn imports(log: &Log) -> HostImports {
                 "nan" => Err(Value::Float(f64::NAN)),
                 _ => Err(Value::String(format!("no {key}"))),
             })
-        })
-        .unwrap();
-    imports
-        .async_service("app:clock/v1", "later", |arguments| {
+        },
+        |arguments| {
             let value = arguments[0].clone();
-            async move {
+            Box::pin(async move {
                 match value {
                     Value::Float(x) if x < 0.0 => Ok(Err(Value::String("negative".into()))),
                     Value::Float(x) if x > 100.0 => bail!("the clock is broken"),
                     value => Ok(Ok(value)),
                 }
-            }
+            })
+        },
+    )
+}
+
+/// The host functions of host-abi.wasm, with these `print`, `read` and
+/// `later`.
+fn imports_with(
+    print: impl Fn(&str) + Send + Sync + 'static,
+    read: impl Fn(&str) -> Result<std::result::Result<Value, Value>> + Send + Sync + 'static,
+    later: impl Fn(&[Value]) -> ServiceFuture + Send + Sync + 'static,
+) -> HostImports {
+    let mut imports = HostImports::default();
+    imports
+        .service("app:console/v1", "print", move |arguments| {
+            let [Value::String(text)] = arguments else {
+                bail!("print takes one String")
+            };
+            print(text);
+            Ok(Ok(Value::Nil))
         })
+        .unwrap();
+    imports
+        .service("app:storage/v1", "read", move |arguments| {
+            let [Value::String(key)] = arguments else {
+                bail!("read takes one String")
+            };
+            read(key)
+        })
+        .unwrap();
+    imports
+        .async_service("app:clock/v1", "later", later)
         .unwrap();
     imports
         .external("app:math/v1", "hypot", |arguments| {
@@ -663,4 +680,220 @@ fn a_stop_in_ilang_start_is_reported_and_the_start_is_required() {
         .err()
         .unwrap();
     assert!(format!("{error:#}").contains("ilang_start"));
+}
+
+/// Deep enough for any recursion of `app/deep` to pass [`WASM_STACK`].
+const TOO_DEEP: f64 = 100_000_000.0;
+
+#[test]
+fn deep_recursion_after_a_resume_stops_like_a_sync_call() {
+    let depth = 100_000.0;
+    let (mut instance, _) = fixture();
+    let value = ok(instance.call("app/deep", &[Value::Float(depth)]).unwrap());
+    assert!(matches!(value, Value::Float(x) if x == depth));
+    let value =
+        ok(block_on(instance.call_async("app/async.deep", &[Value::Float(depth)])).unwrap());
+    assert!(matches!(value, Value::Float(x) if x == depth));
+
+    let (mut instance, _) = fixture();
+    let on_its_own_thread = stop(
+        instance
+            .call("app/deep", &[Value::Float(TOO_DEEP)])
+            .unwrap(),
+    );
+    let (mut instance, _) = fixture();
+    let on_ilang =
+        stop(block_on(async { instance.call("app/deep", &[Value::Float(TOO_DEEP)]) }).unwrap());
+    let (mut instance, _) = fixture();
+    let resumed =
+        stop(block_on(instance.call_async("app/async.deep", &[Value::Float(TOO_DEEP)])).unwrap());
+    assert!(
+        on_its_own_thread.trap.contains("call stack exhausted"),
+        "{}",
+        on_its_own_thread.trap
+    );
+    assert_eq!(on_its_own_thread.message, None);
+    for other in [&on_ilang, &resumed] {
+        assert_eq!(other.trap, on_its_own_thread.trap);
+        assert_eq!(other.message, None);
+    }
+    assert!(instance.unusable().is_some());
+}
+
+/// `later` that answers its argument after a tokio timer of 1 ms. The timer
+/// is made in the start closure, so it needs a tokio runtime there.
+fn timer_later(arguments: &[Value]) -> ServiceFuture {
+    let value = arguments[0].clone();
+    let sleep = tokio::time::sleep(std::time::Duration::from_millis(1));
+    Box::pin(async move {
+        sleep.await;
+        Ok(Ok(value))
+    })
+}
+
+#[test]
+fn block_on_works_inside_a_tokio_runtime() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
+    let (mut instance, _) = fixture();
+    let value = runtime
+        .block_on(async { block_on(instance.call_async("app/async.later", &[Value::Float(1.5)])) });
+    assert!(matches!(ok(value.unwrap()), Value::Float(2.5)));
+    // Awaited on the caller's own runtime: every Wasm call takes the
+    // fallback path.
+    let value = runtime.block_on(instance.call_async("app/async.later", &[Value::Float(3.0)]));
+    assert!(matches!(ok(value.unwrap()), Value::Float(4.0)));
+
+    let mut instance = program()
+        .instantiate(HostOptions::new(imports_with(
+            |_| {},
+            |_| Ok(Ok(Value::Nil)),
+            timer_later,
+        )))
+        .unwrap();
+    let value = runtime.block_on(instance.call_async("app/async.later", &[Value::Float(1.5)]));
+    assert!(matches!(ok(value.unwrap()), Value::Float(2.5)));
+    let value = block_on(instance.call_async("app/async.later", &[Value::Float(5.0)]));
+    assert!(matches!(ok(value.unwrap()), Value::Float(6.0)));
+}
+
+type Threads = Arc<Mutex<Vec<(&'static str, std::thread::ThreadId)>>>;
+
+/// `print` and the start of `later` record the thread they run on.
+fn thread_imports(threads: &Threads) -> HostImports {
+    let mut imports = HostImports::default();
+    let printed = Arc::clone(threads);
+    imports
+        .service("app:console/v1", "print", move |_| {
+            printed
+                .lock()
+                .unwrap()
+                .push(("print", std::thread::current().id()));
+            Ok(Ok(Value::Nil))
+        })
+        .unwrap();
+    let started = Arc::clone(threads);
+    imports
+        .async_service("app:clock/v1", "later", move |arguments| {
+            started
+                .lock()
+                .unwrap()
+                .push(("later", std::thread::current().id()));
+            let value = arguments[0].clone();
+            async move { Ok(Ok(value)) }
+        })
+        .unwrap();
+    imports
+}
+
+#[test]
+fn run_entry_uses_one_thread() {
+    let threads = Threads::default();
+    let options = HostOptions::new(thread_imports(&threads));
+    let program = Program::from_bytes(ONE_THREAD).unwrap();
+    let check = |threads: &Threads| {
+        let recorded = std::mem::take(&mut *threads.lock().unwrap());
+        let count = |name| recorded.iter().filter(|(kind, _)| *kind == name).count();
+        assert_eq!((count("print"), count("later")), (4, 3), "{recorded:?}");
+        let first = recorded[0].1;
+        assert_ne!(first, std::thread::current().id());
+        assert!(recorded.iter().all(|(_, id)| *id == first), "{recorded:?}");
+    };
+    assert!(matches!(
+        program.run_entry(options.clone()).unwrap(),
+        Outcome::Ok(Value::Nil)
+    ));
+    check(&threads);
+    assert!(matches!(
+        program.run_test_with("app/test.waits", options.clone()),
+        TestResult::Passed
+    ));
+    check(&threads);
+    let reports = program.run_tests(&options);
+    assert_eq!(reports.len(), 1);
+    assert!(reports[0].passed());
+    check(&threads);
+}
+
+#[test]
+fn futures_are_send() {
+    fn send<T: Send>(_: &T) {}
+    fn send_type<T: Send>() {}
+    let (mut instance, _) = fixture();
+    {
+        let future = instance.run_async("app/async_test.waits");
+        send(&future);
+    }
+    {
+        let future = instance.call_async("app/async.later", &[Value::Float(1.0)]);
+        send(&future);
+    }
+    send_type::<ServiceFuture>();
+    send_type::<Outcome>();
+    send_type::<TestResult>();
+    send_type::<Value>();
+    send_type::<Instance>();
+}
+
+#[test]
+fn a_nested_store_gets_its_own_thread() {
+    let (mut top, _) = fixture();
+    let expected = stop(top.call("app/deep", &[Value::Float(TOO_DEEP)]).unwrap());
+
+    let inner_threads = Threads::default();
+    let recorded = Arc::clone(&inner_threads);
+    let inner = program()
+        .instantiate(HostOptions::new(imports_with(
+            move |_| {
+                recorded
+                    .lock()
+                    .unwrap()
+                    .push(("print", std::thread::current().id()));
+            },
+            |_| Ok(Ok(Value::Nil)),
+            |_| Box::pin(async { Ok(Ok(Value::Nil)) }),
+        )))
+        .unwrap();
+    inner_threads.lock().unwrap().clear();
+    let inner = Mutex::new(inner);
+    let outer_thread = Arc::new(Mutex::new(None));
+    let inner_trap = Arc::new(Mutex::new(None));
+    let (outer_seen, trap_seen) = (Arc::clone(&outer_thread), Arc::clone(&inner_trap));
+    let mut outer = program()
+        .instantiate(HostOptions::new(imports_with(
+            |_| {},
+            move |_| {
+                let current = std::thread::current();
+                *outer_seen.lock().unwrap() =
+                    Some((current.name().map(str::to_owned), current.id()));
+                let mut inner = inner.lock().unwrap();
+                ensure!(matches!(inner.run("app/main.main")?, Outcome::Ok(_)));
+                let Outcome::Stop(stop) = inner.call("app/deep", &[Value::Float(TOO_DEEP)])? else {
+                    bail!("the inner call did not stop")
+                };
+                *trap_seen.lock().unwrap() = Some(stop);
+                Ok(Ok(Value::String("i".into())))
+            },
+            |_| Box::pin(async { Ok(Ok(Value::Nil)) }),
+        )))
+        .unwrap();
+    let value = ok(
+        block_on(async { outer.call("read_through", &[Value::String("name".into())]) }).unwrap(),
+    );
+    assert!(matches!(value, Value::String(text) if text == "i"));
+    let (name, outer_id) = outer_thread.lock().unwrap().clone().unwrap();
+    assert_eq!(name.as_deref(), Some("ilang"));
+    let inner_prints = inner_threads.lock().unwrap().clone();
+    assert_eq!(inner_prints.len(), 1);
+    assert_ne!(inner_prints[0].1, outer_id);
+    let trap = inner_trap.lock().unwrap().take().unwrap();
+    assert!(
+        expected.trap.contains("call stack exhausted"),
+        "{}",
+        expected.trap
+    );
+    assert_eq!(trap.trap, expected.trap);
+    assert_eq!(trap.message, None);
 }

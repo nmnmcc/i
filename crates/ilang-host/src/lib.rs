@@ -17,9 +17,16 @@
 //! `max_wasm_stack`, 32 MiB). A frame of a small i function takes about 60
 //! bytes, so this is about 500,000 frames of such functions, and fewer of
 //! bigger ones; more traps as "call stack exhausted", which is a stop with
-//! no message (spec §11.7). Every call into the module runs on a
-//! thread of its own with a native stack of [`THREAD_STACK`] bytes, so that
-//! the Wasm stack always fits in it, whatever thread calls the host.
+//! no message (spec §11.7). Every call into the module runs on a thread with
+//! a native stack of [`THREAD_STACK`] bytes, so that the Wasm stack always
+//! fits in it, whatever thread calls the host.
+//!
+//! [`block_on`] runs a future on one such thread, named `ilang`, which also
+//! runs a tokio `current_thread` runtime. [`Program::run_entry`],
+//! [`Program::run_test_with`] and [`Program::run_tests`] use it, so a
+//! program uses one thread from `ilang_start` to its end. A Wasm call made
+//! from any other thread, or from inside a host function (for example into
+//! a second instance), starts a thread of its own for that call.
 //!
 //! # Garbage collection
 //!
@@ -56,6 +63,7 @@
 //! peaked at 310 MB). `ILANG_GC` and `ILANG_GC_HEAP` (in MiB) choose another
 //! collector or size, to measure them.
 
+mod run;
 pub mod services;
 #[cfg(test)]
 mod tests;
@@ -72,6 +80,7 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail, ensure};
 pub use num_bigint::BigInt;
 use num_bigint::Sign;
+pub use run::block_on;
 use serde::{Deserialize, Serialize};
 use wasmtime::{
     AsContext, AsContextMut, Caller, Config, Engine, ExternRef, Func, FuncType,
@@ -473,6 +482,11 @@ impl TestReport {
 
 /// A host service function: the value or an error value of its `E`. An
 /// `Err` of the outer result is a failure of the host, which traps.
+///
+/// A sync service runs inside the tokio runtime of [`block_on`]. It must not
+/// start or block on a runtime of its own (for example `Runtime::block_on` or
+/// `reqwest::blocking`); write it as an async service, or do that work on a
+/// thread of its own and join it.
 pub type ServiceFunction =
     Arc<dyn Fn(&[Value]) -> Result<std::result::Result<Value, Value>> + Send + Sync>;
 /// The work of an async host service function (B.4).
@@ -738,18 +752,21 @@ impl Program {
         }
     }
 
-    /// Run the program entry in a new instance.
+    /// Run the program entry in a new instance, on one `ilang` thread
+    /// ([`block_on`]).
     pub fn run_entry(&self, options: HostOptions) -> Result<Outcome> {
         let entry = self.abi.entry.clone().context("the program has no entry")?;
-        let mut instance = match self.instantiate(options) {
-            Ok(instance) => instance,
-            Err(error) => return stop_of(error).map(Outcome::Stop),
-        };
-        if entry.is_async {
-            block_on(instance.run_async(&entry.name))
-        } else {
-            instance.run(&entry.name)
-        }
+        block_on(async {
+            let mut instance = match self.instantiate(options) {
+                Ok(instance) => instance,
+                Err(error) => return stop_of(error).map(Outcome::Stop),
+            };
+            if entry.is_async {
+                instance.run_async(&entry.name).await
+            } else {
+                instance.run(&entry.name)
+            }
+        })
     }
 
     /// Run every test of the metadata, each in a new instance (spec §10.2).
@@ -759,58 +776,48 @@ impl Program {
             .iter()
             .map(|test| TestReport {
                 name: test.name.clone(),
-                result: self.run_test(test, options),
+                result: self.run_test_with(&test.name, options.clone()),
             })
             .collect()
     }
 
-    fn run_test(&self, test: &EntryPoint, options: &HostOptions) -> TestResult {
-        let mut instance = match self.instantiate(options.clone()) {
-            Ok(instance) => instance,
-            Err(error) => {
-                return match error.downcast::<Stop>() {
-                    Ok(stop) => TestResult::Stopped(stop),
-                    Err(error) => TestResult::Failed(error),
-                };
+    /// Run one test by its export name in a new instance (spec §10.2), on
+    /// one `ilang` thread ([`block_on`]). An async test is waited for (B.5).
+    pub fn run_test_with(&self, name: &str, options: HostOptions) -> TestResult {
+        let is_async = self
+            .abi
+            .tests
+            .iter()
+            .any(|test| test.name == name && test.is_async);
+        block_on(async {
+            let mut instance = match self.instantiate(options) {
+                Ok(instance) => instance,
+                Err(error) => {
+                    return match error.downcast::<Stop>() {
+                        Ok(stop) => TestResult::Stopped(stop),
+                        Err(error) => TestResult::Failed(error),
+                    };
+                }
+            };
+            let outcome = if is_async {
+                instance.run_async(name).await
+            } else {
+                instance.run(name)
+            };
+            match outcome {
+                Ok(Outcome::Ok(_)) => TestResult::Passed,
+                Ok(Outcome::Stop(stop)) => TestResult::Stopped(stop),
+                Ok(Outcome::Err(error)) => {
+                    TestResult::Failed(anyhow!("the test gave the error {:?}", error.0))
+                }
+                Err(error) => TestResult::Failed(error),
             }
-        };
-        let outcome = if test.is_async {
-            block_on(instance.run_async(&test.name))
-        } else {
-            instance.run(&test.name)
-        };
-        match outcome {
-            Ok(Outcome::Ok(_)) => TestResult::Passed,
-            Ok(Outcome::Stop(stop)) => TestResult::Stopped(stop),
-            Ok(Outcome::Err(error)) => TestResult::Failed(anyhow!("a test gave {:?}", error.0)),
-            Err(error) => TestResult::Failed(error),
-        }
+        })
     }
 }
 
 fn stop_of(error: anyhow::Error) -> Result<Stop> {
     error.downcast::<Stop>()
-}
-
-/// Drive a future whose waiting is done by the host functions themselves.
-/// Real hosts call [`Instance::call_async`] from their own executor.
-pub fn block_on<F: Future>(future: F) -> F::Output {
-    use std::task::{Context as TaskContext, Poll, Wake, Waker};
-    struct Thread(std::thread::Thread);
-    impl Wake for Thread {
-        fn wake(self: Arc<Self>) {
-            self.0.unpark();
-        }
-    }
-    let waker = Waker::from(Arc::new(Thread(std::thread::current())));
-    let mut context = TaskContext::from_waker(&waker);
-    let mut future = std::pin::pin!(future);
-    loop {
-        match future.as_mut().poll(&mut context) {
-            Poll::Ready(value) => return value,
-            Poll::Pending => std::thread::park(),
-        }
-    }
 }
 
 pub struct Instance {
@@ -962,6 +969,14 @@ impl Instance {
     /// Call an async host export (B.5). Each async host function that the
     /// program waits for is answered by awaiting its future, then calling
     /// `ilang_resume:namespace:label`; the value comes from `ilang_result:name`.
+    ///
+    /// Inside [`block_on`], every Wasm call runs on the `ilang` thread.
+    /// Called from a thread that `block_on` did not start, each Wasm call
+    /// starts its own thread with a stack of [`THREAD_STACK`] bytes, and the
+    /// futures of the services are polled where this future is awaited. Await
+    /// it inside a tokio runtime with time and IO enabled when a service uses
+    /// tokio; otherwise such a service panics with tokio's message.
+    /// `block_on` and `Program::run_*` give such a runtime.
     pub async fn call_async(&mut self, name: &str, arguments: &[Value]) -> Result<Outcome> {
         self.usable()?;
         let signature = self.signature(name, arguments)?;
@@ -1158,24 +1173,35 @@ fn gc_settings() -> Result<(wasmtime::Collector, u64)> {
 pub const THREAD_STACK: usize = WASM_STACK + (16 << 20);
 
 /// Call a Wasm function inside the root scope of its arguments, on a thread
-/// with a stack of [`THREAD_STACK`] bytes.
+/// with a stack of [`THREAD_STACK`] bytes: directly on the `ilang` thread of
+/// [`block_on`] when no other Wasm call runs on it, and otherwise on a new
+/// thread, which enters the tokio runtime of the caller if there is one.
 fn invoke_in(
     context: &mut (impl AsContextMut<Data = State> + Send),
     function: Func,
     params: &[Val],
     results: &mut [Val],
 ) -> Invoked {
-    let called = std::thread::scope(|scope| {
-        let thread = std::thread::Builder::new()
-            .name("ilang-wasm".into())
-            .stack_size(THREAD_STACK)
-            .spawn_scoped(scope, || function.call(&mut *context, params, results))
-            .expect("a thread for Wasm code");
-        match thread.join() {
-            Ok(called) => called,
-            Err(panic) => std::panic::resume_unwind(panic),
-        }
-    });
+    let called = if run::fast_path() {
+        run::in_wasm(|| function.call(&mut *context, params, results))
+    } else {
+        // The tokio context belongs to a thread, so it is taken here.
+        let handle = tokio::runtime::Handle::try_current().ok();
+        std::thread::scope(|scope| {
+            let thread = std::thread::Builder::new()
+                .name("ilang-wasm".into())
+                .stack_size(THREAD_STACK)
+                .spawn_scoped(scope, || {
+                    let _entered = handle.as_ref().map(|handle| handle.enter());
+                    function.call(&mut *context, params, results)
+                })
+                .expect("a thread for Wasm code");
+            match thread.join() {
+                Ok(called) => called,
+                Err(panic) => std::panic::resume_unwind(panic),
+            }
+        })
+    };
     let Err(error) = called else {
         return Invoked::Done;
     };

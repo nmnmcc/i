@@ -182,6 +182,11 @@
     (i32.const 1))
   (func (export "ilang_resume:app:clock/v1:later")
     (param $tag i32) (param $value f64) (param $ptr i32) (param $len i32) (result i32)
+    (if (global.get $deep_after_resume)
+      (then
+        (global.set $deep_after_resume (i32.const 0))
+        (global.set $deep_result (call $deep (global.get $deep_n)))
+        (return (i32.const 0))))
     (global.set $waits (i32.add (global.get $waits) (i32.const 1)))
     (if (i32.and (i32.eqz (local.get $tag)) (i32.eq (global.get $waits) (i32.const 1)))
       (then
@@ -195,6 +200,25 @@
   (func (export "ilang_result:app/async.later") (result i32 f64 i32 i32)
     (global.get $later_tag) (global.get $later_value)
     (global.get $later_ptr) (global.get $later_len))
+
+  ;; Recursion that is not a tail call, n deep: in a sync call, and in the
+  ;; resume of an async call (after later(1.0) is answered).
+  (global $deep_after_resume (mut i32) (i32.const 0))
+  (global $deep_n (mut i32) (i32.const 0))
+  (global $deep_result (mut i32) (i32.const 0))
+  (func $deep (param $n i32) (result i32)
+    (if (result i32) (i32.eqz (local.get $n))
+      (then (i32.const 0))
+      (else (i32.add (call $deep (i32.sub (local.get $n) (i32.const 1))) (i32.const 1)))))
+  (func (export "app/deep") (param $n f64) (result f64)
+    (f64.convert_i32_s (call $deep (i32.trunc_f64_s (local.get $n)))))
+  (func (export "app/async.deep") (param $n f64) (result i32)
+    (global.set $deep_n (i32.trunc_f64_s (local.get $n)))
+    (global.set $deep_after_resume (i32.const 1))
+    (call $later (f64.const 1))
+    (i32.const 1))
+  (func (export "ilang_result:app/async.deep") (result f64)
+    (f64.convert_i32_s (global.get $deep_result)))
 
   ;; The program entry and the tests have no parameters and no results.
   (func (export "app/main.main")
@@ -272,7 +296,9 @@
       "\"bad_bool\":{\"params\":[],\"result\":\"bool\",\"errors\":[],\"async\":false},"
       "\"bad_utf8\":{\"params\":[],\"result\":\"string\",\"errors\":[],\"async\":false},"
       "\"bad_tag\":{\"params\":[],\"result\":\"nil\",\"errors\":[\"string\"],\"async\":false},"
-      "\"app/async.later\":{\"params\":[\"float\"],\"result\":\"float\",\"errors\":[\"string\"],\"async\":true}},"
+      "\"app/async.later\":{\"params\":[\"float\"],\"result\":\"float\",\"errors\":[\"string\"],\"async\":true},"
+      "\"app/deep\":{\"params\":[\"float\"],\"result\":\"float\",\"errors\":[],\"async\":false},"
+      "\"app/async.deep\":{\"params\":[\"float\"],\"result\":\"float\",\"errors\":[],\"async\":true}},"
     "\"services\":{"
       "\"app:console/v1\":{\"print\":{\"params\":[\"string\"],\"result\":\"nil\",\"errors\":[],\"async\":false}},"
       "\"app:storage/v1\":{\"read\":{\"params\":[\"string\"],\"result\":\"string\",\"errors\":[\"string\"],\"async\":false}},"

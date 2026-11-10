@@ -36,6 +36,10 @@ gives address 0.
 - `app/async.later` is an async export: it waits for `later` twice through
   `ilang_resume:app:clock/v1:later` and gives its results through
   `ilang_result:app/async.later`.
+- `app/deep(Float) -> Float` recurses n deep, not in tail position, and gives
+  n. The async `app/async.deep(Float) -> Float` waits for `later(1.0)` and does
+  the same recursion inside `ilang_resume:app:clock/v1:later`, so tests can
+  compare the stack depth of a sync call and of a resume.
 - The entry `app/main.main` prints `fixture main`. The tests are
   `app/test.passing`, `app/test.failing` (a stop with a message),
   `app/test.trapping` (a trap without one), `app/test.fresh` twice (fails when
@@ -53,6 +57,15 @@ from module `custom`, and the service `custom:fallible/v1`
 Each export forwards to one import. The module makes and frees the parameter
 buffers of the imports and gives the result buffers of the imports on to the
 host as its own results.
+
+## one-thread.wat
+
+It has its own `ilang.abi` section and imports `app:console/v1`
+`print(String) -> Nil` and the async `app:clock/v1`
+`later(Float) -> Float ? String`. Its async entry `app/main.main` and its async
+test `app/test.waits` each print `begin`, then wait for `later` three times in a
+row and print `answer` after each answer: 4 prints and 3 starts of `later`. The
+Rust host checks with it that a whole run uses one thread.
 
 ## required-features.wat
 
