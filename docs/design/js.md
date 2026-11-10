@@ -1,7 +1,7 @@
 # Design: JS bindings, target providers, and checked WASI adapters
 
-Status: revision 6, after independent review, 2026-11-10. This note applies
-rulings J1–J8. It is a design contract conditional on the explicit spec
+Status: revision 7, after the review of 9c28dd1, 2026-11-10. This note applies
+rulings J1–J8 and K1–K5. It is a design contract conditional on the explicit spec
 amendments in §9, not a claim that these features exist. Only this note is
 changed here. In particular the current WASI printer remains until its spec
 amendment lands. The wider questions formerly in §10 (removing externals,
@@ -11,7 +11,8 @@ out of scope.
 Sources, in order: the user's current rulings; `docs/spec.md`; accepted
 `syntax.md`, `runtime.md`, `meta.md`; native N9 and its reconciled runtime on
 `lane/note-native` at `60f37f2260bf604e426ecb1869291ad9db2af96c`;
-the review `.rd/cache/gpt/report-review-js.md`; the previous note. The plan's
+the reviews `.rd/cache/gpt/report-review-js.md` and `report-review-js3.md`;
+the previous note. The second review probes under `/tmp/review-js3/` were read. The plan's
 “已定的设计”, IO and native stages and the coordinator ledger were read.
 Code citations below refer to this lane's base
 `48ad582f5f00fcf4d98a9ee14e8afd84a7a225ce`, not to the newer implementation
@@ -67,8 +68,7 @@ same mechanism to a user-supplied provider plan. The shipped plan supplies
 standard defaults; it does not discover arbitrary package services by name.
 The compiler checks every factory's ordinary type and its dependencies;
 provider dependency cycles are build errors. No provider is a new language
-attribute. The implementation's internal plan format need not be public in
-stage 1.
+attribute. T6 gives the public per-target selection format required by K3.
 
 Infer source types first. An environment statement removes a requirement in
 the usual way (spec §9.2). For remaining entry requirements, instantiate a
@@ -95,8 +95,9 @@ main = () {
 
 On `js`, the missing `Fs` default is a compile error even though this code
 catches every `FsError`, including `unsupported`. Catching an error never
-removes a service requirement. Choose an implementation through `Target`,
-or give an explicit service before it reaches the entry. Smaller services
+removes a service requirement. Choose an application-service provider per target (T6), use a Target branch
+whose payload can actually supply its needs, or give an explicit service
+before it reaches the entry. Smaller services
 make entropy usable; they do **not** restore this fallback pattern.
 
 **T2 — Split by capability, not module. [J1]** Use the following exact split
@@ -187,8 +188,9 @@ In a JS clause, bind `! js.Js = j` from its payload before calling JS code;
 in a WASI clause, bind `! wasi.Wasi = w`. These branches can discharge their
 root requirements. Native and Host clauses cannot discharge arbitrary needs
 from their tags. Any such unsupplied requirement remains in the principal
-entry type on **all** targets. A test may supply any constructed Target;
-linking must follow that actual value, not assume every Target is the default.
+entry type on **all** targets. A test may supply any constructed Target. F2 treats such a value as unknown;
+it never assumes every environment-bound Target is the build default. F2
+recognizes only the certified entry binding and its lexical aliases/captures.
 
 The printing example has its required import:
 
@@ -213,6 +215,248 @@ closed executable rule to WASI. JS generated artifacts, in contrast, must
 supply all their required imports or fail the build; arbitrary embedding uses
 Host. None of these policies changes legal service substitution in i.
 
+**T6 — Application providers are selected before checking their needs. [K3]**
+The root package may select one provider per service and target in `i.toml`.
+A key is an ordinary fully qualified type name; a value is a fully qualified
+exported factory name. The shipped capability registry is data in the plan:
+registered capabilities with no provider for this target do not fall through
+to an implicit host import. This applies to user-registered capabilities too;
+open custom-host bindings follow T5. No module spelling determines either policy. Resolve names through the package graph, never by
+recognizing a module spelling. Factories have no ordinary arguments, return
+the selected service type, have no uncaught typed errors, and may have ordinary
+environment needs. They may stop. Error-producing setup belongs in an ordinary
+service operation or is caught by the factory; provider construction cannot
+silently add an error to a source entry's host-export signature (§10.3).
+Their bodies and types are checked on every target. Only the chosen factory's
+inferred environment is recursively provisioned on that target. A reference
+to an unchosen factory in ordinary executable code is still governed by F2;
+a provider row alone is not such a reference.
+
+A root-package row for the current target overrides the shipped provider for
+that type. No row means use the shipped provider if one exists; otherwise
+report an unsupplied service. Duplicate rows and dependency cycles are errors.
+There is no wildcard, implicit service discovery, dependency-package override,
+or inferred effect deletion. Ordinary local environment substitutions keep
+§9.2's meaning. The plan checks the full chosen provider graph, before F2;
+link pruning cannot remove provider dependencies or change entry classification.
+The same selection rule works for storage, configuration, telemetry and clocks.
+
+Complete proposed package, `i.toml`:
+
+```toml
+name = "app"
+
+[providers."app/main.Settings"]
+js = "app/main.fallback"
+nodejs = "app/main.filesystem"
+native = "app/main.filesystem"
+wasi = "app/main.fallback"
+host = "app/main.fallback"
+```
+
+`src/main.i`:
+
+```i
+(i/fs, i/request)
+
+(Settings(..), filesystem, fallback)
+
+Settings {
+  Settings(read: () -> BitArray ? fs.FsError ! request.Await | request.Owner)
+}
+
+filesystem = (f ! fs.Fs) {
+  Settings(read: () {
+    ! fs.Fs = f
+    fs.read_file("settings.txt")
+  })
+}
+
+fallback = () { Settings(read: () { <<>> }) }
+
+@main
+main = (settings ! Settings) { settings.read() }
+```
+
+The principal environment of main is Settings | Await | Owner on every
+target. The filesystem factory needs Fs; the fallback needs nothing. NodeJS
+and Native select filesystem and supply the real granted Fs registration.
+Their closure is async under T7. The other three targets select fallback;
+their closure contains no Fs and no request service, so it is synchronous.
+The same code reads the real file on Node/Native and computes the empty bit
+array in the browser (main's value is ignored as usual). It type-checks and
+links on all five targets under this proposal when the named standard Fs
+implementation has shipped on Node/Native. It does not promise runtime file
+existence: ordinary FsError still stops main. No dummy Fs, raw-number exposure,
+handwritten JS, Native payload or new effect inference is involved.
+
+This uses T1's already-general provider mechanism; K3 makes its user-facing
+selection mandatory. The new package keys require the explicit §2.6 amendment
+in §9; today's reader ignores unknown root keys
+(`crates/ilang-package/src/manifest.rs:114–129`). It is a design fixture, not a
+claim that this package builds with the current compiler.
+
+**T7 — Entry classification follows the complete provider graph. [K1]**
+For each entry, seed the graph with every service in its inferred environment.
+Choose providers for the build target using T6. A factory node has edges to
+all services in its own inferred environment, even if it only captures them;
+continue until terminal host or entry-context providers. Sharing a node does
+not remove any dependency. Reject unresolved needs and cycles before lowering.
+The entry is async exactly when this transitive closure contains a request-mode
+service provider, Scheduler provider or Runner provider. Normalize the existing
+async host declaration to its request-and-await provider before classification.
+Await, Owner and Root alone do not qualify. Each service node's declared
+request/async host mode counts even when an ordinary factory supplies that
+service: a fake provider for Remote itself still classifies async. A pure
+Bundle provider with no Remote dependency does not qualify merely because its
+function type returns Request values. A local environment substitution that
+removes Remote from inferred needs creates no Remote provider node. There is
+no inspection of library names, function bodies, selected fields, or whether
+an operation will actually wait.
+
+The last two provider categories are general plan roles, not tests for the
+names Scheduler/Runner or their modules. A plan node with the scheduler or
+runner role supplies a typed structured-run entry adapter as part of its
+provider contract; user services may use the same roles/adapters. The shipped
+Scheduler/Runner providers select the accepted FIFO adapter, path [], seed 0,
+with no entropy draw. A request leaf supplies its mode from the host declaration;
+no ordinary provider can erase that leaf's classification. Merely naming a
+service Scheduler is irrelevant. Providers do not change source value sets
+or principal types.
+
+Explicit substitutions contribute only the requirements left by ordinary
+inference. A factory that locally constructs a fake raw service has no raw
+provider dependency; one that captures a provisioned raw service retains it.
+A caller constructing a bundle manually needs whatever the ordinary construction
+and calls require. Low-level code with no qualifying provider that tries to
+hand off still gets runtime's `request: no active entry` stop. This is not an
+unsound guess that a pure-looking closure can never call a low-level wait.
+
+For an async entry, open the host/request context and async admission boundary
+**before** running chosen factories. Bind Root/Owner/Await, install a structured
+run adapter if a scheduler/runner provider is present, construct dependencies
+before consumers, invoke the source entry, then perform structured cleanup.
+Factories have no uncaught typed errors under T6. Close the context
+on every exit; a factory stop still runs no i finals. A synchronous entry constructs
+its providers without an async hand-off and may use completed fakes.
+
+This deliberately classifies a whole bundle: after the request milestone,
+even a converter-only Js use or a Target payload containing Js can make an
+entry async. No selected-field exception is allowed.
+
+A previously synchronous export that needs such a bundle becomes async, even
+if its body only returns 7. Metadata says `async: true`; it has a status-returning
+entry and an `ilang_result:` export. To request a build-time guarantee, a root
+package may list exports in `wasm.synchronous` (a subset of `wasm.exports`).
+A listed export whose provider closure is async is a compile error naming a
+qualifying dependency path. There is no implicit synchronous promise in the
+ordinary source type, no silent blocking adapter, and no new source attribute.
+
+K1's unrestricted wording conflicts with spec B.7's synchronous-only WASI ABI.
+Keep B.7: the exact rule above is the proposed replacement for runtime D5's
+async-protocol targets (Host, JS/NodeJS and native v3). WASI retains blocking
+imports and synchronous metadata. §9 records this explicit scope question;
+do not silently emit v3 async WASI commands or drop J4's custom imports.
+
+**T8 — Wrapper and metadata examples. [K1]** The wrapper order for each async
+example below is fixed (the following is algorithm notation, not an i API):
+
+```text
+start entry's async admission boundary and request context
+bind the chosen Root/Owner/Await providers
+run the selected structured adapter, if any
+construct selected providers in dependency order inside that context
+call the unchanged source entry
+finish structured children/finals; close outstanding request groups
+save the entry result/error and return status 0
+```
+
+A wait inside construction or the source call returns status 1/2 and resumes
+this one wrapper through the v3 root continuation. Error/stop behavior remains
+that of the entry; a stop skips i finals. No provider executes before admission.
+For the promise example in §10,
+main needs Js | Await | Owner. The Js provider depends on JsSync and
+JsRequests, so it is async. `app/main.main() -> i32` returns the v3 status;
+`ilang_result:app/main.main() -> ()` has no result because main's value is
+ignored. The observe reply enters through
+`ilang_resume:i:js-requests/v1:observe(id: i32, outcome: externref) -> i32`. The generated wrapper opens a direct request
+context, builds JsSync/JsRequests and their bundle, then runs main; there is
+no Scheduler/Runner dependency and therefore no task scheduler. A possible
+metadata fragment is:
+
+```json
+{"entry":{"name":"app/main.main","async":true}}
+```
+
+An equivalent user bundle, with no JS or standard-service names in the rule:
+
+```i
+(i/request, i/resource)
+
+(Bundle(..), Remote(..), bundle)
+
+@host("app:remote/v1", "request")
+Remote { Remote(fetch: () -> Request(Int)) }
+
+Bundle { Bundle(fetch: () -> Int ! request.Await | request.Owner) }
+
+bundle = (remote ! Remote) {
+  Bundle(fetch: () {
+    r = remote.fetch()
+    resource.ensure(
+      () { request.await(r) }
+      () { request.cancel(request.ticket(r)) }
+    )
+  })
+}
+
+@main
+main = (b ! Bundle) { b.fetch() }
+```
+
+On Host, select Bundle's factory `app/main.bundle` and explicitly register
+Remote with the embedder. The graph is Bundle -> bundle -> Remote(request),
+plus Await/Owner. The wrapper opens the same direct context, binds Remote,
+constructs Bundle, runs main and cleans up. Its main/status and result exports
+have the same shapes as the promise example. Its fetch reply export takes
+`(id: i32, sign: i32, address: i32, count: i32) -> i32`, the ordinary Int wire
+result after its request id. Its entry metadata is the same
+`async: true` shape above; the service metadata has
+`app:remote/v1.fetch = {params: [], result: "int", errors: [], async: true}`.
+Remote is exported because it occurs in bundle's inferred environment
+(spec §2.4). It is a normal public service for fakes, not a private
+resource-number service. Its provider selection is:
+
+```toml
+name = "app"
+
+[providers."app/main.Bundle"]
+host = "app/main.bundle"
+```
+
+For a synchronous-use export in that module, add this ordinary exported binding:
+
+```i
+answer = (b ! Bundle) { 7 }
+```
+
+Include answer in the exports and configure
+`wasm.exports = ["app/main.answer"]`. Its explicit environment parameter
+makes Bundle a requirement even though b is unused. With the same provider,
+the wrapper opens the context and constructs Bundle before returning 7; it
+may finish with status 0 immediately. The ABI entry is `() -> i32` (status),
+and `ilang_result:app/main.answer` returns the Int's sign/address/count.
+Metadata is:
+
+```json
+{"exports":{"app/main.answer":{"params":[],"result":"int","errors":[],"async":true}}}
+```
+
+If also configured with `wasm.synchronous = ["app/main.answer"]`, reject the
+build; do not emit a misleading synchronous signature. With a pure Bundle
+provider instead, it remains synchronous, returns Int directly through the
+ABI, and its metadata says `async: false`. No recognition of Bundle is involved.
+
 ## 3. Foreign declarations, linking, and loader lifecycle
 
 **F1 — A declaration holds an opaque JS value. [J3]** The new form is
@@ -236,40 +480,104 @@ Js acts was false. Use function expressions to defer work to an explicit Js
 call. The source listing exposes these initializers as foreign code to audit.
 No initializer or synchronous call may re-enter i; callbacks are a later gate.
 
-**F2 — Binding retention is specified before optimization. [J3]** All source
-is type-checked with the same principal types on every target. Then a required
-link pass specializes the known provider values and computes required code
-and foreign declarations. Roots include every ordinary top-level initializer
-under §2.5, every emitted entry/export/test and its callable dependencies.
-Foreign declarations themselves are link declarations, not unconditional
-ordinary initializer roots: retain one when a residual read can execute.
-This distinction must be added explicitly to §2.5; it does not authorize
-removing a side-effecting ordinary top-level binding.
+**F2 — One reference-reachability algorithm. [J3, K2]** This defines both
+acceptance and foreign initializer execution. Run it after ordinary type
+checking and provider selection, before optimization, with the same result
+at O0/O2/O3. There is no per-input specialization, constructor propagation,
+constant folding, Boolean evaluation, type-directed branch elimination or
+implementation-chosen widening. There is exactly one clause-pruning rule below.
 
-Use conservative constructor propagation: a known constructor selects its
-match clause; a set keeps all possible clauses; unknown keeps all clauses.
-Propagate through ordinary bindings, actual parameters and captured values;
-recursive summaries reach a finite union of constructor alternatives, widening
-unknown payloads to unknown. Do not evaluate user computations to prove
-termination. Unknown calls retain all possible callees; a closure escaping
-analysis retains its body. Specialize a body per known constructor input or
-merge its uses conservatively. This analysis does not subtract an inferred
-service requirement; a branch must supply its needed service in source.
+The finite graph has one node for each ordinary binding's initializer, each
+source function/clause-block body, each chosen provider body/terminal, and each
+foreign declaration. References are resolved lexical definition identities.
+Start with all ordinary top-level initializers, emitted entries/exports/tests,
+and chosen provider factories. Scanning an initializer preserves §2.5: making
+a function literal does not scan its body. A reference to an existing binding,
+including an alias or a function passed as data, follows its definition and
+activates all function bodies syntactically contained in that definition.
+Scanning an activated body visits all expressions and guards, both sides of
+conditionals/Boolean operators and every clause except F2's sole pruning case.
+A function literal reached in an activated body is itself activated, even if
+it is never called. A non-direct initializer scans its nested function bodies
+too, since it may execute them. Reads of foreign declarations retain them.
 
-A retained `@js` on wasi/native/host is a **compile error**, at the declaration
-and requiring use. Never replace it by null or a late trap. On js/nodejs the
-loader supplies it. Reachability is about the actual provider, including
-explicit Target substitutions and exported code, not the name of a pattern.
-If analysis cannot prove a binding unused, reject conservatively. Results
-must agree at O0/O2/O3: Binaryen is not the link-safety mechanism.
+Iterate these fixed reference edges to the least fixed point. Every source
+body has one node shared by all callers; a second call adds no specialized
+copy. Recursion and mutually recursive aliases terminate by marking nodes
+once. References to aggregate bindings activate all function literals in their
+definitions, not only a selected field. Higher-order parameters add no inferred
+callee set: all supplied function expressions/aliases are already activated
+where they are referenced, stored, returned or passed. This closed program
+cannot receive an i function from the host (§10.3). Function values supplied
+by chosen providers are traversed in the same way. Thus an unknown function
+parameter cannot hide an unvisited source closure. No function-value analysis
+or optimizer discovery changes this graph.
 
-Thus a helper's `@js` used only in a proven Js/NodeJS branch is absent on WASI.
-But `x = foreign` as an ordinary top-level initializer requires that binding
-even if main later ignores x. Two retained `@js("({})")` declarations on JS
-produce distinct objects; repeated reads of one preserve its identity.
-Removing an unretained foreign initializer also removes its host effects:
-that is the defined foreign-declaration link semantics, and a migration cost
-from the old proposal's unconditional initialization promise.
+**The only pruning case.** The provider plan may designate a nominal service
+as a build-discriminant service by giving a constructor map for every target.
+Its default provider is a generated constructor application from that map,
+with independently provisioned payloads. Target is one ordinary instance of
+this general mechanism. The compiler uses resolved type/constructor identities
+from the map, never the spelling Target, Js, Wasi, or a module name.
+
+A subject is certified only when it is the environment parameter of an actual
+emitted entry with that generated default provider, or a lexical alias made
+solely by `alias = certified_name` (an annotation/group does not change this).
+The entry binding must have **no source value reference anywhere in the
+compiled program**, including as a higher-order value or recursive call,
+and cannot also be selected as a provider factory. Import/export lists and
+entry configuration are declarations, not source value references. Only its
+emitted entry designation may invoke it. This syntactic restriction prevents
+an ordinary i call from supplying another environment to the same entry body.
+An explicit provider override, ordinary parameter, function result, tuple/field
+projection or constructor expression is unknown. A helper's own environment
+parameter is unknown, even if every apparent caller uses the default. There
+is no propagation through actual parameters or return values.
+
+A closure's direct lexical capture of a certified name or alias remains
+certified. A newly bound/shadowing name is a different definition and gains
+certification only through the alias rule. `! D = value` does not mutate a
+previously bound D value; the captured old name remains certified, but later
+calls fetching D see the substitution and their own environment parameters
+are unknown. `keep_env(f)` activates f by ordinary reference reachability;
+it grants no certification to f's environment parameters. A direct capture
+of the original certified value remains a capture, including inside keep_env.
+These rules use lexical identity, not runtime environment/value analysis.
+
+For the source form `certified_name |> { clauses }` (allowing parentheses
+or a one-expression group around the subject), omit a clause's guard and body only
+if its pattern is a mapped constructor for another target, allowing field
+subpatterns and `name = pattern`. A choice of constructors qualifies only if
+every alternative is a mapped other-target constructor. A wildcard, type
+pattern or any other pattern is retained. A matching-target guarded clause
+is always possibly executed, even if its guard is literally False; retain
+later clauses too. An other-target constructor cannot match regardless of its
+guard. No first-match or exhaustiveness reasoning removes any other clause.
+Calling a named clause block or passing the subject to a function gives no
+pruning, even if that function is an alias. Type-check all clauses first.
+Suppressing an impossible clause's references does not remove pattern-failure
+Assert behavior for a one-clause binding, or any other source semantics.
+This rule changes no inferred requirements. The compiler preserves this
+source match marker until the analysis is done; optimizer-introduced matches
+cannot gain certification.
+
+Every retained foreign declaration is initialized exactly once in F1 order,
+even if an optimizer removes its reads. An unretained declaration is never
+initialized. On an unavailable target a retained declaration is a compile
+error at its declaration and a requiring reference, never null or a late trap.
+Ordinary top-level `forced = foreign` always retains it. Two retained
+`@js("({})")` declarations produce distinct objects; reads of one preserve
+its identity within its nominal type (P1).
+
+Documented rejections: the review's choose(True)/choose(False) example retains
+unused, rejects on WASI and initializes (then throws) on JS. Passing Target to
+a helper, fetching it in a helper's environment, or manufacturing the correct
+constructor also gives no pruning. An uncalled closure referenced in retained
+code still retains its foreign reads. This loss is deliberate and predictable.
+T4's direct entry match remains expressible under the certified-entry rule.
+The broader rule “any environment-bound Target is the build target” is unsound;
+§10 gives the substitution/keep_env counterexample. Do not broaden F2 to accept
+it or silently specialize its helper.
 
 **F3 — Artifacts and versioning.** `name.wasm`, `name.mjs` and `name.d.ts` are
 the generated JS artifact. The mjs contains the fixed bridge, retained source
@@ -390,8 +698,10 @@ Mutation of JS bytes afterwards cannot mutate an i BitArray. Outgoing bytes
 are also copies; no view aliases guest linear memory. No operation silently
 pads a bit array, rounds an Int, repairs Unicode or maps a nonfinite number.
 A plain `@js` value may be a promise or object; it is not thereby an i Float,
-String or IO resource. JS object identity uses the existing reference identity
-bridge. Distinct nominal types remain distinct under spec §4.1/§11.4.
+String or IO resource. Foreign identity within one nominal type uses reference_id. Distinct nominal
+types remain distinct under spec §4.1/§11.4; the current representation does
+not preserve that distinction. Prerequisite P1 in §8 must land before this
+bridge, for every opaque boundary, not only JS getters. [K4]
 
 ## 5. Requests, cancellation and IO ownership
 
@@ -423,8 +733,14 @@ Abort removes the outstanding registration before invoking listeners. Late
 completion is ignored using request identity/generation, even after id reuse;
 resource-producing late results must also be closed. Completion delivery is
 serialized through R2's one root continuation. Status 2 yields a macrotask;
-no microtask-only spin. Owner finalization cancels Waiting and unclaimed Ready
-requests under runtime §5.4. A raw outcome has no implicit IO-resource cleanup:
+no microtask-only spin. Public waiting wrappers install an **individual request guard**, using
+resource.ensure, immediately after start and before any wait. Its final
+cancels that handle on normal exit, error or unwind; take the answer before
+normal cleanup, so cancelling Taken does nothing. Closing an Owner/root
+cancels only outstanding Waiting requests. A Ready cell has already left its
+group, belongs to its handle, and survives Owner/root closure. Raw callers
+receive that ownership; no implicit per-request guard is installed for them.
+This preserves runtime §§5.1/5.4 exactly. [K5] A raw outcome has no implicit IO-resource cleanup:
 standard resource factories use the explicit guards and table below. No
 promise is a detached i task, and callbacks/re-entry are not authorized here.
 
@@ -590,6 +906,84 @@ callback bridge or JS evaluator is part of the compiler's macro sandbox.
 
 ## 8. Evidence from code and implementation regions
 
+**P1 — Preserve nominal provenance at every opaque boundary. [K4]** This is
+a prerequisite compiler track, not a spec relaxation. Retain each resolved
+opaque TypeId from the checked HostSignature through internal import/export
+signatures, import coalescing and decode sites. The wire still carries one
+externref; no nominal tag supplied by the host is trusted. On ingress attach
+the *declared* nominal identity to the foreign reference/id in the guest value.
+On egress unwrap the foreign reference without losing the identity of the
+guest value that remains in i. Aliases share their resolved nominal identity;
+different type definitions never do. Within one nominal type preserve the
+host's reference_id identity, including null's id 0. Equality compares the
+pair (nominal identity, foreign identity), not the latter alone. Never
+canonicalize two types' wrappers to the same guest object. Hashing must remain
+consistent with equality; ordinary opaque display stays unchanged.
+
+Cover external results, synchronous host replies, request/async replies,
+host-export arguments and results, generated getters, wrappers reused through
+coalesced imports, and all intervening generic i code. One Wasm externref
+import may be shared, but each i declaration's decoder retains its own nominal
+identity. Ordinary type checks still prevent applying an A function to B.
+Host re-entry/export round trips reattach the receiving declaration's type;
+the wire does not promise to transport guest nominal authority. Opaque
+references remain non-portable; N9's Int wrappers are unaffected.
+
+The current checker retains `HostType::Opaque(TypeId)`
+(`crates/ilang-check/src/types/mod.rs:314–332`), but lowering erases it
+(`crates/ilang-wasm/src/lower.rs:2587–2595`). `$hostref` has only reference/id
+(`runtime/mod.rs:240`); its constructor and equality have no nominal component
+(`runtime/values.rs:28–34`, `:146–148`, under `crates/ilang-wasm/src/`). These
+are read-code facts. The independent review's same-object A/B and null probe
+returned True; that execution was reproduced for this revision using the review's existing
+Wasm fixture and this lane's SDK. It is an existing compiler discrepancy,
+not permission to change spec §4.1/§11.4.
+
+P1 implementation scope: `crates/ilang-wasm/src/ir.rs:584–616` keeps nominal
+provenance alongside the wire shape; `lower.rs:2587–2595` and import merging
+preserve it; `emit/mod.rs:980–1005`, `emit/host.rs:231–242` and the R2 reply
+decoder pass it on ingress. Update `runtime/abi.rs:138–141`,
+`runtime/mod.rs:240`, `runtime/values.rs:28–34` and `:146–148` for construction,
+unwrap and equality; audit equality-compatible hashing and opaque tests.
+All abbreviated paths in this paragraph are under `crates/ilang-wasm/src/`.
+The existing wire type spelling externref and v3 signatures stay unchanged.
+
+Required host-fixture tests through imports **and** exports: the same raw
+object under A and B is False; under A twice is True; distinct objects under
+A are False. Null/A versus null/B is False, null/A twice True, and null/A
+versus non-null/A False. Repeat through a generic equality helper, collections,
+coalesced imports, a host round trip and an async Ready reply. Test aliases
+of A as A and two separate definitions of A as distinct. Keep SDK identity
+behavior within a nominal type. Place compiled boundary regressions in
+`crates/ilang-wasm/tests/codegen.rs`, `bindings/javascript/test/compiled.test.mjs`
+and compiled browser fixtures, plus runtime representation tests in
+`crates/ilang-wasm/tests/runtime_values.rs`. Keep existing SDK identity tests
+(`bindings/javascript/test/host.test.mjs:76–81`, `tests/browser/host.spec.mjs:66–75`).
+These are prerequisite tests before F1/F4.
+
+**P2 — Move entry supply validation to provider resolution. [K1, K3]** The
+checker currently rejects non-host/non-Assert environment members before
+lowering (`crates/ilang-check/src/types/infer.rs:405–429`). Retain ordinary
+inference, named-service validity, entry arity/result checks and §10.3 export
+checks there. Record the complete inferred environment, not only host TypeIds;
+move only the “is there a supply for this entry service?” test to the checked
+provider-plan phase, after type checking all declarations and before F2 and
+Wasm lowering. An unsupplied user service still gives an entry diagnostic,
+now with the entry -> provider -> missing service path. No synthetic provider
+may hide ill-typed source, and no library-name whitelist remains in this test.
+
+Replace `lower.rs:916–938`'s direct-service async calculation with T7's resolved
+provider closure, before constructing the wrapper at `:943–965` and emitting
+entry/export metadata at `:880–913`. All these paths are under
+`crates/ilang-wasm/src/`; they are existing implementation regions read here.
+The checker/plan interface must carry both the original environment and the
+chosen dependency graph. The package reader adds T6's providers and T7's
+synchronous contract at `crates/ilang-package/src/manifest.rs:110–129` and
+its wasm table parser at `:274`, with storage propagated through
+`crates/ilang-package/src/lib.rs:219` and `:497`, followed by CLI build
+orchestration at `crates/ilang-cli/src/lib.rs:89–119`. Check a provider cycle
+or missing Fs before artifact emission, not during instantiation.
+
 These are **read-code facts**, not observations of the proposed implementation.
 Every implementation statement in this note refers to the following anchors.
 The review's probes are reported evidence only; they were not rerun here.
@@ -620,6 +1014,7 @@ Implementation handoff, with changed regions (new files are explicitly new):
 | Stage | Files/regions and required change |
 |---|---|
 | Front end | `crates/ilang-syntax/src/ast.rs:49–63`, `crates/ilang-check/src/resolve.rs:596–647`: represent/validate foreign declarations; preserve spans and resolved nominal identity; accepted-syntax parser/formatter work must use their landed owners' current regions |
+| Provider prerequisites | P1 opaque provenance across all ABI paths; P2 checker entry validation and `lower.rs:916–965` async wrappers; these precede JS/IO integration |
 | Provider/link pass | New target-provider and foreign-reachability modules beside `crates/ilang-wasm/src/lower.rs`; integrate before `:776–807` and `:969–1005`; do not modify principal inference |
 | Target metadata | `crates/ilang-wasm/src/ir.rs:642–675`, `lower.rs:2649–2690`; new JS artifact emitter and versioned target manifest |
 | JS bridge | `bindings/javascript/ilang.mjs:324–378`, `:560–608`, `:784–849`: share validators, add snapshot converters, target getters/outcomes/Args and loader; treat synchronous externref results as opaque, including promises; new i/js and i/target modules |
@@ -629,7 +1024,7 @@ Implementation handoff, with changed regions (new files are explicitly new):
 | Macro integration | M2/M4 owners add M1 to the attribute origin checks and executable-needs validator described in meta §§4.3/8; no existing macro implementation is claimed here |
 | Regression tests | Extend `crates/ilang-cli/tests/wasi.rs:313–355`; new JS-target/compiler diagnostics and generated-artifact tests; SDK and browser fixtures in their existing suites |
 
-Order: land the source reconciliations first. On landed C and accepted syntax,
+Order: land the source reconciliations and P1/P2 first. On landed C and accepted syntax,
 prototype synchronous JS/linking and the checked WASI printer. Integrate
 promises only after R2's typed Request/Owner layer; integrate standard IO only
 after T2/A3 and binding grants. Preview-1 adapters beyond the printer are a
@@ -647,6 +1042,7 @@ widening the §10.3 ABI value/error lists.
 
 | Source section | Replacement/addition |
 |---|---|
+| Spec §2.6 | Add root-package providers tables and wasm.synchronous exactly as T6/T7. These keys were previously unused; do not claim compatibility with old readers that ignore them. |
 | Spec §2.2/§2.5; syntax §2.5 | Add js to built-in attributes. Replace the external-only declaration restriction with: “A declaration requires external or js, or expansion by a macro. A js declaration has the closed opaque type and foreign link semantics of §10.1. It is initialized once during start only if retained by the target link pass; ordinary bindings retain this section's initialization rules.” Add F1's ordering and F2's roots/conservative analysis verbatim as the foreign-declaration subsection. |
 | Spec §4.3/§4.7 | Keep sets, nominal identity and principal inference. Add js to the mandatory-full-annotation exceptions. Explicitly say target linking does not change inferred types. No general cast or request-map rule. |
 | Spec §9.2 | No semantic change. Add the captured-provider versus call-site replacement example described in T1. |
@@ -657,6 +1053,8 @@ widening the §10.3 ABI value/error lists.
 | Spec B.1/B.3 | Keep ABI allocation ownership. “Checked Wasi buffers are separate table-owned allocations and are not addresses supplied to ilang_free by i code.” Use W1/W2 as the checked root contract; ABI exports remain host machinery. |
 | Spec B.4–B.6 | Keep v3 ids, cancel, statuses and import-time re-entry restrictions. Add F3's JS target marker/ilang.js v1 metadata and retained getter imports, without changing the host artifact contract. Mandatory changes to runtime imports/statuses/host-called exports still require a version bump. |
 | Spec B.7 | Replace only the special Io implementation bullet after adoption: “The target's Io provider writes UTF-8 text plus LF through the checked Wasi adapter; positive short writes are retried, zero progress/errors give up, and print gives Nil.” Keep it absent from external required-import metadata because internally provided. Keep custom imports, runtime-reserved import names, stops, `_start`, blocking calls and no tests. Add the no-result proc_exit adapter rule W2. |
+| Runtime D5 and §10 | Replace entry provisioning/classification and ABI async-flag text with §9.1 below. |
+| Runtime §§5.1/5.4 | Keep their existing ownership rules; use corrected A2 and the Ready-survives-Owner test in §10. |
 | Runtime §§7/7.4 | Use native branch's reconciled N9 resource text, not this lane's older opaque types. Split process fields by T2, preserving other signatures/errors. |
 | Runtime §8.2 | Generated js/nodejs defaults follow T1–T3, with no automatic unsupported stubs. Explicit Host factories remain configurable. Generated builds share A4's factories. Keep WASI custom imports; list printer as this target project's separate adapter stage, and do not promise later adapters before they land. |
 | Meta §4.3 | Add js to the built-in names and @js to the caller-origin list, exactly as M1. |
@@ -671,8 +1069,106 @@ Runtime §8.2's automatic unsupported browser defaults conflict with J1;
 its no-preview-adapter scope must explicitly coexist with this separate
 printer project. This lane's opaque resources are superseded by the supplied
 native branch under J2. No conflict remains with native N9 or custom-import
-preservation under J4. Replacing resource factories or adding a Native root
-would create new conflicts, so neither is part of this revision.
+preservation under J4. K1 versus B.7 is recorded in §9.1; do not silently
+apply its unrestricted wording to a blocking WASI command. Replacing resource
+factories or adding a Native root would create new conflicts, so neither is
+part of this revision.
+
+### 9.1 Exact runtime replacement and the remaining ABI scope question
+
+**Replace D5 in full with the following text. [K1]**
+
+> Let N be an entry's ordinary inferred environment. Resolve the target's
+> chosen provider for every service in N, and transitively for every service
+> in each chosen factory's inferred environment. A request host declaration
+> is a request-mode provider; an async host declaration is normalized to its
+> request-and-await provider. Scheduler and Runner are provider roles with
+> typed structured-run entry adapters, usable by any service; no rule tests
+> a module or type spelling. Reject unresolved supplies and provider cycles.
+>
+> On targets using the v3 asynchronous entry protocol, the entry is async
+> exactly when that closure contains a request-mode service provider, a
+> Scheduler provider or a Runner provider. This is computed from the full
+> chosen graph, without source-body reachability or field-use analysis, and
+> does not change the principal source type. Await/Owner/Root providers alone
+> do not qualify. A service node's declared request/async mode counts even if
+> a factory supplies a completed fake for that service. A pure bundle provider
+> without such a dependency may remain synchronous. An ordinary user bundle
+> follows exactly the same rule as a shipped bundle.
+>
+> An async wrapper opens its entry/request context and async admission boundary
+> before constructing providers. It binds Root/Owner/Await, uses the chosen
+> structured-run adapter when the closure has a Scheduler/Runner provider,
+> builds ordinary providers in dependency order, invokes the source entry,
+> and performs structured cleanup. Provider factories return their service
+> without uncaught typed errors; construction cannot add to the source entry's
+> ABI error row. A factory may still stop under §11.7. The shipped task adapter
+> retains FIFO, fresh run identity/path [], seed random.from_seed(0), and no
+> entropy draw.
+> A closure with request providers but no task provider uses the direct Await
+> adapter, not a task scheduler. Synchronous completed-fake contexts cannot
+> hand off: an attempted low-level wait/poll stops with request: no active entry.
+>
+> A host export can therefore become async when its provider closure changes,
+> even if its source type is unchanged or its body never waits. The artifact's
+> async metadata and wrapper follow the closure. If it is listed in the root
+> package's wasm.synchronous contract, such a build is an error showing the
+> qualifying dependency path. Do not silently block or emit synchronous
+> metadata. Otherwise the caller must use the async entry protocol. Status 0
+> on the first call is still possible; pure scheduler switches alone do not
+> yield to the host. Existing progress-polling and contextual Runner seed
+> rules stay unchanged.
+>
+> On WASI preview 1, spec B.7 continues to require blocking imports,
+> synchronous entry metadata and no async hand-off. This is the explicit
+> target-ABI exception pending the scope decision recorded below.
+
+**Runtime §10, §10.2 replacement. [K1, K3]** Keep its first paragraph defining
+main, tests and host exports and their ordinary signatures. Replace all its
+following entry-service and async-classification paragraphs by:
+
+> Any ordinary named service may appear in an entry's inferred environment
+> when the chosen target provider plan supplies it. Source inference and
+> boundary/entry signature checks run first. The provider phase then checks
+> supplies for the full inferred environment and selected factory dependencies;
+> the checker no longer restricts entry services to a built-in list. A missing
+> required service is an entry compile error, even when operation errors are
+> caught. Select user providers per target by spec §2.6; the dependencies of
+> an unchosen provider are not supplied on that target. Do not delete any
+> inferred requirement through target-branch pruning.
+>
+> Apply D5's transitive-provider rule, wrapper order, synchronous-export
+> contract and WASI exception exactly. This is the sole classification rule;
+> directly examining N for host/task service names is insufficient. Ordinary
+> environment statements still replace values at call sites, and selected
+> factories are ordinary functions with ordinary types. A provider can capture
+> its dependencies; later substitutions do not mutate that captured value.
+> The original source type stays unchanged. Main/test errors stop after
+> cleanup; host-export errors reach the host after cleanup; stops run no i finals.
+
+**Runtime §10, B.4–B.6 replacement sentence. [K1]** Replace the sentence saying
+metadata derives async flags from the inferred environment with:
+
+> Metadata derives each entry's async flag and status/result exports from
+> D5's complete chosen provider closure, subject to B.7's blocking WASI ABI.
+> This calculation precedes linking and optimization. A requested synchronous
+> export that classifies async is a build error. Request-mode and async host
+> declarations retain v3's existing wire; completed cells are not outstanding ids.
+
+Keep runtime §5.1/§5.4 verbatim: close_owner/close_root cancel outstanding work,
+not detached Ready answers. Keep native N9, runtime §8.1 and J4's custom WASI
+imports. P1 implements the existing nominal-equality spec, requiring no new
+ABI type or weakening of identity.
+
+**Conflict requiring a coordinator answer.** K1 literally says “an entry is
+async exactly when” without a target qualification. A WASI custom request
+service supplies the smallest counterexample: its chosen closure contains a
+request-mode service, but spec B.7 requires a blocking import and synchronous
+entry with no resume/result exports. The exact replacement above keeps the
+spec and explicitly limits the new rule to the async protocol, matching the
+scope of the replaced D5. Recommended answer: confirm that scope; do not
+change B.7 or remove the custom import. If universal K1 was intended, changing
+B.7 requires a separate explicit ABI decision, not a silent edit in this note.
 
 ## 10. Required tests and adversarial revision
 
@@ -682,13 +1178,25 @@ for cancellation/cleanup, not sleep timing. Run availability tests at O0/O2/O3.
 
 | Test | Expected result and rule |
 |---|---|
+| Promise example and equivalent user bundle on async-protocol target | Async context opens before factories; async true metadata and result export (T7/T8) |
+| answer export with request-backed Bundle / pure Bundle / synchronous contract | async true / async false / compile error for the request-backed plan (T7/T8) |
+| Settings fixture with file contents `<<1, 2>>` on Node/Native | read returns `<<1, 2>>`; real Fs provider chosen, private numbers remain hidden (T6) |
+| Settings fixture on Js/Wasi/Host | read returns `<<>>`, no Fs provider/import, synchronous classification (T6/T7) |
+| User State without any provider; provider dependency cycle | Entry-supply diagnostic after inference / provider-cycle diagnostic (P2/T6) |
+| choose example below | WASI rejects retained unused; JS initializes it and stops with unused, at O0/O2/O3 (F2) |
+| Certified Target alias captured directly; helper environment Target; substituted Target through keep_env | Prune only the direct capture's other-target constructor clauses; helper cases retain foreign binding (F2) |
+| Recursive or higher-order reference to an entry | Its Target binder loses certification; retain all clauses (F2) |
+| Matching-target clause with literal False guard | Retain guard/body and later clauses; no guard/value evaluation (F2) |
+| Same raw object under A/B, A/A; null under A/B, A/A | False, True; False, True through import/export/generic equality (P1) |
+| Ready answer returned from within, then take | Returns original opaque outcome, then Taken; Owner close sent no cancel for it (A2/K5) |
+| Explicit request.cancel after Ready, then take | request: cancelled stop; individual guard differs from Owner close (runtime §§5.1/5.4) |
 | process.entropy(32) on supported JS profile | 32 bytes; only Entropy plus request services required, no Process import (T2) |
 | process.args on WASI without/with explicit adapter plan | Missing Arguments diagnostic / decoded arguments; no spawn/cwd requirement (T2/T3) |
 | fs.read_file inside fail.catch on js | Compile error naming Fs; no executable unsupported handler (T1/J1) |
 | Same nominal service used through one field | Whole service type; no target-dependent principal type (T1) |
 | Capture real Js in Io, then substitute Js | Old Io keeps captured implementation; a later direct JS call uses substitute (T1) |
 | Five-constructor Target match | Exhaustive; entry needs Target only (T4) |
-| Unavailable @js in known-other-target clause | No declaration getter/import on WASI (F2) |
+| Unavailable @js only in another-target constructor clause on a certified entry Target | No declaration getter/import on WASI (F2) |
 | Unavailable @js in unknown call, ordinary initializer or explicit fake Target branch | Compile error, no null, at all optimization levels (F2) |
 | Two @js object expressions and repeated reads | Distinct objects compare False, same declaration True (F1/F2) |
 | Custom WASI Float service and existing greet fixture | Import retained; supplied host result preserved (T5, wasi.rs:313) |
@@ -748,7 +1256,7 @@ Value {}
 Thrown { Thrown(Value) }
 
 @host("probe:js/v1", "request")
-Bad { Bad(wait: (Value) -> request.Request(Result(Value, Thrown))) }
+Bad { Bad(wait: (Value) -> Request(Result(Value, Thrown))) }
 ```
 
 §10.3 and runtime §5.2 reject this declaration. A1 now returns only opaque
@@ -801,77 +1309,182 @@ uses = (t: target.Target) {
 main = (t ! target.Target) { uses(t) }
 ```
 
-On WASI with its default Target, no binding is required. Add an ordinary
-top-level `forced = object`, or call uses with a locally constructed Js value:
-the binding is required and the build fails. Treating all Target values as
-the selected target, or deleting ordinary initializers by unused-name
-analysis, was wrong. F2 now roots all ordinary initialization, follows actual
-values, and rejects unknown uses. Its foreign-only retention exception is an
+This program now rejects on WASI: the ordinary parameter of uses is unknown,
+even though main passes its certified entry service. Moving the match into
+main, or into a closure that lexically captures main's t, permits only F2's
+other-target constructor pruning. Adding `forced = object` at top level
+retains it independently. This is a documented rejection, not a demand for
+smarter analysis. Treating every Target as the build target or deleting ordinary
+initializers by unused-name analysis was wrong. Its foreign-only retention exception is an
 explicit spec amendment. The factory attack `make_fs(fake_js)` returning a
 live guessed Int also defeats N9; A4 removes public root-to-resource factories
 and preserves granted raw factories instead.
 
-### Two passes after the fixes
+### Review-3 attacks and fixed expectations
 
-Pass 1 revisited the three programs above with zero-size buffers, stale tokens,
-interior offsets, sequential entry contexts, getters throwing during copies,
-resource fakes, raw aliases and pending close. It also traced synchronous
-try_call and promise rejection through the exact §10.3 raw signatures, and
-checked ordinary initializer order against F1/F2. It repeated the promise-as-
-opaque-data attack after the generic synchronous externref fix, and checked
-that Target's Js bundle discharges both raw service dependencies. No further
-serious defect was found by this manual analysis.
+The deterministic-analysis witness from the review is retained in full:
 
-Pass 2 changed the roots: exported helper versus main, a captured or replaced
-Target, an unknown higher-order caller, a macro program's non-direct initializer,
-and a startup stop without Io. It checked id reuse versus late completion,
-Ready abandonment, custom WASI request imports, proc_exit's absent result,
-all five Target branches, and native's no-root provider contract. No further
-serious defect was found. Conservative rejection is intentional when F2
-cannot prove a foreign binding absent. These passes are not a compiler,
-scheduler or OS proof.
+```i
+(js = i/js)
 
-Checks run for this revision: all 10 i code blocks parsed with the cached
-accepted-syntax compiler `i-1df2fe0` using `fmt --check` on in-memory files
-(formatting differences allowed). This checks grammar, not future names or
-types. A bounded Python model of W1 visited 90 states and 165 transitions,
-including physical-address reuse, with no token reuse or overlapping live
-regions. A separate three-order model checked cancel/id-reuse/old completion
-under A2; no old result reached the new request. These are abstract-model
-checks, not implementations. The text audit checked balanced fences, table
-widths, ruling/review coverage and cited code paths; `git diff --check` passed.
-No Cargo build or runtime integration suite was run for this note-only change.
-The review's cached-compiler probes were read, not rerun.
+@js("(() => { throw Error('unused'); })()")
+unused: js.Value
+
+choose = (b) {
+  b |> {
+    True -> True
+    False -> False
+  }
+}
+
+@main
+main = () {
+  _ = choose(True)
+  choose(False) |> {
+    True -> unused == unused
+    False -> True
+  }
+}
+```
+
+F2 visits both result clauses, with one choose body node for both calls.
+There is no certified build-discriminant subject. WASI rejects; JS runs the
+retained initializer and stops before main, at every optimization level.
+An implementation that proves the branch False may optimize the reads only;
+it must still initialize unused. The old specialisation choice is removed.
+
+The smallest substitution witness for an overly broad Target rule is:
+
+```i
+(js = i/js, target = i/target)
+
+@js("globalThis")
+foreign: js.Value
+
+inspect = (t ! target.Target) {
+  t |> {
+    target.Native -> foreign == foreign
+    _ -> True
+  }
+}
+
+@main
+main = () {
+  ! target.Target = target.Native
+  inspect()
+}
+```
+
+On WASI this must reject, because inspect really reads foreign. Its environment
+binder is not a certified entry binder; F2 retains it. Capturing inspect with
+`control.keep_env((_: Nil) { inspect() })` inside that substitution and invoking
+it later has the same answer. Conversely, a closure directly capturing an
+entry's certified t still sees that old value after a substitution: its only
+pruning is justified by lexical capture, not by keep_env. If an entry is also
+called recursively or passed to another i function, F2's whole-program source-
+reference check disables its certification, preventing the same bug there.
+This is the smallest sound syntactic boundary chosen for K2, not a hidden
+value-flow analysis. It expresses T4 but deliberately rejects the helper forms.
+
+The Ready-owner test from finding 5, inside an async A1 host fixture, is:
+
+```i
+(js = i/js, i/request)
+
+survives = (promise: js.Value, raw ! js.JsRequests) {
+  r = request.within(() {
+    r = raw.observe(promise)
+    request.wait_any([request.ticket(r)])
+    r
+  })
+  answer = request.take(r)
+  (answer, request.state(r))
+}
+```
+
+The fixture's chosen raw request provider makes the entry async under T7.
+Gate the host completion, deliver a known Outcome, then let within return.
+Expected `(that_outcome, request.Taken)` and no ABI cancel for the completed
+id. Closing the Owner has removed only outstanding registrations, not r's
+Ready value. Explicitly cancelling r before take instead stops with
+`request: cancelled`. Public await wrappers have individual guards and take
+before their final cancels; this raw-handle test intentionally has no such guard.
+
+Three designs were reconsidered for this revision: expose every raw request
+service in public environments; keep bundle APIs and classify their chosen
+provider closure; or infer async behavior from body/value reachability. K1
+chooses the second, preserving ordinary bundles and deterministic metadata at
+the cost of conservative async exports. For linking, specialisation and merged
+value-flow analyses both have more acceptance rules; K2 chooses reference
+reachability plus the certified-discriminant clause rule. For filesystem
+fallback, a Native root or public raw factory would reopen N9; K3's ordinary
+application provider avoids both. Criteria remain §1's generality, principal
+inference, predictable acceptance and buildability.
+
+### Verification and final attacks
+
+The revision-6 memory-model results remain historical evidence, not validation
+of the new provider/link rules. For revision 7, the review's existing
+`/tmp/review-js3/opaque.mjs` probe was run against its cached Wasm fixture and
+this lane's SDK. It reproduced True for the same object under A/B, False for
+different objects, and True for null under A/B. This verifies the P1 defect;
+it does not test a fix. No compiler rebuild or new JS/R2 implementation was run.
+
+All 16 i blocks parsed with cached accepted-syntax compiler i-1df2fe0, using
+fmt --check on in-memory files (formatting differences allowed). TOML and JSON
+blocks parsed, and fence/table/citation/diff checks passed. This verifies
+syntax, not future provider keys or API types. An abstract provider model
+checked the same closure rule on three differently named bundles and all
+five Settings target selections. A separate six-order model checked
+completion/Owner-close/take, including Ready survival and explicit handle
+cancellation. These finite models are not compiler or scheduler implementations.
+
+Initial revision-7 attacks exposed why certification must exclude a helper's
+environment binder and an entry with source callers; F2 now states those
+conditions. A provider factory raising an undeclared host-export error was
+another real hole; T6 now requires its ordinary error type to be Never.
+That preserves the export's source error row without a hidden metadata union.
+
+Pass 1 after those fixes traced direct aliases, shadowing, lexical captures,
+keep_env, higher-order references, recursive entries, guarded clauses, direct
+versus non-direct initializers, and unchosen provider functions through the
+fixed reference graph. It traced both provider branches of Settings and the
+Js/user-bundle/export wrappers, including a pure replacement provider and an
+explicit synchronous contract. No further serious defect was found.
+
+Pass 2 independently checked coalesced opaque imports, nulls, external/async
+replies and export round trips against P1; Ready escape versus individual
+request guards; provider cycles, missing supplies and error-free construction;
+and the retained custom-WASI, checked-buffer, conversion, macro and N9 rules.
+The K1/B.7 conflict remains explicitly flagged for the coordinator. No further
+serious defect was found by manual analysis. Neither pass is a soundness proof
+or an execution of the unimplemented provider/linker/nominal-provenance changes.
 
 ## 11. Risks and coordinator questions
 
-- **Land the spec/provider amendments before implementing them?** Recommended:
-  yes, as one reviewed source update with the corresponding runtime/meta text
-  in §9. Preserve current spec behavior until then. This lane owns only js.md.
-- **Keep Native nullary and keep raw resource factories?** Recommended: yes;
-  it follows accepted N9 and avoids an unapproved universal Native root or a
-  public raw-number injection path. A future explicit capability bundle can
-  be designed independently of packaging.
-- **Approve the smaller checked WASI adapter surface?** Recommended: W1/W2,
-  one-buffer fd_write first. Pointer-layout-aware adapters are necessary for
-  safety; do not restore raw addresses or promise all preview-1 functions
-  from scalar signatures alone.
-- **Adopt the foreign-only retention/initialization rule?** Recommended: F1/F2,
-  with conservative errors and identical O0/O2 behavior. Its effect removal
-  is explicit; ordinary top-level code keeps §2.5. Global-only ESM scope and
-  dynamic import inside functions settle stage-1 module loading.
-- **Which team owns the provider plan and binding-grant trust plumbing?**
-  Recommended: target integration owns general providers/linking; IO owns
-  native N9's general privacy/grants and shared context-aware factories;
-  neither treats a self-signed manifest as authority.
+The ledger accepted revision 6's recommendations: source amendments first,
+nullary Native, existing resource factories, checked WASI slices, foreign-only
+retention, and target-integration/IO ownership. These are retained, not reopened.
 
-Unverified: inference/link-pass implementation, all new API fixtures, generated
-JS artifacts and browser support profiles, checked adapter code, resource
-factories, performance/size costs, and future callbacks. Each JS argument may
-still need a bridge crossing; checked WASI printing allocates/copies. There
-are no measurements here. Host unavailability during a run remains an ordinary
-operation error where a supported provider exists; it is different from a
-missing default at build time.
+- **Does K1 cover only async-protocol targets?** Recommended: yes; confirm §9.1's
+  scope and retain B.7's blocking WASI custom imports. Universal K1 contradicts
+  the current spec on a request-mode WASI import.
+- **Which prerequisite owner lands P1?** Recommended: a general compiler track
+  before JS bindings, coordinating with R2's reply decoder. It must cover all
+  opaque import/export paths, not only the new getters.
+- **Adopt the explicit provider/contract spellings?** Recommended: T6's root
+  `providers` tables and T7's `wasm.synchronous` list. They serialize the chosen
+  general plan and make the requested synchronous-export diagnostic testable.
+- **Confirm the restricted Target certification?** Recommended: F2 exactly.
+  Certifying arbitrary helper environment parameters is unsound under the shown
+  substitution; no wider analysis is needed for T4's direct entry example.
+
+Unverified: future provider-plan/checker/link implementations, full type-checking
+of request-era fixtures, generated artifacts, browser profiles, real request/
+resource cleanup and performance. The example package is complete for the
+proposed plan; today's package reader does not implement its new keys. The
+review's retained conversion, checked-memory, N9, custom-import and macro rules
+remain required. Callback re-entry is still a separate gate.
 
 ## 12. Review disposition
 
@@ -905,3 +1518,27 @@ SDK `ilang.mjs:836–839`); A4 shares accepted factories (N9/runtime §8.2); W1/
 adapter to a checked slice (J6, allocator evidence); §8 keeps callbacks behind
 a separate gate (B.3–B.5/runtime R2). These are design choices, not additional
 claims of user rulings or implemented features.
+
+### Review of 9c28dd1
+
+| Finding | Changed rule and place |
+|---|---|
+| 1 blocker: async hidden behind bundles | T7/T8 (§2), P2 (§8), exact D5/§10 replacement (§9.1); promise, user bundle and synchronous export wrappers/metadata |
+| 2 blocker: implementation-dependent retention | F2 (§3), fixed reference graph and certified-discriminant pruning; choose, aliases, closure, substitution and recursion tests (§10) |
+| 3 major: resource fallback cannot discharge Fs | T6 (§2), complete ordinary-i Settings package and per-target provider plan; no effect deletion or raw-number injection |
+| 4 major: opaque nominal identity erased | P1 (§8), general compiler prerequisite and all-boundary tests; F4 no longer claims the current bridge suffices |
+| 5 major: Owner closure discards Ready | A2 (§5), runtime §§5.1/5.4 unchanged, survivors test (§10) |
+| Handoff: checker rejects ordinary services first | P2 (§8), move supply validation after inference and before linking/lowering; keep ordinary entry/ABI checks |
+
+New choices beyond the rulings: error-free provider construction preserves
+source export error rows (spec §10.3); root-only provider-table precedence and
+`wasm.synchronous` spellings serialize T1/K3 and K1's diagnostic option (spec
+§2.6 amendment); provider roles and a generated discriminant constructor map
+make K1/K2 independent of library names; F2's entry-only certification and
+source-reference exclusion follow §9.2 and the substitution counterexample;
+activating referenced closures without callee-set analysis fixes the finite
+context-insensitive graph required by K2; P1's guest-side nominal/ref pair
+implements §4.1/§11.4 while keeping B.2's externref wire; the proposed K1 target
+qualification preserves higher-priority B.7 pending coordinator confirmation.
+Earlier decisions and their sources in this section remain, except the old
+F2 value analysis and direct-environment async rule, which K1/K2 supersede.
