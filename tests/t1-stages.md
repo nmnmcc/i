@@ -98,9 +98,9 @@ Stage gate:
 The joint algebra shape is `Con(Head, ValueSet, Vec<Ty>)`. New named and
 tuple heads have All values. Every child mapper and rebuilder carries the
 existing set. No expression, annotation, or pattern constructs a restricted
-set yet. Scalar creation and the value accessor have targeted temporary
-dead-code expectations, to be removed as stages 4–7 consume them; no
-verification command or test expectation is relaxed.
+set yet. This step used targeted temporary dead-code expectations for
+staged helpers. Stage 4 removed them: unused constructors/accessors remain
+test-only until their consumer stages. No lint exceptions remain.
 
 The existing coverage integer conversion now calls the same canonical
 decimal helper as the literal tests. Its output is unchanged, including
@@ -211,8 +211,84 @@ Stage gate:
 
 ## Remaining stages
 
-The display/known/coverage rules (stage 5), deferred
-Assert fix, literal inference, written types/narrowing, fitted choices,
-performance scripts, and final soundness review are not enabled by stage 1.
+The display/known/coverage rules (stage 5), deferred Assert fix (6a),
+pattern preparation (6b), literal inference (7), written types/narrowing
+(8), joint fitted choices, performance scripts (9), and final soundness
+review (10) remain unfinished after stage 4. Resume with stage 5; enable
+the test-only set accessors when their production consumers are added.
 Future entries must be removed when their syntax actually parses, never
 in advance. Golden files must be generated in a final separate commit.
+
+M4 handoff, outside this lane: literal-types §5.9 requires literal Syntax,
+negative Int construction as a unary datum (including through groups),
+TypeArg=Type, and Types.members expanding finite scalar sets into literal
+items sorted by full shown text. Do not implement this by shortening or
+reparsing hover text. The complete accepted rows remain in that section.
+
+## Final stage-4 handoff
+
+T1 is incomplete and stops at the committed stage-4 boundary. No source
+literal inference, written literal parsing, new E0520 behavior, or literal
+narrowing is enabled. The complete T1 corpus audit and performance budget
+have not been run. This is not the finished T1 result for T2/T3 integration.
+
+Required upstream merges were made without conflicts: C4 `f5cff7c`, B
+`e1abcb6`, and path/sequence `12d4637`. Files outside T1's regions changed
+only through these requested merges. The final checks below ran after
+merging `12d4637`; redesign was checked again before handoff.
+
+Final implementation checks:
+
+- `ILANG_BROWSER_PORT=4181 ./scripts/dev-verify`: exit 0. This includes
+  Rust fmt, workspace Clippy with -D warnings, workspace tests, library
+  formatting, std/hello/bench at O0/O2, WASI smoke, JavaScript SDK tests,
+  and 33 actual browser tests. Std passed 1399 tests at each level.
+- The spec suite in that workspace run passed 159/159 cases at O0/O2.
+  Earlier explicit `cargo test -p ilang-cli --test spec --locked` runs
+  passed 139 cases before C4 and 140 after C4, both at O0/O2.
+- `scripts/old-syntax-check`: exit 0; 1077 extracted snippets, exact
+  expected diagnostics, 20 future-track entries. T1 entries intentionally
+  remain until stage 8 implements their syntax.
+- `WAT_DUMP=... cargo test -p ilang-cli --test wat_dump --locked`: 602
+  outputs. Every byte equals the exact `12d4637` upstream baseline, with
+  none added or removed. The archived baseline is under target/t1; all
+  848 tracked blobs were verified against git. The four std additions
+  were installed before its test started; its Rust sources are identical
+  to e1abcb6. The Binaryen gitlink uses this lane's submodule.
+- No type golden changed and no derived file remains changed.
+
+The full verification log is `target/t1/dev-verify-12d.log`; old syntax is
+`target/t1/old-syntax-12d.log`. WAT directories are `target/t1/wat-12d` and
+`target/t1/wat-upstream-e1abcb6` (the latter contains the verified 12d4637
+baseline, despite its original directory name). These are implementation
+comparisons, not substitute performance measurements or proof of the
+unfinished literal behavior. The interpretation checks and their source
+sentences are recorded by stage above.
+
+Failed checks and repairs:
+
+- The first old-syntax check rejected the new host example before its
+  required explicit T1 data entry was added. The final exact check passes.
+- A mechanical field edit left trailing whitespace; cargo fmt fixed it.
+- The first full gate failed Clippy's items_after_test_module. The solver
+  tests were moved after the remaining helpers; final Clippy passes.
+- The next full gate found a formatter skip-inventory difference for the
+  unsupported host example. UPDATE=1 generated that line, without a hand
+  edit. The following gate reached spec_blocks_parse and rejected that
+  same not-yet-supported syntax. The example now has an explicit
+  `i pending=T1` fence and a separate exact current-diagnostic test. The
+  existing implemented-snippet parse/print assertion is unchanged, and
+  old-syntax-check still parses the pending fence. Regenerating format
+  tests returned all derived files to baseline. Stage 8 must remove the
+  pending mark, its exact-diagnostic fixture, and its old-syntax entry.
+- Two preliminary spec-edit scripts stopped with indexing errors before
+  writing, and patch context mismatches made no changes. They were fixed;
+  no partial repository edit was retained from those failures.
+- No check was interrupted. No git configuration, lockfile, or dependency
+  was changed. Environment overrides were command-local. Build artifacts
+  and the archived baseline remain only in this lane's ignored target.
+
+The accepted joint corrections control the older note's package-head
+wording, Int|y example, conditional one-clause-choice wording, and T2-first
+merge suggestion. Their corrected source sentences are listed in stage 1.
+There is no unresolved source disagreement for the completed stages.
