@@ -347,9 +347,10 @@ def run_corpus(args):
             if wanted == 'reject':
                 met = check['exit'] == 1 and 'error[' in check['stderr'] and 'panicked at' not in check['stderr']
                 if requirement.get('phase') == 'entry':
-                    met = any(v['exit'] == 1 and ('error[' in v['stderr'] or 'provider:' in v['stderr'])
+                    entry_checks = [check] if check['exit'] != 0 else [result['run0'], result['run2']] if 'run0' in result else [result['test0'], result['test2']]
+                    met = all(v['exit'] == 1 and ('error[' in v['stderr'] or 'provider:' in v['stderr'])
                               and 'E0505' not in v['stderr'] and 'trap:' not in v['stderr']
-                              for v in result.values())
+                              for v in entry_checks)
             elif wanted == 'accept':
                 met = check['exit'] == 0 and all(value['exit'] == 0 for value in result.values())
             else:
