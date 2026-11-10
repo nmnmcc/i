@@ -1,0 +1,1017 @@
+# Design: property tests, finite mathematics, and codepoint strings
+
+Status: proposed for coordinator review. This task changes only this note.
+Source baseline: `b9173ce013405fd3a055ffa34edf3b8829672104`.
+Repository line references are to that baseline, not the older baseline of
+std-1. Examples use the accepted syntax. Signature inventories describe ordinary
+bindings with bodies; they are not bare declarations. `Option`, `Some`, `None`
+come from `std/option`. `Result`, `Ok`, `Error`, `Assert`, and `AssertionFailure`
+are built in. Public interfaces below are complete additions, not replacements
+for existing exports.
+
+## 1. Problem, sources, and evidence
+
+Property tests need reproducible inputs and useful small failures. Float needs
+trigonometry without importing a host math library. String needs searches and
+indexed access with one consistent meaning of an index. All three must work as
+ordinary package code under `i run`, including when std is a dependency.
+
+Controlling sources, in order:
+
+| Source | Constraint |
+|---|---|
+| `docs/spec.md:127–145`, `:221–230` | Ordinary modules and private constructors/fields. No reserved std module. |
+| `docs/spec.md:348–461` | Types are sets; Float is finite; String is UTF-8 scalar values; rank-one inference and direct-value generalization. |
+| `docs/spec.md:591–598`, `:836–908`, `:957–997` | Strict calls, ordinary effects, and replaceable Assert; assertion.catch already supplies the required test boundary. |
+| `docs/spec.md:1014–1087`, `:1124–1145`, `:1218–1250` | SplitMix, exact integers, binary64, equality, bit conversions and UTF-8 primitives. |
+| `docs/design/syntax.md:99–200`, `:223–253`, `:372–386` | Import/export groups, declared type parameters and clause functions. |
+| `docs/design/runtime.md:199–283`; `lib/i/random.i:76–86`, `:126–170`, `:217–223` | Landed pure generators, rejection sampling, split and path derivation. No entropy service needed. |
+| `docs/design/std-1.md:886–984` | Ordinary module contracts belong in module docs; do not add redundant spec rules. Explicit interfaces, tests and honest costs. |
+| Plan `twinkling-swinging-perlis.md:30–56`, `:79`, `:520–550`, `:583–590` | Standalone language; Std-3 owns these modules after R1; string indexes count codepoints; STR owns interpolation. |
+| Ledger, entries “R1 landed” and “FP landed” | R1 and general field privacy are available. No std-specific compiler or runner extension. |
+
+The plan is `/home/agent/.claude/plans/twinkling-swinging-perlis.md`; the ledger
+is `/home/agent/Programming/i/.rd/cache/ledger.md`. Read on 2026-11-10. The lane
+already contains migrated syntax; the shared brief's warning about the old
+spec syntax does not describe this baseline.
+
+Facts checked by reading code:
+
+| Code region | Finding and consequence |
+|---|---|
+| `std/src/float.i:1–7`, `:14–57`, `:229–260`, `:317–338` | Finite-only API and existing rational-to-bits rounding. Reuse its integer techniques with explicit zero/sign/overflow handling. |
+| `std/src/float.i:480–515`, `:577–628` | Roots, powers, exp and log use Result for domain/overflow; exp/log/power already use plain-i fdlibm-derived code. Preserve their results. |
+| `crates/ilang-wasm/src/runtime/values.rs:45–50`; `crates/ilang-wasm/src/runtime/core.rs:11–48` | Float construction rejects NaN/infinity; division by zero produces +0; sqrt uses f64.sqrt. Avoid invalid intermediates. |
+| `std/test/float_test.i:1027–1090`, `:1106–1203` | Bit-level parse/zero tests and overflow cases exist. Approximate equality alone is insufficient. |
+| `std/src/string.i:22–63`, `:70–77`, `:110–176`, `:239–308` | Scalar lengths and negative slice indexes already exist; empty split and replace have different established rules. |
+| `std/src/string.i:179–207`, `:330–389`, `:418–455` | Pattern_White_Space, simple casing, padding and conversions already exist. |
+| `crates/ilang-wasm/src/runtime/values/strings.rs:151–162`, `:170–198`, `:200–238` | Slices copy bytes; search compares at successive offsets; codepoints builds a whole list. No O(1) character indexing primitive. |
+| `std/test/string_test.i:2060–2103`, `:2115–2160`, `:2240–2247` | Empty pieces, trailing lines, negative slices, Unicode and invalid scalar conversion have tests to retain. |
+| `lib/i/assertion.i:13–22`; `crates/ilang-host/src/lib.rs:805–834`; `crates/ilang-cli/src/main.rs:250–302` | Catching Assert cancels its continuation; runner handles ordinary stops and prints their text. Report one AssertionFailure without a discovery hook. |
+| `crates/ilang-check/src/types/infer.rs:232–255`, `:292–325` | Recursive groups are monomorphic internally. Use uniform recursive trees. |
+| `std/src/stream.i:43–55` | Effectful streams require invariant environments. This design stores only pure callbacks. |
+
+Reading establishes available operations, not new algorithm performance. Section
+9 separates executed checks from design reasoning.
+
+## 2. Alternatives and decisions
+
+Choose by source agreement, principal inference, deterministic meaning, bounded
+search policy, implementation/audit cost and honest performance. For math,
+reproducibility and a defensible error bound come before throughput.
+
+| Design | Property | Float | String | Assessment |
+|---|---|---|---|---|
+| A: host-shaped | Reflection and runner registration | Host libm or JavaScript Math | Host indexes and locale | Familiar, but violates ordinary-library and target requirements. |
+| B: smallest wrappers | Separate generator and shrinker | Float Taylor series after modulo rounded tau | Only byte primitives or slice composition | Mapped invariants are lost, huge-angle reduction is wrong, and byte indexes conflict with the plan. |
+| C: pure explicit values | Value with attached lazy shrink tree | Exact-integer enclosures and one final rounding | Scalar operations over UTF-8 primitives | Choose: stronger auditability, with an explicit math performance cost. |
+
+Keep B's explicit callbacks/small API and A's familiar mathematical names and
+reference cases. Custom shrinkers can build trees through make/tree. A future
+fast polynomial must certify the same rounded result, not a target-dependent
+approximation.
+
+1. **No language change.** Gen/Tree are ordinary nominal constructor values with
+   pure function fields. No reflection, implicit generator instances, overloaded
+   index syntax or runner registration (spec §2/§4; std-1 §7).
+2. **Pure generators/predicates, separate assertion adapter.** Replay cannot
+   promise an external service repeats. assertion.catch already provides the
+   adapter (spec §9.6). Generate command lists for a separate state-machine
+   harness rather than hiding IO in Gen.
+3. **Integrated shrinking, fixed candidate budget.** Map retains structure;
+   dependent generation regenerates dependent trees on outer shrinks. Budgets
+   count checks, not arbitrary computation (strict calls, spec §6.2).
+4. **Float remains finite.** Nonfinite values have no cases in the domain.
+   Domain/rounded-overflow errors use Error(Nil), as square_root/real_power do;
+   signed zeros use bits (spec §4.2/§11.3; `float.i:510–515`, `:613–618`).
+5. **Correct rounding for new math.** Exact rational enclosures refine until
+   both endpoints round to identical bits. Existing Int and bit conversions
+   suffice (spec §11.2/§13). Existing exp/log/power contracts do not change.
+6. **Scalar string access follows existing slice.** Negative at indexes count
+   from the end. Searches have explicit nonnegative starting bounds. No Unicode
+   segmentation or syntax change (plan line 56/STR; `string.i:246–270`).
+
+Every type remains a set of values. There is no new inference feature. The same
+building blocks serve at least three unrelated uses: property tests for codec
+round trips, persistent-container models and numerical laws; trig for geometry,
+signals and simulations; scalar text operations for parsers, source tools and
+protocol text. Libraries remain optional ordinary i code.
+
+## 3. `std/property`
+
+### 3.1 Comparison
+
+| Source | Offers | Take | Leave, and why |
+|---|---|---|---|
+| [Go testing/quick](https://pkg.go.dev/testing/quick) | Generated checks and configuration | Explicit configurable checking | Reflection-based argument generation; use explicit Gen. |
+| [Python Hypothesis](https://hypothesis.readthedocs.io/en/latest/) | Strategies, shrinking and replay | Dependent generation and reproducible failures | Database, decorators and automatic state machines; separate tools. |
+| [Effect FastCheck](https://effect-ts.github.io/effect/effect/FastCheck.ts.html) | Access to fast-check | Composable generator values | JS coupling and schema-derived generators requiring reflection. |
+| [Gleam qcheck](https://qcheck.hexdocs.pm/) | Integrated shrink trees | Explicit typed composition | Target integration; use i's Assert. |
+| [QuickCheck](https://hackage-content.haskell.org/package/QuickCheck-2.16.0.0/docs/Test-QuickCheck.html), [Hedgehog](https://github.com/hedgehogqa/haskell-hedgehog) | Seed/size and separate shrinkers; integrated shrinking | Explicit size/replay and attached shrinks | Type classes, discovery macros and parallel execution. |
+
+### 3.2 Complete interface
+
+Export Gen without its constructor. Export Tree, Config, BuildError, Verdict,
+Failure and Report with constructors. Gen's private representation is shown
+for review. No stored callback has errors, services or a polymorphic result.
+
+```i
+Gen(A) { Gen((Int, random.Generator) -> Option(Tree(A))) }
+Tree(A) { Tree(value: A, children: () -> List(Tree(A))) }
+Config {
+  Config(seed: Int, cases: Int, max_size: Int, max_discards: Int, max_shrinks: Int)
+}
+BuildError { InvalidRange(Int, Int) InvalidLength(Int, Int) EmptyChoice }
+Verdict { Pass Fail(String) Discard }
+Failure(A) {
+  Failure(seed: Int, attempt: Int, size: Int, original: A, smallest: A,
+    reason: String, path: List(Int), checked: Int, limited: Bool)
+}
+Report(A) {
+  Passed(successes: Int, discards: Int)
+  GaveUp(successes: Int, discards: Int)
+  Falsified(Failure(A))
+  InvalidConfig(String)
+}
+```
+
+```text
+defaults: () -> Config
+make(A): (draw: (Int, random.Generator) -> Option(Tree(A))) -> Gen(A)
+sample(A): (gen: Gen(A), size: Int, random: random.Generator) -> Option(Tree(A))
+tree(A): (value: A, children: () -> List(Tree(A))) -> Tree(A)
+constant(A): (value: A) -> Gen(A)
+map(A, B): (gen: Gen(A), with: (A) -> B) -> Gen(B)
+flat_map(A, B): (gen: Gen(A), with: (A) -> Gen(B)) -> Gen(B)
+pair(A, B): (first: Gen(A), second: Gen(B)) -> Gen((A, B))
+filter(A): (gen: Gen(A), keeping: (A) -> Bool) -> Gen(A)
+sized(A): (with: (Int) -> Gen(A)) -> Gen(A)
+resize(A): (gen: Gen(A), size: Int) -> Gen(A)
+int: (min: Int, max: Int) -> Result(Gen(Int), BuildError)
+bool: () -> Gen(Bool)
+element(A): (choices: List(A)) -> Result(Gen(A), BuildError)
+list(A): (of: Gen(A), min: Int, max: Int) -> Result(Gen(List(A)), BuildError)
+float: () -> Gen(Float)
+utf_codepoint: () -> Gen(UtfCodepoint)
+string: (max_length: Int) -> Result(Gen(String), BuildError)
+check(A): (gen: Gen(A), config: Config, property: (A) -> Verdict) -> Report(A)
+replay(A): (gen: Gen(A), seed: Int, attempt: Int, size: Int, path: List(Int)) -> Option(A)
+format(A): (report: Report(A), show: (A) -> String) -> String
+test(A): (gen: Gen(A), config: Config, property: (A) -> Nil ! Assert, show: (A) -> String) -> Nil ! Assert
+```
+
+All factories are functions rather than shared weak polymorphic values. A is
+covariant in Gen/Tree/Report. Use direct generic map_tree/bind_tree helpers with
+written recursive result types, never polymorphic recursion. An ordinary client:
+
+```i
+(
+  i/core
+  std/list
+  std/property
+)
+
+@test
+reverse_twice = () {
+  Ok(item) = property.int(-100, 100)
+  Ok(items) = property.list(item, min: 0, max: 50)
+  property.test(items, property.defaults(), (xs) {
+    assert(list.reverse(list.reverse(xs)) == xs)
+  }, core.inspect)
+}
+```
+
+### 3.3 Exact generation and shrinking rules
+
+**P1 Sampling.** make stores draw; sample calls it with max(0,size) and the
+supplied immutable random value. None means one discarded attempt. No automatic
+retry, advancing cursor, hidden entropy or memoization. A Tree root is computed;
+children are deferred by a pure thunk.
+
+**P2 Composition.** constant returns a leaf, ignoring size/random. Map changes
+every value and preserves child order/shape, applying callbacks to children only
+when demanded. sized(f) samples f(size) with the same size/random. Resize replaces
+size by max(0,new_size), including the size retained for dependent shrinks.
+
+For flat_map at (s,g), split g into (left,right). Sample outer on left. For each
+outer node a, sample with(a.value) on the *same* right and s. A discarded inner
+root discards that branch. Otherwise bind its inner tree: the root is its value;
+children are (1) successful bound outer children in order, then (2) inner
+children in order, each retaining the current outer-shrink alternatives.
+Descending an outer child uses that child's outer children; descending an inner
+child keeps the current outer tree. A uniform helper takes Tree(A), Tree(B),
+with, s and right. It needs neither existential types nor polymorphic recursion.
+
+pair is exactly flat_map(first, (x) { map(second, (y) { (x,y) }) }). Seeded
+associativity is deliberately not a law: reassociation changes split addresses.
+
+**P3 Filter.** Sample a root once; discard if keeping is false. At a retained
+node drop each failing child *and its subtree*, preserving the other children
+and recursively filtering them. Do not promote grandchildren or retry until
+success. This sacrifices shrink completeness, not invariants or termination.
+Prefer constructive flat_map for sparse constraints. P2 also prunes discarded
+outer branches without searching their descendants.
+
+**P4 Built-in generators.** Exact allocation/order is replay behavior for a
+package version. Size is ignored except by sized/list/string. random.int and
+random.at_path raise RandomError, rather than returning Result
+(`lib/i/random.i:128–135`, `:219–223`). Private wrappers use fail.catch and
+translate Error to None; they must not leak an error effect into Gen. A None
+derivation discards that attempt/element, or returns None from replay. All paths
+and bounds constructed below are valid, so this fallback is unreachable under
+R1; test those invariants rather than treating repeated fallback as normal.
+
+- int(lo,hi) returns Error(InvalidRange(lo,hi)) for lo>hi. Otherwise draw
+  random.int(g,hi-lo+1), add lo. The bound is positive; exhaustively handle the
+  impossible RandomError branch as an invariant fallback returning None and
+  test that it is never used. Target t is zero if in bounds, else the nearest
+  endpoint to zero.
+- Integer children are t, then x-trunc((x-t)/2), x-trunc((x-t)/4), etc., stopping
+  before the quotient is zero. Remove duplicates and x, preserving order.
+  Recurse by the same rule. Every edge strictly decreases |x-t| and stays in
+  bounds; no linear enumeration of a huge range.
+- bool maps int(0,1) to False/True, so True shrinks to False. element rejects []
+  with EmptyChoice; otherwise draw/shrink an index toward zero. Duplicates
+  retain their sampling multiplicity.
+- list(of,lo,hi) rejects lo<0 or hi<lo with InvalidLength(lo,hi). Effective upper
+  length is min(hi,max(lo,size)). Split g: left draws length uniformly; right
+  gives element i its stream random.at_path(right,[i+1]). A discarded element
+  discards the whole root. Keep the list of element trees.
+- List children first delete contiguous chunks of lengths n,n/2,n/4,...,1,
+  using integer division and distinct lengths. For each k use starts 0,k,2k,...
+  where a full k-chunk fits, left to right; skip results shorter than lo. Then
+  shrink each element left to right in its child order. Keep surviving element
+  trees rather than regenerating them. Repeat at each child. Duplicates are
+  allowed. lo=n prevents deletions.
+- float() uses the pair tree of integer sign 0..1 and magnitude
+  0..0x7fefffffffffffff, then maps their bits. Sign stream is split-left,
+  magnitude split-right, as for pair. Under the independent uniform-word model
+  this gives every finite binary64 bit pattern, including both zeros, equal
+  weight. This is not a theorem that all patterns occur among the finite set
+  of SplitMix seeds. Shrinks move sign toward positive and magnitude toward zero. Exponent 2047 is never constructed. This is not uniform over reals.
+- utf_codepoint() draws integer rank 0..0x10f7ff, adding 0x800 for ranks>=0xd800.
+  Shrink ranks toward zero then map. Its rank mapping spans Unicode scalars,
+  including NUL and excluding surrogates; actual seed coverage is not a
+  statistical theorem. Handle the conversion Result exhaustively.
+- string(k) rejects k<0 with InvalidLength(0,k); otherwise maps scalar lists of
+  length 0..k through core.from_codepoints. Shrinks preserve UTF-8.
+
+Recursive generators can use sized/resize, decreasing size on recursive branches
+and choosing a leaf at zero. No derivation of recursive types, function
+arbitraries, weighted choice, coverage quotas or state-machine framework ships
+in this first interface. They can be ordinary later combinators.
+
+**P5 Laws.** Observations mean root values and finite ordered tree prefixes,
+not equality on Gen/Tree: function fields have identity equality (spec §11.4).
+For deterministic terminating callbacks:
+
+1. Same generator, size and complete random input reproduce all observations.
+   Reusing a random value does not advance it.
+2. constant(x) has root x and no children.
+3. Map identity/composition preserve observations. Equal-looking mapped values
+   do not justify dropping nodes.
+4. Every retained filter node and built-in range/list node meets its bounds.
+   Map preserves an invariant only if its callback preserves it.
+5. Increasing cases or max_discards preserves earlier attempts; increasing
+   max_shrinks preserves the candidate trace prefix. Changing max_size does not.
+6. Replaying a reported seed/attempt/size/path returns smallest, in the same
+   version/code. Seeds differing by 2^64 are equivalent as in R1.
+7. No independence or collision-free stream claim. Integer uniformity is
+   conditional on the random word model, as in R1.
+
+### 3.4 Check, replay and reporting
+
+**P6 Attempts.** defaults() is Config(0,100,100,1000,1000). Normalize seed modulo
+2^64. Validate cases>0, max_size>=0, max_discards>=0, max_shrinks>=0, in that
+order. InvalidConfig messages are respectively `cases must be positive`,
+`max_size must be nonnegative`, `max_discards must be nonnegative`, and
+`max_shrinks must be nonnegative`. No callback runs for invalid configuration.
+
+Attempt j is zero-based. Its stream is
+random.at_path(random.from_seed(seed),[j+1]); size is j%(max_size+1). A previous
+attempt's draw count, discards or success cannot change the next stream/size.
+None or Discard increments discards; Pass increments successes. Return Passed
+when cases successes are reached, GaveUp when discards>max_discards. With zero
+allowed discards, the first discard gives GaveUp(0,1). At most
+cases+max_discards attempts occur before success/failure/give-up. Fail starts
+shrinking immediately.
+
+**P7 Shrink search.** Keep the current failing node and reason. Check its
+children left to right, counting every predicate call, including Pass/Discard.
+At the first Fail, adopt that node/reason, append its zero-based child position
+to path and restart at its first child. Do not descend into Pass/Discard nodes.
+Finish when all current children have been checked or max_shrinks calls are
+used. limited=True whenever budget is exhausted, even if the next child list
+would be empty: it is a conservative budget flag, not a minimality theorem.
+With budget zero, do not force children. Report original/current value,
+normalized seed, attempt, size, path, candidate count and current failure reason.
+Do not rerun the predicate while formatting.
+
+Built-in paths are well-founded and children finite. A user thunk can diverge,
+allocate excessively or stop. The budget is not a timeout and cannot interrupt
+one predicate/thunk; it does not bound sibling-list construction. A cyclic tree
+can consume the budget, but not cause unlimited predicate calls. The field
+smallest means best case found along this search, not a global minimum.
+
+**P8 Replay.** Reject negative attempt/size/path entries with None. Derive the
+P6 stream, sample at supplied size, follow child positions without running a
+predicate. Discarded root or missing child also gives None. Positions count the
+retained list including duplicates. Guarantees require the same library
+version, generator code, captured values and P5's deterministic observations;
+a seed is not a serialized closure.
+Store reports with the lock file. Report protocol is `std/property v1`; changes
+to built-in sampling/shrink order require an explicit protocol version change.
+
+**P9 Assert adapter.** test calls check with a predicate which wraps each
+property invocation in assertion.catch. Ok(Nil) gives Pass; Error(failure)
+gives Fail(failure.message). Afterwards Passed returns Nil; other reports call
+*the caller's* Assert.fail(AssertionFailure(format(report,show))). The final
+fail is outside the per-case catch. Runner sees one ordinary failed @test.
+AssertionFailure carries a message, not the original stack: the final stop site
+is the adapter, with the original message in reason. Do not promise the original
+property source location without a separate general assertion design.
+No compiler special rule, new annotation, CLI flag or runner branch.
+Language stops remain stops and are not shrinkable. Expected errors must be
+explicitly handled using Result/fail.catch inside the property.
+
+format uses decimal integers, LF separators, and exactly this order, without a
+trailing LF:
+
+```text
+std/property v1: falsified
+seed: <normalized seed>
+attempt: <zero-based attempt>
+size: <size>
+path: <core.inspect of List(Int)>
+checked: <candidate calls>
+limited: <True or False>
+original: <show(original)>
+smallest: <show(smallest)>
+reason: <reason>
+```
+
+Multiline show/reason text is included literally. Passed gives
+`std/property v1: passed; successes: <n>; discards: <d>`; GaveUp substitutes
+`gave up`; InvalidConfig gives `std/property v1: invalid config; <message>`.
+show runs exactly twice for Falsified, zero times otherwise. It is pure, but
+printing arbitrary closures/host references is not a portable serialization;
+prefer a domain printer. Numeric/string/list reports can be stable.
+
+### 3.5 Costs
+
+Each attempt costs its generator/predicate. Retain original value, current tree
+and child list, not all previous roots. Closures may retain ancestors. Integer
+nodes have O(log(|x-t|+1)) immediate children. List deletion needs at most
+O(n^2) element-copy work per child-list construction: deleting one item
+produces n lists of length n-1. Element shrinking adds O(n) copying per
+replacement candidate, plus its own child generation. Int arithmetic, callbacks
+and printing add their costs. No constant-memory or wall-clock budget claim. A pure function type only excludes declared errors
+and services; determinism/termination are callback laws, not checker-proved
+properties. A callback that hides host side effects, captures one-use control
+values, or relies on the identity of freshly allocated functions violates
+replay assumptions. Root observations in P5/P8 mean reproducible data values
+or an explicitly chosen observational equivalence, not recreated identities.
+No library can infer that arbitrary callbacks meet this contract.
+
+## 4. Additions to `std/float`
+
+### 4.1 Comparison and complete interface
+
+| Source | Offers | Take | Leave, and why |
+|---|---|---|---|
+| [Go math](https://pkg.go.dev/math) | Trig, atan2, hypot and explicit IEEE cases | Names, quadrants and robust norms | Nonfinite returns and architecture paths; finite i semantics control. |
+| [Python math](https://docs.python.org/3/library/math.html) | Trig, angle conversions, hypot and domain failures | Units and explicit failure | Host libm and exceptions; use Result. |
+| [Effect Number](https://raw.githubusercontent.com/Effect-TS/effect/main/packages/effect/src/Number.ts) | Checking, arithmetic and safe numeric helpers | Checked API style | No portable transcendental contract to adopt. |
+| [Gleam float](https://gleam-stdlib.hexdocs.pm/gleam/float.html) | Result-returning operations and documented target differences | Existing i error conventions | Target differences conflict with this task. |
+| [Haskell Floating/RealFloat](https://raw.githubusercontent.com/ghc/ghc/master/libraries/ghc-internal/src/GHC/Internal/Float.hs) | Trig, inverse trig and classification | Conventional real functions | Type classes/nonfinite classification; not needed for Float. |
+
+Add these exports. Trig uses radians; atan2 arguments are y,x. Short standard
+names coexist with existing square_root/exponential/logarithm; no long aliases.
+
+```text
+pi: Float
+tau: Float
+sin: (x: Float) -> Float
+cos: (x: Float) -> Float
+tan: (x: Float) -> Result(Float, Nil)
+asin: (x: Float) -> Result(Float, Nil)
+acos: (x: Float) -> Result(Float, Nil)
+atan: (x: Float) -> Float
+atan2: (y: Float, x: Float) -> Float
+hypot: (x: Float, y: Float) -> Result(Float, Nil)
+radians: (degrees: Float) -> Float
+degrees: (radians: Float) -> Result(Float, Nil)
+sign_bit: (x: Float) -> Bool
+copy_sign: (magnitude: Float, sign: Float) -> Float
+```
+
+Rename current private integer sign_bit (`std/src/float.i:53`) to sign_mask
+and its private uses before exporting the function. No existing public name
+changes. Hyperbolics, expm1/log1p, cbrt, arbitrary-base logs, erf, gamma, complex
+numbers and vector math are deferred; each needs a stable algorithm and tests.
+Existing exp/log/power remain available and unchanged.
+
+### 4.2 Exact numerical and special-value rules
+
+**F1 Rounding.** Interpret inputs as exact binary rationals. Compute the stated
+real function and round once to nearest binary64, ties to even, with gradual
+underflow. Absolute error is at most half the spacing between adjacent binary64
+values bracketing the exact result (using the virtual neighbor 2^1024 above
+max_finite); in the subnormal range it is at most 2^-1075.
+This avoids an ambiguous “ulp of the input”. Exact zeros use the signs below;
+nonzero underflow preserves the real result's sign.
+
+Let M=(2-2^-52)*2^1023, the largest finite value, and T=M+2^970. At magnitude T,
+ties-to-even overflows to the conceptual next value 2^1024. Checked functions
+return Error(Nil) iff the rounded result would be nonfinite or the real domain
+excludes the inputs. Results strictly between M and T round to M and succeed.
+Never construct a nonfinite Float, including an intermediate. No host math
+import, platform-dependent approximation or flush-to-zero mode.
+
+**F2 Constants/signs.** pi is bits 0x400921fb54442d18; tau is
+0x401921fb54442d18, correctly rounded real constants. Do not treat them as exact
+pi during reduction or unit conversion. sign_bit tests bit 63; copy_sign clears
+that bit in magnitude and copies it from sign, preserving every other bit.
+
+NaN, +infinity and -infinity are outside Float. Parsing those spellings already
+returns Error(Nil); constructing their bits or computing nonfinite core
+arithmetic stops *before* a library call (spec §11.3/§13;
+`crates/ilang-wasm/src/runtime/values.rs:45–50`). There is no NaN propagation
+rule or infinity branch to implement. This note neither catches that stop nor extends Float.
+
+**F3 Real functions.** sin/cos are real sine/cosine. tan is real sin/cos, rounded
+once, not a quotient of rounded sin and cos. Nonzero binary-rational inputs
+cannot be exact poles. Result still handles rounded overflow without depending
+on a conjectured maximum tan over binary64. The stored pi/2 is not real pi/2:
+tan(pi /. 2.0) is not a domain error merely for being near a pole.
+
+| Operation | ±0 | Endpoints/domain |
+|---|---|---|
+| sin, tan | Input zero sign; tan wraps Ok | All finite inputs in domain. |
+| cos | +1 | All finite inputs in domain. |
+| asin | Ok(input zero) | Outside [-1,1]: Error; ±1: rounded ±pi/2. |
+| acos | Ok(rounded pi/2) | Outside [-1,1]: Error; +1: +0; -1: rounded pi. |
+| atan | Input zero sign | Real range (-pi/2,pi/2), before rounding. |
+| hypot | +0 when both zero | Rounded real sqrt(x*x+y*y), without intermediate overflow. |
+| radians | Input zero sign | Rounded real x*pi/180; fits for all finite x. |
+| degrees | Ok(input zero) | Rounded real x*180/pi; overflow checked. |
+
+asin's real range is [-pi/2,pi/2], acos's [0,pi]. Domain tests precede arithmetic.
+
+**F4 atan2.** Argument of x+i*y in [-pi,pi], sign from y. Ratios are exact
+rationals, never y /. x in Float. The following rows are ordered:
+
+| Inputs | Result before final rounding |
+|---|---|
+| y=±0, x positive or +0 | y, including zero sign |
+| y=±0, x negative or -0 | ±pi, sign from y |
+| x=±0, y nonzero | ±pi/2, sign from y |
+| x>0, y nonzero | atan(y/x) |
+| x<0, y>0 | pi-atan(abs(y/x)) |
+| x<0, y<0 | -pi+atan(abs(y/x)) |
+
+Zero-axis rows precede comparisons. Equality of the two zeros does not remove
+their sign bits. Equal positive x,y give rounded pi/4 even at min_positive.
+
+### 4.3 Plain-i algorithm and bounds
+
+The baseline uses exact rational arithmetic and certified intervals. This is a
+concrete algorithm, not a request to find an accurate Taylor polynomial. Only
+input/output bit conversions and finite input comparisons are needed from Float.
+There is no missing Wasm trig instruction prerequisite. Existing square_root
+continues using guarded core.sqrt/f64.sqrt (`float.i:510–515`,
+`crates/ilang-wasm/src/runtime/core.rs:43–44`).
+
+```i
+Rational { Rational(numerator: Int, denominator: Int) }
+Interval { Interval(low: Rational, high: Rational) }
+```
+
+Private denominators are positive; reduce by Euclidean gcd to control growth.
+Implement floor/ceil for negative rational division explicitly: i division
+truncates toward zero. Interval +,-,*,/ use exact rational endpoint arithmetic
+and min/max; divide only after the denominator interval excludes zero. No large
+Int is converted to Float during computation. Helpers recurse at uniform types.
+
+**F5 Decode/round.** Decode sign, exponent e and fraction f. With e=0 magnitude
+is f*2^-1074; otherwise (2^52+f)*2^(e-1075). Handle zero before evaluation.
+Round a rational using integer quotient/remainder at the normal/subnormal
+scale: compare twice the remainder with denominator, increment for greater,
+or equality with odd quotient. Carry exponent; check T before constructing
+bits; preserve sign of nonzero underflow. Existing ratio_bits is a starting
+point, not permission to ignore zero or overflow preconditions.
+
+Round both interval endpoints, including conceptual overflow, and accept only
+identical *bits*, or overflow on the same signed side: low>=T or high<=-T.
+Endpoints overflowing on opposite sides do not justify Error. Otherwise refine.
+Equal numeric zeros with different sign bits are not agreement. Known exact-zero
+cases use F3/F4 directly.
+
+**F6 Certified pi/atan.** For rational |z|<=1/2 sum N terms of
+atan(z)=sum((-1)^k*z^(2k+1)/(2k+1), k=0..N-1). Remainder magnitude is at most
+r(z,N)=|z|^(2N+1)/(2N+1). Add/subtract this exact rational. For positive z>1,
+use pi/2-atan(1/z). For 1/2<z<=1, use
+atan(1/2)+atan((z-1/2)/(1+z/2)); the new argument is at most 1/3. Negatives
+use odd symmetry. Bound pi with 16*atan(1/5)-4*atan(1/239), whose interval width
+is at most 32*r(1/5,N)+8*r(1/239,N). No fixed table runs out of bits at huge x.
+Series/addition identities: [DLMF §4.24](https://dlmf.nist.gov/4.24). The exact
+interval bookkeeping is this design's algorithm.
+
+**F7 sin/cos/tan.** At precision p, refine pi until the interval x/(pi/2)
+selects a unique nearest integer q. For nonzero rational x no half-integer tie
+is possible. Enclose r=x-q*pi/2; refine until width<=2^-p and |r|<1. Its true
+magnitude is <=pi/4. Take rational midpoint m and radius d. Evaluate N Taylor
+terms of sine/cosine at m exactly. Remainder bounds are respectively
+|m|^(2N+1)/(2N+1)! and |m|^(2N)/(2N)! for N>=1. Choose N making each bound
+<=2^-p; add d because both real derivatives have magnitude<=1. This encloses
+sin(r)/cos(r). Apply q modulo 4, explicitly nonnegative, swapping and negating
+intervals. For tan, divide the resulting intervals only once cos excludes zero;
+do not divide rounded outputs. [DLMF §4.19](https://dlmf.nist.gov/4.19) supplies
+the series; decreasing alternating terms for |m|<1 give these error bounds.
+
+**F8 Inverse functions/norm.** atan2 uses F4 and exact ratios, then F6. For
+asin/acos inside (-1,1), enclose sqrt(1-x*x) in rational arithmetic and use
+atan2(x,sqrt(...)) or atan2(sqrt(...),x), propagating intervals. Handle axes and
+endpoints first. To bound sqrt(a/b) at p, compute
+k=isqrt(floor(a*2^(2p)/b)). The interval [k/2^p,(k+1)/2^p] encloses it; return
+an exact singleton when k*k*b==a*2^(2p). Integer sqrt uses binary search or
+decreasing Newton iteration with final square comparisons. Apply monotone atan
+to endpoint ratios. Refine if a denominator still touches zero. Never compute
+1-.x*.x in Float and lose endpoint cancellation.
+
+For hypot, avoid an interval loop that cannot resolve exact midpoint ties.
+Compute rational s=x*x+y*y. Binary-search nonnegative finite bit patterns using
+exact rational square comparisons for adjacent a<=sqrt(s)<=b. If s=a*a, return
+a. Otherwise compare s to ((a+b)/2)^2, selecting the even significand on equality.
+Above M compare s with T*T, yielding M or Error. Below min_positive use a=0,
+b=2^-1074. At most 63 bit-pattern bisections plus integer arithmetic. This handles
+Pythagorean results, midpoint ties and huge exponents without Float overflow.
+
+**F9 Refinement/termination.** Start p=128 and double on F5 ambiguity. Increase
+series length/pi precision until the rational bounds hold; full-input reduction
+may need over 1024 bits of pi on its first pass. Unit conversions enclose the
+real x*pi/180 or x*180/pi, using the same refinement, never public rounded pi.
+
+Each enclosure contains the exact result, so F5 proves correct rounding and F1's
+bound. These are obligations to preserve in the implementation. Refinement
+terminates in exact arithmetic: nonzero algebraic angles have transcendental
+sin/cos/tan (by exponential transcendence), and a nonzero algebraic angle cannot
+have algebraic sin/cos/tan. Thus the nonexceptional inverse trig results here,
+whose arguments/ratios/roots are algebraic, cannot be rational rounding midpoints.
+Nonzero rational multiples/divisors of pi are irrational. Exact zeros/axes are
+handled explicitly and hypot uses exact square comparisons. This is not a small
+fixed-precision/runtime bound. Resource exhaustion remains possible as for other
+large-Int computations; an iteration cap must not manufacture a numeric result.
+
+Optional fast paths must provide valid enclosures and fall back on ambiguity.
+No unsupported ulp claim or random-testing-only argument substitutes for F5–F9.
+Review enclosure code separately from the independent vector generator.
+
+### 4.4 Determinism, test gate and cost
+
+Branches depend on exact Int arithmetic/bit classification; output bits are
+constructed explicitly. No host imports, fused operations, extended-precision
+temporaries or target-selected approximations. Correct Wasm engines therefore
+produce identical bits on native Wasmtime, JavaScript's Wasm engine and WASI,
+at O0 and O2. This is reasoning from operations, not a claim those runs happened.
+
+Generate golden bit vectors with independent directed-rounding MPFR intervals,
+refining until rounding to binary64 is determined. A single 53-bit result or
+Python math is not the oracle. Preserve MPFR version, rounding/exponent handling
+and generation procedure with fixtures; [MPFR's manual](https://www.mpfr.org/mpfr-current/mpfr.html)
+describes those controls. MPFR is a development tool, never a runtime dependency.
+The independent oracle must not reuse i's Machin/Taylor implementation.
+
+Include ±0, subnormal/normal boundaries, ±1 and neighbors, all quadrants,
+binary64 neighbors of multiples of pi/2, largest finite magnitudes, widely
+separated atan2/hypot exponents, deterministic random finite bit patterns and
+oracle-searched midpoint-near values. Run identical fixtures in all three host
+paths at both optimization levels. Approximate equality alone cannot pass.
+
+This baseline is slower than fdlibm and allocates large Ints. Series/reduction
+work grows with precision, including input exponent. There is no libm-throughput
+promise. Measure ordinary/huge angles, tiny inverse arguments and difficult
+rounding cases before landing. If unacceptable, add certified fast paths;
+do not silently weaken the result contract or import host mathematics.
+
+## 5. Additions to `std/string`
+
+### 5.1 Comparison and missing functions
+
+| Source | Offers beyond current module | Take | Leave, and why |
+|---|---|---|---|
+| [Go strings](https://pkg.go.dev/strings) | Index/LastIndex, Count, Fields/FieldsFunc, Cut, bounded replacement | Search/count, predicate splitting and partition | Byte indexes and arbitrary byte strings; i uses scalars/UTF-8. |
+| [Python str](https://docs.python.org/3/library/stdtypes.html#text-sequence-type-str) | Indexing, find/rfind, count, partition/rpartition, classification and full case operations | at, search/count and partition family | Slice-step syntax, casefold and broad Unicode policy; separate scope. |
+| [Effect String](https://effect-ts.github.io/effect/effect/String.ts.html) | Option char/search access, functional helpers | Option for misses | UTF-16 indexing and regex overloads; wrong storage model. |
+| [Gleam string](https://gleam-stdlib.hexdocs.pm/gleam/string.html) | Grapheme operations, codepoints and split/pad helpers | Existing i naming style | Grapheme lengths; plan requires scalars. Most split/pad functions already exist. |
+| [Haskell Data.Text](https://hackage-content.haskell.org/package/text-2.1.3/docs/Data-Text.html) | Scalar map/filter/folds, breaks and counts | Scalar callbacks, taking and honest costs | Lazy text, partial index, another builder and broader Unicode transformations. |
+
+split/split_once, lines, replace, remove_prefix/suffix, reverse, trim, padding and
+conversions already exist (`string.i:22–63`). Missing additions are arbitrary
+scalar access, first/last substring location, count, start/end taking, last
+partition, bounded replacement, and splitting/mapping/filtering/folding scalars.
+
+### 5.2 Complete added interface
+
+```text
+at: (string: String, index: Int) -> Option(String)
+index_of: (string: String, find: String, from: Int) -> Option(Int)
+last_index_of: (string: String, find: String, from: Int) -> Option(Int)
+count: (string: String, find: String) -> Int
+take_start: (from: String, up_to: Int) -> String
+take_end: (from: String, up_to: Int) -> String
+partition: (string: String, on: String) -> Option((String, String))
+partition_last: (string: String, on: String) -> Option((String, String))
+replace_n: (in: String, each: String, with: String, up_to: Int) -> String
+split_when(E, N): (string: String, on: (UtfCodepoint) -> Bool ? E ! N) -> List(String) ? E ! N
+words: (string: String) -> List(String)
+map(E, N): (string: String, with: (UtfCodepoint) -> UtfCodepoint ? E ! N) -> String ? E ! N
+filter(E, N): (string: String, keeping: (UtfCodepoint) -> Bool ? E ! N) -> String ? E ! N
+fold(A, E, N): (string: String, from: A, with: (A, UtfCodepoint) -> A ? E ! N) -> A ? E ! N
+```
+
+**S1 Access.** at returns one scalar as String, like first/last. For length n,
+i<0 means n+i; otherwise use i. Return None unless the result is in [0,n).
+Very negative indexes miss rather than clamp. Follow existing string.slice even
+though list indexing rejects negatives. No s[i] syntax or implicit byte index.
+
+**S2 Search.** Require 0<=from<=n for either search, else None. index_of selects
+the least starting scalar index>=from. last_index_of selects the greatest
+starting scalar index<=from; its match may end after from. A full needle must
+fit. Empty needle matches exactly from in both functions. Whole-string searches
+use from:0 or from:string.length(s). Negative from is invalid, not an end-relative
+index. Overlapping matches are eligible: last_index_of("aaa","aa",3)=Some(1).
+
+**S3 Count/replacement.** count returns left-to-right nonoverlapping matches;
+empty needle gives 0, consistent with replace's no-op convention rather than
+Python's boundary count. replace_n replaces the first max(0,k) nonoverlapping
+matches. Empty each or k<=0 returns input. A sufficient k agrees with existing
+replace. Inserted replacement text is not searched again.
+
+**S4 Taking/partition.** take_start/end clamp counts to [0,n]. partition wraps
+existing split_once behavior; partition_last uses the last full occurrence.
+Both omit the separator and return None for absence or empty on. End separators
+give an empty component. The partition name makes a symmetric pair; it is the
+one intentional alias. No Python three-part tuple: caller already has on.
+
+**S5 Scalar callbacks.** split_when calls on once per scalar left to right.
+True marks a separator; runs collapse and empty pieces are omitted. Empty input
+returns []. words uses existing Pattern_White_Space, not Unicode White_Space or
+Python isspace: U+0009..000D, U+0020, U+0085, U+200E/F, U+2028/2029. NBSP U+00A0
+is not a separator. Map/filter/fold call once per scalar in order; fold passes
+(accumulator,scalar). Empty map/filter gives "", fold gives from. Errors exit
+immediately, without later calls. Services are supplied at traversal time using
+ordinary E/N. No second callback pass to size an output. Map produces one scalar
+per input; expansion uses to_codepoints, list.map and concat explicitly.
+
+**S6 Costs/implementation.** Decode once with core.codepoints, walk lists,
+reverse once and rebuild with core.from_codepoints. Initial at/take/traversal
+implementations cost O(B) time and O(n) auxiliary cells even for an early index:
+core.codepoints decodes the whole string. B is bytes and n scalars. Do not claim
+O(1) or O(index). For many random accesses a caller can convert once into
+std/sequence using from_list/at (`std/src/sequence.i:53–55`, `:121–130`)
+and use that module's separate bounds. No implicit cache.
+
+Search can compare a decoded needle against successive scalar-list suffixes.
+Conversion costs O(B+M), naive matching O(n*m) worst case, auxiliary cells O(n+m),
+where m/M are needle scalars/bytes. Track scalar and byte positions for substring
+boundaries; core.byte_slice copies output. Count/replace advance by needle length
+after matches. Do not repeatedly decode/copy suffix strings. Split/partition/
+replace collect fragments and concatenate once. A future linear search preserves
+the interface; it is not a prerequisite. Negative at/take_end need total length.
+Repeated pop_codepoint is not a linear scanner (`string.i:304–308`). Int arithmetic
+and callbacks add costs; existing length/slice costs remain unchanged.
+
+**S7 Unicode and STR.** Combining marks, variation selectors, regional indicators
+and joiners count individually. No grapheme clusters, display width, locale,
+collation, normalization, full casefold, regex or encoding repair. Those need
+versioned data or separate package contracts. Keep simple case mapping and
+Pattern_White_Space unchanged. STR owns interpolation `\(x)` and its String-only
+requirement; callers explicitly convert with existing to_string/inspect. No
+syntax or automatic string conversion is designed here.
+
+## 6. Spec disposition, section by section
+
+Following accepted std-1 §7, replacement language text is **none**. These are
+ordinary library contracts. Implementation module/function documentation must
+state the interface inventories and P1–P9/F1–F9/S1–S7, including special-value
+and cost rules; no new normative language exception is needed.
+
+| Spec region | Disposition/reason |
+|---|---|
+| §1.6/§7.1 | Unchanged; STR owns syntax. No indexing syntax. |
+| §2.1/§2.4/§2.5 | Unchanged; ordinary modules, hidden Gen and function factories suffice. |
+| §3/§4/§6 | Unchanged; no inference extension, type class or polymorphic recursion. |
+| §9.6 | Unchanged; existing assertion.catch and caller Assert. |
+| §9.10 | Unchanged; R1 fixes random algorithm, seed equivalence and path derivation. |
+| §11.2/§11.3/§11.4 | Unchanged; exact Int, finite Float and representation equality are essential. |
+| §12/§13/Appendix B | Unchanged; no builtin/core operation, host import, ABI or runner extension. |
+| All other sections | Unchanged. |
+
+Float's module introduction gains the new rounding contract; string's gains
+search bounds and costs. Preserve all current public exports/tests.
+
+## 7. File plan and implementation gates
+
+Only this note is owned here. Future implementation regions:
+
+| File/region at baseline | Change |
+|---|---|
+| `std/src/property.i`, new, whole file | Imports/exports/types; tree helpers; generators; checker/replay; formatter/Assert adapter. |
+| `std/test/property_test.i`, new | Deterministic trees, laws, replay, budgets, invalid inputs and reporting. |
+| `std/src/float.i:14–57`, `:630–967`, appended private region | Exports/constants, private sign-mask rename, rational/interval helpers and new math. Preserve existing kernels. |
+| `std/test/float_test.i:1027–1203`, append | Existing bit tests plus domains, signed zeros, quadrants and independent oracle fixtures. |
+| `std/src/string.i:22–63`, `:142–176`, `:246–308`, `:429–455`, append | Exports/docs, partition wrapper, access/search and scalar traversals. |
+| `std/test/string_test.i:2056–2279`, append | Scalar-list models, bounds/empty/callback cases and traversal-cost regressions. |
+
+A development oracle script/extra fixture path needs assignment by the
+coordinator; no runtime dependency. No required edits to std/i.toml, compiler,
+i/random, core, runner, STR or other notes.
+
+Order and gates:
+
+1. Property types and actual generic map/bind/filter witnesses. Test finite
+   hand-built trees before random generation, then P4 and checker/replay/report.
+2. String additions; run old tests to detect altered negative slices, empty
+   split/replace or lines behavior.
+3. Float exact decode/round, including midpoint/overflow boundaries; interval
+   arithmetic, pi/atan, trig, inverse trig, norm and units. Independently review
+   bounds/signs before validating oracle bits.
+4. `i check --project std --types`: compare every public label/type/effect.
+   `i test --project std`, then changed modules with `--opt 2`. Repeat signatures
+   and nominal-callback cases after T1 rebase.
+5. Integration runs cross-engine vectors, old-syntax-check and full verification.
+   Expect old shared WAT exports unchanged except new reachable std code;
+   explain ID/metadata shifts under the coordinator's existing K3 issue, rather
+   than allowing arbitrary differences. No ABI/host changes.
+
+R1 and field privacy are landed. No STR, records, value-types, tasks, IO or macro
+dependency. Math performance and cross-target vector gates are actual remaining
+implementation work, not waived by design acceptance.
+
+## 8. Rule-based tests
+
+Expected results follow numbered rules. Catch intentional adapter failures so
+std tests stay green; use a separate intentionally failing fixture to verify
+CLI failure count, report text and exit status.
+
+| Test | Expected result/rule |
+|---|---|
+| constant(7), any size/state | Root 7, no children; negative size passed to make becomes 0 (P1/P2). |
+| int(3,2); element([]); list(g,-1,2) | InvalidRange, EmptyChoice, InvalidLength errors, no draws (P4). |
+| Integer root 10, target 0 | Children 0,5,8,9; -10 gives 0,-5,-8,-9 (P4). |
+| Map tree with x*x | Same tree shape/order, including duplicate mapped values (P2/P5). |
+| Dependent n then k in [0,n] | Every root/shrink has 0<=k<=n, including after shrinking n (P2/P4). |
+| filter constant(0) with x>0 | One discard/attempt; config max_discards=0 gives GaveUp(0,1) (P3/P6). |
+| Root 10, integer shrinks, Fail for x>=6 | Greedy path adopts 8, then 6, all adopted nodes fail (P4/P7). |
+| Same tree, max_shrinks=0 | smallest=10, checked=0, path=[], limited=True; thunk not called (P7). |
+| Same tree, max_shrinks=2 | Checks 0 and 5; smallest=10, limited=True (P7). |
+| Same config seed, then seed+2^64 | Same observations/report, normalized seed (P5/P6). |
+| cases=0 and callback that would stop | InvalidConfig; callback never runs (P6). |
+| Replay reported path | Some(smallest); negative attempt/missing child gives None (P8). |
+| test constant(1) with assert(x==0) | Outer failure text includes seed and original/smallest 1; one failing CLI test (P9). |
+| Finite/scalar generators, fixed seeds | Exponents<2047 and no surrogates; explicit tree cases cover both zeros/endpoints (P4). |
+| sign_bit(-.0.0); copy_sign(2.0,-.0.0) | True; -2.0 by bits (F2). |
+| sin/atan(-.0.0); tan/asin(-.0.0) | Negative-zero bits; last two wrapped in Ok (F3). |
+| cos(-.0.0); acos(1.0); acos(-.1.0) | 1.0; Ok(+0); Ok(pi) (F3). |
+| asin(1.0000000000000002); acos(-.2.0) | Error(Nil), before sqrt (F3/F8). |
+| atan2(+0,-0); atan2(-0,-0); atan2(-0,+0) | +pi; -pi; -0 (F4; signs are mathematical table notation). |
+| atan2(min_positive,min_positive) | Rounded pi/4 without intermediate underflow (F4/F8). |
+| hypot(3.0,4.0); hypot(-0,+0) | Ok(5.0); Ok(+0) via exact squares (F8). |
+| hypot(max_finite,0.0); hypot(max_finite,max_finite) | Ok(max_finite); Error(Nil), no intermediate overflow (F1/F8). |
+| radians(180.0); degrees(0.0); degrees(max_finite) | pi; Ok(+0); Error(Nil) (F1/F9). |
+| sin/cos/tan at 1e300 and max_finite | Independent exact oracle bits, never reduction by rounded tau (F5–F9). |
+| core.float_from_bits(0x7ff0000000000000) | Existing stop before library call; separate negative fixture (F2). |
+| at("aé😀",1), at(...,-1), at(...,-4), at("",0) | Some("é"), Some("😀"), None, None (S1). |
+| at("e\u{301}",1) | Some("\u{301}"), not grapheme access (S1/S7). |
+| index_of("ééx","x",0) | Some(2), not byte offset 4 (S2). |
+| last_index_of("aaa","aa",3); same from=0 | Some(1); Some(0) (S2). |
+| Empty search needle at n; from=n+1 | Some(n); None (S2). |
+| count("aaaa","aa"); count("abc","") | 2; 0 (S3). |
+| replace_n("aaa","a","aa",2) | "aaaaa", inserted text not searched (S3). |
+| take_start("aé😀",-1); take_end(...,2) | ""; "é😀" (S4). |
+| partition_last("a=b=c","="); partition("x","") | Some(("a=b","c")); None (S4). |
+| words(" a\t\n b "); words("a\u{a0}b") | ["a","b"]; ["a\u{a0}b"] (S5). |
+| Callback error at second scalar | Only first two callbacks run, error propagates (S5). |
+| Empty map/filter/fold | "", "", initial accumulator; no callback (S5). |
+
+Also test reverse twice, codec round trips and persistent container models as
+unrelated property clients. String laws: take_start(s,k)<>drop_start(s,k)==s
+for k>=0; successful partition rejoins with on; replace_n with k>=count agrees
+with replace. For a *valid* normalized index, at(s,i)==Some(slice(s,i,1)); do
+not extend this to invalid indexes (None differs from Some("")). Float symmetry
+and quadrants supplement bits; sin(pi)==0 and sin²+cos²==1 are not exact laws.
+
+## 9. Self-attack and executed checks
+
+### 9.1 First attack: repairs and rejected designs
+
+These attacks cover soundness, implementation constraints and source conflicts.
+Programs below use the proposed interfaces unless identified as a baseline probe.
+The scratch kernels implemented the corresponding operations, not the entire
+library. No new implementation is part of this commit.
+
+**Bounded checking is not bounded work.** This concrete tree is expressible:
+
+```i
+never = () { never() }
+t = property.tree(1, () { never() })
+```
+
+With zero shrink budget, forcing children would hang unnecessarily. P7 now
+explicitly does not force them. A compiled kernel test with that tree and zero
+budget returned immediately. With positive budget the thunk may hang: no timeout
+claim remains. Deleting every individual element of a length-n list constructs
+n lists of length n-1. The first cost draft incorrectly said O(n log n); §3.5
+now states O(n^2) copying and separates candidate-count limits from child
+construction costs. Pure callback types also cannot prove termination or prevent
+hidden host side effects; replay is conditional on the callback laws.
+
+**Dependent constraints and non-monadic seeded behavior.** Shrinking n while
+keeping a previously generated k from [0,n] can produce (0,4). The implemented
+bind witness recomputes the dependent tree at the same right-hand stream after
+an outer shrink. An n=4 example checked every node through four levels and kept
+0<=k<=n. It retained both outer and inner shrinking. The tempting law
+flat_map(constant(x),f)==f(x) is false for seeded draws: one uses split-right,
+the other the supplied state. A compiled random-word witness confirmed the
+split-right result and its difference from the unsplit seed-0 result. P2/P5
+promise map/observation laws, not seeded monad laws or function equality.
+
+**An assertion inside a supposedly pure builder is still an effect.** This
+client must fail to check:
+
+```i
+bad = () {
+  property.flat_map(property.constant(1), (n) {
+    Some(t) = property.sample(property.constant(n), 0, random.from_seed(0))
+    property.constant(t.value)
+  })
+}
+```
+
+The kernel adaptation was rejected with E0501, Assert not a subtype of Never.
+A failing pattern cannot silently disappear because a library author knows it
+will succeed. Pure callbacks must exhaustively match Option/Result. For example,
+a dependent bounded builder can use this shape, after outer has been constructed
+with nonnegative bounds:
+
+```i
+dependent = (outer: property.Gen(Int)) {
+  property.flat_map(outer, (n) {
+    property.int(0, n) |> {
+      Ok(inner) -> property.map(inner, (k) { (n, k) })
+      Error(_) -> property.constant((0, 0))
+    }
+  })
+}
+```
+
+The explicit fallback also defines behavior if an arbitrary caller supplies a
+negative n; it does not pretend the checker proves a refinement. Actual generic
+map/bind helpers with ordinary annotated Tree types compiled, including field
+inference through a nominal User callback. There is no need for higher-rank
+functions or polymorphic recursion.
+
+**Floats can stop before a checked wrapper returns.** Baseline programs:
+
+```i
+(i/core, std/float)
+
+@test
+nonfinite_bits = () {
+  core.float_from_bits(0x7ff0000000000000)
+  Nil
+}
+
+@test
+overflow_before_result = () {
+  float.max_finite *. float.max_finite
+  Nil
+}
+```
+
+Both ran and stopped with `float: result is not finite`; two failed tests,
+exit 1. Thus hypot cannot square Float arguments and then return Error, and NaN
+is not a valid test input. F8 uses exact squares; an actual i hypot witness
+passed 3/4/5, largest finite with zero, largest finite with itself, least
+subnormal and signed-zero tests. It represents every positive float as an Int
+multiple of 2^-1074, so midpoint comparison is simply
+4*s versus (units(a)+units(b))^2. No general rational type or missing primitive
+was needed for this witness.
+
+**Rounded pi and exact ties.** The candidate reduction x modulo public tau is
+wrong at x=1e300; F7 instead certifies pi/reduction with enough integer bits.
+An interval-only sqrt loop can remain undecided at a rational rounding midpoint;
+F8 uses exact square comparisons for hypot. The model tested squared midpoints
+at zero, adjacent subnormals, the normal boundary, 1 and the maximum binade,
+plus the exact overflow threshold. F1 now explicitly names the virtual 2^1024
+neighbor for the error bound above max_finite.
+
+**Existing names and text behavior.** A new exported sign_bit function collides
+with the current private constant, so §4.1 assigns its rename. The alternatives
+that rejected every negative string index or counted empty needles at all
+boundaries contradicted current slice/replace behavior; S1/S3 retain those
+contracts. Tested at on multibyte and combining-mark text; access returns scalar
+strings, never bytes or graphemes. Source audit kept NaN/Inf outside Float and
+left language spec/STR ownership unchanged.
+
+### 9.2 Second attack: first clean pass after repairs
+
+No further serious issue found. Checked these concrete adversarial cases:
+
+- Gen make callback needing Sink: compiler rejects E0501 (Sink versus Never).
+  Mapping a String-only callback over Gen(Int): rejects E0501 (Int versus String).
+  This confirms ordinary type/effect checks still apply to library values.
+- Greedy shrinking of integer 10 with failure at >=6: observed path [2,2],
+  smallest 6, nine candidate checks; budget two retains 10. The first scratch
+  test incorrectly expected [2,1]/eight; corrected the test by enumerating the
+  specified child order. No implementation-order change was made to satisfy it.
+- Filtering 10's tree with >=6 yields immediate children [8,9]; filtering a
+  constant zero with >0 discards without retry. Cyclic/nonterminating child
+  computation with zero budget stays unforced.
+- Per-case Assert becomes Fail, then final delivery is caught by a caller's
+  assertion.catch. A separate failing @test printed the multiline seed/case
+  message and exited 1 with exactly one failed test. It used existing runner
+  behavior and revealed no special registration requirement.
+- Rational sin/cos/tan/atan model against independent MPFR directed endpoints:
+  19 inputs each, including ±0, ±1, half, stored pi/pi/2 and a neighboring float,
+  1e20, 1e300, max_finite, smallest normal/subnormal and six deterministic random
+  bit patterns. All 76 output bit pairs agreed.
+
+This pass checked representation/effects, feasible implementation and source
+agreement. It did not claim the checker enforces mathematical generator laws.
+
+### 9.3 Third attack: second clean pass
+
+No further serious issue found after the preceding corrections. Rechecked the
+complete public signature inventories, the list-copy bound, bounded discard
+count, negative replay validation, sign-preserving endpoint rounding, and the
+assertion message's loss of original source stack.
+
+Concrete second-pass tests included all 64 hypot pairs from zeros, 3, 4, least
+subnormal, least normal, 1e300 and max_finite against MPFR, plus eight exact
+midpoint/overflow square decisions. They passed. The i hypot witness and the
+other kernels passed together at O0/O2. A service-carrying scalar callback and
+an erroring scalar callback compiled and ran, without adding effects to stored
+Gen callbacks. Reviewed both signs of atan2 axes against F4, and empty/invalid
+search bounds against S2; these last cases are rule inspection, not execution
+of an unimplemented atan2/string search.
+
+### 9.4 Commands and evidence limits
+
+All commands ran from this lane through
+`direnv exec /home/agent/Programming/i`; no cargo command or compiler edit.
+Scratch packages and a copied prebuilt compiler were kept only inside this lane
+and removed before committing. The binary was copied from the integration
+lane's prebuilt `target/debug/i`; its SHA-256 was
+`4acd9830e134d5134e76a9e55935ee92935cd708bc1caed0b6d1ba2e57ff1407`.
+The integration checkout was at `7d9f13bb76defd506e10df99bb5eb0cc1ee3e644`
+when copied; that is observed checkout state, not a proven build-to-commit link.
+Code citations remain pinned to this note's b9173ce baseline.
+
+| Command after direnv prefix | Result and meaning |
+|---|---|
+| `.std3-probes/i fmt --project .std3-probes .std3-probes/snippets` | All seven fenced i examples parsed and formatted in scratch files. |
+| `.std3-probes/i check --project .std3-probes --types` | All 50 inventory entries accepted: 22 property functions, 12 float functions + 2 constants, 14 string functions. |
+| Same check, with implemented kernels | Generic make/sample/map/flat_map/pair/filter, tree shrinking, Assert adapter, scalar access/map/fold, sign helpers, error-demoting random wrappers and exact hypot accepted. |
+| `.std3-probes/i test --project .std3-probes --opt 0` | 12 tests passed after correcting scratch syntax and the erroneous hand-counted path expectation. |
+| Same command with `--opt 2` | 12 tests passed. |
+| `.std3-probes/i check --project .std3-negative` | Three separately run clients rejected with E0501: service in pure Gen, wrong map input, assertion in pure callback. |
+| `.std3-probes/i test --project .std3-failure` | Reporting fixture: one intentional failure/exit 1. Replaced fixture: two intentional nonfinite stops/exit 1. |
+| `.std3-probes/i test --project std float_test` | Existing 164 tests passed at default O0. |
+| `.std3-probes/i test --project std string_test` | Existing 332 tests passed at default O0. |
+| `python3 .std3-probes/math_model.py` | Fraction interval model, 76 sin/cos/tan/atan comparisons to MPFR 4.2.2 at 4096-bit directed precision. Both directed endpoints rounded to identical binary64 bits. |
+| `python3 .std3-probes/hypot_model.py` | 64 norm comparisons plus eight exact rounding-square cases passed; also reran the 76 trig comparisons. |
+
+The mechanical signature probe extracts each inventory entry and checks the
+ordinary binding `witness_name(A, B) = (f: { signature }) -> { signature } { f }`,
+with that entry's actual type parameters, imports and public type definitions.
+This verifies type syntax, labels and effects, **not** an implementation body.
+The separately implemented kernels are stronger evidence for the difficult
+generic/representation paths. The client example using final property.int/list/
+test is still an implementation acceptance test, not a passed full-library test.
+
+Not verified: complete property checker/replay/format implementation, full new
+string module, i implementations of transcendental functions, inverse-trig/unit
+models beyond the reasoning above, cross-engine runs, full mathematical proof
+of a future port, or production performance. No complete std suite/full project
+verification was warranted for this note-only commit. The two existing module
+suites and temporary kernels are not substitutes for §7's implementation gates.
+
+## 10. Risks and coordinator questions
+
+1. **Math performance.** Recommend accepting correct rounding/reference intervals,
+   with measurements before landing and certified fast paths if needed. No libm
+   speed promise and no host import fallback.
+2. **Math breadth.** Recommend seven trig functions, hypot, unit conversions and
+   sign helpers; defer hyperbolic/special functions.
+3. **Replay compatibility.** Recommend versioned P1–P8, printed v1 and preserved
+   lock file. A seed alone cannot reproduce changed generator code.
+4. **Negative text indexes.** Recommend at follows existing slice; explicit
+   nonnegative search bounds. Preserve current functions' edge cases.
+5. **Pure property core.** Recommend this pure interface plus Assert adapter;
+   effectful/state-machine execution belongs in an explicit later harness.
+
+These are coordinator design choices, not permission requests blocking this
+note. No deliberate source conflict remains. Section 9 records verification
+limits separately from the proposed implementation gates.
