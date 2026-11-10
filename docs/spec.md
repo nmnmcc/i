@@ -132,6 +132,8 @@ The **path** of a module is the `name` of its package (§2.6), then `/`, then it
 
 Modules in `test/` are checked when their package is checked (§2.6), and compiled as test entries when its tests are run. They may import modules in `src/`, but not the other way.
 
+A test module may be imported only by test modules of the same package. Its exports alone do not make its bindings used (§2.4.1).
+
 In a module, the first part of a module path says which package the module is in. It must be one of these:
 
 - `i`, for the **library modules** (§9, §10, §13, §B.7.1) and kept paths named at the start of this document. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
@@ -231,6 +233,14 @@ ExportItem = name | UpName [ "(" ".." ")" ] .
 - If the type of an exported definition uses a type defined in this module, that type must be exported too. If not, it is a compile error.
 
 A type bound by an alias pattern is an alias with no constructors of its own; exporting it with `(..)` has the same effect as exporting it alone. An exported alias or annotation that depends on a value is checked after its type is complete and must not expose a private nominal type. Its source value need not be exported. Reading from another module never fixes that source’s weak type; a new permanent read requires a wholly closed completed source, or the consumer uses a closed alias exported by the source module (§4.7).
+
+### 2.4.1 Unused top-level bindings
+
+A top-level value name bound by a binding (§2.5) gives warning W0504 when it is not used. Names starting with `_` do not give this warning (§1.3). The warning does not change initialization or make `i check` fail.
+
+A name is used when it is referenced in its module, exported from a module outside `test/`, an entry of its package (§10.2), a test, or named in `[wasm].exports`. References inside any binding, including unused bindings, function bodies, patterns, and written types, count. Merely importing a name does not use it. In test modules, an export is used when referenced by a module of the same package. Each name in a binding is checked separately; using one name does not make its other names used. A name starting with `_` suppresses its own warning.
+
+This warning does not apply to type definitions, aliases, service definitions, constructors, or declarations (`@external` and `@js`). References in their written types count as uses. For an unused function in a test module, with no value parameters and result type `Nil`, the warning adds: "did you forget `@test`?" Environment parameters do not count as value parameters (§10.2). The hint is not given outside test modules, where `@test` is not allowed (§2.2).
 
 ### 2.5 Top-level bindings
 

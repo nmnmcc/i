@@ -12,3 +12,9 @@ odd : (n: Int) -> Bool
 f : (x: A) -> Never
 g : (x: A) -> Never
 uses : (Bool, Never, Never)
+5:1: warning[W0504]: top-level binding `both` is not used
+9:1: warning[W0504]: top-level binding `use_ids` is not used
+12:1: warning[W0504]: top-level binding `local` is not used
+17:1: warning[W0504]: top-level binding `local_mono` is not used
+23:1: warning[W0504]: top-level binding `param` is not used
+42:1: warning[W0504]: top-level binding `uses` is not used
