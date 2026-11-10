@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.capture : (body: () -> A ? E ! N) -> () -> A ? E ! N\napp/main.example : () -> Nil\n",
-      "stderr": ""
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `example` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `example` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `example` is not used\n"
     }
   }
 }

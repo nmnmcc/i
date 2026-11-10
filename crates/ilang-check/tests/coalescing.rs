@@ -38,11 +38,7 @@ use(N) = (s ! S(N)) { S(f) = s f() }
 main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::query::check_for_queries(&graph);
-    assert!(
-        checked.diags.is_empty(),
-        "{:?}",
-        graph.sources.render_all(&checked.diags)
-    );
+    common::expect_unused(&checked.diags, &["main"]);
     let program = checked.program.unwrap();
     let types = checked.types.unwrap();
     assert!(

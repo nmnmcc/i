@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.f_0 : () -> Nil ! N | S(N)\napp/main.f_1 : () -> Nil ! N | S(N)\napp/main.f_2 : () -> Nil ! N | S(N)\napp/main.f_3 : () -> Nil ! N | S(N)\napp/main.f_4 : () -> Nil ! N | S(N)\napp/main.f_5 : () -> Nil ! N | S(N)\napp/main.f_6 : () -> Nil ! N | S(N)\napp/main.f_7 : () -> Nil ! N | S(N)\napp/main.f_8 : () -> Nil ! N | S(N)\napp/main.f_9 : () -> Nil ! N | S(N)\napp/main.f_10 : () -> Nil ! N | S(N)\napp/main.f_11 : () -> Nil ! N | S(N)\napp/main.f_12 : () -> Nil ! N | S(N)\napp/main.f_13 : () -> Nil ! N | S(N)\napp/main.f_14 : () -> Nil ! N | S(N)\napp/main.f_15 : () -> Nil ! N | S(N)\napp/main.f_16 : () -> Nil ! N | S(N)\napp/main.f_17 : () -> Nil ! N | S(N)\napp/main.f_18 : () -> Nil ! N | S(N)\napp/main.f_19 : () -> Nil ! N | S(N)\napp/main.f_20 : () -> Nil ! N | S(N)\napp/main.f_21 : () -> Nil ! N | S(N)\napp/main.f_22 : () -> Nil ! N | S(N)\napp/main.f_23 : () -> Nil ! N | S(N)\napp/main.f_24 : () -> Nil ! N | S(N)\napp/main.f_25 : () -> Nil ! N | S(N)\napp/main.f_26 : () -> Nil ! N | S(N)\napp/main.f_27 : () -> Nil ! N | S(N)\napp/main.f_28 : () -> Nil ! N | S(N)\napp/main.f_29 : () -> Nil ! N | S(N)\napp/main.f_30 : () -> Nil ! N | S(N)\napp/main.f_31 : () -> Nil ! N | S(N)\napp/main.f_32 : () -> Nil ! N | S(N)\napp/main.f_33 : () -> Nil ! N | S(N)\napp/main.f_34 : () -> Nil ! N | S(N)\napp/main.f_35 : () -> Nil ! N | S(N)\napp/main.f_36 : () -> Nil ! N | S(N)\napp/main.f_37 : () -> Nil ! N | S(N)\napp/main.f_38 : () -> Nil ! N | S(N)\napp/main.f_39 : () -> Nil ! N | S(N)\napp/main.f_40 : () -> Nil ! N | S(N)\napp/main.f_41 : () -> Nil ! N | S(N)\napp/main.f_42 : () -> Nil ! N | S(N)\napp/main.f_43 : () -> Nil ! N | S(N)\napp/main.f_44 : () -> Nil ! N | S(N)\napp/main.f_45 : () -> Nil ! N | S(N)\napp/main.f_46 : () -> Nil ! N | S(N)\napp/main.f_47 : () -> Nil ! N | S(N)\napp/main.f_48 : () -> Nil ! N | S(N)\napp/main.f_49 : () -> Nil ! N | S(N)\napp/main.f_50 : () -> Nil ! N | S(N)\napp/main.f_51 : () -> Nil ! N | S(N)\napp/main.f_52 : () -> Nil ! N | S(N)\napp/main.f_53 : () -> Nil ! N | S(N)\napp/main.f_54 : () -> Nil ! N | S(N)\napp/main.f_55 : () -> Nil ! N | S(N)\napp/main.f_56 : () -> Nil ! N | S(N)\napp/main.f_57 : () -> Nil ! N | S(N)\napp/main.f_58 : () -> Nil ! N | S(N)\napp/main.f_59 : () -> Nil ! N | S(N)\napp/main.f_60 : () -> Nil ! N | S(N)\napp/main.f_61 : () -> Nil ! N | S(N)\napp/main.f_62 : () -> Nil ! N | S(N)\napp/main.f_63 : () -> Nil ! N | S(N)\n",
-      "stderr": ""
+      "stderr": "src/main.i:67:1: warning[W0504]: top-level binding `f_63` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:67:1: warning[W0504]: top-level binding `f_63` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:67:1: warning[W0504]: top-level binding `f_63` is not used\n"
     }
   }
 }

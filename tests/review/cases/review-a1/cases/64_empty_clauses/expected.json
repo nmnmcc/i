@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "app/main.f : (Never) -> Never\n",
-      "stderr": ""
+      "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `f` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `f` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `f` is not used\n"
     }
   }
 }

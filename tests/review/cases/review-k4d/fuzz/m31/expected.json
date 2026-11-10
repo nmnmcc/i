@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "app/main.get : () -> Int ! Dep\napp/main.us : () -> Int ! N | S(N)\napp/main.ut : () -> Int ! N | T(N)\napp/main.usa : () -> Int ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.h0 : () -> Int ! N | S(N)\napp/main.h1 : () -> Int ! N | N2 | S(N) | T(N2)\napp/main.main : () -> Nil\n",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\nsrc/main.i:19:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\nsrc/main.i:19:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     "run0": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\nsrc/main.i:19:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     "test2": {
       "command": [
@@ -41,7 +41,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\nsrc/main.i:19:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     "run2": {
       "command": [
@@ -51,7 +51,7 @@
       ],
       "exit": 0,
       "stdout": "",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\nsrc/main.i:19:1: warning[W0504]: top-level binding `h1` is not used\n"
     }
   }
 }
