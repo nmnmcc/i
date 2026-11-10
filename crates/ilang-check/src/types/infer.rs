@@ -723,20 +723,21 @@ impl<'a> Checker<'a> {
         };
         let mut found = Vec::new();
         uses_types(&shown, &mut found);
-        let mut names: Vec<String> = Vec::new();
+        let mut names: Vec<(String, bool)> = Vec::new();
         for id in found {
             let def = self.p.ty(id);
-            if def.module == self.module && !def.exported && !names.contains(&def.name) {
-                names.push(def.name.clone());
+            let name = (def.name.clone(), def.module != self.module);
+            if !def.exported && !names.contains(&name) {
+                names.push(name);
             }
         }
-        for name in names {
+        for (name, foreign) in names {
             self.error(
                 code::EXPORT_HIDDEN_TYPE,
                 d.span,
                 format!(
-                    "`{}` is exported, but its inferred type uses the type `{name}` of this module, which is not exported (§2.4)",
-                    d.name
+                    "`{}` is exported, but its inferred type uses the type `{name}` {}, which is not exported (§2.4)",
+                    d.name, if foreign { "of its defining module" } else { "of this module" }
                 ),
             );
         }

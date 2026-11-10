@@ -16,7 +16,9 @@ use crate::hir::*;
 use crate::types::{Head, HostType, Ty};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast;
+use ilang_syntax::lisp::syntax::{Provenance, Scope as SyntaxScope, ScopeIdentity};
 use ilang_syntax::span::Span;
+use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
 
 pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnostic>) {
@@ -25,6 +27,8 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
         parsed,
         p: Program::default(),
         diags: Vec::new(),
+        generated_values: Vec::new(),
+        generated_types: Vec::new(),
         defs_by_name: Vec::new(),
         types_by_name: Vec::new(),
         ctors_by_name: Vec::new(),
@@ -51,6 +55,7 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
     for m in 0..parsed.len() {
         r.imports(ModuleId(m as u32));
     }
+    r.check_generated_collisions();
     r.import_circles();
     for m in 0..parsed.len() {
         r.type_defs(ModuleId(m as u32));
@@ -100,23 +105,31 @@ enum Slot {
 }
 
 /// Local names bound by one binding, parameter list, or clause.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct NameKey {
+    text: String,
+    scope: SyntaxScope,
+    identity: Option<ScopeIdentity>,
+}
+
 struct Frame {
-    names: HashMap<String, VarId>,
+    names: HashMap<NameKey, VarId>,
     /// `Some(d)`: the names may only be used inside function bodies that
     /// are deeper than `d` (§6.10, the value of a direct binding).
     fn_only: Option<u32>,
 }
 
 struct TyFrame {
-    names: HashMap<String, TyVarId>,
+    names: HashMap<NameKey, TyVarId>,
 }
 
 struct TyDefMode {
-    params: HashMap<String, TyVarId>,
+    params: HashMap<NameKey, TyVarId>,
     used: HashSet<TyVarId>,
 }
 
 enum Found {
+    Private,
     Local(VarId),
     Entry(Entry),
 }
@@ -136,6 +149,8 @@ struct Resolver<'a> {
     parsed: &'a [Parsed],
     p: Program,
     diags: Vec<Diagnostic>,
+    generated_values: Vec<HashMap<NameKey, Entry>>,
+    generated_types: Vec<HashMap<NameKey, TypeId>>,
     defs_by_name: Vec<HashMap<String, u32>>,
     types_by_name: Vec<HashMap<String, TypeId>>,
     ctors_by_name: Vec<HashMap<String, CtorRef>>,
@@ -156,8 +171,8 @@ struct Resolver<'a> {
     /// The aliases in a circle (§4.3); the circle has been reported, and
     /// they are not expanded.
     circular: HashSet<TypeId>,
-    pending: Vec<HashSet<String>>,
-    reserved: Vec<(usize, HashSet<String>)>,
+    pending: Vec<HashSet<NameKey>>,
+    reserved: Vec<(usize, HashSet<NameKey>)>,
 }
 
 fn is_upper(name: &str) -> bool {
@@ -307,6 +322,8 @@ impl<'a> Resolver<'a> {
             }
             self.by_path
                 .insert((parsed.package, parsed.path.clone()), id);
+            self.generated_values.push(HashMap::new());
+            self.generated_types.push(HashMap::new());
             self.defs_by_name.push(HashMap::new());
             self.types_by_name.push(HashMap::new());
             self.ctors_by_name.push(HashMap::new());
@@ -315,10 +332,65 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    /// A marked top-level name must not shadow an ordinary name in its
+    /// definition module: otherwise the two branches of §5 rule 3 compete.
+    fn check_generated_collisions(&mut self) {
+        let mut conflicts = Vec::new();
+        for (m, values) in self.generated_values.iter().enumerate() {
+            for (key, entry) in values {
+                if let Some(owner) = self
+                    .parsed
+                    .iter()
+                    .position(|p| p.source.0 == key.scope.module)
+                    && (self.scopes[owner].values.contains_key(&key.text)
+                        || self.scopes[owner].types.contains_key(&key.text))
+                {
+                    let span = match entry {
+                        Entry::Def(d) => self.p.def(*d).span,
+                        Entry::Ctor(c) => match &self.p.ty(c.ty).body {
+                            TypeBody::Custom(cs) => cs[c.index as usize].span,
+                            _ => unreachable!(),
+                        },
+                        _ => unreachable!(),
+                    };
+                    conflicts.push((ModuleId(m as u32), key.text.clone(), span));
+                }
+            }
+        }
+        for (m, types) in self.generated_types.iter().enumerate() {
+            for (key, id) in types {
+                if let Some(owner) = self
+                    .parsed
+                    .iter()
+                    .position(|p| p.source.0 == key.scope.module)
+                    && (self.scopes[owner].values.contains_key(&key.text)
+                        || self.scopes[owner].types.contains_key(&key.text))
+                {
+                    conflicts.push((ModuleId(m as u32), key.text.clone(), self.p.ty(*id).span));
+                }
+            }
+        }
+        for (m, name, span) in conflicts {
+            self.cur = m;
+            self.error(
+                code::DEFINED_TWICE,
+                span,
+                format!("marked `{name}` conflicts with a name in its scope module (§5)"),
+            );
+        }
+    }
+
     /// A value name of this module may be defined only once (§2.2).
     fn value_free(&mut self, m: ModuleId, name: &str, span: Span) -> bool {
         let mi = m.0 as usize;
-        if self.defs_by_name[mi].contains_key(name) || self.ctors_by_name[mi].contains_key(name) {
+        let key = self.name_key(name, span);
+        self.check_binder(name, span, true, false);
+        let occupied = if key.scope.marks.is_empty() {
+            self.defs_by_name[mi].contains_key(name) || self.ctors_by_name[mi].contains_key(name)
+        } else {
+            self.generated_values[mi].contains_key(&key)
+        };
+        if occupied {
             self.error(
                 code::DEFINED_TWICE,
                 span,
@@ -342,7 +414,12 @@ impl<'a> Resolver<'a> {
             exported: false,
             deprecated: attrs.deprecated.clone(),
         });
-        self.defs_by_name[m.0 as usize].insert(name.to_string(), index);
+        let key = self.name_key(name, span);
+        if key.scope.marks.is_empty() {
+            self.defs_by_name[m.0 as usize].insert(name.to_string(), index);
+        } else {
+            self.generated_values[m.0 as usize].insert(key, Entry::Def(DefId { module: m, index }));
+        }
     }
 
     fn collect(&mut self, m: ModuleId) {
@@ -360,12 +437,22 @@ impl<'a> Resolver<'a> {
                 let pkg = &self.graph.packages[here.package];
                 let default = here.kind == ModuleKind::Src
                     && here.path == format!("{}/main", pkg.name)
-                    && names.iter().any(|(n, _)| n == "main");
+                    && names.iter().any(|(n, span)| {
+                        n == "main"
+                            && self.name_key(n, *span).scope.marks.is_empty()
+                            && self.name_key(n, *span).scope.module == parsed[m.0 as usize].source.0
+                    });
                 let declared = pkg
                     .entries
                     .iter()
                     .filter(|(_, e)| {
-                        e.module == here.path && names.iter().any(|(n, _)| *n == e.function)
+                        e.module == here.path
+                            && names.iter().any(|(n, span)| {
+                                *n == e.function
+                                    && self.name_key(n, *span).scope.marks.is_empty()
+                                    && self.name_key(n, *span).scope.module
+                                        == parsed[m.0 as usize].source.0
+                            })
                     })
                     .collect::<Vec<_>>();
                 let legacy = parsed
@@ -432,7 +519,7 @@ impl<'a> Resolver<'a> {
                     let mut seen = HashSet::new();
                     let mut defs = Vec::new();
                     for (name, span) in names {
-                        if !seen.insert(name.clone()) {
+                        if !seen.insert(self.name_key(&name, span)) {
                             continue; // reported when the pattern is resolved
                         }
                         let kind = DefKind::Binding {
@@ -545,7 +632,14 @@ impl<'a> Resolver<'a> {
     fn collect_type(&mut self, m: ModuleId, def: &ast::TypeDef, attrs: &Attrs) -> TypeId {
         let id = TypeId(self.p.types.len() as u32);
         let mi = m.0 as usize;
-        if self.types_by_name[mi].contains_key(&def.name.name) {
+        let key = self.name_key(&def.name.name, def.name.span);
+        self.check_binder(&def.name.name, def.name.span, true, false);
+        let occupied = if key.scope.marks.is_empty() {
+            self.types_by_name[mi].contains_key(&def.name.name)
+        } else {
+            self.generated_types[mi].contains_key(&key)
+        };
+        if occupied {
             self.error(
                 code::DEFINED_TWICE,
                 def.name.span,
@@ -554,15 +648,23 @@ impl<'a> Resolver<'a> {
                     def.name.name
                 ),
             );
-        } else {
+        } else if key.scope.marks.is_empty() {
             self.types_by_name[mi].insert(def.name.name.clone(), id);
+        } else {
+            self.generated_types[mi].insert(key, id);
         }
         // A repeated parameter is reported, but it keeps its place, so that
         // the parameters stay in line with the written ones and the number
         // of parameters is the written number. Its name refers to the first.
         let mut params: Vec<(String, TyVarId)> = Vec::new();
         for p in &def.params {
-            if params.iter().any(|(n, _)| n == &p.name) {
+            self.check_binder(&p.name, p.span, false, true);
+            if def
+                .params
+                .iter()
+                .take(params.len())
+                .any(|q| self.name_key(&q.name, q.span) == self.name_key(&p.name, p.span))
+            {
                 self.error(
                     code::TYPE_PARAM_TWICE,
                     p.span,
@@ -584,7 +686,13 @@ impl<'a> Resolver<'a> {
                         continue;
                     }
                     let index = out.len() as u32;
-                    self.ctors_by_name[mi].insert(c.name.name.clone(), CtorRef { ty: id, index });
+                    let ctor = CtorRef { ty: id, index };
+                    let key = self.name_key(&c.name.name, c.name.span);
+                    if key.scope.marks.is_empty() {
+                        self.ctors_by_name[mi].insert(c.name.name.clone(), ctor);
+                    } else {
+                        self.generated_values[mi].insert(key, Entry::Ctor(ctor));
+                    }
                     out.push(CtorDef {
                         name: c.name.name.clone(),
                         span: c.name.span,
@@ -818,6 +926,15 @@ impl<'a> Resolver<'a> {
         let mi = m.0 as usize;
         for item in items {
             let name = &item.name.name;
+            let key = self.name_key(name, item.name.span);
+            if !key.scope.marks.is_empty() {
+                self.error(
+                    code::MACRO_BINDER,
+                    item.name.span,
+                    format!("marked `{name}` cannot be exported (§5)"),
+                );
+                continue;
+            }
             if !is_upper(name) {
                 match self.defs_by_name[mi].get(name) {
                     Some(&d) => self.p.modules[mi].defs[d as usize].exported = true,
@@ -1199,7 +1316,8 @@ impl<'a> Resolver<'a> {
             }
             let mut clashes = false;
             for param in &def.params {
-                if is_upper(&param.name) && self.unqualified_type(&param.name).is_some() {
+                let key = self.name_key(&param.name, param.span);
+                if is_upper(&param.name) && self.conflicts_with_type(&key) {
                     clashes = true;
                     self.error(
                         code::TYPE_VAR_IS_TYPE,
@@ -1213,8 +1331,8 @@ impl<'a> Resolver<'a> {
             }
             let params = self.p.ty(id).params.clone();
             let mut by_name = HashMap::new();
-            for (n, v) in &params {
-                by_name.entry(n.clone()).or_insert(*v);
+            for ((n, v), ident) in params.iter().zip(&def.params) {
+                by_name.entry(self.name_key(n, ident.span)).or_insert(*v);
             }
             self.ty_def = Some(TyDefMode {
                 params: by_name,
@@ -1245,7 +1363,9 @@ impl<'a> Resolver<'a> {
             }
             let mode = self.ty_def.take().unwrap();
             for (i, (p, ident)) in params.iter().zip(&def.params).enumerate() {
-                let repeated = params[..i].iter().any(|q| q.0 == p.0);
+                let repeated = def.params[..i].iter().any(|q| {
+                    self.name_key(&q.name, q.span) == self.name_key(&ident.name, ident.span)
+                });
                 if !repeated && !mode.used.contains(&p.1) {
                     self.error(
                         code::TYPE_PARAM_UNUSED,
@@ -1478,7 +1598,7 @@ impl<'a> Resolver<'a> {
     fn lookup_type(&mut self, module: Option<&ast::Ident>, name: &ast::Ident) -> Option<TypeRef> {
         // §2.3: a local name may cover a module name, in types too.
         if let Some(m) = module
-            && let Some(Found::Local(_)) = self.find(&m.name)
+            && let Some(Found::Local(_)) = self.find(&m.name, m.span)
         {
             self.error(
                 code::NOT_A_MODULE,
@@ -1490,12 +1610,25 @@ impl<'a> Resolver<'a> {
             );
             return None;
         }
-        let scope = &self.scopes[self.cur.0 as usize];
+        let key = self.name_key(&name.name, name.span);
         let broken = match module {
-            Some(m) => matches!(scope.values.get(&m.name), Some((Entry::Broken, _))),
-            None => {
-                scope.broken_types.contains(&name.name) && !scope.types.contains_key(&name.name)
+            Some(m) => matches!(
+                self.find(&m.name, m.span),
+                Some(Found::Entry(Entry::Broken))
+            ),
+            None if key.identity.is_some()
+                || self.generated_types[self.cur.0 as usize].contains_key(&key) =>
+            {
+                false
             }
+            None => self
+                .parsed
+                .iter()
+                .position(|p| p.source.0 == key.scope.module)
+                .is_some_and(|owner| {
+                    self.scopes[owner].broken_types.contains(&name.name)
+                        && !self.scopes[owner].types.contains_key(&name.name)
+                }),
         };
         if broken {
             return None;
@@ -1505,7 +1638,7 @@ impl<'a> Resolver<'a> {
             let ti = target.0 as usize;
             let path = self.module_name(target).to_string();
             return match self.types_by_name[ti].get(&name.name).copied() {
-                Some(t) if self.p.ty(t).exported => {
+                Some(t) if self.p.ty(t).exported || self.compiler_reference(m) => {
                     self.used_type(t, name.span);
                     Some(TypeRef::Custom(t))
                 }
@@ -1527,12 +1660,58 @@ impl<'a> Resolver<'a> {
                 }
             };
         }
-        let scope = &self.scopes[self.cur.0 as usize];
-        let found = scope
-            .types
-            .get(&name.name)
-            .map(|(t, _)| *t)
-            .or_else(|| self.builtin_types.get(&name.name).copied());
+        let origin = self.parsed[self.cur.0 as usize]
+            .scoped
+            .as_ref()
+            .and_then(|s| s.origin(name.span));
+        let provenance = origin.map(|o| o.syntax.provenance());
+        let from_answer = matches!(provenance, Some(Provenance::Made { from_answer: true }));
+        let generated = if !key.scope.marks.is_empty() && !from_answer {
+            self.generated_types[self.cur.0 as usize]
+                .get(&key)
+                .copied()
+                .map(TypeRef::Custom)
+        } else {
+            None
+        };
+        let found = if matches!(key.identity, Some(ScopeIdentity::Builtin { .. })) {
+            self.builtin_types.get(&name.name).copied()
+        } else if key.identity.is_some() {
+            None
+        } else if let Some(t) = generated {
+            Some(t)
+        } else {
+            let owner = self
+                .parsed
+                .iter()
+                .position(|p| p.source.0 == key.scope.module);
+            let found = owner.and_then(|owner| {
+                self.scopes[owner]
+                    .types
+                    .get(&name.name)
+                    .map(|(t, _)| (owner, *t))
+            });
+            if let Some((owner, TypeRef::Custom(id))) = found {
+                let made = matches!(provenance, Some(Provenance::Made { .. }));
+                if made
+                    && (!key.scope.marks.is_empty() || owner != self.cur.0 as usize)
+                    && !self.p.ty(id).exported
+                {
+                    self.error(
+                        code::NOT_EXPORTED,
+                        name.span,
+                        format!(
+                            "the type `{}` is not exported from its scope module",
+                            name.name
+                        ),
+                    );
+                    return None;
+                }
+            }
+            found
+                .map(|(_, t)| t)
+                .or_else(|| self.builtin_types.get(&name.name).copied())
+        };
         match found {
             Some(t) => {
                 if let TypeRef::Custom(id) = t {
@@ -1559,8 +1738,16 @@ impl<'a> Resolver<'a> {
     /// The module named by the top-level name `m` in `m.T`. Local names
     /// that cover it are found by the caller.
     fn module_of(&mut self, m: &ast::Ident) -> Option<ModuleId> {
-        match self.scopes[self.cur.0 as usize].values.get(&m.name) {
-            Some((Entry::Module(t), _)) => Some(*t),
+        match self.find(&m.name, m.span) {
+            Some(Found::Entry(Entry::Module(t))) => Some(t),
+            Some(Found::Private) => {
+                self.error(
+                    code::NOT_EXPORTED,
+                    m.span,
+                    format!("`{}` is not exported from its scope module", m.name),
+                );
+                None
+            }
             Some(_) => {
                 self.error(
                     code::NOT_A_MODULE,
@@ -1625,16 +1812,21 @@ impl<'a> Resolver<'a> {
         name: &ast::Ident,
         span: Span,
     ) -> TypeKind {
-        let pending = |n: &str| self.pending.iter().rev().any(|p| p.contains(n));
+        let pending = |n: &str, span: Span| {
+            self.pending
+                .iter()
+                .rev()
+                .any(|p| p.contains(&self.name_key(n, span)))
+        };
         if let Some(m) = module {
-            if pending(&m.name)
+            if pending(&m.name, m.span)
                 || self.reserved.iter().rev().any(|(depth, names)| {
-                    names.contains(&m.name)
+                    names.contains(&self.name_key(&m.name, m.span))
                         && !self
                             .locals
                             .iter()
                             .skip(*depth)
-                            .any(|f| f.names.contains_key(&m.name))
+                            .any(|f| f.names.contains_key(&self.name_key(&m.name, m.span)))
                 })
             {
                 self.error(
@@ -1646,14 +1838,14 @@ impl<'a> Resolver<'a> {
             }
         } else {
             let reserved = self.reserved.iter().rev().any(|(depth, names)| {
-                names.contains(&name.name)
+                names.contains(&self.name_key(&name.name, name.span))
                     && !self
                         .locals
                         .iter()
                         .skip(*depth)
-                        .any(|f| f.names.contains_key(&name.name))
+                        .any(|f| f.names.contains_key(&self.name_key(&name.name, name.span)))
             });
-            if pending(&name.name) || reserved {
+            if pending(&name.name, name.span) || reserved {
                 self.error(code::VALUE_TYPE_OWN_SCOPE, span,
                     format!("the type of `{}` cannot be read in its own pattern, function header, or binding value, even if an outer name exists", name.name));
                 return TypeKind::Error;
@@ -1785,14 +1977,15 @@ impl<'a> Resolver<'a> {
         let kind = match &t.kind {
             T::Lit(v) => TypeKind::Lit(v.clone()),
             T::Named { module, name, args } => {
+                let key = self.name_key(&name.name, name.span);
                 let variable = if module.is_none() {
                     self.ty_frames
                         .iter()
                         .rev()
-                        .find_map(|f| f.names.get(&name.name).copied())
+                        .find_map(|f| f.names.get(&key).copied())
                         .or_else(|| {
                             self.ty_def.as_mut().and_then(|mode| {
-                                let var = mode.params.get(&name.name).copied()?;
+                                let var = mode.params.get(&key).copied()?;
                                 mode.used.insert(var);
                                 Some(var)
                             })
@@ -2268,7 +2461,12 @@ impl<'a> Resolver<'a> {
                     let (binding, binders) = self.binding(b, true);
                     let mi = m.0 as usize;
                     for binder in binders {
-                        if let Some(&d) = self.defs_by_name[mi].get(&binder.name)
+                        let def = self.p.modules[mi].bindings[index as usize]
+                            .defs
+                            .iter()
+                            .find(|d| self.p.def(**d).span == binder.span)
+                            .map(|d| d.index);
+                        if let Some(d) = def
                             && let DefKind::Binding { binding: bi, var } =
                                 &mut self.p.modules[mi].defs[d as usize].kind
                             && *bi == index
@@ -2292,11 +2490,22 @@ impl<'a> Resolver<'a> {
             .or_else(|| self.builtin_types.get(name).copied())
     }
 
+    fn conflicts_with_type(&self, key: &NameKey) -> bool {
+        key.identity.is_none()
+            && if key.scope.marks.is_empty() {
+                self.unqualified_type(&key.text).is_some()
+            } else {
+                self.generated_types[self.cur.0 as usize].contains_key(key)
+            }
+    }
+
     fn push_declared_frame(&mut self, params: &[ast::Ident]) -> Vec<TyVarId> {
         let mut names = HashMap::new();
         let mut vars = Vec::new();
         for param in params {
-            if names.contains_key(&param.name) {
+            let key = self.name_key(&param.name, param.span);
+            self.check_binder(&param.name, param.span, false, false);
+            if names.contains_key(&key) {
                 self.error(
                     code::TYPE_PARAM_TWICE,
                     param.span,
@@ -2307,7 +2516,7 @@ impl<'a> Resolver<'a> {
                 );
                 continue;
             }
-            if self.unqualified_type(&param.name).is_some() {
+            if self.conflicts_with_type(&key) {
                 self.error(
                     code::TYPE_VAR_IS_TYPE,
                     param.span,
@@ -2315,7 +2524,7 @@ impl<'a> Resolver<'a> {
                 );
             }
             let var = self.new_ty_var(&param.name);
-            names.insert(param.name.clone(), var);
+            names.insert(key, var);
             vars.push(var);
         }
         self.ty_frames.push(TyFrame { names });
@@ -2331,7 +2540,10 @@ impl<'a> Resolver<'a> {
         let mut binders = Vec::new();
         let mut names = Vec::new();
         ast_binders(&b.pattern, &mut names);
-        let names: HashSet<String> = names.into_iter().map(|(n, _)| n).collect();
+        let names: HashSet<NameKey> = names
+            .into_iter()
+            .map(|(n, span)| self.name_key(&n, span))
+            .collect();
         self.pending.push(names.clone());
         let pattern = self.pattern(&b.pattern, &mut binders, None);
         self.pending.pop();
@@ -2339,7 +2551,10 @@ impl<'a> Resolver<'a> {
             // §6.10: the names may be used inside the function bodies of a
             // direct value.
             self.locals.push(Frame {
-                names: binders.iter().map(|b| (b.name.clone(), b.var)).collect(),
+                names: binders
+                    .iter()
+                    .map(|b| (self.name_key(&b.name, b.span), b.var))
+                    .collect(),
                 fn_only: Some(self.fn_depth),
             });
             self.reserved.push((self.locals.len(), names.clone()));
@@ -2377,7 +2592,10 @@ impl<'a> Resolver<'a> {
             E::Field { target, .. } => match &target.kind {
                 // `m.x` is a name when `m` is a module.
                 E::Name { module: None, name } => {
-                    matches!(self.find(&name.name), Some(Found::Entry(Entry::Module(_))))
+                    matches!(
+                        self.find(&name.name, name.span),
+                        Some(Found::Entry(Entry::Module(_)))
+                    )
                 }
                 _ => false,
             },
@@ -2409,27 +2627,137 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    fn check_binder(&mut self, name: &str, span: Span, top: bool, type_parameter: bool) {
+        let parsed = &self.parsed[self.cur.0 as usize];
+        let Some(origin) = parsed.scoped.as_ref().and_then(|s| s.origin(span)) else {
+            return;
+        };
+        let syntax = &origin.syntax;
+        let answer = matches!(
+            syntax.provenance(),
+            Provenance::Answer | Provenance::Made { from_answer: true }
+        );
+        let allowed_parameter = type_parameter
+            && matches!(
+                syntax.scope_identity(),
+                Some(ScopeIdentity::DefinitionParameter { .. })
+            );
+        let bad_answer = answer && !allowed_parameter;
+        let forbidden_identity = matches!(
+            syntax.scope_identity(),
+            Some(ScopeIdentity::Builtin { .. } | ScopeIdentity::TypeVariable { .. })
+        );
+        let foreign_unmarked =
+            top && syntax.scope().marks.is_empty() && syntax.scope().module != parsed.source.0;
+        if bad_answer || forbidden_identity || foreign_unmarked || !syntax.valid_scope_identity() {
+            self.error(
+                code::MACRO_BINDER,
+                span,
+                format!("`{name}` cannot bind a name with this macro origin (§5)"),
+            );
+        }
+    }
+
+    /// Exact lexical identity of an occurrence. Written code has its source
+    /// module and no marks; expanded atoms retain their syntax object identity.
+    fn name_key(&self, text: &str, span: Span) -> NameKey {
+        let parsed = &self.parsed[self.cur.0 as usize];
+        let syntax = parsed.scoped.as_ref().and_then(|s| s.origin(span));
+        let (scope, identity) = match syntax {
+            Some(origin) => (
+                origin.syntax.scope().clone(),
+                origin.syntax.scope_identity().cloned(),
+            ),
+            None => (
+                SyntaxScope {
+                    module: parsed.source.0,
+                    marks: BTreeSet::new(),
+                },
+                None,
+            ),
+        };
+        let scope = if identity.is_some() {
+            SyntaxScope {
+                module: 0,
+                marks: BTreeSet::new(),
+            }
+        } else {
+            scope
+        };
+        NameKey {
+            text: text.to_owned(),
+            scope,
+            identity,
+        }
+    }
+
     /// Looks up a value name with no module before it (§5).
-    fn find(&self, name: &str) -> Option<Found> {
+    fn find(&self, name: &str, span: Span) -> Option<Found> {
+        if name.starts_with('\0') {
+            return self.scopes[self.cur.0 as usize]
+                .values
+                .get(name)
+                .map(|(e, _)| Found::Entry(*e));
+        }
+        let key = self.name_key(name, span);
         if !is_upper(name) {
             for f in self.locals.iter().rev() {
                 if f.fn_only.is_some_and(|d| self.fn_depth <= d) {
                     continue;
                 }
-                if let Some(v) = f.names.get(name) {
+                if let Some(v) = f.names.get(&key) {
                     return Some(Found::Local(*v));
                 }
             }
         }
-        let scope = &self.scopes[self.cur.0 as usize];
-        if let Some((e, _)) = scope.values.get(name) {
+        if matches!(key.identity, Some(ScopeIdentity::Builtin { .. })) {
+            return self.builtin_values.get(name).map(|e| Found::Entry(*e));
+        }
+        if key.identity.is_some() {
+            return None;
+        }
+        let origin = self.parsed[self.cur.0 as usize]
+            .scoped
+            .as_ref()
+            .and_then(|s| s.origin(span));
+        let provenance = origin.map(|o| o.syntax.provenance());
+        let from_answer = matches!(provenance, Some(Provenance::Made { from_answer: true }));
+        if !key.scope.marks.is_empty()
+            && !from_answer
+            && let Some(e) = self.generated_values[self.cur.0 as usize].get(&key)
+        {
+            return Some(Found::Entry(*e));
+        }
+        let module = self
+            .parsed
+            .iter()
+            .position(|p| p.source.0 == key.scope.module)?;
+        let scope = &self.scopes[module];
+        if let Some((e, imported)) = scope.values.get(name) {
+            let needs_export = matches!(provenance, Some(Provenance::Made { .. }))
+                && (!key.scope.marks.is_empty() || module != self.cur.0 as usize);
+            let exported = match e {
+                Entry::Def(d) => self.p.def(*d).exported,
+                Entry::Ctor(c) => self.p.ty(c.ty).constructors_exported,
+                Entry::Module(_) => *imported,
+                Entry::Broken => true,
+            };
+            if needs_export && !exported {
+                return Some(Found::Private);
+            }
             return Some(Found::Entry(*e));
         }
         self.builtin_values.get(name).map(|e| Found::Entry(*e))
     }
 
+    /// Only compiler-created modules and unspellable compiler aliases may
+    /// refer directly to private implementation members.
+    fn compiler_reference(&self, module: &ast::Ident) -> bool {
+        self.parsed[self.cur.0 as usize].compiler_generated || module.name.starts_with('\0')
+    }
+
     /// A member `m.x` or `m.C` of another module.
-    fn member(&mut self, target: ModuleId, name: &ast::Ident) -> ExprKind {
+    fn member(&mut self, target: ModuleId, name: &ast::Ident, trusted: bool) -> ExprKind {
         let ti = target.0 as usize;
         let path = self.module_name(target).to_string();
         let (found, exported) = if is_upper(&name.name) {
@@ -2453,7 +2781,7 @@ impl<'a> Resolver<'a> {
             }
         };
         match found {
-            Some(v) if exported => {
+            Some(v) if exported || trusted => {
                 match v {
                     ValueRef::Def(d) => self.used_def(d, name.span),
                     ValueRef::Ctor(c) => self.used_ctor(c, name.span),
@@ -2482,8 +2810,18 @@ impl<'a> Resolver<'a> {
 
     fn name(&mut self, module: Option<&ast::Ident>, name: &ast::Ident) -> ExprKind {
         if let Some(m) = module {
-            return match self.find(&m.name) {
-                Some(Found::Entry(Entry::Module(t))) => self.member(t, name),
+            return match self.find(&m.name, m.span) {
+                Some(Found::Private) => {
+                    self.error(
+                        code::NOT_EXPORTED,
+                        m.span,
+                        format!("`{}` is not exported from its scope module", m.name),
+                    );
+                    ExprKind::Error
+                }
+                Some(Found::Entry(Entry::Module(t))) => {
+                    self.member(t, name, self.compiler_reference(m))
+                }
                 Some(Found::Entry(Entry::Broken)) => ExprKind::Error,
                 Some(_) => {
                     self.error(
@@ -2503,7 +2841,15 @@ impl<'a> Resolver<'a> {
                 }
             };
         }
-        match self.find(&name.name) {
+        match self.find(&name.name, name.span) {
+            Some(Found::Private) => {
+                self.error(
+                    code::NOT_EXPORTED,
+                    name.span,
+                    format!("`{}` is not exported from its scope module", name.name),
+                );
+                ExprKind::Error
+            }
             Some(Found::Local(v)) => ExprKind::Name(ValueRef::Local(v)),
             Some(Found::Entry(Entry::Def(d))) => {
                 self.used_def(d, name.span);
@@ -2604,7 +2950,10 @@ impl<'a> Resolver<'a> {
                 let mut binders = Vec::new();
                 let pattern = self.pattern(&clause.patterns[0], &mut binders, None);
                 self.locals.push(Frame {
-                    names: binders.into_iter().map(|b| (b.name, b.var)).collect(),
+                    names: binders
+                        .into_iter()
+                        .map(|b| (self.name_key(&b.name, b.span), b.var))
+                        .collect(),
                     fn_only: None,
                 });
                 let body = self.expr(&clause.body);
@@ -2642,15 +2991,17 @@ impl<'a> Resolver<'a> {
             },
             E::Field { target, name } => {
                 let module = match &target.kind {
-                    E::Name { module: None, name } => match self.find(&name.name) {
-                        Some(Found::Entry(Entry::Module(t))) => Some(Some(t)),
+                    E::Name { module: None, name } => match self.find(&name.name, name.span) {
+                        Some(Found::Entry(Entry::Module(t))) => {
+                            Some(Some((t, self.compiler_reference(name))))
+                        }
                         Some(Found::Entry(Entry::Broken)) => Some(None),
                         _ => None,
                     },
                     _ => None,
                 };
                 match module {
-                    Some(Some(t)) => self.member(t, name),
+                    Some(Some((t, trusted))) => self.member(t, name, trusted),
                     Some(None) => ExprKind::Error,
                     None => ExprKind::Field {
                         target: Box::new(self.expr(target)),
@@ -2777,7 +3128,10 @@ impl<'a> Resolver<'a> {
                 ast::Stmt::Bind(binding) => {
                     let (binding, binders) = self.binding(binding, false);
                     self.locals.push(Frame {
-                        names: binders.into_iter().map(|b| (b.name, b.var)).collect(),
+                        names: binders
+                            .into_iter()
+                            .map(|b| (self.name_key(&b.name, b.span), b.var))
+                            .collect(),
                         fn_only: None,
                     });
                     Stmt::Bind(binding)
@@ -2815,8 +3169,12 @@ impl<'a> Resolver<'a> {
                 ast::Param::Env { name, .. } => pending.push((name.name.clone(), name.span)),
             }
         }
-        self.pending
-            .push(pending.into_iter().map(|(n, _)| n).collect());
+        self.pending.push(
+            pending
+                .into_iter()
+                .map(|(n, span)| self.name_key(&n, span))
+                .collect(),
+        );
         for p in &f.params {
             match p {
                 ast::Param::Pattern(pat) => {
@@ -2855,6 +3213,7 @@ impl<'a> Resolver<'a> {
                         env_heads.push(head);
                     }
                     let var = self.new_var();
+                    self.check_binder(&name.name, name.span, false, false);
                     self.param_name(&all, &name.name, name.span);
                     all.push(Binder {
                         var,
@@ -2887,7 +3246,10 @@ impl<'a> Resolver<'a> {
         self.pending.pop();
         self.fn_depth += 1;
         self.locals.push(Frame {
-            names: all.into_iter().map(|b| (b.name, b.var)).collect(),
+            names: all
+                .into_iter()
+                .map(|b| (self.name_key(&b.name, b.span), b.var))
+                .collect(),
             fn_only: None,
         });
         let body = self.block(&f.body);
@@ -2902,7 +3264,10 @@ impl<'a> Resolver<'a> {
     }
 
     fn param_name(&mut self, all: &[Binder], name: &str, span: Span) {
-        if all.iter().any(|b| b.name == name) {
+        if all
+            .iter()
+            .any(|b| self.name_key(&b.name, b.span) == self.name_key(name, span))
+        {
             self.error(
                 code::PARAMS_BIND_TWICE,
                 span,
@@ -2918,21 +3283,36 @@ impl<'a> Resolver<'a> {
         for p in &c.patterns {
             ast_binders(p, &mut pending);
         }
-        self.pending
-            .push(pending.into_iter().map(|(n, _)| n).collect());
+        self.pending.push(
+            pending
+                .into_iter()
+                .map(|(n, span)| self.name_key(&n, span))
+                .collect(),
+        );
         for (i, p) in c.patterns.iter().enumerate() {
             if i == 0 {
                 patterns.push(self.pattern(p, &mut first, None));
                 continue;
             }
-            let shared: HashMap<String, VarId> =
-                first.iter().map(|b| (b.name.clone(), b.var)).collect();
+            let shared: HashMap<NameKey, VarId> = first
+                .iter()
+                .map(|b| (self.name_key(&b.name, b.span), b.var))
+                .collect();
             let mut binders = Vec::new();
             patterns.push(self.pattern(p, &mut binders, Some(&shared)));
-            let a: HashSet<&str> = first.iter().map(|b| b.name.as_str()).collect();
-            let b: HashSet<&str> = binders.iter().map(|b| b.name.as_str()).collect();
+            let a: HashSet<NameKey> = first
+                .iter()
+                .map(|b| self.name_key(&b.name, b.span))
+                .collect();
+            let b: HashSet<NameKey> = binders
+                .iter()
+                .map(|b| self.name_key(&b.name, b.span))
+                .collect();
             if a != b {
-                let mut diff: Vec<&str> = a.symmetric_difference(&b).copied().collect();
+                let mut diff: Vec<&str> = a
+                    .symmetric_difference(&b)
+                    .map(|k| k.text.as_str())
+                    .collect();
                 diff.sort();
                 self.error(
                     code::CHOICES_DIFFER,
@@ -2949,7 +3329,10 @@ impl<'a> Resolver<'a> {
         }
         self.pending.pop();
         self.locals.push(Frame {
-            names: first.into_iter().map(|b| (b.name, b.var)).collect(),
+            names: first
+                .into_iter()
+                .map(|b| (self.name_key(&b.name, b.span), b.var))
+                .collect(),
             fn_only: None,
         });
         let guard = c.guard.as_ref().map(|g| self.expr(g));
@@ -2968,16 +3351,21 @@ impl<'a> Resolver<'a> {
         name: &str,
         span: Span,
         binders: &mut Vec<Binder>,
-        shared: Option<&HashMap<String, VarId>>,
+        shared: Option<&HashMap<NameKey, VarId>>,
     ) -> Binder {
-        if binders.iter().any(|b| b.name == name) {
+        let key = self.name_key(name, span);
+        self.check_binder(name, span, false, false);
+        if binders
+            .iter()
+            .any(|b| self.name_key(&b.name, b.span) == key)
+        {
             self.error(
                 code::PATTERN_BINDS_TWICE,
                 span,
                 format!("this pattern binds `{name}` more than once"),
             );
         }
-        let var = match shared.and_then(|s| s.get(name)) {
+        let var = match shared.and_then(|s| s.get(&key)) {
             Some(v) => *v,
             None => self.new_var(),
         };
@@ -2994,7 +3382,7 @@ impl<'a> Resolver<'a> {
         &mut self,
         p: &ast::Pattern,
         binders: &mut Vec<Binder>,
-        shared: Option<&HashMap<String, VarId>>,
+        shared: Option<&HashMap<NameKey, VarId>>,
     ) -> Pattern {
         use ast::PatternKind as P;
         let kind = match &p.kind {
@@ -3080,7 +3468,10 @@ impl<'a> Resolver<'a> {
                     let value = self.pattern(&s.value, binders, shared);
                     // §8.4: a length may use names of earlier segments.
                     self.locals.push(Frame {
-                        names: binders.iter().map(|b| (b.name.clone(), b.var)).collect(),
+                        names: binders
+                            .iter()
+                            .map(|b| (self.name_key(&b.name, b.span), b.var))
+                            .collect(),
                         fn_only: None,
                     });
                     let format = self.format(s.format.as_ref());
@@ -3153,12 +3544,12 @@ impl<'a> Resolver<'a> {
             }
             let mut found = Vec::new();
             self.hidden_types(m, &t, None, &mut HashSet::new(), &mut found);
-            for (span, name) in found {
+            for (span, name, foreign) in found {
                 self.error(
                     code::EXPORT_HIDDEN_TYPE,
                     span,
                     format!(
-                        "{what} is exported, but its type uses the type `{name}` of this module, which is not exported (§2.4)"
+                        "{what} is exported, but its type uses the type `{name}` {}, which is not exported (§2.4)", if foreign { "of its defining module" } else { "of this module" }
                     ),
                 );
             }
@@ -3174,7 +3565,7 @@ impl<'a> Resolver<'a> {
         t: &Type,
         at: Option<Span>,
         seen: &mut HashSet<TypeId>,
-        out: &mut Vec<(Span, String)>,
+        out: &mut Vec<(Span, String, bool)>,
     ) {
         if let TypeKind::Named {
             ty: TypeRef::Custom(id),
@@ -3182,7 +3573,7 @@ impl<'a> Resolver<'a> {
         } = &t.kind
         {
             let def = self.p.ty(*id);
-            if def.module == m && !def.exported {
+            if !def.exported {
                 match &def.body {
                     TypeBody::Alias(body) => {
                         if !self.circular.contains(id) && seen.insert(*id) {
@@ -3190,7 +3581,9 @@ impl<'a> Resolver<'a> {
                             seen.remove(id);
                         }
                     }
-                    TypeBody::Custom(_) => out.push((at.unwrap_or(t.span), def.name.clone())),
+                    TypeBody::Custom(_) => {
+                        out.push((at.unwrap_or(t.span), def.name.clone(), def.module != m))
+                    }
                 }
             }
         }
