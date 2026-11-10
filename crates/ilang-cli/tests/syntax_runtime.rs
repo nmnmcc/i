@@ -258,12 +258,21 @@ fn compiler_templates_rebuild_through_wasm() {
         dir.path().join("test/main.i"),
         r#"
 (syntax = i/syntax)
+make_many = (value: syntax.Syntax, n: Int, acc: List(syntax.Syntax)) -> List(syntax.Syntax) {
+  n.{ 0 -> acc _ -> make_many(value, n - 1, [value, ..acc]) }
+}
+count = (items: List(syntax.Syntax), n: Int) -> Int {
+  items.{ [] -> n [_, ..rest] -> count(rest, n + 1) }
+}
 @test
 exercise = () {
   template = syntax._template(0)
   first = syntax._template(1)
   replacement = syntax._template(2)
   result = syntax._rebuild(template, [first, replacement])
+  combined = syntax._append([first, replacement], [first])
+  assert(syntax.show(syntax._rebuild(template, combined)) == "(f y f)")
+  assert(count(syntax._append(make_many(first, 3000, []), [replacement]), 0) == 3001)
   assert(syntax.show(result) == "(f y)")
   syntax.node(result).{
     syntax.Round([_, child]) -> assert(child == replacement)
@@ -289,27 +298,30 @@ exercise = () {
         Syntax::from_datum(&parsed[1], &scope),
     ]
     .into();
-    let built = ilang_cli::build(
-        dir.path(),
-        ilang_cli::BuildOptions {
-            tests: true,
-            opt: ilang_cli::Level::O0,
-            offline: true,
-            target: ilang_cli::Target::Ilang,
-        },
-    )
-    .unwrap();
-    let mut options = ilang_cli::standard_options();
-    ilang_host::syntax::install_with_templates(&mut options.imports, templates).unwrap();
-    options
-        .imports
-        .grant_package(&built.binding_plan, &built.trusted_package);
-    let result = built
-        .host_program()
-        .unwrap()
-        .run_test_with("app/main.exercise", options);
-    assert!(
-        matches!(result, ilang_host::TestResult::Passed),
-        "{result:?}"
-    );
+    for opt in [ilang_cli::Level::O0, ilang_cli::Level::O2] {
+        let built = ilang_cli::build(
+            dir.path(),
+            ilang_cli::BuildOptions {
+                tests: true,
+                opt,
+                offline: true,
+                target: ilang_cli::Target::Ilang,
+            },
+        )
+        .unwrap();
+        let mut options = ilang_cli::standard_options();
+        ilang_host::syntax::install_with_templates(&mut options.imports, templates.clone())
+            .unwrap();
+        options
+            .imports
+            .grant_package(&built.binding_plan, &built.trusted_package);
+        let result = built
+            .host_program()
+            .unwrap()
+            .run_test_with("app/main.exercise", options);
+        assert!(
+            matches!(result, ilang_host::TestResult::Passed),
+            "{result:?}"
+        );
+    }
 }

@@ -17,6 +17,7 @@
 	show_as
 	_template
 	_rebuild
+	_append
 )
 
 Syntax {}
@@ -158,6 +159,18 @@ reverse = (items: List(Syntax), result: List(Syntax)) -> List(Syntax) {
 		[]              -> result
 		[first, ..rest] -> reverse(rest, [first, ..result])
 	}
+}
+
+prepend_reversed = (items: List(Syntax), result: List(Syntax)) -> List(Syntax) {
+	items.{
+		[]              -> result
+		[first, ..rest] -> prepend_reversed(rest, [first, ..result])
+	}
+}
+
+/// Appends syntax lists while preserving the identity and order of each item.
+_append = (first: List(Syntax), second: List(Syntax)) -> List(Syntax) {
+	prepend_reversed(reverse(first, []), second)
 }
 
 children = (
