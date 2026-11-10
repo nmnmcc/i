@@ -741,3 +741,27 @@ fn t2_nested_pattern_heads_support_hover_and_definition_in_recovery() {
     }
     c.shutdown();
 }
+
+#[test]
+fn disjoint_comparison_is_a_warning_at_the_comparison() {
+    // W520/§6.9 keeps the comparison span and shows both types.
+    let source = "x = 1 == 2\n";
+    let dir = tempfile::tempdir().unwrap();
+    package(dir.path(), &[("src/main.i", source)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut c = Client::start();
+    c.open(&main, source);
+    let ds = c.diagnostics(&main);
+    assert_eq!(ds.len(), 1, "{ds:?}");
+    assert_eq!(
+        ds[0].code,
+        Some(lsp::NumberOrString::String("W0503".into()))
+    );
+    assert_eq!(ds[0].severity, Some(lsp::DiagnosticSeverity::WARNING));
+    assert_eq!(
+        ds[0].range,
+        lsp::Range::new(lsp::Position::new(0, 4), lsp::Position::new(0, 10))
+    );
+    assert!(ds[0].message.contains("`1` and `2`"), "{ds:?}");
+    assert!(ds[0].message.contains("can never be equal"), "{ds:?}");
+}
