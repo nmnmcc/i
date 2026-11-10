@@ -1,0 +1,12 @@
+spec/generic_service_rows.use : () -> Nil ! N | S(N)
+spec/generic_service_rows.annotated : () -> Nil ! N | S(N)
+spec/generic_service_rows.run : (body: () -> A ? E ! N) -> A ? E ! N
+spec/generic_service_rows.finite : () -> Nil ! Assert
+spec/generic_service_rows.get : () -> Int ! Dependency
+spec/generic_service_rows.read : () -> Int ! N | Inner(N)
+spec/generic_service_rows.read_outer : () -> Int ! N | Outer(N)
+spec/generic_service_rows.nested : () -> Nil ! Assert
+spec/generic_service_rows.make : (send: (Entry) -> Nil ? E ! N) -> Sink(E, N)
+spec/generic_service_rows.write : (entry: Entry) -> Nil ? E ! N | Sink(E, N)
+spec/generic_service_rows.write_annotated : (entry: Entry) -> Nil ? E ! N | Sink(E, N)
+spec/generic_service_rows.logging : () -> Nil ! Assert

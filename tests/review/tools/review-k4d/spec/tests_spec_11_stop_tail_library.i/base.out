@@ -1,0 +1,2 @@
+spec/stop_tail_library.root : (x: Float) -> Float
+spec/stop_tail_library.main : () -> Nil

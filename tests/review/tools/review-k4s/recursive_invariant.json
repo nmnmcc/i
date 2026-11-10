@@ -1,0 +1,6 @@
+{
+  "name": "recursive_invariant",
+  "code": 1,
+  "time": 0.01917411503382027,
+  "out": "app/main.bad : (x: A) -> Never\nsrc/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n"
+}

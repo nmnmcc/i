@@ -1,0 +1,3 @@
+review/main.x : String
+review/main.f : (x: Int) -> Int
+review/main.g : () -> Bool

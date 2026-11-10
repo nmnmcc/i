@@ -1,0 +1,8 @@
+[package]
+name = "review-runtime-driver"
+version = "0.0.0"
+edition = "2024"
+[dependencies]
+ilang-package = { path = "/home/agent/Programming/i/.rd/note-runtime/crates/ilang-package" }
+ilang-check = { path = "/home/agent/Programming/i/.rd/note-runtime/crates/ilang-check" }
+ilang-wasm = { path = "/home/agent/Programming/i/.rd/note-runtime/crates/ilang-wasm" }

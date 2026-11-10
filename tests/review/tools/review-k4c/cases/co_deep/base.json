@@ -1,0 +1,6 @@
+{
+  "code": 0,
+  "out": "app/main.use : () -> A ! S(B & A)\napp/main.wrap : (x: A) -> B ! S(C & B)\n",
+  "err": "",
+  "seconds": 0.018704650923609734
+}

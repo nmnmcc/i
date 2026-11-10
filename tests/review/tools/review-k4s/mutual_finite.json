@@ -1,0 +1,6 @@
+{
+  "name": "mutual_finite",
+  "code": 0,
+  "time": 0.021164783975109458,
+  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.first : (b: Bool) -> Nil ! N | S(N)\napp/main.second : (b: Bool) -> Nil ! N | S(N)\n"
+}

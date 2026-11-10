@@ -1,0 +1,6 @@
+{
+  "name": "wide_512",
+  "code": "TIMEOUT",
+  "time": 20.03570920904167,
+  "out": "Command '['/home/agent/Programming/i/.rd/std1/target/debug/i', 'check', '--project', '/tmp/review-k4s/wide_512', '--types', '--offline']' timed out after 20 seconds"
+}

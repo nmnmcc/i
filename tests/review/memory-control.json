@@ -1,0 +1,53 @@
+{
+  "true": {
+    "command": [
+      "/nix/store/cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12/bin/true"
+    ],
+    "exit": 0,
+    "timeout": false,
+    "measurement_tool": "/run/current-system/sw/bin/time",
+    "raw_counters": "0.00 0.00 2232\n",
+    "wall_seconds": 0.0033130680676549673,
+    "user_seconds": 0.0,
+    "system_seconds": 0.0,
+    "cpu_seconds": 0.0,
+    "peak_rss_bytes": 2285568,
+    "instructions_retired": null,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr": "",
+    "load_average": [
+      10.50390625,
+      8.994140625,
+      10.09619140625
+    ]
+  },
+  "startup": {
+    "command": [
+      "/home/agent/Programming/i/.rd/note-pa-arch/target/release/i",
+      "check",
+      "--types",
+      "--offline",
+      "--project",
+      "examples/hello"
+    ],
+    "exit": 0,
+    "timeout": false,
+    "measurement_tool": "/run/current-system/sw/bin/time",
+    "raw_counters": "0.00 0.00 11916\n",
+    "wall_seconds": 0.008219470968469977,
+    "user_seconds": 0.0,
+    "system_seconds": 0.0,
+    "cpu_seconds": 0.0,
+    "peak_rss_bytes": 12201984,
+    "instructions_retired": null,
+    "stdout_sha256": "4690fa57bb633e4be1b29b42ef80a5ec385ced855c2566ae7636f91248ea6290",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr": "",
+    "load_average": [
+      10.50390625,
+      8.994140625,
+      10.09619140625
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+factory/main.new : () -> Stream(Never, Never, Never)
+factory/main.needs_bias : () -> Stream(Int, Never, Bias)
+src/main.i:9:47: error[E0501]: `Bias` is not a subtype of `Never` (the type at 9:20 needs it)
+1 error

@@ -1,0 +1,6 @@
+{
+  "name": "outer_closure_direct",
+  "code": 1,
+  "time": 0.007964876014739275,
+  "out": "src/main.i:5:22: error[E0105]: a block ends with an expression\n1 error\n"
+}

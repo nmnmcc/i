@@ -1,0 +1,21 @@
+spec/patterns.check : (got: String, want: String) -> Nil
+spec/patterns.show : (x: A) -> String
+spec/patterns.literal : (x: Int | String) -> String
+spec/patterns.float : (x: A) -> String
+spec/patterns.string : (s: A) -> String
+spec/patterns.list : (xs: List(A)) -> String
+spec/patterns.literals : () -> Nil
+spec/patterns.lists : () -> Nil
+spec/patterns.constructors : () -> Nil
+spec/patterns.named_and_tuples : () -> Nil
+spec/patterns.kind : (v: Int | String | List(Int) | (Int, Int) | Nil | Bool | Float) -> String
+spec/patterns.type_tests : () -> Nil
+spec/patterns.choices : (x: Int | Option(Int) | Result(Int, A) | B - Int - Option(Int) - Result(Int, _)) -> String
+spec/patterns.pick : (p: (A, A) | B - (A, A)) -> A | Int
+spec/patterns.positive : (p: (Int, Int) | A - (Int, Int)) -> Int
+spec/patterns.choices_and_guards : () -> Nil
+spec/patterns.guarded : (x: Option(Int)) -> String
+spec/patterns.guards : () -> Nil
+spec/patterns.either : (v: Result(Int, String | Nil)) -> String
+spec/patterns.narrowing : () -> Nil
+spec/patterns.nested_case : () -> Nil

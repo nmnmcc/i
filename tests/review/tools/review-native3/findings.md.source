@@ -1,0 +1,49 @@
+# Independent native revision-3 review
+
+No tracked files edited; no commit. Criteria were recorded in criteria-before-native.md before native.md was read. Design counterexamples in design-cases/ are not claimed to compile: the actual task/request/resource modules are still placeholders.
+
+## Findings
+
+1. BLOCKER: portable Root/Owner enumeration returns worker-local Ticket values.
+Sources: runtime.md 303–308, 331–360, 814–822, 1821–1823; multicore.md H at 108, P5 at 145, §18.1/7; native.md N8/N9.
+The enumeration fixture starts one gated request on A and remotely claims a child capturing only Root. outstanding_root(root) promises that request's Ticket on B. This violates the home invariant and the claim that only the home worker can poll/cancel it. Filtering to B's requests changes the fixture's deterministic 1 to 0; pinning Root/Owner pins every task; copying the request cell crosses stores. Shared counts do not implement List(Ticket). Fix the public group observation API before R2, or specify a general remote-ticket/proxy model and revise its locality rules. A type-checked, cross-worker implementation preserving the fixture's observation and all stated Ticket rules would overturn this finding.
+
+2. MAJOR: resource IO wrapper examples do not own their non-creating raw requests.
+Sources: runtime.md 476–493 versus read/close at 1011–1018, 1050–1058 and wait/close at 1137–1145. Native N9.3 preserves cancellation and lease contracts.
+The request-mode starter returns ownership to its caller; request.await deliberately does not cancel a shared producer when a waiter unwinds. The public wrappers only await. In cancelled-read.i, force read to wait before the race's other branch succeeds. After cancellation, the producer retains its read lease under the shared Owner; the next read gets busy, and discarded reads may still consume input. Root teardown eventually cleans it up but cannot repair scope cancellation semantics. Add an ordinary await_owned helper with ensure/cancel for every owned non-resource-producing request. Keep await_resource for creating calls. A concrete owning final around these shown wrappers would overturn the finding; implicit cancellation by request.await would instead contradict the borrowed-request contract.
+
+3. MAJOR: wake requests defeat the literal deadlock predicate.
+Sources: multicore.md 264–268; native N8's ordinary request-mode wake service; runtime 814–822.
+Browser worker 0 must idle with a wake request even with no user IO. While it does so, the last runnable task on another worker can block on sync(never()). The predicate requiring zero outstanding host requests is then never satisfied. One worker stops with task: deadlock; N can wait forever on control wakes. Separate control-wait accounting from program-progress requests using ordinary Root/Owner ownership, and define the quiescent snapshot accordingly. A specified exclusion plus the trace in wake-deadlock.txt producing the required stop would overturn this finding. A general promise of a later progress proof does not currently supply that exclusion.
+
+4. MAJOR: Event cannot simultaneously be a pure description and a path/run-owned universally portable handle.
+Sources: runtime.md 503–508, public always/never/map/choose types, 752–760; multicore.md 236 and §18.5/11/12.
+Top-level event = task.always(1) has no Scheduler or current run, so ordinary i cannot put the creating task's path/run key into it. A map callback capturing a Boundary must make the Event nonportable under runtime and the general captures rule; §18.12 excludes such contents except local handles. Keep runtime's representation: event construction gets a fresh type-independent key; only leaves referring to task/channel/scope objects carry their run checks; user payload/callback captures determine portability. Update the blanket handle/path clauses. A general, principal, plain-i implementation meeting both versions for events.i would overturn this finding; adding Scheduler to the signatures changes the accepted API.
+
+5. MAJOR: borrowed requests both prevent and cause nested deadlock according to different active rules.
+Sources: runtime.md 359–360, 814–822 versus multicore.md 235 and §18.5.
+borrowed-request.i starts a request in the outer Root and awaits it inside a nested task.run. Runtime explicitly permits this on the same worker and includes the ticket in the nested waitable set. Multicore says no work/no requests of its own means deadlock, and claims outer work cannot wake it. Replace the latter with the runtime union of owned work and explicitly borrowed waiters. The gated nested run completing rather than stopping is the regression. This is a residual contradiction, not a proposal to reopen the accepted borrowed-request rule.
+
+6. MINOR: D10 still numbers only go calls.
+Sources: multicore.md 78 versus its 233/613 and runtime.md 564–567.
+In paths.i, go; nested task.run; go gives child paths [1], [3] under the combined counter but [1], [2] under D10. It also changes the second child's random stream. Update D10 to the accepted combined counter. A single agreed expected path tuple resolves it; no new feature is needed.
+
+## Encapsulation assessment
+
+Type-only raw service exports are ordinary §2.4 exports, required when a public environment mentions that nominal type. Constructor privacy is already implemented. General field privacy is the explicit completion of §2.4's “may not make or take apart” requirement, which §6.7/current inference failed to enforce; not an IO-specific type rule. It also protects validated parser values, persistent-container invariants and credential wrappers. Visibility adds no type choice, so it does not require a new solver rule.
+
+Declaration grants are new host-loader policy, not an existing v3 facility and not new subtyping. They can apply equally to plugin stores, database sessions and credential services; binding is tied to resolved declarations, including external aliases, before import coalescing. The cited HostImports map really lacks this provenance. The explicit before-Fs trust plumbing is necessary.
+
+No raw-number injection is library API discipline, not a new compiler rejection rule. Arbitrary libraries remain free to export unsafe constructors/helpers; these resource modules must not, if they promise this abstraction. No new feature is justified or needed for this restriction.
+
+## Executed evidence
+
+Built a scratch harness against this worktree's ilang-package/check/wasm crates using the prescribed heavy/direnv wrapper. The normal CLI build was unavailable because this worktree has no Binaryen submodule checkout. Used current compiler syntax (import/export keywords); prospective design fixtures use accepted syntax.
+
+Direct Stream(777), an alias used as constructor, Int-to-Stream annotation, private Raw construction/update, and external -> Stream were rejected. The positive wrapper call compiled. Private nominal field access compiled and ran, printing 123: confirms the already-acknowledged privacy prerequisite. An intentionally unsafe control exporting Raw(..) constructed Stream(777) outside its defining module and printed it: demonstrates why the adopted no-injection API restriction matters. This control is not an attack accepted by N9's final exports. Results: probe-results.txt, probe-extra.txt, injection-run.txt. Executed Wasm without Binaryen optimization; no O2 or future IO/MC execution claimed.
+
+## Teardown and verdict
+
+N9.3 answers close versus wait with leases, commit order and cleanup receipts; N9.4 answers undelivered/Ready/Taken replies and late spawn creation; N9.5 answers context-owned disposal independent of i finals; N12 answers spins and two simultaneous runs with separate interruption domains. These are coherent design rules, not validated implementations. Generic requests remain covered by H8–H11 plus the explicit new teardown-owner plumbing; current Requests is owned by Store State. No additional confirmed defect was found in those lifecycle rules.
+
+Keep native packaging, one Store per worker, eager publication, one lock and nominal Int resources. R1 can proceed. Keys/portable/keep_env prototypes can proceed. Do not freeze R2's request/event contracts or claim native requires no later rework until findings 1 and 4 are settled and 5/6 reconciled. Fix 2 before resource IO wrappers land. Fix 3 in the specified MC transaction/quiescence contract before MC implementation. The acknowledged field-privacy and trusted-binding prerequisites must still land before Fs. Do not defer these semantic repairs as mere MC implementation details.

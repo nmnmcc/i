@@ -1,0 +1,4 @@
+spec/a1_declared_variables.id : (A) -> A
+spec/a1_declared_variables.outer : (x: A) -> A ! Assert
+spec/a1_declared_variables.unbox : (b: Box(A)) -> A
+spec/a1_declared_variables.main : () -> Nil ! Assert

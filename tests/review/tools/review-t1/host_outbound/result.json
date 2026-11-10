@@ -1,0 +1,12 @@
+[
+  {
+    "cmd": [
+      "check",
+      "--types"
+    ],
+    "exit": 0,
+    "seconds": 0.13149206107482314,
+    "stdout": "probe/main.log : (\"error\" | \"info\" | \"warn\") -> Nil\nprobe/main.number : (Int - 0) -> Nil\n",
+    "stderr": ""
+  }
+]

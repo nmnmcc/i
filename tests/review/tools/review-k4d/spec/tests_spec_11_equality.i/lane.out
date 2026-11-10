@@ -1,0 +1,11 @@
+spec/equality.check : (got: String, want: String) -> Nil
+spec/equality.yes : (b: Bool) -> Nil
+spec/equality.no : (b: Bool) -> Nil
+spec/equality.top : (x: A) -> A
+spec/equality.alias : (x: A) -> A
+spec/equality.make : () -> (x: A) -> A
+spec/equality.values : () -> Nil
+spec/equality.structures : () -> Nil
+spec/equality.mixed : (x: Int | String | Nil) -> Bool
+spec/equality.different_types : () -> Nil
+spec/equality.functions : () -> Nil

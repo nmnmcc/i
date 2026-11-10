@@ -1708,5 +1708,614 @@
   },
   "crates/ilang-check/tests/value_types.rs:d46aee08cc49f6d1": {
     "not_source": "Diagnostic message substring, not i source"
+  },
+  "tests/review/cases/review-a1/_loose/capture/original/.invalid/src/main.i:ce52e71b11ac93a4": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/capture/original/.invalid/src/types.i:47b7331c670212b3": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/03_mixed_headers/original/.invalid/src/main.i:a9d9b44168dfeedb": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/04_header_order/original/.invalid/src/main.i:bc7528f08f9c0a6a": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0115: the imports come before the exports"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/05_empty_header/original/.invalid/src/main.i:33b9e0bcbbd4fa71": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0115: a file with nothing to import or export leaves the group out"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/09_attr_tuple_same_line/original/.invalid/src/main.i:107c7a7cad072cad": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/11_attributed_header/original/.invalid/src/main.i:b5e2e8844dc75630": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0115: a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have no attribute before them"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/17_old_unbound_fn_group/original/.invalid/src/main.i:c0c365581d9f9e49": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected a pattern, found `{`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/18_old_expected_fn_group/original/.invalid/src/main.i:fc7e2229e11ead73": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected a pattern, found `{`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/20_old_alias_returns_fn/original/.invalid/src/main.i:aa26a225a69b2113": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/21_old_alias_typed_fn/original/.invalid/src/main.i:bd4205ecf70c889e": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/25_old_guard_fn/original/.invalid/src/main.i:964f0e757bb34246": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `->`, found `if`; a tuple type in a clause pattern is put in `{ }`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/29_param_shadow/original/.invalid/src/main.i:6fae0c21e165c75b": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0105: a block ends with an expression"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/33_lower_constructor_pattern/original/.invalid/src/main.i:ddb34885a030720f": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `=`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/48_new_ungrouped_product/original/.invalid/src/main.i:695c23c607efd2ff": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/53_new_tuple_clauses_joined/original/.invalid/src/main.i:5162b76efcb2dfae": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0106: a discard binds nothing, so it may not be used as a value"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/56_old_guard_lines/original/.invalid/src/main.i:9160f49b02878079": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `->`, found a line break before `if`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `->`, found `True`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/61_old_type_alias_join/original/.invalid/src/main.i:c78910db9cef477f": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/62_new_record_reserved/original/.invalid/src/main.i:a7b0fb2e4af41106": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
+      "E0101: expected `->`, found `}`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/once/.invalid/src/types.i:47b7331c670212b3": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/main.i:61350a6d6fb1b94d": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/types.i:47b7331c670212b3": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/main.i:61350a6d6fb1b94d": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/types.i:47b7331c670212b3": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/main.i:61350a6d6fb1b94d": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/types.i:47b7331c670212b3": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-plain/once/.invalid/src/types.i:47b7331c670212b3": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/main.i:61350a6d6fb1b94d": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/types.i:47b7331c670212b3": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/idempotence-from-old/original/.invalid/src/main.i:410a94ef7c0d830b": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/once/.invalid/src/main.i:410a94ef7c0d830b": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/original/.invalid/src/main.i:410a94ef7c0d830b": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/idempotence-plain/original/.invalid/src/main.i:410a94ef7c0d830b": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/17/original/.invalid/src/main.i:0ea583b279d075e4": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected a pattern, found `{`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/18/original/.invalid/src/main.i:d3342c4bf974a7f1": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected a pattern, found `{`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/20/original/.invalid/src/main.i:60ba47edf6175dda": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/21/original/.invalid/src/main.i:6097e81d346de1ab": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/25/original/.invalid/src/main.i:23823fdfc5b3a649": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `->`, found `if`; a tuple type in a clause pattern is put in `{ }`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/56/original/.invalid/src/main.i:7afc9e29afa2369e": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `->`, found a line break before `if`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `->`, found `True`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/61/original/.invalid/src/main.i:576bd12dc0cd6e56": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime-new/03/original/.invalid/src/main.i:12c9c8ce6cbfb2c7": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/capture/.invalid/src/types.i:47b7331c670212b3": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/cases/04_header_order/.invalid/src/main.i:bc7528f08f9c0a6a": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0115: the imports come before the exports"
+    ]
+  },
+  "tests/review/cases/review-a1/cases/05_empty_header/.invalid/src/main.i:33b9e0bcbbd4fa71": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0115: a file with nothing to import or export leaves the group out"
+    ]
+  },
+  "tests/review/cases/review-a1/cases/09_attr_tuple_same_line/.invalid/src/main.i:107c7a7cad072cad": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
+    ]
+  },
+  "tests/review/cases/review-a1/cases/11_attributed_header/.invalid/src/main.i:b5e2e8844dc75630": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0115: a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have no attribute before them"
+    ]
+  },
+  "tests/review/cases/review-a1/cases/18_old_expected_fn_group/.invalid/src/main.i:fc7e2229e11ead73": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected a pattern, found `{`"
+    ]
+  },
+  "tests/review/cases/review-a1/cases/21_old_alias_typed_fn/.invalid/src/main.i:bd4205ecf70c889e": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/cases/29_param_shadow/.invalid/src/main.i:6fae0c21e165c75b": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0105: a block ends with an expression"
+    ]
+  },
+  "tests/review/cases/review-a1/cases/33_lower_constructor_pattern/.invalid/src/main.i:ddb34885a030720f": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `=`"
+    ]
+  },
+  "tests/review/cases/review-a1/cases/48_new_ungrouped_product/.invalid/src/main.i:695c23c607efd2ff": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`"
+    ]
+  },
+  "tests/review/cases/review-a1/cases/53_new_tuple_clauses_joined/.invalid/src/main.i:5162b76efcb2dfae": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0106: a discard binds nothing, so it may not be used as a value"
+    ]
+  },
+  "tests/review/cases/review-a1/cases/62_new_record_reserved/.invalid/src/main.i:a7b0fb2e4af41106": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
+      "E0101: expected `->`, found `}`"
+    ]
+  },
+  "tests/review/cases/review-a1/confirmed/capture-from-old/.invalid/src/types.i:47b7331c670212b3": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/confirmed/capture-keep-layout/.invalid/src/types.i:47b7331c670212b3": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/confirmed/capture-plain/.invalid/src/types.i:47b7331c670212b3": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/runtime/18/.invalid/src/main.i:d3342c4bf974a7f1": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected a pattern, found `{`"
+    ]
+  },
+  "tests/review/cases/review-a1/runtime/21/.invalid/src/main.i:6097e81d346de1ab": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_case_brace/.invalid/src/main.i:dfa83f0c5b10d2f3": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `x`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-k4c/cases/plain_1/.invalid/src/main.i:bd5b9fa7651d1619": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0105: a block ends with an expression"
+    ]
+  },
+  "tests/review/cases/review-k4c/cases/plain_3/.invalid/src/main.i:4bc4c5382ab708da": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0105: a block ends with an expression"
+    ]
+  },
+  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/.invalid/src/main.i:1e3adef4d558270c": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `*`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected `{` or `=`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
+    ]
+  },
+  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_46_85/.invalid/src/main.i:3309fab275f3e94d": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `*`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected `{` or `=`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
+    ]
+  },
+  "tests/review/cases/review-k4s/mut_ord_tmp/.invalid/src/main.i:36b001eec0ad49d6": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected a pattern, found `=`",
+      "E0101: expected a pattern, found `=`"
+    ]
+  },
+  "tests/review/cases/review-k4s/outer_closure_direct/.invalid/src/main.i:78a3e8315e3cc25b": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0105: a block ends with an expression"
+    ]
+  },
+  "tests/review/cases/review-k4s/rand_mut_tmp/.invalid/src/main.i:9a220740438b34de": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `!`"
+    ]
+  },
+  "tests/review/cases/review-native3/alias/.invalid/src/main.i:99202954a39fb9f4": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/direct/.invalid/src/main.i:317c40877294e409": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/external/.invalid/src/main.i:a7678ccd6b3bba52": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/field/.invalid/src/main.i:e6a2b33a8ff88ecd": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/injection_control/.invalid/src/main.i:afd55319505d72c1": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/injection_control/.invalid/src/resource.i:681a205b48798d32": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:ee71313076a655d6": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/positive/.invalid/src/main.i:843c29762d098b1b": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/raw_ctor/.invalid/src/main.i:65364e04cfc80e91": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/update/.invalid/src/main.i:fd1a50946bb7ce16": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-rec/_loose/growth/.invalid/src/main.i:21150877805e373b": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected an expression, found `..`",
+      "E0101: expected `}`, found `:`"
+    ],
+    "track": "T3"
+  },
+  "tests/review/cases/review-rec/_loose/probes/.invalid/src/main.i:aeecbdae1c142356": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `}`, found `:`",
+      "E0101: expected `}`, found `:`",
+      "E0101: expected `}`, found `:`",
+      "E0101: expected `}`, found `:`",
+      "E0101: expected a type, found `..`",
+      "E0101: expected a type, found `..`"
+    ],
+    "track": "T3"
+  },
+  "tests/review/cases/review-rec/_loose/schema-union/.invalid/src/main.i:5988d6050671f785": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `:`",
+      "E0101: expected an expression, found `:`",
+      "E0101: expected `}`, found `:`"
+    ],
+    "track": "T3"
+  },
+  "tests/review/cases/review-runtime/echo-types/.invalid/src/main.i:033c3a6c2411563f": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-std1/stream/.invalid/src/stream.i:2bd0f8ec00250ab9": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-std1/stream-positive/.invalid/src/stream.i:2bd0f8ec00250ab9": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "diagnostics": [
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+    ]
   }
 }

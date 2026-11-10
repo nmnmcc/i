@@ -1,0 +1,3 @@
+test/a1_macro_declaration.i:4:1: error[E0308]: a declaration with no `@external` is kept for macros
+test/a1_macro_declaration.i:4:14: error[E0317]: the type of an external function may not have type variables (§10.1)
+2 errors

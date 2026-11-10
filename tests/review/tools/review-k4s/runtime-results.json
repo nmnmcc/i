@@ -1,0 +1,12 @@
+[
+  {
+    "opt": 0,
+    "code": 0,
+    "out": "pass app/cases.integer\npass app/cases.string\npass app/cases.error\npass app/cases.mutual\npass app/cases.installed_in_closure\n5 passed, 0 failed\n"
+  },
+  {
+    "opt": 2,
+    "code": 0,
+    "out": "pass app/cases.integer\npass app/cases.string\npass app/cases.error\npass app/cases.mutual\npass app/cases.installed_in_closure\n5 passed, 0 failed\n"
+  }
+]

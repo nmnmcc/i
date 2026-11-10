@@ -1,0 +1,34 @@
+[
+  {
+    "cmd": [
+      "check",
+      "--types"
+    ],
+    "exit": 0,
+    "seconds": 0.1689098379574716,
+    "stdout": "probe/main.f : (Int) -> \"yes\" ! Assert\nprobe/main.main : () -> Nil ! Assert\n",
+    "stderr": ""
+  },
+  {
+    "cmd": [
+      "run",
+      "--opt",
+      "0"
+    ],
+    "exit": 0,
+    "seconds": 0.25641410890966654,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cmd": [
+      "run",
+      "--opt",
+      "2"
+    ],
+    "exit": 0,
+    "seconds": 0.3233141291420907,
+    "stdout": "",
+    "stderr": ""
+  }
+]

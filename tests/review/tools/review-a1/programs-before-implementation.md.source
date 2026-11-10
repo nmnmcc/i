@@ -1,0 +1,439 @@
+## 01 headers_tuple (new)
+Expected: ok
+```i
+(i/core)
+(f)
+(a, b) = (20, 22)
+f = () { a + b }
+```
+
+## 02 old_headers (old)
+Expected: ok
+```i
+import (i/core)
+export (f)
+f = () { core.inspect(42) }
+```
+
+## 03 mixed_headers (mixed)
+Expected: ok
+```i
+import (i/core)
+(f)
+f = () { 2 |> { x -> core.inspect(x) } }
+```
+
+## 04 header_order (new)
+Expected: error
+```i
+(f)
+(i/core)
+f = () { 1 }
+```
+
+## 05 empty_header (new)
+Expected: error
+```i
+()
+f = () { 1 }
+```
+
+## 06 old_empty_headers (old)
+Expected: ok
+```i
+import ()
+export ()
+f = () { 1 }
+```
+
+## 07 tuple_first (old)
+Expected: ok
+```i
+(a, b) = (20, 22)
+f = () { a + b }
+```
+
+## 08 attr_tuple_newline (new)
+Expected: ok
+```i
+@deprecated("old")
+(a, b) = (20, 22)
+f = () { a + b }
+```
+
+## 09 attr_tuple_same_line (new)
+Expected: error
+```i
+@main (a, b) = (20, 22)
+```
+
+## 10 macro_attr_tuple (new)
+Expected: macro error
+```i
+@m
+(a, b) = (20, 22)
+```
+
+## 11 attributed_header (new)
+Expected: error
+```i
+@deprecated("old")
+(f)
+f = () { 1 }
+```
+
+## 12 group (old)
+Expected: ok
+```i
+f = () { { 20 + 22 } * 2 }
+```
+
+## 13 first_fn_binding (old)
+Expected: ok
+```i
+f = () { { go = (n) -> Int { n + 1 } go(41) } }
+```
+
+## 14 first_chain_fn (old)
+Expected: ok
+```i
+f = () { { go = alias = (n) -> Int { n + 1 } go(41) } }
+```
+
+## 15 first_typed_fn (old)
+Expected: ok
+```i
+f = () { { go: (Int) -> Int = (n) -> Int { n + 1 } go(41) } }
+```
+
+## 16 body_returns_fn (old)
+Expected: ok
+```i
+make = (n) { (x) -> Int { x + n } }
+f = () { make(40)(2) }
+```
+
+## 17 old_unbound_fn_group (old)
+Expected: E0113 in Both; from-old safe extraction
+```i
+f = () { { (x) -> Int { x + 1 }(41) } }
+```
+
+## 18 old_expected_fn_group (old)
+Expected: E0113; explicit migration refusal
+```i
+f: () -> (Int) -> Int = () { { (x) -> Int { x + 1 } } }
+```
+
+## 19 new_alias_tuple_clause (new)
+Expected: ok
+```i
+f = () { (20, 22) |> { t = (a, b) -> a + b } }
+```
+
+## 20 old_alias_returns_fn (old)
+Expected: ok
+```i
+g = (p: (Int, Int)) { case p { t = (a, b) -> (x) { a + b + x } } }
+f = () { g((20, 21))(1) }
+```
+
+## 21 old_alias_typed_fn (old)
+Expected: safe refusal allowed
+```i
+g = (p: (Int, Int)) { case p { t = (a, b) -> (x) -> Int { a + b + x } } }
+f = () { g((20, 21))(1) }
+```
+
+## 22 new_tuple_returns_fn (new)
+Expected: ok
+```i
+g = (p: (Int, Int)) { p |> { (a, b) -> (x) -> Int { a + b + x } } }
+f = () { g((20, 21))(1) }
+```
+
+## 23 guard_parentheses (new)
+Expected: type error: guard is one-tuple
+```i
+f = (n) { n |> { x ? (True) -> 1 _ -> 2 } }
+```
+
+## 24 guard_fn_grouped (new)
+Expected: ok
+```i
+f = (v: (Int) -> Int) { v |> { g: { (Int) -> Int } ? True -> g(41) _ -> 0 } }
+```
+
+## 25 old_guard_fn (old)
+Expected: ok
+```i
+f = (v: (Int) -> Int) { case v { g: (Int) -> Int if True -> g(41) _ -> 0 } }
+```
+
+## 26 guard_fn_ungrouped (new)
+Expected: error: ? belongs to type
+```i
+f = (v) { v |> { g: (Int) -> Int ? True -> 1 _ -> 0 } }
+```
+
+## 27 param_first (new)
+Expected: ok
+```i
+f = () { { id(A) = (x: A) -> A { x } id(42) } }
+```
+
+## 28 param_later (new)
+Expected: ok
+```i
+f = () { k = 42 id(A): (A) -> A = (x) { x } id(k) }
+```
+
+## 29 param_shadow (new)
+Expected: ok
+```i
+outer(A) = (x: A) { inner(A) = (y: A) { y } (x, inner(42), inner("s")) }
+```
+
+## 30 param_type_collision (new)
+Expected: error
+```i
+f(Int) = (x: Int) { x }
+```
+
+## 31 typevar_call (new)
+Expected: error
+```i
+f(A) = (x: A(Int)) { x }
+```
+
+## 32 call_constructor_boundary (new)
+Expected: ok
+```i
+Token { Stop }
+send = (x) { x }
+f = () { send(Stop) }
+```
+
+## 33 lower_constructor_pattern (new)
+Expected: error: f is not constructor
+```i
+f = (x) { x }
+g = () { f(x) = 1 x }
+```
+
+## 34 single_assert (new)
+Expected: ok, Assert environment
+```i
+f = (n: Int) { n |> { 42 -> 7 } }
+```
+
+## 35 single_typed_annotation (new)
+Expected: type error
+```i
+f = (v: Int | String) { v |> { x: Int -> x } }
+```
+
+## 36 multi_typed_test (new)
+Expected: ok
+```i
+f = (v: Int | String) { v |> { x: Int -> x _ -> 0 } }
+```
+
+## 37 old_single_typed (old)
+Expected: ok
+```i
+f = (v: Int) { case v { x: Int -> x } }
+```
+
+## 38 single_choices_pending (new)
+Expected: E0235 accepted deferral
+```i
+f = (r: Result(Int, Int)) { r |> { Ok(v) | Error(v) -> v } }
+```
+
+## 39 old_choices (old)
+Expected: ok; split preserves result
+```i
+f = (r: Result(Int, Int)) { case r { Ok(v) | Error(v) -> v } }
+```
+
+## 40 guarded_choices (new)
+Expected: ok
+```i
+f = (n: Int) { n |> { 0 | 1 ? True -> 42 _ -> 7 } }
+```
+
+## 41 old_match_times (old)
+Expected: ok
+```i
+f = (n: Int) { case n { 0 -> 1 _ -> 2 } * 10 }
+```
+
+## 42 old_plus_match (old)
+Expected: ok
+```i
+f = (n: Int) { 10 + case n { 0 -> 1 _ -> 2 } }
+```
+
+## 43 old_match_compare_subject (old)
+Expected: ok
+```i
+f = (n: Int) { case n > 0 { True -> 42 False -> 7 } }
+```
+
+## 44 old_match_concat_subject (old)
+Expected: ok
+```i
+f = () { case "a" <> "b" { "ab" -> 42 _ -> 7 } }
+```
+
+## 45 old_match_call (old)
+Expected: ok
+```i
+f = (n: Int) { case n { 0 -> (x) { x + 1 } _ -> (x) { x + 2 } }(40) }
+```
+
+## 46 old_match_tuple_field (old)
+Expected: ok
+```i
+f = (n: Int) { case n { 0 -> (42, 0) _ -> (7, 0) }.0 }
+```
+
+## 47 old_match_named_field (old)
+Expected: ok
+```i
+User { User(name: String) }
+f = (n: Int) { case n { 0 -> User("yes") _ -> User("no") }.name }
+```
+
+## 48 new_ungrouped_product (new)
+Expected: E0111
+```i
+f = (n: Int) { n |> { 0 -> 1 _ -> 2 } * 10 }
+```
+
+## 49 new_grouped_product (new)
+Expected: ok
+```i
+f = (n: Int) { { n |> { 0 -> 1 _ -> 2 } } * 10 }
+```
+
+## 50 new_match_empty_call (new)
+Expected: ok: pipe inserts argument
+```i
+f = (n: Int) { n |> { 0 -> 42 _ -> 7 }() }
+```
+
+## 51 old_negative_clauses (old)
+Expected: ok
+```i
+f = (n: Int) { case n { 0 -> 1
+-1 -> 2
+_ -> 3 } }
+```
+
+## 52 new_tuple_clauses_lines (new)
+Expected: ok
+```i
+f = (p: (Int, Int)) { p |> { (0, y) -> y
+(x, _) -> x } }
+```
+
+## 53 new_tuple_clauses_joined (new)
+Expected: error
+```i
+f = (p: (Int, Int)) { p |> { (0, y) -> y (x, _) -> x } }
+```
+
+## 54 minus_newline (old)
+Expected: ok: -2 is last statement
+```i
+f = () { 40
+-2 }
+```
+
+## 55 minus_continued (old)
+Expected: ok: 38
+```i
+f = () { 40 -
+2 }
+```
+
+## 56 old_guard_lines (old)
+Expected: ok
+```i
+f = (n: Int) { case n { 0
+| 1
+if True
+-> 42
+_ -> 7 } }
+```
+
+## 57 new_guard_lines (new)
+Expected: ok
+```i
+f = (n: Int) { n |> { 0
+| 1
+? True
+-> 42
+_ -> 7 } }
+```
+
+## 58 old_typevars (old)
+Expected: ok
+```i
+id = (x: a) -> a { x }
+f = () { (id(42), id("s")) }
+```
+
+## 59 mixed_capture_inner (mixed)
+Expected: ok; rename a avoids A
+```i
+outer(A) = (x: A) { inner = (y: a, z: A) { (y, z) } inner(42, x) }
+```
+
+## 60 mixed_capture_outer (mixed)
+Expected: ok; rename b avoids B
+```i
+outer = (x: b) { inner(B) = (y: B, z: b) { z } inner(42, x) }
+```
+
+## 61 old_type_alias_join (old)
+Expected: J1; from-old succeeds
+```i
+Id(a) = a (p, q) = (20, 22)
+f = () { p + q }
+```
+
+## 62 new_record_reserved (new)
+Expected: records error
+```i
+f = () { { name: 42 } }
+```
+
+## 63 new_greedy_type (new)
+Expected: error: no backtracking
+```i
+f = (v) { v |> { x: Int | 0 -> 1 _ -> 2 } }
+```
+
+## 64 empty_clauses (new)
+Expected: ok: Never parameter
+```i
+f = {}
+```
+
+## 65 new_expected_subject (new)
+Expected: ok
+```i
+User { User(name: String) }
+f = () { (u) { u.name } |> { g: (User) -> String -> g(User("yes")) } }
+```
+
+## 66 new_subject_scope (new)
+Expected: ok: outer f used in subject
+```i
+f = (x) { x + 1 }
+g = () { (x) { f(x) * 2 } |> { f -> f(1) } }
+```
+

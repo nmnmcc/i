@@ -1,0 +1,23 @@
+import { readFile } from 'node:fs/promises';
+const wasm = await readFile('/tmp/review-js/stop.wasm');
+let instance;
+let stderr = [], exit;
+const imports = { wasi_snapshot_preview1: {
+  fd_write(fd, ptr, count, written) {
+    const view = new DataView(instance.exports.memory.buffer);
+    let remaining = 3, total = 0;
+    for (let k = 0; k < count && remaining; k++) {
+      const p = view.getUint32(ptr + k*8, true);
+      const n = Math.min(view.getUint32(ptr + k*8 + 4, true), remaining);
+      if (fd !== 2) throw new Error('unexpected stdout');
+      stderr.push(...new Uint8Array(instance.exports.memory.buffer, p, n));
+      total += n; remaining -= n;
+    }
+    view.setUint32(written,total,true);
+    return 0;
+  },
+  proc_exit(code) { exit = code; throw new Error('exit'); }
+}};
+({instance} = await WebAssembly.instantiate(wasm,imports));
+try {instance.exports._start();} catch(e) {if(exit===undefined)throw e;}
+console.log(JSON.stringify({exit,stderr:new TextDecoder().decode(Uint8Array.from(stderr))}));

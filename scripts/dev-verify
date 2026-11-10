@@ -32,6 +32,8 @@ i() {
     "$i" test --project bench --opt "$level"
   done
   ./scripts/wasi-smoke "$i"
+  ./scripts/review-corpus run --binary "$i" --jobs 3
+  ./scripts/test-generation --mode short --binary "$i"
 }
 
 js() {

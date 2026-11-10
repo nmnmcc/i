@@ -1,0 +1,2 @@
+spec/short_circuit.check : (got: String, want: String) -> Nil
+spec/short_circuit.and_or : () -> Nil

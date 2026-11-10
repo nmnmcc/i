@@ -1,0 +1,6 @@
+{
+  "name": "ann_arg0",
+  "code": 0,
+  "time": 0.01925918599590659,
+  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.test : (f: () -> Nil ! N) -> Nil ! N | S(N)\n"
+}

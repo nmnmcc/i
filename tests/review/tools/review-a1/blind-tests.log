@@ -1,0 +1,48 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 34.3ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 21.7ms
+   Compiling ilang-cli v0.1.0 (/home/agent/Programming/i/.rd/rev5/crates/ilang-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.44s
+     Running tests/spec.rs (/tmp/review-a1/target/debug/deps/spec-1261b91024f29c0a)
+ok   1.7/a1_line_breaks.i
+ok   1.7/a1_same_line_negative.i
+ok   1.7/a1_same_line_tuple.i
+ok   10/a1_entry_exports.i
+ok   11/a1_identity_recursion_tail.i
+ok   2.2/a1_builtin_attribute_call.i
+ok   2.2/a1_empty_header.i
+ok   2.2/a1_header_order.i
+ok   2.2/a1_headers_tuple.i
+ok   2.2/a1_macro_attribute_line.i
+ok   2.2/a1_macro_attribute_same_line.i
+ok   2.2/a1_macro_declaration.i
+ok   2.2/a1_macro_item.i
+ok   3/a1_macro_type_call.i
+ok   3/a1_variable_arguments.i
+ok   4.3/a1_alias_pattern.i
+ok   4.3/a1_custom_type_head.i
+ok   4.7/a1_declared_variables.i
+ok   4.7/a1_duplicate_variables.i
+ok   4.7/a1_undeclared_variable.i
+ok   4.7/a1_variable_hides_type.i
+ok   6/a1_assert_required.i
+ok   6/a1_brace_decisions.i
+ok   6/a1_empty_inhabited.i
+ok   6/a1_empty_never.i
+ok   6/a1_expected_argument.i
+ok   6/a1_fitting_expected_subject.i
+ok   6/a1_labels_and_catchall.i
+ok   6/a1_no_label.i
+ok   6/a1_opening.i
+ok   6/a1_pipe_groups.i
+ok   6/a1_record_kept.i
+ok   6/a1_unused_clause.i
+ok   6/a1_wrong_pattern.i
+ok   7/a1_coverage_guard.i
+ok   7/a1_no_subject_constructor.i
+ok   7/a1_one_clause_annotation.i
+
+spec: 37 of 37 cases passed at --opt 0 and --opt 2

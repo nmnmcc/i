@@ -1,0 +1,4 @@
+f = (n: Int) { case n { 0 -> (42, 0) _ -> (7, 0) }.0 }
+
+@main
+main = () { assert(f(0) == 42 && f(1) == 7) Nil }

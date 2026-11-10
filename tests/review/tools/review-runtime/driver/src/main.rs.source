@@ -1,0 +1,19 @@
+fn main() {
+    let dir = std::env::args().nth(1).unwrap();
+    let (g, ds) = ilang_package::load(std::path::Path::new(&dir));
+    for d in &ds { eprintln!("{}", g.sources.render(d)); }
+    assert!(!ds.iter().any(|d| d.is_error()));
+    let c = ilang_check::check(&g);
+    for d in &c.diags { eprintln!("{}", g.sources.render(d)); }
+    assert!(!c.diags.iter().any(|d| d.is_error()));
+    let p = c.program.as_ref().unwrap();
+    let t = c.types.as_ref().unwrap();
+    for (i, m) in p.modules.iter().enumerate() {
+        if Some(m.package) == p.root {
+            for line in t.lines(p, ilang_check::hir::ModuleId(i as u32)) { println!("{line}"); }
+        }
+    }
+    let opts = ilang_wasm::Options::default();
+    let wasm = ilang_wasm::compile(&g,p,t,opts).unwrap();
+    std::fs::write(format!("{dir}/out.wasm"),wasm).unwrap();
+}

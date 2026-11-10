@@ -1,0 +1,13 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 19.3ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 12.9ms
+   Compiling ilang-host v0.1.0 (/tmp/review-c/mutation/crates/ilang-host)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.52s
+     Running `target/debug/examples/review`
+missing-continue: Ok(Ok(Nil)); unusable=None
+sync call: Ok(Ok(Nil))
+missing-resume: Ok(Ok(Nil)); unusable=None
+sync call: Ok(Ok(Nil))

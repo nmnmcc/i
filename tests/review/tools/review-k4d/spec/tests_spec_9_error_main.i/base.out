@@ -1,0 +1,2 @@
+spec/error_main.get : (n: Int) -> Int ? HttpError
+spec/error_main.main : () -> Int ? HttpError

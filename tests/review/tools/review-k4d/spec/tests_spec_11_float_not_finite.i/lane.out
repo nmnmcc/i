@@ -1,0 +1,2 @@
+spec/float_not_finite.big : (x: Float) -> Float
+spec/float_not_finite.main : () -> Nil

@@ -1,0 +1,478 @@
+[
+  {
+    "kind": "keys",
+    "n": 250,
+    "binary": "/home/agent/Programming/i/.rd/a/target/t1/continued/i-baseline-94789e6",
+    "times": [
+      0.006622579880058765,
+      0.005912535823881626,
+      0.007267904933542013,
+      0.006115121999755502
+    ],
+    "median": 0.006115121999755502,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "keys",
+    "n": 250,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.009000113001093268,
+      0.008828144054859877,
+      0.008875444065779448,
+      0.008399215061217546
+    ],
+    "median": 0.008828144054859877,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "keys",
+    "n": 500,
+    "binary": "/home/agent/Programming/i/.rd/a/target/t1/continued/i-baseline-94789e6",
+    "times": [
+      0.006321444874629378,
+      0.008054362842813134,
+      0.006488907849416137,
+      0.006312279962003231
+    ],
+    "median": 0.006488907849416137,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "keys",
+    "n": 500,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.00877049588598311,
+      0.008710804861038923,
+      0.00896371784619987,
+      0.008209196850657463
+    ],
+    "median": 0.008710804861038923,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "keys",
+    "n": 1000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/t1/continued/i-baseline-94789e6",
+    "times": [
+      0.009640972130000591,
+      0.006455166963860393,
+      0.006749681895598769,
+      0.00592117989435792
+    ],
+    "median": 0.006455166963860393,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "keys",
+    "n": 1000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.0106270220130682,
+      0.012724944157525897,
+      0.010553630068898201,
+      0.012951045064255595
+    ],
+    "median": 0.012724944157525897,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "keys",
+    "n": 2000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/t1/continued/i-baseline-94789e6",
+    "times": [
+      0.0070942731108516455,
+      0.007814161013811827,
+      0.00898551195859909,
+      0.006955080898478627
+    ],
+    "median": 0.007814161013811827,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "keys",
+    "n": 2000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.01641511986963451,
+      0.014195176074281335,
+      0.023185253143310547,
+      0.013820909895002842
+    ],
+    "median": 0.014195176074281335,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "keys",
+    "n": 5000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/t1/continued/i-baseline-94789e6",
+    "times": [
+      0.008360185893252492,
+      0.010200147982686758,
+      0.00808647321537137,
+      0.009361099917441607
+    ],
+    "median": 0.009361099917441607,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "keys",
+    "n": 5000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.03171377396211028,
+      0.027714167954400182,
+      0.03015485592186451,
+      0.03016163781285286
+    ],
+    "median": 0.03015485592186451,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "keys",
+    "n": 10000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/t1/continued/i-baseline-94789e6",
+    "times": [
+      0.012753305956721306,
+      0.012898005079478025,
+      0.013652445049956441,
+      0.012101610889658332
+    ],
+    "median": 0.012898005079478025,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "keys",
+    "n": 10000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.05742089916020632,
+      0.06011023302562535,
+      0.05475254589691758,
+      0.052548162173479795
+    ],
+    "median": 0.05475254589691758,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "pick",
+    "n": 250,
+    "binary": "/home/agent/Programming/i/.rd/a/target/t1/continued/i-baseline-94789e6",
+    "times": [
+      0.012187229935079813,
+      0.015179562149569392,
+      0.012391417985782027,
+      0.012034249026328325
+    ],
+    "median": 0.012391417985782027,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "pick",
+    "n": 250,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.00874196202494204,
+      0.008531234925612807,
+      0.008421588921919465,
+      0.0074523938819766045
+    ],
+    "median": 0.008421588921919465,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "pick",
+    "n": 500,
+    "binary": "/home/agent/Programming/i/.rd/a/target/t1/continued/i-baseline-94789e6",
+    "times": [
+      0.028644835110753775,
+      0.029767351923510432,
+      0.03123055282048881,
+      0.030510165030136704
+    ],
+    "median": 0.030510165030136704,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "pick",
+    "n": 500,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.011822817847132683,
+      0.012320582056418061,
+      0.011348593048751354,
+      0.011133526917546988
+    ],
+    "median": 0.011348593048751354,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "pick",
+    "n": 1000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/t1/continued/i-baseline-94789e6",
+    "times": [
+      0.10190296894870698,
+      0.10617069085128605,
+      0.10064967605285347,
+      0.10350319906137884
+    ],
+    "median": 0.10350319906137884,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "pick",
+    "n": 1000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.027617823099717498,
+      0.02048912807367742,
+      0.021498264046385884,
+      0.021987201878800988
+    ],
+    "median": 0.021498264046385884,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "pick",
+    "n": 2000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/t1/continued/i-baseline-94789e6",
+    "times": [
+      0.4423995509278029,
+      0.45172340399585664,
+      0.4692219300195575,
+      0.38793336786329746
+    ],
+    "median": 0.45172340399585664,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "pick",
+    "n": 2000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.0458133639767766,
+      0.047294032061472535,
+      0.04762038495391607,
+      0.06117722485214472
+    ],
+    "median": 0.04762038495391607,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "pick",
+    "n": 5000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/t1/continued/i-baseline-94789e6",
+    "times": [
+      3.0829944831784815,
+      2.846158100059256,
+      2.905495126033202,
+      2.8936032617930323
+    ],
+    "median": 2.8936032617930323,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "pick",
+    "n": 5000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.21904318104498088,
+      0.22662776405923069,
+      0.20332025783136487,
+      0.2105257068760693
+    ],
+    "median": 0.2105257068760693,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "alias",
+    "n": 250,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.07540225610136986,
+      0.08183461893349886,
+      0.08481726702302694,
+      0.06495442404411733
+    ],
+    "median": 0.08183461893349886,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "alias",
+    "n": 500,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.12407819600775838,
+      0.12657890701666474,
+      0.12426298600621521,
+      0.13498427090235054
+    ],
+    "median": 0.12657890701666474,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "alias",
+    "n": 1000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.27215019008144736,
+      0.25484431185759604,
+      0.24729737592861056,
+      0.27306400099769235
+    ],
+    "median": 0.25484431185759604,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "alias",
+    "n": 2000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.5778369260951877,
+      0.6278287470340729,
+      0.6036239331588149,
+      0.5666383609641343
+    ],
+    "median": 0.6036239331588149,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "nested",
+    "n": 10,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.01068843505345285,
+      0.010826823068782687,
+      0.014130458002910018,
+      0.011145266005769372
+    ],
+    "median": 0.011145266005769372,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "nested",
+    "n": 20,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.05974844703450799,
+      0.06283032381907105,
+      0.06230033398605883,
+      0.06090039783157408
+    ],
+    "median": 0.06230033398605883,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "nested",
+    "n": 30,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.31668431987054646,
+      0.3194982639979571,
+      0.32820526300929487,
+      0.3159026079811156
+    ],
+    "median": 0.3194982639979571,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "nested",
+    "n": 50,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      2.7457285698037595,
+      2.6421557751018554,
+      2.530851225135848,
+      2.5692856980022043
+    ],
+    "median": 2.5692856980022043,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "calls",
+    "n": 2500,
+    "binary": "/home/agent/Programming/i/.rd/a/target/t1/continued/i-baseline-94789e6",
+    "times": [
+      0.012922432040795684,
+      0.011620211880654097,
+      0.013702309923246503,
+      0.012698393082246184
+    ],
+    "median": 0.012698393082246184,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "calls",
+    "n": 2500,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.025225237011909485,
+      0.02238357113674283,
+      0.024197222897782922,
+      0.027426835149526596
+    ],
+    "median": 0.024197222897782922,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "calls",
+    "n": 5000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/t1/continued/i-baseline-94789e6",
+    "times": [
+      0.019690460991114378,
+      0.01928044017404318,
+      0.019797132117673755,
+      0.018267250154167414
+    ],
+    "median": 0.01928044017404318,
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "kind": "calls",
+    "n": 5000,
+    "binary": "/home/agent/Programming/i/.rd/a/target/release/i",
+    "times": [
+      0.0445086311083287,
+      0.037573189940303564,
+      0.03921661409549415,
+      0.038942479994148016
+    ],
+    "median": 0.038942479994148016,
+    "exit": 0,
+    "stderr": ""
+  }
+]

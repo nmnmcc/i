@@ -1,0 +1,3 @@
+review/main.make : (x: A & B) -> Box(A, B)
+review/main.v : Box(Int, Int)
+review/main.x : Int

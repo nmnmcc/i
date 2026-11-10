@@ -1,0 +1,5 @@
+hello/main.repeat : (text: String, times: Int, sep: String) -> String
+hello/main.greet : (g: Greeting) -> String
+hello/main.main : () -> Nil ! Io
+hello/main_test.repeats : () -> Nil
+hello/main_test.greets_by_label : () -> Nil

@@ -1,0 +1,3 @@
+spec/stop_tail_service.check : (c: Bool) -> Nil ! Assert
+spec/stop_tail_service.apply : (f: (A) -> B ? E ! N, x: A) -> List(B) ? E ! N
+spec/stop_tail_service.main : () -> Nil ! Assert

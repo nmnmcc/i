@@ -1,0 +1,6 @@
+{
+  "name": "hidden_conflict_closure",
+  "code": 1,
+  "time": 0.019070107955485582,
+  "out": "app/main.int : () -> Int ! Cell(Int)\napp/main.text : () -> String ! Cell(String)\napp/main.apply : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.both : (a: () -> A ? E ! N, b: () -> B ? E2 ! N2) -> () -> B ? E | E2 ! N | N2\napp/main.bad : () -> String ! Cell(Int) | Cell(String)\nsrc/main.i:6:7: error[E0515]: `String` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2)\n1 error\n"
+}

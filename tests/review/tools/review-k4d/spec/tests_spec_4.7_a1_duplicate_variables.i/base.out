@@ -1,0 +1,2 @@
+test/a1_duplicate_variables.i:4:9: error[E0226]: the type variable `A` is declared more than once here
+1 error

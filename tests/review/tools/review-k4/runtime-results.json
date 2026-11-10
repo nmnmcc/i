@@ -1,0 +1,98 @@
+[
+  {
+    "case": "finite",
+    "opt": 0,
+    "code": 0,
+    "stdout": "",
+    "stderr": "",
+    "wall": 0.06792484107427299
+  },
+  {
+    "case": "finite",
+    "opt": 2,
+    "code": 0,
+    "stdout": "",
+    "stderr": "",
+    "wall": 0.1568344901315868
+  },
+  {
+    "case": "multi",
+    "opt": 0,
+    "code": 0,
+    "stdout": "",
+    "stderr": "",
+    "wall": 0.06285967398434877
+  },
+  {
+    "case": "multi",
+    "opt": 2,
+    "code": 0,
+    "stdout": "",
+    "stderr": "",
+    "wall": 0.16372717008925974
+  },
+  {
+    "case": "mutual",
+    "opt": 0,
+    "code": 0,
+    "stdout": "",
+    "stderr": "",
+    "wall": 0.06043876614421606
+  },
+  {
+    "case": "mutual",
+    "opt": 2,
+    "code": 0,
+    "stdout": "",
+    "stderr": "",
+    "wall": 0.17819153191521764
+  },
+  {
+    "case": "closure_closed",
+    "opt": 0,
+    "code": 0,
+    "stdout": "",
+    "stderr": "",
+    "wall": 0.06921729305759072
+  },
+  {
+    "case": "closure_closed",
+    "opt": 2,
+    "code": 0,
+    "stdout": "",
+    "stderr": "",
+    "wall": 0.15881123882718384
+  },
+  {
+    "case": "matrix_True_False_True",
+    "opt": 0,
+    "code": 0,
+    "stdout": "",
+    "stderr": "",
+    "wall": 0.0807241159491241
+  },
+  {
+    "case": "matrix_True_False_True",
+    "opt": 2,
+    "code": 0,
+    "stdout": "",
+    "stderr": "",
+    "wall": 0.17137225298210979
+  },
+  {
+    "case": "mutual_True_True_True",
+    "opt": 0,
+    "code": 0,
+    "stdout": "",
+    "stderr": "",
+    "wall": 0.0635906991083175
+  },
+  {
+    "case": "mutual_True_True_True",
+    "opt": 2,
+    "code": 0,
+    "stdout": "",
+    "stderr": "",
+    "wall": 0.17404349311254919
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "artifact_digest": "sha256-03b21ada507e0fb5719922feff3c1d59c77debf4ca457a0750a62e2b381b13fc",
+  "declarations": [
+    {
+      "package": "sha256-91abcd829fcdc1509f8ff6c97e648f4d08483ba8de5c3ccc1c9ece4880470a90",
+      "module": "asyncprobe/main",
+      "module_digest": "sha256-adffbc0add337c166bb04633c0c6a991f80dc6c4204643995c2ae789a8e589bd",
+      "declaration": "Pause.next",
+      "namespace": "review:pause",
+      "name": "next",
+      "kind": "service",
+      "signature": {
+        "params": [],
+        "result": "float",
+        "errors": [],
+        "async": true
+      }
+    }
+  ]
+}

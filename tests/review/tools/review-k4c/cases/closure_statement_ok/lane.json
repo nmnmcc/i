@@ -1,0 +1,6 @@
+{
+  "code": 0,
+  "out": "app/main.get : () -> Int ! Dep\napp/main.use : () -> Int ! N | S(N)\napp/main.run : (f: () -> Int ! N) -> Int ! N\napp/main.main : () -> Nil\n",
+  "err": "",
+  "seconds": 0.01774000795558095
+}

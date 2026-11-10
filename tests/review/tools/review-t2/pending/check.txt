@@ -1,0 +1,2 @@
+src/main.i:2:12: error[E0536]: the type of `x` cannot be read in its own pattern, function header, or binding value, even if an outer name exists
+1 error

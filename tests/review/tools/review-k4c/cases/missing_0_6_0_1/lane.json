@@ -1,0 +1,6 @@
+{
+  "code": 1,
+  "out": "app/main.get : () -> Nil ! Dep\napp/main.run : (body: () -> Nil ? E ! N) -> Nil ? E ! N\napp/main.use : () -> Nil ! N | S(A & N)\napp/main.main : () -> Nil ! N | S(N)\n",
+  "err": "src/main.i:6:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:8:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (\u00a710.2), but it needs `S(a)`, which must be given before it gets to the entry point\nsrc/main.i:8:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (\u00a710.2), but it needs `a`, which must be given before it gets to the entry point\n3 errors\n",
+  "seconds": 0.019946692045778036
+}
