@@ -152,9 +152,9 @@ fn main_module(name: &str) -> String {
         r#"//// The package `{name}`. It imports the standard service `Io` from `i/io`
 //// (§9.7), and `i run` gives it, so the program can print.
 
-import ((Io) = i/io)
+((Io) = i/io)
 
-export (greeting)
+(greeting)
 
 /// The greeting for `who`.
 greeting = (who: String) -> String {{ "Hello, " <> who <> "!" }}
@@ -169,11 +169,11 @@ main = (io ! Io) {{
 
 fn test_module(name: &str) -> String {
     format!(
-        r#"import ({name}/main)
+        r#"({name}/main)
 
 @test
 greets = () {{
-  case main.greeting("i") {{
+  main.greeting("i") |> {{
     "Hello, i!" -> Nil
     other -> panic(other)
   }}
@@ -1488,4 +1488,14 @@ fn relative(from: &Path, to: &Path) -> String {
         return ".".to_string();
     }
     parts.join("/")
+}
+
+#[cfg(test)]
+mod syntax_templates {
+    #[test]
+    fn new_package_sources_parse() {
+        for source in [super::main_module("example"), super::test_module("example")] {
+            assert!(ilang_syntax::parse_module(&source).1.is_empty(), "{source}");
+        }
+    }
 }

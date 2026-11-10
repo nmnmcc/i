@@ -261,7 +261,8 @@ const RESERVED: [&str; 7] = [
 #[test]
 fn reserved_modules_import_cleanly() {
     let imports: String = RESERVED.iter().map(|p| format!("  {p}\n")).collect();
-    let main = format!("import (\n{imports})\n\nx = 1\n");
+    let main = format!("(\n{imports})\n\nx = 1\n");
+    assert!(ilang_syntax::parse_module(&main).1.is_empty());
     let (graph, program, diags) = common::check_files(&[("src/main.i", &main)]);
     let rendered = graph.sources.render_all(&diags);
     assert!(rendered.is_empty(), "{rendered:#?}");
@@ -276,7 +277,8 @@ fn reserved_modules_have_no_names() {
         .iter()
         .map(|p| format!("  (nothing) = {p}\n"))
         .collect();
-    let main = format!("import (\n{imports})\n\nx = 1\n");
+    let main = format!("(\n{imports})\n\nx = 1\n");
+    assert!(ilang_syntax::parse_module(&main).1.is_empty());
     let (graph, _, diags) = common::check_files(&[("src/main.i", &main)]);
     let rendered = graph.sources.render_all(&diags);
     let want: Vec<String> = RESERVED
@@ -291,7 +293,7 @@ fn reserved_modules_have_no_names() {
         .collect();
     assert_eq!(rendered, want);
 
-    let main = "import (\n  i/task\n)\n\nx = task.spawn\n";
+    let main = " (\n  i/task\n)\n\nx = task.spawn\n";
     let (graph, _, diags) = common::check_files(&[("src/main.i", main)]);
     let rendered = graph.sources.render_all(&diags);
     assert_eq!(
@@ -306,13 +308,14 @@ fn reserved_modules_have_no_names() {
 #[test]
 fn unknown_library_path_is_missing() {
     for path in ["i/nope", "i/tasks", "i/std", "i/fs/file"] {
-        let main = format!("import ({path})\n\nx = 1\n");
+        let main = format!("({path})\n\nx = 1\n");
+        assert!(ilang_syntax::parse_module(&main).1.is_empty());
         let (graph, _, diags) = common::check_files(&[("src/main.i", &main)]);
         let rendered = graph.sources.render_all(&diags);
         assert_eq!(
             rendered,
             [format!(
-                "src/main.i:1:9: error[E0210]: there is no module `{path}`"
+                "src/main.i:1:2: error[E0210]: there is no module `{path}`"
             )],
             "{path}"
         );

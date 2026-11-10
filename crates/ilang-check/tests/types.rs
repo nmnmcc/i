@@ -159,14 +159,12 @@ fn library() {
 fn many_uses_of_a_parameter() {
     let n = 200;
     let mut source = String::from(
-        "import (i/control)\n\
-         s = (b, v) { control.suspend(b, (k) { control.resume(k, v) }) }\n\
-         f = (b, x) {\n  a0 = x\n",
+        " (i/control)\ns = (b, v) { control.suspend(b, (k) { control.resume(k, v) }) }\nf = (b, x) {\n  a0 = x\n",
     );
     for i in 1..=n {
         let p = i - 1;
         source.push_str(&format!(
-            "  a{i} = case a{p} % 3 {{ 0 -> s(b, a{p} + 1)  _ -> a{p} + 2 }}\n"
+            "  a{i} = {{ a{p} % 3 }} |> {{ 0 -> s(b, a{p} + 1)  _ -> a{p} + 2 }}\n"
         ));
     }
     source.push_str(&format!("  a{n}\n}}\n"));
@@ -222,23 +220,15 @@ fn scheme_types_know_each_type_by_what_it_is() {
         fs::write(p, text).unwrap();
     };
     write("dep/i.toml", "name = \"dep\"\n");
-    write("dep/src/u.i", "export (T(..))\nT { T(String) }\n");
+    write("dep/src/u.i", " (T(..))\nT { T(String) }\n");
     write(
         "app/i.toml",
         "name = \"app\"\n[dependencies]\ndep = { path = \"../dep\" }\n",
     );
-    write("app/src/geo/u.i", "export (T(..))\nT { T(Int) }\n");
+    write("app/src/geo/u.i", " (T(..))\nT { T(Int) }\n");
     write(
         "app/src/main.i",
-        "import (app/geo/u, d = dep/u)\n\
-         export (f, g, ext)\n\
-         @external(\"env\", \"now\")\n\
-         now: () -> Int\n\
-         @external(\"env\", \"ext\")\n\
-         ext: (n: Int) -> Int\n\
-         f = (x: u.T, y: d.T, z: a) -> a { z }\n\
-         g = (o: Result(u.T, Int)) { o }\n\
-         hidden = (x: u.T) { x }\n",
+        " (app/geo/u, d = dep/u)\n (f, g, ext)\n@external(\"env\", \"now\")\nnow: () -> Int\n@external(\"env\", \"ext\")\next: (n: Int) -> Int\nf(A) = (x: u.T, y: d.T, z: A) -> A { z }\ng = (o: Result(u.T, Int)) { o }\nhidden = (x: u.T) { x }\n",
     );
     let (graph, diags) = ilang_package::load(&tmp.path().join("app"));
     assert!(diags.is_empty(), "{diags:?}");

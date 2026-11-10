@@ -185,22 +185,9 @@ fn file_uri(path: &Path) -> String {
         .to_string()
 }
 
-const MAIN: &str = "import (util = app/util)
+const MAIN: &str = " (util = app/util)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser { User(name: String, age: Int) }\n\ngreet = (u: User) { \"héllo 𝕏 \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n";
 
-/// Adds two numbers.
-add = (x, y) { x + y }
-
-User { User(name: String, age: Int) }
-
-greet = (u: User) { \"héllo 𝕏 \" <> u.name }
-
-main = () { util.double(add(1, 2)) }
-";
-
-const UTIL: &str = "export (double)
-
-double = (n: Int) -> Int { n * 2 }
-";
+const UTIL: &str = " (double)\n\ndouble = (n: Int) -> Int { n * 2 }\n";
 
 #[test]
 fn an_editor_session() {
@@ -355,7 +342,7 @@ fn unsaved_changes_in_another_file() {
     c.open(&main, MAIN);
     assert_eq!(c.diagnostics(&main), vec![]);
     // `double` is no longer exported, in the buffer only.
-    c.open(&util, &UTIL.replace("export (double)", "export ()"));
+    c.open(&util, &UTIL.replace(" (double)", " "));
     let diags = c.diagnostics(&main);
     assert_eq!(
         diags.first().and_then(|d| d.code.clone()),

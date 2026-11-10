@@ -112,7 +112,7 @@ impl Fixture {
     }
 }
 
-const MAIN: &str = r#"import (
+const MAIN: &str = r#" (
   util = app/util
   (User, greet) = app/user
 )
@@ -131,24 +131,24 @@ describe = (u: User) {
 }
 
 first = (o) {
-  case o {
+   o |> {
     Some(v) -> v
     None -> 0
   }
 }
 
-Option(a) { Some(a) None }
+Option(A) { Some(A) None }
 
 total = util.double(add(1, 2))
 "#;
 
-const UTIL: &str = r#"export (double)
+const UTIL: &str = r#" (double)
 
 /// Twice the number.
 double = (n: Int) -> Int { n * 2 }
 "#;
 
-const USER: &str = r#"export (User(..), greet)
+const USER: &str = r#" (User(..), greet)
 
 User { User(name: String, age: Int) }
 
@@ -207,8 +207,8 @@ fn type_of_local_names() {
 #[test]
 fn type_of_other_things() {
     let f = fixture();
-    assert_eq!(f.hover("app/main", "Some(v)", 0), "Some: (a) -> Option(a)");
-    assert_eq!(f.hover("app/main", "None ->", 0), "None: Option(a)");
+    assert_eq!(f.hover("app/main", "Some(v)", 0), "Some: (A) -> Option(A)");
+    assert_eq!(f.hover("app/main", "None ->", 0), "None: Option(A)");
     assert_eq!(f.hover("app/main", "name", 0), "name: String");
     assert_eq!(
         f.hover("app/main", "User)", 0),
@@ -346,7 +346,7 @@ fn completions_of_fields_from_inference() {
         "Point { Point(x: Int, y: Int) }\n\
          origin = Point(0, 0)\n\
          f = () {\n  p = origin\n  p.x + origin.y\n}\n\
-         g = (o) {\n  case o {\n    Point(..) -> o.x\n  }\n}\n",
+         g = (o: Point) {\n  o |> {\n    Point(..) ? True -> o.x\n    _ -> panic(\"unreachable\")\n  }\n}\n",
     )]);
     assert!(!f.checked.diags.iter().any(|d| d.is_error()));
     // A local name whose type is inferred.
