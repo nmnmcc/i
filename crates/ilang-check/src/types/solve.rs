@@ -15,7 +15,7 @@ use crate::hir::{BuiltinType, TypeId, TypeRef};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::collections::HashMap as StdHashMap;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct VarState {
     pub level: u32,
     pub lower: Vec<Ty>,
@@ -52,7 +52,7 @@ pub(crate) enum FailKind {
     Ambiguous,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Failure {
     pub kind: FailKind,
     pub lhs: Ty,
@@ -86,7 +86,11 @@ impl Pol {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Solver {
+    observed_shape: bool,
+    /// Allocation ownership observed during a demanded source group.
+    pub observation: Option<(usize, HashSet<V>, std::cell::RefCell<HashSet<V>>)>,
     pub vars: Vec<VarState>,
     /// Peak concrete bounds of one head, on either side of one variable.
     #[cfg(test)]
@@ -138,6 +142,8 @@ pub(crate) fn join_literals(ms: Vec<Ty>) -> Vec<Ty> {
 impl Solver {
     pub fn new(variance: StdHashMap<TypeId, Vec<Variance>>, type_names: Vec<String>) -> Solver {
         Solver {
+            observed_shape: false,
+            observation: None,
             vars: Vec::new(),
             #[cfg(test)]
             peak_bound_count: 0,
@@ -149,6 +155,45 @@ impl Solver {
             variance,
             failures: Vec::new(),
             type_names,
+        }
+    }
+
+    fn observe(&self, v: V) {
+        if let Some((boundary, fixed, seen)) = &self.observation
+            && (v.0 as usize) < *boundary
+            && !fixed.contains(&v)
+        {
+            seen.borrow_mut().insert(v);
+        }
+    }
+
+    fn observe_type(&self, t: &Ty) {
+        match t {
+            Ty::Var(v) => self.observe(*v),
+            Ty::Con(_, _, ts) | Ty::Union(ts) | Ty::Inter(ts) => {
+                for t in ts {
+                    self.observe_type(t);
+                }
+            }
+            Ty::Fn(f) => {
+                for (_, t) in &f.params {
+                    self.observe_type(t);
+                }
+                for t in [&f.ret, &f.err, &f.env] {
+                    self.observe_type(t);
+                }
+            }
+            Ty::Diff(t, ts) => {
+                self.observe_type(t);
+                for t in ts {
+                    self.observe_type(t);
+                }
+            }
+            Ty::Both(a, b) => {
+                self.observe_type(a);
+                self.observe_type(b);
+            }
+            Ty::Never | Ty::Top => {}
         }
     }
 
@@ -268,6 +313,14 @@ impl Solver {
         self.constrain_in(l, r, false);
     }
 
+    /// Observed skeletons contain derived unions of existing arguments, not
+    /// written choices. Reflexive inclusions need no bound insertion/routing.
+    pub fn constrain_observed(&mut self, l: &Ty, r: &Ty) {
+        self.observed_shape = true;
+        self.constrain(l, r);
+        self.observed_shape = false;
+    }
+
     /// Makes `N` **in** `M` true for two environments (§4.5 rule 4): every
     /// member of `N` is a type variable that is a subtype of `M`, or has a
     /// member of `M` with the same type constructor and equal arguments,
@@ -280,6 +333,16 @@ impl Solver {
     /// through the bounds of variables, but not into type arguments: those
     /// are compared as normal types.
     fn constrain_in(&mut self, l: &Ty, r: &Ty, env: bool) {
+        if self.observed_shape
+            && (matches!(r, Ty::Union(ts) if ts.contains(l))
+                || matches!(l,Ty::Inter(ts) if ts.contains(r)))
+        {
+            return;
+        }
+        if l != r {
+            self.observe_type(l);
+            self.observe_type(r);
+        }
         if l == r || matches!(l, Ty::Never) || matches!(r, Ty::Top) {
             return;
         }
@@ -447,6 +510,7 @@ impl Solver {
     /// calls, would make a number of constraints that grows with the
     /// square of their number.
     fn add_bound(&mut self, v: V, t: Ty, lower: bool, env: bool) -> bool {
+        self.observe(v);
         // Only argumentless Con bounds can fuse without touching variables,
         // variance, or service argument comparisons.
         let fusion = if let Ty::Con(h, values, args) = &t {
@@ -562,6 +626,7 @@ impl Solver {
                 continue;
             }
             seen.push(x);
+            self.observe(x);
             let st = self.var(x);
             let (bounds, back) = if lower {
                 (&st.lower, &st.from)
@@ -747,6 +812,7 @@ impl Solver {
     /// Copies the variables of `t` that are deeper than `level` to that
     /// level, with bounds that link them to the originals (Simple-sub).
     fn extrude(&mut self, t: &Ty, pol: Pol, level: u32, cache: &mut HashMap<(V, Pol), V>) -> Ty {
+        self.observe_type(t);
         if self.level_of(t) <= level {
             return t.clone();
         }

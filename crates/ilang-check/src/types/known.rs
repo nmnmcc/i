@@ -162,17 +162,26 @@ impl Checker<'_> {
     }
 
     fn kconv_in(&self, t: &Type, local: &HashMap<TyVarId, Ty>, depth: u32) -> Ty {
-        if depth > 64 {
+        if depth as usize > self.p.types.len() + 1 {
             return Ty::Top;
         }
         let go = |x: &Type| self.kconv_in(x, local, depth);
         match &t.kind {
             TypeKind::Lit(v) => Ty::literal(v),
             TypeKind::Named { ty, args } => {
+                if let TypeRef::Custom(id) = ty
+                    && let Some(None) = self.reads.aliases.get(id)
+                {
+                    return Ty::Top;
+                }
+
                 let args: Vec<Ty> = args.iter().map(go).collect();
                 if let TypeRef::Custom(id) = ty
                     && let TypeBody::Alias(body) = &self.p.ty(*id).body
                 {
+                    if let Some(ty) = self.known_alias(*id, args.clone()) {
+                        return ty;
+                    }
                     let map = self
                         .p
                         .ty(*id)
@@ -193,6 +202,7 @@ impl Checker<'_> {
                 .or_else(|| self.tyvars.get(tv))
                 .cloned()
                 .unwrap_or(Ty::Top),
+            TypeKind::Of { value, site, .. } => self.read_shape(*value, *site),
             TypeKind::Hole | TypeKind::Error => Ty::Top,
             TypeKind::Tuple(ts) => Ty::tuple(ts.iter().map(go).collect()),
             TypeKind::Fn {

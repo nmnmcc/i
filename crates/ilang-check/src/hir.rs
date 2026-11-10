@@ -54,6 +54,17 @@ pub struct BindingRef {
 
 #[derive(Clone, Debug, Default)]
 pub struct Program {
+    /// Reads in invalid dependency components, before query recovery.
+    pub failed_reads: std::collections::HashSet<OfId>,
+    /// Expression SCC members invalidated by a type-dependency cycle.
+    pub failed_type_groups: std::collections::HashSet<BindingRef>,
+    /// Written value reads and structural extraction items (§4.3, §4.7).
+    pub of_sites: Vec<OfSite>,
+    pub alias_patterns: Vec<AliasPattern>,
+    /// Direct alias dependencies and their reverse closure, computed once.
+    pub alias_dependencies: Vec<Vec<TypeId>>,
+    pub alias_sources: Vec<Vec<OfId>>,
+    pub value_aliases: Option<std::collections::HashSet<TypeId>>,
     pub modules: Vec<Module>,
     pub types: Vec<TypeDef>,
     /// The module of the built-in names (§12), in the package `i`.
@@ -287,6 +298,11 @@ pub struct Type {
 #[derive(Clone, Debug)]
 pub enum TypeKind {
     Lit(crate::types::LitValue),
+    Of {
+        value: ValueRef,
+        site: OfId,
+        projection: Option<ProjectionId>,
+    },
     /// A named type with the right number of arguments. An alias is kept as
     /// itself; it is not expanded.
     Named {
@@ -551,4 +567,302 @@ pub struct Order {
     pub groups: Vec<Vec<BindingRef>>,
     /// The order in which top-level values are worked out (§2.5).
     pub init: Vec<BindingRef>,
+}
+
+/// One written read, retained for readiness and diagnostics, never a solver head.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct OfId(pub u32);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ProjectionId(pub u32);
+#[derive(Clone, Debug)]
+pub struct OfSite {
+    pub module: ModuleId,
+    pub span: Span,
+    pub value: ValueRef,
+    pub projection: Option<ProjectionId>,
+    pub permanent: bool,
+}
+#[derive(Clone, Debug)]
+pub struct AliasPattern {
+    pub heads: Vec<(Span, TypeRef)>,
+    pub head_span: Span,
+    pub module: ModuleId,
+    pub span: Span,
+    pub source: Type,
+    pub pattern: TypePattern,
+    pub binders: Vec<TypeId>,
+}
+#[derive(Clone, Debug)]
+pub enum TypePattern {
+    Bind(TypeId),
+    Skip,
+    Named(TypeRef, Vec<TypePattern>),
+    Tuple(Vec<TypePattern>),
+    Exact(Type),
+    Error,
+}
+
+/// Visits every type node, preserving value-reference provenance.
+pub fn walk_type(t: &Type, f: &mut impl FnMut(&Type)) {
+    f(t);
+    match &t.kind {
+        TypeKind::Named { args, .. }
+        | TypeKind::Tuple(args)
+        | TypeKind::Union(args)
+        | TypeKind::Inter(args)
+        | TypeKind::Diff(args) => {
+            for t in args {
+                walk_type(t, f);
+            }
+        }
+        TypeKind::Fn {
+            params,
+            ret,
+            err,
+            env,
+        } => {
+            for p in params {
+                walk_type(&p.ty, f);
+            }
+            walk_type(ret, f);
+            for t in err.iter().chain(env) {
+                walk_type(t, f);
+            }
+        }
+        TypeKind::Lit(_)
+        | TypeKind::Of { .. }
+        | TypeKind::Var(_)
+        | TypeKind::Hole
+        | TypeKind::Error => {}
+    }
+}
+
+/// Whether a type transitively depends on a value. This survives completion.
+pub fn value_dependent(p: &Program, t: &Type) -> bool {
+    if p.of_sites.is_empty() {
+        return false;
+    }
+    if let Some(aliases) = &p.value_aliases {
+        let mut found = false;
+        walk_type(t, &mut |t| match &t.kind {
+            TypeKind::Of { .. } => found = true,
+            TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                ..
+            } => found |= aliases.contains(id),
+            _ => {}
+        });
+        return found;
+    }
+    fn go(p: &Program, t: &Type, seen: &mut std::collections::HashSet<TypeId>) -> bool {
+        let mut found = false;
+        walk_type(t, &mut |t| match &t.kind {
+            TypeKind::Of { .. } => found = true,
+            TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                ..
+            } if seen.insert(*id) => {
+                if let TypeBody::Alias(body) = &p.ty(*id).body {
+                    found |= go(p, body, seen);
+                }
+            }
+            _ => {}
+        });
+        found
+    }
+    go(p, t, &mut std::collections::HashSet::new())
+}
+
+/// Summaries use only direct written edges; propagating provenance visits
+/// each alias and edge once plus the materialized source sets (O1).
+pub fn summarize_aliases(p: &mut Program) {
+    let mut dependents = vec![Vec::new(); p.types.len()];
+    let mut dependencies = vec![Vec::new(); p.types.len()];
+    let mut affected = std::collections::HashSet::new();
+    let mut queue = std::collections::VecDeque::new();
+    for (i, d) in p.types.iter().enumerate() {
+        let TypeBody::Alias(body) = &d.body else {
+            continue;
+        };
+        walk_type(body, &mut |t| match &t.kind {
+            TypeKind::Of { .. } => {
+                if affected.insert(TypeId(i as u32)) {
+                    queue.push_back(TypeId(i as u32));
+                }
+            }
+            TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                ..
+            } if matches!(p.ty(*id).body, TypeBody::Alias(_)) => {
+                dependencies[i].push(*id);
+            }
+            _ => {}
+        });
+        dependencies[i].sort();
+        dependencies[i].dedup();
+        for id in &dependencies[i] {
+            dependents[id.0 as usize].push(TypeId(i as u32));
+        }
+    }
+    while let Some(id) = queue.pop_front() {
+        for next in &dependents[id.0 as usize] {
+            if affected.insert(*next) {
+                queue.push_back(*next);
+            }
+        }
+    }
+    let mut sources = vec![Vec::new(); p.types.len()];
+    let mut remaining = dependencies.iter().map(Vec::len).collect::<Vec<_>>();
+    let mut ready = std::collections::VecDeque::new();
+    for (i, d) in p.types.iter().enumerate() {
+        if let TypeBody::Alias(t) = &d.body {
+            walk_type(t, &mut |t| {
+                if let TypeKind::Of { site, .. } = t.kind {
+                    sources[i].push(site);
+                }
+            });
+            if remaining[i] == 0 {
+                ready.push_back(i);
+            }
+        }
+    }
+    while let Some(i) = ready.pop_front() {
+        for dep in &dependencies[i] {
+            let extra = sources[dep.0 as usize].clone();
+            sources[i].extend(extra);
+        }
+        sources[i].sort_by_key(|site| site.0);
+        sources[i].dedup();
+        for next in &dependents[i] {
+            let k = next.0 as usize;
+            remaining[k] -= 1;
+            if remaining[k] == 0 {
+                ready.push_back(k);
+            }
+        }
+    }
+    p.alias_sources = sources;
+    p.alias_dependencies = dependencies;
+    p.value_aliases = Some(affected);
+}
+
+/// All written types in a binding, including nested bodies and patterns.
+/// Runtime-use analysis deliberately does not call this visitor.
+pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
+    fn pattern(p: &Pattern, f: &mut impl FnMut(&Type)) {
+        match &p.kind {
+            PatternKind::Typed { ty, .. } => f(ty),
+            PatternKind::Named { pattern: p, .. } => pattern(p, f),
+            PatternKind::Constructor { args, .. }
+            | PatternKind::Tuple(args)
+            | PatternKind::Error(args) => {
+                for p in args {
+                    pattern(p, f);
+                }
+            }
+            PatternKind::List { items, .. } => {
+                for p in items {
+                    pattern(p, f);
+                }
+            }
+            PatternKind::BitArray(segs) => {
+                for seg in segs {
+                    pattern(&seg.value, f);
+                    if let Some(arg) = seg.format.as_ref().and_then(|s| s.arg.as_deref()) {
+                        expr(arg, f);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    fn block(b: &Block, f: &mut impl FnMut(&Type)) {
+        for s in &b.stmts {
+            match s {
+                Stmt::Bind(b) => binding_types(b, f),
+                Stmt::Env { ty, value, .. } => {
+                    f(ty);
+                    expr(value, f);
+                }
+                Stmt::Expr(e) => expr(e, f),
+            }
+        }
+    }
+    fn expr(e: &Expr, f: &mut impl FnMut(&Type)) {
+        match &e.kind {
+            ExprKind::Fn(fun) => {
+                for p in &fun.params {
+                    match p {
+                        Param::Pattern { pattern: p, .. } => pattern(p, f),
+                        Param::Env { ty, .. } => f(ty),
+                    }
+                }
+                if let Some(ret) = &fun.ret {
+                    for t in [Some(&ret.value), ret.err.as_ref(), ret.env.as_ref()]
+                        .into_iter()
+                        .flatten()
+                    {
+                        f(t);
+                    }
+                }
+                block(&fun.body, f);
+            }
+            ExprKind::Block(b) => block(b, f),
+            ExprKind::Case { subject, clauses } => {
+                expr(subject, f);
+                for c in clauses {
+                    for p in &c.patterns {
+                        pattern(p, f);
+                    }
+                    if let Some(g) = &c.guard {
+                        expr(g, f);
+                    }
+                    expr(&c.body, f);
+                }
+            }
+            ExprKind::Tuple(ts) => {
+                for e in ts {
+                    expr(e, f);
+                }
+            }
+            ExprKind::List { items, rest } => {
+                for e in items.iter().chain(rest.as_deref()) {
+                    expr(e, f);
+                }
+            }
+            ExprKind::Call { callee, args } => {
+                expr(callee, f);
+                for a in args {
+                    expr(&a.value, f);
+                }
+            }
+            ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => expr(target, f),
+            ExprKind::RecordUpdate { base, fields, .. } => {
+                expr(base, f);
+                for (_, e) in fields {
+                    expr(e, f);
+                }
+            }
+            ExprKind::Unary { expr: e, .. } => expr(e, f),
+            ExprKind::Binary { lhs, rhs, .. } => {
+                expr(lhs, f);
+                expr(rhs, f);
+            }
+            ExprKind::BitArray(segs) => {
+                for seg in segs {
+                    expr(&seg.value, f);
+                    if let Some(arg) = seg.format.as_ref().and_then(|s| s.arg.as_deref()) {
+                        expr(arg, f);
+                    }
+                }
+            }
+            ExprKind::Int(_)
+            | ExprKind::Float(_)
+            | ExprKind::String(_)
+            | ExprKind::Name(_)
+            | ExprKind::Error => {}
+        }
+    }
+    pattern(&b.pattern, f);
+    expr(&b.value, f);
 }

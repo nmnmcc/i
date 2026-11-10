@@ -703,3 +703,41 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
     assert_eq!(hover("r = "), "r: B");
     c.shutdown();
 }
+
+#[test]
+fn t2_nested_pattern_heads_support_hover_and_definition_in_recovery() {
+    // X4: every pattern head targets its existing type, at every depth.
+    let source = include_str!("../../ilang-check/tests/value_type_review/nested/src/main.i")
+        .replace("x: Item = 2", "x: Item = 1");
+    let source = source.as_str();
+    let dir = tempfile::tempdir().unwrap();
+    package(dir.path(), &[("src/main.i", source)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut c = Client::start();
+    c.open(&main, source);
+    assert!(c.diagnostics(&main).is_empty());
+    let broken = source.replace("= v\n", "= missing\n");
+    for (i, text) in [source, &broken].into_iter().enumerate() {
+        if i != 0 {
+            c.change(&main, 2, text);
+            assert!(!c.diagnostics(&main).is_empty());
+        }
+        let (line, col) = find(text, "Box(Item)", 0);
+        let hover = c.request::<lsp::request::HoverRequest>(position_params(&main, line, col));
+        assert!(
+            hover["contents"]["value"]
+                .as_str()
+                .unwrap()
+                .contains("Box(A)")
+        );
+        let definition =
+            c.request::<lsp::request::GotoDefinition>(position_params(&main, line, col));
+        let (line, col) = find(text, "Box(A)", 0);
+        assert_eq!(definition["uri"], main);
+        assert_eq!(
+            definition["range"]["start"],
+            json!({"line":line,"character":col})
+        );
+    }
+    c.shutdown();
+}

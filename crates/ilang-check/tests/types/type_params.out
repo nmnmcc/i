@@ -5,4 +5,4 @@
 3:7: error[E0231]: a type variable may not have the name of a type
 4:15: error[E0230]: a type variable takes no arguments
 5:15: error[E0202]: the type `Missing` is not defined; to use a type variable, declare it after the name of the binding, as in `f(A) = …`
-6:22: error[E0237]: a lowercase name in a type is kept for the type of a value; declare a type variable as an UpName, as in `f(A) = …`
+6:22: error[E0201]: `b` is not defined

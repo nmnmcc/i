@@ -45,13 +45,19 @@ pub mod code {
     pub const TYPE_PARAM_TWICE: &str = "E0226";
     pub const EXPORT_HIDDEN_TYPE: &str = "E0227";
     pub const ENV_PARAMS_SAME: &str = "E0228";
-    pub const TYPE_OF_VALUE_RESERVED: &str = "E0229";
     pub const TYPE_VAR_ARGS: &str = "E0230";
     pub const TYPE_VAR_IS_TYPE: &str = "E0231";
     pub const TYPE_PARAM_FORM: &str = "E0232";
-    pub const ALIAS_PATTERN_RESERVED: &str = "E0233";
     pub const MACRO_RESERVED: &str = "E0234";
-    pub const LOWERCASE_TYPE_RESERVED: &str = "E0237";
+    // E0229, E0233 and E0237 were temporary value-type reservations.
+    pub const VALUE_TYPE_CIRCLE: &str = "E0530";
+    pub const VALUE_TYPE_PLACE: &str = "E0531";
+    pub const TYPE_PATTERN_FORM: &str = "E0532";
+    pub const VALUE_TYPE_OPEN: &str = "E0533";
+    pub const VALUE_TYPE_NOT_FIXED: &str = "E0534";
+    pub const TYPE_PATTERN_MISMATCH: &str = "E0535";
+    pub const VALUE_TYPE_OWN_SCOPE: &str = "E0536";
+    pub const TYPE_PATTERN_BINDER_IS_TYPE: &str = "E0537";
     // Attributes and entry points.
     pub const UNKNOWN_ATTRIBUTE: &str = "E0301";
     pub const ATTRIBUTE_ARGS: &str = "E0302";
