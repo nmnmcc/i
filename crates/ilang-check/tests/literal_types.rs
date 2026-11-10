@@ -378,6 +378,109 @@ fn host_directions_expand_aliases_and_same_scalar_unions() {
 }
 
 #[test]
+fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
+    // Spec §10.3: outgoing scalar members allow any value set; incoming
+    // members must have all values. §4.2/§4.4 define set operations.
+    // These four programs are the independent review's reproductions.
+    for source in [
+        "One = {1 | 2} - 2\n@external(\"app\", \"write\")\nwrite: (One) -> Nil\n",
+        "One = Int & 1\n@external(\"app\", \"write\")\nwrite: (One) -> Nil\n",
+        "Whole = {Int - 0} | 0\n@external(\"app\", \"read\")\nread: () -> Whole\n",
+        "@host(\"app\")\nSvc { Svc(get: () -> String ? String | \"error\") }\n",
+    ] {
+        let (ds, _) = check(source);
+        assert!(ds.is_empty(), "{source}: {ds:?}");
+    }
+    // Include nested aliases, cross-head subtraction, and members that
+    // disappear before the ABI check. No special written form is privileged.
+    for ty in [
+        "{1 | 2} - 2",
+        "Int & 1",
+        "Int - {Int - 1}",
+        "{Int | String} & 1",
+        "{1 | String} - String",
+        "{\"a\" | \"b\"} - \"b\"",
+        "String & \"a\"",
+    ] {
+        let (ds, _) = check(&format!(
+            "Part = {ty}\nAlias = Part\n@external(\"app\", \"write\")\nwrite: (Alias) -> Nil\n"
+        ));
+        assert!(ds.is_empty(), "{ty}: {ds:?}");
+        let (ds, _) = check(&format!(
+            "Part = {ty}\n@external(\"app\", \"read\")\nread: () -> Part\n"
+        ));
+        assert_eq!(
+            ds.iter().map(|d| d.0.as_str()).collect::<Vec<_>>(),
+            ["E0318"],
+            "{ty}: {ds:?}"
+        );
+        let (ds, _) = check(&format!(
+            "Part = {ty}\n@host(\"app\")\nSvc {{ Svc(get: () -> Part) }}\n"
+        ));
+        assert_eq!(
+            ds.iter().map(|d| d.0.as_str()).collect::<Vec<_>>(),
+            ["E0320"],
+            "{ty}: {ds:?}"
+        );
+    }
+    for ty in [
+        "Int & {Int | List(Int)}",
+        "Int & {Int | (Int, String)}",
+        "Int & {Int | {() -> Nil}}",
+        "{Int - 0} | 0",
+        "Int - {1 - 1}",
+        "{String - \"a\"} | \"a\"",
+        "String | \"error\"",
+    ] {
+        let (ds, _) = check(&format!(
+            "Whole = {ty}\n@external(\"app\", \"read\")\nread: () -> Whole\n@host(\"app\")\nSvc {{ Svc(get: () -> Whole ? Whole | Nil) }}\n"
+        ));
+        assert!(ds.is_empty(), "{ty}: {ds:?}");
+    }
+    for env in ["Never", "Int - Int", "String - String"] {
+        let (ds, _) = check(&format!(
+            "@host(\"app\")\nSvc {{ Svc(get: () -> String ! {env}) }}\n"
+        ));
+        assert!(ds.is_empty(), "{env}: {ds:?}");
+    }
+    for empty in ["1 - 1", "Int & String"] {
+        let (ds, _) = check(&format!(
+            "Empty = {empty}\n@external(\"app\", \"write\")\nwrite: (Empty) -> Nil\n"
+        ));
+        assert_eq!(
+            ds.iter().map(|d| d.0.as_str()).collect::<Vec<_>>(),
+            ["E0318"],
+            "{empty}: {ds:?}"
+        );
+    }
+    // Each scalar head in an incoming error row is checked after merging.
+    for err in [
+        "String | \"error\" | Nil",
+        "{{Int - 0} | 0} | String | \"error\"",
+        "Int - Int",
+    ] {
+        let (ds, _) = check(&format!(
+            "Errors = {err}\n@host(\"app\")\nSvc {{ Svc(get: () -> String ? Errors) }}\n"
+        ));
+        assert!(ds.is_empty(), "{err}: {ds:?}");
+    }
+    for err in [
+        "{Int - 0} | 1",
+        "String | 1",
+        "{String - \"error\"} | \"other\"",
+    ] {
+        let (ds, _) = check(&format!(
+            "@host(\"app\")\nSvc {{ Svc(get: () -> String ? {err}) }}\n"
+        ));
+        assert_eq!(
+            ds.iter().map(|d| d.0.as_str()).collect::<Vec<_>>(),
+            ["E0320"],
+            "{err}: {ds:?}"
+        );
+    }
+}
+
+#[test]
 fn literal_values_use_numeric_and_decoded_scalar_identity() {
     // Decision 12 and §11.4: canonical numbers, decoded strings, no NFC normalization.
     for (ty, accepted, rejected) in [
@@ -466,4 +569,26 @@ fn fitted_choices_keep_the_deferred_binding_error() {
     let (ds, _) = check("s = \"b\"\nf = () -> Int { s |> { \"a\" | \"c\" -> 1 } }\n");
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "E0501");
+}
+
+#[test]
+fn everyday_disjoint_equalities_have_explicit_runtime_repairs() {
+    // Literal-types §8/§6.9: disjoint known scalar values give E0520;
+    // parameters and written whole result types permit runtime comparisons.
+    for source in [
+        "x = 1\nf = () { x == 2 }\n",
+        "status = () { \"ok\" }\nf = () { status() == \"error\" }\n",
+        "(list = std/list)\nf = () { list.map([\"a\"], (x) { x == \"b\" }) }\n",
+    ] {
+        let (ds, _) = check(source);
+        assert_eq!(
+            ds.iter().map(|d| d.0.as_str()).collect::<Vec<_>>(),
+            ["E0520"],
+            "{source}: {ds:?}"
+        );
+    }
+    let (ds, _) = check(
+        "(list = std/list)\nx = 1\nequal = (a, b) { a == b }\nstatus = () -> String { \"ok\" }\nf = () { (equal(x, 2), status() == \"error\", list.map([\"a\"], (x: String) { x == \"b\" })) }\n",
+    );
+    assert!(ds.is_empty(), "{ds:?}");
 }

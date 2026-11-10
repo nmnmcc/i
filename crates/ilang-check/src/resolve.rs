@@ -13,7 +13,7 @@
 use crate::Parsed;
 use crate::code;
 use crate::hir::*;
-use crate::types::HostType;
+use crate::types::{Head, HostType, Ty};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast;
 use ilang_syntax::span::Span;
@@ -1535,17 +1535,15 @@ impl<'a> Resolver<'a> {
             if !errors && !self.is_never(err) {
                 return None;
             }
-            let err = self.expand(err);
-            let parts: Vec<Type> = match &err.kind {
-                TypeKind::Union(ms) => ms.clone(),
-                _ => vec![err.clone()],
+            let err = self.boundary_type(err)?;
+            let parts = match err {
+                Ty::Union(ms) => ms,
+                Ty::Never => Vec::new(),
+                t => vec![t],
             };
             for m in parts {
-                if self.is_never(&m) {
-                    continue;
-                }
-                let h = self.host_part(&m, false)?;
-                if matches!(h, HostType::Opaque(_)) || members.contains(&h) {
+                let h = self.host_member(&m, false)?;
+                if matches!(h, HostType::Opaque(_)) {
                     return None;
                 }
                 members.push(h);
@@ -1560,42 +1558,39 @@ impl<'a> Resolver<'a> {
     }
 
     fn is_never(&self, t: &Type) -> bool {
-        matches!(
-            self.expand(t).kind,
-            TypeKind::Named {
-                ty: TypeRef::Builtin(BuiltinType::Never),
-                ..
-            }
-        )
+        self.boundary_type(t) == Some(Ty::Never)
     }
 
     /// The part of B.2 for a type that the host can take (§10.3).
     fn host_part(&self, t: &Type, outgoing: bool) -> Option<HostType> {
-        if let Some((b, all)) = self.scalar_abi(t) {
-            if outgoing || all {
-                return Some(match b {
-                    BuiltinType::Int => HostType::Int,
-                    BuiltinType::String => HostType::String,
-                    _ => unreachable!(),
-                });
-            }
+        if let Some(t) = self.boundary_type(t) {
+            return self.host_member(&t, outgoing);
+        }
+        // Opaque custom types may have parameters; they have no scalar set.
+        if let TypeKind::Named {
+            ty: TypeRef::Custom(id),
+            ..
+        } = self.expand(t).kind
+            && matches!(&self.p.ty(id).body, TypeBody::Custom(cs) if cs.is_empty())
+        {
+            return Some(HostType::Opaque(id));
+        }
+        None
+    }
+
+    fn host_member(&self, t: &Ty, outgoing: bool) -> Option<HostType> {
+        if t.scalar().is_some() && !outgoing && !t.values().is_all() {
             return None;
         }
-        match &self.expand(t).kind {
-            TypeKind::Named {
-                ty: TypeRef::Builtin(b),
-                ..
-            } => match b {
+        match t {
+            Ty::Con(Head::Named(TypeRef::Builtin(b)), _, args) if args.is_empty() => match b {
                 BuiltinType::Int => Some(HostType::Int),
                 BuiltinType::Float => Some(HostType::Float),
                 BuiltinType::String => Some(HostType::String),
                 BuiltinType::BitArray => Some(HostType::BitArray),
                 _ => None,
             },
-            TypeKind::Named {
-                ty: TypeRef::Custom(id),
-                ..
-            } => {
+            Ty::Con(Head::Named(TypeRef::Custom(id)), _, _) => {
                 let def = self.p.ty(*id);
                 let prelude = Some(def.module) == self.p.prelude;
                 match &def.body {
@@ -1666,89 +1661,28 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// Expand scalar unions before deciding their ABI; aliases have no privilege.
-    fn lit_parts(&self, t: &Type) -> Vec<Type> {
-        let t = self.expand(t);
-        match &t.kind {
-            TypeKind::Union(ms) => ms.iter().flat_map(|t| self.lit_parts(t)).collect(),
-            _ => vec![t],
-        }
-    }
-
-    /// The supported scalar boundary forms, and whether their set is whole.
-    fn scalar_abi(&self, t: &Type) -> Option<(BuiltinType, bool)> {
-        use crate::types::LitValue;
-        let t = self.expand(t);
-        match &t.kind {
-            TypeKind::Named {
-                ty: TypeRef::Builtin(b @ (BuiltinType::Int | BuiltinType::String)),
-                args,
-            } if args.is_empty() => Some((*b, true)),
-            TypeKind::Lit(LitValue::Int(_)) => Some((BuiltinType::Int, false)),
-            TypeKind::Lit(LitValue::Str(_)) => Some((BuiltinType::String, false)),
-            TypeKind::Union(_) => {
-                let mut head = None;
-                let mut all = false;
-                for part in self.lit_parts(&t) {
-                    let (b, a) = match &part.kind {
-                        TypeKind::Lit(LitValue::Int(_)) => (BuiltinType::Int, false),
-                        TypeKind::Lit(LitValue::Str(_)) => (BuiltinType::String, false),
-                        TypeKind::Named {
-                            ty: TypeRef::Builtin(b @ (BuiltinType::Int | BuiltinType::String)),
-                            args,
-                        } if args.is_empty() => (*b, true),
-                        _ => return None,
-                    };
-                    if head.is_some_and(|old| old != b) {
-                        return None;
-                    }
-                    head = Some(b);
-                    all |= a;
-                }
-                head.map(|h| (h, all))
-            }
-            TypeKind::Diff(ts) if ts.len() > 1 => {
-                let first = self.expand(&ts[0]);
-                let TypeKind::Named {
-                    ty: TypeRef::Builtin(b @ (BuiltinType::Int | BuiltinType::String)),
-                    args,
-                } = &first.kind
-                else {
-                    return None;
-                };
-                if !args.is_empty() {
-                    return None;
-                }
-                for part in ts[1..].iter().flat_map(|t| self.lit_parts(t)) {
-                    if !matches!(
-                        (&part.kind, b),
-                        (TypeKind::Lit(LitValue::Int(_)), BuiltinType::Int)
-                            | (TypeKind::Lit(LitValue::Str(_)), BuiltinType::String)
-                    ) {
-                        return None;
-                    }
-                }
-                Some((*b, false))
-            }
-            _ => None,
-        }
+    /// Aliases and scalar expressions use inference's finite/cofinite algebra.
+    fn boundary_type(&self, t: &Type) -> Option<Ty> {
+        crate::types::boundary_type(t, &self.p, &|t| self.expand(t))
     }
 
     fn host_input_note(&self, t: &Type) -> String {
-        let Some((b, false)) = self.scalar_abi(t) else {
+        let Some(t) = self.boundary_type(t) else {
             return String::new();
         };
-        let expanded = self.expand(t);
-        let complement = matches!(&expanded.kind, TypeKind::Diff(_));
-        let parts = match &expanded.kind {
-            TypeKind::Diff(ts) => ts[1..].iter().flat_map(|t| self.lit_parts(t)).collect(),
-            _ => self.lit_parts(t),
+        let Some(b) = t.scalar().filter(|_| !t.values().is_all()) else {
+            return String::new();
         };
-        let mut texts: Vec<_> = parts
-            .iter()
-            .filter_map(|t| match &t.kind {
-                TypeKind::Lit(v) => Some(v.text()),
-                _ => None,
+        let complement = !t.values().is_finite();
+        let mut texts: Vec<_> = t
+            .values()
+            .items()
+            .map(|v| {
+                if b == BuiltinType::String {
+                    ast::LitValue::Str(v.to_string()).text()
+                } else {
+                    v.to_string()
+                }
             })
             .collect();
         let count = texts.len();
@@ -1769,32 +1703,17 @@ impl<'a> Resolver<'a> {
 
     /// §10.3: a type that the host can take. Aliases are expanded.
     fn host_type(&self, t: &Type, outgoing: bool) -> bool {
-        if let Some((_, all)) = self.scalar_abi(t) {
-            return outgoing || all;
+        if self.host_part(t, outgoing).is_some() {
+            return true;
         }
         match &self.expand(t).kind {
             TypeKind::Error => true,
             TypeKind::Named {
-                ty: TypeRef::Builtin(b),
-                ..
-            } => matches!(
-                b,
-                BuiltinType::Int | BuiltinType::Float | BuiltinType::String | BuiltinType::BitArray
-            ),
-            TypeKind::Named {
                 ty: TypeRef::Custom(id),
                 ..
             } => {
-                let def = self.p.ty(*id);
-                match &def.body {
-                    // An alias in a circle; the circle has been reported.
-                    TypeBody::Alias(_) => true,
-                    TypeBody::Custom(ctors) => {
-                        ctors.is_empty()
-                            || (Some(def.module) == self.p.prelude
-                                && matches!(def.name.as_str(), "Nil" | "Bool"))
-                    }
-                }
+                // An alias in a circle; the circle has been reported.
+                matches!(self.p.ty(*id).body, TypeBody::Alias(_))
             }
             _ => false,
         }

@@ -919,3 +919,13 @@ No global environment changes remain; build/audit artifacts stay in the
 lane's ignored target directory, and upstream dependency changes stay as
 intended merged changes. Only the documented waits/optional diff analysis
 were interrupted; every required implementation and runtime check finished.
+
+### Independent review: normalized host boundaries
+
+Started from clean 7993590. The review's four failures were reproduced
+with the previous release binary, then fixed using the existing scalar
+set algebra. Exact sources, independent set identities, regression tests,
+source quotes, the written-form audit inventory, and development failures
+are recorded in [review-followup.md](t1/review-followup.md). The obsolete
+syntax-design example is now corrected with the governing design quote.
+Final upstream integration and gate results follow here after the run.

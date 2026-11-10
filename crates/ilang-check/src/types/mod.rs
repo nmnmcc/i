@@ -159,6 +159,98 @@ impl Ty {
     }
 }
 
+/// Normalize a closed written host type with the same algebra as inference.
+/// Structural members may disappear during scalar intersection or difference;
+/// their presence in the source must not decide scalar ABI admissibility.
+pub(crate) fn boundary_type(
+    t: &crate::hir::Type,
+    p: &Program,
+    expand: &impl Fn(&crate::hir::Type) -> crate::hir::Type,
+) -> Option<Ty> {
+    fn convert(
+        s: &mut solve::Solver,
+        t: &crate::hir::Type,
+        p: &Program,
+        expand: &impl Fn(&crate::hir::Type) -> crate::hir::Type,
+    ) -> Option<Ty> {
+        use crate::hir::{BuiltinType, TypeKind};
+        let t = expand(t);
+        Some(match &t.kind {
+            TypeKind::Lit(v) => Ty::literal(v),
+            TypeKind::Named { ty, args } => {
+                if *ty == TypeRef::Builtin(BuiltinType::Never) {
+                    Ty::Never
+                } else {
+                    if matches!(ty, TypeRef::Custom(_)) && !args.is_empty() && s.variance.is_empty()
+                    {
+                        s.variance = infer::variances(p);
+                    }
+                    Ty::named(
+                        *ty,
+                        args.iter()
+                            .map(|t| convert(s, t, p, expand))
+                            .collect::<Option<_>>()?,
+                    )
+                }
+            }
+            TypeKind::Tuple(ts) => Ty::tuple(
+                ts.iter()
+                    .map(|t| convert(s, t, p, expand))
+                    .collect::<Option<_>>()?,
+            ),
+            TypeKind::Fn {
+                params,
+                ret,
+                err,
+                env,
+            } => Ty::Fn(Box::new(FnTy {
+                params: params
+                    .iter()
+                    .map(|part| {
+                        Some((
+                            part.label.as_ref().map(|l| l.name.clone()),
+                            convert(s, &part.ty, p, expand)?,
+                        ))
+                    })
+                    .collect::<Option<_>>()?,
+                ret: convert(s, ret, p, expand)?,
+                err: match err {
+                    Some(t) => convert(s, t, p, expand)?,
+                    None => Ty::Never,
+                },
+                env: match env {
+                    Some(t) => convert(s, t, p, expand)?,
+                    None => Ty::Never,
+                },
+            })),
+            TypeKind::Union(ts) | TypeKind::Inter(ts) => {
+                let ms = ts
+                    .iter()
+                    .map(|t| convert(s, t, p, expand))
+                    .collect::<Option<Vec<_>>>()?;
+                if matches!(t.kind, TypeKind::Union(_)) {
+                    s.union(ms)
+                } else {
+                    s.inter(ms)
+                }
+            }
+            TypeKind::Diff(ts) => {
+                let mut parts = ts.iter();
+                let mut a = convert(s, parts.next()?, p, expand)?;
+                for part in parts {
+                    let h = convert(s, part, p, expand)?;
+                    a = s.diff(a, vec![h]);
+                }
+                a
+            }
+            _ => return None,
+        })
+    }
+    let mut s = solve::Solver::new(HashMap::new(), Vec::new());
+    let t = convert(&mut s, t, p, expand)?;
+    s.failures.is_empty().then_some(t)
+}
+
 #[cfg(test)]
 mod literal_representation_tests {
     use super::{

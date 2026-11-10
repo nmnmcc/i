@@ -2404,7 +2404,7 @@ fn host_builtin(b: BuiltinType) -> bool {
 
 /// §4.5 rules 6 and 7: the variance of every parameter of every custom
 /// type, from the definitions, by a fixpoint over all of them.
-fn variances(p: &Program) -> HashMap<TypeId, Vec<Variance>> {
+pub(super) fn variances(p: &Program) -> HashMap<TypeId, Vec<Variance>> {
     let mut table: HashMap<TypeId, Vec<Variance>> = HashMap::new();
     for (i, t) in p.types.iter().enumerate() {
         table.insert(TypeId(i as u32), vec![Variance::Bi; t.params.len()]);
