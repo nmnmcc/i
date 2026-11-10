@@ -155,3 +155,18 @@ shapes also run through the CLI with all providers removed. Both optimization
 levels must stop with E0522, including the 64-helper chain. These runtime
 boundary checks complement the original principal-scheme and query checks;
 they do not replace them.
+
+The standard-project profile showed allocation and copying costs in repeated
+simplification. Parameter modes and variances now use owned, allocation-free
+iterators for the usual small descriptions. Unusual large descriptions still
+copy their descriptor, allowing constraints to mutate the solver safely.
+Occurrence contexts borrow the immutable type being simplified instead of
+cloning neighboring type trees. Handler input occurrences are collected from
+the original occurrence counts before those counts are changed. These changes
+preserve exactly the same intersection of occurrence contexts and the same
+substitution order; only a selected substitution is cloned. This follows
+4.7's requirement that simplification never change correctness or behavior.
+Callgrind profiles and timing samples are retained separately: instruction
+counts are a substitute profile, not elapsed-time measurements. Valgrind
+reported its brk-segment limitation and completed both profiles successfully;
+it required no environment changes.

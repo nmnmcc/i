@@ -25,6 +25,53 @@ pub(crate) enum Mode {
     Env,
 }
 
+/// Small parameter descriptions are traversed without allocating a vector.
+pub(crate) enum ParamModes<T> {
+    Repeated(std::iter::RepeatN<T>),
+    Inline(std::iter::Take<std::array::IntoIter<T, 4>>),
+    Stored(std::vec::IntoIter<T>),
+}
+impl<T: Copy + Eq> ParamModes<T> {
+    fn repeated(value: T, n: usize) -> Self {
+        Self::Repeated(std::iter::repeat_n(value, n))
+    }
+    fn from_slice(ms: &[T]) -> Self {
+        let Some(&first) = ms.first() else {
+            return Self::Stored(Vec::new().into_iter());
+        };
+        if ms.iter().all(|m| *m == first) {
+            return Self::repeated(first, ms.len());
+        }
+        if ms.len() <= 4 {
+            let mut values = [first; 4];
+            values[..ms.len()].copy_from_slice(ms);
+            Self::Inline(values.into_iter().take(ms.len()))
+        } else {
+            // Constraints may mutate the solver while this iterator lives.
+            let stored = ms.to_vec();
+            Self::Stored(stored.into_iter())
+        }
+    }
+}
+impl<T: Clone> Iterator for ParamModes<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<T> {
+        match self {
+            Self::Repeated(ms) => ms.next(),
+            Self::Inline(ms) => ms.next(),
+            Self::Stored(ms) => ms.next(),
+        }
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            Self::Repeated(ms) => ms.size_hint(),
+            Self::Inline(ms) => ms.size_hint(),
+            Self::Stored(ms) => ms.size_hint(),
+        }
+    }
+}
+impl<T: Clone> ExactSizeIterator for ParamModes<T> {}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct VarState {
     pub level: u32,
@@ -296,15 +343,14 @@ impl Solver {
     }
 
     /// The variances of the parameters of a head (§4.5 rules 6 and 7).
-    pub fn variances(&self, h: Head, n: usize) -> Vec<Variance> {
+    pub fn variances(&self, h: Head, n: usize) -> ParamModes<Variance> {
         match h {
-            Head::Named(TypeRef::Custom(id)) => self
-                .variance
-                .get(&id)
-                .cloned()
-                .unwrap_or_else(|| vec![Variance::Inv; n]),
-            Head::Named(TypeRef::Builtin(b)) => builtin_variance(b),
-            Head::Tuple(_) | Head::Fn => vec![Variance::Co; n],
+            Head::Named(TypeRef::Custom(id)) => self.variance.get(&id).map_or_else(
+                || ParamModes::repeated(Variance::Inv, n),
+                |ms| ParamModes::from_slice(ms),
+            ),
+            Head::Named(TypeRef::Builtin(b)) => ParamModes::from_slice(builtin_variance_values(b)),
+            Head::Tuple(_) | Head::Fn => ParamModes::repeated(Variance::Co, n),
         }
     }
 
@@ -372,23 +418,22 @@ impl Solver {
     }
 
     /// The row parameters of a constructor, determined from its definition.
-    pub fn rows(&self, h: Head, n: usize) -> Vec<Mode> {
+    pub fn rows(&self, h: Head, n: usize) -> ParamModes<Mode> {
         if n == 0 {
-            return Vec::new();
+            return ParamModes::repeated(Mode::Value, 0);
         }
         match h {
-            Head::Named(TypeRef::Custom(id)) => self
-                .row_params
-                .get(&id)
-                .cloned()
-                .unwrap_or_else(|| vec![Mode::Value; n]),
+            Head::Named(TypeRef::Custom(id)) => self.row_params.get(&id).map_or_else(
+                || ParamModes::repeated(Mode::Value, n),
+                |ms| ParamModes::from_slice(ms),
+            ),
             Head::Named(TypeRef::Builtin(BuiltinType::Continuation)) => {
-                vec![Mode::Value, Mode::Value, Mode::Row, Mode::Env]
+                ParamModes::from_slice(&[Mode::Value, Mode::Value, Mode::Row, Mode::Env])
             }
             Head::Named(TypeRef::Builtin(BuiltinType::Boundary)) => {
-                vec![Mode::Value, Mode::Row, Mode::Env]
+                ParamModes::from_slice(&[Mode::Value, Mode::Row, Mode::Env])
             }
-            _ => vec![Mode::Value; n],
+            _ => ParamModes::repeated(Mode::Value, n),
         }
     }
 
@@ -1058,13 +1103,12 @@ impl Solver {
             }
             (Ty::Con(h, _, xs), Ty::Con(_, _, ys)) if xs.len() == ys.len() => {
                 let vs = self.variances(*h, xs.len());
-                for (((x, y), var), row) in xs.iter().zip(ys).zip(&vs).zip(self.rows(*h, xs.len()))
-                {
+                for (((x, y), var), row) in xs.iter().zip(ys).zip(vs).zip(self.rows(*h, xs.len())) {
                     if env != Mode::Value {
                         self.equal(x, y, FailKind::EnvForms);
-                    } else if *var == Variance::Inv {
+                    } else if var == Variance::Inv {
                         self.equal(x, y, FailKind::Invariant);
-                    } else if *var == Variance::Co && lower {
+                    } else if var == Variance::Co && lower {
                         self.join(x, y, level, row);
                     }
                 }
@@ -2234,12 +2278,16 @@ pub(crate) fn flatten_union(ms: &[Ty], out: &mut Vec<Ty>) {
 
 /// §4.5 rule 7.
 pub(crate) fn builtin_variance(b: BuiltinType) -> Vec<Variance> {
+    builtin_variance_values(b).to_vec()
+}
+
+fn builtin_variance_values(b: BuiltinType) -> &'static [Variance] {
     use Variance::*;
     match b {
-        BuiltinType::List => vec![Co],
-        BuiltinType::Boundary => vec![Inv, Inv, Inv],
-        BuiltinType::Continuation => vec![Contra, Co, Co, Co],
-        _ => Vec::new(),
+        BuiltinType::List => &[Co],
+        BuiltinType::Boundary => &[Inv, Inv, Inv],
+        BuiltinType::Continuation => &[Contra, Co, Co, Co],
+        _ => &[],
     }
 }
 

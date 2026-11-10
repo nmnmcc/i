@@ -715,13 +715,14 @@ struct Norm<'s> {
 }
 
 /// The occurrences of a variable: how many on each side, and the members
-/// it always comes with on each side.
+/// it always comes with on each side. The simplification pass only reads
+/// these members; borrowing them avoids copying entire neighboring types.
 #[derive(Default)]
-struct Occ {
+struct Occ<'a> {
     pos: usize,
     neg: usize,
-    pos_with: Option<Vec<Ty>>,
-    neg_with: Option<Vec<Ty>>,
+    pos_with: Option<Vec<&'a Ty>>,
+    neg_with: Option<Vec<&'a Ty>>,
 }
 
 impl Norm<'_> {
@@ -1097,10 +1098,7 @@ impl Norm<'_> {
         // A handler's arguments constrain input variables even when a
         // result annotation hides that relation. Do not turn an otherwise
         // output-only row into an input merely because it excludes itself.
-        let input_only: HashSet<_> = occ
-            .iter()
-            .filter_map(|(v, o)| (o.neg > 0 && o.pos == 0).then_some(*v))
-            .collect();
+        let mut handler_inputs = Vec::new();
         visit(t, &mut |part| {
             if let Ty::Diff(a, hs) = part
                 && self.s.is_row(a)
@@ -1108,14 +1106,17 @@ impl Norm<'_> {
                 for h in hs {
                     visit(h, &mut |x| {
                         if let Ty::Var(v) = x
-                            && input_only.contains(v)
+                            && occ.get(v).is_some_and(|o| o.neg > 0 && o.pos == 0)
                         {
-                            record(&mut occ, &mut order, *v, true, Vec::new());
+                            handler_inputs.push(*v);
                         }
                     });
                 }
             }
         });
+        for v in handler_inputs {
+            record(&mut occ, &mut order, v, true, Vec::new());
+        }
         for v in &order {
             if rigid(self.s, self.keep, *v) {
                 continue;
@@ -1148,15 +1149,15 @@ impl Norm<'_> {
                 continue;
             }
             let (pw, nw) = (
-                o.pos_with.clone().unwrap_or_default(),
-                o.neg_with.clone().unwrap_or_default(),
+                o.pos_with.as_deref().unwrap_or_default(),
+                o.neg_with.as_deref().unwrap_or_default(),
             );
             for w in pw.iter().filter(|w| nw.contains(w)) {
                 match w {
                     Ty::Var(x) if x == v => {}
                     Ty::Var(x) if named && !self.named(*x) => return Some((*x, Ty::Var(*v))),
-                    Ty::Var(_) => return Some((*v, w.clone())),
-                    _ if !mentions(w, *v) => return Some((*v, w.clone())),
+                    Ty::Var(_) => return Some((*v, (**w).clone())),
+                    _ if !mentions(w, *v) => return Some((*v, (**w).clone())),
                     _ => {}
                 }
             }
@@ -1176,7 +1177,14 @@ impl Norm<'_> {
     /// Invariant arguments count on both sides (§4.5 rules 6 and 7), even
     /// when normalization has collapsed their equal `Both` forms. In an
     /// environment, every argument is invariant (§4.5 rule 4).
-    fn walk(&self, t: &Ty, pos: bool, occ: &mut HashMap<V, Occ>, order: &mut Vec<V>, env: bool) {
+    fn walk<'a>(
+        &self,
+        t: &'a Ty,
+        pos: bool,
+        occ: &mut HashMap<V, Occ<'a>>,
+        order: &mut Vec<V>,
+        env: bool,
+    ) {
         // Only a union in an output place and an intersection in an input
         // place say that a variable comes with the other members.
         // This walk only reads the group. Cloning the enclosing tree at
@@ -1189,12 +1197,12 @@ impl Norm<'_> {
         for (i, m) in group.iter().enumerate() {
             match m {
                 Ty::Var(v) => {
-                    let with: Vec<Ty> = if together {
+                    let with: Vec<&Ty> = if together {
                         group
                             .iter()
                             .enumerate()
                             .filter(|(j, _)| *j != i)
-                            .map(|(_, x)| x.clone())
+                            .map(|(_, x)| x)
                             .collect()
                     } else {
                         Vec::new()
@@ -1239,7 +1247,13 @@ impl Norm<'_> {
     }
 }
 
-fn record(occ: &mut HashMap<V, Occ>, order: &mut Vec<V>, v: V, pos: bool, with: Vec<Ty>) {
+fn record<'a>(
+    occ: &mut HashMap<V, Occ<'a>>,
+    order: &mut Vec<V>,
+    v: V,
+    pos: bool,
+    with: Vec<&'a Ty>,
+) {
     let o = occ.entry(v).or_insert_with(|| {
         order.push(v);
         Occ::default()

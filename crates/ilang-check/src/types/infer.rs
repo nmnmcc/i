@@ -1236,7 +1236,6 @@ impl<'a> Checker<'a> {
     pub fn fresh_args(&mut self, t: TypeId) -> Vec<Ty> {
         self.s
             .rows(Head::Named(TypeRef::Custom(t)), self.p.ty(t).params.len())
-            .into_iter()
             .map(|row| {
                 let a = self.s.fresh();
                 if row != Mode::Value {
