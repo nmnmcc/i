@@ -1,8 +1,7 @@
 //! Compiler syntax services carried over the ordinary opaque-reference ABI.
 mod items;
 pub use items::{ItemContext, ItemRequest, flip_output_and_requests, flip_requests};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock, Weak};
+use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result, bail};
 use ilang_syntax::lisp::syntax::{Capture, Node, Position, Substitution, Syntax};
@@ -80,33 +79,7 @@ fn get<T: Send + Sync + 'static>(value: &Value) -> Result<&T> {
 }
 /// Give a syntax value to a macro instance through the opaque-reference ABI.
 pub fn encode(value: Syntax) -> Value {
-    struct Cache {
-        references: HashMap<usize, Weak<dyn std::any::Any + Send + Sync>>,
-        next_cleanup: usize,
-    }
-    static CACHE: OnceLock<Mutex<Cache>> = OnceLock::new();
-    let mut cache = CACHE
-        .get_or_init(|| {
-            Mutex::new(Cache {
-                references: HashMap::new(),
-                next_cleanup: 1024,
-            })
-        })
-        .lock()
-        .expect("syntax reference cache lock poisoned");
-    let key = value.identity_key();
-    if let Some(reference) = cache.references.get(&key).and_then(Weak::upgrade) {
-        return Value::Externref(HostReference(reference));
-    }
-    if cache.references.len() >= cache.next_cleanup {
-        cache
-            .references
-            .retain(|_, reference| reference.strong_count() != 0);
-        cache.next_cleanup = cache.references.len().saturating_mul(2).max(1024);
-    }
-    let reference = HostReference::new(value);
-    cache.references.insert(key, Arc::downgrade(&reference.0));
-    Value::Externref(reference)
+    Value::Externref(HostReference(value.host_identity()))
 }
 /// Read a syntax value returned by a macro instance.
 pub fn decode(value: &Value) -> Result<&Syntax> {
