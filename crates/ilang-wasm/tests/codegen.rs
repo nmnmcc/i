@@ -406,7 +406,16 @@ fn run_opaque_target(bytes: &[u8]) {
         std::fs::write(&host, wat::parse_str(host_wat).unwrap()).unwrap();
         let wasmtime = std::env::var_os("WASMTIME").unwrap_or_else(|| "wasmtime".into());
         let output = std::process::Command::new(wasmtime)
-            .args(["run", "-W", "gc=y,exceptions=y,tail-call=y", "--preload"])
+            .args([
+                "run",
+                "-W",
+                "gc=y",
+                "-W",
+                "exceptions=y",
+                "-W",
+                "tail-call=y",
+                "--preload",
+            ])
             .arg(format!("{}={}", "opaque", host.display()))
             .arg("--preload")
             .arg(format!("{}={}", "ilang:host/v1", host.display()))
