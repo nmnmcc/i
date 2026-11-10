@@ -258,6 +258,8 @@ _entry = ({parameters}) -> syntax.Syntax {{
         source: source_id,
         kind: ilang_package::ModuleKind::Src,
         ast,
+        scoped: None,
+        compiler_generated: true,
     });
     (path, "_entry".into())
 }
