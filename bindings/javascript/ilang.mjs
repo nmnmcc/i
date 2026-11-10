@@ -823,6 +823,14 @@ export async function instantiate(source, options = {}) {
               const entry = { namespace: moduleName, label: name, signature, abort };
               bridge.requests.set(id, entry);
               work.then((outcome) => bridge.settle(id, entry, { outcome }), (failure) => bridge.settle(id, entry, { failure }));
+              // A started request requires its resume even if the module
+              // cancels it or returns status 0 next (B.5).
+              const resume = `ilang_resume:${moduleName}:${name}`;
+              try {
+                validateFunction(module, bridge.instance.exports, resume, [0x7f, ...resultTypes(signature)], [0x7f]);
+              } catch {
+                return importResult(bridge.breakIn(signature, { error: new ModuleFault(`the module does not export ${resume}`) }));
+              }
               return undefined;
             }
             const answer = kind === "service" ? reply(fn, args) : { value: fn(...args) };
@@ -884,12 +892,12 @@ export async function instantiate(source, options = {}) {
           bridge.wake = null;
           next = bridge.settled.shift();
         } else if (status === 2) {
+          exportOrFault("ilang_continue", [], [0x7f], "the module is runnable, but has no ilang_continue");
           // Let timers and IO run once, then give an answer that is done,
           // or go on without one.
           await macrotask();
           next = bridge.settled.shift();
           if (!next) {
-            exportOrFault("ilang_continue", [], [0x7f], "the module is runnable, but has no ilang_continue");
             status = bridge.enterAccepting(() => instance.exports.ilang_continue());
             continue;
           }

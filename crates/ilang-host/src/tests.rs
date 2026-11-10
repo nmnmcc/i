@@ -1683,6 +1683,53 @@ fn requests_from_ilang_continue() {
     }
 }
 
+fn fault_imports(gates: &Gates) -> HostImports {
+    let mut imports = gate_imports(gates);
+    imports
+        .async_service("app:clock/v1", "ready", |_| async { Ok(Ok(Value::Nil)) })
+        .unwrap();
+    imports
+}
+
+/// B.5 requires exports when a request starts or status 2 is returned,
+/// even when an answer is ready, the entry ends, or the request is cancelled.
+#[test]
+fn required_exports_are_checked_before_delivery_or_drop() {
+    for (bytes, bad_resume) in [(NO_CONTINUE, "no_resume"), (WRONG_TYPES, "bad_resume")] {
+        let program = Program::from_bytes(bytes).unwrap();
+        for suffix in [
+            "runnable_ready".to_owned(),
+            format!("{bad_resume}_done"),
+            format!("{bad_resume}_cancel"),
+        ] {
+            let gates = gates(1);
+            let mut instance = program
+                .instantiate(HostOptions::new(fault_imports(&gates)))
+                .unwrap();
+            let text = error_text(block_on(
+                instance.call_async(&format!("app/async.{suffix}"), &[]),
+            ));
+            let expected = if suffix == "runnable_ready" {
+                "the module is runnable, but has no ilang_continue"
+            } else {
+                "the module does not export ilang_resume:app:clock/v1:later"
+            };
+            assert_eq!(text, expected, "{suffix}");
+            assert_eq!(instance.unusable(), Some(expected), "{suffix}");
+            assert!(instance.call("app/sync.nil", &[]).is_err(), "{suffix}");
+            // Neither an answer, a result export, nor the refused sync call ran.
+            assert_eq!(raw(&mut instance, "calls"), 0, "{suffix}");
+            assert!(instance.store.data().requests.is_empty());
+            if suffix != "runnable_ready" {
+                let state = gates.lock().unwrap();
+                assert_eq!(state.starts, 1);
+                assert_eq!(state.drops, 1);
+                assert!(state.completed.is_empty());
+            }
+        }
+    }
+}
+
 #[test]
 fn bad_statuses_are_faults() {
     let gates = gates(1);
@@ -1696,7 +1743,7 @@ fn bad_statuses_are_faults() {
 
     let no_continue = Program::from_bytes(NO_CONTINUE).unwrap();
     let mut instance = no_continue
-        .instantiate(HostOptions::new(gate_imports(&gates)))
+        .instantiate(HostOptions::new(fault_imports(&gates)))
         .unwrap();
     let text = error_text(block_on(instance.call_async("app/async.runnable", &[])));
     assert_eq!(text, "the module is runnable, but has no ilang_continue");
@@ -1704,7 +1751,7 @@ fn bad_statuses_are_faults() {
 
     let gates = self::gates(1);
     let mut instance = no_continue
-        .instantiate(HostOptions::new(gate_imports(&gates)))
+        .instantiate(HostOptions::new(fault_imports(&gates)))
         .unwrap();
     let text = error_text(block_on(instance.call_async("app/async.no_resume", &[])));
     assert_eq!(
@@ -1755,7 +1802,7 @@ fn exports_of_the_wrong_type_are_faults() {
     ] {
         let gates = gates(1);
         let mut instance = wrong
-            .instantiate(HostOptions::new(gate_imports(&gates)))
+            .instantiate(HostOptions::new(fault_imports(&gates)))
             .unwrap();
         let error = error_text(block_on(instance.call_async(name, &[])));
         assert_eq!(error, text, "{name}");

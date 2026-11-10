@@ -1135,9 +1135,8 @@ impl Instance {
     }
 
     async fn wait_inner(&mut self, name: &str, mut status: [Val; 1]) -> Result<Option<Stop>> {
-        // The exports that the loop calls, found and checked once per wait:
-        // `ilang_continue`, and the resume of each import by namespace and
-        // label.
+        // Resumes were checked during their imports (B.5). Cache the
+        // functions used here, and check ilang_continue on the first status 2.
         let mut resume_continue: Option<Func> = None;
         let mut resumes: HashMap<String, HashMap<String, Func>> = HashMap::new();
         loop {
@@ -1152,21 +1151,21 @@ impl Instance {
                     }
                 },
                 Some(2) => {
+                    let resume = match resume_continue {
+                        Some(resume) => resume,
+                        None => *resume_continue.insert(self.export_or_fault(
+                            "ilang_continue",
+                            &[],
+                            &[ValType::I32],
+                            || "the module is runnable, but has no ilang_continue".into(),
+                        )?),
+                    };
                     // Let the timers and IO of the runtime run once, then
                     // give an answer that is done, or go on without one.
                     tokio::task::yield_now().await;
                     match self.store.data_mut().requests.ready() {
                         Some(done) => done,
                         None => {
-                            let resume = match resume_continue {
-                                Some(resume) => resume,
-                                None => *resume_continue.insert(self.export_or_fault(
-                                    "ilang_continue",
-                                    &[],
-                                    &[ValType::I32],
-                                    || "the module is runnable, but has no ilang_continue".into(),
-                                )?),
-                            };
                             if let Some(stop) = self.invoke_accepting(resume, &[], &mut status)? {
                                 return Ok(Some(stop));
                             }
@@ -1636,6 +1635,27 @@ fn define_import(
                     };
                     let id = id.expect("an async import has a request id");
                     caller.data_mut().requests.insert(id, request, work);
+                    // A started request requires this export even if the
+                    // module cancels it or returns status 0 next (B.5).
+                    let resume_name = format!("ilang_resume:{module_name}:{label}");
+                    let fits = caller
+                        .get_export(&resume_name)
+                        .and_then(|export| export.into_func())
+                        .is_some_and(|function| {
+                            let ty = function.ty(&*caller);
+                            let mut params = vec![ValType::I32];
+                            params.extend(signature.result_types());
+                            ty.params().len() == params.len()
+                                && ty.params().zip(&params).all(|(a, b)| ValType::eq(&a, b))
+                                && ty.results().len() == 1
+                                && ty.results().all(|ty| ValType::eq(&ty, &ValType::I32))
+                        });
+                    if !fits {
+                        return Err(host_failure(
+                            caller,
+                            anyhow!("the module does not export {resume_name}"),
+                        ));
+                    }
                     return Ok(());
                 }
                 HostFunction::Service(service) => service(&arguments),

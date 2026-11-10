@@ -450,14 +450,14 @@ test("a request started by ilang_start fails the instantiation", async () => {
 test("ilang_continue and ilang_resume exports of the wrong type are faults", async () => {
   for (const [name, message, aborted] of [
     ["app/async.runnable", "the module is runnable, but has no ilang_continue", 0],
-    ["app/async.bad_resume", "the module does not export ilang_resume:app:clock/v1:later", 0],
+    ["app/async.bad_resume", "the module does not export ilang_resume:app:clock/v1:later", 1],
   ]) {
     const signals = [];
     const later = async (x) => {
       signals.push(requestSignal());
       return x;
     };
-    const value = await instantiate(wrongTypesFixture, { imports: { "app:clock/v1": { later } } });
+    const value = await instantiate(wrongTypesFixture, { imports: { "app:clock/v1": { later, ready: async () => {} } } });
     await assert.rejects(value.callAsync(name), { message }, name);
     assert.equal(value.unusable, message, name);
     assert.throws(() => value.call("app/sync.nil"), /make a new instance/, name);
@@ -569,14 +569,41 @@ test("a module without ilang_continue or an ilang_resume export breaks", async (
     ["app/async.runnable", "the module is runnable, but has no ilang_continue"],
     ["app/async.no_resume", "the module does not export ilang_resume:app:clock/v1:later"],
   ]) {
-    const value = await instantiate(noContinueFixture, { imports: { "app:clock/v1": { later: async (x) => x } } });
+    const value = await instantiate(noContinueFixture, { imports: { "app:clock/v1": { later: async (x) => x, ready: async () => {} } } });
     await assert.rejects(value.callAsync(name), { message });
     assert.equal(value.unusable, message);
     assert.throws(() => value.call("app/sync.nil"), /make a new instance/);
     assert.equal(value.exports.calls(), 0);
   }
-  const value = await guest();
-  const waiting = value.callAsync("app/async.later", [1]);
+  const value = await guest([], { later: () => new Promise(() => {}) });
+  void value.callAsync("app/async.later", [1]);
   assert.throws(() => value.exports.ilang_continue(), WebAssembly.RuntimeError);
-  assert.equal(await waiting, 2);
+  // No answer may resume this instance after the raw trap (B.5).
+});
+
+// B.5 requires exports when a request starts or status 2 is returned,
+// even when an answer is ready, the entry ends, or the request is cancelled.
+test("required exports are checked before delivery or drop", async () => {
+  for (const [fixture, badResume] of [[noContinueFixture, "no_resume"], [wrongTypesFixture, "bad_resume"]]) {
+    for (const suffix of ["runnable_ready", `${badResume}_done`, `${badResume}_cancel`]) {
+      for (const ready of [false, true]) {
+        const signals = [];
+        const work = () => {
+          signals.push(requestSignal());
+          return ready ? Promise.resolve() : new Promise(() => {});
+        };
+        const value = await instantiate(fixture, { imports: { "app:clock/v1": { later: work, ready: work } } });
+        const message = suffix === "runnable_ready" ? "the module is runnable, but has no ilang_continue"
+          : "the module does not export ilang_resume:app:clock/v1:later";
+        await assert.rejects(value.callAsync(`app/async.${suffix}`), { message });
+        assert.equal(value.unusable, message);
+        assert.throws(() => value.call("app/sync.nil"), /make a new instance/);
+        assert.equal(value.exports.calls(), 0);
+        assert.equal(signals.length, 1);
+        assert.ok(signals.every((signal) => signal.aborted));
+        await nextMacrotask();
+        assert.equal(value.unusable, message);
+      }
+    }
+  }
 });

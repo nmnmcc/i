@@ -181,3 +181,13 @@ not make.
 Its `ilang_start` starts a request of the async `later` (id 0), which B.4 does
 not allow outside an async call: the instantiation fails, and the service does
 not run.
+
+Both `no-continue.wat` and `wrong-types.wat` also check when the required
+exports apply (B.5). `app/async.runnable_ready` starts request 0 of `ready`
+and returns status 2. Its correctly typed resume would return 0, so ready
+work must not hide an invalid `ilang_continue`. The `no_resume_done` and
+`no_resume_cancel` exports in `no-continue.wat`, and `bad_resume_done` and
+`bad_resume_cancel` in `wrong-types.wat`, start request 0 of `later`, then
+return 0 or cancel it. The import must fault before either action can hide
+an invalid resume export. `calls` also counts resume and result extraction
+for these cases, so it stays 0 when the host catches the fault in time.
