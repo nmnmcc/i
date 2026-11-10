@@ -328,11 +328,11 @@ Apply the individual accepted replacement texts only where the table says to, wi
 
 > A record type may be the closed result bound to a pattern’s alias name. This does not make a record-shaped type pattern legal. Generic aliases may contain ordinary formal parameters and closed value-derived parts, but their formal parameters may not be record labels.
 
-**§4.4, members/places:** install T1’s value-set union/intersection/difference paragraphs and T3’s one-Rec-plus-spreads exception together. Add:
+**§4.4, members/places:** install T1’s value-set union/intersection/difference paragraphs and T3’s exact-record-union exception (records §20) together. Add:
 
-> Int and String members merge their value sets. Record members merge their common fields for union and all their fields for intersection (§4.9). An unresolved spread stays separate from an ordinary record member. Runtime overlap and removal count it as a record, but this does not merge it with that record member. A union retaining a spread member is allowed only in output places. This restriction is checked on expanded annotations and on shown inferred binding types, including non-generalized bindings. Reading a value’s type cannot hide an illegal place.
+> Int and String members merge their value sets. Record union retains all alternatives; it never replaces them by common fields. Record intersection combines all required fields (§4.9). Runtime overlap and head removal count every record or spread alternative as Record. A union retaining several record alternatives or a spread member is allowed only in output places. This restriction is checked on expanded annotations and on shown inferred binding types, including non-generalized bindings. Reading a value’s type cannot hide an illegal place.
 
-**§4.5:** keep rules 1–7 with T1’s amendments to disjointness and environment equality. Rule 8 is the T1 value-set subset rule. Rule 9 is “Records obey the width, intersection, join, and forgetting rules of §4.9.3.” There is no literal-subset rule for record labels.
+**§4.5:** keep rules 1–7 with T1’s amendments to disjointness and environment equality. Rule 8 is the T1 value-set subset rule. Rule 9 is “Records obey the width, intersection, exact union, and forgetting rules of §4.9.3.” There is no literal-subset rule for record labels.
 
 **§4.7:** install T2 §7.5’s full completion rules, retain principal inference/value restriction, and retain T1’s full-versus-limited text rule. Add:
 
@@ -360,7 +360,7 @@ Apply the individual accepted replacement texts only where the table says to, wi
 
 **§4.9.2–3, forgetting:** apply T3’s set meaning and rules, with the J8 qualification:
 
-> Forgetting from an empty type is empty. Dropping a field from a record type is an exact rewrite only when the discarded field is known to be inhabited for every remaining choice of its variables. Otherwise the forgetting form remains. Closing a value-derived type may make this rewrite possible later. Normalization before or after substituting a closed type must describe the same set.
+> Forgetting from an empty type is empty. Dropping a field from a record type is an exact rewrite only when the discarded field is known to be inhabited for every remaining choice of its variables. Otherwise the forgetting form remains. Closing a value-derived type may make this rewrite possible later. Normalization before or after substituting a closed type must describe the same set. Normalize a record with a plainly empty field to Never. Preserve exact union alternatives before and after substitution, including label substitution. Common-field joins belong only to conservative known summaries. Forgetting distributes over exact union, not over intersection.
 
 **§4.9.4:** retain T3 L1–L9, and replace its value-type sentence with:
 
@@ -406,6 +406,14 @@ Apply the individual accepted replacement texts only where the table says to, wi
 | §11.1, §11.4, §11.8 | Canonical literal equality/escaping stays | No runtime change for reads | Add record values/equality/text; one escape implementation |
 | §14 (new) | Supplies singleton String keys | No library privilege | Ordinary `i/record` declarations/operations from T3 |
 | Future macro sections | Literal Syntax and members decomposition | Written Definitions and readiness | Record node kinds, hygienic label parameters; §5 contract |
+
+### Record substitution amendment (T3 hand-off)
+
+Records §20 replaces the common-field union and one-Rec routing assumptions in J2, J4, J5 and J8; J1, J3, J6 and J7 retain their contracts. This section takes precedence over the earlier representation sketch and routing list. Use N1/N2, E0–E5 with J8’s inhabitance guard, and U1–U5. There may be several `Rec` members per Union. `head()` identifies a runtime constructor, not permission to merge alternatives. A known summary is not a solver type or a permanent alias. Do not join field bounds merely because two lower record bounds share a label.
+
+Install the revised record paragraphs in spec §4.4, subtype rule 9, and §4.9.2–3 as in records §20. Right-side multiple-record constraints must use the no-new-bounds gate U3 before left-intersection or Without routing. Keep output-place checks on both written and inferred types, and repeat them at those same boundaries after substitution and completion. This is not a restriction on temporary solver bounds. All alternatives feed field checking, type tests and coverage; only runtime Record/All tests are deduplicated. Empty normalization can remove a record from coverage, but known summaries may remain conservative.
+
+This amendment proves normalization commutation for the nonrecursive record fragment. It does not import MLstruct’s principality theorem into i’s different set semantics. T3 must test the choice-free inference restriction and preserve J7; ambiguous right-union constraints are rejected, never solved by selecting field bounds. Required tests and changed example expectations are enumerated in records §20 and `tests/t3-record-substitution.py`.
 
 ## 7. Error allocation and reporting order
 
