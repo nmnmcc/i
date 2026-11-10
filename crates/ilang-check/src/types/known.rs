@@ -24,10 +24,40 @@ pub(super) fn members(k: &Ty) -> Vec<Ty> {
         Ty::Union(ms) => ms.iter().flat_map(members).collect(),
         Ty::Diff(a, h) => members(a)
             .into_iter()
-            .filter(|m| m.head().is_none() || !h.iter().any(|x| x.head() == m.head()))
+            .filter_map(|m| {
+                let excluded: Vec<_> = h
+                    .iter()
+                    .flat_map(members)
+                    .filter(|x| x.head() == m.head())
+                    .collect();
+                if excluded.is_empty() || m.head().is_none() {
+                    Some(m)
+                } else if m.scalar().is_some() {
+                    let sets: Vec<_> = excluded.iter().map(|x| x.values().clone()).collect();
+                    m.values()
+                        .minus(&super::lits::ValueSet::join_all(&sets))
+                        .map(|v| m.with_values(Some(v)))
+                } else {
+                    None
+                }
+            })
             .collect(),
         Ty::Inter(ms) => match ms.iter().find(|m| m.head().is_some()) {
-            Some(m) => vec![m.clone()],
+            Some(m) => {
+                let mut out = m.clone();
+                for other in ms.iter().flat_map(members).filter(|x| x.head().is_some()) {
+                    if other.head() != out.head() {
+                        return Vec::new();
+                    }
+                    if out.scalar().is_some() {
+                        out = out.with_values(out.values().meet(other.values()));
+                    }
+                    if out == Ty::Never {
+                        return Vec::new();
+                    }
+                }
+                vec![out]
+            }
             None => vec![k.clone()],
         },
         Ty::Both(_, b) => members(b),
@@ -66,7 +96,10 @@ pub(super) fn disjoint(x: &Ty, y: &Ty) -> bool {
     if xs.iter().chain(&ys).any(|m| m.head().is_none()) {
         return false;
     }
-    xs.iter().all(|a| ys.iter().all(|b| a.head() != b.head()))
+    xs.iter().all(|a| {
+        ys.iter()
+            .all(|b| a.head() != b.head() || a.values().disjoint(b.values()))
+    })
 }
 
 /// The type at the top of a pattern, through `x = …`: `x: T`.
@@ -693,4 +726,143 @@ pub(super) fn format_prim(name: &str) -> Option<BuiltinType> {
         }
         _ => return None,
     })
+}
+
+/// Widen known literal facts only in covariant parts (literal-types decision 7).
+#[cfg(test)]
+pub(super) fn whole_lits(s: &super::solve::Solver, t: &Ty) -> Ty {
+    match t {
+        Ty::Never => Ty::Top,
+        Ty::Con(h, values, xs) => Ty::Con(
+            *h,
+            if t.scalar().is_some() {
+                super::lits::ValueSet::ALL
+            } else {
+                values.clone()
+            },
+            xs.iter()
+                .zip(s.variances(*h, xs.len()))
+                .map(|(x, v)| {
+                    if v == super::Variance::Co {
+                        whole_lits(s, x)
+                    } else {
+                        Ty::Top
+                    }
+                })
+                .collect(),
+        ),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+            params: f.params.iter().map(|(l, _)| (l.clone(), Ty::Top)).collect(),
+            ret: whole_lits(s, &f.ret),
+            err: whole_lits(s, &f.err),
+            env: Ty::Top,
+        })),
+        Ty::Union(ms) => display::known_union(s, ms.iter().map(|t| whole_lits(s, t)).collect()),
+        Ty::Inter(ms) => display::known_inter(s, ms.iter().map(|t| whole_lits(s, t)).collect()),
+        Ty::Diff(a, h)
+            if h.iter()
+                .any(|t| t.scalar().is_some() && !t.values().is_all()) =>
+        {
+            whole_lits(s, a)
+        }
+        Ty::Diff(a, h) => display::known_diff(s, whole_lits(s, a), h.clone()),
+        Ty::Both(..) => Ty::Top,
+        t => t.clone(),
+    }
+}
+
+/// Inputs not shown by a covariant structural part of an actual argument.
+#[cfg(test)]
+pub(super) fn hidden_inputs(s: &super::solve::Solver, f: &FnTy) -> Vec<V> {
+    fn walk(s: &super::solve::Solver, t: &Ty, given: bool, shown: bool, out: &mut Vec<V>) {
+        match t {
+            Ty::Var(v) if given && !shown => {
+                if !out.contains(v) {
+                    out.push(*v);
+                }
+            }
+            Ty::Con(h, _, xs) => {
+                for (x, v) in xs.iter().zip(s.variances(*h, xs.len())) {
+                    match v {
+                        super::Variance::Co => walk(s, x, given, shown, out),
+                        super::Variance::Contra => walk(s, x, !given, false, out),
+                        _ => walk(s, x, true, false, out),
+                    }
+                }
+            }
+            Ty::Fn(f) => {
+                for (_, p) in &f.params {
+                    walk(s, p, !given, false, out);
+                }
+                walk(s, &f.ret, given, false, out);
+                walk(s, &f.err, given, false, out);
+                walk(s, &f.env, true, false, out);
+            }
+            Ty::Union(ms) | Ty::Inter(ms) => {
+                for t in ms {
+                    walk(s, t, given, shown, out);
+                }
+            }
+            Ty::Diff(a, h) => {
+                walk(s, a, given, shown, out);
+                for t in h {
+                    walk(s, t, given, shown, out);
+                }
+            }
+            Ty::Both(a, b) => {
+                walk(s, a, true, false, out);
+                walk(s, b, true, false, out);
+            }
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    for (_, p) in &f.params {
+        walk(s, p, true, true, &mut out);
+    }
+    walk(s, &f.ret, false, false, &mut out);
+    walk(s, &f.env, true, false, &mut out);
+    out
+}
+
+#[cfg(test)]
+mod literal_known_tests {
+    use super::*;
+    #[test]
+    fn hidden_inputs_and_recursive_widening() {
+        // decision 7: callback outputs and environments, not callback inputs.
+        let s = super::super::solve::Solver::new(Default::default(), Vec::new());
+        let f = FnTy {
+            params: vec![(
+                None,
+                Ty::Fn(Box::new(FnTy {
+                    params: vec![(None, Ty::Var(V(0)))],
+                    ret: Ty::Var(V(1)),
+                    err: Ty::Never,
+                    env: Ty::Never,
+                })),
+            )],
+            ret: Ty::Var(V(2)),
+            err: Ty::Never,
+            env: Ty::Var(V(3)),
+        };
+        assert_eq!(hidden_inputs(&s, &f), [V(1), V(3)]);
+        let lit = Ty::lit(
+            BuiltinType::Int,
+            super::super::lits::ValueSet::only([std::sync::Arc::from("0")]).unwrap(),
+        );
+        assert_eq!(
+            whole_lits(&s, &Ty::tuple(vec![lit.clone(), Ty::Never])),
+            Ty::tuple(vec![
+                Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new()),
+                Ty::Top
+            ])
+        );
+        let a = Ty::Diff(
+            Box::new(Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new())),
+            vec![lit.clone()],
+        );
+        assert!(disjoint(&lit, &a));
+        assert_eq!(members(&Ty::Inter(vec![lit.clone(), a])), Vec::<Ty>::new());
+    }
 }

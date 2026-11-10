@@ -85,7 +85,7 @@ pub(crate) fn scheme_in(s: &Solver, t: &Ty, context: &[Ty], opts: Opts) -> Resul
         }
     }
     namer.assign(t);
-    Ok(namer.tree(t).text(&s.type_names))
+    Ok(namer.tree(t).text_limited(&s.type_names, 12))
 }
 
 /// The names that the shown type scheme of `t` (the type of a top-level
@@ -228,7 +228,7 @@ fn same_unmarked(a: &Ty, b: &Ty) -> bool {
     };
     match (a, b) {
         _ if is_top(a) && is_top(b) => true,
-        (Ty::Con(h, _, xs), Ty::Con(g, _, ys)) => h == g && all(xs, ys),
+        (Ty::Con(h, a, xs), Ty::Con(g, b, ys)) => h == g && a == b && all(xs, ys),
         (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => all(xs, ys),
         (Ty::Fn(f), Ty::Fn(g)) => {
             f.params.len() == g.params.len()
@@ -705,6 +705,9 @@ impl Norm<'_> {
     fn union_in(&self, ms: Vec<Ty>, env: bool) -> Ty {
         let mut flat = Vec::new();
         super::solve::flatten_union(&ms, &mut flat);
+        if !env {
+            flat = super::solve::join_literals(flat);
+        }
         let mut out: Vec<Ty> = Vec::new();
         for m in flat {
             if m == Ty::Never || out.contains(&m) {
@@ -734,16 +737,14 @@ impl Norm<'_> {
         });
         // `T | r - T`, where `r` has no effect and `T` has every value of
         // its type constructor, is every value.
-        let full: HashSet<Head> = out
-            .iter()
-            .filter(|m| self.full(m))
-            .filter_map(Ty::head)
-            .collect();
         if out.iter().any(|m| match m {
             Ty::Diff(a, h) => {
                 is_top(a)
-                    && h.iter()
-                        .all(|x| x.head().is_some_and(|y| full.contains(&y)))
+                    && h.iter().all(|x| {
+                        out.iter().any(|u| {
+                            u.head() == x.head() && self.full(u) && x.values().subset(u.values())
+                        })
+                    })
             }
             _ => false,
         }) {
@@ -844,6 +845,9 @@ impl Norm<'_> {
                     Some(i) if out[i].head() == Some(h) => {
                         let old = std::mem::replace(&mut out[i], Ty::Never);
                         out[i] = self.merge(old, m, false);
+                        if out[i] == Ty::Never {
+                            return Ty::Never;
+                        }
                     }
                     Some(_) => return Ty::Never,
                     None => out.push(m),
@@ -874,6 +878,18 @@ impl Norm<'_> {
         match a {
             Ty::Never => Ty::Never,
             Ty::Union(ms) => self.union(ms.into_iter().map(|m| self.diff(m, hs.clone())).collect()),
+            Ty::Con(..) if a.scalar().is_some() => {
+                let sets: Vec<_> = hs
+                    .iter()
+                    .filter(|m| m.head() == a.head())
+                    .map(|m| m.values().clone())
+                    .collect();
+                if sets.is_empty() {
+                    a
+                } else {
+                    a.with_values(a.values().minus(&super::lits::ValueSet::join_all(&sets)))
+                }
+            }
             Ty::Con(..) | Ty::Fn(_) => {
                 if hs.iter().any(|m| m.head() == a.head()) {
                     Ty::Never
@@ -904,7 +920,15 @@ impl Norm<'_> {
             (Variance::Inv, _) => x,
         };
         match (a, b) {
-            (Ty::Con(h, values, xs), Ty::Con(_, _, ys)) if xs.len() == ys.len() => {
+            (Ty::Con(h, values, xs), Ty::Con(_, other, ys)) if xs.len() == ys.len() => {
+                let values = if union {
+                    values.union(&other)
+                } else {
+                    let Some(values) = values.meet(&other) else {
+                        return Ty::Never;
+                    };
+                    values
+                };
                 let vs = self.s.variances(h, xs.len());
                 Ty::Con(
                     h,
@@ -1294,6 +1318,35 @@ fn tree(t: &Ty, name: &mut dyn FnMut(V) -> String) -> ShownType {
         Ty::Var(v) => ShownType::Var(name(*v)),
         Ty::Never => ShownType::Never,
         Ty::Top => ShownType::Hole,
+        Ty::Con(Head::Named(r), values, _) if !values.is_all() => {
+            let mut items: Vec<_> = values.items().map(|v| v.to_string()).collect();
+            if *r == crate::hir::TypeRef::Builtin(crate::hir::BuiltinType::Int) {
+                items.sort_by_cached_key(|v| {
+                    v.parse::<num_bigint::BigInt>().expect("canonical integer")
+                });
+            }
+            let items: Vec<_> = items
+                .into_iter()
+                .map(|v| {
+                    ShownType::Lit(
+                        if *r == crate::hir::TypeRef::Builtin(crate::hir::BuiltinType::String) {
+                            ilang_syntax::print::string_literal(&v)
+                        } else {
+                            v
+                        },
+                    )
+                })
+                .collect();
+            if values.is_finite() {
+                if items.len() == 1 {
+                    items.into_iter().next().unwrap()
+                } else {
+                    ShownType::Union(items)
+                }
+            } else {
+                ShownType::Diff(Box::new(ShownType::Named(*r, Vec::new())), items)
+            }
+        }
         Ty::Con(Head::Named(r), _, args) => ShownType::Named(*r, all(args, name)),
         Ty::Con(_, _, parts) => ShownType::Tuple(all(parts, name)),
         Ty::Fn(f) => {
@@ -1312,9 +1365,9 @@ fn tree(t: &Ty, name: &mut dyn FnMut(V) -> String) -> ShownType {
                 env,
             }))
         }
-        Ty::Union(ms) => ShownType::Union(all(ms, name)),
+        Ty::Union(ms) => ShownType::Union(flat_shown(all(ms, name))),
         Ty::Inter(ms) => ShownType::Inter(all(ms, name)),
-        Ty::Diff(a, h) => ShownType::Diff(Box::new(tree(a, name)), all(h, name)),
+        Ty::Diff(a, h) => ShownType::Diff(Box::new(tree(a, name)), flat_shown(all(h, name))),
         Ty::Both(a, b) => {
             if **a == Ty::Never {
                 tree(b, name)
@@ -1327,7 +1380,7 @@ fn tree(t: &Ty, name: &mut dyn FnMut(V) -> String) -> ShownType {
 
 /// The text of a type (§3), with the names of the custom types `tn`.
 fn render(t: &Ty, name: &mut dyn FnMut(V) -> String, tn: &[String]) -> String {
-    tree(t, name).text(tn)
+    tree(t, name).text_limited(tn, 12)
 }
 
 /// `t` with the variables of `H` in each difference that are nowhere else
@@ -1489,4 +1542,65 @@ pub(crate) fn show_known(s: &Solver, t: &Ty) -> String {
         },
         &s.type_names,
     )
+}
+
+fn flat_shown(ts: Vec<ShownType>) -> Vec<ShownType> {
+    ts.into_iter()
+        .flat_map(|t| match t {
+            ShownType::Union(ms) => ms,
+            t => vec![t],
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod literal_display_tests {
+    use super::super::lits::ValueSet;
+    use super::*;
+    use crate::hir::{BuiltinType, TypeRef};
+    use std::sync::Arc;
+    fn lit(b: BuiltinType, xs: &[&str]) -> Ty {
+        Ty::lit(b, ValueSet::only(xs.iter().map(|s| Arc::from(*s))).unwrap())
+    }
+    #[test]
+    fn set_normalization_and_full_text() {
+        // literal-types §5.7: subset-based Top, exact differences and number ordering.
+        let s = Solver::new(Default::default(), Vec::new());
+        let a = lit(BuiltinType::String, &["a"]);
+        assert_eq!(
+            known_union(
+                &s,
+                vec![a.clone(), Ty::Diff(Box::new(Ty::Top), vec![a.clone()])]
+            ),
+            Ty::Top
+        );
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+        assert_ne!(
+            known_union(
+                &s,
+                vec![a.clone(), Ty::Diff(Box::new(Ty::Top), vec![string.clone()])]
+            ),
+            Ty::Top
+        );
+        let t = known_diff(&s, string, vec![lit(BuiltinType::String, &["b", "a"])]);
+        assert_eq!(
+            scheme(&s, &t, Opts::default()).unwrap().text(&[]),
+            "String - \"a\" - \"b\""
+        );
+        let t = lit(BuiltinType::Int, &["10", "-2", "1"]);
+        assert_eq!(
+            scheme(&s, &t, Opts::default()).unwrap().text(&[]),
+            "-2 | 1 | 10"
+        );
+        assert_eq!(
+            known_inter(&s, vec![a, lit(BuiltinType::String, &["b"])]),
+            Ty::Never
+        );
+        let xs: Vec<_> = (0..40).map(|i| Arc::from(format!("v{i:02}"))).collect();
+        let t = Ty::lit(BuiltinType::String, ValueSet::only(xs).unwrap());
+        let tree = scheme(&s, &t, Opts::default()).unwrap();
+        assert_eq!(tree.text(&[]).matches('|').count(), 39);
+        assert!(tree.text_limited(&[], 12).ends_with("… (30 more)"));
+        assert!(!tree.text(&[]).contains('…'));
+    }
 }

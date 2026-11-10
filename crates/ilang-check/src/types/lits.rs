@@ -80,13 +80,11 @@ impl ValueSet {
         self.0.is_none()
     }
 
-    #[cfg(test)]
     pub fn is_finite(&self) -> bool {
         self.0.as_ref().is_some_and(|l| !l.0.except)
     }
 
     /// The listed values, not the (possibly infinite) domain of the set.
-    #[cfg(test)]
     pub fn items(&self) -> impl Iterator<Item = &Arc<str>> {
         self.0.iter().flat_map(|l| l.0.items.iter())
     }

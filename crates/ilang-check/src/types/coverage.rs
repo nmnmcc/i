@@ -18,6 +18,7 @@
 //!   pattern names: the "other heads" of a column.
 
 use super::infer::Checker;
+use super::lits::ValueSet;
 use super::solve::Solver;
 use super::{Head, Ty, V};
 use crate::hir::*;
@@ -89,7 +90,7 @@ impl Col {
 /// members whose heads are not known.
 #[derive(Clone, Debug, Default)]
 struct Vals {
-    heads: Vec<(Head, Vec<Ty>, Mode)>,
+    heads: Vec<(Head, ValueSet, Vec<Ty>, Mode)>,
     other: bool,
 }
 
@@ -110,18 +111,19 @@ impl Vals {
     }
 
     fn union(mut self, o: Vals) -> Vals {
-        for (h, args, m) in o.heads {
+        for (h, set, args, m) in o.heads {
             match self.heads.iter_mut().find(|x| x.0 == h) {
-                Some(x) if x.1.len() == args.len() => {
-                    for (a, b) in x.1.iter_mut().zip(args) {
+                Some(x) if x.2.len() == args.len() => {
+                    x.1 = x.1.union(&set);
+                    for (a, b) in x.2.iter_mut().zip(args) {
                         *a = Ty::Union(vec![a.clone(), b]);
                     }
-                    if m != x.2 {
-                        x.2 = Mode::Up;
+                    if m != x.3 {
+                        x.3 = Mode::Up;
                     }
                 }
                 Some(_) => {}
-                None => self.heads.push((h, args, m)),
+                None => self.heads.push((h, set, args, m)),
             }
         }
         self.other |= o.other;
@@ -129,27 +131,38 @@ impl Vals {
     }
 
     fn inter(self, o: Vals) -> Vals {
+        if self.other {
+            return o;
+        }
+        if o.other {
+            return self;
+        }
         let mut heads = Vec::new();
-        for (h, args, m) in &self.heads {
-            match o.heads.iter().find(|x| x.0 == *h) {
-                Some(x) if x.1.len() == args.len() => {
-                    let args = args
-                        .iter()
-                        .zip(&x.1)
+        for (h, set, args, m) in &self.heads {
+            // An unknown alternative can contain all values of this head.
+            let other = o.heads.iter().find(|x| x.0 == *h);
+            if o.other {
+                heads.push((*h, set.clone(), args.clone(), *m));
+            } else if let Some(x) = other
+                && let Some(set) = set.meet(&x.1)
+            {
+                let args = if args.len() == x.2.len() {
+                    args.iter()
+                        .zip(&x.2)
                         .map(|(a, b)| Ty::Inter(vec![a.clone(), b.clone()]))
-                        .collect();
-                    let m = if *m == x.2 { *m } else { Mode::Up };
-                    heads.push((*h, args, m));
-                }
-                Some(_) => heads.push((*h, args.clone(), *m)),
-                None if o.other => heads.push((*h, args.clone(), *m)),
-                None => {}
+                        .collect()
+                } else {
+                    args.clone()
+                };
+                heads.push((*h, set, args, if *m == x.3 { *m } else { Mode::Up }));
             }
         }
         if self.other {
             for x in &o.heads {
                 if !self.heads.iter().any(|y| y.0 == x.0) {
                     heads.push(x.clone());
+                } else if let Some(y) = heads.iter_mut().find(|y| y.0 == x.0) {
+                    y.1 = x.1.clone();
                 }
             }
         }
@@ -206,8 +219,8 @@ fn values(s: &Solver, t: &Ty, mode: Mode, seen: &mut Vec<(V, Mode)>) -> Vals {
             seen.pop();
             out
         }
-        Ty::Con(h, _, args) => Vals {
-            heads: vec![(*h, args.clone(), mode)],
+        Ty::Con(h, set, args) => Vals {
+            heads: vec![(*h, set.clone(), args.clone(), mode)],
             other: false,
         },
         // The parameter types stand for the arguments of the head: only
@@ -215,6 +228,7 @@ fn values(s: &Solver, t: &Ty, mode: Mode, seen: &mut Vec<(V, Mode)>) -> Vals {
         Ty::Fn(f) => Vals {
             heads: vec![(
                 Head::Fn,
+                ValueSet::ALL,
                 f.params.iter().map(|p| p.1.clone()).collect(),
                 mode,
             )],
@@ -228,7 +242,20 @@ fn values(s: &Solver, t: &Ty, mode: Mode, seen: &mut Vec<(V, Mode)>) -> Vals {
             .fold(Vals::any(), |acc, m| acc.inter(values(s, m, mode, seen))),
         Ty::Diff(a, h) => {
             let mut v = values(s, a, mode, seen);
-            v.heads.retain(|x| !h.iter().any(|m| m.head() == Some(x.0)));
+            for excluded in h {
+                v.heads = v
+                    .heads
+                    .into_iter()
+                    .filter_map(|(head, set, args, mode)| {
+                        if excluded.head() != Some(head) {
+                            Some((head, set, args, mode))
+                        } else {
+                            set.minus(excluded.values())
+                                .map(|set| (head, set, args, mode))
+                        }
+                    })
+                    .collect();
+            }
             v
         }
         Ty::Never => Vals::default(),
@@ -363,7 +390,7 @@ impl Checker<'_> {
                     return Some(w);
                 }
                 let one = vals.heads.len() == 1;
-                for (h, args, _) in vals.heads {
+                for (h, _, args, _) in vals.heads {
                     let n = args.len();
                     if let Some(mut w) = self.useful_head(&rows, h, n, &q[1..], cols) {
                         if one && matches!(w[0], Pat::Head(..)) {
@@ -450,7 +477,10 @@ impl Checker<'_> {
                 _ => None,
             })
             .collect();
-        let missing = sig.iter().find(|c| !present.contains(c)).cloned();
+        let missing = sig
+            .iter()
+            .find(|c| !present.iter().any(|p| p.covers(c)))
+            .cloned();
         match missing {
             None => sig
                 .iter()
@@ -485,9 +515,21 @@ impl Checker<'_> {
             return Some(vec![Col::Any; k]);
         }
         let vals = self.col_values(col);
-        let Some((_, args, mode)) = vals.heads.iter().find(|x| x.0 == c.head()) else {
+        let Some((_, set, args, mode)) = vals.heads.iter().find(|x| x.0 == c.head()) else {
             return vals.other.then(|| vec![Col::Any; k]);
         };
+        if !vals.other
+            && let Ctor::Lit(lit) = c
+        {
+            let possible = match lit {
+                Lit::Int(v) | Lit::Str(v) => set.contains(v),
+                Lit::Prefix(p) => !set.is_finite() || set.items().any(|v| v.starts_with(p)),
+                _ => true,
+            };
+            if !possible {
+                return None;
+            }
+        }
         let (args, mode) = (args.clone(), *mode);
         let parts: Vec<Ty> = match c {
             Ctor::Custom(r) => {
@@ -516,6 +558,25 @@ impl Checker<'_> {
     /// The constructors of a head with a finite signature, with values in
     /// the column: a constructor with a field of no values has none.
     fn signature(&mut self, h: Head, col: &Col) -> Option<Vec<Ctor>> {
+        if let Head::Named(TypeRef::Builtin(b @ (BuiltinType::Int | BuiltinType::String))) = h {
+            let vals = self.col_values(col);
+            if !vals.other
+                && let Some((_, set, _, _)) = vals.heads.iter().find(|x| x.0 == h)
+                && set.is_finite()
+            {
+                return Some(
+                    set.items()
+                        .map(|v| {
+                            Ctor::Lit(if b == BuiltinType::Int {
+                                Lit::Int(v.to_string())
+                            } else {
+                                Lit::Str(v.to_string())
+                            })
+                        })
+                        .collect(),
+                );
+            }
+        }
         let all = match h {
             Head::Named(TypeRef::Custom(id)) => match &self.p.ty(id).body {
                 TypeBody::Custom(cs) if !cs.is_empty() => (0..cs.len())
@@ -583,8 +644,8 @@ impl Checker<'_> {
             Pat::Ctor(Ctor::Lit(l), _) => match l {
                 Lit::Int(s) => s.clone(),
                 Lit::Float(b) => format!("{:?}", f64::from_bits(*b)),
-                Lit::Str(s) => format!("{s:?}"),
-                Lit::Prefix(s) => format!("{s:?} <> _"),
+                Lit::Str(s) => ilang_syntax::print::string_literal(s),
+                Lit::Prefix(s) => format!("{} <> _", ilang_syntax::print::string_literal(s)),
                 Lit::Bits => "<<..>>".into(),
             },
             Pat::Ctor(Ctor::Custom(c), args) => {
@@ -722,5 +783,31 @@ pub(crate) fn fit_pat(p: &Program, q: &Pattern) -> Pat {
             rest.is_some(),
         ),
         _ => Pat::Wild(None),
+    }
+}
+
+#[cfg(test)]
+mod literal_coverage_tests {
+    use super::*;
+    #[test]
+    fn unknown_alternatives_are_whole_even_beside_an_explicit_head() {
+        // literal-types §5.5: a side with other counts as all values of every head.
+        let head = Head::Named(TypeRef::Builtin(BuiltinType::Int));
+        let set = |v: &str| ValueSet::only([std::sync::Arc::from(v)]).unwrap();
+        let a = Vals {
+            heads: vec![(head, set("0"), Vec::new(), Mode::Pos)],
+            other: true,
+        };
+        let b = Vals {
+            heads: vec![(head, set("1"), Vec::new(), Mode::Pos)],
+            other: false,
+        };
+        assert_eq!(a.clone().inter(b.clone()).heads[0].1, set("1"));
+        assert_eq!(b.clone().inter(a).heads[0].1, set("1"));
+        let c = Vals {
+            heads: vec![(head, set("0"), Vec::new(), Mode::Pos)],
+            other: false,
+        };
+        assert!(c.inter(b).is_empty());
     }
 }

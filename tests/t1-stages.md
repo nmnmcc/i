@@ -292,3 +292,37 @@ The accepted joint corrections control the older note's package-head
 wording, Int|y example, conditional one-clause-choice wording, and T2-first
 merge suggestion. Their corrected source sentences are listed in stage 1.
 There is no unresolved source disagreement for the completed stages.
+
+## Continuation through the remaining T1 stages
+
+The user resumed this lane and requires completion of every done criterion.
+Stage commits are checkpoints; the earlier stage-4 handoff is historical.
+Each remaining stage runs the full gate before the next stage begins.
+Generated files are kept for the final derived-files commit; their source
+rules will be recorded separately, line by line.
+
+### Stage 5: display, known facts, and coverage machinery
+
+Norm joins/intersects/subtracts scalar sets, including the subset-based Top
+rule. Exact ShownType trees contain canonical literal leaves; text() and
+text_with() remain full, while diagnostic/hover text has the 12/10 limit.
+Coverage keeps sets with heads and distinguishes unknown alternatives from
+finite scalar information. The latent hidden-input/whole-literal walkers
+are tested but remain test-only until stage 7, as §12 requires.
+
+Interpretation sources: literal-types §5.7 says “Norm repeats the solver
+rules” and specifies full versus limited text. §5.5 says “A side with other
+... counts as all values for every head.” The coverage regression checks
+both intersection orders with an explicit 0 beside unknown information
+against the singleton 1. Decision 7 supplies the polarity walk and recursive
+whole-literal rule; neither is enabled in source inference yet.
+
+One new known-type unit test initially found a raw difference under an
+intersection was skipped. Recursive member extraction fixed it. A syntax
+error in the first mechanical edit was fixed before further checks.
+
+Stage 5 gate: full dev-verify exited 0 (18 direct tests, unchanged type
+goldens, 159 spec cases at O0/O2, 1399 std tests per level, 33 browser
+tests). old-syntax-check passed 1078 snippets and 20 pending entries.
+The initial partial unit run failed the raw-difference regression above;
+the final full run passes. No golden was regenerated in this stage.
