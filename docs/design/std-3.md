@@ -1,7 +1,7 @@
 # Design: property tests, finite mathematics, and codepoint strings
 
-Status: accepted contract with coordinator rulings. The implementation candidate
-fails the float feasibility gate; see section 11.4.
+Status: property and string implementation ready for integration. Float
+implementation withheld: feasibility gate not met, see lane/std3-float.
 Source baseline: `b9173ce013405fd3a055ffa34edf3b8829672104`.
 Repository line references are to that baseline, not the older baseline of
 std-1. Examples use the accepted syntax. Signature inventories describe ordinary
@@ -379,6 +379,12 @@ or an explicitly chosen observational equivalence, not recreated identities.
 No library can infer that arbitrary callbacks meet this contract.
 
 ## 4. Additions to `std/float`
+
+implementation withheld: feasibility gate not met, see lane/std3-float
+
+The accepted contract and algorithm below remain the specification for that
+branch. This landable branch retains redesign's existing float implementation
+and tests, and omits the float oracle, vectors and profiling harnesses.
 
 ### 4.1 Comparison and complete interface
 
@@ -1056,6 +1062,10 @@ limits separately from the proposed implementation gates.
 
 ## 11. Implementation evidence and remaining gate
 
+Historical evidence for candidate 403a0be, preserved on lane/std3-float. The
+current landable branch contains only the property and string additions; its
+verification is recorded in section 12. The float candidate is withheld.
+
 This section supersedes section 9's note-only evidence limits. Section 9 remains
 historical evidence, not a claim about the finished implementation. No interrupted
 worker changes were present at the start. All work and builds stayed in the lane;
@@ -1222,3 +1232,25 @@ import was implemented or authorized here. Property and all 13 string additions
 are complete. The float candidate remains available for review, with F1 kept;
 it must not be described as meeting the feasibility gate. General compiler
 performance work or a different math contract is outside this lane's ownership.
+
+## 12. Landable property and string split
+
+Coordinator ruling A preserves candidate 403a0be on lane/std3-float and withholds
+its float additions from lane/note-std3. Float source and tests are restored from
+redesign; the float vectors and development harnesses stay on lane/std3-float.
+The landable interface check compares the 35 property/string bindings against
+their unchanged inventories. The intentionally failing property adapter fixture
+checks one ordinary failure at O0 and O2; float stop probes belong to the
+withheld candidate. No property/string requirement or check is weakened.
+
+Verification after withholding float (all through the dev shell):
+
+| Command | Result |
+|---|---|
+| `target/release/i test --project std --opt 0` | 1,465 passed, 0 failed. |
+| `target/release/i test --project std --opt 2` | 1,465 passed, 0 failed. |
+| `target/release/i fmt --check std` | Exit 0. |
+| `./scripts/old-syntax-check` | Exit 0: 1,193 snippets, 19 existing future entries. |
+| `python3 std/test/std3_interfaces.py` | 35/35 signatures match the property/string inventories. |
+| `python3 std/test/property_failures.py` | Harness exit 0: exactly one intentional ordinary property failure at each optimization level. |
+| `git diff --quiet refs/heads/redesign -- std/src/float.i std/test/float_test.i` | Exit 0: both files equal redesign. |
