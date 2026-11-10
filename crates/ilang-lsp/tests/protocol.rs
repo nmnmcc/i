@@ -169,6 +169,29 @@ fn find(text: &str, needle: &str, nth: usize) -> (u32, u32) {
     (line, col)
 }
 
+/// Exact LSP diagnostic for an unused top-level binding.
+fn unused_diagnostic(text: &str, name: &str, binding: &str) -> lsp::Diagnostic {
+    let (line, col) = find(text, binding, 0);
+    lsp::Diagnostic {
+        range: lsp::Range::new(
+            lsp::Position::new(line, col),
+            lsp::Position::new(line, col + name.encode_utf16().count() as u32),
+        ),
+        severity: Some(lsp::DiagnosticSeverity::WARNING),
+        code: Some(lsp::NumberOrString::String("W0504".into())),
+        source: Some("i".into()),
+        message: format!("top-level binding `{name}` is not used"),
+        ..Default::default()
+    }
+}
+
+fn unused_diagnostics(text: &str, names: &[&str]) -> Vec<lsp::Diagnostic> {
+    names
+        .iter()
+        .map(|name| unused_diagnostic(text, name, &format!("{name} =")))
+        .collect()
+}
+
 fn package(dir: &Path, files: &[(&str, &str)]) {
     fs::write(dir.join("i.toml"), "name = \"app\"\n").unwrap();
     for (path, text) in files {
@@ -199,7 +222,10 @@ fn an_editor_session() {
 
     // Opening a correct file clears its problems.
     c.open(&main, MAIN);
-    assert_eq!(c.diagnostics(&main), vec![]);
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(MAIN, &["greet", "main"])
+    );
 
     // Hover shows the type, with the documentation.
     let (l, ch) = find(MAIN, "add(1", 0);
@@ -288,7 +314,10 @@ fn an_editor_session() {
 
     // Fixed again: the problems are cleared.
     c.change(&main, 4, MAIN);
-    assert_eq!(c.diagnostics(&main), vec![]);
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(MAIN, &["greet", "main"])
+    );
 
     // Completion after `u.` in an unsaved buffer that does not parse.
     let typing = MAIN.replace("u.name", "u.");
@@ -340,7 +369,10 @@ fn unsaved_changes_in_another_file() {
     let util = file_uri(&dir.path().join("src/util.i"));
     let mut c = Client::start();
     c.open(&main, MAIN);
-    assert_eq!(c.diagnostics(&main), vec![]);
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(MAIN, &["greet", "main"])
+    );
     // `double` is no longer exported, in the buffer only.
     c.open(&util, &UTIL.replace(" (double)", " "));
     let diags = c.diagnostics(&main);
@@ -353,7 +385,10 @@ fn unsaved_changes_in_another_file() {
     c.notify::<lsp::notification::DidCloseTextDocument>(json!({
         "textDocument": { "uri": util }
     }));
-    assert_eq!(c.diagnostics(&main), vec![]);
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(MAIN, &["greet", "main"])
+    );
     c.shutdown();
 }
 
@@ -486,7 +521,10 @@ fn a_new_document() {
     assert_eq!(h["contents"]["value"], "```i\ny: 2\n```");
     // Fixed: the problems are cleared.
     c.change(&new, 2, "y = 2\nz = y + 1\n");
-    assert_eq!(c.diagnostics(&new), vec![]);
+    assert_eq!(
+        c.diagnostics(&new),
+        unused_diagnostics("y = 2\nz = y + 1\n", &["z"])
+    );
     c.shutdown();
 }
 
@@ -501,7 +539,7 @@ fn completion_after_an_expression() {
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
     c.open(&main, text);
-    assert_eq!(c.diagnostics(&main), vec![]);
+    assert_eq!(c.diagnostics(&main), unused_diagnostics(text, &["f"]));
     for (version, (from, to)) in [("make().x", "make()."), ("{ t }.y", "{ t }.")]
         .into_iter()
         .enumerate()
@@ -542,7 +580,10 @@ fn answers_from_the_last_check() {
     // Long enough that no check starts by itself during the test.
     let mut c = Client::with_debounce(Duration::from_secs(600));
     c.open(&main, MAIN);
-    assert_eq!(c.diagnostics(&main), vec![]);
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(MAIN, &["greet", "main"])
+    );
     let started = Instant::now();
     // A line before everything.
     let edited = format!("\n{MAIN}");
@@ -586,7 +627,10 @@ fn completion_after_a_dot_just_written() {
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::with_debounce(Duration::from_secs(600));
     c.open(&main, &text);
-    assert_eq!(c.diagnostics(&main), vec![]);
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(&text, &["greet", "main", "m"])
+    );
     let started = Instant::now();
     for (version, (from, to)) in [("u.name", "u."), ("make().name", "make().")]
         .into_iter()
@@ -612,7 +656,10 @@ fn quick_changes_are_checked_once() {
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::with_debounce(Duration::from_millis(300));
     c.open(&main, MAIN);
-    assert_eq!(c.diagnostics(&main), vec![]);
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(MAIN, &["greet", "main"])
+    );
     for i in 0..10 {
         let text = format!("{MAIN}{}bad = nope\n", "\n".repeat(i));
         c.change(&main, i as i32 + 2, &text);
@@ -639,7 +686,10 @@ fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
     c.open(&main, text);
-    assert_eq!(c.diagnostics(&main), vec![]);
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(text, &["k", "compose", "pairup"])
+    );
     let mut hover = |needle: &str| {
         let (l, ch) = find(text, needle, 0);
         let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch));
@@ -675,7 +725,10 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
     c.open(&main, text);
-    assert_eq!(c.diagnostics(&main), vec![]);
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(text, &["one", "drop2", "effonly"])
+    );
     let mut hover = |needle: &str| {
         let (l, ch) = find(text, needle, 0);
         let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch));
@@ -715,7 +768,10 @@ fn t2_nested_pattern_heads_support_hover_and_definition_in_recovery() {
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
     c.open(&main, source);
-    assert!(c.diagnostics(&main).is_empty());
+    assert_eq!(
+        c.diagnostics(&main),
+        vec![unused_diagnostic(source, "x", "x: Item")]
+    );
     let broken = source.replace("= v\n", "= missing\n");
     for (i, text) in [source, &broken].into_iter().enumerate() {
         if i != 0 {
@@ -752,7 +808,9 @@ fn disjoint_comparison_is_a_warning_at_the_comparison() {
     let mut c = Client::start();
     c.open(&main, source);
     let ds = c.diagnostics(&main);
-    assert_eq!(ds.len(), 1, "{ds:?}");
+    assert_eq!(ds.len(), 2, "{ds:?}");
+    assert_eq!(ds[0], unused_diagnostics(source, &["x"])[0]);
+    let ds = &ds[1..];
     assert_eq!(
         ds[0].code,
         Some(lsp::NumberOrString::String("W0503".into()))
