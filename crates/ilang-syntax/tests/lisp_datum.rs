@@ -52,12 +52,7 @@ fn quote_splices_are_checked_in_their_written_position() {
 
 #[test]
 fn invalid_datums_do_not_make_core_items() {
-    for source in [
-        "(@ (m) (= x 1))",
-        "(@ m (other 1))",
-        "(= x (1 .. 2))",
-        "(= x [.. 1])",
-    ] {
+    for source in ["(= x (1 .. 2))", "(= x [.. 1])"] {
         let document = parse(source).unwrap();
         assert!(
             ilang_syntax::lisp::parse_module(&document).is_err(),
@@ -67,13 +62,17 @@ fn invalid_datums_do_not_make_core_items() {
 }
 
 #[test]
-fn both_surfaces_reject_unrepresentable_attribute_and_result_forms() {
+fn both_surfaces_preserve_attributes_and_grouped_result_holes() {
     for source in ["@m() x = 1", "@m call(1)", "f = () -> { _ } { 1 }"] {
-        assert!(!ilang_syntax::parse_module(source).1.is_empty(), "{source}");
-    }
-    for source in ["(@ (m) (= x 1))", "(@ m (call 1))", "(= f (-> () {_} {1}))"] {
-        let doc = parse(source).unwrap();
-        assert!(ilang_syntax::lisp::parse_module(&doc).is_err(), "{source}");
+        let (module, errors) = ilang_syntax::parse_module(source);
+        assert!(errors.is_empty(), "{source}: {errors:?}");
+        let lisp = print_module(&module);
+        let back = ilang_syntax::lisp::parse_module(&parse(&lisp).unwrap()).unwrap();
+        assert_eq!(
+            ilang_syntax::shape::canon(&module),
+            ilang_syntax::shape::canon(&back),
+            "{source}\n{lisp}"
+        );
     }
 }
 

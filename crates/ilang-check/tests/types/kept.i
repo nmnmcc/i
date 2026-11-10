@@ -6,8 +6,8 @@ f(1)
 x = 1
 @a.main
 x2 = 2
-// Empty attribute arguments are tested in empty_attribute.i.
-//
+@main()
+x3 = () { Nil }
 @external("env" <> "", "f")
 ext: () -> Int
 @external(module: "env", function: "f")

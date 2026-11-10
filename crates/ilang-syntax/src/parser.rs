@@ -588,13 +588,6 @@ impl Parser<'_> {
                 }
             }
         } else if self.at_macro_item() {
-            if !attributes.is_empty() {
-                return Err(Diagnostic::new(
-                    Code::Unexpected,
-                    self.tok().span,
-                    "an item macro call cannot have an attribute",
-                ));
-            }
             let module = if *self.nth(1) == T::Dot {
                 let module = self.name()?;
                 self.bump();
@@ -750,13 +743,6 @@ impl Parser<'_> {
             let open = self.bump().start;
             let list = self.args()?;
             let span = self.span_from(open);
-            if list.is_empty() {
-                return Err(Diagnostic::new(
-                    Code::Unexpected,
-                    span,
-                    "an attribute cannot have empty arguments",
-                ));
-            }
             let strings: Option<Vec<(String, Span)>> = list
                 .iter()
                 .map(|a| match (&a.label, &a.value.kind) {
@@ -1261,15 +1247,7 @@ impl Parser<'_> {
             })
         })?;
         let ret = if self.eat(&T::Arrow) {
-            let grouped_result = self.at(&T::LBrace);
             let (value, err, env) = self.arrow_tail()?;
-            if grouped_result && matches!(value.kind, TypeKind::Hole) {
-                return Err(Diagnostic::new(
-                    Code::Unexpected,
-                    value.span,
-                    "a function result hole cannot be grouped",
-                ));
-            }
             Some(RetType { value, err, env })
         } else {
             None

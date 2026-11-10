@@ -20,10 +20,7 @@ pub(super) fn show_as(d: &Datum, position: super::syntax::Position) -> Result<St
         Constructor => constructor(d),
         Field => field_type(d),
         Type => typ(d),
-        FunctionResult => {
-            super::to_ast::check_function_result(d)?;
-            return_type(d)
-        }
+        FunctionResult => return_type(d),
         Parameter => parameter(d),
         Expression => checked_expression(d),
         Statement => statement(d),
@@ -309,7 +306,6 @@ fn field_type(d: &Datum) -> Result<String> {
 }
 fn attribute(d: &Datum) -> Result<String> {
     if let Some([h, args @ ..]) = round(d)
-        && !args.is_empty()
         && !symbol(h, ".")
     {
         return Ok(format!(
@@ -427,7 +423,6 @@ fn expr(d: &Datum) -> Result<String> {
                 }
             }
             [h, params, result, body] if symbol(h, "->") => {
-                super::to_ast::check_function_result(result)?;
                 let ps = round(params).ok_or_else(|| bad(params, "function parameters"))?;
                 let ret = if matches!(&result.kind, K::Discard(s) if s == "_") {
                     String::new()

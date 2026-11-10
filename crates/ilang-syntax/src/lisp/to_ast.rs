@@ -154,29 +154,6 @@ fn result_type(d: &Datum) -> Result<RetType> {
         env: None,
     })
 }
-pub(super) fn check_function_result(d: &Datum) -> Result<()> {
-    let value = match round(d) {
-        Some([h, inner, _]) if symbol(h, "!") || symbol(h, "^") => {
-            return check_function_result(inner);
-        }
-        _ => d,
-    };
-    if let K::Curly(xs) = &value.kind
-        && xs.len() == 1
-    {
-        let mut inner = &xs[0];
-        while let K::Curly(xs) = &inner.kind {
-            if xs.len() != 1 {
-                break;
-            }
-            inner = &xs[0];
-        }
-        if matches!(&inner.kind, K::Discard(s) if s == "_") {
-            return Err(bad(value, "an ungrouped function result hole"));
-        }
-    }
-    Ok(())
-}
 
 fn binder(d: &Datum) -> Result<Binder> {
     match &d.kind {
@@ -447,7 +424,6 @@ pub fn parse_expression(d: &Datum) -> Result<Expr> {
                         Ok(Param::Pattern(parse_pattern(p)?))
                     })
                     .collect::<Result<_>>()?;
-                check_function_result(ret)?;
                 let ret = if matches!(&ret.kind, K::Discard(s) if s == "_") {
                     None
                 } else {
@@ -785,9 +761,6 @@ fn item(d: &Datum) -> Result<Item> {
         }
         _ => return Err(bad(current, "an item")),
     };
-    if !attributes.is_empty() && matches!(kind, ItemKind::MacroItem { .. }) {
-        return Err(bad(d, "an attributed item"));
-    }
     Ok(Item {
         doc: Vec::new(),
         attributes,
@@ -797,18 +770,13 @@ fn item(d: &Datum) -> Result<Item> {
 }
 fn attribute(d: &Datum) -> Result<Attribute> {
     let (head, args) = match round(d) {
-        Some([h, args @ ..]) if !symbol(h, ".") => {
-            if args.is_empty() {
-                return Err(bad(d, "an attribute"));
-            }
-            (h, Some(args))
-        }
+        Some([h, args @ ..]) if !symbol(h, ".") => (h, Some(args)),
         _ => (d, None),
     };
     let (module, name) = qualified(head)?;
     let mut strings = Vec::new();
     let call = if let Some(args) = args {
-        if args.iter().all(|d| matches!(d.kind, K::String(_))) {
+        if !args.is_empty() && args.iter().all(|d| matches!(d.kind, K::String(_))) {
             strings = args
                 .iter()
                 .map(|d| {
