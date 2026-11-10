@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { compiledImports } from "../../../tests/browser/fixture-abi.mjs";
+import { compiledImports, checkOpaque } from "../../../tests/browser/fixture-abi.mjs";
 import { instantiate, GuestError, Stop } from "../ilang.mjs";
 
 const compiled = await readFile(new URL("../../../tests/browser/fixtures/compiled.wasm", import.meta.url));
@@ -81,4 +81,13 @@ test("an exception of a host function goes to the caller", async () => {
   const value = await guest([], { read: () => { throw failure; } });
   assert.throws(() => value.call("app/app.lookup", ["name"]), (error) => error === failure);
   assert.match(value.unusable, /the storage is gone/);
+});
+
+// Expected identity follows spec 4.1 and 11.4; display follows 11.8.
+test("compiled opaque imports and exports preserve nominal identity", async () => {
+  const reference = {};
+  for (const opaque of [reference, null]) {
+    const value = await guest([], { opaque });
+    assert.equal(await checkOpaque(value, reference, {}), true);
+  }
 });
