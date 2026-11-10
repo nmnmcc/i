@@ -18,6 +18,7 @@ pub mod expansion;
 mod from_ast;
 pub mod quote_lower;
 pub mod scoped;
+pub mod source_syntax;
 pub mod syntax;
 mod to_ast;
 mod to_source;

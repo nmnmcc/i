@@ -834,6 +834,7 @@ impl<'a> Lowerer<'a> {
         self.out.start = Some(Func {
             name: "ilang_start".into(),
             arity: 0,
+            budget_frame: 1 + fx.vars.len() as u32,
             locals: fx.locals,
             body: out,
             frame: true,
@@ -980,6 +981,7 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[f.0 as usize] = FuncKind::Code(Func {
             name: "async entry".into(),
             arity: 1,
+            budget_frame: 2,
             locals: vec![LocalType::Value; 1 + n as usize],
             body,
             frame: true,
@@ -1292,6 +1294,7 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[f.0 as usize] = FuncKind::Code(Func {
             name: format!("import {} {}", x.module, x.name),
             arity: n,
+            budget_frame: n + 1,
             locals,
             body,
             frame: true,
@@ -1407,6 +1410,7 @@ impl<'a> Lowerer<'a> {
         Func {
             name,
             arity,
+            budget_frame: 1 + arity + (fx.vars.len() - captures.len()) as u32,
             locals: fx.locals,
             body: out,
             frame: true,

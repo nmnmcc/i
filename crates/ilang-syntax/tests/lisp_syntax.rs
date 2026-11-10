@@ -1043,3 +1043,133 @@ fn scoped_virtual_source_uses_utf8_byte_boundaries() {
     );
     assert_eq!(source.origin(span).unwrap().syntax.show(), "\"你好\"");
 }
+
+#[test]
+fn lisp_source_definition_answers_keep_parameter_scope() {
+    use ilang_syntax::lisp::definitions::source_definition;
+    use ilang_syntax::lisp::syntax::Node;
+    let source = "((Pair A B) {(Pair (: left A) (: right B))})";
+    let (module, errors) = ilang_syntax::lisp::parse_source(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let like = root("x");
+    let answer = source_definition(&module.items[0], source, like.scope(), 27);
+    let Node::Round(parts) = answer.node() else {
+        panic!("item")
+    };
+    let Node::Round(head) = parts[0].node() else {
+        panic!("head")
+    };
+    let Node::Curly(body) = parts[1].node() else {
+        panic!("body")
+    };
+    let Node::Round(constructor) = body[0].node() else {
+        panic!("constructor")
+    };
+    let Node::Round(field) = constructor[1].node() else {
+        panic!("field")
+    };
+    assert_eq!(head[1].scope_identity(), field[2].scope_identity());
+    assert!(head[1].scope_identity().is_some());
+}
+
+#[test]
+fn source_syntax_normalizes_lisp_groups_without_erasing_function_bodies() {
+    use ilang_syntax::lisp::source_syntax::{source_expression_syntax, source_item_syntax};
+    use ilang_syntax::lisp::syntax::{Node, Scope};
+    use std::collections::BTreeSet;
+    let scope = Scope {
+        module: 1,
+        marks: BTreeSet::new(),
+    };
+    let normal = "f = (x) { y = { x }\n { y } }";
+    let (normal_module, normal_errors) = ilang_syntax::parse_module(normal);
+    assert!(normal_errors.is_empty(), "{normal_errors:?}");
+    let lisp = "(= f (-> (x) _ {(= y {x}) {y}}))";
+    let (lisp_module, lisp_errors) = ilang_syntax::lisp::parse_source(lisp);
+    assert!(lisp_errors.is_empty(), "{lisp_errors:?}");
+    let a = source_item_syntax(&normal_module.items[0], &scope, normal, false);
+    let b = source_item_syntax(&lisp_module.items[0], &scope, lisp, true);
+    assert!(a.same_code(&b), "{} vs {}", a.show(), b.show());
+    let expression = ilang_syntax::lisp::parse_expression(
+        &ilang_syntax::lisp::parse("{(-> x {x})}").unwrap()[0],
+    )
+    .unwrap();
+    let clause_source = "{(-> x {x})}";
+    let result = source_expression_syntax(&expression, &scope, clause_source, true);
+    assert!(matches!(result.node(), Node::Curly(xs) if xs.len() == 1));
+    assert_eq!(result.show(), "{(-> x x)}");
+}
+
+#[test]
+fn source_syntax_strips_nested_type_groups_in_lisp_items() {
+    use ilang_syntax::lisp::source_syntax::source_item_syntax;
+    use ilang_syntax::lisp::syntax::Scope;
+    use std::collections::BTreeSet;
+    let source = "((Box A) {(Box (: value {A}))})";
+    let (module, errors) = ilang_syntax::lisp::parse_source(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let syntax = source_item_syntax(
+        &module.items[0],
+        &Scope {
+            module: 2,
+            marks: BTreeSet::new(),
+        },
+        source,
+        true,
+    );
+    assert_eq!(syntax.show(), "((Box A) {(Box (: value A))})");
+}
+
+#[test]
+fn lisp_short_function_body_matches_normal_surface_core() {
+    use ilang_syntax::lisp::source_syntax::source_item_syntax;
+    let scope = root("x").scope().clone();
+    let normal = "f = (x) { x }";
+    let lisp = "(= f (-> (x) _ x))";
+    let (a, ae) = ilang_syntax::parse_module(normal);
+    let (b, be) = ilang_syntax::lisp::parse_source(lisp);
+    assert!(ae.is_empty() && be.is_empty());
+    let a = source_item_syntax(&a.items[0], &scope, normal, false);
+    let b = source_item_syntax(&b.items[0], &scope, lisp, true);
+    assert!(a.same_code(&b), "{} vs {}", a.show(), b.show());
+}
+
+#[test]
+fn source_syntax_agrees_across_surfaces_for_library_modules() {
+    use ilang_syntax::lisp::source_syntax::source_item_syntax;
+    use ilang_syntax::lisp::syntax::Scope;
+    use std::collections::BTreeSet;
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let scope = Scope {
+        module: 1,
+        marks: BTreeSet::new(),
+    };
+    for file in [
+        "lib/i/fail.i",
+        "lib/i/assertion.i",
+        "lib/i/resource.i",
+        "lib/i/syntax.i",
+        "std/src/pair.i",
+        "std/src/bool.i",
+        "std/src/option.i",
+        "std/src/order.i",
+    ] {
+        let source = std::fs::read_to_string(root.join(file)).unwrap();
+        let (module, errors) = ilang_syntax::parse_module(&source);
+        assert!(errors.is_empty(), "{file}: {errors:?}");
+        let lisp = ilang_syntax::lisp::print_module(&module);
+        let (parsed, errors) = ilang_syntax::lisp::parse_source(&lisp);
+        assert!(errors.is_empty(), "{file}: {errors:?}");
+        assert_eq!(module.items.len(), parsed.items.len(), "{file}");
+        for (a, b) in module.items.iter().zip(&parsed.items) {
+            let normal = source_item_syntax(a, &scope, &source, false);
+            let other = source_item_syntax(b, &scope, &lisp, true);
+            assert!(
+                normal.same_code(&other),
+                "{file}: {} vs {}",
+                normal.show(),
+                other.show()
+            );
+        }
+    }
+}
