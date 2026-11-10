@@ -693,3 +693,43 @@ not_item = () -> Nil ! Assert {
         );
     }
 }
+
+#[test]
+fn committed_item_requests_flip_marks_without_losing_shared_identity() {
+    use ilang_host::syntax::{ItemRequest, flip_requests};
+    let target = Syntax::from_datum(
+        &parse("entry").unwrap()[0],
+        &Scope {
+            module: 3,
+            marks: BTreeSet::from([7]),
+        },
+    );
+    let requests = vec![
+        ItemRequest::Add {
+            collection: target.clone(),
+            target: target.clone(),
+            data: vec![],
+            at: target.clone(),
+        },
+        ItemRequest::Expose {
+            name: target.clone(),
+        },
+    ];
+    let flipped = flip_requests(&requests, 7);
+    let ItemRequest::Add {
+        collection,
+        target: named,
+        at,
+        ..
+    } = &flipped[0]
+    else {
+        panic!("add")
+    };
+    let ItemRequest::Expose { name } = &flipped[1] else {
+        panic!("expose")
+    };
+    assert!(collection.scope().marks.is_empty());
+    assert!(collection.identical(named));
+    assert!(collection.identical(at));
+    assert!(collection.identical(name));
+}

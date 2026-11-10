@@ -211,3 +211,36 @@ pub(super) fn install(
     })?;
     Ok(())
 }
+
+/// Flip the run mark on an entire successful journal, preserving sharing
+/// between syntax values in different requests.
+pub fn flip_requests(requests: &[ItemRequest], mark: u64) -> Vec<ItemRequest> {
+    use ilang_syntax::lisp::syntax::flip_mark_all;
+    let mut roots = Vec::new();
+    for request in requests {
+        match request {
+            ItemRequest::Add {
+                collection,
+                target,
+                at,
+                ..
+            } => roots.extend([collection.clone(), target.clone(), at.clone()]),
+            ItemRequest::Expose { name } => roots.push(name.clone()),
+        }
+    }
+    let mut flipped = flip_mark_all(&roots, mark).into_iter();
+    requests
+        .iter()
+        .map(|request| match request {
+            ItemRequest::Add { data, .. } => ItemRequest::Add {
+                collection: flipped.next().expect("collection root exists"),
+                target: flipped.next().expect("target root exists"),
+                data: data.clone(),
+                at: flipped.next().expect("location root exists"),
+            },
+            ItemRequest::Expose { .. } => ItemRequest::Expose {
+                name: flipped.next().expect("export root exists"),
+            },
+        })
+        .collect()
+}

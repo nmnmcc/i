@@ -1,6 +1,6 @@
 //! Compiler syntax services carried over the ordinary opaque-reference ABI.
 mod items;
-pub use items::{ItemContext, ItemRequest};
+pub use items::{ItemContext, ItemRequest, flip_requests};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
