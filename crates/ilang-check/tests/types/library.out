@@ -40,6 +40,13 @@ i/core.bit_array_to_string : (BitArray) -> Result(String, Nil)
 i/core.bit_array_concat : (List(BitArray)) -> BitArray
 i/core.inspect : (A) -> String
 i/core.hash : (A) -> Int
+i/record.get : (r: (K: A), key: K) -> A
+i/record.put : (r: Record & A, key: K, value: B) -> (K: B) & (..A, -K)
+i/record.remove : (r: Record & A, key: K) -> (..A, -K)
+i/record.has : (r: Record, key: String) -> Bool
+i/record.keys : (r: Record) -> List(String)
+i/record.size : (r: Record) -> Int
+i/record.texts : (r: Record) -> List((String, String))
 i/random.word_size : () -> Int
 i/random.mask : (x: Int) -> Int
 i/random.xor_shift : (x: Int, n: Int) -> Int

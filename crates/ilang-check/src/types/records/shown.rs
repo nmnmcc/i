@@ -15,6 +15,34 @@ pub struct ShownGraph {
 }
 
 impl ShownGraph {
+    /// Read a versioned graph bundle, resolving named types in its destination.
+    pub fn from_bundle(
+        text: &str,
+        type_ref: &mut impl FnMut(&str) -> Option<TypeRef>,
+    ) -> Result<ShownType, String> {
+        let body = text
+            .strip_prefix("type-graph-v1(")
+            .and_then(|s| s.strip_suffix(')'))
+            .ok_or_else(|| "expected a type-graph-v1 bundle".to_string())?;
+        let pool = super::Pool::default();
+        let mut variables = FxHashMap::default();
+        let mut names = Vec::new();
+        let mut variable = |name: &str| {
+            let id = *variables.entry(name.to_string()).or_insert_with(|| {
+                let id = V(names.len() as u32);
+                names.push(name.to_string());
+                id
+            });
+            Some(id)
+        };
+        let ty = super::codec::decode(body, &pool, type_ref, &mut variable, &mut |_, _, _| {
+            Some(super::graph::LabelOwner::artifact())
+        })?;
+        Ok(crate::types::display::tree_with(&ty, &mut |v| {
+            ShownType::Var(names[v.0 as usize].clone())
+        }))
+    }
+
     pub(crate) fn new(graph: &Graph, name: &mut dyn FnMut(V) -> ShownType) -> Self {
         Self {
             graph: graph.clone(),
@@ -197,121 +225,17 @@ impl ShownGraph {
         ty: &mut dyn FnMut(TypeRef) -> String,
         var: &mut dyn FnMut(&str) -> String,
     ) -> String {
-        let mut nodes = self.graph.nodes();
-        nodes.sort_unstable_by_key(|(id, _)| *id);
-        let ids: FxHashMap<_, _> = nodes
-            .iter()
-            .enumerate()
-            .map(|(i, (id, _))| (*id, i))
-            .collect();
-        let mut scopes = Vec::new();
-        // Name binders before sorting or rendering their labels.
         let names: FxHashMap<_, _> = self
             .names
             .iter()
             .map(|(v, t)| (*v, t.text_with(ty, var)))
             .collect();
-        let mut out = format!("type-graph-v1(root:@{},nodes:[", ids[&self.graph.id]);
-        for (index, (_, node)) in nodes.into_iter().enumerate() {
-            if index != 0 {
-                out.push(';');
-            }
-            out.push_str(&format!("@{index}="));
-            let refs = |children: Vec<super::Id>| {
-                children
-                    .into_iter()
-                    .map(|id| format!("@{}", ids[&id]))
-                    .collect::<Vec<_>>()
-                    .join(",")
-            };
-            let mut label = |l: Label| match l {
-                Label::Name(s) => ilang_syntax::print::string_literal(&s),
-                Label::Param(p) => {
-                    let scope = scopes
-                        .iter()
-                        .position(|owner| *owner == p.owner)
-                        .unwrap_or_else(|| {
-                            scopes.push(p.owner);
-                            scopes.len() - 1
-                        });
-                    format!(
-                        "key({scope},{},{})",
-                        p.index,
-                        ilang_syntax::print::string_literal(&(var)(&p.name))
-                    )
-                }
-            };
-            let body = match node {
-                Node::Never => "never".into(),
-                Node::Top => "top".into(),
-                Node::Var(v) => format!("var({})", ilang_syntax::print::string_literal(&names[&v])),
-                Node::Con(Head::Named(t), values, parts)
-                    if parts.is_empty() && !values.is_all() =>
-                {
-                    let atom = crate::types::display::tree(
-                        &Ty::Con(Head::Named(t), values, Vec::new()),
-                        &mut |_| unreachable!("scalar leaf"),
-                    );
-                    format!(
-                        "atom({})",
-                        ilang_syntax::print::string_literal(&atom.text_with(ty, var))
-                    )
-                }
-                Node::Con(Head::Named(t), _, parts) => format!(
-                    "named({},[{}])",
-                    ilang_syntax::print::string_literal(&(ty)(t)),
-                    refs(parts)
-                ),
-                Node::Con(Head::Tuple(_), _, parts) => format!("tuple([{}])", refs(parts)),
-                Node::Con(Head::Fn | Head::Record, _, _) => {
-                    unreachable!("separate graph node forms")
-                }
-                Node::Fn(f) => {
-                    let params = f
-                        .params
-                        .into_iter()
-                        .map(|(l, t)| {
-                            format!(
-                                "{}:@{}",
-                                l.map_or_else(
-                                    || "_".into(),
-                                    |s| ilang_syntax::print::string_literal(&s)
-                                ),
-                                ids[&t]
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                        .join(",");
-                    format!(
-                        "fn([{params}],@{},@{},@{})",
-                        ids[&f.ret], ids[&f.err], ids[&f.env]
-                    )
-                }
-                Node::Rec(fields) => format!(
-                    "record([{}])",
-                    fields
-                        .into_iter()
-                        .map(|(l, t)| format!("{}:@{}", label(l), ids[&t]))
-                        .collect::<Vec<_>>()
-                        .join(",")
-                ),
-                Node::Union(a, b) => format!("union(@{},@{})", ids[&a], ids[&b]),
-                Node::Inter(a, b) => format!("inter(@{},@{})", ids[&a], ids[&b]),
-                Node::Without(base, labels) => format!(
-                    "without(@{},[{}])",
-                    ids[&base],
-                    labels
-                        .into_iter()
-                        .map(&mut label)
-                        .collect::<Vec<_>>()
-                        .join(",")
-                ),
-                Node::Diff(base, heads) => format!("diff(@{},[{}])", ids[&base], refs(heads)),
-                Node::Both(a, b) => format!("both(@{},@{})", ids[&a], ids[&b]),
-            };
-            out.push_str(&body);
-        }
-        out.push_str("])");
-        out
+        let wire = super::codec::encode(
+            &self.graph,
+            &mut |t| ty(t),
+            &mut |v| names[&v].clone(),
+            &mut |param| var(&param.name),
+        );
+        format!("type-graph-v1({wire})")
     }
 }

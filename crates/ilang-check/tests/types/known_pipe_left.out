@@ -6,5 +6,4 @@ left_fn : String
 left_fn_later : List(Int)
 pair : (p: ((User) -> Int, Int)) -> ((User) -> Int, Int)
 left_tuple : ((User) -> Int, Int)
-unknown : (g: ((u: A) -> Never) -> B ? E ! N) -> B ? E ! N
-32:25: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
+unknown : (g: ((u: (name: A)) -> A) -> B ? E ! N) -> B ? E ! N

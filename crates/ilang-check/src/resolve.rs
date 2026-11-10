@@ -2373,9 +2373,21 @@ impl<'a> Resolver<'a> {
             if let Param::Pattern { pattern, .. } = param {
                 let mut pattern = pattern;
                 let mut named = false;
-                while let PatternKind::Named { pattern: inner, .. } = &pattern.kind { named = true; pattern = inner; }
-                if let PatternKind::Typed { binder, ty: Type { kind: TypeKind::Var(var), span } } = &pattern.kind
-                    && (named || binder.is_some()) && labels.contains(var) {
+                while let PatternKind::Named { pattern: inner, .. } = &pattern.kind {
+                    named = true;
+                    pattern = inner;
+                }
+                if let PatternKind::Typed {
+                    binder,
+                    ty:
+                        Type {
+                            kind: TypeKind::Var(var),
+                            span,
+                        },
+                } = &pattern.kind
+                    && (named || binder.is_some())
+                    && labels.contains(var)
+                {
                     allowed.entry(*var).or_insert_with(Vec::new).push(*span);
                 }
             }

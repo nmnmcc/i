@@ -85,6 +85,8 @@ pub(crate) struct VarState {
     pub upper: Vec<Ty>,
     /// The name written in an annotation (§4.7), kept when it is shown.
     pub name: Option<String>,
+    /// The binding-scoped label whose key value has this variable's type.
+    pub label_key: Option<crate::hir::TyVarId>,
     /// Values may come to the variable from outside the constraints: it is
     /// the type of a parameter, a written type variable, or the result of a
     /// function that is not known. Its lower bounds are then not all its
@@ -340,6 +342,7 @@ impl Solver {
             lower: Vec::new(),
             upper: Vec::new(),
             name: None,
+            label_key: None,
             input: false,
             from: Vec::new(),
             into: Vec::new(),
@@ -392,7 +395,6 @@ impl Solver {
             ),
             Head::Named(TypeRef::Builtin(b)) => ParamModes::from_slice(builtin_variance_values(b)),
             Head::Tuple(_) | Head::Fn => ParamModes::repeated(Variance::Co, n),
-
         }
     }
 
@@ -878,7 +880,6 @@ impl Solver {
             || matches!(r, Ty::Union(ms) if ms.contains(l))
         {
             return;
-
         }
         if self.observed_shape
             && (matches!(r, Ty::Union(ts) if ts.contains(l))
@@ -1343,6 +1344,8 @@ impl Solver {
     fn reach(&self, starts: Vec<V>, lower: bool) -> (Vec<V>, Vec<Ty>) {
         let mut seen: Vec<V> = Vec::new();
         let mut visited: HashSet<V> = HashSet::default();
+        // Graph keys hash their immutable pool identity and node ID.
+        #[allow(clippy::mutable_key_type)]
         let mut found: HashSet<&Ty> = HashSet::default();
         let mut stack = starts;
         let mut out = Vec::new();
@@ -1706,6 +1709,10 @@ impl Solver {
                     return Ty::Var(*nv);
                 }
                 let nv = self.fresh_at(self.level);
+                if let Some(label) = self.vars[v.0 as usize].label_key {
+                    self.vars[nv.0 as usize].name = self.vars[v.0 as usize].name.clone();
+                    self.vars[nv.0 as usize].label_key = Some(label);
+                }
                 map.insert(*v, nv);
                 self.var_mut(nv).row = self.var(*v).row;
                 self.var_mut(nv).difference = self.var(*v).difference;
@@ -2086,7 +2093,7 @@ impl Solver {
         self.diff_mode(a, h, Mode::Env)
     }
 
-    fn diff_mode(&mut self, a: Ty, h: Vec<Ty>, mode: Mode) -> Ty {
+    pub(super) fn diff_mode(&mut self, a: Ty, h: Vec<Ty>, mode: Mode) -> Ty {
         let mode = mode.max(self.mode(&a));
         let env = mode != Mode::Value;
         let mut hs = Vec::new();
@@ -2150,7 +2157,7 @@ impl Solver {
     pub fn normalize_mode(&mut self, t: Ty, mode: Mode) -> Ty {
         let mode = mode.max(self.mode(&t));
         match t {
-            Ty::Graph(g) => g.normalize(self),
+            Ty::Graph(g) => g.normalize(self, mode),
             Ty::Con(h, values, args) => {
                 let modes = self.rows(h, args.len());
                 Ty::Con(
@@ -2201,6 +2208,14 @@ impl Solver {
             ),
             t => t,
         }
+    }
+
+    pub(super) fn inter_mode(&mut self, members: Vec<Ty>, mode: Mode) -> Ty {
+        let scalar = members.iter().any(|t| t.scalar().is_some());
+        self.inter_in(
+            members,
+            mode != Mode::Value && !(mode == Mode::Row && scalar),
+        )
     }
 
     /// `t` with each `Top` in it changed to a new variable at `level`.

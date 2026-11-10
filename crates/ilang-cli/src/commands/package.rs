@@ -1473,19 +1473,29 @@ impl<'a> TypeShow<'a> {
                 if let Some(base) = base {
                     parts.push(format!("..{}", self.ty(base, 0)));
                 }
-                parts.extend(fields.iter().map(|(label, ty)| {
-                    format!(
-                        "{}: {}",
-                        ilang_syntax::print::record_label(&label.name, label.parameter.is_some()),
-                        self.ty(ty, 0)
-                    )
-                }));
-                parts.extend(removed.iter().map(|label| {
-                    format!(
-                        "-{}",
-                        ilang_syntax::print::record_label(&label.name, label.parameter.is_some())
-                    )
-                }));
+                let label_text = |label: &hir::RecordLabel| match label.parameter {
+                    Some(id) if self.canonical => self
+                        .def
+                        .params
+                        .iter()
+                        .position(|(_, p)| *p == id)
+                        .map(|i| self.param(i))
+                        .unwrap_or_else(|| self.var(id)),
+                    _ => ilang_syntax::print::record_label(&label.name, label.parameter.is_some()),
+                };
+                let mut members: Vec<_> = fields
+                    .iter()
+                    .map(|(label, ty)| format!("{}: {}", label_text(label), self.ty(ty, 0)))
+                    .collect();
+                members.extend(
+                    removed
+                        .iter()
+                        .map(|label| format!("-{}", label_text(label))),
+                );
+                if self.canonical {
+                    members.sort();
+                }
+                parts.extend(members);
                 format!("({})", parts.join(", "))
             }
             TypeKind::Fn {
@@ -1716,5 +1726,19 @@ mod value_type_interfaces {
         let a = canonical("(T)\nport: Int = 1\nT(A,B) = (B,A,Int | String,port)");
         let b = canonical("(T)\nvalue: Int = 2\nT(X,Y) = (Y,X,String | Int,value)");
         assert_eq!(a, b);
+    }
+    #[test]
+    fn record_interfaces_preserve_label_parameters_and_field_sets() {
+        let a = canonical(
+            "(f, Person)\nf(K) = (r: (K: Int), key: K) -> Int { 1 }\nPerson = (name: String, age: Int)",
+        );
+        let b = canonical(
+            "(f, Person)\nf(Key) = (r: (Key: Int), key: Key) -> Int { 1 }\nPerson = (age: Int, name: String)",
+        );
+        assert_eq!(a, b);
+        let changed = canonical(
+            "(f, Person)\nf(Key) = (r: (Key: String), key: Key) -> Int { 1 }\nPerson = (age: Int, name: String)",
+        );
+        assert_ne!(a, changed);
     }
 }

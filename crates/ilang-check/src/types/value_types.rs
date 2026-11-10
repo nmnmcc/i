@@ -613,7 +613,11 @@ impl Checker<'_> {
     pub(super) fn read_annotation(&mut self, value: ValueRef, site: OfId) -> Ty {
         if !self.label_slots_ref(value).is_empty() {
             let span = self.p.of_sites[site.0 as usize].span;
-            self.error(code::LABEL_PARAMETER_VALUE, span, "a binding with label parameters may only be called");
+            self.error(
+                code::LABEL_PARAMETER_VALUE,
+                span,
+                "a binding with label parameters may only be called",
+            );
         }
         if let ValueRef::Local(var) = value
             && self.label_key_values.contains_key(&var)
@@ -657,8 +661,7 @@ impl Checker<'_> {
                 }
             }
         }
-        let result = self.instantiate(&scheme);
-        result
+        self.instantiate(&scheme)
     }
 
     fn read_error(&mut self, site: OfId, c: &'static str) {

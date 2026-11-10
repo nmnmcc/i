@@ -604,3 +604,12 @@ call lost the first field in its known result. Matching graph views and known
 record fields now retains that base. `t3_record_schema.i` passes at O0/O2;
 the K4 merge also builds and all 33 existing T3 source cases pass at both
 levels. Label and graph interface audits and the full merge gate remain open.
+
+The changed checker type goldens implement spec §4.8 rule 13b: an unknown
+receiver of `.name` now acquires a structural field constraint instead of
+E0506. The `known_general_vars` and `labels` diagnostics then become E0501
+when the inferred structural parameter is given a nominal User or Node,
+which follows records D7. `library.out` adds the seven §14 declarations and
+shows each label parameter and its key with the same K. Existing nominal
+constructor-narrowing behavior was restored before updating these fixtures.
+The whole checker type-golden test passes without UPDATE.

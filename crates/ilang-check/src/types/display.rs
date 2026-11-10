@@ -341,7 +341,9 @@ fn trace(s: &Solver, t: &Ty, opts: Opts) -> Result<Traced, ()> {
 }
 
 fn rigid(s: &Solver, keep: Option<u32>, v: V) -> bool {
-    keep.is_some_and(|k| s.vars.get(v.0 as usize).is_some_and(|x| x.level <= k))
+    s.vars
+        .get(v.0 as usize)
+        .is_some_and(|x| x.label_key.is_some() || keep.is_some_and(|k| x.level <= k))
 }
 
 /// A type as it is in the solver, for messages: variables are `_`.
@@ -657,6 +659,8 @@ impl Coalescer<'_> {
                 }
                 let mut flat = Vec::new();
                 let mut todo: Vec<_> = parts.into_iter().rev().collect();
+                // Graph keys hash their immutable pool identity and node ID.
+                #[allow(clippy::mutable_key_type)]
                 let mut seen = HashSet::default();
                 while let Some(t) = todo.pop() {
                     match t {
@@ -675,7 +679,6 @@ impl Coalescer<'_> {
                     self.memo.insert((v, pos, env), t.clone());
                 }
                 t
-
             }
             Ty::Con(h, values, args) => {
                 let vs = self.s.variances(*h, args.len());
@@ -1463,6 +1466,7 @@ enum Role {
 struct Namer {
     names: HashMap<V, String>,
     taken: HashSet<String>,
+    label_names: HashMap<V, String>,
 }
 
 impl Namer {
@@ -1481,6 +1485,17 @@ impl Namer {
         Namer {
             names: HashMap::default(),
             taken,
+            label_names: s
+                .vars
+                .iter()
+                .enumerate()
+                .filter_map(|(i, state)| {
+                    state
+                        .label_key
+                        .and_then(|_| state.name.clone())
+                        .map(|name| (V(i as u32), name))
+                })
+                .collect(),
         }
     }
 
@@ -1494,6 +1509,12 @@ impl Namer {
     fn assign(&mut self, t: &Ty) {
         let mut order = Vec::new();
         roles(t, Role::Value, &mut order);
+        for (v, _) in &order {
+            if let Some(name) = self.label_names.get(v) {
+                self.taken.insert(name.clone());
+                self.names.insert(*v, name.clone());
+            }
+        }
         for (v, role) in &order {
             if self.names.contains_key(v) {
                 continue;

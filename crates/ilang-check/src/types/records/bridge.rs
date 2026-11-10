@@ -930,47 +930,101 @@ impl Graph {
     /// Reapply the ordinary leaf algebra after substitution. This includes
     /// invariant nominal constraints; the record graph never replaces them
     /// by a common-field approximation or an unrecorded equality.
-    pub fn normalize(&self, solver: &mut crate::types::solve::Solver) -> Ty {
-        let mut nodes = self.nodes();
-        nodes.sort_unstable_by_key(|(id, _)| *id);
-        let mut done: FxHashMap<Id, Ty> = FxHashMap::default();
-        for (id, node) in nodes {
-            let value = match node {
+    pub fn normalize(
+        &self,
+        solver: &mut crate::types::solve::Solver,
+        mode: crate::types::solve::Mode,
+    ) -> Ty {
+        use crate::types::solve::Mode;
+        let mut needed = FxHashSet::default();
+        let mut pending = vec![(self.id, mode)];
+        while let Some((id, mode)) = pending.pop() {
+            if !needed.insert((id, mode)) {
+                continue;
+            }
+            match self.node_at(id) {
+                Node::Con(head, _, parts) => pending.extend(
+                    parts
+                        .into_iter()
+                        .zip(solver.rows(head, self.node_at(id).children().len())),
+                ),
+                Node::Fn(f) => {
+                    pending.extend(f.params.into_iter().map(|(_, id)| (id, Mode::Value)));
+                    pending.extend([(f.ret, Mode::Value), (f.err, Mode::Row), (f.env, Mode::Env)]);
+                }
+                Node::Rec(fields) => {
+                    pending.extend(fields.into_iter().map(|(_, id)| (id, Mode::Value)))
+                }
+                Node::Without(base, _) => pending.push((base, Mode::Value)),
+                node => pending.extend(node.children().into_iter().map(|id| (id, mode))),
+            }
+        }
+        let mut order: Vec<_> = needed.into_iter().collect();
+        order.sort_unstable();
+        let mut done: FxHashMap<(Id, Mode), Ty> = FxHashMap::default();
+        for (id, mode) in order {
+            let value = match self.node_at(id) {
                 Node::Never => Ty::Never,
                 Node::Top => Ty::Top,
                 Node::Var(v) => Ty::Var(v),
-                Node::Con(h, vs, parts) => {
-                    Ty::Con(h, vs, parts.iter().map(|id| done[id].clone()).collect())
+                Node::Con(head, values, parts) => {
+                    let modes = solver.rows(head, parts.len());
+                    Ty::Con(
+                        head,
+                        values,
+                        parts
+                            .into_iter()
+                            .zip(modes)
+                            .map(|(id, mode)| done[&(id, mode)].clone())
+                            .collect(),
+                    )
                 }
                 Node::Fn(f) => Ty::Fn(Box::new(FnTy {
                     params: f
                         .params
                         .into_iter()
-                        .map(|(l, t)| (l.map(|s| s.to_string()), done[&t].clone()))
+                        .map(|(label, id)| {
+                            (
+                                label.map(|s| s.to_string()),
+                                done[&(id, Mode::Value)].clone(),
+                            )
+                        })
                         .collect(),
-                    ret: done[&f.ret].clone(),
-                    err: done[&f.err].clone(),
-                    env: done[&f.env].clone(),
+                    ret: done[&(f.ret, Mode::Value)].clone(),
+                    err: done[&(f.err, Mode::Row)].clone(),
+                    env: done[&(f.env, Mode::Env)].clone(),
                 })),
                 Node::Rec(fields) => solver.record(
                     fields
                         .into_iter()
-                        .map(|(l, t)| (l, done[&t].clone()))
+                        .map(|(label, id)| (label, done[&(id, Mode::Value)].clone()))
                         .collect(),
                 ),
-                Node::Union(a, b) => solver.union(vec![done[&a].clone(), done[&b].clone()]),
-                Node::Inter(a, b) => solver.inter(vec![done[&a].clone(), done[&b].clone()]),
-                Node::Without(base, ls) => solver.without(&done[&base], ls),
-                Node::Diff(base, hs) => solver.diff(
-                    done[&base].clone(),
-                    hs.iter().map(|h| done[h].clone()).collect(),
+                Node::Union(a, b) => solver.union_mode(
+                    vec![done[&(a, mode)].clone(), done[&(b, mode)].clone()],
+                    mode,
                 ),
-                Node::Both(a, b) => {
-                    Ty::Both(Box::new(done[&a].clone()), Box::new(done[&b].clone()))
-                }
+                Node::Inter(a, b) => solver.inter_mode(
+                    vec![done[&(a, mode)].clone(), done[&(b, mode)].clone()],
+                    mode,
+                ),
+                Node::Without(base, labels) => solver.without(&done[&(base, Mode::Value)], labels),
+                Node::Diff(base, heads) => solver.diff_mode(
+                    done[&(base, mode)].clone(),
+                    heads
+                        .into_iter()
+                        .map(|id| done[&(id, mode)].clone())
+                        .collect(),
+                    mode,
+                ),
+                Node::Both(a, b) => Ty::Both(
+                    Box::new(done[&(a, mode)].clone()),
+                    Box::new(done[&(b, mode)].clone()),
+                ),
             };
-            done.insert(id, self.pool.ty(self.pool.import(&value)));
+            done.insert((id, mode), self.pool.ty(self.pool.import(&value)));
         }
-        done.remove(&self.id).expect("normalized graph root")
+        done.remove(&(self.id, mode))
+            .expect("normalized graph root")
     }
 }

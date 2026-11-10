@@ -5,29 +5,92 @@ use ilang_wasm::ir::*;
 use std::{env, process::Command};
 
 fn function(name: &str, arity: u32, locals: usize, body: Vec<Stmt>) -> FuncKind {
-    FuncKind::Code(Func { name: name.into(), arity, locals: vec![LocalType::Value; locals], body, frame: false })
+    FuncKind::Code(Func {
+        name: name.into(),
+        arity,
+        locals: vec![LocalType::Value; locals],
+        body,
+        frame: false,
+    })
 }
 
 fn let_value(dst: u32, value: Value) -> Stmt {
-    Stmt::Let { dst, value, site: None }
+    Stmt::Let {
+        dst,
+        value,
+        site: None,
+    }
 }
 
 #[test]
 fn record_globals_and_large_arrays_validate_and_run_at_o0_and_o2() {
     for labels in [
-        vec!["é".into(), "a b".into(), "_x".into(), "".into(), "quote\"".into()],
+        vec![
+            "é".into(),
+            "a b".into(),
+            "_x".into(),
+            "".into(),
+            "quote\"".into(),
+        ],
         vec!["a".repeat(10_001)],
         (0..5_001).map(|i| format!("f{i:04}")).collect(),
     ] {
         let count = labels.len();
-        let fields = (0..count).rev().map(|i| (LabelConst(i as u32), Atom::Int((i as i64).into()))).collect();
-        let mut p = Program { labels, ..Program::default() };
+        let fields = (0..count)
+            .rev()
+            .map(|i| (LabelConst(i as u32), Atom::Int((i as i64).into())))
+            .collect();
+        let mut p = Program {
+            labels,
+            ..Program::default()
+        };
         p.funcs = vec![
-            function("new", 0, 1, vec![let_value(0, Value::RecNew(fields)), Stmt::Return(Atom::Local(0))]),
-            function("get", 1, 2, vec![let_value(1, Value::RecGet(Atom::Local(0), LabelConst(0))), Stmt::Return(Atom::Local(1))]),
-            function("with", 1, 2, vec![let_value(1, Value::RecWith(Atom::Local(0), vec![(LabelConst(0), Atom::Int(99.into()))])), Stmt::Return(Atom::Local(1))]),
-            function("is record", 1, 1, vec![Stmt::If { cond: Cond::IsRec(Atom::Local(0)), then: vec![Stmt::Return(Atom::Bool(true))], otherwise: vec![Stmt::Return(Atom::Bool(false))] }]),
-            function("label", 0, 0, vec![Stmt::Return(Atom::Label(LabelConst(0)))]),
+            function(
+                "new",
+                0,
+                1,
+                vec![
+                    let_value(0, Value::RecNew(fields)),
+                    Stmt::Return(Atom::Local(0)),
+                ],
+            ),
+            function(
+                "get",
+                1,
+                2,
+                vec![
+                    let_value(1, Value::RecGet(Atom::Local(0), LabelConst(0))),
+                    Stmt::Return(Atom::Local(1)),
+                ],
+            ),
+            function(
+                "with",
+                1,
+                2,
+                vec![
+                    let_value(
+                        1,
+                        Value::RecWith(Atom::Local(0), vec![(LabelConst(0), Atom::Int(99.into()))]),
+                    ),
+                    Stmt::Return(Atom::Local(1)),
+                ],
+            ),
+            function(
+                "is record",
+                1,
+                1,
+                vec![Stmt::If {
+                    cond: Cond::IsRec(Atom::Local(0)),
+                    then: vec![Stmt::Return(Atom::Bool(true))],
+                    otherwise: vec![Stmt::Return(Atom::Bool(false))],
+                }],
+            ),
+            function(
+                "label",
+                0,
+                0,
+                vec![Stmt::Return(Atom::Label(LabelConst(0)))],
+            ),
         ];
         ilang_wasm::control::split(&mut p);
         let source = ilang_wasm::emit::wat(&p).replace(ilang_wasm::runtime::HOST,
@@ -67,8 +130,17 @@ fn record_globals_and_large_arrays_validate_and_run_at_o0_and_o2() {
         let raw = dir.path().join("record.wasm");
         std::fs::write(&wat, source).unwrap();
         let output = Command::new(env::var_os("WASM_TOOLS").unwrap_or_else(|| "wasm-tools".into()))
-            .arg("parse").arg(&wat).arg("-o").arg(&raw).output().unwrap();
-        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+            .arg("parse")
+            .arg(&wat)
+            .arg("-o")
+            .arg(&raw)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         let raw = std::fs::read(raw).unwrap();
         for level in [ilang_binaryen::Level::O0, ilang_binaryen::Level::O2] {
             let binary = ilang_binaryen::optimize(&raw, level).unwrap();
@@ -76,8 +148,15 @@ fn record_globals_and_large_arrays_validate_and_run_at_o0_and_o2() {
             let file = dir.path().join("optimized.wasm");
             std::fs::write(&file, binary).unwrap();
             let output = Command::new(env::var_os("WASMTIME").unwrap_or_else(|| "wasmtime".into()))
-                .args(["run", "--invoke", "record_test"]).arg(file).output().unwrap();
-            assert!(output.status.success(), "count {count}, {level:?}: {}", String::from_utf8_lossy(&output.stderr));
+                .args(["run", "--invoke", "record_test"])
+                .arg(file)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "count {count}, {level:?}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
             assert_eq!(String::from_utf8(output.stdout).unwrap().trim(), "1");
         }
     }

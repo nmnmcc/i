@@ -654,6 +654,8 @@ impl Checker<'_> {
             }
         }
         if LITERAL_CANDIDATES {
+            // Graph keys hash their immutable pool identity and node ID.
+            #[allow(clippy::mutable_key_type)]
             let mut scalar_taken: HashSet<Ty> = HashSet::default();
             for (earlier_clause, unguarded, candidate, pat) in &place.scalar_seen {
                 if *earlier_clause >= ci || !unguarded || scalar_taken.contains(candidate) {

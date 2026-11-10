@@ -34,7 +34,9 @@ pub(crate) enum LabelOwner {
 }
 
 impl From<BindingRef> for LabelOwner {
-    fn from(binding: BindingRef) -> Self { Self::Binding(binding) }
+    fn from(binding: BindingRef) -> Self {
+        Self::Binding(binding)
+    }
 }
 
 impl LabelOwner {
@@ -639,7 +641,8 @@ mod tests {
             owner: BindingRef {
                 module: ModuleId(0),
                 index: 0,
-            }.into(),
+            }
+            .into(),
             index: 0,
             level: 1,
             name: "K".into(),

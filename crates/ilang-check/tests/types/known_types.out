@@ -56,7 +56,7 @@ pattern_list : (xs: List(String)) -> Bool
 pattern_case_part : (b: Box(Int | String)) -> Bool
 pattern_narrowed : (x: Int | String | Nil) -> 0 | 1 | 2
 not_general : () -> Bool
-untyped_field : (u: A) -> Never
+untyped_field : (u: (name: A)) -> A
 option_name : (opt: Option(User)) -> String
 annotated : (x: Int) -> Int
 annotated_call : Int
@@ -111,4 +111,3 @@ annotated_call : Int
 218:24: warning[W0503]: the two sides have the known types `Int | String` and `Float`, which can never be equal, so `==` is always `False` (§6.9)
 227:14: warning[W0503]: the two sides have the known types `Int | String` and `Nil`, which can never be equal, so `==` is always `False` (§6.9)
 237:2: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
-247:25: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`

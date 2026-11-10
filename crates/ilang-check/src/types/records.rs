@@ -4,6 +4,7 @@
 
 mod bdd;
 mod bridge;
+mod codec;
 mod graph;
 mod proof;
 #[cfg(test)]
