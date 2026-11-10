@@ -2207,3 +2207,123 @@ fn a_nested_store_in_the_allocator_gets_its_own_thread() {
     );
     assert!(recorded.iter().all(|(_, id)| *id != outer), "{recorded:?}");
 }
+
+// Spec 4.1 and 11.4 require distinct nominal constructors to differ, even
+// when the host passes one object (or null) through both declarations.
+#[test]
+fn compiled_opaque_boundaries_preserve_nominal_identity() {
+    const COMPILED: &[u8] = include_bytes!("../../../tests/browser/fixtures/compiled.wasm");
+    let reference = HostReference::new(42);
+    let raw = Value::Externref(reference.clone());
+    let other = Value::Externref(HostReference::new(42));
+    for seed in [raw.clone(), Value::NullExternref] {
+        let mut imports = imports(&Arc::default());
+        imports
+            .async_service("app:clock/v1", "tick", |_| async {
+                Ok(Ok(Value::Int(42.into())))
+            })
+            .unwrap();
+        let get = seed.clone();
+        imports
+            .external("app:opaque/v1", "get", move |_| Ok(get.clone()))
+            .unwrap();
+        imports
+            .external("app:opaque/v1", "echo", |args| Ok(args[0].clone()))
+            .unwrap();
+        for label in ["get_a", "get_b"] {
+            let get = seed.clone();
+            imports
+                .service("app:opaque-sync/v1", label, move |_| Ok(Ok(get.clone())))
+                .unwrap();
+            let get = seed.clone();
+            imports
+                .async_service("app:opaque-async/v1", label, move |_| {
+                    let get = get.clone();
+                    async move { Ok(Ok(get)) }
+                })
+                .unwrap();
+        }
+        let mut instance = Program::from_bytes(COMPILED)
+            .unwrap()
+            .instantiate(HostOptions::new(imports))
+            .unwrap();
+        let boolean = |instance: &mut Instance, name: &str, args: &[Value]| {
+            let result = ok(instance.call(&format!("app/opaque.{name}"), args).unwrap());
+            let Value::Bool(value) = result else {
+                panic!("expected Bool: {result:?}")
+            };
+            value
+        };
+        for (a, b, same) in [
+            (raw.clone(), raw.clone(), true),
+            (raw.clone(), other.clone(), false),
+            (Value::NullExternref, Value::NullExternref, true),
+            (Value::NullExternref, raw.clone(), false),
+        ] {
+            let args = [a, b];
+            for name in [
+                "direct_aa",
+                "generic_aa",
+                "alias_aa",
+                "collection_aa",
+                "roundtrip_aa",
+            ] {
+                assert_eq!(
+                    boolean(&mut instance, name, &args),
+                    same,
+                    "{name}: {args:?}"
+                );
+            }
+            for name in ["direct_ab", "generic_ab", "module_ab", "collection_ab"] {
+                assert!(!boolean(&mut instance, name, &args), "{name}: {args:?}");
+            }
+        }
+        for a in [raw.clone(), Value::NullExternref] {
+            let returned = ok(instance
+                .call("app/opaque.echo", std::slice::from_ref(&a))
+                .unwrap());
+            match &returned {
+                Value::Externref(value) => assert!(reference.ptr_eq(value)),
+                Value::NullExternref => assert!(matches!(a, Value::NullExternref)),
+                _ => panic!("expected opaque reference"),
+            }
+            assert!(boolean(
+                &mut instance,
+                "generic_aa",
+                &[a.clone(), returned.clone()]
+            ));
+            assert!(!boolean(
+                &mut instance,
+                "generic_ab",
+                &[a.clone(), returned]
+            ));
+            assert!(!boolean(
+                &mut instance,
+                "roundtrip_ab",
+                std::slice::from_ref(&a)
+            ));
+            assert!(boolean(&mut instance, "hash_aa", &[a.clone(), a.clone()]));
+            assert!(
+                matches!(ok(instance.call("app/opaque.inspect_a", &[a]).unwrap()),
+                Value::String(text) if text == "//wasm(opaque)")
+            );
+            instance.collect_garbage().unwrap();
+        }
+        for (name, expected) in [
+            ("import_aa", true),
+            ("import_ab", false),
+            ("sync_aa", true),
+            ("sync_ab", false),
+        ] {
+            assert_eq!(boolean(&mut instance, name, &[]), expected, "{name}");
+        }
+        for (name, expected) in [("async_aa", true), ("async_ab", false)] {
+            let result =
+                ok(block_on(instance.call_async(&format!("app/opaque.{name}"), &[])).unwrap());
+            assert!(
+                matches!(result, Value::Bool(value) if value == expected),
+                "{name}: {result:?}"
+            );
+        }
+    }
+}
