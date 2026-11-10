@@ -338,7 +338,7 @@ fn compiler_wrapper_returns_a_successful_macro_value() {
         &built,
         &format!("{path}.{name}"),
         &[input()],
-        prepared.templates.into(),
+        prepared.templates.clone().into(),
         context,
     )
     .unwrap();
@@ -346,6 +346,23 @@ fn compiler_wrapper_returns_a_successful_macro_value() {
         panic!("wrong completion: {result:?}")
     };
     assert_eq!(value.show(), "(wrapped (f x))");
+    let budget = ilang_host::macro_budget::MacroBudget::new(ilang_host::macro_budget::Limits {
+        work: 1,
+        allocation: u64::MAX,
+        frames: u64::MAX,
+    });
+    let context = Arc::new(DefinitionContext::new(|at| DefinitionReply::CompileError {
+        message: "unexpected query".into(),
+        at: at.clone(),
+    }));
+    let error = ilang_macro::run::invoke_with_items_budget(
+        &built, &format!("{path}.{name}"), &[input()], prepared.templates.into(),
+        context, None, budget.clone(),
+    ).unwrap_err();
+    assert_eq!(budget.exceeded(), Some(ilang_host::macro_budget::Limit::Work));
+    assert_eq!(error.downcast_ref::<ilang_host::macro_budget::Exceeded>(),
+        Some(&ilang_host::macro_budget::Exceeded(ilang_host::macro_budget::Limit::Work)));
+
 }
 
 #[test]

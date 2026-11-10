@@ -202,6 +202,7 @@ impl Syntax {
             identity: self.scope_identity().cloned(),
             definition_head: Some(answer),
             origin: self.0.origin.clone(),
+            host_identity: Mutex::new(None),
         }))
     }
     /// Whether a made name remains compatible with a compiler-owned identity.
