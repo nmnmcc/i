@@ -1,5 +1,5 @@
 //! Position-directed conversion of datums to the normal surface.
-use super::{Datum, DatumKind as K, show};
+use super::{Datum, DatumKind as K, Document, show};
 use crate::{Code, Diagnostic};
 
 type Result<T> = std::result::Result<T, Diagnostic>;
@@ -39,11 +39,11 @@ fn joined(xs: &[Datum], f: fn(&Datum) -> Result<String>, sep: &str) -> Result<St
 
 /// Convert a Lisp-surface module to normal source. Errors refer to the datum's
 /// original span. A future macro phase consumes quotes without printing them.
-pub fn normal_source(datums: &[Datum]) -> Result<String> {
+pub fn normal_source(document: &Document) -> Result<String> {
     let mut lines = Vec::new();
     let mut headers = 0;
     let mut items_started = false;
-    for datum in datums {
+    for datum in &document.datums {
         for doc in &datum.docs {
             lines.push(format!(
                 "{}{}",
@@ -70,6 +70,13 @@ pub fn normal_source(datums: &[Datum]) -> Result<String> {
         }
         items_started = true;
         lines.push(item(datum)?);
+    }
+    for doc in &document.trailing_docs {
+        lines.push(format!(
+            "{}{}",
+            if doc.module { "////" } else { "///" },
+            doc.text
+        ));
     }
     Ok(if lines.is_empty() {
         String::new()
@@ -277,12 +284,13 @@ fn expr(d: &Datum) -> Result<String> {
     }
     match &d.kind {
         K::Round(xs) => match xs.as_slice() {
+            [] => Ok("()".into()),
             [h, rest @ ..] if symbol(h, ",") && !rest.is_empty() => {
                 Ok(format!("({})", joined(rest, expr, ", ")?))
             }
             [h, a, b] if symbol(h, ".") => {
                 if let K::Curly(cs) = &b.kind {
-                    Ok(format!("{} |> {}", expr(a)?, clauses(cs)?))
+                    Ok(format!("{} |> {}", field_target(a)?, clauses(cs)?))
                 } else {
                     Ok(format!(
                         "{}.{}",

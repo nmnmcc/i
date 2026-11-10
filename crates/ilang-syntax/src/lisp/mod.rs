@@ -40,8 +40,30 @@ pub enum DatumKind {
     Splice(Box<Datum>),
 }
 
+/// A file's datums and documentation after its final datum.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Document {
+    pub datums: Vec<Datum>,
+    pub trailing_docs: Vec<DocComment>,
+}
+
+impl std::ops::Deref for Document {
+    type Target = [Datum];
+    fn deref(&self) -> &[Datum] {
+        &self.datums
+    }
+}
+
+impl IntoIterator for Document {
+    type Item = Datum;
+    type IntoIter = std::vec::IntoIter<Datum>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.datums.into_iter()
+    }
+}
+
 /// Read all datums, ignoring the normal surface's line break rule.
-pub fn parse(source: &str) -> Result<Vec<Datum>, Vec<Diagnostic>> {
+pub fn parse(source: &str) -> Result<Document, Vec<Diagnostic>> {
     let lexed = lex_lisp(source);
     if !lexed.diagnostics.is_empty() {
         return Err(lexed.diagnostics);
@@ -63,7 +85,10 @@ pub fn parse(source: &str) -> Result<Vec<Datum>, Vec<Diagnostic>> {
             datum.docs.push(docs.next().unwrap());
         }
     }
-    Ok(result)
+    Ok(Document {
+        datums: result,
+        trailing_docs: docs.collect(),
+    })
 }
 
 struct Parser<'a> {
@@ -180,7 +205,7 @@ pub fn show(datum: &Datum) -> String {
     match &datum.kind {
         Name(s) | Discard(s) | UpName(s) | Symbol(s) => s.clone(),
         Int(n) => n.to_string(),
-        Float(n) => format!("{n:?}"),
+        Float(n) => float(*n),
         String(s) => crate::print::string_literal(s),
         Round(xs) => bracket("(", ")", xs),
         Square(xs) => bracket("[", "]", xs),
@@ -195,6 +220,14 @@ pub fn show(datum: &Datum) -> String {
         Quote(x) => format!("`{}", show(x)),
         Unquote(x) => format!("~{}", show(x)),
         Splice(x) => format!("~..{}", show(x)),
+    }
+}
+
+fn float(n: f64) -> String {
+    let s = format!("{n:?}");
+    match s.split_once('e') {
+        Some((mantissa, exponent)) if !mantissa.contains('.') => format!("{mantissa}.0e{exponent}"),
+        _ => s,
     }
 }
 

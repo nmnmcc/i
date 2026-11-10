@@ -25,7 +25,7 @@ fn qualified(module: &Option<Ident>, n: &Ident) -> String {
         .map_or_else(|| name(n), |m| form(".", [name(m), name(n)]))
 }
 fn float(n: f64) -> String {
-    format!("{n:?}")
+    super::float(n)
 }
 
 /// Render a normal surface module in the Lisp surface.
@@ -229,6 +229,7 @@ fn expr(e: &Expr) -> String {
         ExprKind::Float(n) => float(*n),
         ExprKind::String(s) => string_literal(s),
         ExprKind::Name { module, name } => qualified(module, name),
+        ExprKind::Tuple(es) if es.is_empty() => "()".into(),
         ExprKind::Tuple(es) => form(",", es.iter().map(expr)),
         ExprKind::List { items, rest } => braced(
             "[",

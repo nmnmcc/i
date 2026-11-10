@@ -61,31 +61,51 @@ choose = (x) { x |> { 0 -> "zero" _ -> "other" } }
 #[test]
 fn format_corpus_has_a_lisp_round_trip() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/format");
+    check_corpus(&dir);
+}
+
+#[test]
+fn libraries_have_a_lisp_round_trip() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    check_corpus(&root.join("lib"));
+    check_corpus(&root.join("std"));
+}
+
+fn check_corpus(dir: &std::path::Path) {
     let mut failures = Vec::new();
-    for file in std::fs::read_dir(dir).unwrap() {
-        let path = file.unwrap().path();
-        if path.extension().is_none_or(|ext| ext != "i") {
-            continue;
-        }
-        let source = std::fs::read_to_string(&path).unwrap();
-        let (module, diagnostics) = ilang_syntax::parse_module(&source);
-        if !diagnostics.is_empty() {
-            continue;
-        }
-        let lisp = print_module(&module);
-        let converted = parse(&lisp)
-            .map_err(|e| format!("datum: {e:?}"))
-            .and_then(|ds| normal_source(&ds).map_err(|e| format!("conversion: {e:?}")));
-        match converted {
-            Err(e) => failures.push(format!("{}: {e}\n{lisp}", path.display())),
-            Ok(normal) => {
-                let (back, errors) = ilang_syntax::parse_module(&normal);
-                if !errors.is_empty() || print_module(&module) != print_module(&back) {
-                    failures.push(format!(
-                        "{}: {errors:?}\n{lisp}\n{normal}\nBACK:\n{}",
-                        path.display(),
-                        print_module(&back)
-                    ));
+    let mut dirs = vec![dir.to_owned()];
+    while let Some(dir) = dirs.pop() {
+        for file in std::fs::read_dir(dir).unwrap() {
+            let path = file.unwrap().path();
+            if path.is_dir() {
+                dirs.push(path);
+                continue;
+            }
+            if path.extension().is_none_or(|ext| ext != "i") {
+                continue;
+            }
+            let source = std::fs::read_to_string(&path).unwrap();
+            let (module, diagnostics) = ilang_syntax::parse_module(&source);
+            if !diagnostics.is_empty() {
+                continue;
+            }
+            let lisp = print_module(&module);
+            let converted = parse(&lisp)
+                .map_err(|e| format!("datum: {e:?}"))
+                .and_then(|ds| normal_source(&ds).map_err(|e| format!("conversion: {e:?}")));
+            match converted {
+                Err(e) => failures.push(format!("{}: {e}\n{lisp}", path.display())),
+                Ok(normal) => {
+                    let (back, errors) = ilang_syntax::parse_module(&normal);
+                    if !errors.is_empty()
+                        || ilang_syntax::shape::canon(&module) != ilang_syntax::shape::canon(&back)
+                    {
+                        failures.push(format!(
+                            "{}: {errors:?}\n{lisp}\n{normal}\nBACK:\n{}",
+                            path.display(),
+                            print_module(&back)
+                        ));
+                    }
                 }
             }
         }
