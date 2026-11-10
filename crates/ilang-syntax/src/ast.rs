@@ -236,6 +236,11 @@ pub enum ExprKind {
         name: Ident,
     },
     Tuple(Vec<Expr>),
+    /// A structural record, with an optional spread evaluated before its fields.
+    Record {
+        base: Option<Box<Expr>>,
+        fields: Vec<(Ident, Expr)>,
+    },
     List {
         items: Vec<Expr>,
         rest: Option<Box<Expr>>,
@@ -426,6 +431,11 @@ pub enum TypeKind {
     /// `_`.
     Hole,
     Tuple(Vec<TypeExpr>),
+    Record {
+        base: Option<Box<TypeExpr>>,
+        fields: Vec<(Ident, TypeExpr)>,
+        removed: Vec<Ident>,
+    },
     Fn {
         params: Vec<FnParamType>,
         ret: Box<TypeExpr>,

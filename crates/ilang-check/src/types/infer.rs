@@ -758,6 +758,14 @@ impl<'a> Checker<'a> {
                     self.check_places(a, pol, depth);
                 }
             }
+            TypeKind::Record { base, fields, .. } => {
+                if let Some(base) = base {
+                    self.check_places(base, pol, depth);
+                }
+                for (_, field) in fields {
+                    self.check_places(field, pol, depth);
+                }
+            }
             TypeKind::Fn {
                 params,
                 ret,
@@ -1117,6 +1125,38 @@ impl<'a> Checker<'a> {
             TypeKind::Of { value, site, .. } => self.read_annotation(*value, *site),
             TypeKind::Hole | TypeKind::Error => self.s.fresh_input(),
             TypeKind::Tuple(ts) => Ty::tuple(ts.iter().map(|a| self.conv(a, local)).collect()),
+            TypeKind::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let labels: Vec<_> = fields
+                    .iter()
+                    .map(|(label, _)| super::records::Label::name(label.name.as_str()))
+                    .chain(
+                        removed
+                            .iter()
+                            .map(|label| super::records::Label::name(label.name.as_str())),
+                    )
+                    .collect();
+                let fields = fields
+                    .iter()
+                    .map(|(label, ty)| {
+                        (
+                            super::records::Label::name(label.name.as_str()),
+                            self.conv(ty, local),
+                        )
+                    })
+                    .collect();
+                let result = self.s.record(fields);
+                if let Some(base) = base {
+                    let base = self.conv(base, local);
+                    let rest = self.s.without(&base, labels);
+                    self.s.inter(vec![rest, result])
+                } else {
+                    result
+                }
+            }
             TypeKind::Fn {
                 params,
                 ret,
@@ -1355,6 +1395,42 @@ impl<'a> Checker<'a> {
                     .map(|(x, p)| self.infer_k(x, p))
                     .unzip();
                 (Ty::tuple(ts), Ty::tuple(ks))
+            }
+            ExprKind::Record { base, fields } => {
+                use super::records::Label;
+                let mut names = HashSet::new();
+                let mut labels = Vec::new();
+                let mut values = Vec::new();
+                let mut known_values = Vec::new();
+                let base_types = base.as_ref().map(|b| self.infer_k(b, &Ty::Top));
+                for (name, value) in fields {
+                    if !names.insert(name.name.clone()) {
+                        self.error(
+                            code::DUPLICATE_RECORD_LABEL,
+                            name.span,
+                            format!("the record label `{}` is repeated", name.name),
+                        );
+                    }
+                    let label = Label::name(name.name.as_str());
+                    let (ty, known) = self.infer_k(value, &Ty::Top);
+                    labels.push(label.clone());
+                    values.push((label.clone(), ty));
+                    known_values.push((label, known));
+                }
+                let result = self.s.record(values);
+                let known = self.s.record(known_values);
+                if let Some((base_ty, base_known)) = base_types {
+                    let any_record = self.s.record(Vec::new());
+                    self.sub(&base_ty, &any_record, base.as_ref().unwrap().span);
+                    let remainder = self.s.without(&base_ty, labels.clone());
+                    let known_remainder = self.s.without(&base_known, labels);
+                    (
+                        self.s.inter(vec![remainder, result]),
+                        self.s.inter(vec![known_remainder, known]),
+                    )
+                } else {
+                    (result, known)
+                }
             }
             ExprKind::List { items, rest } => {
                 let head = Some(Head::Named(TypeRef::Builtin(BuiltinType::List)));
@@ -1799,6 +1875,36 @@ impl<'a> Checker<'a> {
     /// types.
     fn field(&mut self, target: &Expr, name: &Ident, span: Span) -> (Ty, Ty) {
         let (t, kv) = self.infer_k(target, &Ty::Top);
+        let members = known::members(&kv);
+        let record_access = kv == Ty::Top
+            || !members.is_empty()
+                && members.iter().all(|m| {
+                    matches!(m, Ty::Var(_) | Ty::Top) || m.value_head() == Some(Head::Record)
+                });
+        if record_access {
+            let value = self.s.fresh();
+            let label = super::records::Label::name(name.name.as_str());
+            let known_fields: Option<Vec<_>> = members
+                .iter()
+                .map(|member| match member {
+                    Ty::Graph(graph) => match graph.field(&label) {
+                        super::records::Field::Found(ty) => Some(ty),
+                        _ => None,
+                    },
+                    _ => None,
+                })
+                .collect();
+            let known = match known_fields {
+                Some(fields) if !fields.is_empty() => self.kunion(fields),
+                _ => Ty::Top,
+            };
+            let required = self.s.record(vec![(label, value.clone())]);
+            self.sub(&t, &required, name.span);
+            self.out
+                .access
+                .insert((self.module, span), super::Access::Label(name.name.clone()));
+            return (value, known);
+        }
         // The constructors that may have made `v`, each with the arguments
         // of its type in the known type of `v`, when they are known.
         let mut ctors: Vec<(CtorRef, Option<Vec<Ty>>)> = Vec::new();
@@ -2668,6 +2774,14 @@ fn walk_variance(
         TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) => {
             ts.iter().for_each(|a| go(a, v, acc))
         }
+        TypeKind::Record { base, fields, .. } => {
+            if let Some(base) = base {
+                go(base, v, acc);
+            }
+            for (_, field) in fields {
+                go(field, v, acc);
+            }
+        }
         TypeKind::Diff(ts) => {
             go(&ts[0], v, acc);
             ts[1..].iter().for_each(|a| go(a, Variance::Inv, acc));
@@ -2699,6 +2813,10 @@ fn has_no_effect(e: &Expr) -> bool {
         | ExprKind::Name(_)
         | ExprKind::Fn(_) => true,
         ExprKind::Tuple(items) => items.iter().all(has_no_effect),
+        ExprKind::Record { base, fields } => {
+            base.as_deref().is_none_or(has_no_effect)
+                && fields.iter().all(|(_, value)| has_no_effect(value))
+        }
         ExprKind::List { items, rest } => {
             items.iter().all(has_no_effect) && rest.as_deref().is_none_or(has_no_effect)
         }

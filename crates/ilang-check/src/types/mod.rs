@@ -149,6 +149,10 @@ impl Ty {
     }
 
     pub fn named(t: TypeRef, args: Vec<Ty>) -> Ty {
+        if t == TypeRef::Builtin(crate::hir::BuiltinType::Record) {
+            assert!(args.is_empty(), "Record takes no type arguments");
+            return records::Pool::default().record(Vec::new());
+        }
         Ty::Con(Head::Named(t), lits::ValueSet::ALL, args)
     }
 
@@ -218,6 +222,33 @@ pub(crate) fn boundary_type(
                     .map(|t| convert(s, t, p, expand))
                     .collect::<Option<_>>()?,
             ),
+            TypeKind::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let mut labels = Vec::new();
+                let mut resolved = Vec::new();
+                for (name, ty) in fields {
+                    let label = records::Label::name(name.name.as_str());
+                    labels.push(label.clone());
+                    resolved.push((label, convert(s, ty, p, expand)?));
+                }
+                labels.extend(
+                    removed
+                        .iter()
+                        .map(|name| records::Label::name(name.name.as_str())),
+                );
+                let record = s.record(resolved);
+                match base {
+                    Some(base) => {
+                        let base = convert(s, base, p, expand)?;
+                        let rest = s.without(&base, labels);
+                        s.inter(vec![rest, record])
+                    }
+                    None => record,
+                }
+            }
             TypeKind::Fn {
                 params,
                 ret,
@@ -350,6 +381,8 @@ impl Variance {
 /// How `v.f` or `v.k` reads a part of its value (§4.8 rule 13).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Access {
+    /// A structural record field selected by its label.
+    Label(String),
     /// `v.f`: each constructor that may have made `v` (§6.7), with the
     /// index of its field with the label `f`. At run time, the constructor
     /// of the value picks one.

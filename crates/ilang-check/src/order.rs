@@ -46,6 +46,14 @@ impl Walker<'_> {
             | ExprKind::Name(_)
             | ExprKind::Error => {}
             ExprKind::Tuple(items) => items.iter().for_each(|x| self.expr(x, inside)),
+            ExprKind::Record { base, fields } => {
+                if let Some(base) = base {
+                    self.expr(base, inside);
+                }
+                for (_, value) in fields {
+                    self.expr(value, inside);
+                }
+            }
             ExprKind::List { items, rest } => {
                 items
                     .iter()

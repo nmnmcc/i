@@ -198,6 +198,34 @@ impl Checker<'_> {
                 }
             }
             TypeKind::Tuple(ts) => Ty::tuple(ts.iter().map(&mut go).collect::<Option<_>>()?),
+            TypeKind::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let pool = super::records::Pool::default();
+                let mut labels = Vec::new();
+                let mut resolved = Vec::new();
+                for (name, ty) in fields {
+                    let label = super::records::Label::name(name.name.as_str());
+                    labels.push(label.clone());
+                    resolved.push((label, go(ty)?));
+                }
+                labels.extend(
+                    removed
+                        .iter()
+                        .map(|name| super::records::Label::name(name.name.as_str())),
+                );
+                let record = pool.record(resolved);
+                match base {
+                    Some(base) => {
+                        let base = go(base)?;
+                        let rest = pool.without(&base, labels);
+                        pool.inter(&[rest, record])
+                    }
+                    None => record,
+                }
+            }
             TypeKind::Union(ts) => Ty::Union(ts.iter().map(&mut go).collect::<Option<_>>()?),
             TypeKind::Inter(ts) => Ty::Inter(ts.iter().map(&mut go).collect::<Option<_>>()?),
             TypeKind::Diff(ts) => {

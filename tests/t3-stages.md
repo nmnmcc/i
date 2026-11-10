@@ -565,3 +565,16 @@ contract. Level and spelling metadata stay separate from the artifact scope.
 The type-graph component alone is not a complete scheme interface; no claim
 of the retained-constraint/interface criterion is made until its wrapper is
 connected and tested.
+
+Source integration checkpoint: record expressions and spreads now pass through
+syntax, HIR, inference and Wasm record operations; field selection constrains
+an unknown or record receiver to a one-field record. The empty expression is
+the empty record; empty tuple patterns and types are rejected. Record type
+annotations and the builtin Record name are connected to the graph. These are
+not a complete T3 implementation: uppercase record labels still need scoped
+label-parameter resolution and call-site substitution and must not be treated
+as finished; i/record, interface graph round trips, and the remaining written
+rules and tests are outstanding. The source-level t3_record spec cases pass at
+O0 and O2, the 29 graph tests pass, and record_ir passes at both optimization
+levels. Existing syntax goldens for the removed empty tuple were adjusted under
+the user's SYN2 rule; pattern coverage uses Nil where it had an empty tuple.

@@ -1294,6 +1294,34 @@ impl Checker<'_> {
                     .map(|t| self.closed_written(t, map, seen))
                     .collect::<Result<_, _>>()?,
             )),
+            TypeKind::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let pool = super::records::Pool::default();
+                let mut labels = Vec::new();
+                let mut resolved = Vec::new();
+                for (name, ty) in fields {
+                    let label = super::records::Label::name(name.name.as_str());
+                    labels.push(label.clone());
+                    resolved.push((label, self.closed_written(ty, map, seen)?));
+                }
+                labels.extend(
+                    removed
+                        .iter()
+                        .map(|name| super::records::Label::name(name.name.as_str())),
+                );
+                let record = pool.record(resolved);
+                Ok(match base {
+                    Some(base) => {
+                        let base = self.closed_written(base, map, seen)?;
+                        let rest = pool.without(&base, labels);
+                        pool.inter(&[rest, record])
+                    }
+                    None => record,
+                })
+            }
             TypeKind::Fn {
                 params,
                 ret,
@@ -1571,6 +1599,40 @@ impl Checker<'_> {
                 }
                 TypeKind::Tuple(ts) => {
                     Ty::tuple(ts.iter().map(|t| written(c, t, map, seen)).collect())
+                }
+                TypeKind::Record {
+                    base,
+                    fields,
+                    removed,
+                } => {
+                    let pool = super::records::Pool::default();
+                    let labels: Vec<_> = fields
+                        .iter()
+                        .map(|(name, _)| super::records::Label::name(name.name.as_str()))
+                        .chain(
+                            removed
+                                .iter()
+                                .map(|name| super::records::Label::name(name.name.as_str())),
+                        )
+                        .collect();
+                    let record = pool.record(
+                        fields
+                            .iter()
+                            .map(|(name, ty)| {
+                                (
+                                    super::records::Label::name(name.name.as_str()),
+                                    written(c, ty, map, seen),
+                                )
+                            })
+                            .collect(),
+                    );
+                    match base {
+                        Some(base) => {
+                            let rest = pool.without(&written(c, base, map, seen), labels);
+                            pool.inter(&[rest, record])
+                        }
+                        None => record,
+                    }
                 }
                 TypeKind::Union(ts) => {
                     Ty::Union(ts.iter().map(|t| written(c, t, map, seen)).collect())

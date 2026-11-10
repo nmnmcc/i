@@ -214,6 +214,35 @@ impl Checker<'_> {
             TypeKind::Of { value, site, .. } => self.read_shape(*value, *site),
             TypeKind::Hole | TypeKind::Error => Ty::Top,
             TypeKind::Tuple(ts) => Ty::tuple(ts.iter().map(go).collect()),
+            TypeKind::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let pool = super::records::Pool::default();
+                let labels: Vec<_> = fields
+                    .iter()
+                    .map(|(name, _)| super::records::Label::name(name.name.as_str()))
+                    .chain(
+                        removed
+                            .iter()
+                            .map(|name| super::records::Label::name(name.name.as_str())),
+                    )
+                    .collect();
+                let record = pool.record(
+                    fields
+                        .iter()
+                        .map(|(name, ty)| (super::records::Label::name(name.name.as_str()), go(ty)))
+                        .collect(),
+                );
+                match base {
+                    Some(base) => {
+                        let rest = pool.without(&go(base), labels);
+                        pool.inter(&[rest, record])
+                    }
+                    None => record,
+                }
+            }
             TypeKind::Fn {
                 params,
                 ret,

@@ -27,13 +27,13 @@ def tests(string):
 
     def inspect_text(fields):
         if not fields:
-            return "{..}"
+            return "()"
         def label(key):
             return key if re.fullmatch(r"_?[a-z][a-z0-9_]*", key) else json.dumps(key, ensure_ascii=False)
-        return "{ " + ", ".join(
+        return "(" + ", ".join(
             f"{label(key)}: {value}"
             for key, value in sorted(fields.items(), key=lambda item: item[0].encode())
-        ) + " }"
+        ) + ")"
 
     out = ['(func (export "structural_records") (result i32) (local $a eqref) (local $b eqref) (local $c eqref)']
     labels = ["", "_a", "a", "a b", "fooBar", "é", "😀"]

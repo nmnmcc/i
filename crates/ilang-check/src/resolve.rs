@@ -1793,6 +1793,23 @@ impl<'a> Resolver<'a> {
             }
             T::Hole => TypeKind::Hole,
             T::Tuple(ts) => TypeKind::Tuple(ts.iter().map(|x| self.ty(x)).collect()),
+            T::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let mut labels = HashSet::new();
+                for label in fields.iter().map(|(label, _)| label).chain(removed.iter()) {
+                    if !labels.insert(&label.name) {
+                        self.error(code::DUPLICATE_RECORD_LABEL, label.span, format!("the record label `{}` is repeated", label.name));
+                    }
+                }
+                TypeKind::Record {
+                    base: base.as_ref().map(|b| Box::new(self.ty(b))),
+                    fields: fields.iter().map(|(label, ty)| (label.clone(), self.ty(ty))).collect(),
+                    removed: removed.clone(),
+                }
+            },
             T::Union(ts) => TypeKind::Union(ts.iter().map(|x| self.ty(x)).collect()),
             T::Inter(ts) => TypeKind::Inter(ts.iter().map(|x| self.ty(x)).collect()),
             T::Diff(ts) => TypeKind::Diff(ts.iter().map(|x| self.ty(x)).collect()),
@@ -2310,6 +2327,10 @@ impl<'a> Resolver<'a> {
                 _ => false,
             },
             E::Tuple(items) => items.iter().all(|x| self.is_direct(x)),
+            E::Record { base, fields } => {
+                base.as_deref().is_none_or(|b| self.is_direct(b))
+                    && fields.iter().all(|(_, value)| self.is_direct(value))
+            }
             E::List { items, rest } => items
                 .iter()
                 .chain(rest.as_deref())
@@ -2496,6 +2517,13 @@ impl<'a> Resolver<'a> {
             E::String(s) => ExprKind::String(s.clone()),
             E::Name { module, name } => self.name(module.as_ref(), name),
             E::Tuple(items) => ExprKind::Tuple(items.iter().map(|x| self.expr(x)).collect()),
+            E::Record { base, fields } => ExprKind::Record {
+                base: base.as_ref().map(|b| Box::new(self.expr(b))),
+                fields: fields
+                    .iter()
+                    .map(|(label, value)| (label.clone(), self.expr(value)))
+                    .collect(),
+            },
             E::List { items, rest } => ExprKind::List {
                 items: items.iter().map(|x| self.expr(x)).collect(),
                 rest: rest.as_ref().map(|r| Box::new(self.expr(r))),
@@ -3261,6 +3289,14 @@ fn named_types(t: &Type, out: &mut Vec<TypeId>) {
         TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
             ts.iter().for_each(|a| named_types(a, out))
         }
+        TypeKind::Record { base, fields, .. } => {
+            if let Some(base) = base {
+                named_types(base, out);
+            }
+            for (_, field) in fields {
+                named_types(field, out);
+            }
+        }
         TypeKind::Fn {
             params,
             ret,
@@ -3288,6 +3324,14 @@ fn is_constructor(e: &ast::Expr) -> bool {
 fn for_each_child(t: &Type, f: &mut dyn FnMut(&Type)) {
     match &t.kind {
         TypeKind::Named { args, .. } => args.iter().for_each(f),
+        TypeKind::Record { base, fields, .. } => {
+            if let Some(base) = base {
+                f(base);
+            }
+            for (_, field) in fields {
+                f(field);
+            }
+        }
         TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
             ts.iter().for_each(f)
         }
@@ -3337,6 +3381,18 @@ pub(crate) fn subst(t: &Type, map: &HashMap<TyVarId, &Type>) -> Type {
             args: args.iter().map(|a| subst(a, map)).collect(),
         },
         TypeKind::Tuple(ts) => TypeKind::Tuple(ts.iter().map(|a| subst(a, map)).collect()),
+        TypeKind::Record {
+            base,
+            fields,
+            removed,
+        } => TypeKind::Record {
+            base: base.as_ref().map(|base| Box::new(subst(base, map))),
+            fields: fields
+                .iter()
+                .map(|(label, field)| (label.clone(), subst(field, map)))
+                .collect(),
+            removed: removed.clone(),
+        },
         TypeKind::Union(ts) => TypeKind::Union(ts.iter().map(|a| subst(a, map)).collect()),
         TypeKind::Inter(ts) => TypeKind::Inter(ts.iter().map(|a| subst(a, map)).collect()),
         TypeKind::Diff(ts) => TypeKind::Diff(ts.iter().map(|a| subst(a, map)).collect()),
@@ -3466,6 +3522,7 @@ fn projectable_body(
                 .collect::<Option<_>>()?,
         )),
         TypeKind::Lit(_)
+        | TypeKind::Record { .. }
         | TypeKind::Fn { .. }
         | TypeKind::Union(_)
         | TypeKind::Inter(_)

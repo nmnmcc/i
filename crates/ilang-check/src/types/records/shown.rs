@@ -150,10 +150,10 @@ impl ShownGraph {
                 }
                 Node::Rec(fields) => (
                     if fields.is_empty() {
-                        "{..}".into()
+                        "Record".into()
                     } else {
                         format!(
-                            "{{ {} }}",
+                            "({})",
                             fields
                                 .into_iter()
                                 .map(|(l, id)| format!("{}: {}", label(&l, var), child(id)))
@@ -167,7 +167,7 @@ impl ShownGraph {
                 Node::Inter(a, b) => (format!("{} & {}", group(a), group(b)), false),
                 Node::Without(base, labels) => (
                     format!(
-                        "{{ ..{}, {} }}",
+                        "(..{}, {})",
                         group(base),
                         labels
                             .iter()

@@ -46,6 +46,9 @@ fn is_simple(e: &Expr) -> bool {
         }
         ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_) | ExprKind::Name { .. } => true,
         ExprKind::Tuple(items) => items.iter().all(is_simple),
+        ExprKind::Record { base, fields } => {
+            base.as_deref().is_none_or(is_simple) && fields.iter().all(|(_, e)| is_simple(e))
+        }
         ExprKind::List { items, rest } => {
             items.iter().all(is_simple) && rest.as_deref().is_none_or(is_simple)
         }
@@ -199,6 +202,10 @@ fn walk_expr(e: &Expr, f: &mut impl FnMut(&Expr)) {
     match &e.kind {
         ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_) | ExprKind::Name { .. } => {}
         ExprKind::Tuple(items) => items.iter().for_each(f),
+        ExprKind::Record { base, fields } => {
+            base.iter().for_each(|e| f(e));
+            fields.iter().for_each(|(_, e)| f(e));
+        }
         ExprKind::List { items, rest } => items.iter().chain(rest.as_deref()).for_each(f),
         ExprKind::BitArray(segs) => {
             for s in segs {
@@ -532,6 +539,22 @@ impl Printer {
                 self.list(items, |p, e| p.expr(e, 0));
                 self.w(")");
             }
+            ExprKind::Record { base, fields } => {
+                self.w("(");
+                if let Some(base) = base {
+                    self.w("..");
+                    self.expr(base, 0);
+                }
+                for (i, (label, value)) in fields.iter().enumerate() {
+                    if i > 0 || base.is_some() {
+                        self.w(", ");
+                    }
+                    self.w(&label.name);
+                    self.w(": ");
+                    self.expr(value, 0);
+                }
+                self.w(")");
+            }
             ExprKind::List { items, rest } => {
                 self.w("[");
                 self.list(items, |p, e| p.expr(e, 0));
@@ -852,6 +875,33 @@ impl Printer {
             TypeKind::Tuple(items) => {
                 self.w("(");
                 self.list(items, |p, a| p.ty(a));
+                return self.w(")");
+            }
+            TypeKind::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                self.w("(");
+                if let Some(base) = base {
+                    self.w("..");
+                    self.ty(base);
+                }
+                for (i, (label, ty)) in fields.iter().enumerate() {
+                    if i > 0 || base.is_some() {
+                        self.w(", ");
+                    }
+                    self.w(&label.name);
+                    self.w(": ");
+                    self.ty(ty);
+                }
+                for (i, label) in removed.iter().enumerate() {
+                    if i > 0 || base.is_some() || !fields.is_empty() {
+                        self.w(", ");
+                    }
+                    self.w("-");
+                    self.w(&label.name);
+                }
                 return self.w(")");
             }
             TypeKind::Fn {

@@ -1456,6 +1456,23 @@ impl<'a> TypeShow<'a> {
             },
             TypeKind::Hole | TypeKind::Error => "_".to_string(),
             TypeKind::Tuple(ts) => format!("({})", join(ts, ", ", 0)),
+            TypeKind::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let mut parts = Vec::new();
+                if let Some(base) = base {
+                    parts.push(format!("..{}", self.ty(base, 0)));
+                }
+                parts.extend(
+                    fields
+                        .iter()
+                        .map(|(label, ty)| format!("{}: {}", label.name, self.ty(ty, 0))),
+                );
+                parts.extend(removed.iter().map(|label| format!("-{}", label.name)));
+                format!("({})", parts.join(", "))
+            }
             TypeKind::Fn {
                 params,
                 ret,

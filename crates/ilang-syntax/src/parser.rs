@@ -1222,12 +1222,43 @@ impl Parser<'_> {
         self.bump();
         let kind = if is_fn {
             ExprKind::Fn(Box::new(self.function()?))
+        } else if self.eat(&T::RParen) {
+            ExprKind::Record { base: None, fields: Vec::new() }
+        } else if self.at(&T::DotDot)
+            || matches!(self.kind(), T::Name(_)) && *self.nth(1) == T::Colon
+        {
+            self.record_expr()?
         } else {
             ExprKind::Tuple(self.seq(T::RParen, true, Self::expr)?)
         };
         Ok(Expr {
             kind,
             span: self.span_from(start),
+        })
+    }
+
+    fn record_expr(&mut self) -> PResult<ExprKind> {
+        self.nested(|p| {
+            let base = if p.eat(&T::DotDot) {
+                Some(Box::new(p.expr()?))
+            } else {
+                None
+            };
+            let mut fields = Vec::new();
+            while !p.eat(&T::RParen) {
+                if base.is_some() || !fields.is_empty() {
+                    if !p.eat(&T::Comma) && !p.tok().brk {
+                        return p.error("`,` or `)`");
+                    }
+                    if p.eat(&T::RParen) {
+                        break;
+                    }
+                }
+                let label = p.name()?;
+                p.expect(&T::Colon)?;
+                fields.push((label, p.expr()?));
+            }
+            Ok(ExprKind::Record { base, fields })
         })
     }
 
@@ -1561,6 +1592,9 @@ impl Parser<'_> {
             }
             T::LParen => {
                 self.bump();
+                if self.at(&T::RParen) {
+                    return Err(Diagnostic::new(Code::Unexpected, self.tok().span, "a tuple pattern has at least one part; use `Nil` for an empty value"));
+                }
                 PatternKind::Tuple(self.seq(T::RParen, true, Self::pattern)?)
             }
             T::LBracket => self.list_pattern()?,
@@ -1786,7 +1820,17 @@ impl Parser<'_> {
                     .is_some_and(|c| self.toks[c as usize + 1].kind == T::Arrow);
                 self.bump();
                 if !is_fn {
-                    TypeKind::Tuple(self.seq(T::RParen, true, Self::ty)?)
+                    if self.at(&T::RParen) {
+                        return Err(Diagnostic::new(Code::Unexpected, self.tok().span, "a tuple type has at least one part; use `Record` for the type of all records"));
+                    }
+                    if self.at(&T::DotDot)
+                        || matches!(self.kind(), T::Name(_) | T::UpName(_))
+                            && *self.nth(1) == T::Colon
+                    {
+                        self.record_type()?
+                    } else {
+                        TypeKind::Tuple(self.seq(T::RParen, true, Self::ty)?)
+                    }
                 } else {
                     let params = self.seq(T::RParen, true, |p| {
                         let label = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Colon {
@@ -1854,6 +1898,45 @@ impl Parser<'_> {
         Ok(TypeExpr {
             kind,
             span: self.span_from(start),
+        })
+    }
+
+    fn record_type(&mut self) -> PResult<TypeKind> {
+        self.nested(|p| {
+            let base = if p.eat(&T::DotDot) {
+                Some(Box::new(p.ty()?))
+            } else {
+                None
+            };
+            let mut fields = Vec::new();
+            let mut removed = Vec::new();
+            while !p.eat(&T::RParen) {
+                if base.is_some() || !fields.is_empty() || !removed.is_empty() {
+                    if !p.eat(&T::Comma) && !p.tok().brk {
+                        return p.error("`,` or `)`");
+                    }
+                    if p.eat(&T::RParen) {
+                        break;
+                    }
+                }
+                let remove = p.eat(&T::Minus);
+                let label = if matches!(p.kind(), T::UpName(_)) {
+                    p.up_name()?
+                } else {
+                    p.name()?
+                };
+                if remove {
+                    removed.push(label);
+                } else {
+                    p.expect(&T::Colon)?;
+                    fields.push((label, p.ty()?));
+                }
+            }
+            Ok(TypeKind::Record {
+                base,
+                fields,
+                removed,
+            })
         })
     }
 }
