@@ -1054,11 +1054,11 @@ main = () { drive(control.boundary((b) { walk(b, TreeDepth)  Done }), 0, 0, 0) }
 
 // Eager 1df2fe0, Wasmtime 49.0.2, x86_64 Linux (14 step 2).
 // At S=131072 the last complete tree walk has L=219. Recursion alone
-// needs (2400182, 2401206] bytes; S11=1.5*2401206=3601809. At S11
+// needs (5600085, 5601109] bytes; S11=1.5*5601109=8401663. At S11
 // eager recursion with a resume fails with a clean Wasm stack trap.
 const NESTED_STACK: u64 = 128 * 1024;
 const EAGER_NESTED_DEPTH: u32 = 219;
-const RECURSION_STACK: u64 = 3_601_809;
+const RECURSION_STACK: u64 = 8_401_663;
 
 #[test]
 fn nested_resume_stack() {
@@ -1089,17 +1089,16 @@ fn nested_resume_stack() {
 fn recursion_source(paused: bool) -> String {
     let source = bench_source(50_000, 1, false);
     let source = source.split(concat!("\n@", "main")).next().unwrap();
-    let recurse = if paused {
-        "rec = (n, k) { n |> { 0 -> done(control.resume(k, Nil))  _ -> rec(n - 1, k) + 1 } }\n\
-         done = { Done(n) -> n  _ -> panic(\"not done\") }\n\
+    let recurse = "rec = (n, body) { n |> { 0 -> body()  _ -> rec(n - 1, body) + 1 } }";
+    let main = if paused {
+        "done = { Done(n) -> n  _ -> panic(\"not done\") }\n\
          @main\nmain = () {\n\
          k = control.boundary((b) { down(b, 50_000) }) |> { More(_, k) -> k  _ -> panic(\"not paused\") }\n\
-         check(rec(50_000, k) == 100_000, \"recursion lost a frame\")\n}"
+         check(rec(50_000, () { done(control.resume(k, Nil)) }) == 100_000, \"recursion lost a frame\")\n}"
     } else {
-        "rec = (n) { n |> { 0 -> 0  _ -> rec(n - 1) + 1 } }\n\
-         @main\nmain = () { check(rec(50_000) == 50_000, \"recursion lost a frame\") }"
+        "@main\nmain = () { check(rec(50_000, () { 0 }) == 50_000, \"recursion lost a frame\") }"
     };
-    format!("{source}\n{recurse}\n")
+    format!("{source}\n{recurse}\n{main}\n")
 }
 
 #[test]
