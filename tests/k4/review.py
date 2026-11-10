@@ -16,6 +16,7 @@ def cases():
         source = (FIXTURES / f'q{n}.i').read_text()
         yield f'q{n}', source + '\n@main\nmain = () { ! S(Never) = S(() { 1 }) assert(fw() == 1) }\n', False, ''
     yield 'r4', (FIXTURES / 'r4.i').read_text(), False, 'four\nthree\n'
+    yield 'closed_handler_hole', (FIXTURES / 'closed_handler_hole.i').read_text(), False, ''
     for n in range(1, 17):
         for row in ['Never', 'Dep']:
             source = (FIXTURES / f'w{n}.i').read_text()

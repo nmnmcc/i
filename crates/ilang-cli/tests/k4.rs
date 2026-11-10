@@ -250,3 +250,21 @@ forward_0 = () { run(() { use() }) }\n",
     chain.push_str("\n@main\nmain = () { forward_63() }\n");
     check_and_run("original-helper-chain", &chain, Some("E0522"), "");
 }
+
+#[test]
+fn concrete_handler_holes_have_the_same_runtime_type() {
+    // §4.5's equality rule and §4.8 rule 9 give the same handler for
+    // Svc(_) fixed to Int and Svc(Int). The installed callback returns 6.
+    for inferred in [false, true] {
+        for hole in [false, true] {
+            let mut source = include_str!("k4/closed_handler_hole.i").to_string();
+            if !hole {
+                source = source.replace("! Svc(_) = svc", "! Svc(Int) = svc");
+            }
+            if inferred {
+                source = source.replace(") -> Int ! N {", ") {");
+            }
+            check_and_run("closed-handler-hole", &source, None, "");
+        }
+    }
+}

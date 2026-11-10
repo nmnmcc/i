@@ -325,9 +325,9 @@ files above.
 
 | File | Functions |
 | --- | --- |
-| `types/solve.rs` | `Solver::new`, `for_closed_types`, `fresh_at`, `variances`, `fail`, `constrain`, `constrain_env`, `rows`, `mark_row`, `mark_mode`, `is_row`, `mode`, `constrain_row`, `has_obligations`, `handle`, `same_form`, `hidden_handlers` (and its `parts` walker), `constrain_in`, `constrain_by`, `add_bound`, `compare`, `join`, `route`, `diff_left`, `extrude`, `freshen`, `env_union`, `union_mode`, `merge`, `merge_arg`, `diff`, `env_diff`, `diff_mode`, `normalize_mode`, `diff_bound`, `diff_bound_mode`, `occurs`, `normalize_bounds`, `normalize_type`, `normalized`, `occurs_from`; `edge_vars`, `bound_vars`, `env_vars`, `builtin_variance`, `builtin_variance_values`; `ParamModes::{repeated,from_slice,next,size_hint}`. |
+| `types/solve.rs` | `Solver::new`, `for_closed_types`, `fresh_at`, `variances`, `fail`, `constrain`, `constrain_env`, `rows`, `mark_row`, `mark_mode`, `is_row`, `mode`, `constrain_row`, `has_obligations`, `handle`, `same_form`, `same_form_in`, `hidden_handlers` (and its `parts` walker), `constrain_in`, `constrain_by`, `add_bound`, `compare`, `join`, `route`, `diff_left`, `extrude`, `freshen`, `env_union`, `union_mode`, `merge`, `merge_arg`, `diff`, `env_diff`, `diff_mode`, `normalize_mode`, `diff_bound`, `diff_bound_mode`, `occurs`, `normalize_bounds`, `normalize_type`, `normalized`, `occurs_from`; `edge_vars`, `bound_vars`, `env_vars`, `builtin_variance`, `builtin_variance_values`; `ParamModes::{repeated,from_slice,next,size_hint}`. |
 | `types/infer.rs` | `Checker::new`, `run`, `group`, `entry_point`, `exported_type`, `check_occurs`, `report_coalescing`, `add_err`, `add_env`, `pop_effects`, `conv`, `fresh_args`, `function`, `local_binding`, `generalize`, `rebuild`; `row_parameters` and its `walk`. |
-| `types/display.rs` | `scheme_in`, `scheme_names`, `simplify_steps`; `Coalescer::go`; `Norm::{norm,env,union_in,step,walk}`; `record`. |
+| `types/display.rs` | `scheme_in`, `scheme_names`, `simplify_steps`; `Coalescer::go`; `Norm::{norm,env,union_in,step,walk}`; `record`, `hide`. |
 | `types/alias.rs` | `Checker::instantiate_alias`; `normalize`. |
 | `types/known.rs` | `Checker::ctor_known` (consume the variance iterator). |
 | `types/value_types.rs` | `closed_equal`, `normalize_closed`, `Checker::closed_written` (preserve row metadata in closed-type scratch solvers). |
@@ -360,3 +360,35 @@ The CLI boundary tests additionally run the first review's exact annotated
 `@main main(N)` reproducer and its unannotated twin. Both must give E0522.
 Replacing the call with Nil must succeed at both optimization levels: 4.8
 rule 4 says that merely creating the unused function needs no service.
+
+A final F3 probe found a correct concrete handler annotation still rejected:
+`! Svc(_) = svc` with svc: Svc(Int), and a body row N | Svc(Int). The
+hole has matching Int lower and upper bounds. `same_form_in` now proves
+such equalities from both directions of the existing bounds, including
+Never's implicit lower bound and Top's implicit upper bound. It never uses
+a lower bound alone. A set of variables currently being expanded makes this
+proof finite even on a constructor cycle; a dedicated solver test checks
+the guard and confirms the actual occurs check still rejects that cycle.
+The checker and CLI compare explicit/holed handlers with annotated/inferred
+results; the callback literally returns 6, so the call rule requires 6.
+The named runtime corpus gains `closed_handler_hole` (75 cases in total).
+
+Redesign moved to 1a8fee2 while checks ran. Only the two prior-art documents
+changed from c2f41b7; compiler, library and test sources are byte-identical.
+The lane merged those documents and the isolated baseline tree was refreshed
+with exactly those additions. A baseline build and WAT export are rerun there.
+The equality proof was edited while a queued gate started; that gate stopped
+at formatting (`merged-final-gates`). The proof is formatted and the complete
+gate is repeated after its targeted checks. The pending old-binary quiet
+measurement was stopped for this new correctness fix; no result from that
+interrupted measurement is used as final evidence.
+
+The first exact-hole regression then exposed a display identity: after an
+H-only variable was hidden as Top, an inferred result still showed
+Svc(_ & Int), whereas the explicit handler showed Svc(Int). The exact-scheme
+assertion was retained. `hide` now removes Top from intersections after hiding
+those variables, using the intersection identity; neither the scheme's
+restriction nor a solver bound is removed. The first `proof-final-build` attempt failed that assertion; the
+implementation was corrected rather than accepting the noncanonical expected
+string. A queued duplicate (`proof-delivery-build`) was superseded before it
+started; the complete targeted run is `final-proof-build`.

@@ -578,36 +578,85 @@ impl Solver {
     /// Equality used only to prove a scheme's handler witness. Variable
     /// inclusions must hold both ways; row member order is immaterial.
     fn same_form(&self, a: &Ty, b: &Ty) -> bool {
+        self.same_form_in(a, b, &mut HashSet::default())
+    }
+
+    fn same_form_in(&self, a: &Ty, b: &Ty, expanding: &mut HashSet<V>) -> bool {
         if a == b {
             return true;
         }
-        let sets = |xs: &[Ty], ys: &[Ty]| {
-            xs.iter().all(|x| ys.iter().any(|y| self.same_form(x, y)))
-                && ys.iter().all(|y| xs.iter().any(|x| self.same_form(x, y)))
+        let sets = |xs: &[Ty], ys: &[Ty], expanding: &mut HashSet<V>| {
+            xs.iter()
+                .all(|x| ys.iter().any(|y| self.same_form_in(x, y, expanding)))
+                && ys
+                    .iter()
+                    .all(|y| xs.iter().any(|x| self.same_form_in(x, y, expanding)))
         };
         match (a, b) {
-            (Ty::Var(v), Ty::Var(w)) => {
-                self.reach(vec![*v], true).0.contains(w)
-                    && self.reach(vec![*v], false).0.contains(w)
+            (Ty::Var(v), Ty::Var(w))
+                if self.reach(vec![*v], true).0.contains(w)
+                    && self.reach(vec![*v], false).0.contains(w) =>
+            {
+                true
+            }
+            (Ty::Var(v), t) | (t, Ty::Var(v)) => {
+                // L <: v <: U proves v = T when both L and U equal T.
+                // A hole fixed by a concrete service form is such a case.
+                self.observe(*v);
+                let st = self.var(*v);
+                if (st.lower.is_empty() && st.from.is_empty() && !matches!(t, Ty::Never))
+                    || (st.upper.is_empty() && st.into.is_empty() && !matches!(t, Ty::Top))
+                {
+                    return false;
+                }
+                if !expanding.insert(*v) {
+                    return false;
+                }
+                let lower = self.reach(vec![*v], true).0;
+                let upper = self.reach(vec![*v], false).0;
+                let equal = (matches!(t, Ty::Never)
+                    || lower.iter().any(|w| {
+                        self.var(*w)
+                            .lower
+                            .iter()
+                            .any(|b| !matches!(b, Ty::Var(_)) && self.same_form_in(b, t, expanding))
+                    }))
+                    && (matches!(t, Ty::Top)
+                        || upper.iter().any(|w| {
+                            self.var(*w).upper.iter().any(|b| {
+                                !matches!(b, Ty::Var(_)) && self.same_form_in(b, t, expanding)
+                            })
+                        }));
+                expanding.remove(v);
+                equal
             }
             (Ty::Con(h, values, xs), Ty::Con(k, other, ys)) => {
                 h == k
                     && values == other
                     && xs.len() == ys.len()
-                    && xs.iter().zip(ys).all(|(x, y)| self.same_form(x, y))
+                    && xs
+                        .iter()
+                        .zip(ys)
+                        .all(|(x, y)| self.same_form_in(x, y, expanding))
             }
-            (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => sets(xs, ys),
-            (Ty::Diff(a, hs), Ty::Diff(b, ks)) => self.same_form(a, b) && sets(hs, ks),
-            (Ty::Both(a, b), Ty::Both(c, d)) => self.same_form(a, c) && self.same_form(b, d),
+            (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => {
+                sets(xs, ys, expanding)
+            }
+            (Ty::Diff(a, hs), Ty::Diff(b, ks)) => {
+                self.same_form_in(a, b, expanding) && sets(hs, ks, expanding)
+            }
+            (Ty::Both(a, b), Ty::Both(c, d)) => {
+                self.same_form_in(a, c, expanding) && self.same_form_in(b, d, expanding)
+            }
             (Ty::Fn(f), Ty::Fn(g)) => {
                 f.params.len() == g.params.len()
                     && f.params
                         .iter()
                         .zip(&g.params)
-                        .all(|(p, q)| self.same_form(&p.1, &q.1))
-                    && self.same_form(&f.ret, &g.ret)
-                    && self.same_form(&f.err, &g.err)
-                    && self.same_form(&f.env, &g.env)
+                        .all(|(p, q)| self.same_form_in(&p.1, &q.1, expanding))
+                    && self.same_form_in(&f.ret, &g.ret, expanding)
+                    && self.same_form_in(&f.err, &g.err, expanding)
+                    && self.same_form_in(&f.env, &g.env, expanding)
             }
             _ => false,
         }
@@ -2642,5 +2691,26 @@ mod literal_stress_tests {
     #[ignore = "literal-types §9 performance gate"]
     fn t1_stress_nested_50_by_50() {
         stress("nested", 50);
+    }
+}
+
+#[cfg(test)]
+mod handler_proof_tests {
+    use super::*;
+
+    #[test]
+    fn exact_bound_proofs_stop_at_constructor_cycles() {
+        let mut s = Solver::new(StdHashMap::new(), Vec::new());
+        let a = s.fresh();
+        let b = s.fresh();
+        let list = |t| Ty::named(TypeRef::Builtin(BuiltinType::List), vec![t]);
+        for t in [&a, &b] {
+            let recursive = list(list(t.clone()));
+            s.constrain(t, &recursive);
+            s.constrain(&recursive, t);
+        }
+        assert!(!s.same_form(&a, &list(b)));
+        let Ty::Var(v) = a else { unreachable!() };
+        assert!(s.occurs(vec![v]));
     }
 }

@@ -138,3 +138,33 @@ bad(N) = (body: Row(N), one: Svc(Int), two: Svc(Nil)) {
         );
     }
 }
+
+#[test]
+fn handler_witnesses_include_exact_bounds_of_annotation_holes() {
+    // §4.5: L <: v <: U proves v = T when L = T = U. A hole in a
+    // handler fixed to Int must prove the same witness as writing Int.
+    let source = "Svc(A) { Svc(f: () -> A) }
+wrap(N) = (body: () -> Int ! N | Svc(Int), svc: Svc(Int)) -> Int ! N {
+ ! Svc(Int) = svc
+ body()
+}";
+    for inferred in [false, true] {
+        let source = if inferred {
+            source.replace(") -> Int ! N {", ") {")
+        } else {
+            source.to_string()
+        };
+        assert_eq!(
+            types(&source),
+            types(&source.replace("! Svc(Int) = svc", "! Svc(_) = svc"))
+        );
+    }
+    // Never has an implicit lower bound, so v <: Never also fixes v.
+    let never = "S(N) { S(() -> Nil ! N) }
+use = (s ! S(Never)) { S(f) = s f() }
+wrap(N) = (body: () -> Nil ! N | S(Never), svc: S(Never)) -> Nil ! N {
+ ! S(_) = svc
+ body()
+}";
+    types(never);
+}

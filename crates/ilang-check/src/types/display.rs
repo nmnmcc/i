@@ -1591,7 +1591,14 @@ fn hide(t: &Ty, outside: &HashSet<V>, in_h: bool) -> Ty {
         Ty::Var(v) if in_h && (v.0 >= MARK || !outside.contains(v)) => Ty::Top,
         Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
-        Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
+        Ty::Inter(xs) => {
+            let mut xs: Vec<_> = xs.iter().map(go).filter(|t| *t != Ty::Top).collect();
+            match xs.len() {
+                0 => Ty::Top,
+                1 => xs.pop().unwrap(),
+                _ => Ty::Inter(xs),
+            }
+        }
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
             params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
             ret: go(&f.ret),
