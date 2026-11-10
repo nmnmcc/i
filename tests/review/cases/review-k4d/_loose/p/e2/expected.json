@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "app/main.read : () -> A ! State(B & A)\napp/main.outer : (runner: (() -> A ! State(B & A)) -> C ? E ! N) -> () -> { () -> D ! State(F & D) } ? E ! N\napp/main.outer2 : (runner: (() -> Int ! State(Int)) -> Int ! State(Int)) -> () -> { () -> A ! State(B & A) } ! State(Int)\napp/main.outer3 : (k: (A) -> B ? E ! N) -> () -> B ? E ! N | State(C & A)\napp/main.outer4 : (k: (Int) -> Int) -> Int ! State(A & Int)\n",
-      "stderr": ""
+      "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `outer` is not used\nsrc/main.i:11:1: warning[W0504]: top-level binding `outer2` is not used\nsrc/main.i:19:1: warning[W0504]: top-level binding `outer3` is not used\nsrc/main.i:23:1: warning[W0504]: top-level binding `outer4` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `outer` is not used\nsrc/main.i:11:1: warning[W0504]: top-level binding `outer2` is not used\nsrc/main.i:19:1: warning[W0504]: top-level binding `outer3` is not used\nsrc/main.i:23:1: warning[W0504]: top-level binding `outer4` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `outer` is not used\nsrc/main.i:11:1: warning[W0504]: top-level binding `outer2` is not used\nsrc/main.i:19:1: warning[W0504]: top-level binding `outer3` is not used\nsrc/main.i:23:1: warning[W0504]: top-level binding `outer4` is not used\n"
     }
   }
 }

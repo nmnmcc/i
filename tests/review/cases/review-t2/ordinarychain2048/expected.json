@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "review/main.x : Int\n",
-      "stderr": ""
+      "stderr": "src/main.i:2049:1: warning[W0504]: top-level binding `x` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass review/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:2049:1: warning[W0504]: top-level binding `x` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass review/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:2049:1: warning[W0504]: top-level binding `x` is not used\n"
     }
   }
 }

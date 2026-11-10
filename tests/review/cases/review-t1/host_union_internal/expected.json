@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "probe/main.identity : (n: Int) -> Int\nprobe/main.reverse : (n: Int) -> Int\nprobe/main.a : 1\nprobe/main.b : 1\n",
-      "stderr": ""
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `identity` is not used\nsrc/main.i:5:1: warning[W0504]: top-level binding `reverse` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `a` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `b` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass probe/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `identity` is not used\nsrc/main.i:5:1: warning[W0504]: top-level binding `reverse` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `a` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `b` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass probe/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `identity` is not used\nsrc/main.i:5:1: warning[W0504]: top-level binding `reverse` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `a` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `b` is not used\n"
     }
   }
 }
