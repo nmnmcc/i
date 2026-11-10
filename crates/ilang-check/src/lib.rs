@@ -52,7 +52,6 @@ pub mod code {
     pub const ALIAS_PATTERN_RESERVED: &str = "E0233";
     pub const MACRO_RESERVED: &str = "E0234";
     pub const LOWERCASE_TYPE_RESERVED: &str = "E0237";
-    pub const CHOICES_ONE_CLAUSE: &str = "E0235";
     // Attributes and entry points.
     pub const UNKNOWN_ATTRIBUTE: &str = "E0301";
     pub const ATTRIBUTE_ARGS: &str = "E0302";

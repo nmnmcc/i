@@ -10,6 +10,7 @@
 
 use super::display;
 use super::infer::Checker;
+use super::lits::ValueSet;
 use super::{FnTy, Head, Ty, V};
 use crate::hir::*;
 use std::collections::HashMap;
@@ -24,10 +25,40 @@ pub(super) fn members(k: &Ty) -> Vec<Ty> {
         Ty::Union(ms) => ms.iter().flat_map(members).collect(),
         Ty::Diff(a, h) => members(a)
             .into_iter()
-            .filter(|m| m.head().is_none() || !h.iter().any(|x| x.head() == m.head()))
+            .filter_map(|m| {
+                let excluded: Vec<_> = h
+                    .iter()
+                    .flat_map(members)
+                    .filter(|x| x.head() == m.head())
+                    .collect();
+                if excluded.is_empty() || m.head().is_none() {
+                    Some(m)
+                } else if m.scalar().is_some() {
+                    let sets: Vec<_> = excluded.iter().map(|x| x.values().clone()).collect();
+                    m.values()
+                        .minus(&super::lits::ValueSet::join_all(&sets))
+                        .map(|v| m.with_values(Some(v)))
+                } else {
+                    None
+                }
+            })
             .collect(),
         Ty::Inter(ms) => match ms.iter().find(|m| m.head().is_some()) {
-            Some(m) => vec![m.clone()],
+            Some(m) => {
+                let mut out = m.clone();
+                for other in ms.iter().flat_map(members).filter(|x| x.head().is_some()) {
+                    if other.head() != out.head() {
+                        return Vec::new();
+                    }
+                    if out.scalar().is_some() {
+                        out = out.with_values(out.values().meet(other.values()));
+                    }
+                    if out == Ty::Never {
+                        return Vec::new();
+                    }
+                }
+                vec![out]
+            }
             None => vec![k.clone()],
         },
         Ty::Both(_, b) => members(b),
@@ -66,7 +97,10 @@ pub(super) fn disjoint(x: &Ty, y: &Ty) -> bool {
     if xs.iter().chain(&ys).any(|m| m.head().is_none()) {
         return false;
     }
-    xs.iter().all(|a| ys.iter().all(|b| a.head() != b.head()))
+    xs.iter().all(|a| {
+        ys.iter()
+            .all(|b| a.head() != b.head() || a.values().disjoint(b.values()))
+    })
 }
 
 /// The type at the top of a pattern, through `x = …`: `x: T`.
@@ -92,6 +126,30 @@ pub(super) fn open_fn(e: &Expr) -> bool {
 }
 
 impl Checker<'_> {
+    pub fn hidden_inputs(&self, f: &FnTy) -> Vec<V> {
+        hidden_inputs(&self.s, f)
+    }
+
+    pub fn whole_sigma(&self, sigma: &Sigma, hidden: &[V]) -> Sigma {
+        sigma
+            .iter()
+            .map(|(v, ts)| {
+                (
+                    *v,
+                    ts.iter()
+                        .map(|t| {
+                            if hidden.contains(v) {
+                                whole_lits(&self.s, t)
+                            } else {
+                                t.clone()
+                            }
+                        })
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+
     pub fn kunion(&self, ms: Vec<Ty>) -> Ty {
         display::known_union(&self.s, ms)
     }
@@ -109,6 +167,7 @@ impl Checker<'_> {
         }
         let go = |x: &Type| self.kconv_in(x, local, depth);
         match &t.kind {
+            TypeKind::Lit(v) => Ty::literal(v),
             TypeKind::Named { ty, args } => {
                 let args: Vec<Ty> = args.iter().map(go).collect();
                 if let TypeRef::Custom(id) = ty
@@ -240,19 +299,42 @@ impl Checker<'_> {
         match k {
             Ty::Var(_) | Ty::Top | Ty::Both(..) => self.s.fresh(),
             Ty::Never => Ty::Never,
-            Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(|x| self.known_bound(x)).collect()),
+            Ty::Con(h, values, xs) => Ty::Con(
+                *h,
+                if k.scalar().is_some() {
+                    ValueSet::ALL
+                } else {
+                    values.clone()
+                },
+                xs.iter()
+                    .zip(self.s.variances(*h, xs.len()))
+                    .map(|(x, v)| {
+                        if v == super::Variance::Co {
+                            self.known_bound(x)
+                        } else {
+                            self.s.fresh()
+                        }
+                    })
+                    .collect(),
+            ),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
                 params: f
                     .params
                     .iter()
-                    .map(|(l, p)| (l.clone(), self.known_bound(p)))
+                    .map(|(l, _)| (l.clone(), self.s.fresh()))
                     .collect(),
                 ret: self.known_bound(&f.ret),
                 err: self.known_bound(&f.err),
-                env: self.known_bound(&f.env),
+                env: self.s.fresh(),
             })),
             Ty::Union(xs) => Ty::Union(xs.iter().map(|x| self.known_bound(x)).collect()),
             Ty::Inter(xs) => Ty::Inter(xs.iter().map(|x| self.known_bound(x)).collect()),
+            Ty::Diff(a, h)
+                if h.iter()
+                    .any(|t| t.scalar().is_some() && !t.values().is_all()) =>
+            {
+                self.known_bound(a)
+            }
             Ty::Diff(a, h) => Ty::Diff(Box::new(self.known_bound(a)), h.clone()),
         }
     }
@@ -265,7 +347,7 @@ impl Checker<'_> {
             Ty::Var(v) => {
                 self.kgen.insert(*v);
             }
-            Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+            Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
                 xs.iter().for_each(|x| self.note_general(x))
             }
             Ty::Fn(f) => {
@@ -320,18 +402,21 @@ impl Checker<'_> {
     /// the types its type variables get. `_` in `k`, and a type variable
     /// that is generalized in `k`, match nothing.
     pub fn match_k(&self, p: &Ty, k: &Ty, sigma: &mut Sigma, depth: u32) {
-        if *k == Ty::Top || depth > 64 {
+        if depth > 64 {
             return;
         }
-        if let Ty::Var(v) = k
-            && self.kgen.contains(v)
-        {
+        if *k == Ty::Top || matches!(k, Ty::Var(v) if self.kgen.contains(v)) {
+            let mut vars = Vec::new();
+            ty_vars(p, &mut vars);
+            for v in vars {
+                sigma.entry(v).or_default().push(Ty::Top);
+            }
             return;
         }
         match p {
             Ty::Var(v) => sigma.entry(*v).or_default().push(k.clone()),
             Ty::Con(..) | Ty::Fn(_) => match (p, member(k, p.head())) {
-                (Ty::Con(_, ps), Some(Ty::Con(_, ks))) if ps.len() == ks.len() => {
+                (Ty::Con(_, _, ps), Some(Ty::Con(_, _, ks))) if ps.len() == ks.len() => {
                     for (x, y) in ps.iter().zip(&ks) {
                         self.match_k(x, y, sigma, depth + 1);
                     }
@@ -347,16 +432,12 @@ impl Checker<'_> {
                 _ => {}
             },
             Ty::Union(ps) => {
-                let heads: Vec<Head> = ps.iter().filter_map(Ty::head).collect();
+                let concrete: Vec<Ty> = ps.iter().filter(|t| t.head().is_some()).cloned().collect();
                 for m in ps {
                     if m.head().is_some() {
                         self.match_k(m, k, sigma, depth + 1);
                     } else if let Ty::Var(v) = m {
-                        let rest = members(k)
-                            .into_iter()
-                            .filter(|x| x.head().is_none_or(|h| !heads.contains(&h)))
-                            .collect();
-                        let rest = self.kunion(rest);
+                        let rest = display::known_diff(&self.s, k.clone(), concrete.clone());
                         sigma.entry(*v).or_default().push(rest);
                     }
                 }
@@ -388,7 +469,7 @@ impl Checker<'_> {
                 None if partial => Ty::Top,
                 None => return None,
             },
-            Ty::Con(h, xs) => Ty::Con(*h, all(xs)?),
+            Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), all(xs)?),
             Ty::Union(xs) => Ty::Union(all(xs)?),
             Ty::Inter(xs) => Ty::Inter(all(xs)?),
             Ty::Diff(a, h) => Ty::Diff(Box::new(go(a)?), all(h)?),
@@ -415,6 +496,7 @@ impl Checker<'_> {
         for ((_, p), k) in f.params.iter().zip(args) {
             self.match_k(p, k, &mut sigma, 0);
         }
+        let sigma = self.whole_sigma(&sigma, &self.hidden_inputs(f));
         self.ksubst(&f.ret, &sigma, false).unwrap_or(Ty::Top)
     }
 
@@ -446,7 +528,11 @@ impl Checker<'_> {
             PatternKind::List { .. } => Head::Named(TypeRef::Builtin(BuiltinType::List)),
             PatternKind::Error(_) => return Ty::Top,
         };
-        one_member(b, head).unwrap_or(Ty::Top)
+        let m = one_member(b, head).unwrap_or(Ty::Top);
+        match coverage_literal(q) {
+            Some(t) => display::known_inter(&self.s, vec![m, t]),
+            None => m,
+        }
     }
 
     /// Names in patterns (§4.8): when `q` is fitted to a value with the
@@ -471,12 +557,11 @@ impl Checker<'_> {
                 self.fit_known(pattern, b, in_case);
             }
             PatternKind::Prefix { rest: Some(x), .. } => {
-                let k = self.member_for(q, b);
-                self.kbind(x.var, k, in_case);
+                self.kbind(x.var, prim(BuiltinType::String), in_case);
             }
             PatternKind::Constructor { ctor, args, spread } => {
                 let args_k = match member(b, Some(Head::Named(TypeRef::Custom(ctor.ty)))) {
-                    Some(Ty::Con(_, xs)) => Some(xs),
+                    Some(Ty::Con(_, _, xs)) => Some(xs),
                     _ => None,
                 };
                 let n = match &self.p.ty(ctor.ty).body {
@@ -506,7 +591,7 @@ impl Checker<'_> {
             }
             PatternKind::Tuple(ps) => {
                 let parts = match member(b, Some(Head::Tuple(ps.len() as u32))) {
-                    Some(Ty::Con(_, xs)) => xs,
+                    Some(Ty::Con(_, _, xs)) => xs,
                     _ => vec![Ty::Top; ps.len()],
                 };
                 for (x, k) in ps.iter().zip(&parts) {
@@ -516,7 +601,7 @@ impl Checker<'_> {
             PatternKind::List { items, rest } => {
                 let list = member(b, Some(Head::Named(TypeRef::Builtin(BuiltinType::List))));
                 let e = match &list {
-                    Some(Ty::Con(_, xs)) if xs.len() == 1 => xs[0].clone(),
+                    Some(Ty::Con(_, _, xs)) if xs.len() == 1 => xs[0].clone(),
                     _ => Ty::Top,
                 };
                 for x in items {
@@ -550,10 +635,16 @@ impl Checker<'_> {
     pub fn written_known(&self, e: &Expr) -> Ty {
         let prim = |t| Ty::named(TypeRef::Builtin(t), Vec::new());
         match &e.kind {
-            ExprKind::Int(_) => prim(BuiltinType::Int),
+            ExprKind::Int(n) => scalar_literal(BuiltinType::Int, n.to_string()),
             ExprKind::Float(_) => prim(BuiltinType::Float),
-            ExprKind::String(_) => prim(BuiltinType::String),
+            ExprKind::String(s) => scalar_literal(BuiltinType::String, s.clone()),
             ExprKind::BitArray(_) => prim(BuiltinType::BitArray),
+            ExprKind::Unary {
+                op: ilang_syntax::ast::UnOp::Neg,
+                expr,
+            } if neg_literal(expr).is_some() => {
+                scalar_literal(BuiltinType::Int, neg_literal(expr).unwrap())
+            }
             ExprKind::Unary { op, .. } => prim(match op {
                 ilang_syntax::ast::UnOp::Neg => BuiltinType::Int,
                 ilang_syntax::ast::UnOp::NegFloat => BuiltinType::Float,
@@ -634,7 +725,9 @@ fn ty_vars(t: &Ty, out: &mut Vec<V>) {
                 out.push(*v);
             }
         }
-        Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| ty_vars(x, out)),
+        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+            xs.iter().for_each(|x| ty_vars(x, out))
+        }
         Ty::Fn(f) => {
             f.params.iter().for_each(|p| ty_vars(&p.1, out));
             [&f.ret, &f.err, &f.env]
@@ -687,4 +780,166 @@ pub(super) fn format_prim(name: &str) -> Option<BuiltinType> {
         }
         _ => return None,
     })
+}
+
+/// Widen known literal facts only in covariant parts (literal-types decision 7).
+pub(super) fn whole_lits(s: &super::solve::Solver, t: &Ty) -> Ty {
+    match t {
+        Ty::Never => Ty::Top,
+        Ty::Con(h, values, xs) => Ty::Con(
+            *h,
+            if t.scalar().is_some() {
+                super::lits::ValueSet::ALL
+            } else {
+                values.clone()
+            },
+            xs.iter()
+                .zip(s.variances(*h, xs.len()))
+                .map(|(x, v)| {
+                    if v == super::Variance::Co {
+                        whole_lits(s, x)
+                    } else {
+                        Ty::Top
+                    }
+                })
+                .collect(),
+        ),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+            params: f.params.iter().map(|(l, _)| (l.clone(), Ty::Top)).collect(),
+            ret: whole_lits(s, &f.ret),
+            err: whole_lits(s, &f.err),
+            env: Ty::Top,
+        })),
+        Ty::Union(ms) => display::known_union(s, ms.iter().map(|t| whole_lits(s, t)).collect()),
+        Ty::Inter(ms) => display::known_inter(s, ms.iter().map(|t| whole_lits(s, t)).collect()),
+        Ty::Diff(a, h)
+            if h.iter()
+                .any(|t| t.scalar().is_some() && !t.values().is_all()) =>
+        {
+            whole_lits(s, a)
+        }
+        Ty::Diff(a, h) => display::known_diff(s, whole_lits(s, a), h.clone()),
+        Ty::Both(..) => Ty::Top,
+        t => t.clone(),
+    }
+}
+
+/// Inputs not shown by a covariant structural part of an actual argument.
+pub(super) fn hidden_inputs(s: &super::solve::Solver, f: &FnTy) -> Vec<V> {
+    fn walk(s: &super::solve::Solver, t: &Ty, given: bool, shown: bool, out: &mut Vec<V>) {
+        match t {
+            Ty::Var(v) if given && !shown => {
+                if !out.contains(v) {
+                    out.push(*v);
+                }
+            }
+            Ty::Con(h, _, xs) => {
+                for (x, v) in xs.iter().zip(s.variances(*h, xs.len())) {
+                    match v {
+                        super::Variance::Co => walk(s, x, given, shown, out),
+                        super::Variance::Contra => walk(s, x, !given, false, out),
+                        _ => walk(s, x, true, false, out),
+                    }
+                }
+            }
+            Ty::Fn(f) => {
+                for (_, p) in &f.params {
+                    walk(s, p, !given, false, out);
+                }
+                walk(s, &f.ret, given, false, out);
+                walk(s, &f.err, given, false, out);
+                walk(s, &f.env, true, false, out);
+            }
+            Ty::Union(ms) | Ty::Inter(ms) => {
+                for t in ms {
+                    walk(s, t, given, shown, out);
+                }
+            }
+            Ty::Diff(a, h) => {
+                walk(s, a, given, shown, out);
+                for t in h {
+                    walk(s, t, given, shown, out);
+                }
+            }
+            Ty::Both(a, b) => {
+                walk(s, a, true, false, out);
+                walk(s, b, true, false, out);
+            }
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    for (_, p) in &f.params {
+        walk(s, p, true, true, &mut out);
+    }
+    walk(s, &f.ret, false, false, &mut out);
+    walk(s, &f.env, true, false, &mut out);
+    out
+}
+
+/// A scalar singleton uses the same canonical text in inference and coverage.
+pub(super) fn scalar_literal(b: BuiltinType, text: String) -> Ty {
+    Ty::lit(b, ValueSet::only([text.into()]).unwrap())
+}
+
+fn coverage_literal(q: &Pattern) -> Option<Ty> {
+    match super::coverage::literal(q)? {
+        super::coverage::Lit::Int(n) => Some(scalar_literal(BuiltinType::Int, n)),
+        super::coverage::Lit::Str(s) => Some(scalar_literal(BuiltinType::String, s)),
+        _ => None,
+    }
+}
+
+/// Only brace groups around an unsigned literal are transparent to unary minus.
+pub(super) fn neg_literal(e: &Expr) -> Option<String> {
+    match &e.kind {
+        ExprKind::Int(n) => Some(super::lits::int_text(true, n)),
+        ExprKind::Block(b) => match b.stmts.as_slice() {
+            [Stmt::Expr(x)] => neg_literal(x),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod literal_known_tests {
+    use super::*;
+    #[test]
+    fn hidden_inputs_and_recursive_widening() {
+        // decision 7: callback outputs and environments, not callback inputs.
+        let s = super::super::solve::Solver::new(Default::default(), Vec::new());
+        let f = FnTy {
+            params: vec![(
+                None,
+                Ty::Fn(Box::new(FnTy {
+                    params: vec![(None, Ty::Var(V(0)))],
+                    ret: Ty::Var(V(1)),
+                    err: Ty::Never,
+                    env: Ty::Never,
+                })),
+            )],
+            ret: Ty::Var(V(2)),
+            err: Ty::Never,
+            env: Ty::Var(V(3)),
+        };
+        assert_eq!(hidden_inputs(&s, &f), [V(1), V(3)]);
+        let lit = Ty::lit(
+            BuiltinType::Int,
+            super::super::lits::ValueSet::only([std::sync::Arc::from("0")]).unwrap(),
+        );
+        assert_eq!(
+            whole_lits(&s, &Ty::tuple(vec![lit.clone(), Ty::Never])),
+            Ty::tuple(vec![
+                Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new()),
+                Ty::Top
+            ])
+        );
+        let a = Ty::Diff(
+            Box::new(Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new())),
+            vec![lit.clone()],
+        );
+        assert!(disjoint(&lit, &a));
+        assert_eq!(members(&Ty::Inter(vec![lit.clone(), a])), Vec::<Ty>::new());
+    }
 }

@@ -25,7 +25,7 @@ shadowing = () {
 	}
 	check(show((x, y)), "(2, 21)")
 	check = "a local name may cover a top-level name"
-	{ check == "" } |> {
+	{ (a, b) { a == b }(check, "") } |> {
 		True  -> panic("no")
 		False -> Nil
 	}
@@ -33,7 +33,7 @@ shadowing = () {
 
 @test
 values_in_every_place = () {
-	n = 3
+	n = (n: Int) { n }(3)
 	check(show(pair(n |> {
 		3 -> "three"
 		_ -> "other"

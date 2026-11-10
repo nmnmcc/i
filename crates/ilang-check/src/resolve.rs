@@ -13,7 +13,7 @@
 use crate::Parsed;
 use crate::code;
 use crate::hir::*;
-use crate::types::HostType;
+use crate::types::{Head, HostType, Ty};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast;
 use ilang_syntax::span::Span;
@@ -1304,6 +1304,7 @@ impl<'a> Resolver<'a> {
     fn ty(&mut self, t: &ast::TypeExpr) -> Type {
         use ast::TypeKind as T;
         let kind = match &t.kind {
+            T::Lit(v) => TypeKind::Lit(v.clone()),
             T::Named { module, name, args } => {
                 let variable = if module.is_none() {
                     self.ty_frames
@@ -1588,8 +1589,19 @@ impl<'a> Resolver<'a> {
                     }
                 } else {
                     self.cur = module;
+                    let input_note = match &wire.kind {
+                        TypeKind::Fn { ret, err, .. } => [Some(&**ret), err.as_deref()]
+                            .into_iter()
+                            .flatten()
+                            .find_map(|ty| {
+                                let note = self.host_input_note(ty);
+                                (!note.is_empty()).then_some(note)
+                            })
+                            .unwrap_or_default(),
+                        _ => String::new(),
+                    };
                     self.error(code::HOST_TYPE, f.ty.span,
-                        "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3)");
+                        format!("a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3){input_note}"));
                 }
             }
         }
@@ -1615,25 +1627,23 @@ impl<'a> Resolver<'a> {
         }
         let params = params
             .iter()
-            .map(|p| self.host_part(&p.ty))
+            .map(|p| self.host_part(&p.ty, true))
             .collect::<Option<Vec<_>>>()?;
-        let result = self.host_part(ret)?;
+        let result = self.host_part(ret, false)?;
         let mut members = Vec::new();
         if let Some(err) = err {
             if !errors && !self.is_never(err) {
                 return None;
             }
-            let err = self.expand(err);
-            let parts: Vec<Type> = match &err.kind {
-                TypeKind::Union(ms) => ms.clone(),
-                _ => vec![err.clone()],
+            let err = self.boundary_type(err)?;
+            let parts = match err {
+                Ty::Union(ms) => ms,
+                Ty::Never => Vec::new(),
+                t => vec![t],
             };
             for m in parts {
-                if self.is_never(&m) {
-                    continue;
-                }
-                let h = self.host_part(&m)?;
-                if matches!(h, HostType::Opaque(_)) || members.contains(&h) {
+                let h = self.host_member(&m, false)?;
+                if matches!(h, HostType::Opaque(_)) {
                     return None;
                 }
                 members.push(h);
@@ -1649,32 +1659,39 @@ impl<'a> Resolver<'a> {
     }
 
     fn is_never(&self, t: &Type) -> bool {
-        matches!(
-            self.expand(t).kind,
-            TypeKind::Named {
-                ty: TypeRef::Builtin(BuiltinType::Never),
-                ..
-            }
-        )
+        self.boundary_type(t) == Some(Ty::Never)
     }
 
     /// The part of B.2 for a type that the host can take (§10.3).
-    fn host_part(&self, t: &Type) -> Option<HostType> {
-        match &self.expand(t).kind {
-            TypeKind::Named {
-                ty: TypeRef::Builtin(b),
-                ..
-            } => match b {
+    fn host_part(&self, t: &Type, outgoing: bool) -> Option<HostType> {
+        if let Some(t) = self.boundary_type(t) {
+            return self.host_member(&t, outgoing);
+        }
+        // Opaque custom types may have parameters; they have no scalar set.
+        if let TypeKind::Named {
+            ty: TypeRef::Custom(id),
+            ..
+        } = self.expand(t).kind
+            && matches!(&self.p.ty(id).body, TypeBody::Custom(cs) if cs.is_empty())
+        {
+            return Some(HostType::Opaque(id));
+        }
+        None
+    }
+
+    fn host_member(&self, t: &Ty, outgoing: bool) -> Option<HostType> {
+        if t.scalar().is_some() && !outgoing && !t.values().is_all() {
+            return None;
+        }
+        match t {
+            Ty::Con(Head::Named(TypeRef::Builtin(b)), _, args) if args.is_empty() => match b {
                 BuiltinType::Int => Some(HostType::Int),
                 BuiltinType::Float => Some(HostType::Float),
                 BuiltinType::String => Some(HostType::String),
                 BuiltinType::BitArray => Some(HostType::BitArray),
                 _ => None,
             },
-            TypeKind::Named {
-                ty: TypeRef::Custom(id),
-                ..
-            } => {
+            Ty::Con(Head::Named(TypeRef::Custom(id)), _, _) => {
                 let def = self.p.ty(*id);
                 let prelude = Some(def.module) == self.p.prelude;
                 match &def.body {
@@ -1718,7 +1735,11 @@ impl<'a> Resolver<'a> {
                 );
             }
         }
-        for part in params.iter().map(|p| &p.ty).chain([&**ret]) {
+        for (part, outgoing) in params
+            .iter()
+            .map(|p| (&p.ty, true))
+            .chain([(&**ret, false)])
+        {
             if let Some(span) = find_in_type(part, &|k| matches!(k, TypeKind::Hole)) {
                 self.error(
                     code::EXTERNAL_HOLE,
@@ -1731,41 +1752,69 @@ impl<'a> Resolver<'a> {
                     span,
                     "the type of an external function may not have type variables (§10.1)",
                 );
-            } else if !self.host_type(part) {
+            } else if !self.host_type(part, outgoing) {
                 self.error(
                     code::EXTERNAL_HOST_TYPE,
                     part.span,
-                    "the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3)",
+                    format!("the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3){}", if outgoing { String::new() } else { self.host_input_note(part) }),
                 );
             }
         }
     }
 
+    /// Aliases and scalar expressions use inference's finite/cofinite algebra.
+    fn boundary_type(&self, t: &Type) -> Option<Ty> {
+        crate::types::boundary_type(t, &self.p, &|t| self.expand(t))
+    }
+
+    fn host_input_note(&self, t: &Type) -> String {
+        let Some(t) = self.boundary_type(t) else {
+            return String::new();
+        };
+        let Some(b) = t.scalar().filter(|_| !t.values().is_all()) else {
+            return String::new();
+        };
+        let complement = !t.values().is_finite();
+        let mut texts: Vec<_> = t
+            .values()
+            .items()
+            .map(|v| {
+                if b == BuiltinType::String {
+                    ast::LitValue::Str(v.to_string()).text()
+                } else {
+                    v.to_string()
+                }
+            })
+            .collect();
+        let count = texts.len();
+        if count > 12 {
+            texts.truncate(10);
+            texts.push(format!("… ({} more)", count - 10));
+        }
+        let shown = if complement {
+            format!("{} - {}", b.name(), texts.join(" - "))
+        } else {
+            texts.join(" | ")
+        };
+        format!(
+            "; the host gives this value, so it must be all of `{}`, not `{shown}`",
+            b.name()
+        )
+    }
+
     /// §10.3: a type that the host can take. Aliases are expanded.
-    fn host_type(&self, t: &Type) -> bool {
+    fn host_type(&self, t: &Type, outgoing: bool) -> bool {
+        if self.host_part(t, outgoing).is_some() {
+            return true;
+        }
         match &self.expand(t).kind {
             TypeKind::Error => true,
-            TypeKind::Named {
-                ty: TypeRef::Builtin(b),
-                ..
-            } => matches!(
-                b,
-                BuiltinType::Int | BuiltinType::Float | BuiltinType::String | BuiltinType::BitArray
-            ),
             TypeKind::Named {
                 ty: TypeRef::Custom(id),
                 ..
             } => {
-                let def = self.p.ty(*id);
-                match &def.body {
-                    // An alias in a circle; the circle has been reported.
-                    TypeBody::Alias(_) => true,
-                    TypeBody::Custom(ctors) => {
-                        ctors.is_empty()
-                            || (Some(def.module) == self.p.prelude
-                                && matches!(def.name.as_str(), "Nil" | "Bool"))
-                    }
-                }
+                // An alias in a circle; the circle has been reported.
+                matches!(self.p.ty(*id).body, TypeBody::Alias(_))
             }
             _ => false,
         }
@@ -1913,7 +1962,7 @@ impl<'a> Resolver<'a> {
                 true
             }
             E::Unary { expr, .. } => {
-                matches!(expr.kind, E::Int(_) | E::Float(_) | E::String(_))
+                matches!(ungroup(expr).kind, E::Int(_) | E::Float(_) | E::String(_))
             }
             E::Field { target, .. } => match &target.kind {
                 // `m.x` is a name when `m` is a module.
@@ -2125,37 +2174,37 @@ impl<'a> Resolver<'a> {
             E::Block(b) => ExprKind::Block(self.block(b)),
             E::Fn(f) => ExprKind::Fn(Box::new(self.function(f, e.span))),
             E::Clauses(clauses) => self.clause_function(clauses, e.span),
-            E::Case { subject, clauses } if clauses.len() == 1 && clauses[0].guard.is_none() => {
+            E::Case { subject, clauses }
+                if clauses.len() == 1
+                    && clauses[0].guard.is_none()
+                    && clauses[0].patterns.len() == 1 =>
+            {
                 let clause = &clauses[0];
-                if clause.patterns.len() != 1 {
-                    self.one_clause_choices(e.span)
-                } else {
-                    // §3.9: the subject precedes the new scope; no type frame,
-                    // no generalization, and the binding stops at the pattern.
-                    let value = self.expr(subject);
-                    let mut binders = Vec::new();
-                    let pattern = self.pattern(&clause.patterns[0], &mut binders, None);
-                    self.locals.push(Frame {
-                        names: binders.into_iter().map(|b| (b.name, b.var)).collect(),
-                        fn_only: None,
-                    });
-                    let body = self.expr(&clause.body);
-                    self.locals.pop();
-                    let span = pattern.span;
-                    ExprKind::Block(Block {
-                        stmts: vec![
-                            Stmt::Bind(Binding {
-                                pattern,
-                                value,
-                                direct: false,
-                                ty_vars: vec![],
-                                span,
-                            }),
-                            Stmt::Expr(body),
-                        ],
-                        span: e.span,
-                    })
-                }
+                // §3.9: the subject precedes the new scope; no type frame,
+                // no generalization, and the binding stops at the pattern.
+                let value = self.expr(subject);
+                let mut binders = Vec::new();
+                let pattern = self.pattern(&clause.patterns[0], &mut binders, None);
+                self.locals.push(Frame {
+                    names: binders.into_iter().map(|b| (b.name, b.var)).collect(),
+                    fn_only: None,
+                });
+                let body = self.expr(&clause.body);
+                self.locals.pop();
+                let span = pattern.span;
+                ExprKind::Block(Block {
+                    stmts: vec![
+                        Stmt::Bind(Binding {
+                            pattern,
+                            value,
+                            direct: false,
+                            ty_vars: vec![],
+                            span,
+                        }),
+                        Stmt::Expr(body),
+                    ],
+                    span: e.span,
+                })
             }
             E::Case {
                 subject, clauses, ..
@@ -2244,16 +2293,9 @@ impl<'a> Resolver<'a> {
         Expr { kind, span: e.span }
     }
 
-    fn one_clause_choices(&mut self, span: Span) -> ExprKind {
-        self.error(code::CHOICES_ONE_CLAUSE, span, "a clause block with one clause and choices is not supported yet; write one clause for each choice");
-        ExprKind::Error
-    }
-
     fn clause_function(&mut self, clauses: &[ast::Clause], span: Span) -> ExprKind {
-        let single = clauses.len() == 1 && clauses[0].guard.is_none();
-        if single && clauses[0].patterns.len() != 1 {
-            return self.one_clause_choices(span);
-        }
+        let single =
+            clauses.len() == 1 && clauses[0].guard.is_none() && clauses[0].patterns.len() == 1;
         let synthetic = Span::new(span.start, span.start);
         let (param, body) = if single {
             (clauses[0].patterns[0].clone(), clauses[0].body.clone())
@@ -2861,7 +2903,7 @@ fn named_types(t: &Type, out: &mut Vec<TypeId>) {
             named_types(ret, out);
             err.iter().chain(env).for_each(|a| named_types(a, out));
         }
-        TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
+        TypeKind::Lit(_) | TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
     }
 }
 
@@ -2887,7 +2929,7 @@ fn for_each_child(t: &Type, f: &mut dyn FnMut(&Type)) {
             f(ret);
             err.iter().chain(env).for_each(|a| f(a));
         }
-        TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
+        TypeKind::Lit(_) | TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
     }
 }
 
@@ -2909,6 +2951,7 @@ fn find_in_type(t: &Type, is: &dyn Fn(&TypeKind) -> bool) -> Option<Span> {
 /// `t` with the type variables in `map` replaced.
 pub(crate) fn subst(t: &Type, map: &HashMap<TyVarId, &Type>) -> Type {
     let kind = match &t.kind {
+        TypeKind::Lit(v) => TypeKind::Lit(v.clone()),
         TypeKind::Var(v) => match map.get(v) {
             Some(r) => return (*r).clone(),
             None => TypeKind::Var(*v),

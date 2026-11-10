@@ -78,12 +78,13 @@ fn brace_decisions_follow_the_ordered_tests() {
             ..
         })
     ));
+    // T1 §6.1: a literal type starts an annotation, so this is a clause.
+    assert!(matches!(
+        value(&module("a = { x: 1 -> 2 }")).kind,
+        ExprKind::Clauses(_)
+    ));
     // §3.5 test 4 and test 5: records vs a clause with a wrong pattern.
     for (src, code) in [
-        (
-            /* old-syntax-check: E0114,E0101 */ "a = { x: 1 -> 2 }",
-            Code::RecordReserved,
-        ),
         (
             /* old-syntax-check: E0114,E0101 */ "a = { p: (Int, Int) -> e }",
             Code::RecordReserved,
@@ -523,5 +524,44 @@ fn brace_cache_and_uncached_parser_agree() {
             ilang_syntax::parser::parse_module_uncached(source),
             "{path}"
         );
+    }
+}
+
+#[test]
+fn literal_type_grammar_and_type_call_arguments() {
+    // types-joint §5: Literal Prim, grouped negatives and TypeArg=Type.
+    let m = module(
+        r#"A = Int - -1
+B = -{1} | 0x10 | "é"
+f = (x: "a" | "b") { x }
+"#,
+    );
+    let ItemKind::TypeDef(a) = &m.items[0].kind else {
+        panic!()
+    };
+    let TypeBody::Alias(t) = &a.body else {
+        panic!()
+    };
+    assert!(
+        matches!(&t.kind,TypeKind::Diff(ts) if matches!(&ts[1].kind,TypeKind::Lit(LitValue::Int(n)) if *n==(-1).into()))
+    );
+    module("A = m(-{1}, \"x\" | String)\n");
+    for source in [
+        /* old-syntax-check: E0101 */ "a: 1.5 = 1",
+        /* old-syntax-check: E0101 */ "a: { 1.5 | 2.5 } = 1",
+        /* old-syntax-check: E0101 */ "a: -1.5 = 1",
+    ] {
+        let ds = parse_module(source).1;
+        assert!(
+            ds.iter().any(|d| d.message == "Float has no literal types"),
+            "{ds:?}"
+        );
+    }
+    for source in [
+        /* old-syntax-check: E0101 */ "A = -x",
+        /* old-syntax-check: E0101 */ "A = -(1)",
+        /* old-syntax-check: E0101 */ "A = -{-1}",
+    ] {
+        assert!(!parse_module(source).1.is_empty(), "{source}");
     }
 }

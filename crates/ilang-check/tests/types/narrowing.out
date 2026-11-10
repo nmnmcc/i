@@ -9,7 +9,7 @@ nested : (r: Result(Int | String, Nil)) -> String
 pairs : (p: (Int | String, Bool)) -> String
 deep : (r: Result(Result(Int, String) | Nil, Nil)) -> String | Nil
 guarded : (v: Int | String) -> String | Int
-literal : (v: Int | String) -> String | Int
+literal : (v: Int | String) -> String | Int - 1
 partial : (v: Result(Int, String) | Nil) -> Nil | Result(Int, String)
 by_patterns : (p: (Bool, Int | String)) -> String | Int
-open : (v: A) -> Int | A - Int
+open : (v: A) -> 0 | A - Int

@@ -15,13 +15,13 @@ param : (f: A) -> Never
 bad_pattern : (u: User) -> Never
 id : (x: A) -> A
 through : () -> User
-holes : (f: (x: Int) -> Int) -> Int
+holes : (f: (x: 1) -> Int) -> Int
 minus : (a: Int, b: Int) -> Int
 piped : Int
 walk : (n: Int) -> Node
 walk_unwritten : (n: Int) -> Node
-ping : (n: Int) -> Int
-pong : (m: Int) -> Int
+ping : (n: Int) -> 0
+pong : (m: Int) -> 0
 wins : (x: Int) -> Int
 wins_ok : Int
 wins_value : Never

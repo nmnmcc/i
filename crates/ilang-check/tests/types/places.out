@@ -1,10 +1,10 @@
 union_in : (v: A | B) -> A | B
 inter_out : (v: Int) -> Int
 inter_both : (x: A & B, y: B) -> A & B
-inter_param_of_param : (f: (Never) -> Int) -> Int
+inter_param_of_param : (f: (Never) -> Int) -> 1
 union_in_alias : (v: A | B) -> A | B
 inter_in : (x: A & Int) -> A
-union_param_of_param : (f: (Never) -> Int) -> Int
+union_param_of_param : (f: (Never) -> Int) -> 1
 union_out : (Int) -> Never
 4:22: error[E0518]: a union with two or more type variables as members may only be in an output place (§4.4): inference could not choose the variable for a value that comes here
 6:28: error[E0518]: an intersection with a type variable may only be in an input place (§4.4): inference could not give a value that is in both
