@@ -695,6 +695,7 @@ dependencies = [
  "num-bigint",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "wasmparser 0.262.0",
  "wasmtime",
