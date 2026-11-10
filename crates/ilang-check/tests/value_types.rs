@@ -525,6 +525,8 @@ fn spec_corpus_reverse_order_and_recovery() {
         ..Default::default()
     };
     let mut count = 0;
+    let mut rejected = 0;
+    let mut discovered = 0;
     for section in std::fs::read_dir(root).unwrap() {
         let section = section.unwrap().path();
         if !section.is_dir() {
@@ -547,13 +549,38 @@ fn spec_corpus_reverse_order_and_recovery() {
             } else {
                 continue;
             };
+            discovered += 1;
+            let header = std::fs::read_to_string(if path.is_dir() {
+                path.join("i.toml")
+            } else {
+                path.clone()
+            })
+            .unwrap();
+            let expects_compile_error = header.lines().any(|line| {
+                line.starts_with("// expect: compile-error")
+                    || line.starts_with("# expect: compile-error")
+            });
             let (g, load_diags) = ilang_package::load_with(&project, &options);
             if load_diags.iter().any(Diagnostic::is_error) {
+                assert!(
+                    expects_compile_error,
+                    "unexpected load failure: {}: {:?}",
+                    path.display(),
+                    load_diags
+                );
+                rejected += 1;
                 continue;
             }
             let (p, resolve_diags) = ilang_check::resolve_program(&g);
             // Parser-rejected cases have no inference graph to permute.
             let Some(mut p) = p else {
+                assert!(
+                    expects_compile_error,
+                    "unexpected parse failure: {}: {:?}",
+                    path.display(),
+                    resolve_diags
+                );
+                rejected += 1;
                 continue;
             };
             let prior_errors = resolve_diags.iter().any(Diagnostic::is_error);
@@ -584,7 +611,11 @@ fn spec_corpus_reverse_order_and_recovery() {
         }
     }
     assert!(count > 0, "no resolved spec cases");
-    eprintln!("Compared all {count} resolved spec cases in normal/reversed recovery inference");
+    assert_eq!(count + rejected, discovered);
+    eprintln!(
+        "inventory (total, rejected, compared): {:?}",
+        (discovered, rejected, count)
+    );
 }
 
 #[test]
