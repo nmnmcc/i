@@ -211,3 +211,13 @@ review audit: repeated cancellation callbacks remain independent registrations"
 checks two remaining registrations both execute. Rust work cells already have
 independent identities (the paired two-work cancellation test checks both).
 The 16 JS review tests pass after this change.
+
+Rust panic payloads can themselves have panicking destructors. The error boundary
+now isolates finite payload-destructor panic chains outside the diagnostic lock;
+bg_review_a_panicking_panic_payload_cannot_skip_later_cleanup passes, as does
+Clippy -D warnings. JS thrown values have no synchronous destructor and remain
+stored unchanged. One edit of this audit helper initially omitted its loop-state
+assignment, causing E0382 and an unused-mut warning in the targeted build; fixed
+both without changing the regression assertion. The full post-Std-2 gate passed
+(76 Rust host tests, 76 Node tests, 51 browser tests); the next full gate also
+covers this final Rust payload test after merging the newer documentation.

@@ -43,7 +43,8 @@ pub struct CleanupFailure {
 }
 type CleanupErrors = Arc<Mutex<Vec<CleanupFailure>>>;
 fn isolate_cleanup(errors: &CleanupErrors, phase: &'static str, action: impl FnOnce()) {
-    if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(action)) {
+    let mut failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(action)).err();
+    while let Some(panic) = failure {
         let message = panic
             .downcast_ref::<String>()
             .cloned()
@@ -53,6 +54,9 @@ fn isolate_cleanup(errors: &CleanupErrors, phase: &'static str, action: impl FnO
             .lock()
             .unwrap()
             .push(CleanupFailure { phase, message });
+        // Panic payload destructors are embedding callbacks too. Drop them
+        // outside the diagnostic lock and isolate finite panic chains.
+        failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(panic))).err();
     }
 }
 
@@ -968,4 +972,33 @@ mod bg_review_tests {
         );
         assert_eq!(host.take_cleanup_errors()[0].message, "late cleanup failed");
     }
+}
+
+#[cfg(test)]
+#[test]
+fn bg_review_a_panicking_panic_payload_cannot_skip_later_cleanup() {
+    struct Payload;
+    impl Drop for Payload {
+        fn drop(&mut self) {
+            panic!("panic payload destructor failed");
+        }
+    }
+    let host = ResourceHost::default();
+    let context = host.context();
+    context
+        .insert("file", (), |_, _| std::panic::panic_any(Payload))
+        .unwrap();
+    let cleaned = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mark = cleaned.clone();
+    context
+        .insert("file", (), move |_, _| {
+            mark.store(true, std::sync::atomic::Ordering::SeqCst);
+        })
+        .unwrap();
+    let receipts = context.teardown();
+    assert!(cleaned.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(receipts.iter().all(CloseReceipt::is_complete));
+    let errors = host.take_cleanup_errors();
+    assert_eq!(errors.len(), 2);
+    assert_eq!(errors[1].message, "panic payload destructor failed");
 }
