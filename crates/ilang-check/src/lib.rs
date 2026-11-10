@@ -45,6 +45,7 @@ pub mod code {
     pub const TYPE_PARAM_TWICE: &str = "E0226";
     pub const EXPORT_HIDDEN_TYPE: &str = "E0227";
     pub const ENV_PARAMS_SAME: &str = "E0228";
+    pub const CHOICES_ONE_CLAUSE: &str = "E0235";
     // Attributes and entry points.
     pub const UNKNOWN_ATTRIBUTE: &str = "E0301";
     pub const ATTRIBUTE_ARGS: &str = "E0302";

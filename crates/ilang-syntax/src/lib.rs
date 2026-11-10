@@ -7,13 +7,25 @@ pub mod format;
 pub mod lexer;
 pub mod parser;
 pub mod print;
+#[doc(hidden)]
+pub mod shape;
 pub mod span;
 pub mod token;
 
 use span::Span;
 
 pub use lexer::{Lexed, lex};
-pub use parser::parse_module;
+pub use parser::{ParseStats, parse_module, parse_module_old, parse_stats};
+
+/// The hint for a parse error of a file that the old syntax reads with no
+/// error: `Some` only then. It parses the source again, so it is only for
+/// the error path.
+pub fn old_syntax_hint(source: &str) -> Option<&'static str> {
+    parse_module_old(source)
+        .1
+        .is_empty()
+        .then_some("if this file is in the old syntax, run `i fmt --from-old`")
+}
 
 /// The kind of a syntax error. Each kind has a stable code.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -40,6 +52,10 @@ pub enum Code {
     ArgOrder,
     PipeTarget,
     TypeGroupBreak,
+    /// Removed with the old syntax in stream A3.
+    DualAmbiguous,
+    RecordReserved,
+    HeaderGroup,
 }
 
 impl Code {
@@ -67,6 +83,9 @@ impl Code {
             Code::ArgOrder => "E0110",
             Code::PipeTarget => "E0111",
             Code::TypeGroupBreak => "E0112",
+            Code::DualAmbiguous => "E0113",
+            Code::RecordReserved => "E0114",
+            Code::HeaderGroup => "E0115",
         }
     }
 }

@@ -996,6 +996,7 @@ impl<'a> Query<'a> {
         for item in &ast.items {
             let within = |s: Span| item.span.start <= s.start && s.end <= item.span.end;
             match &item.kind {
+                ast::ItemKind::MacroItem { .. } => {}
                 ast::ItemKind::TypeDef(def) => {
                     let Some(&t) = module
                         .types

@@ -21,10 +21,10 @@
 
 use crate::ast::*;
 use crate::lexer::{Comment, lex};
-use crate::print::{has_open_fn, level, type_prec};
+use crate::print::{has_open_fn, is_match, level, type_prec};
 use crate::span::Span;
 use crate::token::{Token, TokenKind as T};
-use crate::{Diagnostic, parse_module};
+use crate::{Code, Diagnostic, old_syntax_hint, parse_module, parse_module_old};
 
 /// The width that the layout tries to keep to.
 pub const WIDTH: usize = 80;
@@ -33,11 +33,30 @@ pub const WIDTH: usize = 80;
 pub const TAB_WIDTH: usize = 4;
 
 /// Formats a source file. A file with syntax errors is not formatted; its
-/// errors are given back.
+/// errors are given back. Each node keeps the syntax it is written in.
+///
+/// Until stream A3, the parser reads the old and the new syntax. A file that
+/// the old syntax reads in another way, with no error, is not formatted: a
+/// lowercase name before a `(` on its line in a type is a `TypeCall` in the
+/// new syntax, but may end an old item before a binding that starts with
+/// `(`.
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
-    let (module, diags) = parse_module(source);
+    let (module, mut diags) = parse_module(source);
     if !diags.is_empty() {
+        if let Some(hint) = old_syntax_hint(source) {
+            for d in &mut diags {
+                d.message.push_str("; ");
+                d.message.push_str(hint);
+            }
+        }
         return Err(diags);
+    }
+    if let Some(span) = lower_type_call(&module) {
+        let (old, old_diags) = parse_module_old(source);
+        if old_diags.is_empty() && crate::shape::shape(&old) != crate::shape::shape(&module) {
+            let msg = "this file reads differently in the old syntax; run `i fmt --from-old`";
+            return Err(vec![Diagnostic::new(Code::DualAmbiguous, span, msg)]);
+        }
     }
     let lexed = lex(source);
     let mut f = Formatter {
@@ -48,10 +67,180 @@ pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
         next: 0,
         hard: 0,
         one_line: false,
+        fn_next: false,
     };
     let doc = f.module(&module);
     debug_assert_eq!(f.next, f.comments.len(), "every comment is printed");
     Ok(render(&doc, WIDTH))
+}
+
+/// The span of the first `TypeCall` in `module` with a lowercase name and
+/// no module name.
+fn lower_type_call(module: &Module) -> Option<Span> {
+    let mut found = None;
+    for item in &module.items {
+        match &item.kind {
+            ItemKind::TypeDef(def) => {
+                def.head.iter().for_each(|t| find_ty(t, &mut found));
+                match &def.body {
+                    TypeBody::Alias(t) => find_ty(t, &mut found),
+                    TypeBody::Custom(cs) => cs
+                        .iter()
+                        .flat_map(|c| &c.fields)
+                        .for_each(|f| find_ty(&f.ty, &mut found)),
+                }
+            }
+            ItemKind::Binding(b) => {
+                find_pat(&b.pattern, &mut found);
+                find_expr(&b.value, &mut found);
+            }
+            ItemKind::Declaration { ty, .. } => find_ty(ty, &mut found),
+            ItemKind::MacroItem { args, .. } => {
+                args.iter().for_each(|a| find_expr(&a.value, &mut found))
+            }
+        }
+        for a in &item.attributes {
+            if let Some((args, _)) = &a.call {
+                args.iter().for_each(|a| find_expr(&a.value, &mut found));
+            }
+        }
+    }
+    found
+}
+
+fn find_ty(t: &TypeExpr, found: &mut Option<Span>) {
+    match &t.kind {
+        TypeKind::Call { module, args, .. } => {
+            if module.is_none() && found.is_none() {
+                *found = Some(t.span);
+            }
+            for a in args {
+                if let TypeArg::Type(t) = a {
+                    find_ty(t, found);
+                }
+            }
+        }
+        TypeKind::Named { args, .. } => args.iter().for_each(|a| find_ty(a, found)),
+        TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
+            ts.iter().for_each(|a| find_ty(a, found))
+        }
+        TypeKind::Fn {
+            params,
+            ret,
+            err,
+            env,
+        } => {
+            params.iter().for_each(|p| find_ty(&p.ty, found));
+            find_ty(ret, found);
+            err.iter().chain(env).for_each(|a| find_ty(a, found));
+        }
+        TypeKind::Var(_) | TypeKind::ValueOf { .. } | TypeKind::Hole => {}
+    }
+}
+
+fn find_pat(p: &Pattern, found: &mut Option<Span>) {
+    match &p.kind {
+        PatternKind::Typed { ty, .. } => find_ty(ty, found),
+        PatternKind::Named { pattern, .. } => find_pat(pattern, found),
+        PatternKind::Constructor { args: ps, .. } | PatternKind::Tuple(ps) => {
+            ps.iter().for_each(|a| find_pat(a, found))
+        }
+        PatternKind::List { items, .. } => items.iter().for_each(|a| find_pat(a, found)),
+        PatternKind::BitArray(segs) => {
+            for s in segs {
+                find_pat(&s.value, found);
+                if let Some(arg) = s.format.as_ref().and_then(|f| f.arg.as_deref()) {
+                    find_expr(arg, found);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn find_block(b: &Block, found: &mut Option<Span>) {
+    for s in &b.stmts {
+        match s {
+            Stmt::Bind(b) => {
+                find_pat(&b.pattern, found);
+                find_expr(&b.value, found);
+            }
+            Stmt::Env { ty, value, .. } => {
+                find_ty(ty, found);
+                find_expr(value, found);
+            }
+            Stmt::Expr(e) => find_expr(e, found),
+        }
+    }
+}
+
+fn find_expr(e: &Expr, found: &mut Option<Span>) {
+    match &e.kind {
+        ExprKind::Fn(f) => {
+            for p in &f.params {
+                match p {
+                    Param::Pattern(p) => find_pat(p, found),
+                    Param::Env { ty, .. } => find_ty(ty, found),
+                }
+            }
+            if let Some(r) = &f.ret {
+                find_ty(&r.value, found);
+                r.err.iter().chain(&r.env).for_each(|t| find_ty(t, found));
+            }
+            find_block(&f.body, found);
+        }
+        ExprKind::Block(b) => find_block(b, found),
+        ExprKind::Case {
+            subject, clauses, ..
+        } => {
+            find_expr(subject, found);
+            find_clauses(clauses, found);
+        }
+        ExprKind::Clauses(clauses) => find_clauses(clauses, found),
+        ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_) | ExprKind::Name { .. } => {}
+        ExprKind::Tuple(items) => items.iter().for_each(|x| find_expr(x, found)),
+        ExprKind::List { items, rest } => items
+            .iter()
+            .chain(rest.as_deref())
+            .for_each(|x| find_expr(x, found)),
+        ExprKind::BitArray(segs) => {
+            for s in segs {
+                find_expr(&s.value, found);
+                if let Some(arg) = s.format.as_ref().and_then(|f| f.arg.as_deref()) {
+                    find_expr(arg, found);
+                }
+            }
+        }
+        ExprKind::Call { callee, args } => {
+            find_expr(callee, found);
+            args.iter().for_each(|a| find_expr(&a.value, found));
+        }
+        ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
+            find_expr(target, found)
+        }
+        ExprKind::RecordUpdate {
+            constructor,
+            base,
+            fields,
+        } => {
+            find_expr(constructor, found);
+            find_expr(base, found);
+            fields.iter().for_each(|(_, x)| find_expr(x, found));
+        }
+        ExprKind::Unary { expr, .. } => find_expr(expr, found),
+        ExprKind::Binary { lhs, rhs, .. } => {
+            find_expr(lhs, found);
+            find_expr(rhs, found);
+        }
+    }
+}
+
+fn find_clauses(clauses: &[Clause], found: &mut Option<Span>) {
+    for c in clauses {
+        c.patterns.iter().for_each(|p| find_pat(p, found));
+        c.guard.iter().for_each(|g| find_expr(g, found));
+        find_expr(&c.body, found);
+    }
 }
 
 // ---- Documents ----
@@ -437,6 +626,9 @@ struct Formatter<'a> {
     /// Set in the `->` part of a function, which stays on the line of its
     /// `)` and `{`: its brackets are not broken.
     one_line: bool,
+    /// Set while a clause pattern is printed that `?` or `|` comes after,
+    /// which a function type at its end would take (§7.1).
+    fn_next: bool,
 }
 
 /// How blank lines between the lines of a list of statements, clauses,
@@ -798,27 +990,29 @@ impl<'a> Formatter<'a> {
 
     fn module(&mut self, m: &Module) -> Doc {
         enum Thing<'m> {
-            Import(u32, &'m [ImportItem]),
-            Export(u32, &'m [ExportItem]),
+            Import(u32, HeaderStyle, &'m [ImportItem]),
+            Export(u32, HeaderStyle, &'m [ExportItem]),
             Item(&'m Item),
         }
         let mut things = Vec::new();
         let mut spans = Vec::new();
-        let mut i = 0;
-        for (kw, is_import) in [(T::Import, true), (T::Export, false)] {
-            if self.toks[i].kind != kw {
-                continue;
+        let header = [
+            (m.imports_span, m.imports_style, true),
+            (m.exports_span, m.exports_style, false),
+        ];
+        for (span, style, is_import) in header {
+            let Some(span) = span else { continue };
+            let mut at = self.tok_index(span.start);
+            if style == HeaderStyle::Keyword {
+                at += 1;
             }
-            let start = self.toks[i].span.start;
-            let paren = self.toks[i + 1].span.start;
-            let close = self.closer(paren);
-            spans.push((start, close + 1));
+            let paren = self.toks[at].span.start;
+            spans.push((span.start, span.end));
             things.push(if is_import {
-                Thing::Import(paren, &m.imports)
+                Thing::Import(paren, style, &m.imports)
             } else {
-                Thing::Export(paren, &m.exports)
+                Thing::Export(paren, style, &m.exports)
             });
-            i = self.tok_index(close + 1);
         }
         for item in &m.items {
             spans.push((item.span.start, item.span.end));
@@ -826,15 +1020,15 @@ impl<'a> Formatter<'a> {
         }
         let end = self.src.len() as u32;
         let mut lines = self.lines(None, end, &spans, Blank::Top, |f, i| match &things[i] {
-            Thing::Import(paren, items) => f.import(*paren, items),
-            Thing::Export(paren, items) => f.export(*paren, items),
+            Thing::Import(paren, style, items) => f.import(*paren, *style, items),
+            Thing::Export(paren, style, items) => f.export(*paren, *style, items),
             Thing::Item(item) => f.item(item),
         });
         lines.push(Doc::Hard);
         cat(lines)
     }
 
-    fn import(&mut self, paren: u32, items: &[ImportItem]) -> Doc {
+    fn import(&mut self, paren: u32, style: HeaderStyle, items: &[ImportItem]) -> Doc {
         let close = self.closer(paren);
         let spans: Vec<_> = items.iter().map(|i| (i.span.start, i.span.end)).collect();
         let list = self.seq("(", ")", paren, close, &spans, true, |f, i| {
@@ -864,10 +1058,13 @@ impl<'a> Formatter<'a> {
             out.push(text(path.join("/")));
             cat(out)
         });
-        cat(vec![text("import "), list])
+        match style {
+            HeaderStyle::Keyword => cat(vec![text("import "), list]),
+            HeaderStyle::Group => list,
+        }
     }
 
-    fn export(&mut self, paren: u32, items: &[ExportItem]) -> Doc {
+    fn export(&mut self, paren: u32, style: HeaderStyle, items: &[ExportItem]) -> Doc {
         let close = self.closer(paren);
         let spans: Vec<_> = items.iter().map(|i| (i.span.start, i.span.end)).collect();
         let list = self.seq("(", ")", paren, close, &spans, true, |_, i| {
@@ -878,15 +1075,23 @@ impl<'a> Formatter<'a> {
                 if e.constructors { "(..)" } else { "" }
             ))
         });
-        cat(vec![text("export "), list])
+        match style {
+            HeaderStyle::Keyword => cat(vec![text("export "), list]),
+            HeaderStyle::Group => list,
+        }
     }
 
     fn item(&mut self, item: &Item) -> Doc {
         let mut out = Vec::new();
         for a in &item.attributes {
             out.push(self.leading(a.span.start));
-            out.push(text(format!("@{}", a.name.name)));
-            if !a.args.is_empty() {
+            match &a.module {
+                Some(m) => out.push(text(format!("@{}.{}", m.name, a.name.name))),
+                None => out.push(text(format!("@{}", a.name.name))),
+            }
+            if let Some((args, span)) = &a.call {
+                out.push(self.args(span.start, span.end - 1, args));
+            } else if !a.args.is_empty() {
                 let open = self.tok_after(a.name.span.end).span.start;
                 let close = self.closer(open);
                 let spans: Vec<_> = a.args.iter().map(|(_, s)| (s.start, s.end)).collect();
@@ -899,6 +1104,9 @@ impl<'a> Formatter<'a> {
                 ItemKind::TypeDef(def) => def.name.span.start,
                 ItemKind::Binding(b) => b.span.start,
                 ItemKind::Declaration { name, .. } => name.span.start,
+                ItemKind::MacroItem { module, name, .. } => {
+                    module.as_ref().unwrap_or(name).span.start
+                }
             };
             if let Some(t) = self.trailing(a.span.end, next) {
                 out.push(t);
@@ -911,13 +1119,64 @@ impl<'a> Formatter<'a> {
                 out.push(self.leading(b.span.start));
                 out.push(self.binding(b));
             }
-            ItemKind::Declaration { name, ty } => {
+            ItemKind::Declaration {
+                name,
+                type_params,
+                ty,
+            } => {
                 out.push(self.leading(name.span.start));
-                out.push(text(format!("{}: ", name.name)));
+                out.push(text(name.name.as_str()));
+                out.push(self.type_params(name, type_params));
+                out.push(text(": "));
                 out.push(self.ty(ty));
+            }
+            ItemKind::MacroItem { module, name, args } => {
+                let head = module.as_ref().unwrap_or(name);
+                out.push(self.leading(head.span.start));
+                match module {
+                    Some(m) => out.push(text(format!("{}.{}", m.name, name.name))),
+                    None => out.push(text(name.name.as_str())),
+                }
+                let open = self.tok_after(name.span.end).span.start;
+                let close = self.closer(open);
+                out.push(self.args(open, close, args));
             }
         }
         cat(out)
+    }
+
+    /// `(A, B)` after the name `name`, or nothing.
+    fn type_params(&mut self, name: &Ident, params: &[Ident]) -> Doc {
+        if params.is_empty() {
+            return cat(vec![]);
+        }
+        let open = self.tok_after(name.span.end).span.start;
+        let close = self.closer(open);
+        let spans: Vec<_> = params.iter().map(|n| (n.span.start, n.span.end)).collect();
+        self.seq("(", ")", open, close, &spans, false, |_, i| {
+            text(params[i].name.as_str())
+        })
+    }
+
+    /// The arguments of a call, from the `(` at `open` to the `)` at `close`.
+    fn args(&mut self, open: u32, close: u32, args: &[Arg]) -> Doc {
+        let spans: Vec<_> = args
+            .iter()
+            .map(|a| {
+                let start = a
+                    .label
+                    .as_ref()
+                    .map_or(a.value.span.start, |l| l.span.start);
+                (start, a.value.span.end)
+            })
+            .collect();
+        self.seq("(", ")", open, close, &spans, false, |f, i| {
+            let arg = &args[i];
+            match &arg.label {
+                Some(l) => cat(vec![f.label(&l.name), f.expr(&arg.value, 0)]),
+                None => f.expr(&arg.value, 0),
+            }
+        })
     }
 
     fn type_def(&mut self, def: &TypeDef, end: u32) -> Doc {
@@ -926,7 +1185,12 @@ impl<'a> Formatter<'a> {
             text(def.name.name.as_str()),
         ];
         let mut after = def.name.span.end;
-        if !def.params.is_empty() {
+        if !def.head.is_empty() {
+            let open = self.tok_after(after).span.start;
+            let close = self.closer(open);
+            out.push(self.types(open, close, &def.head));
+            after = close + 1;
+        } else if !def.params.is_empty() {
             let open = self.tok_after(after).span.start;
             let close = self.closer(open);
             let spans: Vec<_> = def
@@ -978,11 +1242,34 @@ impl<'a> Formatter<'a> {
     }
 
     fn binding(&mut self, b: &Binding) -> Doc {
-        cat(vec![
-            self.pattern(&b.pattern, false),
-            text(" = "),
-            self.expr(&b.value, 0),
-        ])
+        let head = match (&b.pattern.kind, b.type_params.is_empty()) {
+            (PatternKind::Var(n), false) => {
+                let name = Ident {
+                    name: n.clone(),
+                    span: b.pattern.span,
+                };
+                cat(vec![
+                    self.leading(name.span.start),
+                    text(n.as_str()),
+                    self.type_params(&name, &b.type_params),
+                ])
+            }
+            (PatternKind::Typed { binder, ty }, false) => {
+                let name = Ident {
+                    name: binder.name.clone(),
+                    span: binder.span,
+                };
+                cat(vec![
+                    self.leading(name.span.start),
+                    text(binder.name.as_str()),
+                    self.type_params(&name, &b.type_params),
+                    text(": "),
+                    self.ty(ty),
+                ])
+            }
+            _ => self.pattern(&b.pattern, false),
+        };
+        cat(vec![head, text(" = "), self.expr(&b.value, 0)])
     }
 
     fn stmt(&mut self, s: &Stmt) -> Doc {
@@ -1044,7 +1331,8 @@ impl<'a> Formatter<'a> {
     /// `e` where an expression of at least level `min` is needed (§6.9).
     fn expr(&mut self, e: &Expr, min: u8) -> Doc {
         self.continued(e.span.start, |f| {
-            if level(e) < min {
+            // A match is an operation at level 6 (§6.9).
+            if level(e) < min || is_match(e) && min > 6 {
                 cat(vec![text("{ "), f.expr_raw(e), text(" }")])
             } else {
                 f.expr_raw(e)
@@ -1101,7 +1389,26 @@ impl<'a> Formatter<'a> {
             }
             ExprKind::Block(b) => self.block(b, false),
             ExprKind::Fn(func) => self.function(func, span.start),
-            ExprKind::Case { subject, clauses } => self.case(subject, clauses, span),
+            ExprKind::Case {
+                subject,
+                clauses,
+                syntax: Syntax::Old,
+            } => self.case(subject, clauses, span),
+            ExprKind::Case {
+                subject,
+                clauses,
+                syntax: Syntax::New,
+            } => {
+                // §6.9: `|>` is stronger than the operators of levels 1 to 5.
+                let subject_doc = self.expr(subject, 6);
+                let open = self.tok_after(subject.span.end);
+                let open = self.tok_after(open.span.end).span.start;
+                let body = self.clause_block(open, span.end - 1, clauses, Syntax::New);
+                cat(vec![subject_doc, text(" |> "), body])
+            }
+            ExprKind::Clauses(clauses) => {
+                self.clause_block(span.start, span.end - 1, clauses, Syntax::New)
+            }
             ExprKind::Call { callee, args } => {
                 let head = self.expr(callee, 10);
                 let open = self.tok_after(callee.span.end).span.start;
@@ -1305,19 +1612,27 @@ impl<'a> Formatter<'a> {
             self.expr(subject, 0)
         };
         let open = self.tok_after(subject.span.end).span.start;
-        let spans: Vec<_> = clauses.iter().map(|c| (c.span.start, c.span.end)).collect();
-        let body = self.braced_lines(open, span.end - 1, &spans, |f, i| f.clause(&clauses[i]));
+        let body = self.clause_block(open, span.end - 1, clauses, Syntax::Old);
         cat(vec![text("case "), subject_doc, text(" "), body])
+    }
+
+    /// The clauses of a `case` or a clause block, from the `{` at `open` to
+    /// the `}` at `close`, one clause per line.
+    fn clause_block(&mut self, open: u32, close: u32, clauses: &[Clause], syntax: Syntax) -> Doc {
+        let spans: Vec<_> = clauses.iter().map(|c| (c.span.start, c.span.end)).collect();
+        self.braced_lines(open, close, &spans, |f, i| f.clause(&clauses[i], syntax))
     }
 
     /// A clause. Its patterns are not broken inside; when they do not fit
     /// on one line, each choice after the first begins a line with `|`,
     /// which goes on from the line before (§1.7).
-    fn clause(&mut self, c: &Clause) -> Doc {
+    fn clause(&mut self, c: &Clause, syntax: Syntax) -> Doc {
         let saved = std::mem::replace(&mut self.one_line, true);
+        let guard = syntax == Syntax::New && c.guard.is_some();
+        self.fn_next = c.patterns.len() > 1 || guard;
         let first = self.pattern(&c.patterns[0], true);
         let mut more = Vec::new();
-        for p in &c.patterns[1..] {
+        for (i, p) in c.patterns.iter().enumerate().skip(1) {
             // A comment before a choice stays at the end of the line before
             // its `|`.
             if let Some(comments) = self.mid_comments(p.span.start) {
@@ -1326,12 +1641,17 @@ impl<'a> Formatter<'a> {
             }
             more.push(Doc::Line);
             more.push(text("| "));
+            self.fn_next = i + 1 < c.patterns.len() || guard;
             more.push(self.pattern(p, true));
         }
+        self.fn_next = false;
         self.one_line = saved;
         let mut out = vec![group(cat(vec![first, nest(cat(more))]))];
         if let Some(g) = &c.guard {
-            out.push(text(" if "));
+            out.push(text(match syntax {
+                Syntax::Old => " if ",
+                Syntax::New => " ? ",
+            }));
             out.push(self.expr(g, 0));
         }
         out.push(Doc::Tab(Align::Arrow));
@@ -1361,6 +1681,9 @@ impl<'a> Formatter<'a> {
             PatternKind::Typed { binder, ty } => {
                 let t = if clause && ends_with_tuple(ty) {
                     cat(vec![text("{ "), self.ty(ty), text(" }")])
+                } else if clause && self.fn_next {
+                    // §7.1: a function type before `?` or `|` is put in `{ }`.
+                    self.ty_in(ty, 1, false)
                 } else {
                     self.ty(ty)
                 };
@@ -1507,6 +1830,43 @@ impl<'a> Formatter<'a> {
                 return cat(vec![head, list]);
             }
             TypeKind::Var(n) => return text(n.as_str()),
+            TypeKind::ValueOf { module, name } => {
+                return match module {
+                    Some(m) => text(format!("{}.{}", m.name, name.name)),
+                    None => text(name.name.as_str()),
+                };
+            }
+            TypeKind::Call { module, name, args } => {
+                let head = match module {
+                    Some(m) => text(format!("{}.{}", m.name, name.name)),
+                    None => text(name.name.as_str()),
+                };
+                let open = self.tok_after(name.span.end).span.start;
+                let spans: Vec<_> = args
+                    .iter()
+                    .map(|a| {
+                        let span = match a {
+                            TypeArg::Type(t) => t.span,
+                            TypeArg::Int(_, s) | TypeArg::String(_, s) => *s,
+                        };
+                        (span.start, span.end)
+                    })
+                    .collect();
+                let list =
+                    self.seq(
+                        "(",
+                        ")",
+                        open,
+                        t.span.end - 1,
+                        &spans,
+                        false,
+                        |f, i| match &args[i] {
+                            TypeArg::Type(t) => f.ty(t),
+                            TypeArg::Int(_, s) | TypeArg::String(_, s) => text(f.slice(*s)),
+                        },
+                    );
+                return cat(vec![head, list]);
+            }
             TypeKind::Hole => return text("_"),
             TypeKind::Tuple(items) => return self.types(t.span.start, t.span.end - 1, items),
             TypeKind::Fn {

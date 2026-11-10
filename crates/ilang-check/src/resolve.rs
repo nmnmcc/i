@@ -208,7 +208,14 @@ fn type_vars(t: &ast::TypeExpr, out: &mut Vec<String>) {
     match &t.kind {
         T::Var(n) => out.push(n.clone()),
         T::Named { args, .. } => args.iter().for_each(|a| type_vars(a, out)),
-        T::Hole => {}
+        T::ValueOf { .. } | T::Hole => {}
+        T::Call { args, .. } => {
+            for arg in args {
+                if let ast::TypeArg::Type(ty) = arg {
+                    type_vars(ty, out);
+                }
+            }
+        }
         T::Tuple(ts) | T::Union(ts) | T::Inter(ts) | T::Diff(ts) => {
             ts.iter().for_each(|a| type_vars(a, out))
         }
@@ -286,8 +293,17 @@ fn expr_annotations(e: &ast::Expr, out: &mut Vec<String>) {
             }
             block_annotations(&f.body, out);
         }
-        E::Case { subject, clauses } => {
+        E::Case {
+            subject, clauses, ..
+        } => {
             expr_annotations(subject, out);
+            for c in clauses {
+                c.patterns.iter().for_each(|p| pattern_annotations(p, out));
+                c.guard.iter().for_each(|g| expr_annotations(g, out));
+                expr_annotations(&c.body, out);
+            }
+        }
+        E::Clauses(clauses) => {
             for c in clauses {
                 c.patterns.iter().for_each(|p| pattern_annotations(p, out));
                 c.guard.iter().for_each(|g| expr_annotations(g, out));
@@ -500,7 +516,18 @@ impl<'a> Resolver<'a> {
                     });
                     Slot::Binding(index)
                 }
-                ast::ItemKind::Declaration { name, ty } => {
+                ast::ItemKind::MacroItem { .. } => {
+                    self.error(code::CHOICES_ONE_CLAUSE, item.span, "not yet supported");
+                    Slot::None
+                }
+                ast::ItemKind::Declaration {
+                    name,
+                    ty,
+                    type_params,
+                } => {
+                    if !type_params.is_empty() {
+                        self.error(code::CHOICES_ONE_CLAUSE, item.span, "not yet supported");
+                    }
                     let (module, function) = attrs.external.clone().unwrap_or_default();
                     let kind = DefKind::External {
                         module,
@@ -1352,6 +1379,10 @@ impl<'a> Resolver<'a> {
                     None => TypeKind::Error,
                 }
             }
+            T::ValueOf { .. } | T::Call { .. } => {
+                self.error(code::CHOICES_ONE_CLAUSE, t.span, "not yet supported");
+                TypeKind::Error
+            }
             T::Var(n) => self.ty_var(n, t.span),
             T::Hole => TypeKind::Hole,
             T::Tuple(ts) => TypeKind::Tuple(ts.iter().map(|x| self.ty(x)).collect()),
@@ -1758,6 +1789,9 @@ impl<'a> Resolver<'a> {
     /// its pattern; in a block, the caller makes them visible from the next
     /// statement (§6.10).
     fn binding(&mut self, b: &ast::Binding, top: bool) -> (Binding, Vec<Binder>) {
+        if !b.type_params.is_empty() {
+            self.error(code::CHOICES_ONE_CLAUSE, b.span, "not yet supported");
+        }
         let names = annotation_vars(&b.pattern, &b.value);
         let ty_vars = self.push_ty_frame(&names);
         let direct = self.is_direct(&b.value);
@@ -2004,7 +2038,17 @@ impl<'a> Resolver<'a> {
             ),
             E::Block(b) => ExprKind::Block(self.block(b)),
             E::Fn(f) => ExprKind::Fn(Box::new(self.function(f, e.span))),
-            E::Case { subject, clauses } => ExprKind::Case {
+            E::Clauses(_)
+            | E::Case {
+                syntax: ast::Syntax::New,
+                ..
+            } => {
+                self.error(code::CHOICES_ONE_CLAUSE, e.span, "not yet supported");
+                ExprKind::Error
+            }
+            E::Case {
+                subject, clauses, ..
+            } => ExprKind::Case {
                 subject: Box::new(self.expr(subject)),
                 clauses: clauses.iter().map(|c| self.clause(c)).collect(),
             },
