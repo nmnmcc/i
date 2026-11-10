@@ -61,6 +61,8 @@ const DECLARED: &[&str] = &[
     "$boundary_reenter",
     "$cancel_reenter",
     "$control_unpend",
+    "$keep_call",
+    "$keep_reenter",
 ];
 
 /// The WAT text of the whole module.
@@ -217,7 +219,7 @@ pub fn wat(p: &Program) -> String {
             m,
             "(global $c{} (ref $clo{n}) {})",
             f.0,
-            closure(n, f, "(ref.null $values)")
+            closure(n, f, "(ref.null $values)", false)
         );
     }
     m.push_str(&e.out);
@@ -229,9 +231,10 @@ pub fn wat(p: &Program) -> String {
     m
 }
 
-fn closure(arity: u32, f: FuncId, captures: &str) -> String {
+fn closure(arity: u32, f: FuncId, captures: &str, patched: bool) -> String {
+    let flags = u32::from(patched);
     format!(
-        "(struct.new $clo{arity} (i32.const 7) (i32.const 0) (i64.const {arity}) (f64.const 0) \
+        "(struct.new $clo{arity} (i32.const 7) (i32.const {flags}) (i64.const {arity}) (f64.const 0) \
          (ref.null $bytes) {captures} (ref.null $limbs) (ref.null $call) (ref.func $f{}))",
         f.0
     )
@@ -548,6 +551,7 @@ impl<'p> Emitter<'p> {
             Op::Suspend => format!("(call $control_suspend {a} {b})"),
             Op::Resume => format!("(call $control_resume {a} {b} {env})"),
             Op::Cancel => format!("(call $control_cancel {a} {env})"),
+            Op::KeepEnv => format!("(call $control_keep_env {a} {env})"),
         }
     }
 
@@ -569,19 +573,24 @@ impl<'p> Emitter<'p> {
             Value::Service(env, id) => {
                 format!("(array.get $env {} (i32.const {id}))", env_text(*env))
             }
-            Value::Closure { func, captures } => {
+            Value::Closure {
+                func,
+                captures,
+                patched,
+            } => {
                 let n = self.p.funcs[func.0 as usize].arity();
                 self.arities.insert(n);
-                let caps = if captures.is_empty() {
+                let caps = if captures.is_empty() && !patched {
                     "(ref.null $values)".to_string()
                 } else {
                     format!(
-                        "(array.new_fixed $values {}{})",
-                        captures.len(),
-                        self.atoms(captures)
+                        "(array.new_fixed $values {}{}{})",
+                        captures.len() + usize::from(*patched),
+                        self.atoms(captures),
+                        if *patched { " (ref.null eq)" } else { "" }
                     )
                 };
-                closure(n, *func, &caps)
+                closure(n, *func, &caps, *patched)
             }
             Value::Tuple(parts) => format!(
                 "(call $tuple (array.new_fixed $values {}{}))",

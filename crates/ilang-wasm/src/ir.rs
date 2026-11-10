@@ -205,6 +205,8 @@ pub enum Op {
     Resume,
     /// `control.cancel(k)`.
     Cancel,
+    /// Keeps all currently bound services in a fresh one-argument function.
+    KeepEnv,
 }
 
 impl Op {
@@ -232,7 +234,7 @@ impl Op {
     pub fn needs_env(self) -> bool {
         matches!(
             self,
-            Op::Catch | Op::Ensure | Op::Boundary | Op::Resume | Op::Cancel
+            Op::Catch | Op::Ensure | Op::Boundary | Op::Resume | Op::Cancel | Op::KeepEnv
         )
     }
 
@@ -273,6 +275,7 @@ pub enum Value {
     Closure {
         func: FuncId,
         captures: Vec<Atom>,
+        patched: bool,
     },
     Tuple(Vec<Atom>),
     Record {

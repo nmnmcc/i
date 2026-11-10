@@ -20,6 +20,7 @@ fn library_resolves_cleanly() {
             "i/control",
             "i/resource",
             "i/assertion",
+            "i/key",
             "i/core",
             "i/io",
             "i/task",
@@ -79,7 +80,11 @@ fn library_names() {
     let program = program.unwrap();
     let expect: &[(&str, &[&str])] = &[
         ("i/fail", &["raise", "catch", "from_result", "map_error"]),
-        ("i/control", &["boundary", "suspend", "resume", "cancel"]),
+        (
+            "i/control",
+            &["boundary", "suspend", "resume", "cancel", "keep_env"],
+        ),
+        ("i/key", &["new", "wrap", "unwrap"]),
         ("i/resource", &["ensure", "acquire"]),
         ("i/assertion", &["catch"]),
         (
@@ -114,6 +119,7 @@ fn library_names() {
                 "bit_array_concat",
                 "inspect",
                 "hash",
+                "portable",
             ],
         ),
         ("i/prelude", &["panic", "assert"]),

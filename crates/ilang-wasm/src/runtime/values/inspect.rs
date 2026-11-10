@@ -257,6 +257,8 @@ pub fn wat() -> String {
     (if (i32.eq (local.get $tag) (i32.const 10)) (then (return {{opaque}})))
     (if (i32.eq (local.get $tag) (i32.const 11)) (then (return {{boundary}})))
     (if (i32.eq (local.get $tag) (i32.const 12)) (then (return {{continuation}})))
+    (if (i32.eq (local.get $tag) (i32.const 15)) (then (return {{key}})))
+    (if (i32.eq (local.get $tag) (i32.const 16)) (then (return {{keyed}})))
     (local.set $obj (ref.cast (ref $obj) (local.get $value)))
     (if (i32.eq (local.get $tag) (i32.const 7))
       (then (return_call $inspect_function (i32.wrap_i64 (struct.get $obj 2 (local.get $obj))))))
@@ -373,6 +375,8 @@ pub fn wat() -> String {
             ("opaque", "//wasm(opaque)"),
             ("boundary", "//boundary"),
             ("continuation", "//continuation"),
+            ("key", "//key"),
+            ("keyed", "//keyed"),
             ("codepoint_open", "//utfcodepoint("),
             ("unknown", "//wasm(unknown)"),
         ],

@@ -43,13 +43,15 @@
 //! | 4 | Tuple | field 5: the parts |
 //! | 5 | Custom type value | field 1: constructor id, field 2: type id, field 5: the fields, or null when there are none |
 //! | 6 | List | `[]` is an `$obj` (the global `$value_empty_list`); any other list is a `$cons`: field 1 the head, field 2 the tail |
-//! | 7 | Function | field 2: the number of parameters, without environment parameters |
+//! | 7 | Function | field 1 bit 0: patched captures with a final walk stamp; field 2: arity |
 //! | 8 | Int | `i31ref` for -2^30..2^30-1, else field 1: sign, field 6: magnitude limbs |
 //! | 9 | BitArray | field 1: bit offset, field 2: bit length, field 4: bytes, highest bit first |
 //! | 10 | Host reference | a `$hostref` struct (not `$obj`): the `externref` and its `reference_id` |
 //! | 11 | Boundary | an `$obj` with tag 11; the other fields belong to the code generator |
 //! | 12 | Continuation | an `$obj` with tag 12; the other fields belong to the code generator |
 //! | 13 | UtfCodepoint | field 1: the scalar value |
+//! | 15 | Key | identity value; no parts |
+//! | 16 | Keyed | field 5: key, value |
 //!
 //! Code outside `values.rs` goes through lists only with `$list_is_empty`,
 //! `$list_head` and `$list_tail`. A list cell is a lean `$cons`, one small

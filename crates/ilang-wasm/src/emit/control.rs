@@ -581,6 +581,66 @@ pub(super) const EFFECTS: &str = r#"
     (ref.cast (ref $cont) (array.get $values (local.get $saved) (i32.const 0)))
     (ref.cast (ref null $sub) (array.get $values (local.get $saved) (i32.const 1)))
     (local.get $env) (local.get $v) (local.get $mode)))
+;; Kept slots are ordinary tuple fields, so the general portable walk sees
+;; every service, including slots unused by the argument's inferred type.
+(func $control_keep_env (param $f eqref) (param $env (ref null $env)) (result eqref)
+  (local $slots (ref $values)) (local $i i32) (local $n i32)
+  (local.set $n (array.len (local.get $env)))
+  (local.set $slots (array.new_default $values (local.get $n)))
+  (block $done (loop $copy
+    (br_if $done (i32.ge_u (local.get $i) (local.get $n)))
+    (array.set $values (local.get $slots) (local.get $i)
+      (array.get $env (local.get $env) (local.get $i)))
+    (local.set $i (i32.add (local.get $i) (i32.const 1)))
+    (br $copy)))
+  (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0)
+    (ref.null $bytes)
+    (array.new_fixed $values 2 (local.get $f) (call $tuple (local.get $slots)))
+    (ref.null $limbs) (ref.null $call) (ref.func $keep_call)))
+
+(func $keep_call (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env))
+    (param $arg eqref) (result eqref)
+  (local $caps (ref $values)) (local $slots (ref $values)) (local $kept (ref $env))
+  (local $i i32) (local $n i32)
+  (local.set $caps (ref.as_non_null (struct.get $obj 5 (ref.as_non_null (local.get $clo)))))
+  (local.set $slots (ref.as_non_null (struct.get $obj 5
+    (ref.cast (ref $obj) (array.get $values (local.get $caps) (i32.const 1))))))
+  (local.set $n (array.len (local.get $slots)))
+  (local.set $kept (array.new_default $env (local.get $n)))
+  (block $done (loop $copy
+    (br_if $done (i32.ge_u (local.get $i) (local.get $n)))
+    (array.set $env (local.get $kept) (local.get $i)
+      (array.get $values (local.get $slots) (local.get $i)))
+    (local.set $i (i32.add (local.get $i) (i32.const 1)))
+    (br $copy)))
+  (return_call $keep_run (array.get $values (local.get $caps) (i32.const 0))
+    (local.get $arg) (local.get $kept)))
+
+;; A delimiter packs its inner records. Re-entry always uses the kept base,
+;; before applying any environment statements made inside the kept call.
+(func $keep_run (param $f eqref) (param $arg eqref) (param $env (ref null $env)) (result eqref)
+  (block $captured (result (ref $cap) exnref)
+    (return (try_table (result eqref) (catch_ref $capture $captured)
+      (call $call1 (local.get $f) (local.get $arg) (local.get $env)))))
+  (call $capture_pack (ref.func $keep_reenter) (local.get $env))
+  unreachable)
+
+(func $keep_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env))
+    (param $v eqref) (param $mode i32) (result eqref)
+  (local $saved (ref $values)) (local $kept (ref null $env))
+  (local $c (ref $cap)) (local $x exnref)
+  (local.set $saved (ref.as_non_null (struct.get $frame 1 (local.get $frame))))
+  (local.set $kept (ref.cast (ref null $env) (array.get $values (local.get $saved) (i32.const 0))))
+  (block $captured (result (ref $cap) exnref)
+    (return (try_table (result eqref) (catch_ref $capture $captured)
+      (call $tramp_run
+        (ref.cast (ref null $sub) (array.get $values (local.get $saved) (i32.const 1)))
+        (local.get $kept) (local.get $v) (local.get $mode)))))
+  (local.set $x)
+  (local.set $c)
+  (call $capture_pack (local.get $c) (local.get $x) (ref.func $keep_reenter) (local.get $kept))
+  unreachable)
+
 "#;
 
 /// The types of control (§9.4), after `$env`.

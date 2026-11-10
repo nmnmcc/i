@@ -110,7 +110,7 @@ const CORE: &str = r#"
 ;; Functions, boundaries and continuations are the same only as themselves.
 (func $value_identity_kind (param $kind i32) (result i32)
   (i32.or (i32.eq (local.get $kind) (i32.const 7))
-    (i32.or (i32.eq (local.get $kind) (i32.const 11)) (i32.eq (local.get $kind) (i32.const 12)))))
+    (i32.or (i32.eq (local.get $kind) (i32.const 11)) (i32.or (i32.eq (local.get $kind) (i32.const 12)) (i32.eq (local.get $kind) (i32.const 15))))))
 (func $compare_i32 (param $a i32) (param $b i32) (result i32)
   (i32.sub (i32.gt_s (local.get $a) (local.get $b)) (i32.lt_s (local.get $a) (local.get $b))))
 (func $compare_i64 (param $a i64) (param $b i64) (result i32)
@@ -383,4 +383,79 @@ const CORE: &str = r#"
   (local.get $h))
 (func $value_hash (param $v eqref) (result eqref)
   (call $int_from_i64 (i64.extend_i32_u (call $value_hash_u32 (local.get $v)))))
+
+;; Keys are identity values. Tag 14 remains reserved for structural records.
+(func $key_new (result eqref)
+  (struct.new $obj (i32.const 15) (i32.const 0) (i64.const 0) (f64.const 0)
+    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
+(func $key_wrap (param $key eqref) (param $value eqref) (result eqref)
+  (struct.new $obj (i32.const 16) (i32.const 0) (i64.const 0) (f64.const 0)
+    (ref.null $bytes) (array.new_fixed $values 2 (local.get $key) (local.get $value))
+    (ref.null $limbs) (ref.null $call)))
+(func $key_read (param $key eqref) (param $value eqref) (result eqref)
+  (if (ref.eq (local.get $key) (call $field (local.get $value) (i32.const 0)))
+    (then (return_call $result_ok (call $field (local.get $value) (i32.const 1)))))
+  (call $result_error (ref.null eq)))
+
+;; Explicit work stack, including list tails. Only patched captures can form
+;; cycles; their last slot is the stamp, never a language capture (§11.9).
+(func $core_portable (param $v eqref) (result eqref)
+  (local $stack (ref $values)) (local $grown (ref $values))
+  (local $sp i32) (local $tag i32) (local $n i32)
+  (local $xs (ref null $values)) (local $o (ref $obj))
+  (local $token eqref)
+  (local.set $token (call $key_new))
+  (local.set $stack (array.new_default $values (i32.const 16)))
+  (array.set $values (local.get $stack) (i32.const 0) (local.get $v))
+  (local.set $sp (i32.const 1))
+  (block $done (loop $walk
+    (br_if $done (i32.eqz (local.get $sp)))
+    (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
+    (local.set $v (array.get $values (local.get $stack) (local.get $sp)))
+    (local.set $tag (call $value_tag (local.get $v)))
+    (if (i32.or (i32.and (i32.ge_u (local.get $tag) (i32.const 10))
+                       (i32.le_u (local.get $tag) (i32.const 12)))
+               (i32.ge_u (local.get $tag) (i32.const 17)))
+      (then (return (global.get $value_false))))
+    (local.set $xs (ref.null $values))
+    (local.set $n (i32.const 0))
+    (if (i32.eq (local.get $tag) (i32.const 6))
+      (then
+        (br_if $walk (call $list_is_empty (local.get $v)))
+        (local.set $n (i32.const 2)))
+      (else
+        (br_if $walk (i32.eqz (i32.or
+          (i32.or (i32.eq (local.get $tag) (i32.const 4)) (i32.eq (local.get $tag) (i32.const 5)))
+          (i32.or (i32.eq (local.get $tag) (i32.const 7))
+            (i32.or (i32.eq (local.get $tag) (i32.const 14)) (i32.eq (local.get $tag) (i32.const 16)))))))
+        (local.set $o (ref.cast (ref $obj) (local.get $v)))
+        (local.set $xs (struct.get $obj 5 (local.get $o)))
+        (br_if $walk (ref.is_null (local.get $xs)))
+        (local.set $n (array.len (local.get $xs)))
+        (if (i32.and (i32.eq (local.get $tag) (i32.const 7))
+                    (i32.and (struct.get $obj 1 (local.get $o)) (i32.const 1)))
+          (then
+            (local.set $n (i32.sub (local.get $n) (i32.const 1)))
+            (br_if $walk (ref.eq (local.get $token)
+              (array.get $values (local.get $xs) (local.get $n))))
+            (array.set $values (local.get $xs) (local.get $n) (local.get $token))))))
+    (if (i32.gt_u (i32.add (local.get $sp) (local.get $n)) (array.len (local.get $stack)))
+      (then
+        (if (i32.ge_u (array.len (local.get $stack)) (i32.const 268435456)) (then unreachable))
+        (local.set $grown (array.new_default $values
+          (i32.add (i32.shl (array.len (local.get $stack)) (i32.const 1)) (local.get $n))))
+        (array.copy $values $values (local.get $grown) (i32.const 0)
+          (local.get $stack) (i32.const 0) (local.get $sp))
+        (local.set $stack (local.get $grown))))
+    (if (i32.eq (local.get $tag) (i32.const 6))
+      (then
+        (array.set $values (local.get $stack) (local.get $sp) (call $list_tail (local.get $v)))
+        (array.set $values (local.get $stack) (i32.add (local.get $sp) (i32.const 1))
+          (call $list_head (local.get $v))))
+      (else
+        (array.copy $values $values (local.get $stack) (local.get $sp)
+          (local.get $xs) (i32.const 0) (local.get $n))))
+    (local.set $sp (i32.add (local.get $sp) (local.get $n)))
+    (br $walk)))
+  (global.get $value_true))
 "#;

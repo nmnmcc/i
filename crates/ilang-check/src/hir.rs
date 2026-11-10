@@ -217,10 +217,12 @@ pub enum BuiltinType {
     Never,
     Boundary,
     Continuation,
+    Key,
+    Keyed,
 }
 
 impl BuiltinType {
-    pub const ALL: [BuiltinType; 9] = [
+    pub const ALL: [BuiltinType; 11] = [
         BuiltinType::Int,
         BuiltinType::Float,
         BuiltinType::String,
@@ -230,6 +232,8 @@ impl BuiltinType {
         BuiltinType::Never,
         BuiltinType::Boundary,
         BuiltinType::Continuation,
+        BuiltinType::Key,
+        BuiltinType::Keyed,
     ];
 
     pub fn name(self) -> &'static str {
@@ -243,13 +247,15 @@ impl BuiltinType {
             BuiltinType::Never => "Never",
             BuiltinType::Boundary => "Boundary",
             BuiltinType::Continuation => "Continuation",
+            BuiltinType::Key => "Key",
+            BuiltinType::Keyed => "Keyed",
         }
     }
 
     /// The number of type parameters (§4.2, §4.5 rule 7).
     pub fn arity(self) -> usize {
         match self {
-            BuiltinType::List => 1,
+            BuiltinType::List | BuiltinType::Key => 1,
             BuiltinType::Boundary => 3,
             BuiltinType::Continuation => 4,
             _ => 0,

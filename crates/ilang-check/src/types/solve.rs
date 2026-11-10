@@ -1286,8 +1286,19 @@ pub(crate) fn builtin_variance(b: BuiltinType) -> Vec<Variance> {
     use Variance::*;
     match b {
         BuiltinType::List => vec![Co],
+        BuiltinType::Key => vec![Inv],
         BuiltinType::Boundary => vec![Inv, Inv, Inv],
         BuiltinType::Continuation => vec![Contra, Co, Co, Co],
         _ => Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod primitive_variance_tests {
+    use super::*;
+
+    #[test]
+    fn typed_keys_are_invariant() {
+        assert_eq!(builtin_variance(BuiltinType::Key), vec![Variance::Inv]);
     }
 }

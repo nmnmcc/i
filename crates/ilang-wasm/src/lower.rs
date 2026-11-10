@@ -129,6 +129,7 @@ const CORE: &[&str] = &[
     "to_lower",
     "index_of",
     "bit_array_concat",
+    "portable",
 ];
 
 const CORE_FUNCS: &[&str] = &[
@@ -161,6 +162,7 @@ const CORE_FUNCS: &[&str] = &[
     "core_to_lower",
     "core_index_of",
     "core_bit_array_concat",
+    "core_portable",
 ];
 
 /// The state of one function while it is lowered.
@@ -1387,6 +1389,30 @@ impl<'a> Lowerer<'a> {
                 )),
                 None => Err(format!("`core.{function}` is not known")),
             },
+            "ilang:key" => match function.as_str() {
+                "new" => Ok((
+                    Op::Runtime {
+                        name: "key_new",
+                        arity,
+                    },
+                    arity,
+                )),
+                "wrap" => Ok((
+                    Op::Runtime {
+                        name: "key_wrap",
+                        arity,
+                    },
+                    arity,
+                )),
+                "read" => Ok((
+                    Op::Runtime {
+                        name: "key_read",
+                        arity,
+                    },
+                    arity,
+                )),
+                _ => Err(format!("`key.{function}` is not known")),
+            },
             "ilang:fail" if function == "raise" => Ok((Op::Raise, arity)),
             "ilang:fail" if function == "catch" => Ok((Op::Catch, arity)),
             "ilang:resource" if function == "ensure" => Ok((Op::Ensure, arity)),
@@ -1395,6 +1421,7 @@ impl<'a> Lowerer<'a> {
                 "suspend" => Ok((Op::Suspend, arity)),
                 "resume" => Ok((Op::Resume, arity)),
                 "cancel" => Ok((Op::Cancel, arity)),
+                "keep_env" => Ok((Op::KeepEnv, arity)),
                 _ => Err(format!("`control.{function}` is not known")),
             },
             _ => Err(format!(
@@ -1662,6 +1689,7 @@ impl<'a> Lowerer<'a> {
             value: Value::Closure {
                 func: id,
                 captures: atoms,
+                patched: !later.is_empty(),
             },
             site: None,
         });
@@ -2221,6 +2249,8 @@ impl<'a> Lowerer<'a> {
                     BuiltinType::UtfCodepoint => 13,
                     BuiltinType::Boundary => 11,
                     BuiltinType::Continuation => 12,
+                    BuiltinType::Key => 15,
+                    BuiltinType::Keyed => 16,
                     BuiltinType::Never => u32::MAX,
                 },
             ),
