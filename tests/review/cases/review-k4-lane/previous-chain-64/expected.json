@@ -1,0 +1,37 @@
+{
+  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
+  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 10.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 1,
+      "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.forward_0 : () -> Nil ! N | S(N)\napp/main.forward_1 : () -> Nil ! N | S(N)\napp/main.forward_2 : () -> Nil ! N | S(N)\napp/main.forward_3 : () -> Nil ! N | S(N)\napp/main.forward_4 : () -> Nil ! N | S(N)\napp/main.forward_5 : () -> Nil ! N | S(N)\napp/main.forward_6 : () -> Nil ! N | S(N)\napp/main.forward_7 : () -> Nil ! N | S(N)\napp/main.forward_8 : () -> Nil ! N | S(N)\napp/main.forward_9 : () -> Nil ! N | S(N)\napp/main.forward_10 : () -> Nil ! N | S(N)\napp/main.forward_11 : () -> Nil ! N | S(N)\napp/main.forward_12 : () -> Nil ! N | S(N)\napp/main.forward_13 : () -> Nil ! N | S(N)\napp/main.forward_14 : () -> Nil ! N | S(N)\napp/main.forward_15 : () -> Nil ! N | S(N)\napp/main.forward_16 : () -> Nil ! N | S(N)\napp/main.forward_17 : () -> Nil ! N | S(N)\napp/main.forward_18 : () -> Nil ! N | S(N)\napp/main.forward_19 : () -> Nil ! N | S(N)\napp/main.forward_20 : () -> Nil ! N | S(N)\napp/main.forward_21 : () -> Nil ! N | S(N)\napp/main.forward_22 : () -> Nil ! N | S(N)\napp/main.forward_23 : () -> Nil ! N | S(N)\napp/main.forward_24 : () -> Nil ! N | S(N)\napp/main.forward_25 : () -> Nil ! N | S(N)\napp/main.forward_26 : () -> Nil ! N | S(N)\napp/main.forward_27 : () -> Nil ! N | S(N)\napp/main.forward_28 : () -> Nil ! N | S(N)\napp/main.forward_29 : () -> Nil ! N | S(N)\napp/main.forward_30 : () -> Nil ! N | S(N)\napp/main.forward_31 : () -> Nil ! N | S(N)\napp/main.forward_32 : () -> Nil ! N | S(N)\napp/main.forward_33 : () -> Nil ! N | S(N)\napp/main.forward_34 : () -> Nil ! N | S(N)\napp/main.forward_35 : () -> Nil ! N | S(N)\napp/main.forward_36 : () -> Nil ! N | S(N)\napp/main.forward_37 : () -> Nil ! N | S(N)\napp/main.forward_38 : () -> Nil ! N | S(N)\napp/main.forward_39 : () -> Nil ! N | S(N)\napp/main.forward_40 : () -> Nil ! N | S(N)\napp/main.forward_41 : () -> Nil ! N | S(N)\napp/main.forward_42 : () -> Nil ! N | S(N)\napp/main.forward_43 : () -> Nil ! N | S(N)\napp/main.forward_44 : () -> Nil ! N | S(N)\napp/main.forward_45 : () -> Nil ! N | S(N)\napp/main.forward_46 : () -> Nil ! N | S(N)\napp/main.forward_47 : () -> Nil ! N | S(N)\napp/main.forward_48 : () -> Nil ! N | S(N)\napp/main.forward_49 : () -> Nil ! N | S(N)\napp/main.forward_50 : () -> Nil ! N | S(N)\napp/main.forward_51 : () -> Nil ! N | S(N)\napp/main.forward_52 : () -> Nil ! N | S(N)\napp/main.forward_53 : () -> Nil ! N | S(N)\napp/main.forward_54 : () -> Nil ! N | S(N)\napp/main.forward_55 : () -> Nil ! N | S(N)\napp/main.forward_56 : () -> Nil ! N | S(N)\napp/main.forward_57 : () -> Nil ! N | S(N)\napp/main.forward_58 : () -> Nil ! N | S(N)\napp/main.forward_59 : () -> Nil ! N | S(N)\napp/main.forward_60 : () -> Nil ! N | S(N)\napp/main.forward_61 : () -> Nil ! N | S(N)\napp/main.forward_62 : () -> Nil ! N | S(N)\napp/main.forward_63 : () -> Nil ! N | S(N)\napp/main.main : () -> Nil ! N | S(N)\n",
+      "stderr": "src/main.i:141:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `S(a)`, which must be given before it gets to the entry point\nsrc/main.i:141:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `a`, which must be given before it gets to the entry point\n2 errors\n"
+    },
+    "run0": {
+      "command": [
+        "run",
+        "--opt",
+        "0"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:141:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `S(a)`, which must be given before it gets to the entry point\nsrc/main.i:141:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `a`, which must be given before it gets to the entry point\n2 errors\n"
+    },
+    "run2": {
+      "command": [
+        "run",
+        "--opt",
+        "2"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:141:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `S(a)`, which must be given before it gets to the entry point\nsrc/main.i:141:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `a`, which must be given before it gets to the entry point\n2 errors\n"
+    }
+  }
+}
