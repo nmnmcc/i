@@ -8,10 +8,116 @@ use crate::{
 };
 use rustc_hash::FxHashMap;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct ShownGraph {
     pub(crate) graph: Graph,
     pub(crate) names: Vec<(V, ShownType)>,
+}
+
+// ShownType equality compares the represented graph shape, independent of
+// arena allocation. Semantic type equality is a separate inclusion proof.
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum Shape {
+    Never,
+    Top,
+    Var(ShownType),
+    Con(Head, crate::types::lits::ValueSet, Vec<usize>),
+    Fn(Vec<(Option<String>, usize)>, usize, usize, usize),
+    Record(Vec<(ShapeLabel, usize)>),
+    Union(usize, usize),
+    Inter(usize, usize),
+    Both(usize, usize),
+    Without(usize, Vec<ShapeLabel>),
+    Diff(usize, Vec<usize>),
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum ShapeLabel {
+    Name(String),
+    Param {
+        scope: usize,
+        index: u32,
+        name: String,
+    },
+}
+
+// Graph handles use immutable node and pool identities for their hash keys.
+#[allow(clippy::mutable_key_type)]
+fn graph_shape(shown: &ShownGraph, interned: &mut FxHashMap<Shape, usize>) -> usize {
+    let names: FxHashMap<_, _> = shown.names.iter().cloned().collect();
+    let mut nodes = shown.graph.nodes();
+    nodes.sort_unstable_by_key(|(id, _)| *id);
+    let mut ids = FxHashMap::default();
+    let mut scopes = FxHashMap::default();
+    for (id, node) in nodes {
+        let at = |id| ids[&id];
+        let mut normalized_label = |label| match label {
+            Label::Name(name) => ShapeLabel::Name(name.to_string()),
+            Label::Param(p) => {
+                let next = scopes.len();
+                let scope = *scopes.entry(p.owner).or_insert(next);
+                ShapeLabel::Param {
+                    scope,
+                    index: p.index,
+                    name: p.name.to_string(),
+                }
+            }
+        };
+        let shape = match node {
+            Node::Never => Shape::Never,
+            Node::Top => Shape::Top,
+            Node::Var(v) => Shape::Var(names[&v].clone()),
+            Node::Con(h, values, args) => Shape::Con(h, values, args.into_iter().map(at).collect()),
+            Node::Fn(f) => Shape::Fn(
+                f.params
+                    .into_iter()
+                    .map(|(n, t)| (n.map(|n| n.to_string()), at(t)))
+                    .collect(),
+                at(f.ret),
+                at(f.err),
+                at(f.env),
+            ),
+            Node::Rec(fields) => Shape::Record(
+                fields
+                    .into_iter()
+                    .map(|(label, t)| (normalized_label(label), at(t)))
+                    .collect(),
+            ),
+            Node::Union(a, b) => {
+                let (a, b) = (at(a), at(b));
+                Shape::Union(a.min(b), a.max(b))
+            }
+            Node::Inter(a, b) => {
+                let (a, b) = (at(a), at(b));
+                Shape::Inter(a.min(b), a.max(b))
+            }
+            Node::Both(a, b) => Shape::Both(at(a), at(b)),
+            Node::Without(base, labels) => {
+                Shape::Without(at(base), labels.into_iter().map(normalized_label).collect())
+            }
+            Node::Diff(base, heads) => Shape::Diff(at(base), heads.into_iter().map(at).collect()),
+        };
+        let next = interned.len();
+        ids.insert(id, *interned.entry(shape).or_insert(next));
+    }
+    ids[&shown.graph.id]
+}
+
+impl PartialEq for ShownGraph {
+    fn eq(&self, other: &Self) -> bool {
+        #[allow(clippy::mutable_key_type)]
+        let mut interned = FxHashMap::default();
+        graph_shape(self, &mut interned) == graph_shape(other, &mut interned)
+    }
+}
+
+impl Eq for ShownGraph {}
+
+impl std::hash::Hash for ShownGraph {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Equivalent graphs may have different nodes and allocation orders.
+        state.write_u8(0);
+    }
 }
 
 impl ShownGraph {
@@ -237,5 +343,68 @@ impl ShownGraph {
             &mut |param| var(&param.name),
         );
         format!("type-graph-v1({wire})")
+    }
+}
+
+#[cfg(test)]
+mod equality_tests {
+    use super::*;
+    use crate::types::records::Pool;
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    fn shown(pool: &Pool, var: V) -> ShownGraph {
+        let ty = pool.record(vec![(Label::name("value"), Ty::Var(var))]);
+        let Ty::Graph(graph) = ty else { unreachable!() };
+        ShownGraph::new(&graph, &mut |_| ShownType::Var("A".into()))
+    }
+
+    #[test]
+    fn shown_graph_equality_is_independent_of_arena_and_solver_ids() {
+        let a = shown(&Pool::default(), V(1));
+        let b = shown(&Pool::default(), V(20));
+        let c = shown(&Pool::default(), V(55));
+        assert_eq!(a, b);
+        assert_eq!(b, c);
+        assert_eq!(a, c);
+        let hash = |x: &ShownGraph| {
+            let mut h = DefaultHasher::new();
+            x.hash(&mut h);
+            h.finish()
+        };
+        assert_eq!(hash(&a), hash(&b));
+    }
+
+    #[test]
+    fn shown_graph_equality_keeps_distinct_scoped_labels_distinct() {
+        let make = |shared: bool| {
+            let pool = Pool::default();
+            let first = super::super::graph::LabelOwner::artifact();
+            let second = if shared {
+                first
+            } else {
+                super::super::graph::LabelOwner::artifact()
+            };
+            let label = |owner| {
+                Label::Param(super::super::LabelParam {
+                    owner,
+                    index: 0,
+                    level: 1,
+                    name: "K".into(),
+                })
+            };
+            let left = pool.record(vec![(label(first), Ty::Var(V(0)))]);
+            let right = pool.record(vec![(label(second), Ty::Var(V(0)))]);
+            let root = pool.record(vec![
+                (Label::name("first"), left),
+                (Label::name("second"), right),
+            ]);
+            let Ty::Graph(graph) = root else {
+                unreachable!()
+            };
+            ShownGraph::new(&graph, &mut |_| ShownType::Var("A".into()))
+        };
+        assert_eq!(make(false), make(false));
+        assert_ne!(make(false), make(true));
     }
 }

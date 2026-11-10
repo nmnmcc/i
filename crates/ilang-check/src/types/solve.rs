@@ -190,6 +190,9 @@ pub(crate) struct Solver {
     /// The pairs of bounds whose parts `add_bound` has put together.
     compared: HashSet<(Ty, Ty, bool, Mode)>,
     pub variance: StdHashMap<TypeId, Vec<Variance>>,
+    /// Internal comparison wrappers have exactly the values of their one
+    /// argument, tagged with a disjoint identity.
+    pub(super) comparison_wrappers: HashSet<TypeId>,
     pub(super) has_handlers: bool,
     pub row_params: StdHashMap<TypeId, Vec<Mode>>,
     pub failures: Vec<Failure>,
@@ -271,6 +274,7 @@ impl Solver {
             touched: Vec::new(),
             reported: HashSet::default(),
             variance,
+            comparison_wrappers: HashSet::default(),
             row_params: StdHashMap::new(),
             has_handlers: false,
             failures: Vec::new(),

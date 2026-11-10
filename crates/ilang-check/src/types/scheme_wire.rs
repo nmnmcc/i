@@ -757,20 +757,34 @@ impl AliasArtifact {
         };
         let a = import(self, &left, left_name)?;
         let b = import(other, &right, right_name)?;
-        // Function parameter names are call-site API metadata even though
-        // subtype proofs deliberately ignore them. Until their alignment is
-        // proved, do not infer interface equality from type inclusion alone.
-        let has_functions = [&a, &b].into_iter().any(|ty| {
-            solver
-                .records
-                .graph(ty)
-                .nodes()
+        // The subtype relation intentionally ignores argument labels, while
+        // the package interface must preserve named-call availability. Wrap
+        // each function in a disjoint tagged wrapper encoding its labels.
+        // The ordinary proof then compares both the function type
+        // and its call protocol, including inside records and unions.
+        let graph_a = solver.records.graph(&a);
+        let graph_b = solver.records.graph(&b);
+        let mut tags = HashMap::<Vec<Option<String>>, crate::hir::TypeId>::new();
+        let mut tag = |ty: Ty, _: bool| {
+            let Ty::Fn(function) = &ty else {
+                return ty;
+            };
+            let labels = function
+                .params
                 .iter()
-                .any(|(_, node)| matches!(node, Node::Fn(_)))
-        });
-        if has_functions && a != b {
-            return Err("function parameter labels need interface alignment".into());
-        }
+                .map(|(label, _)| label.clone())
+                .collect::<Vec<_>>();
+            let id = *tags.entry(labels).or_insert_with(|| {
+                let id = crate::hir::TypeId(next_id);
+                next_id += 1;
+                solver.variance.insert(id, vec![Variance::Co]);
+                solver.comparison_wrappers.insert(id);
+                id
+            });
+            Ty::named(TypeRef::Custom(id), vec![ty])
+        };
+        let a = graph_a.map_nodes(false, &mut tag);
+        let b = graph_b.map_nodes(false, &mut tag);
         let prove = |a: &Ty, b: &Ty| {
             records::prove(
                 &solver,

@@ -1809,4 +1809,45 @@ mod value_type_interfaces {
         let different = interface("(T)\nT = (a: String)");
         assert!(!Diff::new(&concrete, &different).unwrap().changed.is_empty());
     }
+
+    #[test]
+    fn function_labels_inside_record_aliases_are_part_of_the_call_interface() {
+        let a = interface("(T)\nT = (run: (a: Int | String) -> Int)");
+        let same = interface("(T)\nT = (run: (a: String | Int) -> Int)");
+        let changed = interface("(T)\nT = (run: (b: Int | String) -> Int)");
+        let tuple = interface("(T)\nT = (run: ((a: Int | String) -> Int, String))");
+        assert!(Diff::new(&a, &same).unwrap().changed.is_empty());
+        assert!(!Diff::new(&a, &changed).unwrap().changed.is_empty());
+        assert!(!Diff::new(&a, &tuple).unwrap().changed.is_empty());
+    }
+
+    #[test]
+    fn function_call_protocol_distinguishes_labels_positions_and_nested_fields() {
+        let compare = |a: &str, b: &str| {
+            Diff::new(&interface(a), &interface(b))
+                .unwrap()
+                .changed
+                .is_empty()
+        };
+        assert!(!compare(
+            "(T)\nT = (run: (a: Int) -> Int)",
+            "(T)\nT = (run: (Int) -> Int)"
+        ));
+        assert!(!compare(
+            "(T)\nT = (run: (a: Int, b: Int) -> Int)",
+            "(T)\nT = (run: (b: Int, a: Int) -> Int)"
+        ));
+        assert!(!compare(
+            "(T)\nT = (a: (run: (x: Int) -> Int))",
+            "(T)\nT = (a: (run: (y: Int) -> Int))"
+        ));
+        assert!(compare(
+            "(T)\nT = (a: (a: Int) -> Int)",
+            "(T)\nT = (a: (a: Int) -> Int)"
+        ));
+        assert!(!compare(
+            "(T)\nT = (a: (a: Int) -> Int)",
+            "(T)\nT = (a: (b: Int) -> Int)"
+        ));
+    }
 }

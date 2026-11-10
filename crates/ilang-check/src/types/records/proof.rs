@@ -5,7 +5,12 @@
 
 use super::bdd::{Bdd, Kernel, Op};
 use super::{Demand, Id, Label, Node, Pool, ResourceLimit};
-use crate::types::{Head, Ty, V, Variance, lits::ValueSet, solve::Solver};
+use crate::hir::TypeRef;
+use crate::types::{
+    Head, Ty, V, Variance,
+    lits::ValueSet,
+    solve::{Mode, Solver},
+};
 use rustc_hash::{FxHashMap as Map, FxHashSet as Set};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -412,7 +417,7 @@ type Product = Vec<(Label, Cell)>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum Goal {
-    Rel(Id, Id, bool),
+    Rel(Id, Id, Mode),
     Enclose(Id, bool),
     Empty(Vec<Id>, Vec<Id>),
     Force(Id),
@@ -482,7 +487,7 @@ fn prove_with_cache(s: &Solver, lhs: &Ty, rhs: &Ty, demand: &mut Demand, cache: 
     let a = pool.import(lhs);
     let b = pool.import(rhs);
     let mut e = Engine::new(s, demand, cache);
-    match e.run(Goal::Rel(a, b, false)) {
+    match e.run(Goal::Rel(a, b, Mode::Value)) {
         Ok(Answer::Rel(true)) => Verdict::Proven,
         Err(_) => Verdict::ResourceLimit,
         _ => e.coverage(a, b).unwrap_or(Verdict::ResourceLimit),
@@ -591,7 +596,7 @@ impl Engine<'_> {
         Err(Pause::Need(goal))
     }
 
-    fn rel(&self, a: Id, b: Id, env: bool, f: &mut Frame) -> Result<bool, Pause> {
+    fn rel(&self, a: Id, b: Id, env: Mode, f: &mut Frame) -> Result<bool, Pause> {
         match self.need(Goal::Rel(a, b, env), f)? {
             Answer::Rel(v) => Ok(v),
             _ => unreachable!(),
@@ -710,7 +715,7 @@ impl Engine<'_> {
         })
     }
 
-    fn relation(&mut self, a: Id, b: Id, env: bool, f: &mut Frame) -> Result<bool, Pause> {
+    fn relation(&mut self, a: Id, b: Id, env: Mode, f: &mut Frame) -> Result<bool, Pause> {
         if a == b || a == Id::NEVER || b == Id::TOP {
             return Ok(true);
         }
@@ -729,43 +734,50 @@ impl Engine<'_> {
                 self.rel(a, self.union(bounds), env, f)?
             }
             (Node::Con(h, av, aa), Node::Con(k, bv, ba)) if h == k && aa.len() == ba.len() => {
-                if !av.subset(&bv) {
+                if (env == Mode::Env && av != bv) || (env != Mode::Env && !av.subset(&bv)) {
                     return Ok(false);
                 }
                 let variance = self.solver.variances(h, aa.len());
-                for ((a, b), v) in aa.into_iter().zip(ba).zip(variance) {
-                    let v = if env { Variance::Inv } else { v };
-                    if matches!(v, Variance::Co | Variance::Inv) && !self.rel(a, b, false, f)? {
+                let rows = self.solver.rows(h, aa.len());
+                for (((a, b), v), row) in aa.into_iter().zip(ba).zip(variance).zip(rows) {
+                    let (v, row) = if env == Mode::Value {
+                        (v, row)
+                    } else {
+                        (Variance::Inv, Mode::Value)
+                    };
+                    if matches!(v, Variance::Co | Variance::Inv) && !self.rel(a, b, row, f)? {
                         return Ok(false);
                     }
-                    if matches!(v, Variance::Contra | Variance::Inv) && !self.rel(b, a, false, f)? {
+                    if matches!(v, Variance::Contra | Variance::Inv) && !self.rel(b, a, row, f)? {
                         return Ok(false);
                     }
                 }
                 true
             }
-            (Node::Fn(a), Node::Fn(b)) if !env && a.params.len() == b.params.len() => {
+            (Node::Fn(a), Node::Fn(b))
+                if env == Mode::Value && a.params.len() == b.params.len() =>
+            {
                 for ((_, a), (_, b)) in a.params.into_iter().zip(b.params) {
-                    if !self.rel(b, a, false, f)? {
+                    if !self.rel(b, a, Mode::Value, f)? {
                         return Ok(false);
                     }
                 }
-                self.rel(a.ret, b.ret, false, f)?
-                    && self.rel(a.err, b.err, false, f)?
-                    && self.rel(a.env, b.env, true, f)?
+                self.rel(a.ret, b.ret, Mode::Value, f)?
+                    && self.rel(a.err, b.err, Mode::Row, f)?
+                    && self.rel(a.env, b.env, Mode::Env, f)?
             }
-            (Node::Rec(a), Node::Rec(b)) if !env => {
+            (Node::Rec(a), Node::Rec(b)) if env == Mode::Value => {
                 for (l, t) in b {
                     let Ok(i) = a.binary_search_by(|(key, _)| key.cmp(&l)) else {
                         return Ok(false);
                     };
-                    if !self.rel(a[i].1, t, false, f)? {
+                    if !self.rel(a[i].1, t, Mode::Value, f)? {
                         return Ok(false);
                     }
                 }
                 true
             }
-            (Node::Without(x, labels), Node::Rec(fields)) if !env => {
+            (Node::Without(x, labels), Node::Rec(fields)) if env == Mode::Value => {
                 if fields.is_empty() {
                     true
                 } else if fields
@@ -774,7 +786,7 @@ impl Engine<'_> {
                 {
                     false
                 } else {
-                    self.rel(x, b, false, f)?
+                    self.rel(x, b, Mode::Value, f)?
                 }
             }
             (Node::Without(x, removed), Node::Without(y, target))
@@ -782,8 +794,8 @@ impl Engine<'_> {
             {
                 self.rel(x, y, env, f)?
             }
-            (_, Node::Without(y, _)) if !env => {
-                self.rel(a, y, false, f)? && self.rel(a, Id::RECORD, false, f)?
+            (_, Node::Without(y, _)) if env == Mode::Value => {
+                self.rel(a, y, Mode::Value, f)? && self.rel(a, Id::RECORD, Mode::Value, f)?
             }
             (Node::Both(x, _), _) => self.rel(x, b, env, f)?,
             (_, Node::Both(_, y)) => self.rel(a, y, env, f)?,
@@ -797,7 +809,7 @@ impl Engine<'_> {
         }
         for &a in p {
             for &b in n {
-                if self.rel(a, b, false, f)? {
+                if self.rel(a, b, Mode::Value, f)? {
                     return Ok(Empty::Yes);
                 }
             }
@@ -946,6 +958,29 @@ impl Engine<'_> {
             let free = self.product(vec![])?;
             return match self.need(Goal::Walk(source, free, vec![], None), f)? {
                 Answer::Empty(v) => Ok(v),
+                _ => unreachable!(),
+            };
+        }
+        if let Head::Named(TypeRef::Custom(id)) = head
+            && self.solver.comparison_wrappers.contains(&id)
+        {
+            let mut positive = Vec::new();
+            let mut negative = Vec::new();
+            for &node in p {
+                let Node::Con(_, _, args) = self.node(node) else {
+                    unreachable!()
+                };
+                positive.push(args[0]);
+            }
+            for &node in n {
+                match self.node(node) {
+                    Node::Con(h, _, args) if h == head => negative.push(args[0]),
+                    Node::Con(..) | Node::Fn(_) | Node::Rec(_) | Node::Without(..) => (),
+                    _ => return Ok(Empty::Unknown),
+                }
+            }
+            return match self.need(Goal::Empty(positive, negative), f)? {
+                Answer::Empty(value) => Ok(value),
                 _ => unreachable!(),
             };
         }

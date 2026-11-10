@@ -4,14 +4,40 @@ use super::{Label, LabelParam};
 use crate::{
     hir::{BindingRef, BuiltinType, ModuleId, TypeId, TypeRef},
     types::{
-        Ty, V,
-        solve::{FailKind, Solver},
+        Ty, V, Variance,
+        solve::{FailKind, Mode, Solver},
     },
 };
 use std::collections::HashMap;
 
 fn solver() -> Solver {
     Solver::new(HashMap::new(), Vec::new())
+}
+
+#[test]
+fn record_proof_preserves_environment_mode_inside_nominal_arguments() {
+    let mut s = solver();
+    let outer = TypeId(10);
+    let service = TypeId(11);
+    s.variance.insert(outer, vec![Variance::Co]);
+    s.variance.insert(service, vec![Variance::Co]);
+    s.row_params.insert(outer, vec![Mode::Env]);
+    let narrow = Ty::named(TypeRef::Custom(service), vec![int()]);
+    let wide_arg = s.union(vec![int(), string()]);
+    let wide = Ty::named(TypeRef::Custom(service), vec![wide_arg]);
+    let narrow = Ty::named(TypeRef::Custom(outer), vec![narrow]);
+    let wide = Ty::named(TypeRef::Custom(outer), vec![wide]);
+    let left = s.record(vec![(Label::name("x"), narrow)]);
+    let right = s.record(vec![(Label::name("x"), wide)]);
+    assert_ne!(
+        super::prove(
+            &s,
+            &left,
+            &right,
+            &mut super::Demand::new(super::Demand::LIMIT, true)
+        ),
+        super::Verdict::Proven
+    );
 }
 fn int() -> Ty {
     Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new())

@@ -366,6 +366,10 @@ mod tests {
             decoded.field(&Label::name("a")),
             Field::Found(Ty::Var(V(0)))
         ));
+        let show = |v: V| crate::types::ShownType::Var(format!("A{}", v.0));
+        let a = super::super::shown::ShownGraph::new(record_graph, &mut show.clone());
+        let b = super::super::shown::ShownGraph::new(&decoded, &mut show.clone());
+        assert_eq!(a, b);
     }
 
     #[test]
