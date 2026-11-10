@@ -1,6 +1,6 @@
 # Design: lazy re-entry of paused frames
 
-Status: draft for review (stream B, step B-D). Base commit `dcb19df`. This note changes no behaviour, so `docs/spec.md` does not change. Every program gives the same values, the same errors, the same stop messages and the same order of final functions as today. Only the cost of `control.resume`, `control.cancel` and of a suspend after a resume changes.
+Status: draft for review (stream B, step B-D). Base commit `dcb19df`. This note changes no behaviour, so `docs/spec.md` does not change. Every program gives the same values, the same errors, the same stop messages and the same order of final functions as today. The one exception is the stop "There is no more memory or stack" (§11.7): the depth at which the Wasm stack runs out may move (section 7, last bullet). Only the cost of `control.resume` and of a suspend after a resume changes. `control.cancel` keeps the same order of cost as today: it still goes through every pending record (section 10).
 
 The code this note talks about is at `dcb19df`:
 
@@ -71,9 +71,9 @@ Each decision has its reason. Where a review asked for a change, the reason says
 
 **D10. The bench resumes from a flat loop outside the boundary.** `f` returns the continuation in a value, and a tail-recursive driver resumes it. *Reason (review):* if `f` called `resume` itself, each round would run one boundary deeper, and the bench would measure nesting, not resume. The eager baseline would also hold about 10^6 frames at depth 1000 and might overflow.
 
-**D11. The checks of the list invariants are always on.** Each node has a state field. The trampoline traps (`unreachable`) if it takes a node that was taken before, or meets a delimiter that is not the first record. *Reason:* a mistake in the list code would run a frame twice or lose one silently. The check costs one field read and one write per record. If the coordinator's measurement shows a cost, the checks move behind `cfg!(debug_assertions)` of the compiler (open question 4).
+**D11. The checks of the list invariants are always on.** Each node has a state field. The trampoline traps (`unreachable`) if it takes a node that was taken before, or meets a delimiter that is not the first record. *Reason:* a mistake in the list code would run a frame twice or lose one silently. The check costs one field read and one write per record. If the coordinator's measurement shows a cost, the checks move behind `cfg!(debug_assertions)` of the compiler (open question 3).
 
-**D12. No change to `docs/spec.md`.** The spec states no costs, and every rule it states holds (section 7).
+**D12. No change to `docs/spec.md`.** The spec states no costs, and every rule it states holds (section 7). The spec also gives no fixed stack size, so the depth at which "There is no more memory or stack" happens may move; that is the only behaviour that can differ.
 
 ## 4. Data
 
@@ -291,7 +291,7 @@ The trampoline catches only `$error`, `$cancel` and `$capture`. It has no `catch
 - `$control_resume(k, v, env)` (same signature): take `k`, set its boundary active, `return_call $boundary_core(b, env, null, k.sub, v, 0)`.
 - `$control_cancel(k, env)`: take `k`, `return_call $cancel_core(k, k.sub, env, k, 2)`.
 - `$cancel_core(k, sub, env, v, mode)` is today's `$cancel_run` with `$reenter_next` replaced by `$tramp_run(sub, env, v, mode)`. It takes `$cancel e` only when `e` is `k`, and then restores the depth and gives null. It packs a capture (5.4).
-- `$control_reset` sets `$pend` to null. Whatever resets `$sp` for a new host entry must also call it (section 5.9).
+- `$control_reset` sets `$pend` to null. Code that resets `$sp` for a new entry inside the same instance must also call it (section 5.9).
 
 ### 5.8 Stops (§11.7)
 
@@ -318,7 +318,7 @@ $shadow = new ; $sp = sp + n
 ```
 
 - Runtime records push no slot in eager re-entry either, so they are left out.
-- A trampoline whose depth is above `$sp` cannot be live (invariant P3). It can only be left over from an earlier trap, so it is skipped.
+- A trampoline whose depth is above `$sp` cannot be live (invariant P3). It could only be left over from an earlier trap in an instance that is used again, which a host may not do (section 5.9). The skip is kept as a cheap defence, for the test harness.
 - Trampolines at the same depth (from descent, D4) are handled in order: the inner one's records land above the outer one's, as in eager.
 - The walker then prints the array as today, with the same tail-site rule.
 
@@ -326,10 +326,10 @@ $shadow = new ; $sp = sp + n
 
 - `$pend` is balanced on every exit of the trampoline that is not a trap (invariant P1).
 - After a trap, `$pend` is stale, and so are `$sp` and `$shadow` today.
-- At `dcb19df` no production code resets `$sp` for a new host entry. `$async_run` only restores its saved depth after an error, and only the test harness in `runtime/tests.rs` sets `$sp` to 0.
-- The rule written into the protocol doc of `runtime/mod.rs` is: "Code that resets `$sp` for a new entry also calls `$control_reset`." Today no such place exists, so no call is added.
-- If a host keeps using an instance after a trap, the reset belongs in host.rs, which is lane C's file (open question 2).
-- Until then, `$control_unpend` skips trampolines above `$sp`, and `$stopping` makes a second stop trap at once, as today.
+- The spec already rules out using such an instance again. Appendix B.5: "After a trap, the host may not use that instance of the module again; it makes a new instance and calls `ilang_start` on it." §10.2 runs each test in a new instance. So a conforming host never sees a stale `$pend`, and `emit/host.rs` and lane C need no change for it.
+- At `dcb19df` the only code that resets `$sp` inside one instance is the test harness in `runtime/tests.rs`. Its modules have no control text, so they have no `$pend` and need no call.
+- The rule written into the protocol doc of `runtime/mod.rs` is: "Code that resets `$sp` for a new entry also calls `$control_reset`." It is for internal harnesses, and for the compiler's runner of macro programs if it reuses an instance in a way "a macro cannot tell from a new instance" (meta.md §8). Today no such place exists, so no call is added.
+- `$control_unpend` still skips trampolines above `$sp`, and `$stopping` makes a second stop trap at once, as today.
 
 ## 6. Invariants
 
@@ -389,6 +389,7 @@ Each path:
 - **(R) Resume, suspend, resume.** By O1, the second continuation owns the new records followed by the old pending ones. A second resume runs them as a first resume would. The spec case `control_lazy_resuspend` checks every frame once.
 - **(S) A final function that suspends during a cancel.** `$ensure_final` adds `$final_reenter`. The trampoline splices, and `$cancel_core` packs with `$cancel_reenter`. A later resume re-enters the cancel by descent. `$final_reenter` in mode 0 calls `$ensure_end(2, k)`, which throws `$cancel k`. The trampoline passes it outward to the end of the inner list, and `$cancel_core` takes it because it is `k`. This is `cancel_runs_final_functions` in `control.i`.
 - **(H) The host.** See section 9.
+- **(M) Running out of stack.** This is the one stop whose place may move. A deep resume now uses less Wasm stack: eager made N frames and N `try_table`s at once, lazy makes one record frame at a time. But each level of nested resume holds one more frame than before (`$tramp_run`, with its `try_table` and about 10 locals): `$boundary_core` + `$tramp_run` + the record frame, where eager held `$boundary_run` + the `$r` chain. So a program that recursively resumes inside resumes (an in-order tree walk where each level resumes inside the previous resume) and is just under the stack limit today may stop with "There is no more memory or stack" after B, and a program that stopped there today may now finish. The spec gives no fixed stack size (§11.7), so both are allowed. Test 10 of 13.2 pins how much this moves.
 
 ## 8. Tail calls
 
@@ -396,6 +397,17 @@ Each path:
 - Inside a record, segments chain with `return_call` as today. A segment that ends in a tail call returns its callee's value to the trampoline. So a loop of 1,000,000 tail calls in a resumed computation keeps O(1) Wasm stack (`control.i` `tail_calls`).
 - The trampoline and walk W never read or write `$tail`. Eager re-entry used `$shadow_enter`, not `$shadow_enter_call`, so it did not touch `$tail` either. The segments run in the same order with the same calls between them, so every read of `$tail`, and every stop, sees the same value. This keeps the 11:28 rule of `stop_tail_resume`.
 - Slots are stored as read, tail sites included (`-2 - site`).
+
+## 8a. The seam with M2: call depth
+
+M2 adds limits to `emit/control.rs` after B (plan merge order B → M2), counted "in units of the language, independent of how the compiler optimizes" (meta.md §4.4, §11 question 3), and one of them is how deep calls may go. B adds no limit, but it changes what `$sp` means:
+
+- Eager re-entry rebuilt every paused frame at resume, so `$sp` was the logical depth.
+- Lazy re-entry leaves the paused frames in `$pend`. If a computation is paused under 900 frames and resumed from a place 200 frames deep, and then goes 50 frames deeper, eager had `$sp` = 1150. Lazy has `$sp` about 251, and 900 frames wait in `$pend`.
+
+**Rule.** The call depth of a running program is `$sp` plus the number of pending code records (kind 0 or 1) in the live trampolines of `$pend` whose depth is at most `$sp`. This is the size of the array `$control_unpend` builds, and it equals the eager `$sp`. Runtime records and delimiters do not count, as they pushed no slot in eager either. A depth limit built on `$sp` alone would let a program go deeper after B than before, and so would change behaviour.
+
+M2 can compute this in O(1) per check if it needs to: `$cap` and `$sub` keep a count of their code records (append adds 1 for kind 0 or 1, splice adds the trampoline's remaining count, pack moves the count into the delimiter's `$sub`), each `$tramp` keeps its remaining count, and a global keeps the sum over `$pend`. B does not add these fields, because nothing reads them yet. M2 adds them with the limit, and its review checks the rule above.
 
 ## 9. The seam with `emit/host.rs`
 
@@ -419,14 +431,15 @@ Terms, for one continuation:
 
 Costs:
 
-- `resume` and `cancel`: O(1 + D + E). Walk W uses no allocation for the reversal; it makes one array copy per kind-1 record.
+- `resume`: O(1 + D + E). Walk W uses no allocation for the reversal; it makes one array copy per kind-1 record.
+- `cancel`: O(1 + D + E + P), where P is the number of pending records. The trampoline runs in mode 2 from the start, and the loop visits every pending record: it skips code records with no call, but it still takes each one (state check, `continue`). Only after the last record does it throw `$cancel k` to `$cancel_core`. Eager cancel re-entered all N frames first, so this is the same order as today (D8); B does not make cancel cheaper. The R2 task scheduler cancels tasks with `control.cancel`, so later tracks should not count on O(1) cancel.
 - A suspend after a resume: O(1 + F + D). The splice is O(1), and each delimiter it goes through packs in O(1).
 - `fail.catch` and `resource.ensure` records cost nothing at resume or at a suspend. They cost one call each when an error or a cancel goes through them.
 - An error or a cancel that goes through pending records: O(records it goes through), in a loop with no call for code records. Today it is the same order, as a Wasm unwind.
 - The first capture of a frame: O(1), as today.
 - A stop: O(depth), once.
 
-A program pays more than O(1) per resume only when it has frames with environment statements or nested boundaries in the paused part.
+A program pays more than O(1) per resume only when it has frames with environment statements or nested boundaries in the paused part. A cancel always pays for each pending record.
 
 **Threshold.** The pass rule of the plan ("恢复耗时不随栈深增长") is:
 
@@ -483,7 +496,7 @@ Doc comment of `EFFECTS` in `emit/control.rs`, the bullets of "Control (§9.4)" 
 > - a frame whose call is under an environment statement (`! S = v`) of its function: its environment is worked out again;
 > - a boundary that the computation is paused inside, and a cancel whose final function suspended: they are re-entered at once, and a later suspend through them packs the frames inside them.
 >
-> `fail.catch` and `resource.ensure` cost nothing at a resume. An error or a cancel goes through the waiting frames one at a time, as an unwind does.
+> `fail.catch` and `resource.ensure` cost nothing at a resume. An error or a cancel goes through the waiting frames one at a time, as an unwind does. So `control.cancel` costs time in proportion to the number of waiting frames, as it did before.
 >
 > `bench/test/control_test.i` resumes at depths 10, 100 and 1000 (`scripts/bench control`). The pass rule is that, at `--opt 2`, the median of 5 runs at depth 1000, and at depth 100, is at most 1.5 times the one at depth 10. CI checks with fuel that one more round costs the same at depth 1000 and at depth 10 (`crates/ilang-wasm/tests/control_lazy.rs`).
 
@@ -595,7 +608,7 @@ resume_depth_100 = () { run(100) }
 resume_depth_1000 = () { run(1000) }
 ```
 
-Before it is committed, it must check under A1+A2: the imports group, the `|>` clause blocks, `@test` on bindings, a top-level clause block (`deeper`), and `b`, `k` and `step` with no type. A `Step` with the same field types is already used in `tests/spec/9/control.i`. If `deeper` were inlined, the frames would still stay, because it does work after `down` returns.
+Before it is committed, it must check under A1+A2: the imports group, the `|>` clause blocks, `@test` on bindings, a top-level clause block (`deeper`), and `b`, `k` and `step` with no type. `tests/spec/9/control.i` (line 205) has a similar `Step`, `Step { Done  More(Int, Continuation(Nil, Step, Never, Never)) }`. Only its `More` matches: its `Done` has no field, and the bench's `Done` has an `Int`. So the bench's type is checked on its own, not taken from that file. `Continuation(Nil, Step, Never, Never)` is written the same in the new syntax: syntax.md renames only type variables, and `Nil`, `Step` and `Never` are types (syntax.md §3: an `UpName` is a type variable only when a type variable with that name is declared where the type is written). If `deeper` were inlined, the frames would still stay, because it does work after `down` returns.
 
 ### 13.2 `crates/ilang-wasm/tests/control_lazy.rs`
 
@@ -620,6 +633,7 @@ Run tests (wasmtime CLI). The test writes a small module of stub imports and a d
 7. `deep_resume`: depth 100,000, 1000 rounds, with the Wasm stack size the spec runner uses. It must finish. Eager would do about 10^8 re-entries here. If the stack does not hold 100,000 frames at the first capture, the depth is 20,000.
 8. `resume_twice_from_new_places`: kind-1 frames are pending; the computation is resumed from two places with different environments, and the second resume sees the second environment (walk W starts from the new base each time).
 9. `counted_frames`: a resume where 3 inner frames return, so outer frames are re-entered; then a suspend, a resume, and at the end a cancel. Each frame counts itself, and every count is 1.
+10. `nested_resume_stack`: a recursive generator composition at `--opt 0`: an in-order walk of a tree of depth L, where each level resumes the generator of the level below inside its own resume. The test runs it with a fixed `-W max-wasm-stack=S` and bisects the largest L that finishes. It asserts L_lazy ≥ 0.8 × L_eager, where L_eager is a constant measured on the eager compiler at the bench commit (section 14, step 2). A second case pauses at depth 50,000 and resumes from inside a 50,000-deep recursion, and asserts that it finishes with the same S (eager may stop here; lazy must not). This pins how far the "no more stack" point moves (section 7, path M).
 
 ### 13.3 New spec cases
 
@@ -651,9 +665,15 @@ All of `tests/spec/9` and `tests/spec/11` at O0 and O2 pass unchanged, in partic
 
 ## 14. Order of work (plan B-I)
 
-1. Before A1+A2 land: the Rust changes and the doc text, kept green on the old-syntax spec cases at O0 and O2, with shape tests written against old-syntax sources if needed.
-2. After A1+A2 land: check that the bench forms type-check, then commit `bench/test/control_test.i` and `control_lazy.rs` on the tip of `redesign`. Before this commit `control_lazy.rs` tests 1 and 6 fail on eager code, so they are marked `#[ignore]` with the note "turned on by the lazy re-entry commit". The coordinator measures the eager baseline at this commit, and the expected `at:` lists of 13.3 are taken here.
-3. Rebase the implementation onto that commit, and turn the tests on.
+1. Before A1+A2 land: the Rust changes and the doc text on B's implementation branch, kept green on the old-syntax spec cases at O0 and O2. The shape tests of 13.2 that need i source (2 `record_kinds`, 5 `modules_validate`) are written on this branch in `crates/ilang-wasm/tests/control_lazy.rs`, with old-syntax sources in Rust strings. Tests 1, 3 and 4 need no i source and go in the same file. Nothing of this file is on `redesign` yet, so A2's migration does not see it, and B owns converting it.
+2. After A1+A2 land: check that the bench forms type-check, then commit `bench/test/control_test.i` and `control_lazy.rs` on the tip of `redesign`, with every i source in the new syntax. On eager code these tests fail, so they are marked `#[ignore]` with the note "turned on by the lazy re-entry commit":
+   - 1 `reentry_rebuilds_one_frame` and 2 `record_kinds`: the eager record has no kind, no slot field and no delta, and `$r` holds a `try_table`;
+   - 3 `host_seam_kept`: at `dcb19df` `$control_resume` passes a non-null `rest` to `$boundary_run`, `$boundary_reenter` passes `rest` and `frame`, and `$boundary_core` does not exist;
+   - 6 `resume_cost_is_flat`: the ratio grows with depth;
+   - 7 `deep_resume`: about 10^8 eager re-entries and as many capture rethrows, far over a CI time budget.
+
+   Tests 4, 5, 8, 9 and 10 pass on eager code and stay on. The coordinator measures the eager baseline at this commit; the expected `at:` lists of 13.3 and L_eager of test 10 are taken here.
+3. Rebase the implementation onto that commit. In the conflict on `control_lazy.rs`, B keeps step 2's file (new syntax) and drops the old-syntax copy of step 1, then turns the ignored tests on. After this step no old-syntax i source of B is left in a Rust string, and B runs `$C/tools/old-syntax-check` on the branch before it lands.
 4. Rebuild `tests/browser/fixtures/compiled.wasm` if B lands after C. If C lands after B, C rebuilds it.
 5. B-RF: the coordinator measures again; `tests/spec/9` and `tests/spec/11` pass at O0 and O2; the scope review checks that `emit/host.rs` has no diff.
 
@@ -662,13 +682,14 @@ All of `tests/spec/9` and `tests/spec/11` at O0 and O2 pass unchanged, in partic
 - **List mutation.** O1 and invariant D are new. A slip would run a frame twice or lose one. The mitigations are the state check (D11), the delimiter check, the run test that counts frames, and the re-suspend, inner-boundary and cancel spec cases at O0 and O2.
 - **Files outside B's list.** `runtime/stops.rs`, `runtime/mod.rs` and `emit/mod.rs` change a little, and `compiled.wasm` is lane C's file.
 - **Exact traces.** These rest on P2, P3 and S0. A future frameless function with a point would break them, which is why `point()` asserts S0.
-- **State after a trap.** `$pend` is stale after a trap, as `$sp` is. The reset rule is written down, but no host place calls `$control_reset` yet (open question 2).
+- **State after a trap.** `$pend` is stale after a trap, as `$sp` is. The spec forbids reusing the instance (Appendix B.5), so only an internal harness could see it. The reset rule is written down for such harnesses (section 5.9).
 - **The shim.** If stream C starts to pass a non-null `rest`, `cancel` or `frame` to `$boundary_run`, the shim traps. The trap is loud, but it is a run-time failure.
 - **Delimiters cost O(D).** Code that resumes inside many nested boundaries keeps a linear cost. The threshold does not cover it, and performance.md says so.
 - **Environment statements cost O(E).** A frame whose call is under its own environment statement costs two environment copies per resume: one in walk W, and one when `$r` rebuilds its locals.
-- **Wasm stack per nested resume.** Each level of nested resumes now uses `$boundary_core`, `$tramp_run` and the record call. Eager used `$boundary_run`, `$reenter_next` and the `$r` chain. The deep generator spec cases must be checked for stack use at O0.
+- **Wasm stack per nested resume.** Each level of nested resumes now uses `$boundary_core`, `$tramp_run` and the record call. Eager used `$boundary_run`, `$reenter_next` and the `$r` chain. So the point of "There is no more memory or stack" may move (section 7, path M). Test 10 of 13.2 pins how far, at O0.
+- **Call depth for M2.** Pending frames are not on `$sp`. A depth limit that reads only `$sp` would change behaviour. Section 8a gives the rule M2 must follow.
 - **Wall-clock noise.** GC of the larger live heap at depth 1000 may push the ratio above 1.0. The 1.5 bound and the quiet window leave room. The fuel check in CI ignores GC.
-- **Fuel in the CLI.** The CI check needs `-W fuel` together with GC, exceptions and tail calls in the pinned `wasmtime`. If that does not work, see open question 5.
+- **Fuel in the CLI.** The CI check needs `-W fuel` together with GC, exceptions and tail calls in the pinned `wasmtime`. If that does not work, see open question 4.
 - **Bench and A1+A2.** The bench and the run tests depend on the new syntax, so they can only land after A1+A2.
 - **Errors through many handlers.** An error through a long chain of `fail.catch` or `ensure` records costs one call and one throw per handler. That is as today, but it is not free.
 - **New `Env` variants.** `Point::delta` must follow every variant. The match has no `_` arm, so a new variant does not build until it is handled.
@@ -676,8 +697,6 @@ All of `tests/spec/9` and `tests/spec/11` at O0 and O2 pass unchanged, in partic
 ## 16. Open questions
 
 1. **Scope.** Does the coordinator agree to these changes outside B's file list: `runtime/stops.rs` (one global and the call in `$stop`), `runtime/mod.rs` (one type and the protocol bullet), `emit/mod.rs` (one `DECLARED` name), the new spec cases in `tests/spec/9`, `tests/spec/9.7` and `tests/spec/11`, and the rebuilt `tests/browser/fixtures/compiled.wasm` (lane C's)?
-2. **Reuse after a trap.** Does `ilang-host` or the JS binding call into an instance again after a trap? If so, the place that would reset `$sp` (in host.rs, lane C, then R2) should also call `$control_reset`.
-3. **D4.** Is O(D) for resumes inside nested boundaries accepted? The alternative, cutting the pending list at a boundary that a suspend names, makes resume O(1 + E) but adds a new path that the existing boundary code does not cover.
-4. **D11.** Should the list checks stay on in release builds? They cost one read and one write per record. The coordinator's measurement decides.
-5. **Fuel.** If the pinned `wasmtime` CLI cannot run fuel with GC and exceptions, the fallback is a wall-clock check in `control_lazy.rs`: the minimum of 5 runs, a ratio of at most 2.0, and `#[ignore]` by default. Is that acceptable?
-6. **Bench types.** Is `Continuation(Nil, Step, Never, Never)` still the written form of a continuation type with no errors and no services after A1+A2? `tests/spec/9/control.i` uses it today.
+2. **D4.** Is O(D) for resumes inside nested boundaries accepted? The alternative, cutting the pending list at a boundary that a suspend names, makes resume O(1 + E) but adds a new path that the existing boundary code does not cover.
+3. **D11.** Should the list checks stay on in release builds? They cost one read and one write per record. The coordinator's measurement decides.
+4. **Fuel.** If the pinned `wasmtime` CLI cannot run fuel with GC and exceptions, the fallback is a wall-clock check in `control_lazy.rs`: the minimum of 5 runs, a ratio of at most 2.0, and `#[ignore]` by default. Is that acceptable?
