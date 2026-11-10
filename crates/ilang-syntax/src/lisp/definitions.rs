@@ -46,3 +46,115 @@ pub fn builtin_definition(name: &str, scope: &Scope, at: Span, answer: u64) -> O
     let document = parse(source).expect("compiler builtin definition must parse");
     Some(convert(&document[0], scope, at, answer, name == "Result").as_answer())
 }
+
+/// Give a written type definition as a query answer with fresh identities for
+/// its formal type parameters. Alias-pattern items retain their written head.
+pub fn source_definition(
+    item: &crate::ast::Item,
+    source: &str,
+    scope: &Scope,
+    answer: u64,
+) -> Syntax {
+    use crate::ast::{ItemKind, TypeBody, TypeExpr, TypeKind};
+    use std::collections::HashMap;
+    let ItemKind::TypeDef(def) = &item.kind else {
+        panic!("definition query requires a type definition")
+    };
+    let parameters: HashMap<_, _> = def
+        .params
+        .iter()
+        .enumerate()
+        .map(|(index, name)| (name.name.as_str(), index as u32))
+        .collect();
+    let mut sites = HashMap::new();
+    for name in &def.params {
+        sites.insert(
+            (name.span, name.name.clone()),
+            parameters[name.name.as_str()],
+        );
+    }
+    fn type_sites(
+        ty: &TypeExpr,
+        parameters: &HashMap<&str, u32>,
+        sites: &mut HashMap<(Span, String), u32>,
+    ) {
+        match &ty.kind {
+            TypeKind::Named { module, name, args } => {
+                if module.is_none()
+                    && let Some(&id) = parameters.get(name.name.as_str())
+                {
+                    sites.insert((name.span, name.name.clone()), id);
+                }
+                for arg in args {
+                    type_sites(arg, parameters, sites);
+                }
+            }
+            TypeKind::Call { args, .. } => {
+                for arg in args {
+                    type_sites(arg, parameters, sites);
+                }
+            }
+            TypeKind::Tuple(types)
+            | TypeKind::Union(types)
+            | TypeKind::Inter(types)
+            | TypeKind::Diff(types) => {
+                for ty in types {
+                    type_sites(ty, parameters, sites);
+                }
+            }
+            TypeKind::Fn {
+                params,
+                ret,
+                err,
+                env,
+            } => {
+                for param in params {
+                    type_sites(&param.ty, parameters, sites);
+                }
+                type_sites(ret, parameters, sites);
+                for ty in err.iter().chain(env.iter()) {
+                    type_sites(ty, parameters, sites);
+                }
+            }
+            TypeKind::Lit(_) | TypeKind::ValueOf { .. } | TypeKind::Hole => {}
+        }
+    }
+    for ty in &def.head {
+        type_sites(ty, &parameters, &mut sites);
+    }
+    match &def.body {
+        TypeBody::Alias(ty) => type_sites(ty, &parameters, &mut sites),
+        TypeBody::Custom(constructors) => {
+            for constructor in constructors {
+                for field in &constructor.fields {
+                    type_sites(&field.ty, &parameters, &mut sites);
+                }
+            }
+        }
+    }
+    fn annotate(syntax: &Syntax, sites: &HashMap<(Span, String), u32>, answer: u64) -> Syntax {
+        if let Node::Up(name) = syntax.node()
+            && let Some(&parameter) = sites.get(&(syntax.span(), name.clone()))
+        {
+            return syntax.with_scope_identity(ScopeIdentity::DefinitionParameter {
+                answer,
+                parameter,
+                name: name.clone(),
+            });
+        }
+        let children = |xs: &[Syntax]| xs.iter().map(|s| annotate(s, sites, answer)).collect();
+        let node = match syntax.node() {
+            Node::Round(xs) => Node::Round(children(xs)),
+            Node::Square(xs) => Node::Square(children(xs)),
+            Node::Curly(xs) => Node::Curly(children(xs)),
+            Node::Bits(xs) => Node::Bits(children(xs)),
+            Node::Quote(x) => Node::Quote(annotate(x, sites, answer)),
+            Node::Unquote(x) => Node::Unquote(annotate(x, sites, answer)),
+            Node::Splice(x) => Node::Splice(annotate(x, sites, answer)),
+            leaf => leaf.clone(),
+        };
+        syntax.with_node(node)
+    }
+    let syntax = super::item_syntax(item, scope, source);
+    annotate(&syntax, &sites, answer).as_answer()
+}

@@ -198,7 +198,7 @@ impl Syntax {
             origin: Arc::new(()),
         }))
     }
-    fn with_node(&self, node: Node) -> Self {
+    pub(super) fn with_node(&self, node: Node) -> Self {
         Self(Arc::new(SyntaxData {
             node,
             scope: self.scope().clone(),

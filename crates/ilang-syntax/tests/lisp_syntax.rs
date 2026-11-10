@@ -479,3 +479,39 @@ fn builtin_definitions_preserve_builtins_and_fresh_parameter_binders() {
     };
     assert_ne!(head[1].scope_identity(), head2[1].scope_identity());
 }
+
+#[test]
+fn written_definition_answers_give_parameters_their_own_binder() {
+    use ilang_syntax::lisp::definitions::source_definition;
+    use ilang_syntax::lisp::syntax::{Node, ScopeIdentity};
+    let source = "Pair(A, B) { Pair(left: A, right: List(B)) }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let like = root("x");
+    let result = source_definition(&module.items[0], source, like.scope(), 17);
+    let Node::Round(parts) = result.node() else {
+        panic!("item")
+    };
+    let Node::Round(head) = parts[0].node() else {
+        panic!("head")
+    };
+    let Node::Curly(body) = parts[1].node() else {
+        panic!("body")
+    };
+    let Node::Round(ctor) = body[0].node() else {
+        panic!("constructor")
+    };
+    let Node::Round(field) = ctor[1].node() else {
+        panic!("field")
+    };
+    assert!(matches!(
+        head[1].scope_identity(),
+        Some(ScopeIdentity::DefinitionParameter {
+            answer: 17,
+            parameter: 0,
+            ..
+        })
+    ));
+    assert_eq!(head[1].scope_identity(), field[2].scope_identity());
+    assert!(ctor[0].scope_identity().is_none());
+}
