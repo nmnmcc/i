@@ -1,6 +1,6 @@
 {
-  "compiler": "9c03f16491a5a40031c14aa77884b2c3d61eba9f",
-  "binary_sha256": "cef48a582319ee42f93efcb5d4d11a78e8801051f743254ca07ea8152d5976d3",
+  "compiler": "8ddb1c4f68d98848272585b38e84438a8169cf35",
+  "binary_sha256": "6dc694d066820e51f9e0e975018f221913403fccafa98b35949f52824ddf8c0d",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.main : () -> Never ! task.Scheduler | Io\n",
+      "stdout": "app/main.main : () -> Never ! Io | task.Scheduler\n",
       "stderr": ""
     },
     "test0": {
