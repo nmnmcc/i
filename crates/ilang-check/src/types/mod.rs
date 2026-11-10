@@ -22,10 +22,6 @@ mod coverage;
 mod display;
 mod infer;
 mod known;
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "T1 literal rules are enabled in later stages")
-)]
 mod lits;
 mod pattern;
 mod shown;

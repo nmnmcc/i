@@ -48,3 +48,29 @@ fn spec_blocks_parse() {
         );
     }
 }
+
+#[test]
+fn pending_literal_types_have_the_expected_parse_errors() {
+    // literal-types §12 step 1 explicitly stages written literal syntax
+    // until step 8. old-syntax-check also parses this fence against its
+    // T1 entry. Keep implemented snippets under spec_blocks_parse above.
+    let spec = include_str!("../../../docs/spec.md");
+    let pending: Vec<_> = spec.split("```i pending=T1\n").skip(1).collect();
+    assert_eq!(pending.len(), 1, "update this fixture when T1 step 8 lands");
+    let source = pending[0].split_once("\n```").unwrap().0;
+    let (_, diags) = parse_module(source);
+    let actual: Vec<_> = diags.iter().map(|d| (d.code, d.message.as_str())).collect();
+    assert_eq!(
+        actual,
+        [
+            (
+                ilang_syntax::Code::Unexpected,
+                "expected a type, found a string"
+            ),
+            (
+                ilang_syntax::Code::Unexpected,
+                "expected a type, found a string"
+            ),
+        ]
+    );
+}
