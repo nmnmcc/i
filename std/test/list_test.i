@@ -1,4 +1,4 @@
-import (
+(
 	i/core
 	i/fail
 	i/control
@@ -180,7 +180,7 @@ rest_error_test = () {
 @test
 group_test = () {
 	assert(list.group([Ok(10), Error("Wrong"), Ok(200), Ok(1)], (i) {
-		case i {
+		i |> {
 			Ok(_)    -> "Successful"
 			Error(_) -> "Failed"
 		}
@@ -338,7 +338,7 @@ map_fold_tco_test = () {
 @test
 try_map_ok_test = () {
 	fun = (x) {
-		case x == 6 || x == 5 || x == 4 {
+		{ x == 6 || x == 5 || x == 4 } |> {
 			True  -> Ok(x * 2)
 			False -> Error(x)
 		}
@@ -351,7 +351,7 @@ try_map_ok_test = () {
 @test
 try_map_error_test = () {
 	fun = (x) {
-		case x == 6 || x == 5 || x == 4 {
+		{ x == 6 || x == 5 || x == 4 } |> {
 			True  -> Ok(x * 2)
 			False -> Error(x)
 		}
@@ -364,7 +364,7 @@ try_map_error_test = () {
 @test
 try_map_tco_test = () {
 	fun = (x) {
-		case x == 6 || x == 5 || x == 4 {
+		{ x == 6 || x == 5 || x == 4 } |> {
 			True  -> Ok(x * 2)
 			False -> Error(x)
 		}
@@ -583,7 +583,7 @@ index_fold_tco_test = () {
 @test
 fold_until_test = () {
 	assert(list.fold_until([1, 2, 3, 4], from: 0, with: (acc, n) {
-		case n < 4 {
+		{ n < 4 } |> {
 			True  -> list.Continue(acc + n)
 			False -> list.Stop(acc)
 		}
@@ -594,7 +594,7 @@ fold_until_test = () {
 @test
 fold_until_tco_test = () {
 	r = list.fold_until(list.range(1, big), 0, (acc, x) {
-		case x > 10 {
+		{ x > 10 } |> {
 			True  -> Stop(acc)
 			False -> Continue(acc + x)
 		}
@@ -611,7 +611,7 @@ fold_until_tco_test = () {
 @test
 try_fold_ok_test = () {
 	assert(list.try_fold([1, 2, 3], 0, (acc, i) {
-		case i < 4 {
+		{ i < 4 } |> {
 			True  -> Ok(acc + i)
 			False -> Error(Nil)
 		}
@@ -622,7 +622,7 @@ try_fold_ok_test = () {
 @test
 try_fold_error_test = () {
 	assert(list.try_fold([1, 2, 3], 0, (acc, i) {
-		case i < 3 {
+		{ i < 3 } |> {
 			True  -> Ok(acc + i)
 			False -> Error(Nil)
 		}
@@ -641,7 +641,7 @@ try_fold_tco_test = () {
 @test
 find_map_found_test = () {
 	f = (x) {
-		case x {
+		x |> {
 			2 -> Some(4)
 			_ -> None
 		}
@@ -654,7 +654,7 @@ find_map_found_test = () {
 @test
 find_map_found_different_order_test = () {
 	f = (x) {
-		case x {
+		x |> {
 			2 -> Some(4)
 			_ -> None
 		}
@@ -667,7 +667,7 @@ find_map_found_different_order_test = () {
 @test
 find_map_not_found_test = () {
 	f = (x) {
-		case x {
+		x |> {
 			2 -> Some(4)
 			_ -> None
 		}
@@ -682,7 +682,7 @@ find_map_tco_test = () {
 	// TCO test
 	int.range(from: recursion_test_cycles, to: -1, with: [], run: list.prepend)
 		|> list.find_map(with: (x) {
-			case x == recursion_test_cycles {
+			{ x == recursion_test_cycles } |> {
 				True  -> Some(recursion_test_cycles)
 				False -> None
 			}
@@ -743,7 +743,7 @@ all_empty_test = () {
 @test
 all_short_circuit_test = () {
 	[1, 2, 3] |> list.all((x) {
-		case x {
+		x |> {
 			1 -> True
 			2 -> False
 			// Crash if no short-circuit
@@ -757,7 +757,7 @@ all_short_circuit_test = () {
 all_tco_test = () {
 	// TCO test
 	list.repeat(0, recursion_test_cycles) |> list.all((x) {
-		case x {
+		x |> {
 			0 -> True
 			_ -> False
 		}
@@ -786,7 +786,7 @@ any_empty_test = () {
 @test
 any_short_circuit_test = () {
 	[1, 2, 3] |> list.any((x) {
-		case x {
+		x |> {
 			1 -> False
 			2 -> True
 			// Crash if no short-circuit
@@ -1652,7 +1652,7 @@ scan_basic_test = () {
 @test
 scan_list_test = () {
 	assert(list.scan([1, 2, 3, 4], from: [], with: (acc, i) {
-		case int.is_even(i) {
+		int.is_even(i) |> {
 			True  -> ["Even", ..acc]
 			False -> ["Odd", ..acc]
 		}
@@ -1974,7 +1974,7 @@ sort_effects_test = () {
 map_effects_test = () {
 	r = result.catch(() {
 		list.map([1, 2, 3], (x) {
-			case x {
+			x |> {
 				2 -> fail.raise("two")
 				_ -> x
 			}
@@ -2100,14 +2100,14 @@ Counter {
 	Counter(step: Int)
 }
 
-Yield(a) {
-	Yield(emit: (value: a) -> Nil)
+Yield(A) {
+	Yield(emit: (value: A) -> Nil)
 }
 
 // A generator made with `i/control` (§9.4).
-collect = (body: () -> Nil ! Yield(a) | n) -> List(a) ! n {
+collect(A, N) = (body: () -> Nil ! Yield(A) | N) -> List(A) ! N {
 	control.boundary((b) {
-		! Yield(a) = Yield((x) {
+		! Yield(A) = Yield((x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
 		body()

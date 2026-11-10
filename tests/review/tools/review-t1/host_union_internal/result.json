@@ -1,0 +1,12 @@
+[
+  {
+    "cmd": [
+      "check",
+      "--types"
+    ],
+    "exit": 0,
+    "seconds": 0.1448798649944365,
+    "stdout": "probe/main.identity : (n: Int) -> Int\nprobe/main.reverse : (n: Int) -> Int\nprobe/main.a : 1\nprobe/main.b : 1\n",
+    "stderr": ""
+  }
+]

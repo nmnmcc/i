@@ -1,5 +1,5 @@
-//! The six library modules and the prelude parse and resolve with no
-//! problems, and they have the names and labels of the spec tables.
+//! The library modules and the prelude parse and resolve with no problems,
+//! and they have the names and labels of the spec tables.
 
 mod common;
 
@@ -21,12 +21,58 @@ fn library_resolves_cleanly() {
             "i/resource",
             "i/assertion",
             "i/core",
-            "i/io"
+            "i/io",
+            "i/task",
+            "i/clock",
+            "i/random",
+            "i/fs",
+            "i/process",
+            "i/net",
+            "i/stdio"
         ]
     );
 }
 
-/// The exported names of each library module, as in §9.3–§9.6 and §13.
+/// Every registered module path has its own source in the package `i`,
+/// with the text of the list.
+#[test]
+fn library_modules_have_sources() {
+    let (graph, _, _) = common::check_files(&[]);
+    let package = &graph.packages[graph.library];
+    let registered = std::iter::once(ilang_package::library::PRELUDE)
+        .chain(ilang_package::library::MODULES.iter().copied());
+    let mut count = 0;
+    for (path, text) in registered {
+        let module = package
+            .modules
+            .iter()
+            .find(|m| m.path == path)
+            .unwrap_or_else(|| panic!("{path} has no module"));
+        assert_eq!(graph.sources.get(module.source).text, text, "{path}");
+        count += 1;
+    }
+    assert_eq!(package.modules.len(), count);
+}
+
+/// The reserved modules parse with no problems, and hold only a module
+/// documentation comment: no imports, no exports and no items.
+#[test]
+fn reserved_modules_are_placeholders() {
+    for path in RESERVED {
+        let (_, text) = ilang_package::library::MODULES
+            .iter()
+            .find(|(p, _)| *p == path)
+            .unwrap_or_else(|| panic!("{path} is not registered"));
+        let (module, diags) = ilang_syntax::parse_module(text);
+        assert!(diags.is_empty(), "{path}: {diags:#?}");
+        assert!(!module.doc.is_empty(), "{path}");
+        assert!(module.imports.is_empty(), "{path}");
+        assert!(module.exports.is_empty(), "{path}");
+        assert!(module.items.is_empty(), "{path}");
+    }
+}
+
+/// The exported names of each library module, as in §9.3–§9.6, §9.10 and §13.
 #[test]
 fn library_names() {
     let (_, program, _) = common::check_files(&[]);
@@ -72,6 +118,16 @@ fn library_names() {
         ),
         ("i/prelude", &["panic", "assert"]),
         ("i/io", &[]),
+        ("i/task", &[]),
+        ("i/clock", &[]),
+        (
+            "i/random",
+            &["from_seed", "word", "int", "float", "split", "at_path"],
+        ),
+        ("i/fs", &[]),
+        ("i/process", &[]),
+        ("i/net", &[]),
+        ("i/stdio", &[]),
     ];
     for (path, names) in expect {
         let m = program.module(common::module(&program, path));
@@ -107,6 +163,12 @@ fn library_names() {
         ("i/fail", "from_result"),
         ("i/fail", "map_error"),
         ("i/prelude", "assert"),
+        ("i/random", "from_seed"),
+        ("i/random", "word"),
+        ("i/random", "int"),
+        ("i/random", "float"),
+        ("i/random", "split"),
+        ("i/random", "at_path"),
     ] {
         let d = common::def(&program, path, name);
         assert!(matches!(d.kind, DefKind::Binding { .. }), "{path}.{name}");
@@ -114,7 +176,7 @@ fn library_names() {
 }
 
 /// The labels of the parameters in the spec tables, for example
-/// `control.suspend: (b: …, f: (k: …) -> …) -> a`.
+/// `control.suspend: (b: …, f: (k: …) -> …) -> A`.
 #[test]
 fn library_labels() {
     let (_, program, _) = common::check_files(&[]);
@@ -180,4 +242,73 @@ fn hello_example_checks() {
     diags.extend(checked.diags);
     assert!(diags.is_empty(), "{:#?}", graph.sources.render_all(&diags));
     assert!(checked.program.is_some() && checked.types.is_some());
+}
+
+const RESERVED: [&str; 6] = ["i/task", "i/clock", "i/fs", "i/process", "i/net", "i/stdio"];
+
+/// User code imports every reserved module with no problems.
+///
+/// The paths in RESERVED are explicitly kept as empty modules (§0, §2.1).
+#[test]
+fn reserved_modules_import_cleanly() {
+    let imports: String = RESERVED.iter().map(|p| format!("  {p}\n")).collect();
+    let main = format!("(\n{imports})\n\nx = 1\n");
+    assert!(ilang_syntax::parse_module(&main).1.is_empty());
+    let (graph, program, diags) = common::check_files(&[("src/main.i", &main)]);
+    let rendered = graph.sources.render_all(&diags);
+    assert!(rendered.is_empty(), "{rendered:#?}");
+    assert!(program.is_some());
+}
+
+/// A name imported from a reserved module, or used through its alias, is
+/// reported as missing from that module.
+#[test]
+fn reserved_modules_have_no_names() {
+    let imports: String = RESERVED
+        .iter()
+        .map(|p| format!("  (nothing) = {p}\n"))
+        .collect();
+    let main = format!("(\n{imports})\n\nx = 1\n");
+    assert!(ilang_syntax::parse_module(&main).1.is_empty());
+    let (graph, _, diags) = common::check_files(&[("src/main.i", &main)]);
+    let rendered = graph.sources.render_all(&diags);
+    let want: Vec<String> = RESERVED
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            format!(
+                "src/main.i:{}:4: error[E0203]: `{p}` has no `nothing`",
+                i + 2
+            )
+        })
+        .collect();
+    assert_eq!(rendered, want);
+
+    let main = " (\n  i/task\n)\n\nx = task.spawn\n";
+    let (graph, _, diags) = common::check_files(&[("src/main.i", main)]);
+    let rendered = graph.sources.render_all(&diags);
+    assert_eq!(
+        rendered,
+        ["src/main.i:5:10: error[E0203]: `i/task` has no `spawn`"]
+    );
+}
+
+/// Only the registered paths are modules of `i`. Any other path in `i` is
+/// still a missing module, as §2.1 says, so the reserved modules do not
+/// open the whole of `i` to user imports.
+#[test]
+fn unknown_library_path_is_missing() {
+    for path in ["i/nope", "i/tasks", "i/std", "i/fs/file"] {
+        let main = format!("({path})\n\nx = 1\n");
+        assert!(ilang_syntax::parse_module(&main).1.is_empty());
+        let (graph, _, diags) = common::check_files(&[("src/main.i", &main)]);
+        let rendered = graph.sources.render_all(&diags);
+        assert_eq!(
+            rendered,
+            [format!(
+                "src/main.i:1:2: error[E0210]: there is no module `{path}`"
+            )],
+            "{path}"
+        );
+    }
 }

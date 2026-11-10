@@ -1,0 +1,12 @@
+[
+  {
+    "cmd": [
+      "check",
+      "--types"
+    ],
+    "exit": 1,
+    "seconds": 0.028230502037331462,
+    "stdout": "",
+    "stderr": "src/main.i:2:16: error[E0320]: the parameters and the value of a function of a host service are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors; its errors are a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; and it has no environment (\u00a79.7, \u00a710.3)\n1 error\n"
+  }
+]

@@ -1,0 +1,229 @@
+bad_rec 1 0.02 app/main.use : () -> Nil ! N | S(N)
+ src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+1 error
+
+bad_self 1 0.018  src/main.i:1:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+1 error
+
+closure 1 0.019 app/main.use : () -> Nil ! N | S(N)
+ src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+src/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+src/main.i:5:13: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+3 errors
+
+closure_annotated 1 0.02 app/main.use : () -> Nil ! N | S(N)
+ src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+src/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+src/main.i:5:13: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+3 errors
+
+closure_captured 1 0.018 app/main.use : () -> Nil ! N | S(N)
+ src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+src/main.i:5:13: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+2 errors
+
+closure_closed 0 0.019 app/main.use : () -> Nil ! N | S(N)
+app/main.make : (f: () -> Nil) -> () -> Nil
+app/main.main : () -> Nil
+ 
+closure_covariant 1 0.02 app/main.use : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+src/main.i:5:13: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+2 errors
+
+closure_explicit_use 1 0.02 app/main.use : () -> Nil ! N | S(N)
+ src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+src/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+src/main.i:5:13: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+3 errors
+
+closure_inner_annotation 1 0.02 app/main.use : () -> Nil ! N | S(N)
+ src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+src/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+src/main.i:5:13: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+3 errors
+
+closure_noreturn 1 0.02 app/main.use : () -> Nil ! N | S(N)
+ src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+src/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+2 errors
+
+closure_unused 1 0.019 app/main.use : () -> Nil ! N | S(N)
+ src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+1 error
+
+finite 0 0.02 app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> Nil ! N) -> Nil ! N
+app/main.forward : () -> Nil ! N | S(N)
+app/main.example : () -> Nil
+app/main.main : () -> Nil
+ 
+generic_conflict 1 0.019 app/main.use : (f: () -> Nil ! N) -> A ! N | S(B & A)
+app/main.two : () -> Nil ! S(String)
+app/main.bad : () -> Int ! S(Int)
+ src/main.i:4:26: error[E0515]: `String` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 4:19 needs it)
+src/main.i:4:28: error[E0501]: `String` is not a subtype of `Int` (the type at 4:13 needs it)
+2 errors
+
+hidden_conflict 1 0.019 app/main.one : () -> Int ! S(Int)
+app/main.two : () -> String ! S(String)
+app/main.join : (f: () -> Int ! N, g: () -> String ! N2) -> (Int, String) ! N | N2
+app/main.bad : () -> (Int, String) ! S(Int) | S(String)
+ src/main.i:5:7: error[E0515]: `String` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)
+1 error
+
+invariant_args 0 0.02 app/main.use : () -> A ! N | S(A, N)
+app/main.run : (f: () -> A ? E ! N) -> A ? E ! N
+app/main.f : () -> A ! N | S(B & A, N)
+ 
+matrix_False_False_False 0 0.02 app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ? E ! N) -> A ? E ! N
+app/main.f : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_False_False_False_reverse 0 0.02 app/main.f : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ? E ! N) -> A ? E ! N
+app/main.use : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_False_False_True 0 0.019 app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ? E ! N) -> A ? E ! N
+app/main.f : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_False_False_True_reverse 0 0.02 app/main.f : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ? E ! N) -> A ? E ! N
+app/main.use : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_False_True_False 0 0.023 app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> Nil ! N) -> Nil ! N
+app/main.f : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_False_True_False_reverse 0 0.023 app/main.f : () -> Nil ! N | S(N)
+app/main.run : (body: () -> Nil ! N) -> Nil ! N
+app/main.use : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_False_True_True 0 0.019 app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> Nil ! N) -> Nil ! N
+app/main.f : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_False_True_True_reverse 0 0.021 app/main.f : () -> Nil ! N | S(N)
+app/main.run : (body: () -> Nil ! N) -> Nil ! N
+app/main.use : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_True_False_False 0 0.023 app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ? E ! N) -> A ? E ! N
+app/main.f : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_True_False_False_reverse 0 0.019 app/main.f : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ? E ! N) -> A ? E ! N
+app/main.use : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_True_False_True 0 0.023 app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ? E ! N) -> A ? E ! N
+app/main.f : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_True_False_True_reverse 0 0.023 app/main.f : () -> Nil ! N | S(N)
+app/main.run : (body: () -> A ? E ! N) -> A ? E ! N
+app/main.use : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_True_True_False 0 0.019 app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> Nil ! N) -> Nil ! N
+app/main.f : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_True_True_False_reverse 0 0.022 app/main.f : () -> Nil ! N | S(N)
+app/main.run : (body: () -> Nil ! N) -> Nil ! N
+app/main.use : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_True_True_True 0 0.022 app/main.use : () -> Nil ! N | S(N)
+app/main.run : (body: () -> Nil ! N) -> Nil ! N
+app/main.f : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+matrix_True_True_True_reverse 0 0.019 app/main.f : () -> Nil ! N | S(N)
+app/main.run : (body: () -> Nil ! N) -> Nil ! N
+app/main.use : () -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+multi 0 0.019 app/main.use : (a: A) -> A ? E ! N | S(A, E, N)
+app/main.run : (f: () -> A ? E ! N) -> A ? E ! N
+app/main.int : () -> Int
+app/main.str : () -> String
+app/main.main : () -> Nil
+ 
+mutual 0 0.019 app/main.use : () -> Nil ! N | S(N)
+app/main.f : (n: Int) -> Nil ! N | S(N)
+app/main.g : (n: Int) -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+mutual_False_False_False 0 0.019 app/main.use : () -> Nil ! N | S(N)
+app/main.f : (n: Int) -> Nil ! N | S(N)
+app/main.g : (n: Int) -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+mutual_False_False_True 0 0.019 app/main.use : () -> Nil ! N | S(N)
+app/main.g : (n: Int) -> Nil ! N | S(N)
+app/main.f : (n: Int) -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+mutual_False_True_False 0 0.022 app/main.use : () -> Nil ! N | S(N)
+app/main.f : (n: Int) -> Nil ! N | S(N)
+app/main.g : (n: Int) -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+mutual_False_True_True 0 0.022 app/main.use : () -> Nil ! N | S(N)
+app/main.g : (n: Int) -> Nil ! N | S(N)
+app/main.f : (n: Int) -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+mutual_True_False_False 0 0.02 app/main.use : () -> Nil ! N | S(N)
+app/main.f : (n: Int) -> Nil ! N | S(N)
+app/main.g : (n: Int) -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+mutual_True_False_True 0 0.022 app/main.use : () -> Nil ! N | S(N)
+app/main.g : (n: Int) -> Nil ! N | S(N)
+app/main.f : (n: Int) -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+mutual_True_True_False 0 0.019 app/main.use : () -> Nil ! N | S(N)
+app/main.f : (n: Int) -> Nil ! N | S(N)
+app/main.g : (n: Int) -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+mutual_True_True_True 0 0.019 app/main.use : () -> Nil ! N | S(N)
+app/main.g : (n: Int) -> Nil ! N | S(N)
+app/main.f : (n: Int) -> Nil ! N | S(N)
+app/main.main : () -> Nil
+ 
+recursive_env_cov 1 0.017  src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+1 error
+
+recursive_env_mutual 1 0.022  src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+1 error
+
+recursive_inv 1 0.022  src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+1 error
+
+recursive_mutual 1 0.019  src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+1 error
+
+recursive_value 1 0.021  src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+1 error
+
+same_row 0 0.02 app/main.use : () -> Nil ! N | S(N) | T(N)
+ 
+two_rows 0 0.019 app/main.use : () -> Nil ! N | N2 | S(N) | T(N2)
+ 

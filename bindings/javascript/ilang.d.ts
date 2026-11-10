@@ -11,7 +11,7 @@ export interface Signature {
 export interface EntryPoint { name: string; async?: boolean }
 /** The ilang.abi metadata (Appendix B.6). */
 export interface Abi {
-  version: 2;
+  version: 3;
   entry?: EntryPoint | null;
   tests?: EntryPoint[];
   exports?: Record<string, Signature>;
@@ -23,12 +23,19 @@ export interface BitArray { bytes: Uint8Array; bitLength: number }
 export type Value = undefined | null | boolean | bigint | number | string | BitArray | unknown;
 export type ModuleSource = WebAssembly.Module | BufferSource | Response | Request | URL | string;
 export interface Options {
+  /** Context registrations are restricted to approved resolved declarations. */
+  contextImports?: Record<string, Record<string, (context: ResourceContext, ...args: any[]) => unknown>>;
+  /** Host approval from authorizeBindings; a plain manifest cannot grant itself. */
+  bindings?: BindingAuthorization;
+  /** Reuse this host across instances/tests; each invocation has its own table. */
+  resourceHost?: ResourceHost;
   /** Metadata for a module without an ilang.abi section. */
   abi?: Abi;
   /**
    * Host service functions and external functions, by import module and name.
    * A service function throws `GuestError(value)` to give an error; an async
-   * one gives a Promise.
+   * one gives a Promise. An async one is called during the import; it may
+   * call `requestSignal()` before its first `await`.
    */
   imports?: Record<string, Record<string, (...args: any[]) => unknown>>;
   rawImports?: WebAssembly.Imports;
@@ -47,6 +54,10 @@ export interface Guest {
   readonly abi: Readonly<Required<Abi>>;
   /** Why the instance cannot be used any more, or null. */
   readonly unusable: string | null;
+  /** Stop admission and cancel work/resources independently of language finals. */
+  dispose(): void;
+  /** Drain the host-wide cleanup diagnostic queue without entering Wasm. */
+  takeCleanupErrors(): CleanupFailure[];
   /** Gives the value; throws GuestError for an error of `? E` and Stop when the program stops. */
   call(name: string, args?: unknown[]): unknown;
   callAsync(name: string, args?: unknown[]): Promise<unknown>;
@@ -68,6 +79,61 @@ export const HOST_VALUE_REASON: "host: value is not correct";
 export function supportsRequiredFeatures(): boolean;
 export function integerToLimbs(value: bigint): { sign: number; bytes: Uint8Array };
 export function integerFromLimbs(sign: number, bytes: Uint8Array): bigint;
+/**
+ * The AbortSignal of the async request whose service is starting; it is
+ * aborted when the request is dropped. Throws when no service is starting.
+ */
+export function requestSignal(): AbortSignal;
 export function readAbi(module: WebAssembly.Module, supplied?: Abi): Readonly<Required<Abi>>;
 export function instantiate(source: ModuleSource, options?: Options): Promise<Guest>;
 export function runTests(source: ModuleSource, options?: Options & { tests?: string[] }): Promise<Array<{ name: string; passed: boolean; error?: unknown }>>;
+
+/** Required resolved declaration before Wasm imports are coalesced (native 3.1). */
+export interface BindingDeclaration {
+  package: string;
+  module: string;
+  module_digest: string;
+  declaration: string;
+  namespace: string;
+  name: string;
+  kind: "service" | "external";
+  signature: Signature;
+}
+export interface BindingPlan {
+  artifact_digest: string;
+  declarations: BindingDeclaration[];
+}
+/** Opaque host approval tied to a module compiled from exact artifact bytes. */
+export interface BindingAuthorization { readonly module: WebAssembly.Module }
+export function authorizeBindings(source: Exclude<ModuleSource, WebAssembly.Module>, plan: BindingPlan,
+  approve: (declaration: Readonly<BindingDeclaration>) => boolean | Promise<boolean>, options?: { abi?: Abi }): Promise<BindingAuthorization>;
+export class ResourceError extends Error { readonly code: "closed" | "busy" | "memory exhausted" }
+export interface CleanupFailure { readonly phase: "cancel" | "wake" | "cleanup"; readonly error: unknown }
+export class ResourceHost {
+  constructor(options?: { limit?: bigint });
+  context(): ResourceContext;
+  takeCleanupErrors(): CleanupFailure[];
+}
+export interface ResourceLease<T> {
+  readonly value: T;
+  readonly signal: AbortSignal;
+  release(): void;
+  commit<A>(answer: A): A;
+}
+export interface ProvisionalResource {
+  readonly id: bigint;
+  deliver(): bigint;
+  discard(): Promise<void>;
+}
+export class ResourceContext {
+  private constructor();
+  readonly live: boolean;
+  abortController(phase?: "cancel" | "wake"): AbortController;
+  ownRequest(cancel: () => void): () => void;
+  cleanupJob(): { readonly receipt: Promise<void>; complete(): void };
+  insert<T>(kind: string, value: T, cleanup: (value: T) => void | Promise<void>): bigint;
+  acquire<T = unknown>(id: bigint, kind: string, lane: string): ResourceLease<T>;
+  close(id: bigint, kind: string): Promise<void>;
+  teardown(): Promise<void>;
+  provisional(id: bigint, kind: string): ProvisionalResource;
+}

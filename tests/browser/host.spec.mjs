@@ -164,6 +164,61 @@ test("host functions never throw into the module, and the module checks their an
   }, `(${load})`);
   expect(result).toEqual({
     guarded: { nil: "thrown to the caller", float: "thrown to the caller" },
-    stop: "host: value is not correct\napp/app:32:35",
+    stop: "host: value is not correct\napp/app:48:35",
   });
+});
+
+test("many requests complete out of order", async ({ page }) => {
+  const result = await page.evaluate(async (loader) => {
+    const { instantiate, hostImports, gateService, fold, requestSignal, GuestError } = await eval(loader)();
+    const module = await WebAssembly.compile(await (await fetch("/tests/browser/fixtures/host-abi.wasm")).arrayBuffer());
+    const wrong = [];
+    for (let seed = 0; seed < 200; seed++) {
+      const n = 1 + (seed % 16);
+      const gates = gateService({ seed, requestSignal });
+      const guest = await instantiate(module, { imports: hostImports(GuestError, [], { later: gates.later }) });
+      const h = await gates.drive(guest.callAsync("app/async.many", [n]));
+      if (h !== fold(gates.answered()) || gates.starts !== 2 * n || guest.unusable !== null) wrong.push(seed);
+    }
+    return wrong;
+  }, `(${load})`);
+  expect(result).toEqual([]);
+});
+
+test("status 2 and cancel", async ({ page }) => {
+  const result = await page.evaluate(async (loader) => {
+    const { instantiate, hostImports, gateService, fold, requestSignal, GuestError } = await eval(loader)();
+    // A service that is ready at once: the answer comes after status 2,
+    // and ilang_continue ends the call.
+    const ready = await instantiate("/tests/browser/fixtures/host-abi.wasm", { imports: hostImports(GuestError, [], { later: async (x) => 2 * x }) });
+    const count = await ready.callAsync("app/async.yielding", [1000]);
+    const module = await WebAssembly.compile(await (await fetch("/tests/browser/fixtures/host-abi.wasm")).arrayBuffer());
+    const wrong = [];
+    for (let seed = 0; seed < 50; seed++) {
+      for (const [name, n, burst] of [["app/async.continue_io", 2 + (seed % 8), false], ["app/async.cancel_reuse", 2 + (seed % 15), true]]) {
+        const gates = gateService({ seed, burst, requestSignal });
+        const guest = await instantiate(module, { imports: hostImports(GuestError, [], { later: gates.later }) });
+        const h = await gates.drive(guest.callAsync(name, [n]));
+        if (h !== fold(gates.answered()) || guest.unusable !== null) wrong.push([name, seed]);
+      }
+    }
+    return { yielded: count >= 1 && count < 1000, wrong };
+  }, `(${load})`);
+  expect(result).toEqual({ yielded: true, wrong: [] });
+});
+
+// Exercise production compiler output, including coalesced external imports.
+test("compiled opaque boundaries preserve nominal identity", async ({ page }) => {
+  const result = await page.evaluate(async (loader) => {
+    const { instantiate, compiledImports, checkOpaque, GuestError } = await eval(loader)();
+    const reference = {};
+    for (const opaque of [reference, null]) {
+      const guest = await instantiate("/tests/browser/fixtures/compiled.wasm", {
+        imports: compiledImports(GuestError, [], { opaque }),
+      });
+      if (!await checkOpaque(guest, reference, {})) return false;
+    }
+    return true;
+  }, `(${load})`);
+  expect(result).toBe(true);
 });

@@ -46,7 +46,7 @@
 //! | 7 | Function | field 2: the number of parameters, without environment parameters |
 //! | 8 | Int | `i31ref` for -2^30..2^30-1, else field 1: sign, field 6: magnitude limbs |
 //! | 9 | BitArray | field 1: bit offset, field 2: bit length, field 4: bytes, highest bit first |
-//! | 10 | Host reference | a `$hostref` struct (not `$obj`): the `externref` and its `reference_id` |
+//! | 10 | Host reference | a `$hostref` struct (not `$obj`): the `externref`, its `reference_id`, and the nominal type id |
 //! | 11 | Boundary | an `$obj` with tag 11; the other fields belong to the code generator |
 //! | 12 | Continuation | an `$obj` with tag 12; the other fields belong to the code generator |
 //! | 13 | UtfCodepoint | field 1: the scalar value |
@@ -93,9 +93,12 @@
 //! - Where an exception is caught (`try_table`), restore the depth saved with
 //!   `$shadow_depth` when the handler was entered: `call $shadow_restore`.
 //!   A capture (`$capture`) restores it only at its boundary.
-//! - When a continuation is resumed or cancelled, each frame that is rebuilt
-//!   enters again with the site of the call it was paused at, on top of the
-//!   frames of the place of `resume` (spec §9.4).
+//! - When a continuation is resumed or cancelled, a frame is rebuilt only
+//!   when the frames inside it have returned, and it enters again with the
+//!   site of the call it was paused at. The frames not rebuilt yet wait in
+//!   the trampolines of `$pend` (`emit/control.rs`); a stop puts their sites
+//!   back into the shadow stack through `$stop_unpend` before it prints.
+//!   Code that resets `$sp` for a new entry also calls `$control_reset`.
 //!
 //! Site ids index the site table, installed once at the very start of
 //! `ilang_start` with `$sites_install (param (ref $sites) (ref $values))`:
@@ -151,7 +154,7 @@
 //! | Tuples, custom values | `$tuple (ref $values)`, `$record (ctor i32) (type i64) (ref $values)`, `$field (v, i32)` |
 //! | `Ok`, `Error` | `$result_ok (v)`, `$result_error (v)` |
 //! | Codepoints | `$codepoint_new (i32)` |
-//! | Host references | `$host_ref_new (externref)`, `$host_ref_get -> externref` |
+//! | Host references | `$host_ref_new (externref, i32)`, `$host_ref_get -> externref` |
 //! | String literals | `$string_from_bytes (ref $bytes)` |
 //! | String prefix patterns | `$string_starts_with (s, prefix) -> i32`, `$string_suffix (s, start i32)` |
 //!
@@ -204,7 +207,7 @@
 //! | Int | `$abi_int_in (sign, address, count i32)` | `$abi_int_out (v) -> i32 i32 i32` |
 //! | String | `$abi_string_in (address, length i32)` | `$abi_string_out (v) -> i32 i32` |
 //! | BitArray | `$abi_bits_in (address, bits i32)` | `$abi_bits_out (v) -> i32 i32` |
-//! | externref | `$abi_ref_in (externref)` | `$abi_ref_out (v) -> externref` |
+//! | externref | `$abi_ref_in (externref, type i32)` | `$abi_ref_out (v) -> externref` |
 //! | error tag | `$abi_tag_in (tag i32, members i32) -> i32` | |
 //!
 //! `$abi_int_take`, `$abi_string_take` and `$abi_bits_take` read an import
@@ -237,9 +240,10 @@ pub const TYPES: &str = r#"
  (field (ref null $bytes)) (field (ref null $values))
  (field (ref null $limbs)) (field (ref null $call)))))
 (type $cons (sub final $val (struct (field i32) (field eqref) (field eqref))))
-(type $hostref (struct (field externref) (field i64)))
+(type $hostref (struct (field externref) (field i32) (field i64)))
 (type $sites (array i32))
 (type $frames (array (mut i32)))
+(type $unpend (func))
 "#;
 
 /// The runtime imports (spec B.4) on the target of the binary interface.
@@ -312,22 +316,49 @@ pub const FIRST_CONSTRUCTOR: u32 = 16;
 /// [`HOST`], or on the WASI target [`WASI_HOST`] with [`WASI_RUNTIME`] and
 /// [`WASI_REFERENCE_ID_IMPORT`] or [`WASI_REFERENCE_ID`].
 pub fn wat() -> &'static str {
-    static RUNTIME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    RUNTIME.get_or_init(|| {
-        [
-            MEMORY.to_owned(),
-            bigint::wat(),
-            bitarrays::wat(),
-            values::wat(),
-            stops::wat(),
-            core::wat(),
-            casing::wat(),
-            search::wat(),
-            bits_join::wat(),
-            abi::wat(),
-        ]
-        .concat()
-    })
+    wat_for_host_references(true)
+}
+
+/// Modules with no opaque boundary keep the previous, unreachable host
+/// reference code. This leaves their generated WAT unchanged.
+pub(crate) fn types_for_host_references(references: bool) -> std::borrow::Cow<'static, str> {
+    if references {
+        TYPES.into()
+    } else {
+        TYPES
+            .replace(
+                "(type $hostref (struct (field externref) (field i32) (field i64)))",
+                "(type $hostref (struct (field externref) (field i64)))",
+            )
+            .into()
+    }
+}
+
+pub(crate) fn wat_for_host_references(references: bool) -> &'static str {
+    static WITH_REFERENCES: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    static WITHOUT_REFERENCES: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    let runtime = if references {
+        &WITH_REFERENCES
+    } else {
+        &WITHOUT_REFERENCES
+    };
+    runtime.get_or_init(|| runtime_wat(references))
+}
+
+fn runtime_wat(references: bool) -> String {
+    [
+        MEMORY.to_owned(),
+        bigint::wat(),
+        bitarrays::wat(),
+        values::wat(references),
+        stops::wat(),
+        core::wat(),
+        casing::wat(),
+        search::wat(),
+        bits_join::wat(),
+        abi::wat(references),
+    ]
+    .concat()
 }
 
 const MEMORY: &str = r#"

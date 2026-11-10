@@ -1,0 +1,16 @@
+use std::{path::Path, time::Instant};
+fn main() {
+ let a:Vec<String> = std::env::args().collect();
+ let path = a.iter().position(|s|s=="--project").map(|i|a[i+1].as_str()).unwrap_or("std");
+ let (g,mut ds) = ilang_package::load(Path::new(path));
+ let start=Instant::now();
+ let c=ilang_check::check(&g);
+ let elapsed=start.elapsed();
+ ds.extend(c.diags);
+ if a.iter().any(|s|s=="--types") { if let (Some(p),Some(t))=(&c.program,&c.types) {
+  for (i,m) in p.modules.iter().enumerate() { if Some(m.package)==g.root {for l in t.lines(p,ilang_check::hir::ModuleId(i as u32)) {println!("{l}");}} }
+ }}
+ for d in g.sources.render_all(&ds) { eprintln!("{d}"); }
+ if a.iter().any(|s|s=="--time") {eprintln!("CHECK_SECONDS={:.9}",elapsed.as_secs_f64());}
+ if ds.iter().any(|d|d.is_error()) {std::process::exit(1);}
+}

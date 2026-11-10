@@ -1,0 +1,5 @@
+new : () -> Sink(A)
+int_sink : () -> Sink(Int)
+string_sink : () -> Sink(String)
+make : (s: Sink(A)) -> Back(A)
+wrap : (f: (A) -> Nil) -> Sink(A)

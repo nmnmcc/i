@@ -1,0 +1,13 @@
+inferred : () -> Cell(A)
+written : () -> Cell(A)
+int_cell : () -> Cell(Int)
+string_cell : () -> Cell(String)
+written_int : () -> Cell(Int)
+written_string : () -> Cell(String)
+ignore : (x: Cell(A)) -> Nil
+ignore_inferred : (Cell(A)) -> Nil
+ignored : () -> (Nil, Nil)
+nested : () -> List(Cell(A))
+nested_int : () -> List(Cell(Int))
+nested_string : () -> List(Cell(String))
+local : () -> (Cell(Int), Cell(String))

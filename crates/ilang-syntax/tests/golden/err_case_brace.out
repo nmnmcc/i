@@ -1,2 +1,0 @@
---- errors ---
-E0101 @2:1 expected `{` after the expression of `case`, found a line break before `{`

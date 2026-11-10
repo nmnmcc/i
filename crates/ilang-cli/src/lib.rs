@@ -25,8 +25,27 @@ pub struct Built {
     /// The `name` of the package (§2.6).
     pub name: String,
     pub wasm: Vec<u8>,
+    /// Compiler provenance outside ABI v3, bound to the optimized artifact.
+    pub binding_plan: ilang_host::bindings::BindingPlan,
+    /// Trusted library package content identity, supplied by resolution.
+    pub trusted_package: String,
     /// The warnings, rendered as `path:line:col: warning[CODE]: …`.
     pub warnings: Vec<String>,
+}
+
+impl Built {
+    /// Preserve the in-process compiler trust path; approve the loader's library
+    /// content only. Custom imports remain explicit embedding authority.
+    pub fn host_program(&self) -> anyhow::Result<ilang_host::Program> {
+        ilang_host::Program::from_bytes(&self.wasm)?.with_binding_plan(self.binding_plan.clone())
+    }
+    pub fn host_options(&self) -> ilang_host::HostOptions {
+        let mut options = standard_options();
+        options
+            .imports
+            .grant_package(&self.binding_plan, &self.trusted_package);
+        options
+    }
 }
 
 /// Why a build failed.
@@ -58,9 +77,33 @@ impl std::fmt::Display for BuildError {
 
 impl std::error::Error for BuildError {}
 
+/// Diagnostics followed by one old-version note per affected dependency.
+pub fn diagnostic_lines(graph: &PackageGraph, diags: &[Diagnostic]) -> Vec<String> {
+    let mut lines = graph.sources.render_all(diags);
+    for (id, package) in graph.packages.iter().enumerate() {
+        if Some(id) == graph.root || id == graph.library {
+            continue;
+        }
+        if package.modules.iter().any(|m| {
+            diags
+                .iter()
+                .any(|d| d.is_error() && d.source == Some(m.source))
+                && ilang_syntax::old_syntax_marks(&graph.sources.get(m.source).text)
+        }) {
+            let tag = package
+                .location
+                .as_ref()
+                .map(|l| format!("v{}", l.version))
+                .unwrap_or_else(|| "path dependency".into());
+            lines.push(format!("note: this version of `{}` (`{tag}`) is written in the syntax from before {} (A3); it cannot be used with this compiler; use a newer version of the package, or an older version of `i`", package.name, env!("CARGO_PKG_VERSION")));
+        }
+    }
+    lines
+}
+
 fn program_error(graph: &PackageGraph, diags: &[Diagnostic]) -> BuildError {
     BuildError::Program {
-        lines: graph.sources.render_all(diags),
+        lines: diagnostic_lines(graph, diags),
         codes: diags
             .iter()
             .filter(|d| d.is_error())
@@ -100,7 +143,7 @@ pub fn build(project: &Path, options: BuildOptions) -> Result<Built, BuildError>
         return Err(program_error(&graph, &diags));
     }
     let warnings: Vec<Diagnostic> = diags.iter().filter(|d| !d.is_error()).cloned().collect();
-    let wasm = match ilang_wasm::compile(
+    let (wasm, declarations) = match ilang_wasm::compile_with_bindings(
         &graph,
         program,
         typed,
@@ -117,9 +160,29 @@ pub fn build(project: &Path, options: BuildOptions) -> Result<Built, BuildError>
         Err(ilang_wasm::Error::Internal(m)) => return Err(BuildError::Internal(m)),
     };
     let wasm = optimize(&wasm, options.opt)?;
+    let declarations = declarations
+        .into_iter()
+        .map(|d| ilang_host::bindings::BindingDeclaration::from_json(&d.to_string()))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| BuildError::Internal(error.to_string()))?;
+    let binding_plan = ilang_host::bindings::BindingPlan::new(&wasm, declarations);
+    // The library is selected by the package loader, never by a caller's name.
+    use ilang_package::lock::{FileKind, PackageFile, hash};
+    let files: Vec<_> = graph.packages[graph.library]
+        .modules
+        .iter()
+        .map(|m| PackageFile {
+            path: m.path.clone(),
+            kind: FileKind::Regular,
+            bytes: graph.sources.get(m.source).text.as_bytes().to_vec(),
+        })
+        .collect();
+    let trusted_package = hash(&files);
     Ok(Built {
         name: graph.packages[root].name.clone(),
         wasm,
+        binding_plan,
+        trusted_package,
         warnings: graph.sources.render_all(&warnings),
     })
 }
@@ -157,38 +220,144 @@ pub fn run_test(program: &ilang_host::Program, name: &str) -> ilang_host::TestRe
     run_test_with(program, name, standard_options())
 }
 
-/// Runs one test in a new instance (§10.2) with these host services. An
-/// async test is waited for (B.5).
+/// Runs one test in a new instance (§10.2) with these host services, on one
+/// `ilang` thread. An async test is waited for (B.5).
 pub fn run_test_with(
     program: &ilang_host::Program,
     name: &str,
     options: ilang_host::HostOptions,
 ) -> ilang_host::TestResult {
-    let mut instance = match program.instantiate(options) {
-        Ok(i) => i,
-        Err(e) => {
-            return match e.downcast::<ilang_host::Stop>() {
-                Ok(stop) => ilang_host::TestResult::Stopped(stop),
-                Err(e) => ilang_host::TestResult::Failed(e),
-            };
-        }
-    };
-    let is_async = program
-        .abi()
-        .tests
-        .iter()
-        .any(|t| t.name == name && t.is_async);
-    let outcome = if is_async {
-        ilang_host::block_on(instance.run_async(name))
-    } else {
-        instance.run(name)
-    };
-    match outcome {
-        Ok(ilang_host::Outcome::Ok(_)) => ilang_host::TestResult::Passed,
-        Ok(ilang_host::Outcome::Stop(stop)) => ilang_host::TestResult::Stopped(stop),
-        Ok(ilang_host::Outcome::Err(e)) => {
-            ilang_host::TestResult::Failed(anyhow::anyhow!("the test gave the error {:?}", e.0))
-        }
-        Err(e) => ilang_host::TestResult::Failed(e),
+    program.run_test_with(name, options)
+}
+
+#[cfg(test)]
+mod binding_tests {
+    use super::*;
+
+    // Native 3.1: two required declarations of one Wasm name must retain
+    // separate authority. A public wrapper/re-export introduces no raw alias.
+    #[test]
+    fn compiler_plan_preserves_coalesced_external_declarations() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        std::fs::write(
+            dir.path().join("src/main.i"),
+            r#"
+@external("plugin:raw/v1", "number")
+first: (Float) -> Float
+@external("plugin:raw/v1", "number")
+second: (Float) -> Float
+@main
+main = () {
+  first(1.0)
+  second(2.0)
+  Nil
+}
+"#,
+        )
+        .unwrap();
+        let built = build(
+            dir.path(),
+            BuildOptions {
+                tests: false,
+                opt: Level::O0,
+                offline: true,
+                target: Target::Ilang,
+            },
+        )
+        .unwrap();
+        let plan = &built.binding_plan;
+        assert_eq!(plan.declarations.len(), 2);
+        assert_ne!(
+            plan.declarations[0].declaration,
+            plan.declarations[1].declaration
+        );
+        assert_eq!(
+            plan.artifact_digest,
+            ilang_host::bindings::artifact_digest(&built.wasm)
+        );
+        let program = built.host_program().unwrap();
+        assert_eq!(program.abi().externals["plugin:raw/v1"].len(), 1);
+        let mut options = built.host_options();
+        options
+            .imports
+            .context_external("plugin:raw/v1", "number", |_, _| {
+                Ok(ilang_host::Value::Float(0.0))
+            })
+            .unwrap();
+        options.imports.grant(plan, &plan.declarations[0]);
+        assert!(
+            program
+                .instantiate(options.clone())
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("ungranted host import")
+        );
+        options.imports.grant(plan, &plan.declarations[1]);
+        assert!(matches!(
+            program.run_entry(options).unwrap(),
+            ilang_host::Outcome::Ok(_)
+        ));
+        // Optimizing changes the final bytes, so it gets a fresh artifact digest.
+        let optimized = build(
+            dir.path(),
+            BuildOptions {
+                tests: false,
+                opt: Level::O2,
+                offline: true,
+                target: Target::Ilang,
+            },
+        )
+        .unwrap();
+        assert_eq!(optimized.binding_plan.declarations, plan.declarations);
+        assert_eq!(
+            optimized.binding_plan.artifact_digest,
+            ilang_host::bindings::artifact_digest(&optimized.wasm)
+        );
     }
+}
+
+#[cfg(test)]
+#[test]
+fn cli_grants_the_resolved_library_content_to_restricted_default_bindings() {
+    let project = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello");
+    let built = build(
+        &project,
+        BuildOptions {
+            tests: false,
+            opt: Level::O0,
+            offline: true,
+            target: Target::Ilang,
+        },
+    )
+    .unwrap();
+    let declaration = built
+        .binding_plan
+        .declarations
+        .iter()
+        .find(|d| d.namespace == "i:io/v1" && d.name == "print")
+        .unwrap();
+    assert_eq!(declaration.package, built.trusted_package);
+    let mut imports = ilang_host::HostImports::default();
+    imports
+        .context_service("i:io/v1", "print", |_, _| Ok(Ok(ilang_host::Value::Nil)))
+        .unwrap();
+    let program = built.host_program().unwrap();
+    assert!(
+        program
+            .instantiate(ilang_host::HostOptions::new(imports.clone()))
+            .err()
+            .unwrap()
+            .to_string()
+            .starts_with("ungranted host import")
+    );
+    imports.grant_package(&built.binding_plan, &built.trusted_package);
+    assert!(matches!(
+        program
+            .run_entry(ilang_host::HostOptions::new(imports))
+            .unwrap(),
+        ilang_host::Outcome::Ok(_)
+    ));
 }

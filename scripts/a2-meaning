@@ -1,0 +1,60 @@
+#!/usr/bin/env -S python3 -I
+"""Find tests whose expected errors lie in an old one-clause case (A1 R7c).
+
+Usage: scripts/a2-meaning [path-to-i]
+Reads tracked tests and the compiler's migration report. Writes no sources.
+"""
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parent.parent
+BINARY = str(Path(sys.argv[1]).resolve()) if len(sys.argv) > 1 else str(ROOT / 'target/debug/i')
+
+
+def offset(text, line, column):
+    lines = text.splitlines(keepends=True)
+    return sum(len(s.encode()) for s in lines[:line - 1]) + column - 1
+
+
+def expectations(path):
+    if path.parts[:2] == ('tests', 'spec'):
+        text = (ROOT / path).read_text()
+        return [(None, m[1]) for m in re.finditer(r'(?m)^// expect: compile-error (E\d+)', text)]
+    short = (ROOT / path).with_suffix('.out')
+    if short.exists():
+        return [(offset((ROOT / path).read_bytes().decode(), int(m[1]), int(m[2])), m[3])
+                for m in re.finditer(r'(?m)^(\d+):(\d+): error\[(E\d+)\]', short.read_text())]
+    for parent in (ROOT / path).parents:
+        expected = parent / 'expected.out'
+        if expected.exists():
+            relative = (ROOT / path).relative_to(parent).as_posix()
+            return [(offset((ROOT / path).read_bytes().decode(), int(m[2]), int(m[3])), m[4])
+                    for m in re.finditer(r'(?m)^(.+):(\d+):(\d+): error\[(E\d+)\]', expected.read_text())
+                    if m[1] == relative]
+        if parent == ROOT: break
+    return []
+
+
+def main():
+    files = subprocess.check_output(['git', 'ls-files', '--', 'tests/spec/**/*.i', 'crates/ilang-check/tests/**/*.i'], cwd=ROOT, text=True).splitlines()
+    added = set(subprocess.check_output(['git', 'diff', '--name-only', '--diff-filter=A', 'b28fca5', 'HEAD', '--', '*.i'], cwd=ROOT, text=True).splitlines())
+    for name in sorted(files):
+        path = Path(name)
+        if name in added: continue
+        expected = expectations(path)
+        if not expected: continue
+        proc = subprocess.run([BINARY, 'fmt', '--from-old', '--check', '--report', name], cwd=ROOT, capture_output=True, text=True)
+        for line in proc.stderr.splitlines():
+            fields = line.split(None, 4)
+            if len(fields) != 5 or fields[0] not in {'one-clause', 'choices-split'}: continue
+            span = re.search(r'\bspan=(\d+):(\d+)\b', fields[4])
+            if span is None: raise RuntimeError('migration report has no source span: ' + line)
+            start, end = map(int, span.groups())
+            for position, code in expected:
+                if position is None or start <= position < end:
+                    print(f'{fields[2]} {code} {fields[1]} {fields[3]} {fields[4]}')
+
+
+if __name__ == '__main__': main()

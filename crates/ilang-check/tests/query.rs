@@ -112,7 +112,7 @@ impl Fixture {
     }
 }
 
-const MAIN: &str = r#"import (
+const MAIN: &str = r#" (
   util = app/util
   (User, greet) = app/user
 )
@@ -131,24 +131,24 @@ describe = (u: User) {
 }
 
 first = (o) {
-  case o {
+   o |> {
     Some(v) -> v
     None -> 0
   }
 }
 
-Option(a) { Some(a) None }
+Option(A) { Some(A) None }
 
 total = util.double(add(1, 2))
 "#;
 
-const UTIL: &str = r#"export (double)
+const UTIL: &str = r#" (double)
 
 /// Twice the number.
 double = (n: Int) -> Int { n * 2 }
 "#;
 
-const USER: &str = r#"export (User(..), greet)
+const USER: &str = r#" (User(..), greet)
 
 User { User(name: String, age: Int) }
 
@@ -177,7 +177,7 @@ fn type_of_top_level_names() {
         f.hover("app/main", "add(1", 0),
         "add: (x: Int, y: Int) -> Int"
     );
-    assert_eq!(f.hover("app/main", "id = ", 0), "id: (a: a) -> a");
+    assert_eq!(f.hover("app/main", "id = ", 0), "id: (a: A) -> A");
     assert_eq!(f.hover("app/main", "total", 0), "total: Int");
     // A name of another module, after `m.`.
     assert_eq!(f.hover("app/main", "double", 0), "double: (n: Int) -> Int");
@@ -198,17 +198,17 @@ fn type_of_local_names() {
     assert_eq!(f.hover("app/main", "z = ", 0), "z: Int");
     assert_eq!(f.hover("app/main", "z + y", 0), "z: Int");
     // A parameter of any type.
-    assert_eq!(f.hover("app/main", "a) {", 0), "a: a");
+    assert_eq!(f.hover("app/main", "a) {", 0), "a: A");
     assert_eq!(f.hover("app/main", "label = ", 0), "label: String");
-    assert_eq!(f.hover("app/main", "v) -> v", 0), "v: a");
-    assert_eq!(f.hover("app/main", "o) {", 0), "o: Option(a)");
+    assert_eq!(f.hover("app/main", "v) -> v", 0), "v: A");
+    assert_eq!(f.hover("app/main", "o) {", 0), "o: Option(A)");
 }
 
 #[test]
 fn type_of_other_things() {
     let f = fixture();
-    assert_eq!(f.hover("app/main", "Some(v)", 0), "Some: (a) -> Option(a)");
-    assert_eq!(f.hover("app/main", "None ->", 0), "None: Option(a)");
+    assert_eq!(f.hover("app/main", "Some(v)", 0), "Some: (A) -> Option(A)");
+    assert_eq!(f.hover("app/main", "None ->", 0), "None: Option(A)");
     assert_eq!(f.hover("app/main", "name", 0), "name: String");
     assert_eq!(
         f.hover("app/main", "User)", 0),
@@ -287,6 +287,7 @@ fn definitions() {
 fn definitions_with_a_syntax_error() {
     let f = Fixture::new(&[(
         "src/main.i",
+        /* old-syntax-check: E0101 */
         "f = (n) { n + 1 }\ng = () { f(1) }\nh = (x) { x + }\n",
     )]);
     assert!(f.checked.diags.iter().any(|d| d.is_error()));
@@ -310,10 +311,11 @@ fn completions_in_scope() {
     ] {
         assert!(ls.contains(&name), "{name} in {ls:?}");
     }
-    // Built-in names and types, and keywords.
-    for name in ["panic", "assert", "True", "Ok", "Int", "List", "case"] {
+    // Built-in names and types.
+    for name in ["panic", "assert", "True", "Ok", "Int", "List"] {
         assert!(ls.contains(&name), "{name} in {ls:?}");
     }
+    assert!(!ls.contains(&"case"));
     // Names of other functions are not in scope.
     assert!(!ls.contains(&"label") && !ls.contains(&"a"), "{ls:?}");
     assert!(cs.contains(&("z".into(), CompletionKind::Local)));
@@ -346,7 +348,7 @@ fn completions_of_fields_from_inference() {
         "Point { Point(x: Int, y: Int) }\n\
          origin = Point(0, 0)\n\
          f = () {\n  p = origin\n  p.x + origin.y\n}\n\
-         g = (o) {\n  case o {\n    Point(..) -> o.x\n  }\n}\n",
+         g = (o: Point) {\n  o |> {\n    Point(..) ? True -> o.x\n    _ -> panic(\"unreachable\")\n  }\n}\n",
     )]);
     assert!(!f.checked.diags.iter().any(|d| d.is_error()));
     // A local name whose type is inferred.
@@ -417,16 +419,16 @@ fn types_of_parameters_that_share_a_type_variable() {
     // The parameter type of `f` is the type of `x`, which the scheme names.
     assert_eq!(
         f.hover("app/main", "h3", 0),
-        "h3: (f: (a) -> Int ? e ! n, x: a) -> Int ? e ! n"
+        "h3: (f: (A) -> Int ? E ! N, x: A) -> Int ? E ! N"
     );
-    assert_eq!(f.hover("app/main", "f, x", 0), "f: (a) -> Int ? e ! n");
-    assert_eq!(f.hover("app/main", "f(x)", 0), "f: (a) -> Int ? e ! n");
-    assert_eq!(f.hover("app/main", "x)", 0), "x: a");
-    assert_eq!(f.hover("app/main", "f, v", 0), "f: (a) -> b ? e ! n");
-    assert_eq!(f.hover("app/main", "v)", 0), "v: a");
+    assert_eq!(f.hover("app/main", "f, x", 0), "f: (A) -> Int ? E ! N");
+    assert_eq!(f.hover("app/main", "f(x)", 0), "f: (A) -> Int ? E ! N");
+    assert_eq!(f.hover("app/main", "x)", 0), "x: A");
+    assert_eq!(f.hover("app/main", "f, v", 0), "f: (A) -> B ? E ! N");
+    assert_eq!(f.hover("app/main", "v)", 0), "v: A");
     // Not shared: as before.
-    assert_eq!(f.hover("app/main", "f) {", 0), "f: (Int) -> a ? e ! n");
-    assert_eq!(f.hover("app/main", "a) {", 0), "a: a");
+    assert_eq!(f.hover("app/main", "f) {", 0), "f: (1) -> A ? E ! N");
+    assert_eq!(f.hover("app/main", "a) {", 0), "a: A");
 }
 
 #[test]
@@ -443,51 +445,51 @@ fn local_types_use_the_names_of_the_scheme() {
     // The value of `f` is `y`, and the value of `k`.
     assert_eq!(
         f.hover("app/main", "k = ", 0),
-        "k: (f: (a) -> b ? e ! n, x: a) -> b ? e ! n"
+        "k: (f: (A) -> B ? E ! N, x: A) -> B ? E ! N"
     );
-    assert_eq!(f.hover("app/main", "y = ", 0), "y: b");
-    assert_eq!(f.hover("app/main", "y\n}", 0), "y: b");
+    assert_eq!(f.hover("app/main", "y = ", 0), "y: B");
+    assert_eq!(f.hover("app/main", "y\n}", 0), "y: B");
     assert_eq!(
         f.hover("app/main", "f, x) {\n  y", 0),
-        "f: (a) -> b ? e ! n"
+        "f: (A) -> B ? E ! N"
     );
     // The second parameter of `compose` is named as in its scheme.
     let compose = f.hover("app/main", "compose", 0);
     assert_eq!(
         compose,
-        "compose: (f: (a) -> b ? e ! n, g: (b) -> c ? e2 ! n2) -> \
-         (x: a) -> c ? e | e2 ! n | n2"
+        "compose: (f: (A) -> B ? E ! N, g: (B) -> C ? E2 ! N2) -> \
+         (x: A) -> C ? E | E2 ! N | N2"
     );
-    assert_eq!(f.hover("app/main", "f, g", 0), "f: (a) -> b ? e ! n");
-    assert_eq!(f.hover("app/main", "g) {", 0), "g: (b) -> c ? e2 ! n2");
-    assert_eq!(f.hover("app/main", "x) { g", 0), "x: a");
-    assert_eq!(f.hover("app/main", "g(f(x))", 0), "g: (b) -> c ? e2 ! n2");
+    assert_eq!(f.hover("app/main", "f, g", 0), "f: (A) -> B ? E ! N");
+    assert_eq!(f.hover("app/main", "g) {", 0), "g: (B) -> C ? E2 ! N2");
+    assert_eq!(f.hover("app/main", "x) { g", 0), "x: A");
+    assert_eq!(f.hover("app/main", "g(f(x))", 0), "g: (B) -> C ? E2 ! N2");
     // The names of the parameters are not the names of their types.
     assert_eq!(
         f.hover("app/main", "pairup", 0),
-        "pairup: (a: a, b: b) -> (b, a)"
+        "pairup: (a: A, b: B) -> (B, A)"
     );
-    assert_eq!(f.hover("app/main", "a, b)", 0), "a: a");
-    assert_eq!(f.hover("app/main", "b) {", 0), "b: b");
-    assert_eq!(f.hover("app/main", "b, a)", 0), "b: b");
+    assert_eq!(f.hover("app/main", "a, b)", 0), "a: A");
+    assert_eq!(f.hover("app/main", "b) {", 0), "b: B");
+    assert_eq!(f.hover("app/main", "b, a)", 0), "b: B");
     assert_eq!(
         f.hover("app/main", "twice", 0),
-        "twice: (f: (a | b) -> b & c ? e ! n) -> (z: a) -> c ? e ! n"
+        "twice: (f: (A | B) -> B & C ? E ! N) -> (z: A) -> C ? E ! N"
     );
-    assert_eq!(f.hover("app/main", "z) {", 0), "z: a");
+    assert_eq!(f.hover("app/main", "z) {", 0), "z: A");
     assert_eq!(
         f.hover("app/main", "f(f(z))", 0),
-        "f: (a | b) -> b & c ? e ! n"
+        "f: (A | B) -> B & C ? E ! N"
     );
     // `w` is generalized in the block: its own variable is not one of the
     // scheme, and has a name that is not used there.
     assert_eq!(
         f.hover("app/main", "both = ", 0),
-        "both: (f: (a) -> b ? e ! n, x: a) -> (b, (q: c) -> (c, a)) ? e ! n"
+        "both: (f: (A) -> B ? E ! N, x: A) -> (B, (q: C) -> (C, A)) ? E ! N"
     );
-    assert_eq!(f.hover("app/main", "w = ", 0), "w: (q: d) -> (d, a)");
-    assert_eq!(f.hover("app/main", "q) {", 0), "q: d");
-    assert_eq!(f.hover("app/main", "x) {\n  w", 0), "x: a");
+    assert_eq!(f.hover("app/main", "w = ", 0), "w: (q: D) -> (D, A)");
+    assert_eq!(f.hover("app/main", "q) {", 0), "q: D");
+    assert_eq!(f.hover("app/main", "x) {\n  w", 0), "x: A");
 }
 
 #[test]
@@ -503,40 +505,40 @@ fn local_types_name_one_sided_variables_as_the_scheme() {
          effonly = (f, x) {\n  r = f(x)\n  Nil\n}\n",
     )]);
     assert!(!f.checked.diags.iter().any(|d| d.is_error()));
-    assert_eq!(f.hover("app/main", "one", 0), "one: (x: a) -> Int");
-    assert_eq!(f.hover("app/main", "x) {\n  y = x\n  1", 0), "x: a");
-    assert_eq!(f.hover("app/main", "y = x\n  1", 0), "y: a");
-    assert_eq!(f.hover("app/main", "x\n  1", 0), "x: a");
+    assert_eq!(f.hover("app/main", "one", 0), "one: (x: A) -> 1");
+    assert_eq!(f.hover("app/main", "x) {\n  y = x\n  1", 0), "x: A");
+    assert_eq!(f.hover("app/main", "y = x\n  1", 0), "y: A");
+    assert_eq!(f.hover("app/main", "x\n  1", 0), "x: A");
     assert_eq!(
         f.hover("app/main", "drop =", 0),
-        "drop: (x: a, g: (Int) -> b ? e ! n) -> b ? e ! n"
+        "drop: (x: A, g: (1) -> B ? E ! N) -> B ? E ! N"
     );
-    assert_eq!(f.hover("app/main", "x, g) {\n  y = x\n  g", 0), "x: a");
-    assert_eq!(f.hover("app/main", "y = x\n  g", 0), "y: a");
+    assert_eq!(f.hover("app/main", "x, g) {\n  y = x\n  g", 0), "x: A");
+    assert_eq!(f.hover("app/main", "y = x\n  g", 0), "y: A");
     assert_eq!(
         f.hover("app/main", "g) {\n  y = x", 0),
-        "g: (Int) -> b ? e ! n"
+        "g: (1) -> B ? E ! N"
     );
     assert_eq!(
         f.hover("app/main", "drop2", 0),
-        "drop2: (x: a, g: (Int) -> b ? e ! n, h: c) -> b ? e ! n"
+        "drop2: (x: A, g: (1) -> B ? E ! N, h: C) -> B ? E ! N"
     );
-    assert_eq!(f.hover("app/main", "x, g, h", 0), "x: a");
-    assert_eq!(f.hover("app/main", "h) {", 0), "h: c");
-    assert_eq!(f.hover("app/main", "y = (x, h)", 0), "y: (a, c)");
-    assert_eq!(f.hover("app/main", "x, h)", 0), "x: a");
-    assert_eq!(f.hover("app/main", "h)\n", 0), "h: c");
+    assert_eq!(f.hover("app/main", "x, g, h", 0), "x: A");
+    assert_eq!(f.hover("app/main", "h) {", 0), "h: C");
+    assert_eq!(f.hover("app/main", "y = (x, h)", 0), "y: (A, C)");
+    assert_eq!(f.hover("app/main", "x, h)", 0), "x: A");
+    assert_eq!(f.hover("app/main", "h)\n", 0), "h: C");
     assert_eq!(
         f.hover("app/main", "effonly", 0),
-        "effonly: (f: (a) -> b ? e ! n, x: a) -> Nil ? e ! n"
+        "effonly: (f: (A) -> B ? E ! N, x: A) -> Nil ? E ! N"
     );
     assert_eq!(
         f.hover("app/main", "f, x) {\n  r", 0),
-        "f: (a) -> b ? e ! n"
+        "f: (A) -> B ? E ! N"
     );
-    assert_eq!(f.hover("app/main", "x) {\n  r", 0), "x: a");
-    assert_eq!(f.hover("app/main", "f(x)\n  Nil", 0), "f: (a) -> b ? e ! n");
-    assert_eq!(f.hover("app/main", "r = ", 0), "r: b");
+    assert_eq!(f.hover("app/main", "x) {\n  r", 0), "x: A");
+    assert_eq!(f.hover("app/main", "f(x)\n  Nil", 0), "f: (A) -> B ? E ! N");
+    assert_eq!(f.hover("app/main", "r = ", 0), "r: B");
 }
 
 #[test]
@@ -575,4 +577,63 @@ fn completions_after_any_expression() {
     // With some letters written.
     let cs = f.completions("app/main", "make().x", 8);
     assert_eq!(labels(&cs), vec!["x", "y"]);
+}
+
+#[test]
+fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
+    // A1 §3.12: the made-up binding covers the subject too, and its names
+    // enter scope only in the body. Synthetic parameters never appear.
+    let source = "main = () { local = 4\n (x) { local + x } |> { f -> f(local) } }\nmany = { 0 -> 1  _ -> 2 }\nuse_many = () { apply(1,{ 0 -> 1  _ -> 2 }) }\napply = (x, f) { f(x) }";
+    let fixture = Fixture::new(&[("src/main.i", source)]);
+    let subject = fixture.completions("app/main", "local + x", 0);
+    assert!(subject.iter().any(|(n, _)| n == "local"), "{subject:?}");
+    assert!(subject.iter().any(|(n, _)| n == "x"), "{subject:?}");
+    assert!(!subject.iter().any(|(n, _)| n == "f"), "{subject:?}");
+    let body = fixture.completions("app/main", "f(local)", 0);
+    assert!(body.iter().any(|(n, _)| n == "f"), "{body:?}");
+    for needle in ["{ 0 ->", ",{ 0 ->"] {
+        let at = fixture.at("app/main", needle, 0, 0);
+        let query = fixture.query();
+        let module = fixture.module("app/main");
+        assert!(
+            !query
+                .completions_at(module, at)
+                .iter()
+                .any(|c| c.label.starts_with('%'))
+        );
+        if let Some(hover) = query.type_at(module, at) {
+            assert!(!hover.code.contains("%arg"), "{}", hover.code);
+        }
+        assert!(query.definition_at(module, at).is_none());
+    }
+    assert!(
+        fixture
+            .hover("app/main", "many", 0)
+            .contains("(A) -> 1 | 2")
+    );
+}
+
+#[test]
+fn private_value_and_written_alias_hovers_limit_literals_only_in_human_text() {
+    // Decision 11: the hover is limited; Typed::schemes and package text stay full.
+    let lits = (0..14).map(|i| format!("\"m{i:02}\"")).collect::<Vec<_>>();
+    let source = format!("Modes = {}\nxs = [{}]\n", lits.join(" | "), lits.join(", "));
+    let f = Fixture::new(&[("src/main.i", &source)]);
+    assert!(
+        !f.checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        f.checked.diags
+    );
+    for name in ["Modes", "xs ="] {
+        let text = f.hover("app/main", name, 0);
+        assert!(text.contains("… (4 more)"), "{text}");
+        assert!(!text.contains("m13"), "{text}");
+    }
+    let types = f.checked.types.as_ref().unwrap();
+    assert!(
+        types
+            .schemes
+            .values()
+            .any(|t| t.contains("m13") && !t.contains('…'))
+    );
 }

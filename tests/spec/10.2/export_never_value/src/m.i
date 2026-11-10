@@ -1,5 +1,9 @@
-import (i/fail)
+(
+	i/fail
+)
 
-export (f)
+(
+	f
+)
 
 f = (n: Int) -> Never ? String { fail.raise("no") }

@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""Parse repository i snippets using the new-only parser; see old-syntax-check.md."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parent.parent
+DATA = ROOT / "scripts/old-syntax-check.json"
+
+
+def rust_strings(text):
+    """Lex Rust strings, skipping nested comments, chars, and lifetimes."""
+    i = 0
+    while i < len(text):
+        if text.startswith("//", i):
+            end = text.find("\n", i)
+            i = len(text) if end < 0 else end
+            continue
+        if text.startswith("/*", i):
+            depth = 1
+            i += 2
+            while depth and i < len(text):
+                if text.startswith("/*", i):
+                    depth += 1
+                    i += 2
+                elif text.startswith("*/", i):
+                    depth -= 1
+                    i += 2
+                else:
+                    i += 1
+            continue
+        raw = re.match(r'r(#+)?"', text[i:])
+        if raw:
+            start = i
+            hashes = raw[1] or ""
+            i += len(raw[0])
+            end = text.index('"' + hashes, i)
+            yield start, end + 1 + len(hashes), text[i:end]
+            i = end + 1 + len(hashes)
+            continue
+        if text[i] == '"':
+            start = i
+            i += 1
+            value = ""
+            while i < len(text) and text[i] != '"':
+                c = text[i]
+                i += 1
+                if c != "\\":
+                    value += c
+                    continue
+                c = text[i]
+                i += 1
+                if c in "\n\r":
+                    while i < len(text) and text[i].isspace():
+                        i += 1
+                elif c in "nrt0":
+                    value += dict(n="\n", r="\r", t="\t", **{"0": "\0"})[c]
+                elif c in "\\\"'":
+                    value += c
+                elif c == "x":
+                    value += chr(int(text[i:i + 2], 16))
+                    i += 2
+                elif c == "u":
+                    end = text.index("}", i)
+                    value += chr(int(text[i + 1:end].replace("_", ""), 16))
+                    i = end + 1
+                else:
+                    raise ValueError((start, c))
+            yield start, i + 1, value
+            i += 1
+            continue
+        if text[i] == "'":
+            char = re.match(r"'(?:\\(?:[nrt0\\'\"]|x[0-9a-fA-F]{2}|u\{[0-9a-fA-F_]+\})|[^'\\])'", text[i:])
+            if char:
+                i += len(char[0])
+                continue
+        i += 1
+
+
+def js_strings(text):
+    """Read JS strings/templates, including the fixture application's i source."""
+    token = re.compile(r"//[^\n]*|/\*.*?\*/|(['\"`])((?:\\.|(?!\1).)*?)\1", re.S)
+    for match in token.finditer(text):
+        if not match[1]:
+            continue
+        value = re.sub(r"\\(u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|.)", lambda m:
+            chr(int(m[1][1:], 16)) if m[1][0] in "ux" else
+            {"n": "\n", "r": "\r", "t": "\t"}.get(m[1], m[1]), match[2])
+        yield match.start(), match.end(), value
+
+
+def candidate(value):
+    # Applied to decoded literals, never Rust/JS files or English prose.
+    return bool(re.search(r"(?m)^\s*(?:[a-z_]\w*(?:\{[a-z_]\w*\})?(?:\([^\n)]*\))?(?:\s*:\s*[^=\n]+)?\s*=(?!=)|[A-Z][A-Za-z0-9]*(?:\([^)]*\))?\s*[{=]|@[a-z_]\w*(?:\([^\n]*\))?(?:\s*$)|\([A-Za-z0-9_, =()/\n]*[a-z_]\w*/[a-z_])", value))
+
+
+
+def identity(path, source):
+    return path + ":" + hashlib.sha256(source.encode("utf-8", "surrogatepass")).hexdigest()[:16]
+
+
+def snippets():
+    registered = json.loads(DATA.read_text())
+    paths = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", "*.i", "*.md", "*.rs", "*.js", "*.mjs"], cwd=ROOT, text=True).splitlines()
+    for path in sorted(set(paths)):
+        file = ROOT / path
+        if not file.is_file():
+            continue
+        text = file.read_bytes().decode()
+        if path.endswith(".i"):
+            yield dict(path=path, line=1, source=re.sub(r"(?m)^// old-syntax-check:.*\n?", "", text), start=0, end=len(text), host=text, kind="file")
+        elif path.endswith(".md"):
+            for m in re.finditer(r"(?m)^```i(?:[ \t][^\n]*)?\n(.*?)^```[ \t]*$", text, re.S):
+                yield dict(path=path, line=text[:m.start()].count("\n") + 1, source=m[1], start=m.start(), end=m.end(), host=text, kind="markdown")
+        else:
+            read = rust_strings if path.endswith(".rs") else js_strings
+            for start, end, value in read(text):
+                if identity(path, value) in registered or candidate(value) or re.match(r"\s*(?:import|export|case)\b", value):
+                    yield dict(path=path, line=text[:start].count("\n") + 1, source=value, start=start, end=end, host=text, kind="embedded")
+
+
+def parse(sources):
+    data = b"".join(str(len(s.encode())).encode() + b"\n" + s.encode() for s in sources)
+    tool = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug/examples/parse-snippets"
+    out = subprocess.check_output([str(tool)], input=data).decode().splitlines()
+    it = iter(out)
+    return [[(lambda c, m: c + ": " + bytes.fromhex(m).decode())(*next(it).split(" ", 1))
+             for _ in range(int(next(it)))] for _ in sources]
+
+
+def main():
+    os.chdir(ROOT)
+    command = ["cargo", "build", "-p", "ilang-syntax", "--example", "parse-snippets", "--locked", "--quiet"]
+    # The redesign lanes share the coordinator's heavy-job slots.
+    for heavy, shell in [(ROOT.parent / "cache/heavy", ROOT.parent.parent),
+                         (ROOT / ".rd/cache/heavy", ROOT)]:
+        if heavy.is_file():
+            command = [str(heavy), "direnv", "exec", str(shell)] + command
+            break
+    subprocess.run(command, check=True)
+    config = json.loads(DATA.read_text())
+    all_snippets = list(snippets())
+    sources = []
+    used = set()
+    for item in all_snippets:
+        key = identity(item["path"], item["source"])
+        entry = config.get(key, {})
+        if entry:
+            used.add(key)
+        item["id"] = key
+        item["entry"] = entry
+        source = entry.get("prefix", "") + item["source"] + entry.get("suffix", "")
+        for old, new in entry.get("substitutions", []):
+            source = source.replace(old, new)
+        sources.append(source)
+    results = parse(sources)
+    if "--inventory" in sys.argv:
+        print(json.dumps([{k: v for k, v in item.items() if k not in ("host", "entry")} | {"diagnostics": ds} for item, ds in zip(all_snippets, results)], indent=2))
+        return
+    failed = []
+    for item, actual in zip(all_snippets, results):
+        entry = item["entry"]
+        if entry.get("not_source"):
+            if item["kind"] != "embedded":
+                failed.append(item["id"] + ": only host literals can be classified as non-i")
+            continue
+        expected = entry.get("diagnostics", [])
+        if entry.get("track"):
+            if not expected:
+                failed.append(item["id"] + ": future-track entry must expect an error")
+        elif expected:
+            # Errors outside future-track notes must be documented next to the source.
+            marker = "old-syntax-check: " + ",".join(d.split(":", 1)[0] for d in expected)
+            nearby = item["host"][max(0, item["start"] - len(marker) - 20):item["end"] + len(marker) + 20]
+            if marker not in nearby:
+                failed.append(item["id"] + ": missing adjacent expected diagnostics")
+        if actual != expected:
+            failed.append(f'{item["path"]}:{item["line"]} ({item["id"]})\n  expected {expected!r}\n  actual   {actual!r}')
+    failed.extend(key + ": stale data entry" for key in config.keys() - used)
+    if failed:
+        print("\n".join(failed), file=sys.stderr)
+        raise SystemExit(1)
+    print(f"old-syntax-check: {len(all_snippets)} extracted literals/blocks parsed; exact expected diagnostics match; {sum(bool(i['entry'].get('track')) for i in all_snippets)} future-track entries")
+
+
+if __name__ == "__main__":
+    main()

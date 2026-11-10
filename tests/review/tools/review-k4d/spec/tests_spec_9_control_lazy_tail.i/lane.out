@@ -1,0 +1,5 @@
+spec/control_lazy_tail.check : (got: String, want: String) -> Nil
+spec/control_lazy_tail.show : (x: A) -> String
+spec/control_lazy_tail.count : (n: Int, acc: Int) -> Int
+spec/control_lazy_tail.down : (b: Boundary(A, B, C), n: Int) -> Int
+spec/control_lazy_tail.tail_calls_after_resume : () -> Nil

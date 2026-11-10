@@ -95,7 +95,7 @@ fn paths_are_files_or_directories() {
 
 #[test]
 fn files_with_errors_are_left_as_they_are() {
-    let bad = "main = () {\n  x = \n}\n";
+    let bad = /* old-syntax-check: E0101 */ "main = () {\n  x = \n}\n";
     let dir = package(&[("src/bad.i", bad), ("src/good.i", UGLY)]);
     let out = fmt(&[], dir.path());
     assert_eq!(out.status.code(), Some(1));

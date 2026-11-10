@@ -82,19 +82,9 @@ g = (n) { f(n) }
 
 #[test]
 fn names_resolve() {
-    let program = ok("
-import (i/core, c = (not) = i/core)
-
-T(a) { C(a) }
-
-f = (x: a) -> a {
-  y = C(x)
-  case y {
-    C(z) | C(z = _) -> core.not(not(True))
-  }
-  x
-}
-");
+    let program = ok(
+        "\n (i/core, c = (not) = i/core)\n\nT(A) { C(A) }\n\nf(A) = (x: A) -> A {\n  y = C(x)\n   y |> {\n    C(z) | C(z = _) ? True -> core.not(not(True))\n    _ -> panic(\"unreachable\")\n  }\n  x\n}\n",
+    );
     let main = program.module(common::module(&program, "app/main"));
     let b = &main.bindings[0].binding;
     assert!(b.direct);

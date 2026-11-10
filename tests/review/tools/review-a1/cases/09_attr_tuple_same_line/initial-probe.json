@@ -1,0 +1,1 @@
+{"check":["E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"],"parse":["E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"],"roundtrip":false,"wat":false}

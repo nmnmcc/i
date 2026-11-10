@@ -1,3 +1,4 @@
+// old-syntax-check: E0101,E0101,E0101
 f = () {
   x = = 1
   y = 2

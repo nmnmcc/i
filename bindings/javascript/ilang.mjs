@@ -1,5 +1,8 @@
+import { ResourceHost, ResourceError } from "./resources.mjs";
+export { ResourceHost, ResourceContext, ResourceError } from "./resources.mjs";
+const defaultResourceHost = new ResourceHost();
 /**
- * The binary interface of i, version 2 (docs/spec.md, Appendix B). Language
+ * The binary interface of i, version 3 (docs/spec.md, Appendix B). Language
  * values live in the guest; this module loads modules and copies values
  * across the host boundary.
  * SPDX-License-Identifier: Apache-2.0
@@ -12,7 +15,7 @@ const kinds = new Set(["nil", "bool", "int", "float", "string", "bit_array", "ex
 /** The canonical order of the members of an error type (B.2). */
 const canonical = ["nil", "bool", "int", "float", "string", "bit_array"];
 const namespace = "ilang:host/v1";
-const version = 2;
+const version = 3;
 export const HOST_VALUE_REASON = "host: value is not correct";
 const wasmTypes = { nil: [], bool: [0x7f], float: [0x7c], int: [0x7f, 0x7f, 0x7f], string: [0x7f, 0x7f], bit_array: [0x7f, 0x7f], externref: [0x6f] };
 const signatureModules = new Map();
@@ -22,6 +25,42 @@ const embeddedAbis = new WeakMap();
 // a GC structure, a typed function reference, return_call_ref, and try_table
 // with catch_ref and throw_ref (exnref).
 const featureProbe = Uint8Array.from(atob("AGFzbQEAAAABFwVfAX8AYAF/AX9gAX8AYAACf2lgAAF/AwQDAQEEDQMBAAIHCQEFcHJvYmUAAgkFAQMAAQAKOQMHACAAQQFqCx0AAn8fQAEAAAACAx9AAQEAACAACAALAAsKCwALCxEAQSn7AAD7AgAAEAHSABUBCwBbBG5hbWUBFQIACWluY3JlbWVudAEHcmV0aHJvdwITAgABAAV2YWx1ZQEBAAV2YWx1ZQMRAQECAAVvdXRlcgIFaW5uZXIEDQIAA2JveAEFdW5hcnkLBgEAA3RhZw=="), (value) => value.charCodeAt(0));
+
+/** The signal of the async request whose service starts now, or null. */
+let currentSignal = null;
+
+/**
+ * The AbortSignal of the async request whose service is starting. Call it
+ * before the first `await` of the service; it is aborted when the request is
+ * dropped (B.4, B.5).
+ */
+export function requestSignal() {
+  if (!currentSignal) throw new AbiError("requestSignal() may only be called while an async service starts");
+  return currentSignal;
+}
+
+/**
+ * Where there is no setImmediate (in browsers), one MessageChannel serves
+ * every wait: each message resolves the oldest waiting promise.
+ */
+let macrotaskChannel = null;
+const macrotaskWaiters = [];
+
+/** Wait for one macrotask, so that timers and IO of the host can run. */
+function macrotask() {
+  if (typeof setImmediate === "function") return new Promise((resolve) => setImmediate(resolve));
+  if (!macrotaskChannel) {
+    macrotaskChannel = new MessageChannel();
+    macrotaskChannel.port1.onmessage = () => macrotaskWaiters.shift()?.();
+    // The channel must not keep a server runtime alive by itself.
+    macrotaskChannel.port1.unref?.();
+    macrotaskChannel.port2.unref?.();
+  }
+  return new Promise((resolve) => {
+    macrotaskWaiters.push(resolve);
+    macrotaskChannel.port2.postMessage(null);
+  });
+}
 
 /** Does this engine have GC, typed function references, tail calls and exnref? */
 export function supportsRequiredFeatures() {
@@ -186,7 +225,7 @@ function entryPoint(value, location) {
   return Object.freeze({ name: value.name, async: isAsync });
 }
 
-const reserved = (name) => ["memory", "ilang_alloc", "ilang_free", "ilang_start"].includes(name) || name.startsWith("ilang_resume:") || name.startsWith("ilang_result:");
+const reserved = (name) => ["memory", "ilang_alloc", "ilang_free", "ilang_start", "ilang_continue"].includes(name) || name.startsWith("ilang_resume:") || name.startsWith("ilang_result:");
 
 function functions(value, location, external) {
   const result = Object.create(null);
@@ -220,6 +259,12 @@ export function readAbi(module, supplied) {
   const fields = ["version", "entry", "tests", "exports", "services", "externals"];
   only(value, fields, "the ABI metadata");
   for (const field of fields) expect(field in value, `The ABI metadata needs the field ${field}`);
+  if (typeof value.version === "number" && value.version < version) {
+    throw new AbiError(`the module uses i ABI version ${value.version}; build it again with this version of i`);
+  }
+  if (typeof value.version === "number" && value.version > version) {
+    throw new AbiError(`the module uses i ABI version ${value.version}, but this host reads version ${version}; update the host`);
+  }
   if (value.version !== version) throw new AbiError(`Unsupported i ABI version ${value.version}`);
   const exports = Object.create(null);
   for (const [name, signature] of Object.entries(plainObject(value.exports === undefined ? {} : value.exports, "ABI exports"))) {
@@ -336,14 +381,19 @@ function correct(type, value) {
   }
 }
 
+/** A fault of the module: the instance is not used again (B.4, B.5). */
+class ModuleFault extends AbiError {}
+
 /** A value that the module gave and that is not correct (B.2). */
-class GuestFault extends AbiError {
+class GuestFault extends ModuleFault {
   constructor(message) {
     super(`The module gave a value that is not correct: ${message}`);
   }
 }
 
 class Bridge {
+  resources;
+  ending = false;
   instance;
   /** Set while an async export waits (B.5). */
   waiting = false;
@@ -356,7 +406,16 @@ class Bridge {
   broken = false;
   /** Check the answers of host functions in the host (`checkReplies`). */
   checkReplies = false;
-  pending = [];
+  /** The outstanding requests by id: `{ namespace, label, signature, abort }` (B.4). */
+  requests = new Map();
+  /** Answers whose work is done, in the order they settled: `{ id, entry, outcome }` or `{ id, entry, failure }`. */
+  settled = [];
+  /** Resolves the wait for the next settled answer. */
+  wake = null;
+  /** Whether a request may start now: only during an async call, and not inside an import (B.4). */
+  accepting = false;
+  /** The Wasm calls of the host that are running. */
+  depth = 0;
 
   exports() {
     if (!this.instance) throw new AbiError("Host memory access before instantiation");
@@ -383,7 +442,7 @@ class Bridge {
     if (!bytes.length) return 0;
     const allocator = this.exports().ilang_alloc;
     expect(typeof allocator === "function", "The module does not export ilang_alloc");
-    const pointer = unsigned(allocator(bytes.length), "Allocation address");
+    const pointer = unsigned(this.guestCall(() => allocator(bytes.length)), "Allocation address");
     const buffer = this.memory().buffer;
     expect(pointer + bytes.length <= buffer.byteLength, "ilang_alloc gave a buffer outside memory");
     new Uint8Array(buffer, pointer, bytes.length).set(bytes);
@@ -399,28 +458,98 @@ class Bridge {
     for (const [pointer, length] of buffers.toReversed()) {
       if (pointer === 0 || released.has(pointer)) continue;
       released.add(pointer);
-      free(pointer, length);
+      this.guestCall(() => free(pointer, length));
     }
   }
 
   usable() {
     expect(!this.unusable, `The instance cannot be used after it stopped (${this.unusable}); make a new instance`);
+    expect(this.depth === 0, "The instance is running Wasm; a host function may not call it (§B.3)");
     expect(!this.waiting, "An async call is waiting; only its host functions may answer now");
+    expect(!this.ending, "An invocation is tearing down; cleanup may not enter Wasm");
+  }
+
+  /**
+   * An import callback that gets, first, whether a request could start when
+   * the import was called. No request may start while it runs (B.4).
+   */
+  admitting(callback) {
+    return (...raw) => {
+      const admitted = this.accepting;
+      this.accepting = false;
+      try {
+        return callback(admitted, ...raw);
+      } finally {
+        this.accepting = admitted;
+      }
+    };
+  }
+
+  /** Run Wasm in which the module may start and cancel requests (B.4). */
+  enterAccepting(operation) {
+    return this.enter(() => {
+      this.accepting = true;
+      try {
+        return operation();
+      } finally {
+        this.accepting = false;
+      }
+    });
+  }
+
+  /** Keep the answer of a request, unless the request was dropped. */
+  settle(id, entry, result) {
+    if (this.requests.get(id) !== entry) return;
+    this.settled.push({ id, entry, ...result });
+    this.wake?.();
+  }
+
+  /** Drop every request: abort its signal and forget its answer. */
+  dropRequests() {
+    // The table is empty before any abort listener runs.
+    const dropped = [...this.requests.values()];
+    this.requests.clear();
+    this.settled = [];
+    for (const entry of dropped) { entry.detach(); entry.abort.abort(); }
   }
 
   /** The program stops with `host: value is not correct`. */
   hostValueStop() {
+    this.endResources();
+    this.dropRequests();
     this.unusable = HOST_VALUE_REASON;
     return new Stop(HOST_VALUE_REASON);
   }
 
-  /** Run Wasm; a trap or exception makes the instance unusable. */
-  enter(operation) {
-    try {
-      return operation();
-    } catch (error) {
-      throw this.trapped(error);
+  endResources(resources = this.resources) {
+    const saved = this.ending;
+    this.ending = true;
+    try { return resources?.teardown(); }
+    finally { this.ending = saved; }
+  }
+
+  liveContext() {
+    if (!this.resources.live) {
+      this.unusable ??= "The resource context has ended";
+      throw new ModuleFault(this.unusable);
     }
+  }
+
+  /** Gate each actual guest call, including calls nested in argument lowering. */
+  guestCall(operation) {
+    this.liveContext();
+    this.depth++;
+    try {
+      const result = operation();
+      this.liveContext();
+      return result;
+    } finally { this.depth--; }
+  }
+
+  /** Translate a trap once at the enclosing SDK boundary. */
+  enter(operation) {
+    try { return this.guestCall(operation); }
+    catch (error) { throw this.trapped(error); }
   }
 
   /**
@@ -433,19 +562,21 @@ class Bridge {
     if (failure) this.failure ??= failure;
     else this.stopMessage ??= HOST_VALUE_REASON;
     this.broken = true;
+    this.endResources();
     return signature.async ? [] : resultTypes(signature).map((wasm) => (wasm === 0x6f ? null : 0));
   }
 
   trapped(error) {
-    this.pending = [];
+    this.endResources();
+    this.dropRequests();
     if (this.failure) {
       const { error: failure } = this.failure;
       this.failure = null;
       this.stopMessage = null;
       this.unusable = String(failure?.message ?? failure);
-      return failure;
+      return failure instanceof ResourceError && failure.code === "memory exhausted" ? new Stop(null, { cause: failure }) : failure;
     }
-    if (error instanceof GuestFault) {
+    if (error instanceof ModuleFault) {
       this.unusable = error.message;
       return error;
     }
@@ -614,6 +745,89 @@ function reply(fn, args) {
   }
 }
 
+// Authorization tokens are host objects. Neither JSON nor ABI fields can forge
+// one, and each token is tied to the module compiled from its approved bytes.
+const bindingAuthorizations = new WeakMap();
+
+function validateBindingPlan(plan, abi) {
+  expect(plan && typeof plan.artifact_digest === "string" && Array.isArray(plan.declarations), "Invalid binding plan");
+  for (const declaration of plan.declarations) {
+    for (const key of ["package", "module", "module_digest", "declaration", "namespace", "name"]) {
+      expect(typeof declaration[key] === "string" && declaration[key].length > 0, "Binding plan has an empty declaration identity");
+    }
+    const table = declaration.kind === "service" ? abi.services : declaration.kind === "external" ? abi.externals : null;
+    expect(table, "Binding plan has an invalid import kind");
+    const signature = descriptor(declaration.signature, "binding declaration");
+    expect(JSON.stringify(table[declaration.namespace]?.[declaration.name]) === JSON.stringify(signature),
+      `Binding plan declaration ${declaration.declaration} does not match ABI import ${declaration.namespace} ${declaration.name}`);
+  }
+  for (const [kind, table] of [["service", abi.services], ["external", abi.externals]]) {
+    for (const [namespace, fields] of Object.entries(table)) {
+      for (const name of Object.keys(fields)) expect(plan.declarations.some((d) => d.kind === kind && d.namespace === namespace && d.name === name), `Binding plan is missing import ${namespace} ${name}`);
+    }
+  }
+}
+
+function freezePlan(value) {
+  if (value && typeof value === "object") {
+    for (const child of Object.values(value)) freezePlan(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+/**
+ * Explicit embedding authority for a complete compiler plan, outside ABI v3.
+ * The caller authenticates the plan's compiler/package provenance before
+ * approving any declaration. A self-asserted manifest is not evidence.
+ * Artifact bytes are required; a WebAssembly.Module cannot attest its bytes.
+ */
+export async function authorizeBindings(source, plan, approve, options = {}) {
+  expect(typeof approve === "function", "Binding approval must be a function");
+  expect(!(source instanceof WebAssembly.Module), "Binding authorization requires artifact bytes");
+  if (typeof source === "string" || source instanceof URL || source instanceof Request) source = await fetch(source);
+  if (source instanceof Response) {
+    expect(source.ok, `Unable to fetch Wasm: HTTP ${source.status}`);
+    source = await source.arrayBuffer();
+  }
+  const bytes = source instanceof ArrayBuffer ? new Uint8Array(source).slice()
+    : ArrayBuffer.isView(source) ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength).slice() : null;
+  expect(bytes, "Binding authorization requires artifact bytes");
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  const expected = "sha256-" + [...digest].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const snapshot = freezePlan(JSON.parse(JSON.stringify(plan)));
+  expect(snapshot.artifact_digest === expected, "Binding plan artifact digest does not match the module");
+  const module = await compile(bytes);
+  const abi = readAbi(module, options.abi);
+  validateBindingPlan(snapshot, abi);
+  const approved = [];
+  for (const declaration of snapshot.declarations) approved.push(await approve(declaration) === true);
+  const token = Object.freeze({ module });
+  bindingAuthorizations.set(token, { plan: snapshot, approved, abi });
+  return token;
+}
+
+function checkBindings(module, abi, options) {
+  if (options.bindings) {
+    const authorization = bindingAuthorizations.get(options.bindings);
+    expect(authorization && options.bindings.module === module, "Binding authorization does not match the module");
+    validateBindingPlan(authorization.plan, abi);
+    for (const [index, d] of authorization.plan.declarations.entries()) {
+      expect(authorization.approved[index] || typeof options.imports?.[d.namespace]?.[d.name] === "function",
+        `ungranted host import ${d.namespace} ${d.name} declared by ${d.module} ${d.declaration}`);
+    }
+  } else {
+    for (const table of [abi.services, abi.externals]) {
+      for (const [namespace, fields] of Object.entries(table)) {
+        for (const name of Object.keys(fields)) {
+          expect(!options.contextImports?.[namespace]?.[name] || typeof options.imports?.[namespace]?.[name] === "function",
+            `ungranted host import ${namespace} ${name}: a trusted binding plan or explicit declaration grant is required`);
+        }
+      }
+    }
+  }
+}
+
 /**
  * Load a module, link its imports and call `ilang_start` once (B.1).
  * `imports[module][name]` are the host service functions and external
@@ -627,7 +841,11 @@ export async function instantiate(source, options = {}) {
   }
   const module = await compile(source);
   const abi = readAbi(module, options.abi);
+  checkBindings(module, abi, options);
   const bridge = new Bridge();
+  const resourceHost = options.resourceHost ?? defaultResourceHost;
+  expect(resourceHost instanceof ResourceHost, "resourceHost must be a ResourceHost");
+  bridge.resources = resourceHost.context();
   bridge.checkReplies = options.checkReplies ?? false;
   expect(typeof bridge.checkReplies === "boolean", "checkReplies must be a boolean");
   const imports = Object.create(null);
@@ -640,7 +858,20 @@ export async function instantiate(source, options = {}) {
     imports[name] = { ...values };
   }
   imports[namespace] = {
-    reference_id: guardedFunction((value) => {
+    // Drops an outstanding request (B.4).
+    cancel: guardedFunction(bridge.admitting((admitted, id) => {
+      const nothing = { result: "nil", errors: [] };
+      if (bridge.broken) return importResult(bridge.breakIn(nothing, null));
+      if (!admitted) return importResult(bridge.breakIn(nothing, { error: new ModuleFault(`the module cancelled request ${id} outside an async call`) }));
+      const entry = bridge.requests.get(id);
+      if (!entry) return importResult(bridge.breakIn(nothing, { error: new ModuleFault(`the module cancelled request ${id}, which is not outstanding`) }));
+      bridge.requests.delete(id);
+      bridge.settled = bridge.settled.filter((answer) => answer.entry !== entry);
+      entry.detach();
+      entry.abort.abort();
+      return undefined;
+    }), broken, [0x7f], [], `${namespace} cancel`),
+    reference_id: guardedFunction(bridge.admitting((_, value) => {
       if (value === null) return 0n;
       const identities = (typeof value === "object" || typeof value === "function") ? objectIds : primitiveIds;
       let id = identities.get(value);
@@ -653,9 +884,9 @@ export async function instantiate(source, options = {}) {
         identities.set(value, id);
       }
       return id;
-    }, broken, [0x6f], [0x7e], `${namespace} reference_id`),
+    }), broken, [0x6f], [0x7e], `${namespace} reference_id`),
     // The module traps right after this call (B.4).
-    panic: typedFunction((pointer, length) => {
+    panic: typedFunction(bridge.admitting((_, pointer, length) => {
       let message;
       try {
         message = lossy.decode(bridge.copy(pointer, length));
@@ -663,40 +894,83 @@ export async function instantiate(source, options = {}) {
         message = `(the stop message is outside memory: ${error.message})`;
       }
       bridge.stopMessage ??= message;
-    }, [0x7f, 0x7f], [], `${namespace} panic`),
+      bridge.endResources();
+    }), [0x7f, 0x7f], [], `${namespace} panic`),
   };
   for (const [kind, table] of [["service", abi.services], ["external", abi.externals]]) {
     for (const [moduleName, entries] of Object.entries(table)) {
       imports[moduleName] ??= Object.create(null);
       for (const [name, signature] of Object.entries(entries)) {
-        const fn = options.imports?.[moduleName]?.[name];
-        expect(typeof fn === "function", `Missing host function ${moduleName} ${name}`);
+        const legacy = options.imports?.[moduleName]?.[name];
+        const contextFn = options.contextImports?.[moduleName]?.[name];
+        expect(!(legacy && contextFn), `Host function ${moduleName} ${name} is registered twice`);
+        expect(typeof (contextFn ?? legacy) === "function", `Missing host function ${moduleName} ${name}`);
         expect(!Object.hasOwn(imports[moduleName], name), `Host function ${moduleName} ${name} is registered twice`);
         // Nothing is thrown into the module (B.1): an exception of the
         // host function, or an answer that stops the program, is kept, and
         // the guard of the import traps.
-        const callback = (...raw) => {
+        const callback = (admitted, ...raw) => {
           if (bridge.broken) return importResult(bridge.breakIn(signature, null));
+          const resources = bridge.resources;
+          if (!resources.live) return importResult(bridge.breakIn(signature, { error: new AbiError("The resource context has ended") }));
+          const fn = contextFn ? (...args) => contextFn(resources, ...args) : legacy;
+          // An async import takes the request id first, which is checked
+          // before the service runs (B.4).
+          const id = signature.async ? raw.shift() : undefined;
+          if (signature.async) {
+            const refused = !admitted ? `the module started request ${id} outside an async call`
+              : id < 0 ? `the module started request ${id}, which is below 0`
+                : bridge.requests.has(id) ? `the module started request ${id} twice` : null;
+            if (refused) return importResult(bridge.breakIn(signature, { error: new ModuleFault(refused) }));
+          }
           try {
             const args = bridge.liftAll(signature.params, raw);
             if (signature.async) {
-              const work = Promise.resolve().then(() => fn(...args)).then((value) => ({ value }), (error) => {
+              // The service runs now, during the import, with the signal of
+              // this request (D6 of docs/design/host-concurrency.md).
+              const abort = resources.abortController();
+              const target = new WeakRef(bridge);
+              const detach = resources.ownRequest(() => { abort.abort(); target.deref()?.wake?.(); });
+              const saved = currentSignal;
+              currentSignal = abort.signal;
+              let started;
+              try {
+                started = Promise.resolve(fn(...args));
+              } catch (error) {
+                started = Promise.reject(error);
+              } finally {
+                currentSignal = saved;
+              }
+              const work = started.then((value) => ({ value }), (error) => {
                 if (error instanceof GuestError) return { error: error.value };
                 throw error;
               });
-              work.catch(() => {});
-              bridge.pending.push({ namespace: moduleName, label: name, signature, work });
+              const entry = { namespace: moduleName, label: name, signature, abort, detach };
+              bridge.requests.set(id, entry);
+              // An unresolved Promise must not retain the Wasm instance after
+              // disposal. Each reply still checks the original request entry.
+              work.then((outcome) => target.deref()?.settle(id, entry, { outcome }), (failure) => target.deref()?.settle(id, entry, { failure }));
+              // A started request requires its resume even if the module
+              // cancels it or returns status 0 next (B.5).
+              const resume = `ilang_resume:${moduleName}:${name}`;
+              try {
+                validateFunction(module, bridge.instance.exports, resume, [0x7f, ...resultTypes(signature)], [0x7f]);
+              } catch {
+                return importResult(bridge.breakIn(signature, { error: new ModuleFault(`the module does not export ${resume}`) }));
+              }
               return undefined;
             }
             const answer = kind === "service" ? reply(fn, args) : { value: fn(...args) };
-            expect(!answer.value || typeof answer.value.then !== "function", `${moduleName} ${name} is not async; it must not give a Promise`);
+            bridge.liveContext();
+            expect(signature.result === "externref" || !answer.value || typeof answer.value.then !== "function", `${moduleName} ${name} is not async; it must not give a Promise`);
             const values = bridge.lowerReply(signature, answer);
             return importResult(values ?? bridge.breakIn(signature, null));
           } catch (error) {
             return importResult(bridge.breakIn(signature, { error }));
           }
         };
-        imports[moduleName][name] = guardedFunction(callback, broken, paramTypes(signature), signature.async ? [] : resultTypes(signature), `${moduleName} ${name}`);
+        const params = signature.async ? [0x7f, ...paramTypes(signature)] : paramTypes(signature);
+        imports[moduleName][name] = guardedFunction(bridge.admitting(callback), broken, params, signature.async ? [] : resultTypes(signature), `${moduleName} ${name}`);
       }
     }
   }
@@ -722,30 +996,69 @@ export async function instantiate(source, options = {}) {
     return signature;
   };
 
-  /** Answer async host functions until the status is 0 (B.5). */
+  /** The export `name` with these Wasm types, or a fault of the module. */
+  const exportOrFault = (name, params, results, text) => {
+    try {
+      validateFunction(module, instance.exports, name, params, results);
+    } catch {
+      throw bridge.trapped(new ModuleFault(text));
+    }
+  };
+
+  /**
+   * Answer the requests of the module, in the order their work settles,
+   * until the status is 0 (B.5). Every exit drops the requests that are left.
+   */
   const wait = async (name, status) => {
     bridge.waiting = true;
     try {
+      bridge.liveContext();
       while (status !== 0) {
-        if (status !== 1) throw bridge.trapped(new GuestFault(`status ${status} of ${name}`));
-        const pending = bridge.pending;
-        bridge.pending = [];
-        if (pending.length !== 1) throw bridge.trapped(new GuestFault(`the module waits for ${pending.length} host functions instead of one`));
-        const [{ namespace: ns, label, signature, work }] = pending;
-        let answer;
-        try {
-          answer = await work;
-        } catch (error) {
-          bridge.unusable = String(error?.message ?? error);
-          throw error;
+        bridge.liveContext();
+        let next;
+        if (status === 1) {
+          if (!bridge.requests.size) throw bridge.trapped(new ModuleFault("the module waits, but no host function is running"));
+          while (!bridge.settled.length) {
+            if (bridge.unusable) throw new AbiError(`The instance cannot be used (${bridge.unusable})`);
+            if (!bridge.resources.live) throw bridge.trapped(new ModuleFault("The resource context has ended"));
+            await new Promise((resolve) => (bridge.wake = resolve));
+          }
+          bridge.wake = null;
+          next = bridge.settled.shift();
+        } else if (status === 2) {
+          exportOrFault("ilang_continue", [], [0x7f], "the module is runnable, but has no ilang_continue");
+          // Let timers and IO run once, then give an answer that is done,
+          // or go on without one.
+          await macrotask();
+          bridge.liveContext();
+          next = bridge.settled.shift();
+          if (!next) {
+            status = bridge.enterAccepting(() => instance.exports.ilang_continue());
+            continue;
+          }
+        } else {
+          throw bridge.trapped(new ModuleFault(`export ${name} gave the status ${status}, which is not 0, 1 or 2`));
         }
-        const resume = `ilang_resume:${ns}:${label}`;
-        validateFunction(module, instance.exports, resume, resultTypes(signature), [0x7f]);
-        const values = bridge.enter(() => bridge.lowerReply(signature, answer));
+        const { id, entry } = next;
+        if (!bridge.resources.live) throw bridge.trapped(new ModuleFault("The resource context has ended"));
+        bridge.requests.delete(id);
+        entry.detach();
+        if ("failure" in next) {
+          bridge.unusable = String(next.failure?.message ?? next.failure);
+          if (next.failure instanceof ResourceError && next.failure.code === "memory exhausted") throw new Stop(null, { cause: next.failure });
+          throw next.failure;
+        }
+        const resume = `ilang_resume:${entry.namespace}:${entry.label}`;
+        exportOrFault(resume, [0x7f, ...resultTypes(entry.signature)], [0x7f], `the module does not export ${resume}`);
+        // Result buffers are made just before the resume (B.5).
+        const values = bridge.enter(() => bridge.lowerReply(entry.signature, next.outcome));
         if (!values) throw bridge.hostValueStop();
-        status = bridge.enter(() => instance.exports[resume](...values));
+        status = bridge.enterAccepting(() => instance.exports[resume](id, ...values));
       }
     } finally {
+      // The abort listeners of the dropped requests run during the drop.
+      // The instance still waits then, so they cannot start a call on it.
+      bridge.dropRequests();
       bridge.waiting = false;
     }
   };
@@ -770,7 +1083,7 @@ export async function instantiate(source, options = {}) {
       return undefined;
     }
     return (async () => {
-      const status = bridge.enter(() => instance.exports[point.name]());
+      const status = bridge.enterAccepting(() => instance.exports[point.name]());
       await wait(point.name, status);
       const result = `ilang_result:${point.name}`;
       validateFunction(module, instance.exports, result, [], []);
@@ -778,7 +1091,7 @@ export async function instantiate(source, options = {}) {
     })();
   };
 
-  return Object.freeze({
+  const guest = {
     module, instance, exports: instance.exports, abi,
     /** Why the instance cannot be used any more, or null. */
     get unusable() { return bridge.unusable; },
@@ -795,7 +1108,7 @@ export async function instantiate(source, options = {}) {
       const owned = [];
       const raw = bridge.enter(() => {
         const rawArguments = signature.params.flatMap((type, index) => bridge.lower(type, args[index], owned));
-        return instance.exports[name](...rawArguments);
+        return bridge.guestCall(() => instance.exports[name](...rawArguments));
       });
       return finish(signature, raw, owned);
     },
@@ -808,7 +1121,12 @@ export async function instantiate(source, options = {}) {
       const owned = [];
       const status = bridge.enter(() => {
         const rawArguments = signature.params.flatMap((type, index) => bridge.lower(type, args[index], owned));
-        return instance.exports[name](...rawArguments);
+        bridge.accepting = true;
+        try {
+          return bridge.guestCall(() => instance.exports[name](...rawArguments));
+        } finally {
+          bridge.accepting = false;
+        }
       });
       await wait(name, status);
       const result = `ilang_result:${name}`;
@@ -827,7 +1145,39 @@ export async function instantiate(source, options = {}) {
       expect(point, `${name} is not an entry point of the metadata`);
       return runPoint(point);
     },
-  });
+    /** Abandon a live invocation and clean up host resources without i callbacks. */
+    takeCleanupErrors() { return resourceHost.takeCleanupErrors(); },
+    dispose() {
+      bridge.unusable ??= "the instance was disposed";
+      bridge.endResources();
+      bridge.dropRequests();
+      bridge.wake?.();
+    },
+  };
+  // All invocation paths share the same ownership boundary. The immutable
+  // captured context also survives Promise callbacks after disposal.
+  for (const name of ["call", "callAsync", "run", "runEntryPoint"]) {
+    const operation = guest[name];
+    const invoke = (...args) => {
+      bridge.usable();
+      bridge.endResources();
+      const resources = resourceHost.context();
+      bridge.resources = resources;
+      try {
+        const value = operation(...args);
+        const asynchronous = name === "callAsync" || (name === "run" && abi.entry?.async)
+          || (name === "runEntryPoint" && [...(abi.entry ? [abi.entry] : []), ...abi.tests].find((point) => point.name === args[0])?.async);
+        if (asynchronous) return value.finally(() => bridge.endResources(resources));
+        bridge.endResources(resources);
+        return value;
+      } catch (error) {
+        bridge.endResources(resources);
+        throw error;
+      }
+    };
+    guest[name] = name === "callAsync" ? async (...args) => invoke(...args) : invoke;
+  }
+  return Object.freeze(guest);
 }
 
 /** Run each test in a new instance (spec §10.2); a stop fails only its own test. */

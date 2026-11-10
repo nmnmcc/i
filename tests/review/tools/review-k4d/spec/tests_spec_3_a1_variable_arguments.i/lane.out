@@ -1,0 +1,2 @@
+test/a1_variable_arguments.i:4:14: error[E0230]: a type variable takes no arguments
+1 error

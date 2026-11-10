@@ -1,0 +1,14 @@
+Closed source: Gone = { ..{ a: Never } | { b: Never }, -a }
+Join first: common labels = {} ; empty record present = True
+E2 then E1: empty record present = False
+Canonical generic source: Gone(A) = { ..{ a: Never } | { ..A, b: Never }, -a }
+Normalize, then A = {..}: ('never',)
+A = {..}, then normalize: ('rec', ())
+Traceback (most recent call last):
+  File "/home/agent/Programming/i/.rd/note-rec/tests/t3-forgetting-conflict.py", line 144, in <module>
+    main()
+    ~~~~^^
+  File "/home/agent/Programming/i/.rd/note-rec/tests/t3-forgetting-conflict.py", line 133, in main
+    assert normalize_first == substitute_first, (
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: joint §6 requires substitution stability, but records §4.3 E1/E2 and §4.5 give Never versus {..}; the union before E2 is canonical

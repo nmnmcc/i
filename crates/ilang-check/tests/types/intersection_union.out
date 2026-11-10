@@ -1,4 +1,4 @@
-unbox : (b: Box(a)) -> a
+unbox : (b: Box(A)) -> A
 call : (x: Box(Int)) -> Int
 bind : (x: Box(Int)) -> Box(Int)
 field : (x: Box(Int)) -> Int

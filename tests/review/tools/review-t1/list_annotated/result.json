@@ -1,0 +1,34 @@
+[
+  {
+    "cmd": [
+      "check",
+      "--types"
+    ],
+    "exit": 0,
+    "seconds": 0.13430629298090935,
+    "stdout": "probe/main.f : (xs: List(\"a\" | \"b\")) -> 0 | 1 | 2\nprobe/main.main : () -> Nil ! Assert\n",
+    "stderr": ""
+  },
+  {
+    "cmd": [
+      "run",
+      "--opt",
+      "0"
+    ],
+    "exit": 0,
+    "seconds": 0.20269006211310625,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "cmd": [
+      "run",
+      "--opt",
+      "2"
+    ],
+    "exit": 0,
+    "seconds": 0.30539983906783164,
+    "stdout": "",
+    "stderr": ""
+  }
+]

@@ -1,0 +1,15 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 23.4ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 16.9ms
+   Compiling ilang-host v0.1.0 (/tmp/review-c/mutation/crates/ilang-host)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.04s
+     Running unittests src/lib.rs (target/debug/deps/ilang_host-dcebbce76c946c1f)
+
+running 1 test
+test tests::many_requests_complete_out_of_order ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.27s
+

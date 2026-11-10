@@ -1,0 +1,7 @@
+spec/blocks.check : (got: String, want: String) -> Nil
+spec/blocks.show : (x: A) -> String
+spec/blocks.pair : (a: A, b: B) -> (A, B)
+spec/blocks.shadowing : () -> Nil
+spec/blocks.values_in_every_place : () -> Nil
+spec/blocks.recursion_inside_closures : () -> Nil
+spec/blocks.parameters_that_name_the_whole_value : () -> Nil

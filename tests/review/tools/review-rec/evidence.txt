@@ -1,0 +1,14 @@
+Review target: f100d01f493991761b0d55425446bd5d96baf77b
+Redesign reference read: c2f41b734f2af530a82e3510eb778f8e1402075b
+No tracked files changed; no commits.
+No proposed record programs were compiled: parser still reserves records in this checkout.
+Historical model exited 1 with the documented Never versus empty-record witness.
+New model passed 4,994,560 substitutions, 33,344 independent flat set checks,
+78,040 union-order checks, and 1,024 label substitutions.
+Extension passed 15,876 two-variable substitutions (324 sources), with four
+labels and nested fields; 4,202 flat instances also checked by independent sets.
+Nested checks compare normalized trees, not independent nested denotations.
+Distinct-label branch growth: 16 stages -> 65,536 alternatives -> 1,048,576 field entries.
+Timings are Python model timings, not compiler benchmarks.
+Normalization-limit witness: 12 binary choices give 4,096 open alternatives;
+substituting Never first gives one record; both successful normalizations agree.

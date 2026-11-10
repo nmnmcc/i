@@ -1,4 +1,4 @@
 ok = 1
 --- errors ---
-E0112 @2:1 a line break directly inside a `{ }` that groups a type is a compile error
-E0112 @4:1 a line break directly inside a `{ }` that groups a type is a compile error
+E0112 @3:1 a line break directly inside a `{ }` that groups a type is a compile error
+E0112 @5:1 a line break directly inside a `{ }` that groups a type is a compile error

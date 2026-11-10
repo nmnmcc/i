@@ -15,13 +15,13 @@ fn breaks_need_both_sides() {
     // `+` cannot end, `)` cannot begin.
     assert_eq!(breaks("a +\nb"), [false, false, false, false]);
     assert_eq!(breaks("(a\n)"), [false, false, false, false]);
-    // `|>`, `.`, `|`, `?`, `->`, `if` never begin a statement.
-    for op in ["|> f", ".f", "| f", "? f", "-> f", "if f", "* f", "== f"] {
+    // `|>`, `.`, `|`, `?`, `->` never begin a statement.
+    for op in ["|> f", ".f", "| f", "? f", "-> f", "* f", "== f"] {
         assert!(!lex(&format!("a\n{op}")).tokens[1].brk, "{op}");
     }
-    // `-`, `-.`, `..`, `!`, `@`, and keywords other than `if` do.
+    // `-`, `-.`, `..`, `!`, `@`, and all names do.
     for op in [
-        "- f", "-. f", "..f", "! F", "@main", "case", "import", "export",
+        "- f", "-. f", "..f", "! F", "@main", "if", "case", "import", "export",
     ] {
         assert!(lex(&format!("a\n{op}")).tokens[1].brk, "{op}");
     }

@@ -1,7 +1,7 @@
 # i JavaScript host
 
 `ilang.mjs` is a self-contained ECMAScript module that runs i programs through
-the binary interface version 2 of `docs/spec.md` (Appendix B). It runs in modern
+the binary interface version 3 of `docs/spec.md` (Appendix B). It runs in modern
 browsers and Node.js without npm runtime dependencies. `ilang.d.ts` describes the
 same API for TypeScript.
 
@@ -38,7 +38,7 @@ exception handling with `exnref`. `supportsRequiredFeatures()` checks all four
 with a tiny probe module, without a network request.
 
 `instantiate` compiles the module, reads and checks its `ilang.abi` metadata
-(B.6), links `ilang:host/v1` (`panic` and `reference_id`, B.4) and every
+(B.6), links `ilang:host/v1` (`panic`, `reference_id` and `cancel`, B.4) and every
 function in `services` and `externals`, and calls `ilang_start` once (B.1). The
 loader checks every declared signature with Wasm's linker, also for an already
 compiled `WebAssembly.Module`. `abi` gives the metadata of a module without the
@@ -111,11 +111,42 @@ result buffer whose address is not 0, also an empty one.
 ## Async
 
 A function of an async host service (`@host("…", "async")`) gives a Promise.
-`callAsync(name, args)` calls an async export (B.5): while the status is 1, it
-awaits the Promise of the one host function that the module started, gives its
-value to `ilang_resume:namespace:label`, and at status 0 reads the results from
-`ilang_result:name`. While it waits, other calls are refused. `run()` and
-`runTests` also wait for async entry points.
+The module picks a request id for each async host function that it starts,
+and may keep many requests outstanding (B.4). The loader calls the service
+during the import, and answers the requests one at a time, in the order their
+Promises settle, through `ilang_resume:namespace:label` with the id first.
+`callAsync(name, args)` calls an async export (B.5). At status 2 (the module
+can go on without an answer) it waits one macrotask, gives an answer that is
+done, and otherwise calls `ilang_continue`. At status 0 it reads the results
+from `ilang_result:name`. While it waits, and while Wasm runs, other calls are
+refused; so a service may not call the instance. `run()` and `runTests` also
+wait for async entry points.
+
+The service is called during the import, so the part of an `async` function
+before its first `await` runs then. Fix anything that depends on the time of
+the call, such as a deadline, before the first `await`.
+
+A request is dropped when the module cancels it with the runtime import
+`cancel`, when the entry point ends while it is outstanding, when the program
+stops, and when the work of another request fails. JavaScript cannot stop a
+Promise, so the loader gives each request an `AbortSignal` and aborts it when
+the request is dropped. Call `requestSignal()` before the first `await` of the
+service to get it, and use it to clear a timer or abort a `fetch`:
+
+```javascript
+import { requestSignal } from "./ilang.mjs";
+
+const sleep = (ms) => {
+  const signal = requestSignal();
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener("abort", () => clearTimeout(timer));
+  });
+};
+```
+
+A service that ignores the signal keeps running, and its side effects still
+happen; only its answer is ignored.
 
 ## Verification
 
@@ -132,3 +163,85 @@ WebKit. Regenerate them, and the feature probe in `ilang.mjs`, with
 `bash scripts/build-abi-fixture.sh`. The hand-written ones test the host
 contract; `compiled.wasm` is built by the compiler, and runs sync and async host
 services, external functions, and host exports of a real program.
+
+## Resource contexts and binding permissions
+
+A `ResourceHost` is one live host identity domain. Reuse it in `resourceHost`
+across instances and tests; the SDK otherwise uses a shared default host. Every
+SDK entry/export invocation receives a fresh `ResourceContext`. Nested request
+roots and workers share that context. Numbers are positive BigInts and never
+reused in that host. Resources are looked up by context and kind; named leases
+serialize competing operations and reject success after close. A close receipt
+joins independent cleanup, including when the close waiter is abandoned.
+`cleanupJob()` registers creation/supervision before OS work starts, so teardown
+also joins jobs that have not produced a resource yet. `dispose()` closes the
+invocation gate and aborts outstanding requests without running i functions.
+Direct `instance.exports` access is the raw ABI; use SDK calls for invocation
+ownership. Initialization has its own context, closed by the first SDK call or
+disposal.
+
+`contextImports` callbacks receive their immutable invocation context first.
+They are restricted registrations: without approved declarations, loading fails
+with `ungranted host import <namespace> <name>: a trusted binding plan or explicit
+declaration grant is required`. Refusing a declaration gives
+`ungranted host import <namespace> <name> declared by <module> <declaration>`.
+Legacy `imports` registrations deliberately authorize all declarations of the
+specified import name, preserving custom embeddings. A resource factory must
+use `contextImports` and explicit declaration approval.
+
+`i build` writes a separate `.bindings.json` compiler plan next to an ilang
+artifact. It lists every required declaration before coalescing, its package
+content identity, module digest, host type/field or external name, and wire
+signature. Its artifact digest covers the final optimized Wasm bytes. This is
+outside ABI v3. Authenticate the compiler plan and trusted package content
+through your build/deployment path. A manifest's own names and digests do not
+establish trust. Pass the artifact bytes and plan to `authorizeBindings` with
+an explicit approval predicate; instantiate its returned `module` with that
+opaque token in `bindings`. A token cannot authorize a separately compiled
+module, even one supplied by an untrusted manifest.
+
+The CLI grants its loader-selected library content identity. Its existing
+printer is an ordinary public binding. Existing test/custom bindings retain
+explicit embedding authority: console print, storage read, clock later, math
+hypot; the spec host's test io print, math add/hypot, kv get/check, async
+double/echo/nan and bad nan/bits. No IO resource service is implemented here.
+
+Additional existing fixture grants are `custom.echo_string`, `custom.echo_int`,
+`custom.echo_bits`, `custom.echo_ref`, `custom.echo_bool`, `custom.echo_float`,
+`custom.echo_nil`, `custom:fallible/v1.fallible`, and the compiled fixture's
+`app:clock/v1.tick`. They use the same explicit legacy registration authority.
+
+Approval covers the complete authenticated binding plan: the artifact digest
+and the entire ordered declaration list, including refused and duplicate entries.
+JS authorization tokens retain an immutable snapshot, just as Rust grants do.
+Replacing any part of it, even by deleting a refused alias while keeping identical
+Wasm bytes, requires fresh explicit approval. Wire-import coverage alone cannot
+prove the list complete. Legacy broad registration authority is unchanged.
+
+Every SDK-managed entry into guest code checks the invocation gate, including
+continuations, result exports, allocation and each free. Ending during a host
+callback prevents return into guest code. Ending during request cancellation at
+status zero prevents the later result export. An interrupted invocation leaves
+the instance unusable. Synchronous opaque values are returned unchanged, without
+reading `then` or `finally`; operation kind and ABI metadata determine whether
+invocation handling is asynchronous. Direct raw Wasm export access remains the
+embedding's ABI duty.
+
+Teardown closes admission, removes every live entry and publishes close receipts
+before running any callback. Reentrant teardown joins the same completion.
+Callbacks cannot acquire resources, commit leases, deliver provisional values or
+reenter an SDK invocation during this transition.
+
+Cleanup failures are host diagnostics. Close and teardown still complete every
+cancellation, lease wake and cleanup starter, and keep their error-free contract.
+Thrown cancellation/cleanup errors, rejected cleanup Promises and exceptions in
+listeners registered on the supplied AbortSignals (including `onabort`) are
+isolated and collected. Drain records with `ResourceHost.takeCleanupErrors()` or
+`guest.takeCleanupErrors()`. Each record retains `phase` (`cancel`, `wake` or
+`cleanup`) and the original thrown `error`. The queue belongs to the host identity
+domain and includes late cleanup; draining it does not enter Wasm or replace the
+invocation's original result or failure. There are no implicit console reports
+or unhandled rejections for these failures. Cancellation callbacks revoke work
+synchronously; register independent asynchronous cleanup with `cleanupJob()`.
+If a cancellation callback nevertheless returns a Promise, its rejection is
+observed and recorded when it settles, without delaying synchronous revocation.

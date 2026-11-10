@@ -1,0 +1,6 @@
+{
+  "name": "extra_genuine_two_rows",
+  "code": 1,
+  "time": 0.01991037093102932,
+  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (f: () -> A ! N) -> A ! N\nsrc/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:6:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n2 errors\n"
+}

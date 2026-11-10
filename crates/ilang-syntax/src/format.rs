@@ -21,7 +21,7 @@
 
 use crate::ast::*;
 use crate::lexer::{Comment, lex};
-use crate::print::{has_open_fn, level, type_prec};
+use crate::print::{is_match, level, type_prec};
 use crate::span::Span;
 use crate::token::{Token, TokenKind as T};
 use crate::{Diagnostic, parse_module};
@@ -32,13 +32,16 @@ pub const WIDTH: usize = 80;
 /// The columns that a tab counts for when lines are measured.
 pub const TAB_WIDTH: usize = 4;
 
-/// Formats a source file. A file with syntax errors is not formatted; its
-/// errors are given back.
+/// Formats a source file. Syntax errors leave the source untouched.
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
     let (module, diags) = parse_module(source);
     if !diags.is_empty() {
         return Err(diags);
     }
+    Ok(format_module(source, &module))
+}
+
+fn format_module(source: &str, module: &Module) -> String {
     let lexed = lex(source);
     let mut f = Formatter {
         src: source,
@@ -48,15 +51,13 @@ pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
         next: 0,
         hard: 0,
         one_line: false,
+        fn_next: false,
     };
-    let doc = f.module(&module);
+    let doc = f.module(module);
     debug_assert_eq!(f.next, f.comments.len(), "every comment is printed");
-    Ok(render(&doc, WIDTH))
+    render(&doc, WIDTH)
 }
 
-// ---- Documents ----
-
-/// What a column of aligned lines lines up (gofmt's elastic tabstops).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Align {
     /// The part after `label:` of a field or an argument.
@@ -437,6 +438,9 @@ struct Formatter<'a> {
     /// Set in the `->` part of a function, which stays on the line of its
     /// `)` and `{`: its brackets are not broken.
     one_line: bool,
+    /// Set while a clause pattern is printed that `?` or `|` comes after,
+    /// which a function type at its end would take (§7.1).
+    fn_next: bool,
 }
 
 /// How blank lines between the lines of a list of statements, clauses,
@@ -804,21 +808,17 @@ impl<'a> Formatter<'a> {
         }
         let mut things = Vec::new();
         let mut spans = Vec::new();
-        let mut i = 0;
-        for (kw, is_import) in [(T::Import, true), (T::Export, false)] {
-            if self.toks[i].kind != kw {
-                continue;
-            }
-            let start = self.toks[i].span.start;
-            let paren = self.toks[i + 1].span.start;
-            let close = self.closer(paren);
-            spans.push((start, close + 1));
+        let header = [(m.imports_span, true), (m.exports_span, false)];
+        for (span, is_import) in header {
+            let Some(span) = span else { continue };
+            let at = self.tok_index(span.start);
+            let paren = self.toks[at].span.start;
+            spans.push((span.start, span.end));
             things.push(if is_import {
                 Thing::Import(paren, &m.imports)
             } else {
                 Thing::Export(paren, &m.exports)
             });
-            i = self.tok_index(close + 1);
         }
         for item in &m.items {
             spans.push((item.span.start, item.span.end));
@@ -837,7 +837,7 @@ impl<'a> Formatter<'a> {
     fn import(&mut self, paren: u32, items: &[ImportItem]) -> Doc {
         let close = self.closer(paren);
         let spans: Vec<_> = items.iter().map(|i| (i.span.start, i.span.end)).collect();
-        let list = self.seq("(", ")", paren, close, &spans, true, |f, i| {
+        self.seq("(", ")", paren, close, &spans, true, |f, i| {
             let item = &items[i];
             let mut out = Vec::new();
             if let Some(alias) = &item.alias {
@@ -863,30 +863,33 @@ impl<'a> Formatter<'a> {
             let path: Vec<&str> = item.path.iter().map(|p| p.name.as_str()).collect();
             out.push(text(path.join("/")));
             cat(out)
-        });
-        cat(vec![text("import "), list])
+        })
     }
 
     fn export(&mut self, paren: u32, items: &[ExportItem]) -> Doc {
         let close = self.closer(paren);
         let spans: Vec<_> = items.iter().map(|i| (i.span.start, i.span.end)).collect();
-        let list = self.seq("(", ")", paren, close, &spans, true, |_, i| {
+        self.seq("(", ")", paren, close, &spans, true, |_, i| {
             let e = &items[i];
             text(format!(
                 "{}{}",
                 e.name.name,
                 if e.constructors { "(..)" } else { "" }
             ))
-        });
-        cat(vec![text("export "), list])
+        })
     }
 
     fn item(&mut self, item: &Item) -> Doc {
         let mut out = Vec::new();
         for a in &item.attributes {
             out.push(self.leading(a.span.start));
-            out.push(text(format!("@{}", a.name.name)));
-            if !a.args.is_empty() {
+            match &a.module {
+                Some(m) => out.push(text(format!("@{}.{}", m.name, a.name.name))),
+                None => out.push(text(format!("@{}", a.name.name))),
+            }
+            if let Some((args, span)) = &a.call {
+                out.push(self.args(span.start, span.end - 1, args));
+            } else if !a.args.is_empty() {
                 let open = self.tok_after(a.name.span.end).span.start;
                 let close = self.closer(open);
                 let spans: Vec<_> = a.args.iter().map(|(_, s)| (s.start, s.end)).collect();
@@ -899,6 +902,9 @@ impl<'a> Formatter<'a> {
                 ItemKind::TypeDef(def) => def.name.span.start,
                 ItemKind::Binding(b) => b.span.start,
                 ItemKind::Declaration { name, .. } => name.span.start,
+                ItemKind::MacroItem { module, name, .. } => {
+                    module.as_ref().unwrap_or(name).span.start
+                }
             };
             if let Some(t) = self.trailing(a.span.end, next) {
                 out.push(t);
@@ -909,15 +915,66 @@ impl<'a> Formatter<'a> {
             ItemKind::TypeDef(def) => out.push(self.type_def(def, item.span.end)),
             ItemKind::Binding(b) => {
                 out.push(self.leading(b.span.start));
-                out.push(self.binding(b));
+                out.push(self.binding(b, true));
             }
-            ItemKind::Declaration { name, ty } => {
+            ItemKind::Declaration {
+                name,
+                type_params,
+                ty,
+            } => {
                 out.push(self.leading(name.span.start));
-                out.push(text(format!("{}: ", name.name)));
+                out.push(text(name.name.as_str()));
+                out.push(self.type_params(name, type_params));
+                out.push(text(": "));
                 out.push(self.ty(ty));
+            }
+            ItemKind::MacroItem { module, name, args } => {
+                let head = module.as_ref().unwrap_or(name);
+                out.push(self.leading(head.span.start));
+                match module {
+                    Some(m) => out.push(text(format!("{}.{}", m.name, name.name))),
+                    None => out.push(text(name.name.as_str())),
+                }
+                let open = self.tok_after(name.span.end).span.start;
+                let close = self.closer(open);
+                out.push(self.args(open, close, args));
             }
         }
         cat(out)
+    }
+
+    /// `(A, B)` after the name `name`, or nothing.
+    fn type_params(&mut self, name: &Ident, params: &[Ident]) -> Doc {
+        if params.is_empty() {
+            return cat(vec![]);
+        }
+        let open = self.tok_after(name.span.end).span.start;
+        let close = self.closer(open);
+        let spans: Vec<_> = params.iter().map(|n| (n.span.start, n.span.end)).collect();
+        self.seq("(", ")", open, close, &spans, false, |_, i| {
+            text(params[i].name.as_str())
+        })
+    }
+
+    /// The arguments of a call, from the `(` at `open` to the `)` at `close`.
+    fn args(&mut self, open: u32, close: u32, args: &[Arg]) -> Doc {
+        let spans: Vec<_> = args
+            .iter()
+            .map(|a| {
+                let start = a
+                    .label
+                    .as_ref()
+                    .map_or(a.value.span.start, |l| l.span.start);
+                (start, a.value.span.end)
+            })
+            .collect();
+        self.seq("(", ")", open, close, &spans, false, |f, i| {
+            let arg = &args[i];
+            match &arg.label {
+                Some(l) => cat(vec![f.label(&l.name), f.expr(&arg.value, 0)]),
+                None => f.expr(&arg.value, 0),
+            }
+        })
     }
 
     fn type_def(&mut self, def: &TypeDef, end: u32) -> Doc {
@@ -926,7 +983,12 @@ impl<'a> Formatter<'a> {
             text(def.name.name.as_str()),
         ];
         let mut after = def.name.span.end;
-        if !def.params.is_empty() {
+        if !def.head.is_empty() {
+            let open = self.tok_after(after).span.start;
+            let close = self.closer(open);
+            out.push(self.types(open, close, &def.head));
+            after = close + 1;
+        } else if !def.params.is_empty() {
             let open = self.tok_after(after).span.start;
             let close = self.closer(open);
             let spans: Vec<_> = def
@@ -935,7 +997,7 @@ impl<'a> Formatter<'a> {
                 .map(|n| (n.span.start, n.span.end))
                 .collect();
             out.push(self.seq("(", ")", open, close, &spans, false, |_, i| {
-                text(def.params[i].name.as_str())
+                text(&def.params[i].name)
             }));
             after = close + 1;
         }
@@ -977,17 +1039,40 @@ impl<'a> Formatter<'a> {
         cat(vec![name, fields])
     }
 
-    fn binding(&mut self, b: &Binding) -> Doc {
-        cat(vec![
-            self.pattern(&b.pattern, false),
-            text(" = "),
-            self.expr(&b.value, 0),
-        ])
+    fn binding(&mut self, b: &Binding, _top: bool) -> Doc {
+        let head = match (&b.pattern.kind, b.type_params.is_empty()) {
+            (PatternKind::Var(n), false) => {
+                let name = Ident {
+                    name: n.clone(),
+                    span: b.pattern.span,
+                };
+                cat(vec![
+                    self.leading(name.span.start),
+                    text(n.as_str()),
+                    self.type_params(&name, &b.type_params),
+                ])
+            }
+            (PatternKind::Typed { binder, ty }, false) => {
+                let name = Ident {
+                    name: binder.name.clone(),
+                    span: binder.span,
+                };
+                cat(vec![
+                    self.leading(name.span.start),
+                    text(binder.name.as_str()),
+                    self.type_params(&name, &b.type_params),
+                    text(": "),
+                    self.ty(ty),
+                ])
+            }
+            _ => self.pattern(&b.pattern, false),
+        };
+        cat(vec![head, text(" = "), self.expr(&b.value, 0)])
     }
 
     fn stmt(&mut self, s: &Stmt) -> Doc {
         match s {
-            Stmt::Bind(b) => self.binding(b),
+            Stmt::Bind(b) => self.binding(b, false),
             Stmt::Env { ty, value, span } => cat(vec![
                 self.leading(span.start),
                 text("! "),
@@ -1044,8 +1129,24 @@ impl<'a> Formatter<'a> {
     /// `e` where an expression of at least level `min` is needed (§6.9).
     fn expr(&mut self, e: &Expr, min: u8) -> Doc {
         self.continued(e.span.start, |f| {
-            if level(e) < min {
-                cat(vec![text("{ "), f.expr_raw(e), text(" }")])
+            // A match is an operation at level 6 (§6.9).
+            if level(e) < min || is_match(e) && min > 6 {
+                let before = f.hard;
+                let body = f.expr_raw(e);
+                if f.hard == before {
+                    group_of(
+                        Kind::Block,
+                        cat(vec![
+                            text("{"),
+                            nest(cat(vec![Doc::Line, body])),
+                            Doc::Line,
+                            text("}"),
+                        ]),
+                    )
+                } else {
+                    let (a, z) = (f.hard(), f.hard());
+                    group(cat(vec![text("{"), nest(cat(vec![a, body])), z, text("}")]))
+                }
             } else {
                 f.expr_raw(e)
             }
@@ -1101,7 +1202,15 @@ impl<'a> Formatter<'a> {
             }
             ExprKind::Block(b) => self.block(b, false),
             ExprKind::Fn(func) => self.function(func, span.start),
-            ExprKind::Case { subject, clauses } => self.case(subject, clauses, span),
+            ExprKind::Case { subject, clauses } => {
+                // §6.9: `|>` is stronger than the operators of levels 1 to 5.
+                let subject_doc = self.expr(subject, 6);
+                let open = self.tok_after(subject.span.end);
+                let open = self.tok_after(open.span.end).span.start;
+                let body = self.clause_block(open, span.end - 1, clauses);
+                cat(vec![subject_doc, text(" |> "), body])
+            }
+            ExprKind::Clauses(clauses) => self.clause_block(span.start, span.end - 1, clauses),
             ExprKind::Call { callee, args } => {
                 let head = self.expr(callee, 10);
                 let open = self.tok_after(callee.span.end).span.start;
@@ -1297,17 +1406,11 @@ impl<'a> Formatter<'a> {
         cat(out)
     }
 
-    /// `case e { clauses }`, with one clause per line.
-    fn case(&mut self, subject: &Expr, clauses: &[Clause], span: Span) -> Doc {
-        let subject_doc = if has_open_fn(subject) {
-            cat(vec![text("{ "), self.expr(subject, 0), text(" }")])
-        } else {
-            self.expr(subject, 0)
-        };
-        let open = self.tok_after(subject.span.end).span.start;
+    /// The clauses of a `case` or a clause block, from the `{` at `open` to
+    /// the `}` at `close`, one clause per line.
+    fn clause_block(&mut self, open: u32, close: u32, clauses: &[Clause]) -> Doc {
         let spans: Vec<_> = clauses.iter().map(|c| (c.span.start, c.span.end)).collect();
-        let body = self.braced_lines(open, span.end - 1, &spans, |f, i| f.clause(&clauses[i]));
-        cat(vec![text("case "), subject_doc, text(" "), body])
+        self.braced_lines(open, close, &spans, |f, i| f.clause(&clauses[i]))
     }
 
     /// A clause. Its patterns are not broken inside; when they do not fit
@@ -1315,9 +1418,11 @@ impl<'a> Formatter<'a> {
     /// which goes on from the line before (§1.7).
     fn clause(&mut self, c: &Clause) -> Doc {
         let saved = std::mem::replace(&mut self.one_line, true);
+        let guard = c.guard.is_some();
+        self.fn_next = c.patterns.len() > 1 || guard;
         let first = self.pattern(&c.patterns[0], true);
         let mut more = Vec::new();
-        for p in &c.patterns[1..] {
+        for (i, p) in c.patterns.iter().enumerate().skip(1) {
             // A comment before a choice stays at the end of the line before
             // its `|`.
             if let Some(comments) = self.mid_comments(p.span.start) {
@@ -1326,12 +1431,14 @@ impl<'a> Formatter<'a> {
             }
             more.push(Doc::Line);
             more.push(text("| "));
+            self.fn_next = i + 1 < c.patterns.len() || guard;
             more.push(self.pattern(p, true));
         }
+        self.fn_next = false;
         self.one_line = saved;
         let mut out = vec![group(cat(vec![first, nest(cat(more))]))];
         if let Some(g) = &c.guard {
-            out.push(text(" if "));
+            out.push(text(" ? "));
             out.push(self.expr(g, 0));
         }
         out.push(Doc::Tab(Align::Arrow));
@@ -1361,6 +1468,9 @@ impl<'a> Formatter<'a> {
             PatternKind::Typed { binder, ty } => {
                 let t = if clause && ends_with_tuple(ty) {
                     cat(vec![text("{ "), self.ty(ty), text(" }")])
+                } else if clause && self.fn_next {
+                    // §7.1: a function type before `?` or `|` is put in `{ }`.
+                    self.ty_in(ty, 1, false)
                 } else {
                     self.ty(ty)
                 };
@@ -1506,7 +1616,22 @@ impl<'a> Formatter<'a> {
                 let list = self.types(open, t.span.end - 1, args);
                 return cat(vec![head, list]);
             }
-            TypeKind::Var(n) => return text(n.as_str()),
+            TypeKind::ValueOf { module, name } => {
+                return match module {
+                    Some(m) => text(format!("{}.{}", m.name, name.name)),
+                    None => text(name.name.as_str()),
+                };
+            }
+            TypeKind::Call { module, name, args } => {
+                let head = match module {
+                    Some(m) => text(format!("{}.{}", m.name, name.name)),
+                    None => text(name.name.as_str()),
+                };
+                let open = self.tok_after(name.span.end).span.start;
+                let list = self.types(open, t.span.end - 1, args);
+                return cat(vec![head, list]);
+            }
+            TypeKind::Lit(v) => return text(v.text()),
             TypeKind::Hole => return text("_"),
             TypeKind::Tuple(items) => return self.types(t.span.start, t.span.end - 1, items),
             TypeKind::Fn {

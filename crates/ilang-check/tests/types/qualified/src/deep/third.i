@@ -1,4 +1,10 @@
-export (X(..), make)
+(
+	X(..)
+	make
+)
 
-X { X }
+X {
+	X
+}
+
 make = () { X }

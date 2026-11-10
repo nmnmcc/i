@@ -1,0 +1,4 @@
+new : () -> Stream(Never, Never, A)
+needs_bias : () -> Stream(Int, Never, Bias)
+make : (pull: () -> Step(A, B, C) ? B ! C) -> Stream(A, B, C)
+biased : () -> Stream(Int, Never, Bias)

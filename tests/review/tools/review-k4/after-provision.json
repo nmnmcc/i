@@ -1,0 +1,443 @@
+[
+  {
+    "case": "bad_rec",
+    "code": 1,
+    "time": 0.019252039026468992,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\n",
+    "stderr": "src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n"
+  },
+  {
+    "case": "bad_self",
+    "code": 1,
+    "time": 0.021669364999979734,
+    "stdout": "",
+    "stderr": "src/main.i:1:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n"
+  },
+  {
+    "case": "closure",
+    "code": 1,
+    "time": 0.020347926998510957,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\n",
+    "stderr": "src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:5:13: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n3 errors\n"
+  },
+  {
+    "case": "closure_annotated",
+    "code": 1,
+    "time": 0.018995651975274086,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\n",
+    "stderr": "src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:5:13: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n3 errors\n"
+  },
+  {
+    "case": "closure_captured",
+    "code": 1,
+    "time": 0.017870272044092417,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\n",
+    "stderr": "src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:5:13: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n2 errors\n"
+  },
+  {
+    "case": "closure_closed",
+    "code": 0,
+    "time": 0.017368324100971222,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.make : (f: () -> Nil) -> () -> Nil\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "closure_covariant",
+    "code": 1,
+    "time": 0.02877564704976976,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": "src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:5:13: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n2 errors\n"
+  },
+  {
+    "case": "closure_explicit_use",
+    "code": 1,
+    "time": 0.018284699181094766,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\n",
+    "stderr": "src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:5:13: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n3 errors\n"
+  },
+  {
+    "case": "closure_inner_annotation",
+    "code": 1,
+    "time": 0.018996465019881725,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\n",
+    "stderr": "src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:5:13: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n3 errors\n"
+  },
+  {
+    "case": "closure_noreturn",
+    "code": 1,
+    "time": 0.01895548216998577,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\n",
+    "stderr": "src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n2 errors\n"
+  },
+  {
+    "case": "closure_unused",
+    "code": 1,
+    "time": 0.01769030001014471,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\n",
+    "stderr": "src/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n"
+  },
+  {
+    "case": "conflict_2046229799906290556",
+    "code": 1,
+    "time": 0.01930934702977538,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.join : (f: () -> String ! N, g: () -> Int ! N2) -> Int ! N | N2\napp/main.bad : () -> Int ! S(String) | S(Int)\n",
+    "stderr": "src/main.i:6:7: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2)\n1 error\n"
+  },
+  {
+    "case": "conflict_3995797194752417745",
+    "code": 1,
+    "time": 0.01921743806451559,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.join : (f: () -> String ! N, g: () -> Int ! N2) -> Int ! N | N2\napp/main.bad : () -> Int ! S(String) | S(Int)\n",
+    "stderr": "src/main.i:6:7: error[E0515]: `String` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2)\nsrc/main.i:6:16: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2)\n2 errors\n"
+  },
+  {
+    "case": "conflict_4688151140569818353",
+    "code": 1,
+    "time": 0.023687784792855382,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.join : (f: () -> String ! N, g: () -> Int ! N2) -> Int ! N | N2\napp/main.bad : () -> Int ! S(String) | S(Int)\n",
+    "stderr": "src/main.i:6:7: error[E0515]: `String` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2)\nsrc/main.i:6:16: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2)\n2 errors\n"
+  },
+  {
+    "case": "conflict_4759503553685934015",
+    "code": 1,
+    "time": 0.023981409147381783,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.join : (f: () -> String ! N, g: () -> Int ! N2) -> Int ! N | N2\napp/main.bad : () -> Int ! S(String) | S(Int)\n",
+    "stderr": "src/main.i:6:7: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2)\n1 error\n"
+  },
+  {
+    "case": "conflict_5003292184701381503",
+    "code": 1,
+    "time": 0.021979481913149357,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.join : (f: () -> String ! N, g: () -> Int ! N2) -> Int ! N | N2\napp/main.bad : () -> Int ! S(String) | S(Int)\n",
+    "stderr": "src/main.i:6:7: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2)\n1 error\n"
+  },
+  {
+    "case": "conflict_7401424894349461812",
+    "code": 1,
+    "time": 0.025575157953426242,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.join : (f: () -> String ! N, g: () -> Int ! N2) -> Int ! N | N2\napp/main.bad : () -> Int ! S(String) | S(Int)\n",
+    "stderr": "src/main.i:6:7: error[E0515]: `String` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2)\nsrc/main.i:6:16: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2)\n2 errors\n"
+  },
+  {
+    "case": "finite",
+    "code": 0,
+    "time": 0.01946806814521551,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.forward : () -> Nil ! N | S(N)\napp/main.example : () -> Nil\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "generic_conflict",
+    "code": 1,
+    "time": 0.019139138981699944,
+    "stdout": "app/main.use : (f: () -> Nil ! N) -> A ! N | S(B & A)\napp/main.two : () -> Nil ! S(String)\napp/main.bad : () -> Int ! S(Int)\n",
+    "stderr": "src/main.i:4:26: error[E0515]: `String` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2) (the type at 4:19 needs it)\nsrc/main.i:4:28: error[E0501]: `String` is not a subtype of `Int` (the type at 4:13 needs it)\n2 errors\n"
+  },
+  {
+    "case": "hidden_conflict",
+    "code": 1,
+    "time": 0.020996788050979376,
+    "stdout": "app/main.one : () -> Int ! S(Int)\napp/main.two : () -> String ! S(String)\napp/main.join : (f: () -> Int ! N, g: () -> String ! N2) -> (Int, String) ! N | N2\napp/main.bad : () -> (Int, String) ! S(Int) | S(String)\n",
+    "stderr": "src/main.i:5:7: error[E0515]: `String` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2)\n1 error\n"
+  },
+  {
+    "case": "invariant_args",
+    "code": 0,
+    "time": 0.019285510992631316,
+    "stdout": "app/main.use : () -> A ! N | S(A, N)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f : () -> A ! N | S(B & A, N)\n",
+    "stderr": ""
+  },
+  {
+    "case": "local_instances",
+    "code": 1,
+    "time": 0.020185411907732487,
+    "stdout": "app/main.use : () -> A ! N | S(A, N)\napp/main.main : () -> Nil ! Assert\n",
+    "stderr": "src/main.i:6:2: error[E0515]: `_` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (\u00a74.5 rule 4, \u00a79.2)\n1 error\n"
+  },
+  {
+    "case": "matrix_False_False_False",
+    "code": 0,
+    "time": 0.01832924410700798,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ? E ! N) -> A ? E ! N\napp/main.f : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_False_False_False_reverse",
+    "code": 0,
+    "time": 0.020431173034012318,
+    "stdout": "app/main.f : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ? E ! N) -> A ? E ! N\napp/main.use : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_False_False_True",
+    "code": 0,
+    "time": 0.021134225884452462,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ? E ! N) -> A ? E ! N\napp/main.f : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_False_False_True_reverse",
+    "code": 0,
+    "time": 0.022326397011056542,
+    "stdout": "app/main.f : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ? E ! N) -> A ? E ! N\napp/main.use : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_False_True_False",
+    "code": 0,
+    "time": 0.021983419079333544,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.f : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_False_True_False_reverse",
+    "code": 0,
+    "time": 0.018686997005715966,
+    "stdout": "app/main.f : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.use : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_False_True_True",
+    "code": 0,
+    "time": 0.018647906137630343,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.f : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_False_True_True_reverse",
+    "code": 0,
+    "time": 0.018188893795013428,
+    "stdout": "app/main.f : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.use : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_True_False_False",
+    "code": 0,
+    "time": 0.019274573074653745,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ? E ! N) -> A ? E ! N\napp/main.f : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_True_False_False_reverse",
+    "code": 0,
+    "time": 0.018750211922451854,
+    "stdout": "app/main.f : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ? E ! N) -> A ? E ! N\napp/main.use : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_True_False_True",
+    "code": 0,
+    "time": 0.01837758906185627,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ? E ! N) -> A ? E ! N\napp/main.f : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_True_False_True_reverse",
+    "code": 0,
+    "time": 0.018874680157750845,
+    "stdout": "app/main.f : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ? E ! N) -> A ? E ! N\napp/main.use : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_True_True_False",
+    "code": 0,
+    "time": 0.021383472019806504,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.f : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_True_True_False_reverse",
+    "code": 0,
+    "time": 0.023565900046378374,
+    "stdout": "app/main.f : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.use : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_True_True_True",
+    "code": 0,
+    "time": 0.021449901862069964,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.f : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "matrix_True_True_True_reverse",
+    "code": 0,
+    "time": 0.026226793881505728,
+    "stdout": "app/main.f : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.use : () -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "multi",
+    "code": 0,
+    "time": 0.02028544107452035,
+    "stdout": "app/main.use : (a: A) -> A ? E ! N | S(A, E, N)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.int : () -> Int\napp/main.str : () -> String\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "mutual",
+    "code": 0,
+    "time": 0.019626094959676266,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.f : (n: Int) -> Nil ! N | S(N)\napp/main.g : (n: Int) -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "mutual_False_False_False",
+    "code": 0,
+    "time": 0.019015532918274403,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.f : (n: Int) -> Nil ! N | S(N)\napp/main.g : (n: Int) -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "mutual_False_False_True",
+    "code": 0,
+    "time": 0.01910900487564504,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.g : (n: Int) -> Nil ! N | S(N)\napp/main.f : (n: Int) -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "mutual_False_True_False",
+    "code": 0,
+    "time": 0.019727959064766765,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.f : (n: Int) -> Nil ! N | S(N)\napp/main.g : (n: Int) -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "mutual_False_True_True",
+    "code": 0,
+    "time": 0.020411744015291333,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.g : (n: Int) -> Nil ! N | S(N)\napp/main.f : (n: Int) -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "mutual_True_False_False",
+    "code": 0,
+    "time": 0.02172392699867487,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.f : (n: Int) -> Nil ! N | S(N)\napp/main.g : (n: Int) -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "mutual_True_False_True",
+    "code": 0,
+    "time": 0.01987051498144865,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.g : (n: Int) -> Nil ! N | S(N)\napp/main.f : (n: Int) -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "mutual_True_True_False",
+    "code": 0,
+    "time": 0.02074737986549735,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.f : (n: Int) -> Nil ! N | S(N)\napp/main.g : (n: Int) -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "mutual_True_True_True",
+    "code": 0,
+    "time": 0.023894677171483636,
+    "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.g : (n: Int) -> Nil ! N | S(N)\napp/main.f : (n: Int) -> Nil ! N | S(N)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "provision_closure_False",
+    "code": 0,
+    "time": 0.020895505091175437,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.with : (x: A, f: () -> B ! N) -> () -> B ! N - S(_)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "provision_closure_True",
+    "code": 0,
+    "time": 0.01887220609933138,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.with : (x: A, f: () -> B ! N) -> () -> B ! N - S(_)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "provision_direct_False",
+    "code": 0,
+    "time": 0.026780350133776665,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.with : (x: A, f: () -> B ! N) -> B ! N - S(_)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "provision_direct_True",
+    "code": 0,
+    "time": 0.018760046921670437,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.with : (x: A, f: () -> B ! N) -> B ! N - S(_)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "provision_helper_False",
+    "code": 0,
+    "time": 0.0267544100061059,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.with : (x: A, f: () -> B ! N) -> B ! N - S(_)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "provision_helper_True",
+    "code": 0,
+    "time": 0.020697365049272776,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.with : (x: A, f: () -> B ! N) -> B ! N - S(_)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "provision_inferred_False",
+    "code": 0,
+    "time": 0.020953712984919548,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.with : (x: A, f: () -> B ? E ! N) -> B ? E ! N - S(_)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "provision_inferred_True",
+    "code": 0,
+    "time": 0.02069625398144126,
+    "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.with : (x: A, f: () -> B ? E ! N) -> B ? E ! N - S(_)\napp/main.main : () -> Nil\n",
+    "stderr": ""
+  },
+  {
+    "case": "recursive_env_cov",
+    "code": 1,
+    "time": 0.02916163904592395,
+    "stdout": "",
+    "stderr": "src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n"
+  },
+  {
+    "case": "recursive_env_mutual",
+    "code": 1,
+    "time": 0.020158390048891306,
+    "stdout": "",
+    "stderr": "src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n"
+  },
+  {
+    "case": "recursive_inv",
+    "code": 1,
+    "time": 0.018783400999382138,
+    "stdout": "",
+    "stderr": "src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n"
+  },
+  {
+    "case": "recursive_mutual",
+    "code": 1,
+    "time": 0.020040652016177773,
+    "stdout": "",
+    "stderr": "src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n"
+  },
+  {
+    "case": "recursive_value",
+    "code": 1,
+    "time": 0.017666713101789355,
+    "stdout": "",
+    "stderr": "src/main.i:2:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n"
+  },
+  {
+    "case": "same_row",
+    "code": 0,
+    "time": 0.018346843076869845,
+    "stdout": "app/main.use : () -> Nil ! N | S(N) | T(N)\n",
+    "stderr": ""
+  },
+  {
+    "case": "two_rows",
+    "code": 0,
+    "time": 0.01963227614760399,
+    "stdout": "app/main.use : () -> Nil ! N | N2 | S(N) | T(N2)\n",
+    "stderr": ""
+  }
+]

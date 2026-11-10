@@ -1,4 +1,4 @@
-import (
+(
 	i/core
 	int = std/int
 	string = std/string

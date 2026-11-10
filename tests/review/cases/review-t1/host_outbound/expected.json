@@ -1,0 +1,37 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 0,
+      "stdout": "probe/main.log : (\"error\" | \"info\" | \"warn\") -> Nil\nprobe/main.number : (Int - 0) -> Nil\n",
+      "stderr": ""
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 1,
+      "stdout": "FAIL probe/qa_corpus_runtime_test.qa_startup\n  missing host function app log\n0 passed, 1 failed\n",
+      "stderr": ""
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 1,
+      "stdout": "FAIL probe/qa_corpus_runtime_test.qa_startup\n  missing host function app log\n0 passed, 1 failed\n",
+      "stderr": ""
+    }
+  }
+}

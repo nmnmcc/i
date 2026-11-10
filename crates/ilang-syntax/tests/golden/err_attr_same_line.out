@@ -1,0 +1,2 @@
+--- errors ---
+E0101 @2:16 expected an item: a type definition, or a binding `pattern = value`, found `=`

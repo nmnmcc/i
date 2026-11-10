@@ -9,7 +9,10 @@ use super::{FnTy, Head, Ty};
 use crate::code;
 use crate::hir::*;
 use ilang_syntax::span::Span;
+use rustc_hash::FxHashSet as HashSet;
 use std::collections::HashMap;
+
+const LITERAL_CANDIDATES: bool = true;
 
 /// A catch-all is a name, a discard, or `x = q` where `q` is one (§4.8).
 pub(crate) fn catch_all(p: &Pattern) -> bool {
@@ -69,12 +72,16 @@ struct Place {
     heads: Vec<(Head, Vec<Ty>)>,
     /// A clause without a guard has a catch-all here.
     catch_here: bool,
+    /// Earliest item index covered by an unguarded list rest.
+    rest_from: Option<u32>,
     parent: Option<usize>,
     children: Vec<(Step, usize)>,
     /// The type constructors of the patterns here that are not catch-alls:
     /// the clause, whether it has no guard, the head, and its number of
     /// arguments.
     seen: Vec<(usize, bool, Head, usize)>,
+    scalar_seen: Vec<(usize, bool, Ty, Pat)>,
+    shared: bool,
 }
 
 /// A catch-all in a clause pattern, to be narrowed (rule 12).
@@ -93,10 +100,12 @@ pub(crate) struct PendingCase {
     pub span: Span,
     /// Each clause: its choices, whether it has a guard, and its place.
     pub clauses: Vec<(Pat, bool, Span)>,
+    pub held: Vec<(super::solve::Failure, Span)>,
 }
 
 /// What a clause pass needs while it visits patterns.
 struct Visit<'p> {
+    fitted: bool,
     clause: usize,
     choice: usize,
     unguarded: bool,
@@ -204,15 +213,22 @@ impl Checker<'_> {
                 }
                 list
             }
-            _ => self.leaf(q, false),
+            _ => self.leaf(q, false, false),
         }
     }
 
     /// The pattern types of literals, prefixes, and bit arrays, with their
     /// names bound.
-    fn leaf(&mut self, q: &Pattern, in_case: bool) -> Ty {
+    fn leaf(&mut self, q: &Pattern, in_case: bool, literal: bool) -> Ty {
         let prim = |b| Ty::named(TypeRef::Builtin(b), Vec::new());
         match &q.kind {
+            PatternKind::Int { negative, value } if literal => super::known::scalar_literal(
+                BuiltinType::Int,
+                super::lits::int_text(*negative, value),
+            ),
+            PatternKind::String(s) if literal => {
+                super::known::scalar_literal(BuiltinType::String, s.clone())
+            }
             PatternKind::Int { .. } => prim(BuiltinType::Int),
             PatternKind::Float { .. } => prim(BuiltinType::Float),
             PatternKind::String(_) => prim(BuiltinType::String),
@@ -352,7 +368,7 @@ impl Checker<'_> {
 
     /// A member that is a custom type with no constructors (§4.3).
     fn no_constructors(&self, m: &Ty) -> bool {
-        matches!(m, Ty::Con(Head::Named(TypeRef::Custom(id)), _)
+        matches!(m, Ty::Con(Head::Named(TypeRef::Custom(id)), _, _)
             if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty()))
     }
 
@@ -409,6 +425,7 @@ impl Checker<'_> {
         span: Span,
         expected: &Ty,
     ) -> (Ty, Ty) {
+        let fitted = clauses.len() == 1 && clauses[0].guard.is_none();
         let (a, subject_known) = self.infer_k(subject, &Ty::Top);
         let mut places = vec![Place {
             ty: a.clone(),
@@ -416,12 +433,16 @@ impl Checker<'_> {
             pats: Vec::new(),
             heads: Vec::new(),
             catch_here: false,
+            rest_from: None,
             parent: None,
             children: Vec::new(),
             seen: Vec::new(),
+            scalar_seen: Vec::new(),
+            shared: false,
         }];
         let mut rows: Vec<Vec<Pat>> = Vec::new();
         let mut v = Visit {
+            fitted,
             clause: 0,
             choice: 0,
             unguarded: true,
@@ -441,6 +462,7 @@ impl Checker<'_> {
         }
         // `B <: P`, or `B <: P | r - P` when a clause without a guard has a
         // catch-all at the place or above it.
+        let mut held = Vec::new();
         let mut slack = vec![false; places.len()];
         for i in 0..places.len() {
             slack[i] = places[i].catch_here || places[i].parent.is_some_and(|p| slack[p]);
@@ -457,7 +479,12 @@ impl Checker<'_> {
                 p
             };
             let b = places[i].ty.clone();
-            self.sub(&b, &want, if i == 0 { subject.span } else { span });
+            let at = if i == 0 { subject.span } else { span };
+            if fitted {
+                self.sub(&b, &want, at);
+            } else {
+                held.extend(self.sub_case(&b, &want, at));
+            }
         }
         // Rule 12: each catch-all gets `B - H`, and its known type less the
         // members that are taken (§4.8).
@@ -468,15 +495,8 @@ impl Checker<'_> {
             self.bind_catch_all(pattern, &t, true);
             let known = match taken {
                 None => Ty::Never,
-                Some(hs) => {
-                    let ms = known::members(&places[place].known)
-                        .into_iter()
-                        .filter(|m| m.head().is_none_or(|h| !hs.contains(&h)))
-                        .collect();
-                    match &places[place].known {
-                        Ty::Top => Ty::Top,
-                        _ => self.kunion(ms),
-                    }
+                Some(taken) => {
+                    super::display::known_diff(&self.s, places[place].known.clone(), taken)
                 }
             };
             self.fit_known(pattern, &known, true);
@@ -495,7 +515,7 @@ impl Checker<'_> {
         let mut knowns = Vec::new();
         for c in clauses {
             // Every choice of the clause has `C` at its top.
-            let known = subject_var.and_then(|x| {
+            let known = subject_var.filter(|_| !fitted).and_then(|x| {
                 let mut ctors = c.patterns.iter().map(top_ctor);
                 let first = ctors.next()??;
                 ctors.all(|o| o == Some(first)).then_some((x, first))
@@ -531,25 +551,37 @@ impl Checker<'_> {
             }
         }
         let module = self.module;
-        self.cases.push(PendingCase {
-            module,
-            subject: a,
-            span: subject.span,
-            clauses: rows
-                .into_iter()
-                .zip(clauses)
-                .map(|(choices, c)| {
-                    let span = match (c.patterns.first(), c.patterns.last()) {
-                        (Some(f), Some(l)) => Span {
-                            start: f.span.start,
-                            end: l.span.end,
-                        },
-                        _ => c.span,
-                    };
-                    (Pat::Or(choices), c.guard.is_some(), span)
-                })
-                .collect(),
-        });
+        if fitted {
+            let clause = &clauses[0];
+            let at = clause
+                .patterns
+                .first()
+                .unwrap()
+                .span
+                .to(clause.patterns.last().unwrap().span);
+            self.defer_failure(Pat::Or(rows[0].clone()), a, at);
+        } else {
+            self.cases.push(PendingCase {
+                module,
+                held,
+                subject: a,
+                span: subject.span,
+                clauses: rows
+                    .into_iter()
+                    .zip(clauses)
+                    .map(|(choices, c)| {
+                        let span = match (c.patterns.first(), c.patterns.last()) {
+                            (Some(f), Some(l)) => Span {
+                                start: f.span.start,
+                                end: l.span.end,
+                            },
+                            _ => c.span,
+                        };
+                        (Pat::Or(choices), c.guard.is_some(), span)
+                    })
+                    .collect(),
+            });
+        }
         (r, self.kunion(knowns))
     }
 
@@ -568,7 +600,7 @@ impl Checker<'_> {
         choice: usize,
         id: u32,
         place: &Place,
-    ) -> (Ty, Option<Vec<Head>>) {
+    ) -> (Ty, Option<Vec<Ty>>) {
         let earlier: Vec<Vec<Pat>> = (0..ci)
             .filter(|i| clauses[*i].guard.is_none())
             .map(|i| vec![Pat::Or(rows[i].clone())])
@@ -592,11 +624,23 @@ impl Checker<'_> {
             }
         }
         let mut taken = Vec::new();
-        let mut heads = Vec::new();
+        // Under Any columns, a finite literal prefix cannot cover a
+        // whole infinite scalar head. Keep the matrix for every other row.
+        let literal_prefix = place.parent.is_none()
+            && (0..ci)
+                .filter(|i| clauses[*i].guard.is_none())
+                .all(|i| rows[i].iter().all(coverage::scalar_literal_row));
         for (h, n) in candidates {
+            if literal_prefix
+                && matches!(
+                    h,
+                    Head::Named(TypeRef::Builtin(BuiltinType::Int | BuiltinType::String))
+                )
+            {
+                continue;
+            }
             let q = coverage::replace(&rows[ci][choice], id, &Pat::Head(h, n));
             if self.useful(&earlier, &[q], &[Col::Any]).is_none() {
-                heads.push(h);
                 let args: Vec<Ty> = (0..n).map(|_| self.s.fresh()).collect();
                 taken.push(match h {
                     Head::Fn => Ty::Fn(Box::new(FnTy {
@@ -605,16 +649,33 @@ impl Checker<'_> {
                         err: self.s.fresh(),
                         env: self.s.fresh(),
                     })),
-                    h => Ty::Con(h, args),
+                    h => Ty::Con(h, super::lits::ValueSet::ALL, args),
                 });
             }
         }
-        if taken.is_empty() {
-            return (place.ty.clone(), Some(heads));
+        if LITERAL_CANDIDATES {
+            let mut scalar_taken: HashSet<Ty> = HashSet::default();
+            for (earlier_clause, unguarded, candidate, pat) in &place.scalar_seen {
+                if *earlier_clause >= ci || !unguarded || scalar_taken.contains(candidate) {
+                    continue;
+                }
+                // The visit record already identifies the earlier clause.
+                // Inspect its actual row, not every earlier row and not a
+                // fitted row (which would erase a failing type test).
+                let fast = place.parent.is_none() && rows[*earlier_clause].iter().any(|row| matches!((row,pat),(Pat::Ctor(Ctor::Lit(a),_),Pat::Ctor(Ctor::Lit(b),_)) if a == b));
+                let q = coverage::replace(&rows[ci][choice], id, pat);
+                if fast || self.useful(&earlier, &[q], &[Col::Any]).is_none() {
+                    scalar_taken.insert(candidate.clone());
+                    taken.push(candidate.clone());
+                }
+            }
         }
-        let t = self.s.diff(place.ty.clone(), taken);
+        if taken.is_empty() {
+            return (place.ty.clone(), Some(taken));
+        }
+        let t = self.s.diff(place.ty.clone(), taken.clone());
         self.flush(place_span(clauses, ci), None);
-        (t, Some(heads))
+        (t, Some(taken))
     }
 
     /// Checks the coverage (§7.4) of a `case`, and warns about the clauses
@@ -623,31 +684,103 @@ impl Checker<'_> {
         self.set_module(c.module);
         let col = [Col::of(c.subject.clone())];
         let mut rows: Vec<Vec<Pat>> = Vec::new();
+        let mut scalar_rows = Some(coverage::ScalarRows::default());
         for (pat, guarded, span) in &c.clauses {
-            if self
-                .useful(&rows, std::slice::from_ref(pat), &col)
-                .is_none()
-            {
-                self.warning(
-                    code::NEVER_USED,
-                    *span,
-                    "this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)",
-                );
+            let useful = match &scalar_rows {
+                Some(index) => self.scalar_row_useful(index, pat, &c.subject, &rows),
+                None => self
+                    .useful(&rows, std::slice::from_ref(pat), &col)
+                    .is_some(),
+            };
+            if !useful {
+                let mut message = "this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)".to_string();
+                if let Ok(t) =
+                    super::display::shown(&self.s, &c.subject, super::display::Opts::default())
+                {
+                    let ms = known::members(&t);
+                    if let [m] = ms.as_slice()
+                        && m.scalar().is_some()
+                        && m.values().is_finite()
+                        && m.values().items().count() == 1
+                    {
+                        message.push_str(&format!(
+                            "; the value matched is always `{}`",
+                            super::display::show_known(&self.s, m)
+                        ));
+                    }
+                }
+                self.warning(code::NEVER_USED, *span, message);
             }
             if !guarded {
+                if let Some(index) = &mut scalar_rows
+                    && !index.add(pat)
+                {
+                    scalar_rows = None;
+                }
                 rows.push(vec![pat.clone()]);
             }
         }
-        if let Some(w) = self.useful(&rows, &[Pat::Wild(None)], &col) {
+        let missing = match &scalar_rows {
+            Some(index) => self.scalar_row_missing(index, &c.subject),
+            None => self.useful(&rows, &[Pat::Wild(None)], &col),
+        };
+        if let Some(w) = missing {
             let text = self.show_pat(&w[0]);
-            self.error(
-                code::CASE_NOT_COVERED,
-                c.span,
-                format!(
-                    "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `{text}`"
-                ),
+            let mut message = format!(
+                "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `{text}`"
             );
+            if let Some(hint) = self.shared_hint(&w[0], &rows) {
+                message.push_str("; ");
+                message.push_str(&hint);
+            }
+            self.error(code::CASE_NOT_COVERED, c.span, message);
+        } else {
+            for (failure, span) in c.held {
+                self.s.failures.push(failure);
+                self.flush(span, None);
+            }
         }
+    }
+
+    pub(super) fn field_shared(&mut self, ctor: CtorRef, index: usize) -> bool {
+        if !self.shared_fields.contains_key(&ctor)
+            && let TypeBody::Custom(ctors) = &self.p.ty(ctor.ty).body
+        {
+            let fields: Vec<Vec<Vec<TyVarId>>> = ctors
+                .iter()
+                .map(|c| {
+                    c.fields
+                        .iter()
+                        .map(|f| {
+                            let mut out = Vec::new();
+                            field_vars(self.p, &f.ty, &mut out, 0);
+                            out
+                        })
+                        .collect()
+                })
+                .collect();
+            let mut counts = HashMap::new();
+            for v in fields.iter().flatten().flatten() {
+                *counts.entry(*v).or_insert(0usize) += 1;
+            }
+            for (i, fields) in fields.into_iter().enumerate() {
+                self.shared_fields.insert(
+                    CtorRef {
+                        ty: ctor.ty,
+                        index: i as u32,
+                    },
+                    fields
+                        .into_iter()
+                        .map(|vars| vars.iter().any(|v| counts[v] > 1))
+                        .collect(),
+                );
+            }
+        }
+        self.shared_fields
+            .get(&ctor)
+            .and_then(|xs| xs.get(index))
+            .copied()
+            .unwrap_or(false)
     }
 
     /// The place below `at` by `step`, with the type `ty` and the known
@@ -663,15 +796,26 @@ impl Checker<'_> {
         if let Some((_, i)) = places[at].children.iter().find(|c| c.0 == step) {
             return *i;
         }
+        let shared = places[at].shared
+            || matches!(step, Step::Item(_))
+            || match step {
+                Step::Field(c, i) => self.field_shared(c, i as usize),
+                _ => false,
+            };
+        let catch_here =
+            matches!(step, Step::Item(i) if places[at].rest_from.is_some_and(|from| i>=from));
         places.push(Place {
             ty,
             known,
             pats: Vec::new(),
             heads: Vec::new(),
-            catch_here: false,
+            catch_here,
+            rest_from: None,
             parent: Some(at),
             children: Vec::new(),
             seen: Vec::new(),
+            scalar_seen: Vec::new(),
+            shared,
         });
         let i = places.len() - 1;
         places[at].children.push((step, i));
@@ -731,7 +875,7 @@ impl Checker<'_> {
                     self.error(
                         code::CASE_TYPE_VAR,
                         ty.span,
-                        "in a `case`, `x: T` tests the type constructor, so `T` may not have a type variable as a member (§7.1)",
+                        "in a test, `x: T` tests the type constructor, so `T` may not have a type variable as a member (§7.1)",
                     );
                     Pat::Wild(None)
                 } else {
@@ -739,25 +883,63 @@ impl Checker<'_> {
                         members
                             .iter()
                             .filter_map(|m| match m {
-                                Ty::Con(h, args) => Some(Pat::Head(*h, args.len())),
+                                m @ Ty::Con(..) if m.scalar().is_some() => {
+                                    Some(coverage::scalar_pat(m))
+                                }
+                                Ty::Con(h, _, args) => Some(Pat::Head(*h, args.len())),
                                 Ty::Fn(f) => Some(Pat::Head(Head::Fn, f.params.len())),
                                 _ => None,
                             })
                             .collect(),
                     )
                 };
-                if let Pat::Or(alts) = &pat {
-                    let heads = alts
+                if matches!(&pat, Pat::Or(_)) {
+                    let heads = members
                         .iter()
-                        .filter_map(|a| match a {
-                            Pat::Head(h, _) => Some(*h),
-                            _ => None,
+                        .filter_map(|m| {
+                            m.head().map(|head| super::TestMember {
+                                head,
+                                values: if m.values().is_all() {
+                                    super::TestValues::All
+                                } else {
+                                    let values = m
+                                        .values()
+                                        .items()
+                                        .map(|v| match m.scalar().unwrap() {
+                                            BuiltinType::Int => {
+                                                super::LitValue::Int(v.parse().unwrap())
+                                            }
+                                            BuiltinType::String => {
+                                                super::LitValue::Str(v.to_string())
+                                            }
+                                            _ => unreachable!(),
+                                        })
+                                        .collect();
+                                    if m.values().is_finite() {
+                                        super::TestValues::Only(values)
+                                    } else {
+                                        super::TestValues::Except(values)
+                                    }
+                                },
+                            })
                         })
                         .collect();
                     self.out.type_tests.insert((self.module, q.span), heads);
-                    for a in alts {
-                        if let Pat::Head(h, n) = a {
-                            places[at].seen.push((v.clause, v.unguarded, *h, *n));
+                    for m in &members {
+                        if m.scalar().is_some() && !m.values().is_all() {
+                            places[at].scalar_seen.push((
+                                v.clause,
+                                v.unguarded,
+                                m.clone(),
+                                coverage::scalar_pat(m),
+                            ));
+                        } else if let Some(h) = m.head() {
+                            let n = match m {
+                                Ty::Con(_, _, xs) => xs.len(),
+                                Ty::Fn(f) => f.params.len(),
+                                _ => 0,
+                            };
+                            places[at].seen.push((v.clause, v.unguarded, h, n));
                         }
                     }
                     // Rule 11: the test takes every value of the type
@@ -798,7 +980,7 @@ impl Checker<'_> {
                 let targs = self.shared(places, at, h, n);
                 let fields = self.ctor_fields(*ctor, &targs);
                 let kargs = match known::member(&places[at].known, Some(h)) {
-                    Some(Ty::Con(_, xs)) => Some(xs),
+                    Some(Ty::Con(_, _, xs)) => Some(xs),
                     _ => None,
                 };
                 let mut parts = vec![Pat::Wild(None); fields.len()];
@@ -849,7 +1031,7 @@ impl Checker<'_> {
                 let h = Head::Tuple(n);
                 let parts = self.shared(places, at, h, ps.len());
                 let kparts = match known::member(&places[at].known, Some(h)) {
-                    Some(Ty::Con(_, xs)) => xs,
+                    Some(Ty::Con(_, _, xs)) => xs,
                     _ => vec![Ty::Top; ps.len()],
                 };
                 let mut pats = Vec::new();
@@ -872,7 +1054,7 @@ impl Checker<'_> {
                 let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![e.clone()]);
                 let klist = known::member(&places[at].known, Some(h)).unwrap_or(Ty::Top);
                 let kitem = match &klist {
-                    Ty::Con(_, xs) if xs.len() == 1 => xs[0].clone(),
+                    Ty::Con(_, _, xs) if xs.len() == 1 => xs[0].clone(),
                     _ => Ty::Top,
                 };
                 let mut pats = Vec::new();
@@ -881,6 +1063,21 @@ impl Checker<'_> {
                     pats.push(self.visit(x, c, v, places).1);
                 }
                 if let Some(r) = rest {
+                    if v.unguarded {
+                        let from = items.len() as u32;
+                        places[at].rest_from =
+                            Some(places[at].rest_from.map_or(from, |old| old.min(from)));
+                        let covered: Vec<_> = places[at]
+                            .children
+                            .iter()
+                            .filter_map(|(step, i)| {
+                                matches!(step,Step::Item(j) if *j>=from).then_some(*i)
+                            })
+                            .collect();
+                        for i in covered {
+                            places[i].catch_here = true;
+                        }
+                    }
                     let c = self.child(places, at, Step::Rest, list.clone(), klist.clone());
                     if let Some(b) = r {
                         self.bind(b, list.clone(), true);
@@ -894,11 +1091,31 @@ impl Checker<'_> {
                 (list, coverage::list(pats, rest.is_some()))
             }
             _ => {
-                let t = self.leaf(q, true);
+                let t = self.leaf(q, true, !v.fitted && !places[at].shared);
                 let k = places[at].known.clone();
                 self.fit_known(q, &k, true);
                 let pat = match coverage::literal(q) {
                     Some(l) => {
+                        if LITERAL_CANDIDATES {
+                            let value = match &l {
+                                coverage::Lit::Int(n) => Some((BuiltinType::Int, n.as_str())),
+                                coverage::Lit::Str(s) => Some((BuiltinType::String, s.as_str())),
+                                _ => None,
+                            };
+                            if let Some((b, text)) = value {
+                                let t = Ty::lit(
+                                    b,
+                                    super::lits::ValueSet::only([std::sync::Arc::from(text)])
+                                        .unwrap(),
+                                );
+                                places[at].scalar_seen.push((
+                                    v.clause,
+                                    v.unguarded,
+                                    t,
+                                    Pat::Ctor(Ctor::Lit(l.clone()), Vec::new()),
+                                ));
+                            }
+                        }
                         let c = Ctor::Lit(l);
                         places[at].seen.push((v.clause, v.unguarded, c.head(), 0));
                         Pat::Ctor(c, Vec::new())
@@ -947,4 +1164,140 @@ fn ctor_binders(p: &Pattern, out: &mut Vec<(VarId, Option<CtorRef>)>) {
 fn place_span(clauses: &[Clause], ci: usize) -> Span {
     let c = &clauses[ci];
     c.patterns.first().map_or(c.span, |p| p.span)
+}
+
+fn field_vars(p: &Program, t: &Type, out: &mut Vec<TyVarId>, depth: usize) {
+    if depth > 64 {
+        return;
+    }
+    match &t.kind {
+        TypeKind::Var(v) => out.push(*v),
+        TypeKind::Named {
+            ty: TypeRef::Custom(id),
+            args,
+        } if matches!(p.ty(*id).body, TypeBody::Alias(_)) => {
+            let TypeBody::Alias(body) = &p.ty(*id).body else {
+                unreachable!()
+            };
+            let map = p
+                .ty(*id)
+                .params
+                .iter()
+                .map(|(_, v)| *v)
+                .zip(args.iter())
+                .collect();
+            field_vars(p, &crate::resolve::subst(body, &map), out, depth + 1);
+        }
+        TypeKind::Named { args, .. }
+        | TypeKind::Tuple(args)
+        | TypeKind::Union(args)
+        | TypeKind::Inter(args)
+        | TypeKind::Diff(args) => {
+            for t in args {
+                field_vars(p, t, out, depth);
+            }
+        }
+        TypeKind::Fn {
+            params,
+            ret,
+            err,
+            env,
+        } => {
+            for pty in params {
+                field_vars(p, &pty.ty, out, depth);
+            }
+            field_vars(p, ret, out, depth);
+            for t in [err, env].into_iter().flatten() {
+                field_vars(p, t, out, depth);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+mod shared_place_tests {
+    use super::*;
+    #[test]
+    fn written_occurrences_include_other_constructors_and_aliases() {
+        // literal-types §5.3: count every written occurrence after aliases,
+        // across every constructor of the family, before inference.
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::create_dir(root.path().join("src")).unwrap();
+        std::fs::write(
+            root.path().join("src/main.i"),
+            r#"
+Pair(A) { Pair(A, A) }
+Event(A) { Start(A) Stop(A) }
+Two(A) = (A, A)
+Wrapped(A) { Wrapped(Two(A)) }
+Solo(A) { Solo(A, Int) }
+"#,
+        )
+        .unwrap();
+        let (graph, diags) = ilang_package::load(root.path());
+        assert!(diags.is_empty());
+        let checked = crate::check(&graph);
+        assert!(checked.diags.is_empty(), "{:?}", checked.diags);
+        let mut p = checked.program.unwrap();
+        let wrapped = p.types.iter().position(|t| t.name == "Wrapped").unwrap();
+        if let TypeBody::Custom(cs) = &mut p.types[wrapped].body {
+            for _ in 0..80 {
+                let inner = cs[0].fields[0].ty.clone();
+                cs[0].fields[0].ty.kind = TypeKind::Tuple(vec![inner]);
+            }
+        }
+        let mut c = Checker::new(&p, &graph.sources);
+        let id = |name| TypeId(p.types.iter().position(|t| t.name == name).unwrap() as u32);
+        assert!(c.field_shared(
+            CtorRef {
+                ty: id("Pair"),
+                index: 0
+            },
+            0
+        ));
+        assert!(c.field_shared(
+            CtorRef {
+                ty: id("Pair"),
+                index: 0
+            },
+            1
+        ));
+        assert!(c.field_shared(
+            CtorRef {
+                ty: id("Event"),
+                index: 0
+            },
+            0
+        ));
+        assert!(c.field_shared(
+            CtorRef {
+                ty: id("Event"),
+                index: 1
+            },
+            0
+        ));
+        assert!(c.field_shared(
+            CtorRef {
+                ty: id("Wrapped"),
+                index: 0
+            },
+            0
+        ));
+        assert!(!c.field_shared(
+            CtorRef {
+                ty: id("Solo"),
+                index: 0
+            },
+            0
+        ));
+        assert!(!c.field_shared(
+            CtorRef {
+                ty: id("Solo"),
+                index: 0
+            },
+            1
+        ));
+    }
 }

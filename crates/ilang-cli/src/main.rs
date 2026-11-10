@@ -3,8 +3,8 @@
 mod commands;
 
 use clap::{Parser, Subcommand};
-use ilang_cli::{BuildOptions, build, level, run_test};
-use ilang_host::{Outcome, Program, TestResult};
+use ilang_cli::{BuildOptions, build, level};
+use ilang_host::{Outcome, TestResult};
 use ilang_wasm::Target;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -205,6 +205,12 @@ fn cmd_build(
         std::fs::create_dir_all(dir)?;
     }
     std::fs::write(&out, &b.wasm)?;
+    if target == ilang_wasm::Target::Ilang {
+        std::fs::write(
+            out.with_extension("bindings.json"),
+            b.binding_plan.to_json()?,
+        )?;
+    }
     if wat {
         let (graph, _) = ilang_cli::load(project, false, offline);
         let checked = ilang_check::check(&graph);
@@ -230,11 +236,11 @@ fn cmd_run(project: &Path, opt: u8, offline: bool) -> anyhow::Result<ExitCode> {
     let Some(b) = built(project, options(opt, false, offline)?)? else {
         return Ok(ExitCode::FAILURE);
     };
-    let program = Program::from_bytes(&b.wasm)?;
+    let program = b.host_program()?;
     if program.abi().entry.is_none() {
         anyhow::bail!("the package has no `@main` (§10.2)");
     }
-    match program.run_entry(ilang_cli::standard_options())? {
+    match program.run_entry(b.host_options())? {
         Outcome::Ok(_) => Ok(ExitCode::SUCCESS),
         Outcome::Stop(stop) => {
             eprintln!("{stop}");
@@ -257,7 +263,7 @@ fn cmd_test(
     let Some(b) = built(project, options(opt, true, offline)?)? else {
         return Ok(ExitCode::FAILURE);
     };
-    let program = Program::from_bytes(&b.wasm)?;
+    let program = b.host_program()?;
     let tests: Vec<String> = program
         .abi()
         .tests
@@ -268,7 +274,7 @@ fn cmd_test(
     let mut failed = 0;
     for name in &tests {
         let start = (std::time::Instant::now(), cpu_seconds());
-        let result = run_test(&program, name);
+        let result = ilang_cli::run_test_with(&program, name, b.host_options());
         let took = if time {
             let wall = start.0.elapsed().as_secs_f64();
             match (start.1, cpu_seconds()) {
@@ -335,7 +341,7 @@ fn check(project: &Path, offline: bool, types: bool) -> ExitCode {
             }
         }
     }
-    for line in graph.sources.render_all(&diags) {
+    for line in ilang_cli::diagnostic_lines(&graph, &diags) {
         eprintln!("{line}");
     }
     let errors = diags.iter().filter(|d| d.is_error()).count();

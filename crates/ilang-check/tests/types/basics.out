@@ -1,25 +1,25 @@
-one : Int
+one : 1
 pi : Float
-hello : String
-pair : (Int, String)
+hello : "hello"
+pair : (1, "a")
 unit : ()
-ints : List(Int)
-mixed : List(Int | String)
+ints : List(1 | 2 | 3)
+mixed : List(1 | "a")
 empty : List(Never)
 sum : Int
 ratio : Float
-neg : Int
+neg : -1
 both : Bool
 cmp : Bool
 text : String
 same : Bool
-id : (x: a) -> a
-const : (x: a, y: b) -> a
+id : (x: A) -> A
+const : (x: A, y: B) -> A
 add : (x: Int, y: Int) -> Int
-inc : (x: a & Int) -> a
-apply : (f: (a) -> b ? e ! n, x: a) -> b ? e ! n
-compose : (f: (a) -> b ? e ! n, g: (c) -> a ? e2 ! n2) -> (x: c) -> b ? e2 | e ! n2 | n
-twice : (f: (a | b) -> b & c ? e ! n, x: a) -> c ? e ! n
-ignore : (x: a) -> Int
-16:8: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
-22:13: warning[W0502]: this value is not used, and working it out does nothing
+inc : (x: A & Int) -> A
+apply : (f: (A) -> B ? E ! N, x: A) -> B ? E ! N
+compose : (f: (A) -> B ? E ! N, g: (C) -> A ? E2 ! N2) -> (x: C) -> B ? E2 | E ! N2 | N
+twice : (f: (A | B) -> B & C ? E ! N, x: A) -> C ? E ! N
+ignore : (x: A) -> 1
+30:8: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
+40:2: warning[W0502]: this value is not used, and working it out does nothing

@@ -1,0 +1,23 @@
+use std::path::Path;
+fn main() {
+    for name in ["fake", "handle"] {
+        let path = format!("/tmp/review-native/{name}");
+        let (graph, mut diagnostics) = ilang_package::load(Path::new(&path));
+        let checked = ilang_check::check(&graph);
+        diagnostics.extend(checked.diags);
+        println!("CASE {name}");
+        for line in graph.sources.render_all(&diagnostics) { println!("{line}"); }
+        if diagnostics.iter().any(|d| d.is_error()) { continue; }
+        let program = checked.program.unwrap();
+        let types = checked.types.unwrap();
+        let options = ilang_wasm::Options {tests: false, target: ilang_wasm::Target::Ilang};
+        let wasm = ilang_wasm::compile(&graph, &program, &types, options).unwrap();
+        let wat = ilang_wasm::compile_wat(&graph, &program, &types, options).unwrap();
+        std::fs::write(format!("/tmp/review-native/{name}.wasm"), &wasm).unwrap();
+        std::fs::write(format!("/tmp/review-native/{name}.wat"), wat).unwrap();
+        let host = ilang_host::Program::from_bytes(&wasm).unwrap();
+        println!("services={:?}", host.abi().services);
+        let result = host.run_entry(ilang_host::HostOptions::new(ilang_host::services::stdout())).unwrap();
+        println!("outcome={result:?}");
+    }
+}

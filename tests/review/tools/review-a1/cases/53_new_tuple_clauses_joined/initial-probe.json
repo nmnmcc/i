@@ -1,0 +1,1 @@
+{"check":["E0106: a discard binds nothing, so it may not be used as a value"],"parse":["E0106: a discard binds nothing, so it may not be used as a value"],"roundtrip":false,"wat":false}

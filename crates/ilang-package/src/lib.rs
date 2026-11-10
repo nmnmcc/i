@@ -171,13 +171,12 @@ impl Sources {
     }
 }
 
-/// `[ "_" ] lower { lower | digit | "_" }`, and not a keyword (§1.3, §1.4).
+/// `[ "_" ] lower { lower | digit | "_" }` (§1.3, §1.4).
 pub fn is_name(s: &str) -> bool {
     let rest = s.strip_prefix('_').unwrap_or(s);
     let mut chars = rest.chars();
     matches!(chars.next(), Some('a'..='z'))
         && chars.all(|c| matches!(c, 'a'..='z' | '0'..='9' | '_'))
-        && !matches!(s, "import" | "export" | "case" | "if")
 }
 
 pub type PackageId = usize;

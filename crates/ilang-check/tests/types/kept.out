@@ -1,0 +1,15 @@
+4:1: error[E0234]: a call at the top level is kept for macros
+5:1: error[E0301]: the attribute `@custom` is kept for macros; the built-in attributes are `@external`, `@host`, `@main`, `@test`, and `@deprecated`
+7:1: error[E0301]: the attribute `@a.main` is kept for macros; the built-in attributes are `@external`, `@host`, `@main`, `@test`, and `@deprecated`
+9:1: error[E0302]: `@main` takes no arguments and is written with no `( )`
+11:1: error[E0302]: the arguments of `@external` are string literals given by position: `@external("module", "function")`
+13:1: error[E0302]: the arguments of `@external` are string literals given by position: `@external("module", "function")`
+15:1: error[E0303]: `@external` may only be on a declaration `name: Type`
+17:1: error[E0308]: a declaration with no `@external` is kept for macros
+20:1: error[E0208]: the type `User` is defined more than once in this module
+18:1: error[E0202]: the type `Schema` is not defined
+18:19: error[E0201]: `user` is not defined
+19:7: error[E0231]: a type parameter may not have the name of a type
+2:13: error[E0207]: `p` is a pending value, not a module
+3:18: error[E0234]: a call in a type is kept for macros
+17:18: error[E0317]: the type of an external function may not have type variables (§10.1)

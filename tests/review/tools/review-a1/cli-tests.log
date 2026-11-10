@@ -1,0 +1,31 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 16.1ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 15.8ms
+   Compiling ilang-cli v0.1.0 (/home/agent/Programming/i/.rd/rev5/crates/ilang-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.94s
+     Running tests/check.rs (/tmp/review-a1/target/debug/deps/check-52a878432bbdebd7)
+
+running 7 tests
+test normal_build_never_enables_the_equivalence_feature ... ok
+test check_old_joined_type_call_explains_the_migration_path ... ok
+test blind_expected_subject_is_checked_before_audit_codegen ... ok
+test check_reports_type_errors ... ok
+test check_types ... ok
+test migration_flags_check_before_writing_and_keep_layout ... ok
+test new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/fmt.rs (/tmp/review-a1/target/debug/deps/fmt-623288bfa4e93da7)
+
+running 4 tests
+test paths_are_files_or_directories ... ok
+test files_with_errors_are_left_as_they_are ... ok
+test formats_src_and_test ... ok
+test check_lists_files_that_would_change ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

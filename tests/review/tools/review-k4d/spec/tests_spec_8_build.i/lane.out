@@ -1,0 +1,7 @@
+spec/build.check : (got: String, want: String) -> Nil
+spec/build.show : (x: A) -> String
+spec/build.integers : () -> Nil
+spec/build.floats : () -> Nil
+spec/build.bits_and_bytes : () -> Nil
+spec/build.strings : () -> Nil
+spec/build.order : () -> Nil

@@ -1,3 +1,5 @@
-import (app/b)
+(
+	app/b
+)
 
 x = 1

@@ -1,23 +1,23 @@
-pair : (t: (a, b)) -> a
+pair : (t: (A, B)) -> A
 pair_written : (t: (Int, String)) -> String
-first : (r: Result(a, b)) -> a ! Assert
+first : (r: Result(A, B)) -> A ! Assert
 annotated : () -> Int
-literal : (n: a & Int) -> a ! Assert
+literal : (n: A & Int) -> A ! Assert
 single : (u: User) -> String
 only_ok : (r: Result(Int, Never)) -> Int
 nested : (p: (Result(Int, Never), Bool)) -> Int
-from_value : () -> Int
-list : (xs: List(a)) -> a ! Assert
-list_rest : (xs: List(a)) -> List(a)
+from_value : () -> 1
+list : (xs: List(A)) -> A ! Assert
+list_rest : (xs: List(A)) -> List(A)
 prefix : (s: String) -> String
 prefix_some : (s: String) -> String ! Assert
-named : (r: Result(a, b)) -> Result(a, b) ! Assert
-typed_part : (p: (Int, a)) -> a
+named : (r: Result(A, B)) -> Result(A, B) ! Assert
+typed_part : (p: (Int, A)) -> A
 bits : (b: BitArray) -> Int ! Assert
-float : (f: a & Float) -> a ! Assert
-type_var : (x: a) -> a
-param_tuple : ((a, b)) -> a
+float : (f: A & Float) -> A ! Assert
+type_var : (x: A) -> A
+param_tuple : ((A, B)) -> A
 param_user : (User) -> String
-param_ctor : (Result(a, b)) -> a ! Assert
-param_literal : (Int) -> Int ! Assert
-param_list : (List(a)) -> Int ! Assert
+param_ctor : (Result(A, B)) -> A ! Assert
+param_literal : (Int) -> 1 ! Assert
+param_list : (List(A)) -> 1 ! Assert

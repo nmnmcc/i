@@ -1,0 +1,174 @@
+{
+  "results": {
+    "symbols": {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "result": [
+        {
+          "detail": "A",
+          "kind": 5,
+          "name": "A",
+          "range": {
+            "end": {
+              "character": 5,
+              "line": 0
+            },
+            "start": {
+              "character": 0,
+              "line": 0
+            }
+          },
+          "selectionRange": {
+            "end": {
+              "character": 1,
+              "line": 0
+            },
+            "start": {
+              "character": 0,
+              "line": 0
+            }
+          }
+        },
+        {
+          "detail": "Never",
+          "kind": 12,
+          "name": "f",
+          "range": {
+            "end": {
+              "character": 16,
+              "line": 1
+            },
+            "start": {
+              "character": 0,
+              "line": 1
+            }
+          },
+          "selectionRange": {
+            "end": {
+              "character": 1,
+              "line": 1
+            },
+            "start": {
+              "character": 0,
+              "line": 1
+            }
+          }
+        }
+      ]
+    }
+  },
+  "messages": [
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "capabilities": {
+          "completionProvider": {
+            "triggerCharacters": [
+              "."
+            ]
+          },
+          "definitionProvider": true,
+          "documentFormattingProvider": true,
+          "documentSymbolProvider": true,
+          "hoverProvider": true,
+          "textDocumentSync": {
+            "change": 1,
+            "openClose": true,
+            "save": true
+          }
+        },
+        "serverInfo": {
+          "name": "i",
+          "version": "0.1.0"
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "textDocument/publishDiagnostics",
+      "params": {
+        "diagnostics": [
+          {
+            "code": "E0530",
+            "message": "the type of f is needed to type f through A, but the dependencies form a circle (f -> f); write the type instead",
+            "range": {
+              "end": {
+                "character": 9,
+                "line": 1
+              },
+              "start": {
+                "character": 8,
+                "line": 1
+              }
+            },
+            "severity": 1,
+            "source": "i"
+          }
+        ],
+        "uri": "file:///tmp/review-t2/cycle_alias/src/main.i"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "result": [
+        {
+          "detail": "A",
+          "kind": 5,
+          "name": "A",
+          "range": {
+            "end": {
+              "character": 5,
+              "line": 0
+            },
+            "start": {
+              "character": 0,
+              "line": 0
+            }
+          },
+          "selectionRange": {
+            "end": {
+              "character": 1,
+              "line": 0
+            },
+            "start": {
+              "character": 0,
+              "line": 0
+            }
+          }
+        },
+        {
+          "detail": "Never",
+          "kind": 12,
+          "name": "f",
+          "range": {
+            "end": {
+              "character": 16,
+              "line": 1
+            },
+            "start": {
+              "character": 0,
+              "line": 1
+            }
+          },
+          "selectionRange": {
+            "end": {
+              "character": 1,
+              "line": 1
+            },
+            "start": {
+              "character": 0,
+              "line": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "result": null
+    }
+  ]
+}

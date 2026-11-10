@@ -1,3 +1,5 @@
-export (f)
+(
+	f
+)
 
 f = (n: Int) { n }

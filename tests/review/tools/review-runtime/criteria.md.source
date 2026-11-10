@@ -1,0 +1,10 @@
+Pre-note criteria (recorded before reading docs/design/runtime.md)
+Sources: normative spec §§4,9,10,11,B; syntax; multicore §18; host-concurrency §6.4/H1-H14; lazy-reentry D15-D16/§7a; records L5/L9; meta §8.
+1. Public library expressibility: rank-1 inference, set-of-values types, general primitives useful beyond task; no compiler dispatch by library name except public primitives; replaceable entry defaults.
+2. Entry contract: pure synchronous exports, tests, SDK call vs callAsync, cost without tasks, startup, macros, WASI; justify and explicitly reconcile any compatibility changes.
+3. Cancellation: final function yields, async waits, opens scope/spawns/joins, second cancellation, own cancellation target inactive, captured cancellation resumption, nested scope vs whole task cancellation; exactly-once finals and no dropped waiters.
+4. Deadlock: empty queue with no requests, irrelevant request, completed unconsumed request, nested run waiting on outer task, request owned by a different task/group, nested group hierarchy, cancelled cleanup waiting on child.
+5. ABI requests: one root continuation, multiple same-import answers, id reuse and stale aliases, pending vs settled, cancel after settle, wait-any empty list, fake service and higher-order async callable, request escaping owner.
+6. Multicore binding invariants: no go portability check, local socket handlers, source-defined captures, kept env across resume at O2, portable handle equality, scope-chain authority, ordered errors, pure stable path-derived random.
+7. Acceptance: actual echo accept loop and handler task placement, per-connection resource closure on failure/cancel, listener lifetime, error type inhabitation and scope relationship.
+8. Standalone IO: normal host services with fakes, lazy startup vs synchronous returns, bounded byte operations, cancellation/drop effects, target support explicit.

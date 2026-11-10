@@ -1,0 +1,5 @@
+# spec: 4.3, 4.7, 4.8
+# expect: pass
+name = "app"
+[dependencies]
+model = { path = "model" }

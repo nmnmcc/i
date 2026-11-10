@@ -1,0 +1,5 @@
+new : () -> Phantom(Never)
+int_phantom : () -> Phantom(Int)
+string_phantom : () -> Phantom(String)
+change : (p: Phantom(Int)) -> Phantom(String)
+change_back : (p: Phantom(String)) -> Phantom(Int)

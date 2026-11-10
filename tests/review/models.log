@@ -1,0 +1,151 @@
+[0mdirenv: loading ~/Programming/i/.envrc
+[0mdirenv: using devenv --quiet
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 22.8ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 20.2ms
+model t3-forgetting-conflict.py: 1
+model t3-record-bdd.py: 0
+model t3-record-demand.py: 0
+model t3-record-substitution.py: timeout
+model uri_model.py: 0
+model math_review.py: 1
+model extra_math.py: 1
+model hypot_ties.py: 1
+model underflow_review.py: 1
+{
+  "compiler": "ba22c507a174a93b495dd33b66f4500c76daf309",
+  "binary_sha256": "af95f7a3a2da74aaef965dd33a5fa467726d4c96c2f20f491a98e69cb2162968",
+  "seed": 412,
+  "count": 1,
+  "mode": "long",
+  "counts": {
+    "attempted": 4,
+    "rejected-by-model": 2,
+    "permutations": 8,
+    "annotation-removals": 3,
+    "accepted": 2
+  },
+  "failures": [],
+  "report_only": [
+    {
+      "property": "remove source annotation before permanent read",
+      "source": "docs/spec.md \u00a74.7: Write a wider annotation at the source when needed.",
+      "exits": [
+        0,
+        1
+      ],
+      "classification": "permitted difference; report only",
+      "outcomes": [
+        {
+          "command": [
+            "check",
+            "--types"
+          ],
+          "exit": 0,
+          "stdout": "generated/main.value : Int\ngenerated/main.x : Int\n",
+          "stderr": ""
+        },
+        {
+          "command": [
+            "check",
+            "--types"
+          ],
+          "exit": 1,
+          "stdout": "generated/main.value : 1\ngenerated/main.x : 1\n",
+          "stderr": "src/main.i:3:1: error[E0501]: `2` is not a subtype of `1`\n1 error\n"
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "coverage": "docs/spec.md \u00a77.4: A clause with a guard is not counted.",
+    "runtime": "docs/spec.md \u00a76.12: it takes the first clause whose pattern matches the value and whose guard, if there is one, is True",
+    "literal": "docs/spec.md \u00a74.2: Values are never changed, so a literal type is never made wider",
+    "value": "docs/spec.md \u00a72.5: It only orders type inference",
+    "annotation": "docs/spec.md \u00a74.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance."
+  },
+  "models": [
+    {
+      "model": "tools/record-models/t3-forgetting-conflict.py",
+      "source_sha256": "b0d673584b4b85d71505e7dda72d8948c61e69f92c9a480cc478ed5f61d18a34",
+      "python": "/nix/store/xahxrjs30p3mw0a42bqg9ikgkikskw8m-python3-3.14.8/bin/python3",
+      "exit": 1,
+      "stdout": "Closed source: Gone = { ..{ a: Never } | { b: Never }, -a }\nJoin first: common labels = {} ; empty record present = True\nE2 then E1: empty record present = False\nCanonical generic source: Gone(A) = { ..{ a: Never } | { ..A, b: Never }, -a }\nNormalize, then A = {..}: ('never',)\nA = {..}, then normalize: ('rec', ())\n",
+      "stderr": "Traceback (most recent call last):\n  File \"/home/agent/Programming/i/.rd/note-pa-arch/tests/review/tools/record-models/t3-forgetting-conflict.py\", line 144, in <module>\n    main()\n    ~~~~^^\n  File \"/home/agent/Programming/i/.rd/note-pa-arch/tests/review/tools/record-models/t3-forgetting-conflict.py\", line 133, in main\n    assert normalize_first == substitute_first, (\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: joint \u00a76 requires substitution stability, but records \u00a74.3 E1/E2 and \u00a74.5 give Never versus {..}; the union before E2 is canonical\n",
+      "classification": "independent model; not compiler implementation validation"
+    },
+    {
+      "model": "tools/record-models/t3-record-bdd.py",
+      "source_sha256": "7668fa9ff0f77cbebb291019cc66f652e49790818054f130a1193a5d2b7ff1c3",
+      "python": "/nix/store/xahxrjs30p3mw0a42bqg9ikgkikskw8m-python3-3.14.8/bin/python3",
+      "exit": 0,
+      "stdout": "20-step branch: 137 reachable nodes, 3487 bytes, 0.00141 seconds\n20-step Fan: 81 reachable nodes, 2091 bytes, 0.001035 seconds; closed 1 record\nDemanded 20-step closed Fan BDD: 40 reachable nodes; 0.000568 seconds\nInvariant/covariant/contravariant sharing: one variable retained\nBoolean operation pairs (cache on/off): 38400 ; atom reorder: 16 assignments; substitutions: 15\nMap inclusions: 133120 ; negative-map projections: 16384 ; zero oracle disagreements\n",
+      "stderr": "",
+      "classification": "independent model; not compiler implementation validation"
+    },
+    {
+      "model": "tools/record-models/t3-record-demand.py",
+      "source_sha256": "dda44734c486dbc208bb86c01b9bf26dae405749ac77d50224191d3436ec8c2a",
+      "python": "/nix/store/xahxrjs30p3mw0a42bqg9ikgkikskw8m-python3-3.14.8/bin/python3",
+      "exit": 0,
+      "stdout": "20-step branch: 137 reachable nodes, 3487 bytes, 0.001191 seconds\n20-step Fan: 81 reachable nodes, 2091 bytes, 0.00151 seconds; closed 1 record\nproof/set oracle: 133120 inclusions; structural, bound direction, Schema read, missing-field and resource probes passed\ncompact commutation: 13668 trees x 64 closed records = 874752 ; old failure detected\ntwo-variable/four-label/nested sources 324 substitutions 15876 set checks 4202\nindependent old-rule negative control: detected\n",
+      "stderr": "",
+      "classification": "independent model; not compiler implementation validation"
+    },
+    {
+      "model": "tools/record-models/t3-record-substitution.py",
+      "source_sha256": "d18ee0bf04e9c20826c80c263d2662b5eb0b2aa9241d7c7617ad8a1250c818f3",
+      "python": "/nix/store/xahxrjs30p3mw0a42bqg9ikgkikskw8m-python3-3.14.8/bin/python3",
+      "exit": "timeout",
+      "stdout": "progress union/remove 2000\nprogress union/remove 4000\nprogress union/remove 6000\nprogress union/remove 8000\nprogress union/remove 10000\nprogress union/remove 12000\nprogress union/remove 14000\nprogress union/remove 16000\nprogress union/remove 18000\nprogress union/remove 20000\nprogress union/remove 22000\nprogress union/remove 24000\nprogress union/remove 26000\nprogress union/remove 28000\nprogress union/remove 30000\nprogress union/remove 32000\nprogress union/remove 34000\nprogress union/remove 36000\nprogress union/remove 38000\nprogress union/remove 40000\nprogress union/remove 42000\nprogress union/remove 44000\nprogress union/remove 46000\nprogress union/remove 48000\nprogress union/remove 50000\nprogress union/remove 52000\nprogress union/remove 54000\nprogress union/remove 56000\nprogress union/remove 58000\nprogress union/remove 60000\nprogress union/remove 62000\nprogress union/remove 64000\nprogress nested/remove 2000\n",
+      "stderr": "",
+      "classification": "independent model; not compiler implementation validation"
+    },
+    {
+      "model": "tools/review-std1/uri_model.py",
+      "source_sha256": "45e33460bed21dd8c860d94d7cefe3b024f06b23b4fd2d840ef327252c948695",
+      "python": "/nix/store/xahxrjs30p3mw0a42bqg9ikgkikskw8m-python3-3.14.8/bin/python3",
+      "exit": 0,
+      "stdout": "base=x:a reference='/.//h': scheme=x authority=None path='//h' rendered='x://h'\nbase=x:a reference='/a/..//h': scheme=x authority=None path='//h' rendered='x://h'\nbase=x:a reference='/.//a:b': scheme=x authority=None path='//a:b' rendered='x://a:b'\n",
+      "stderr": "",
+      "classification": "independent model; not compiler implementation validation"
+    },
+    {
+      "model": "tools/review-std3/math_review.py",
+      "source_sha256": "0566a07c317dca76749308f2486e95d698d0a33b6262335e290c43525678054b",
+      "python": "/nix/store/lb41b0anx1f98y9y5s9mdv97gjgsq740-python3-3.14.7/bin/python3.14",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/home/agent/Programming/i/.rd/note-pa-arch/tests/review/.work/models-pkbd6h03/math/math_review.py\", line 1, in <module>\n    import gmpy2 as g, math, struct, time, json, random\nModuleNotFoundError: No module named 'gmpy2'\n",
+      "classification": "independent model; not compiler implementation validation"
+    },
+    {
+      "model": "tools/review-std3/extra_math.py",
+      "source_sha256": "634bec6e9a029b8aa377f416c984cc2bb23e91796fb07e3137fabcd90cd692a7",
+      "python": "/nix/store/lb41b0anx1f98y9y5s9mdv97gjgsq740-python3-3.14.7/bin/python3.14",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/home/agent/Programming/i/.rd/note-pa-arch/tests/review/.work/models-pkbd6h03/math/extra_math.py\", line 3, in <module>\n    from math_review import *\n  File \"/home/agent/Programming/i/.rd/note-pa-arch/tests/review/.work/models-pkbd6h03/math/math_review.py\", line 1, in <module>\n    import gmpy2 as g, math, struct, time, json, random\nModuleNotFoundError: No module named 'gmpy2'\n",
+      "classification": "independent model; not compiler implementation validation"
+    },
+    {
+      "model": "tools/review-std3/hypot_ties.py",
+      "source_sha256": "4c10a4cd6910e69751b9ba67c36d54e6c72401a4a90f50acd33c10f2121f62e0",
+      "python": "/nix/store/lb41b0anx1f98y9y5s9mdv97gjgsq740-python3-3.14.7/bin/python3.14",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/home/agent/Programming/i/.rd/note-pa-arch/tests/review/.work/models-pkbd6h03/math/hypot_ties.py\", line 1, in <module>\n    from math_review import *\n  File \"/home/agent/Programming/i/.rd/note-pa-arch/tests/review/.work/models-pkbd6h03/math/math_review.py\", line 1, in <module>\n    import gmpy2 as g, math, struct, time, json, random\nModuleNotFoundError: No module named 'gmpy2'\n",
+      "classification": "independent model; not compiler implementation validation"
+    },
+    {
+      "model": "tools/review-std3/underflow_review.py",
+      "source_sha256": "db7fc1054acc03d7b46f5d719a00a8ae32c721933e5566f31f96747f17f02e5d",
+      "python": "/nix/store/lb41b0anx1f98y9y5s9mdv97gjgsq740-python3-3.14.7/bin/python3.14",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/home/agent/Programming/i/.rd/note-pa-arch/tests/review/.work/models-pkbd6h03/math/underflow_review.py\", line 3, in <module>\n    from math_review import *\n  File \"/home/agent/Programming/i/.rd/note-pa-arch/tests/review/.work/models-pkbd6h03/math/math_review.py\", line 1, in <module>\n    import gmpy2 as g, math, struct, time, json, random\nModuleNotFoundError: No module named 'gmpy2'\n",
+      "classification": "independent model; not compiler implementation validation"
+    }
+  ]
+}

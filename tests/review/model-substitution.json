@@ -1,0 +1,66 @@
+{
+  "compiler": "ba22c507a174a93b495dd33b66f4500c76daf309",
+  "binary_sha256": "af95f7a3a2da74aaef965dd33a5fa467726d4c96c2f20f491a98e69cb2162968",
+  "seed": 412,
+  "count": 1,
+  "mode": "long",
+  "counts": {
+    "attempted": 4,
+    "rejected-by-model": 2,
+    "permutations": 8,
+    "annotation-removals": 3,
+    "accepted": 2
+  },
+  "failures": [],
+  "report_only": [
+    {
+      "property": "remove source annotation before permanent read",
+      "source": "docs/spec.md §4.7: Write a wider annotation at the source when needed.",
+      "exits": [
+        0,
+        1
+      ],
+      "classification": "permitted difference; report only",
+      "outcomes": [
+        {
+          "command": [
+            "check",
+            "--types"
+          ],
+          "exit": 0,
+          "stdout": "generated/main.value : Int\ngenerated/main.x : Int\n",
+          "stderr": ""
+        },
+        {
+          "command": [
+            "check",
+            "--types"
+          ],
+          "exit": 1,
+          "stdout": "generated/main.value : 1\ngenerated/main.x : 1\n",
+          "stderr": "src/main.i:3:1: error[E0501]: `2` is not a subtype of `1`\n1 error\n"
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "coverage": "docs/spec.md §7.4: A clause with a guard is not counted.",
+    "runtime": "docs/spec.md §6.12: it takes the first clause whose pattern matches the value and whose guard, if there is one, is True",
+    "literal": "docs/spec.md §4.2: Values are never changed, so a literal type is never made wider",
+    "value": "docs/spec.md §2.5: It only orders type inference",
+    "annotation": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance."
+  },
+  "models": [
+    {
+      "model": "tools/record-models/t3-record-substitution.py",
+      "source_sha256": "d18ee0bf04e9c20826c80c263d2662b5eb0b2aa9241d7c7617ad8a1250c818f3",
+      "python": "/nix/store/xahxrjs30p3mw0a42bqg9ikgkikskw8m-python3-3.14.8/bin/python3",
+      "exit": 0,
+      "stdout": "progress union/remove 2000\nprogress union/remove 4000\nprogress union/remove 6000\nprogress union/remove 8000\nprogress union/remove 10000\nprogress union/remove 12000\nprogress union/remove 14000\nprogress union/remove 16000\nprogress union/remove 18000\nprogress union/remove 20000\nprogress union/remove 22000\nprogress union/remove 24000\nprogress union/remove 26000\nprogress union/remove 28000\nprogress union/remove 30000\nprogress union/remove 32000\nprogress union/remove 34000\nprogress union/remove 36000\nprogress union/remove 38000\nprogress union/remove 40000\nprogress union/remove 42000\nprogress union/remove 44000\nprogress union/remove 46000\nprogress union/remove 48000\nprogress union/remove 50000\nprogress union/remove 52000\nprogress union/remove 54000\nprogress union/remove 56000\nprogress union/remove 58000\nprogress union/remove 60000\nprogress union/remove 62000\nprogress union/remove 64000\nprogress nested/remove 2000\nprogress nested/remove 4000\nprogress spread/union/remove 2000\nprogress nested/remove 6000\nprogress nested/remove 8000\nclosed substitutions: 64\ntype families: {'atom/remove': 1016, 'union/remove': 65024, 'spread/remove': 1000, 'spread/union/remove': 3000, 'nested/remove': 8000}\ntypes: 78040\nsubstitution checks: 4994560\nold tree differences: 288861\nold semantic commutation failures: 32235\nnew commutation failures: 0\nindependent set checks: 33344\nold set-equality failures: 5103\nunion-order checks: 78040\nlabel-substitution checks: 1024\n",
+      "stderr": "",
+      "classification": "independent model; not compiler implementation validation",
+      "expected_exit": 0,
+      "matched": true
+    }
+  ]
+}

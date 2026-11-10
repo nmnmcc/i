@@ -1,0 +1,13 @@
+spec/generic_service_rows.use : () -> Nil ! N | S(N)
+spec/generic_service_rows.run : (body: () -> A ? E ! N) -> A ? E ! N
+spec/generic_service_rows.get : () -> Int ! Dependency
+spec/generic_service_rows.read : () -> Int ! N | Inner(N)
+spec/generic_service_rows.make : (send: (Entry) -> Nil ? E ! N) -> Sink(E, N)
+spec/generic_service_rows.write : (entry: Entry) -> Nil ? E ! N | Sink(E, N)
+test/generic_service_rows.i:8:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+test/generic_service_rows.i:13:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+test/generic_service_rows.i:24:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+test/generic_service_rows.i:28:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+test/generic_service_rows.i:50:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+test/generic_service_rows.i:58:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+6 errors

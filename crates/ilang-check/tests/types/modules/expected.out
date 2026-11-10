@@ -1,6 +1,6 @@
 app/main.lengths : (xs: List(String)) -> List(String)
 app/main.numbers : List(Int)
-app/main.flipped : Pair(String, Int)
+app/main.flipped : Pair("a", 1)
 app/main.by_label : List(Int)
-app/util/list.map : (xs: List(a), f: (a) -> b ? e ! n) -> List(b) ? e ! n
-app/util/list.swap : (p: Pair(a, b)) -> Pair(b, a)
+app/util/list.map : (xs: List(A), f: (A) -> B ? E ! N) -> List(B) ? E ! N
+app/util/list.swap : (p: Pair(A, B)) -> Pair(B, A)

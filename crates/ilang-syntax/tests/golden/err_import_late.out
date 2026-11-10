@@ -2,4 +2,4 @@ a = 1
 
 b = 2
 --- errors ---
-E0103 @2:1 `import` and `export` come first in a file, `import` before `export`, at most once each
+E0115 @3:1 a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file

@@ -1,0 +1,54 @@
+{
+  "compiler": "e7875d8d744616e9187d54a41c6db64c6138bf65",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "seed": 412,
+  "count": 8,
+  "mode": "short",
+  "counts": {
+    "attempted": 32,
+    "rejected-by-model": 12,
+    "permutations": 64,
+    "annotation-removals": 32,
+    "accepted": 20
+  },
+  "failures": [],
+  "report_only": [
+    {
+      "property": "remove source annotation before permanent read",
+      "source": "docs/spec.md §4.7: Write a wider annotation at the source when needed.",
+      "exits": [
+        0,
+        1
+      ],
+      "classification": "permitted difference; report only",
+      "outcomes": [
+        {
+          "command": [
+            "check",
+            "--types"
+          ],
+          "exit": 0,
+          "stdout": "generated/main.value : Int\ngenerated/main.x : Int\n",
+          "stderr": ""
+        },
+        {
+          "command": [
+            "check",
+            "--types"
+          ],
+          "exit": 1,
+          "stdout": "generated/main.value : 1\ngenerated/main.x : 1\n",
+          "stderr": "src/main.i:3:1: error[E0501]: `2` is not a subtype of `1`\n1 error\n"
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "coverage": "docs/spec.md §7.4: A clause with a guard is not counted.",
+    "runtime": "docs/spec.md §6.12: it takes the first clause whose pattern matches the value and whose guard, if there is one, is True",
+    "literal": "docs/spec.md §4.2: Values are never changed, so a literal type is never made wider",
+    "value": "docs/spec.md §2.5: It only orders type inference",
+    "annotation": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance."
+  },
+  "models": []
+}

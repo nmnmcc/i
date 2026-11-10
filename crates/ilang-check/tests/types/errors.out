@@ -1,39 +1,39 @@
-id : (x: a) -> a
-ids : (x: Int | String) -> Int | String
+id : (x: A) -> A
+ids : (x: 1 | "a") -> 1 | "a"
 n : Int
 s : String
 add : (x: Int) -> Int
 bad_arg : () -> Int
 bad_op : () -> Int
-bad_guard : (x: a) -> a | Int
+bad_guard : (x: A) -> A | 2
 arity : () -> Never
-arity_var : (f: (Int) -> a ? e ! n) -> (a, Never) ? e ! n
-ambiguous : (x: a | b) -> a | b
+arity_var : (f: (1) -> A ? E ! N) -> (A, Never) ? E ! N
+ambiguous : (x: A | B) -> A | B
 use_ambiguous : () -> Never
-field : (u: a) -> Never
-part : (t: a) -> Never
+field : (u: A) -> Never
+part : (t: A) -> Never
 radius : (s: Shape) -> Never
 now : () -> Int ! Clock
 top_env : Int
 top_err : Never
-top_a : Int
-top_fail : Int
+top_a : 1
+top_fail : 1
 bits : BitArray
 bad_bits : BitArray
-8:13: error[E0501]: `String` is not a subtype of `Int`
-8:1: error[E0501]: `Int` is not a subtype of `String`
-12:20: error[E0501]: `String` is not a subtype of `Int` (the type at 12:16 needs it)
-13:19: error[E0501]: `String` is not a subtype of `Int`
-16:10: error[E0501]: `Int` is not a subtype of `Bool`
-21:14: error[E0502]: this call gives 2 arguments, but the function has 1 parameter (§6.6)
-22:26: error[E0502]: the function types `(Int) -> _ ? _ ! _` and `(Int, Int) -> _ ? _ ! _` have different numbers of parameters
-24:17: error[E0518]: a union with two or more type variables as members may only be in an output place (§4.4): inference could not choose the variable for a value that comes here
-25:32: error[E0504]: a value of `Int` could go to more than one type variable of `_ | _` (§4.4) (the type at 25:22 needs it)
-27:17: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
-28:16: error[E0506]: `.k` needs a known type for its value (§4.8 rule 13); write its type, such as `x: (A, B)`
-31:25: error[E0512]: not every constructor of `Shape` has a field with the label `radius` (§4.8 rule 13)
-35:1: error[E0509]: a top-level binding may not need an environment (§2.5), but this one has `Clock`
-36:1: error[E0509]: a top-level binding may not give errors (§2.5), but this one has `Int`
-37:1: error[E0509]: a top-level binding may not need an environment (§2.5), but this one has `Assert`
-40:16: error[E0514]: there is no bit array format `u16` (§8.2)
-40:23: error[E0514]: there is no bit array format `x8` (§8.2)
+13:13: error[E0501]: `"a"` is not a subtype of `Int`
+13:1: error[E0501]: `1` is not a subtype of `String`
+18:20: error[E0501]: `"a"` is not a subtype of `Int` (the type at 18:16 needs it)
+20:19: error[E0501]: `"a"` is not a subtype of `Int`
+24:7: error[E0501]: `1` is not a subtype of `Bool`
+30:14: error[E0502]: this call gives 2 arguments, but the function has 1 parameter (§6.6)
+32:26: error[E0502]: the function types `(1) -> _ ? _ ! _` and `(1, 2) -> _ ? _ ! _` have different numbers of parameters
+35:23: error[E0518]: a union with two or more type variables as members may only be in an output place (§4.4): inference could not choose the variable for a value that comes here
+37:32: error[E0504]: a value of `1` could go to more than one type variable of `_ | _` (§4.4) (the type at 37:22 needs it)
+40:17: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
+42:16: error[E0506]: `.k` needs a known type for its value (§4.8 rule 13); write its type, such as `x: (A, B)`
+50:25: error[E0512]: not every constructor of `Shape` has a field with the label `radius` (§4.8 rule 13)
+59:1: error[E0509]: a top-level binding may not need an environment (§2.5), but this one has `Clock`
+61:1: error[E0509]: a top-level binding may not give errors (§2.5), but this one has `1`
+63:1: error[E0509]: a top-level binding may not need an environment (§2.5), but this one has `Assert`
+68:16: error[E0514]: there is no bit array format `u16` (§8.2)
+68:23: error[E0514]: there is no bit array format `x8` (§8.2)

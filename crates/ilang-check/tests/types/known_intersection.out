@@ -1,7 +1,8 @@
-inc : (x: a & Int) -> a
+inc : (x: A & Int) -> A
 same : () -> Bool
 other : () -> Bool
 wide : (v: Int) -> Bool
-4:13: warning[W0502]: this value is not used, and working it out does nothing
-6:14: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
-8:19: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
+5:2: warning[W0502]: this value is not used, and working it out does nothing
+9:13: warning[W0503]: both sides are constants, `5` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+11:14: warning[W0503]: both sides are constants, `5` and `"s"`, which can never be equal, so `==` is always `False` (§6.9)
+14:19: warning[W0503]: the two sides have the known types `Int` and `"s"`, which can never be equal, so `==` is always `False` (§6.9)

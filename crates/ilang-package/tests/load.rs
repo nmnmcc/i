@@ -64,7 +64,26 @@ fn graph_with_path_dependencies() {
     // The library package.
     let lib = &graph.packages[graph.library];
     assert_eq!(lib.name, "i");
-    assert_eq!(lib.modules.len(), 7);
+    let paths: Vec<&str> = lib.modules.iter().map(|m| m.path.as_str()).collect();
+    assert_eq!(
+        paths,
+        [
+            "i/prelude",
+            "i/fail",
+            "i/control",
+            "i/resource",
+            "i/assertion",
+            "i/core",
+            "i/io",
+            "i/task",
+            "i/clock",
+            "i/random",
+            "i/fs",
+            "i/process",
+            "i/net",
+            "i/stdio"
+        ]
+    );
 }
 
 #[test]

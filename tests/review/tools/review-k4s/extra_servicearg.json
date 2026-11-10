@@ -1,0 +1,6 @@
+{
+  "name": "extra_servicearg",
+  "code": 0,
+  "time": 0.019217634107917547,
+  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (f: () -> A ! N) -> A ! N\napp/main.forward : () -> Nil ! N | S(N)\n"
+}

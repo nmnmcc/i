@@ -1,0 +1,40 @@
+{
+  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
+  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 3.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 0,
+      "stdout": "spec/equality.check : (got: String, want: String) -> Nil\nspec/equality.yes : (b: Bool) -> Nil\nspec/equality.no : (b: Bool) -> Nil\nspec/equality.top : (x: A) -> A\nspec/equality.alias : (x: A) -> A\nspec/equality.make : () -> (x: A) -> A\nspec/equality.values : () -> Nil\nspec/equality.structures : () -> Nil\nspec/equality.mixed : (x: Int | String | Nil) -> Bool\nspec/equality.different_types : () -> Nil\nspec/equality.functions : () -> Nil\n",
+      "stderr": "test/equality.i:36:5: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False` (§6.9)\ntest/equality.i:38:5: warning[W0503]: both sides are constants, `100000000000000000000` and `100000000000000000001`, which can never be equal, so `==` is always `False` (§6.9)\ntest/equality.i:39:6: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True` (§6.9)\ntest/equality.i:44:5: warning[W0503]: both sides are constants, `\"a\"` and `\"A\"`, which can never be equal, so `==` is always `False` (§6.9)\n"
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass spec/equality.values\npass spec/equality.structures\npass spec/equality.different_types\npass spec/equality.functions\npass spec/qa_corpus_runtime_test.qa_startup\n5 passed, 0 failed\n",
+      "stderr": "test/equality.i:36:5: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False` (§6.9)\ntest/equality.i:38:5: warning[W0503]: both sides are constants, `100000000000000000000` and `100000000000000000001`, which can never be equal, so `==` is always `False` (§6.9)\ntest/equality.i:39:6: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True` (§6.9)\ntest/equality.i:44:5: warning[W0503]: both sides are constants, `\"a\"` and `\"A\"`, which can never be equal, so `==` is always `False` (§6.9)\n"
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass spec/equality.values\npass spec/equality.structures\npass spec/equality.different_types\npass spec/equality.functions\npass spec/qa_corpus_runtime_test.qa_startup\n5 passed, 0 failed\n",
+      "stderr": "test/equality.i:36:5: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False` (§6.9)\ntest/equality.i:38:5: warning[W0503]: both sides are constants, `100000000000000000000` and `100000000000000000001`, which can never be equal, so `==` is always `False` (§6.9)\ntest/equality.i:39:6: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True` (§6.9)\ntest/equality.i:44:5: warning[W0503]: both sides are constants, `\"a\"` and `\"A\"`, which can never be equal, so `==` is always `False` (§6.9)\n"
+    }
+  },
+  "transitions": [
+    "W520 applied: E0520 -> W0503; docs/spec.md §6.9 requires Bool, no widening or new narrowing fact"
+  ]
+}

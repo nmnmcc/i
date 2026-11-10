@@ -45,6 +45,19 @@ pub mod code {
     pub const TYPE_PARAM_TWICE: &str = "E0226";
     pub const EXPORT_HIDDEN_TYPE: &str = "E0227";
     pub const ENV_PARAMS_SAME: &str = "E0228";
+    pub const TYPE_VAR_ARGS: &str = "E0230";
+    pub const TYPE_VAR_IS_TYPE: &str = "E0231";
+    pub const TYPE_PARAM_FORM: &str = "E0232";
+    pub const MACRO_RESERVED: &str = "E0234";
+    // E0229, E0233 and E0237 were temporary value-type reservations.
+    pub const VALUE_TYPE_CIRCLE: &str = "E0530";
+    pub const VALUE_TYPE_PLACE: &str = "E0531";
+    pub const TYPE_PATTERN_FORM: &str = "E0532";
+    pub const VALUE_TYPE_OPEN: &str = "E0533";
+    pub const VALUE_TYPE_NOT_FIXED: &str = "E0534";
+    pub const TYPE_PATTERN_MISMATCH: &str = "E0535";
+    pub const VALUE_TYPE_OWN_SCOPE: &str = "E0536";
+    pub const TYPE_PATTERN_BINDER_IS_TYPE: &str = "E0537";
     // Attributes and entry points.
     pub const UNKNOWN_ATTRIBUTE: &str = "E0301";
     pub const ATTRIBUTE_ARGS: &str = "E0302";
@@ -91,11 +104,12 @@ pub mod code {
     pub const NOT_KNOWN_CTOR: &str = "E0517";
     pub const TYPE_PLACE: &str = "E0518";
     pub const BIT_PATTERN: &str = "E0519";
-    pub const EQ_DISJOINT: &str = "E0520";
+    // E0520 became warning W0503: disjoint equality is well defined (§6.9).
     pub const ENTRY_TYPE: &str = "E0521";
     pub const ENTRY_ENV: &str = "E0522";
     pub const NEVER_USED: &str = "W0501";
     pub const VALUE_NOT_USED: &str = "W0502";
+    pub const EQ_DISJOINT: &str = "W0503";
 }
 
 /// A parsed module of the graph.
@@ -149,7 +163,8 @@ pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagn
 pub struct Checked {
     /// `None` when a module has a syntax error.
     pub program: Option<hir::Program>,
-    /// `None` when the program could not be resolved.
+    /// `None` when the program could not be resolved, or the equivalence
+    /// audit needs a known type before it can supply lowering data.
     pub types: Option<types::Typed>,
     pub diags: Vec<Diagnostic>,
 }

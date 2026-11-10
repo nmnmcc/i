@@ -1,4 +1,4 @@
-import (
+(
 	i/core
 	bool = std/bool
 	order = (Less, Equal, Greater) = std/order

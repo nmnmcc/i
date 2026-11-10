@@ -1,7 +1,7 @@
 # i Rust host
 
 `ilang-host` embeds Wasmtime 50 and runs i programs through the binary
-interface version 2 of `docs/spec.md` (Appendix B). It enables the Wasm
+interface version 3 of `docs/spec.md` (Appendix B). It enables the Wasm
 features that i needs: garbage collection, typed function references, tail
 calls, and exception handling with `exnref`.
 
@@ -35,13 +35,13 @@ fn main() -> anyhow::Result<()> {
 
 `Program::from_bytes` compiles the module and reads its `ilang.abi` custom
 section (B.6): `entry`, `tests` (with `async`), `exports` (with `errors` and
-`async`), `services` and `externals`. Unknown fields, a version other than 2,
+`async`), `services` and `externals`. Unknown fields, a version other than 3,
 errors that are not in the canonical order, and names of the interface used for
 exports are refused. `Program::with_abi` gives the metadata of a module without
 the section; it cannot replace a section.
 
-`Program::instantiate` links the two runtime imports of `ilang:host/v1`
-(`panic` and `reference_id`, B.4) and every function in `services` and
+`Program::instantiate` links the three runtime imports of `ilang:host/v1`
+(`panic`, `reference_id` and `cancel`, B.4) and every function in `services` and
 `externals`. A missing host function fails instantiation. Then it calls
 `ilang_start` once, before anything else (B.1). When the program stops in
 `ilang_start`, the error is a `Stop`.
@@ -131,12 +131,44 @@ imports.external("app:math/v1", "sqrt", |arguments| match arguments {
 ## Async (B.4, B.5)
 
 `HostImports::async_service` registers a function of an async host service. It
-starts the work and gives a future. `Instance::call_async` and
-`Instance::run_async` call an async export: while the status is 1, they await
-the future of the one host function that the module started, give its value to
-`ilang_resume:namespace:label`, and at status 0 read the results from
-`ilang_result:name`. `ilang_host::block_on` drives such a call without an
-executor.
+starts the work and gives a future. The module picks a request id for each
+async host function that it starts, and may keep many requests outstanding.
+`Instance::call_async` and `Instance::run_async` call an async export. While
+the status is 1, they wait for the work of any outstanding request, and answer
+the requests one at a time, in the order their work finishes, through
+`ilang_resume:namespace:label` with the id first. At status 2 (the module can
+go on without an answer) they let the runtime run once, give an answer that is
+done, and otherwise call `ilang_continue`. At status 0 they read the results
+from `ilang_result:name`. The module may drop a request with the runtime
+import `cancel`. The requests that are left when the entry point ends, when it
+stops, or when a host function fails are dropped, and so is their work.
+
+The start closure of an async service runs during the import, and its future
+is first polled when the host waits. So work out deadlines and copy inputs in
+the start closure, and do not spawn tasks. Work handed to `spawn_blocking` is
+detached when its request is dropped: it runs to its end and its result is
+thrown away.
+
+`ilang_host::block_on` runs such a call on one new thread named `ilang`, with a
+stack of `THREAD_STACK` bytes and a tokio `current_thread` runtime with time
+and IO enabled. IO is there whenever tokio is built with its IO driver, which a
+service that uses tokio IO turns on through its own tokio features (for example
+`net`). Every Wasm call of the future runs directly on that thread. It needs a
+`Send` future; with a future that is not `Send`, await `call_async` on your own
+executor. `Program::run_entry`, `Program::run_test_with` and
+`Program::run_tests` run each program or test inside one `block_on`.
+
+Called from a thread that `block_on` did not start, each Wasm call starts its
+own thread with a stack of `THREAD_STACK` bytes, and the futures of the
+services are polled where the call is awaited. Await it inside a tokio runtime
+with time and IO enabled when a service uses tokio; otherwise such a service
+panics with tokio's message. A Wasm call made from inside a host function, for
+example into a second instance, also gets a thread of its own.
+
+A sync service runs inside the tokio runtime of `block_on`. It must not start or
+block on a runtime of its own (for example `Runtime::block_on` or
+`reqwest::blocking`); write it as an async service, or do that work on a thread
+of its own and join it.
 
 ## Host references
 
@@ -153,3 +185,90 @@ cargo run --release -p ilang-host --example run -- path/to/program.wasm
 ```
 
 runs the program entry and the tests of a module that needs no host functions.
+
+## Changes in version 3
+
+- Async imports take a request id first, and the module may keep many
+  requests outstanding; the host answers them in any order. The runtime import
+  `cancel`, status 2 and the export `ilang_continue` are new. Modules of
+  version 2 are refused; build them again.
+- `block_on` runs the future on one `ilang` thread with a tokio
+  `current_thread` runtime, and needs a `Send` future. With a future that is
+  not `Send`, await `call_async` on your own executor.
+- Sync services and externals run inside that tokio runtime. A sync service
+  that starts or blocks on a runtime of its own (for example
+  `Runtime::block_on` or `reqwest::blocking`) now panics with tokio's message;
+  write it as an async service, or do that work on a thread of its own and
+  join it.
+
+## Run-owned resources and declaration grants
+
+`ResourceHost` shares an arbitrary-precision, non-reusing Int allocator across
+programs, tests and instances. Default `HostImports` share one process host;
+`with_resource_host` chooses an explicit identity domain. Each entry/export call
+gets a fresh `ResourceContext`, passed at start to `context_service`,
+`context_async_service` and `context_external`. Capture it in asynchronous work.
+The instance never retargets a captured context. Initialization has its own
+context, closed before the first invocation or on disposal.
+
+Contexts own kind-checked resources, named operation leases, provisional reply
+guards and independent cleanup receipts. `Lease::commit` serializes with close;
+`closed()` wakes pending work. `close` removes the entry before starting cleanup,
+and concurrent closes join its receipt. Cleanup starters run outside the table
+lock and must return promptly. Their independent host jobs complete `CleanupDone`
+after actual cleanup; dropping a close waiter cannot cancel them. Register
+creation/supervision with `cleanup_job` before OS work starts. `teardown` returns
+all unfinished receipts, including jobs and already-closing entries. Invocation
+exit, trap, host failure, future abandonment and `Instance::dispose` close the
+gate and initiate teardown without i finals or a Wasm callback. Individual IO
+services supply their own safe OS references and cleanup implementations.
+
+Context registrations require a separate `BindingPlan` and declaration grants.
+`Program::with_binding_plan` checks its final-artifact SHA-256 and wire signatures;
+this does not approve its provenance. The embedding authenticates the compiler
+plan and uses `HostImports::grant` or `grant_package` with trusted content
+identities. Loading checks every declaration before coalescing/linking, including
+external aliases. An unauthorized declaration fails with
+`ungranted host import <namespace> <name> declared by <module> <declaration>`.
+Without a plan, a restricted binding fails with
+`ungranted host import <namespace> <name>: a trusted binding plan or explicit
+declaration grant is required`. Plain ABI metadata grants no authority.
+
+Legacy `service`, `async_service` and `external` registrations remain deliberate
+embedding authority over all declarations of that import name. Use restricted
+context registrations for resource factories. The CLI passes the compiler plan
+and grants its loader-selected library content identity. Existing explicit
+bindings remain: standard io print; test io print, math add/hypot, kv get/check,
+async double/echo/nan and bad nan/bits; custom fixture console print, storage
+read, clock later and math hypot. These grants confer raw binding authority;
+resource numbers are not secrets. No library module is named by the mechanism,
+and ABI v3 and generated Wasm are unchanged by the plan.
+
+Additional existing fixture grants are `custom.echo_string`, `custom.echo_int`,
+`custom.echo_bits`, `custom.echo_ref`, `custom.echo_bool`, `custom.echo_float`,
+`custom.echo_nil`, `custom:fallible/v1.fallible`, and the compiled fixture's
+`app:clock/v1.tick`. They use the same explicit legacy registration authority.
+
+Approval covers the complete authenticated binding plan: the artifact digest
+and the entire ordered declaration list, including refused and duplicate entries.
+Rust grants retain a snapshot of that plan, just as JS authorization tokens do.
+Replacing any part of it, even by deleting a refused alias while keeping identical
+Wasm bytes, requires fresh explicit approval. Wire-import coverage alone cannot
+prove the list complete. Legacy broad registration authority is unchanged.
+
+Every SDK-managed entry into guest code checks the invocation gate, including
+continuations, result exports, allocation and each free. Ending during a host
+callback prevents return into guest code. Ending during request cancellation at
+status zero prevents the later result export. An interrupted invocation leaves
+the instance unusable. Raw access to a Wasm instance remains the embedding's ABI
+duty.
+
+Cleanup failures are host diagnostics. Close and teardown still complete every
+cancellation, lease wake and cleanup starter, and keep their error-free contract.
+Rust isolates unwinding panics in cleanup starters, request-future destructors
+and wake callbacks; its normal panic hook still runs. Drain diagnostic records
+with `ResourceHost::take_cleanup_errors()` or the instance's forwarding method.
+Each record has `phase` (`cancel`, `wake` or `cleanup`) and a panic `message`.
+The queue belongs to the host identity domain and includes late cleanup; draining
+it does not enter Wasm or replace the invocation's original result or failure.
+No process-wide panic hook is installed or changed.

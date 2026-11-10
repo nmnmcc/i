@@ -115,7 +115,7 @@ pub fn run(command: PackageCommand) -> Result<ExitCode> {
 fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
     if !is_name(name) || name == "i" {
         bail!(
-            "the package name `{name}` must be a name (§1.3): a lowercase letter, then lowercase letters, digits and `_`; and it may not be `i` or a keyword"
+            "the package name `{name}` must be a name (§1.3): a lowercase letter, then lowercase letters, digits and `_`; and it may not be `i`"
         );
     }
     let dir = path.unwrap_or_else(|| PathBuf::from(name));
@@ -152,9 +152,9 @@ fn main_module(name: &str) -> String {
         r#"//// The package `{name}`. It imports the standard service `Io` from `i/io`
 //// (§9.7), and `i run` gives it, so the program can print.
 
-import ((Io) = i/io)
+((Io) = i/io)
 
-export (greeting)
+(greeting)
 
 /// The greeting for `who`.
 greeting = (who: String) -> String {{ "Hello, " <> who <> "!" }}
@@ -169,11 +169,11 @@ main = (io ! Io) {{
 
 fn test_module(name: &str) -> String {
     format!(
-        r#"import ({name}/main)
+        r#"({name}/main)
 
 @test
 greets = () {{
-  case main.greeting("i") {{
+  main.greeting("i") |> {{
     "Hello, i!" -> Nil
     other -> panic(other)
   }}
@@ -1022,6 +1022,28 @@ fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interfac
         );
     }
     let dir = tmp.path().join(prefix);
+    let (graph, mut diags) = ilang_package::load_with(
+        &dir,
+        &LoadOptions {
+            tests: false,
+            write_lock: false,
+            ..LoadOptions::from_env()
+        },
+    );
+    diags.extend(ilang_check::check(&graph).diags);
+    let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
+    if !errors.is_empty()
+        && errors.iter().all(|d| {
+            d.source
+                .is_some_and(|s| ilang_syntax::old_syntax_marks(&graph.sources.get(s).text))
+        })
+    {
+        println!(
+            "the interface of `{tag}` is in the syntax from before {} (A3) and cannot be compared; check the interface by hand",
+            env!("CARGO_PKG_VERSION")
+        );
+        return Ok(None);
+    }
     Ok(Some(interface_of(&dir, false)?))
 }
 
@@ -1137,8 +1159,8 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
             .chain(library_hosts(program, graph.library, m));
         for t in types {
             let def = program.ty(t);
-            let shown = TypeShow::new(program, def, &shown_names, false);
-            let canonical = TypeShow::new(program, def, &canonical_names, true);
+            let shown = TypeShow::new(def, &shown_names, false);
+            let canonical = TypeShow::new(def, &canonical_names, true);
             // The host gives the functions of a host service by their
             // labels (§9.7), so they are part of the interface even when
             // the type or its constructor is not exported.
@@ -1162,8 +1184,14 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
             out.insert(
                 format!("type {path}.{}", def.name),
                 Entry {
-                    shown: shown.head(),
-                    canonical: canonical.head(),
+                    shown: match typed.alias_types.get(&t) {
+                        Some(body) => shown.completed_head(body),
+                        None => shown.head(),
+                    },
+                    canonical: match typed.alias_types.get(&t) {
+                        Some(body) => canonical.completed_head(body),
+                        None => canonical.head(),
+                    },
                 },
             );
             if (def.constructors_exported || def.host.is_some())
@@ -1250,9 +1278,8 @@ fn canonical_type(t: &ShownType, names: &[String]) -> String {
 }
 
 /// Shows the parts of a type definition. The parameters are named by their
-/// place, `a`, `b`, …, so that renaming them is no change.
+/// place, `A`, `B`, …, so that renaming them is no change.
 struct TypeShow<'a> {
-    program: &'a hir::Program,
     def: &'a hir::TypeDef,
     /// The name of each custom type, by `TypeId`.
     names: &'a [String],
@@ -1263,14 +1290,8 @@ struct TypeShow<'a> {
 }
 
 impl<'a> TypeShow<'a> {
-    fn new(
-        program: &'a hir::Program,
-        def: &'a hir::TypeDef,
-        names: &'a [String],
-        canonical: bool,
-    ) -> Self {
+    fn new(def: &'a hir::TypeDef, names: &'a [String], canonical: bool) -> Self {
         TypeShow {
-            program,
             def,
             names,
             canonical,
@@ -1279,11 +1300,23 @@ impl<'a> TypeShow<'a> {
     }
 
     fn param(&self, i: usize) -> String {
-        let letters = b"abcdefghijklmnopqrstuvwxyz";
-        match letters.get(i) {
-            Some(&c) => (c as char).to_string(),
-            None => format!("t{i}"),
+        if self.canonical {
+            return format!("'p{i}");
         }
+        let letters = b"ABCDFGHIJKLMOPQRSTUVWXYZ";
+        (0..)
+            .flat_map(|round| {
+                letters.iter().map(move |c| {
+                    if round == 0 {
+                        (*c as char).to_string()
+                    } else {
+                        format!("{}{suffix}", *c as char, suffix = round + 1)
+                    }
+                })
+            })
+            .filter(|name| !self.names.contains(name))
+            .nth(i)
+            .unwrap()
     }
 
     /// The name of a type variable that is not a parameter.
@@ -1296,15 +1329,16 @@ impl<'a> TypeShow<'a> {
             });
             return format!("'{i}");
         }
-        self.program
-            .ty_var_names
-            .get(v.0 as usize)
-            .cloned()
-            .unwrap_or_else(|| "_".to_string())
+        let mut vars = self.vars.borrow_mut();
+        let i = vars.iter().position(|x| *x == v).unwrap_or_else(|| {
+            vars.push(v);
+            vars.len() - 1
+        });
+        self.param(self.def.params.len() + i)
     }
 
-    /// `@host("ns") Name(a, b)`, or `Name(a) = Type` for an alias.
-    fn head(&self) -> String {
+    /// `@host("ns") Name(A, B)`, or `Name(A) = Type` for an alias.
+    fn head_prefix(&self) -> String {
         let mut s = String::new();
         if let Some(h) = &self.def.host {
             if h.is_async {
@@ -1318,10 +1352,54 @@ impl<'a> TypeShow<'a> {
             let ps: Vec<String> = (0..self.def.params.len()).map(|i| self.param(i)).collect();
             s.push_str(&format!("({})", ps.join(", ")));
         }
+        s
+    }
+
+    fn head(&self) -> String {
+        let mut s = self.head_prefix();
         if let TypeBody::Alias(t) = &self.def.body {
             s.push_str(&format!(" = {}", self.ty(t, 0)));
         }
         s
+    }
+
+    fn completed_head(&self, body: &ShownType) -> String {
+        let head = self.head_prefix();
+        let ordered;
+        let body = if self.canonical {
+            ordered = canonical_alias_order(body, &|t| {
+                t.text_with(
+                    &mut |ty| match ty {
+                        TypeRef::Builtin(b) => b.name().to_string(),
+                        TypeRef::Custom(id) => self.names[id.0 as usize].clone(),
+                    },
+                    &mut |v| {
+                        self.def
+                            .params
+                            .iter()
+                            .position(|(n, _)| n == v)
+                            .map_or_else(|| v.to_string(), |i| self.param(i))
+                    },
+                )
+            });
+            &ordered
+        } else {
+            body
+        };
+        let text = body.text_with(
+            &mut |ty| match ty {
+                TypeRef::Builtin(b) => b.name().to_string(),
+                TypeRef::Custom(id) => self.names[id.0 as usize].clone(),
+            },
+            &mut |name| {
+                self.def
+                    .params
+                    .iter()
+                    .position(|(n, _)| n == name)
+                    .map_or_else(|| name.to_string(), |i| self.param(i))
+            },
+        );
+        format!("{head} = {text}")
     }
 
     /// `C(label: Type, Type)`.
@@ -1359,6 +1437,8 @@ impl<'a> TypeShow<'a> {
                 .join(sep)
         };
         match &t.kind {
+            TypeKind::Of { .. } => panic!("unresolved value type in a package interface"),
+            TypeKind::Lit(v) => v.text(),
             TypeKind::Named { ty, args } => {
                 let name = match ty {
                     TypeRef::Builtin(b) => b.name().to_string(),
@@ -1482,4 +1562,123 @@ fn relative(from: &Path, to: &Path) -> String {
         return ".".to_string();
     }
     parts.join("/")
+}
+
+#[cfg(test)]
+mod syntax_templates {
+    #[test]
+    fn new_package_sources_parse() {
+        for source in [super::main_module("example"), super::test_module("example")] {
+            assert!(ilang_syntax::parse_module(&source).1.is_empty(), "{source}");
+        }
+    }
+}
+
+/// Sort commutative alias members after formal identities have been assigned.
+fn canonical_alias_order(t: &ShownType, key: &dyn Fn(&ShownType) -> String) -> ShownType {
+    use ilang_check::types::ShownFn;
+    match t {
+        ShownType::Union(ts) | ShownType::Inter(ts) => {
+            let union = matches!(t, ShownType::Union(_));
+            let mut parts = Vec::new();
+            for t in ts {
+                let t = canonical_alias_order(t, key);
+                match t {
+                    ShownType::Union(inner) if union => parts.extend(inner),
+                    ShownType::Inter(inner) if !union => parts.extend(inner),
+                    _ => parts.push(t),
+                }
+            }
+            parts.sort_by_key(key);
+            if union {
+                ShownType::Union(parts)
+            } else {
+                ShownType::Inter(parts)
+            }
+        }
+        ShownType::Named(ty, ts) => ShownType::Named(
+            *ty,
+            ts.iter().map(|t| canonical_alias_order(t, key)).collect(),
+        ),
+        ShownType::Tuple(ts) => {
+            ShownType::Tuple(ts.iter().map(|t| canonical_alias_order(t, key)).collect())
+        }
+        ShownType::Fn(f) => ShownType::Fn(Box::new(ShownFn {
+            params: f
+                .params
+                .iter()
+                .map(|(n, t)| (n.clone(), canonical_alias_order(t, key)))
+                .collect(),
+            ret: canonical_alias_order(&f.ret, key),
+            err: f.err.as_ref().map(|t| canonical_alias_order(t, key)),
+            env: f.env.as_ref().map(|t| canonical_alias_order(t, key)),
+        })),
+        ShownType::Diff(t, ts) => ShownType::Diff(
+            Box::new(canonical_alias_order(t, key)),
+            ts.iter().map(|t| canonical_alias_order(t, key)).collect(),
+        ),
+        ShownType::Lit(_) | ShownType::Var(_) | ShownType::Hole | ShownType::Never => t.clone(),
+    }
+}
+
+#[cfg(test)]
+mod value_type_interfaces {
+    use super::*;
+    use std::fs;
+    fn canonical(source: &str) -> BTreeMap<String, String> {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        fs::write(dir.path().join("src/api.i"), source).unwrap();
+        interface_of(dir.path(), false)
+            .unwrap()
+            .unwrap()
+            .into_iter()
+            .map(|(key, entry)| (key, entry.canonical))
+            .collect()
+    }
+    #[test]
+    fn exported_alias_uses_completed_body_not_private_source_spelling() {
+        // X3: private renames are stable, changed closed public types differ.
+        let a = canonical("(A)\nprivate: Int = 1\nA = private");
+        assert_eq!(a, canonical("(A)\nother: Int = 1\nA = other"));
+        assert_ne!(a, canonical("(A)\nprivate: String = \"a\"\nA = private"));
+        assert!(a["type api.A"].ends_with("= Int"));
+    }
+    #[test]
+    fn completed_alias_keeps_formal_positions() {
+        // X3: alpha-renaming cannot reorder formal parameter identities.
+        let a = canonical("(Pair)\nport: Int = 1\nPair(A,B) = (B,A,port)");
+        assert_eq!(
+            a,
+            canonical("(Pair)\nother: Int = 2\nPair(X,Y) = (Y,X,other)")
+        );
+        assert_ne!(
+            a,
+            canonical("(Pair)\nport: Int = 1\nPair(A,B) = (A,B,port)")
+        );
+    }
+    #[test]
+    fn completed_literal_aliases_have_full_canonical_identity() {
+        // Joint §4: literal spelling and private source spelling are not identity.
+        let a = canonical("(A)\nv=0x10\nA=v");
+        assert_eq!(a, canonical("(A)\nrenamed=16\nA=renamed"));
+        assert_ne!(a, canonical("(A)\nv=17\nA=v"));
+        assert_eq!(
+            canonical("(A)\nv=\"\\u{61}\"\nA=v"),
+            canonical("(A)\nv=\"a\"\nA=v")
+        );
+        // This is deliberately beyond the limited hover's first ten members.
+        let source = "(A)\nv: 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19=0\nA=v";
+        let a = canonical(source);
+        assert_ne!(a, canonical(&source.replace("18|19=0", "18|20=0")));
+        assert!(!a["type api.A"].contains('…'));
+        assert!(a["type api.A"].contains("19"));
+    }
+    #[test]
+    fn commutative_alias_members_keep_canonical_formal_identity() {
+        let a = canonical("(T)\nport: Int = 1\nT(A,B) = (B,A,Int | String,port)");
+        let b = canonical("(T)\nvalue: Int = 2\nT(X,Y) = (Y,X,String | Int,value)");
+        assert_eq!(a, b);
+    }
 }

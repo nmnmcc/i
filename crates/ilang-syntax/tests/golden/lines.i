@@ -52,13 +52,13 @@ bits = <<
 
 // Statements and clauses may share a line.
 shared = { x = 1 y = 2 x + y }
-clauses = case b { True -> 1  False -> 0 }
+clauses =  b |> { True -> 1  False -> 0 }
 
 // `|`, `if`, and `->` at the start of a line go on.
-case_lines = case x {
+case_lines =  x |> {
   1
   | 2
-  if y
+  ? y
   -> 3
   _ -> 4
 }
@@ -70,7 +70,7 @@ typed = (x) -> Int
 }
 
 // A break ends a clause: `-1` begins the next one.
-negative = case n {
+negative =  n |> {
   0 -> 1
   -1 -> 2
   _ -> 3

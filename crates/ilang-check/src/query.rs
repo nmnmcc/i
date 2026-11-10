@@ -36,7 +36,7 @@ pub fn check_for_queries(graph: &PackageGraph) -> Checked {
     if diags.iter().any(Diagnostic::is_error) {
         // Inference is only a best effort on a program with errors.
         let types = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            types::check_keeping_locals(&program, &graph.sources).0
+            types::check_keeping_locals_with_errors(&program, &graph.sources, true).0
         }))
         .ok();
         return Checked {
@@ -241,7 +241,7 @@ impl<'a> Query<'a> {
     }
 
     fn def_type(&self, d: DefId) -> Option<String> {
-        if let Some(s) = self.types.and_then(|t| t.schemes.get(&d)) {
+        if let Some(s) = self.types.and_then(|t| t.scheme_hovers.get(&d)) {
             return Some(s.clone());
         }
         match &self.program.def(d).kind {
@@ -342,6 +342,25 @@ impl<'a> Query<'a> {
     fn type_definition(&self, t: TypeId) -> String {
         let def = self.program.ty(t);
         let head = self.type_head(t);
+        if let Some(shown) = self.types.and_then(|types| types.alias_types.get(&t)) {
+            return format!(
+                "{head} = {}",
+                shown.text(&types::type_names(self.program, def.module))
+            );
+        }
+        if let Some(pattern) = self
+            .program
+            .alias_patterns
+            .iter()
+            .find(|p| p.binders.contains(&t))
+        {
+            let source = &self
+                .graph
+                .sources
+                .get(self.program.module(pattern.module).source)
+                .text;
+            return source[pattern.span.start as usize..pattern.span.end as usize].to_string();
+        }
         match &def.body {
             TypeBody::Alias(ty) => format!("{head} = {}", self.show_type(ty)),
             TypeBody::Custom(cs) if cs.is_empty() => format!("{head} {{}}"),
@@ -406,7 +425,16 @@ impl<'a> Query<'a> {
                     format!("{base}({})", args.join(", "))
                 }
             }
+            TypeKind::Lit(v) => v.text(),
             TypeKind::Var(v) => self.ty_var_name(*v),
+            TypeKind::Of { site, .. } => {
+                let s = &self.program.of_sites[site.0 as usize];
+                self.graph
+                    .sources
+                    .get(self.program.module(s.module).source)
+                    .text[s.span.start as usize..s.span.end as usize]
+                    .to_string()
+            }
             TypeKind::Hole | TypeKind::Error => "_".into(),
             TypeKind::Tuple(parts) => {
                 let parts: Vec<String> = parts.iter().map(|a| self.show_type(a)).collect();
@@ -447,7 +475,7 @@ impl<'a> Query<'a> {
                 wrap(s, 0)
             }
             TypeKind::Union(ms) => {
-                let ms: Vec<String> = ms.iter().map(|m| self.show_type_prec(m, 1)).collect();
+                let ms = self.shown_type_parts(ms, 1);
                 wrap(ms.join(" | "), 0)
             }
             TypeKind::Inter(ms) => {
@@ -455,10 +483,40 @@ impl<'a> Query<'a> {
                 wrap(ms.join(" & "), 1)
             }
             TypeKind::Diff(ms) => {
-                let ms: Vec<String> = ms.iter().map(|m| self.show_type_prec(m, 3)).collect();
+                let ms = self.shown_type_parts(ms, 3);
                 wrap(ms.join(" - "), 2)
             }
         }
+    }
+
+    /// Written alias hovers follow the same per-scalar limit as inferred hovers.
+    fn shown_type_parts(&self, parts: &[Type], prec: u8) -> Vec<String> {
+        let kind = |t: &Type| match &t.kind {
+            TypeKind::Lit(crate::types::LitValue::Int(_)) => Some(0usize),
+            TypeKind::Lit(crate::types::LitValue::Str(_)) => Some(1usize),
+            _ => None,
+        };
+        let mut counts = [0usize; 2];
+        for t in parts {
+            if let Some(k) = kind(t) {
+                counts[k] += 1;
+            }
+        }
+        let mut seen = [0usize; 2];
+        let mut result = Vec::new();
+        for t in parts {
+            if let Some(k) = kind(t) {
+                seen[k] += 1;
+                if counts[k] > 12 && seen[k] > 10 {
+                    if seen[k] == 11 {
+                        result.push(format!("… ({} more)", counts[k] - 10));
+                    }
+                    continue;
+                }
+            }
+            result.push(self.show_type_prec(t, prec));
+        }
+        result
     }
 
     /// The `///` comment of the item whose span holds `span`.
@@ -531,7 +589,7 @@ impl<'a> Query<'a> {
         let found = w
             .occ
             .iter()
-            .filter(|(s, _)| s.start <= offset && offset <= s.end)
+            .filter(|(s, _)| s.start < s.end && s.start <= offset && offset <= s.end)
             .min_by_key(|(s, _)| s.end - s.start)
             .cloned();
         // `m` in `m.x`: the HIR has one name for `m.x`.
@@ -572,6 +630,15 @@ impl<'a> Query<'a> {
         for b in &module.bindings {
             w.pattern(&b.binding.pattern);
             w.expr(&b.binding.value);
+        }
+        for pattern in &p.alias_patterns {
+            if pattern.module != m {
+                continue;
+            }
+            for (span, head) in &pattern.heads {
+                w.occ.push((*span, Target::Type(*head)));
+            }
+            w.ty(&pattern.source);
         }
         for (i, d) in module.defs.iter().enumerate() {
             let id = DefId {
@@ -670,7 +737,7 @@ impl<'a> Query<'a> {
     /// a module, the exported members of `m`. After `v.`, the fields of the
     /// known type of `v` (§4.8, §6.7). Else the local names in scope, the
     /// top-level names and types of the module, the imported names, the
-    /// built-in names, and the keywords.
+    /// built-in names.
     pub fn completions_at(&self, m: ModuleId, offset: u32) -> Vec<Completion> {
         let text = self.text(m);
         let bytes = text.as_bytes();
@@ -968,13 +1035,6 @@ impl<'a> Query<'a> {
         for b in BuiltinType::ALL {
             out.push(self.type_completion(TypeRef::Builtin(b)));
         }
-        for k in ["case", "if", "import", "export"] {
-            out.push(Completion {
-                label: k.to_string(),
-                kind: CompletionKind::Keyword,
-                detail: None,
-            });
-        }
         // A name covers the names after it with the same name and kind.
         let mut seen = HashSet::new();
         out.retain(|c| {
@@ -996,6 +1056,25 @@ impl<'a> Query<'a> {
         for item in &ast.items {
             let within = |s: Span| item.span.start <= s.start && s.end <= item.span.end;
             match &item.kind {
+                ast::ItemKind::MacroItem { .. } => {}
+                ast::ItemKind::TypeDef(def) if def.alias_pattern => {
+                    for pattern in &p.alias_patterns {
+                        if pattern.module != m || pattern.span != item.span {
+                            continue;
+                        }
+                        for id in &pattern.binders {
+                            let t = p.ty(*id);
+                            out.push(Symbol {
+                                name: t.name.clone(),
+                                kind: SymbolKind::Type,
+                                span: item.span,
+                                name_span: t.span,
+                                detail: Some(self.type_definition(*id)),
+                                children: Vec::new(),
+                            });
+                        }
+                    }
+                }
                 ast::ItemKind::TypeDef(def) => {
                     let Some(&t) = module
                         .types
@@ -1066,10 +1145,10 @@ fn with_type(name: &str, ty: Option<&str>) -> String {
 }
 
 fn builtin_head(b: BuiltinType) -> String {
-    const PARAMS: [&str; 4] = ["a", "r", "e", "n"];
+    const PARAMS: [&str; 4] = ["A", "R", "E", "N"];
     match b {
-        BuiltinType::List => "List(a)".into(),
-        BuiltinType::Boundary => "Boundary(r, e, n)".into(),
+        BuiltinType::List => "List(A)".into(),
+        BuiltinType::Boundary => "Boundary(R, E, N)".into(),
         BuiltinType::Continuation => format!("Continuation({})", PARAMS.join(", ")),
         b => b.name().into(),
     }
@@ -1160,6 +1239,9 @@ struct Walk<'q> {
 
 impl Walk<'_> {
     fn binder(&mut self, b: &Binder) {
+        if b.name.starts_with('%') {
+            return;
+        }
         self.binders.entry(b.var).or_insert(b.span);
         self.occ.push((b.span, Target::Local(b.var)));
     }
@@ -1223,7 +1305,15 @@ impl Walk<'_> {
                 args.iter().for_each(|a| self.ty(a));
             }
             TypeKind::Var(v) => self.occ.push((t.span, Target::TyVar(*v))),
-            TypeKind::Hole | TypeKind::Error => {}
+            TypeKind::Of { value, .. } => {
+                let target = match value {
+                    ValueRef::Local(v) => Target::Local(*v),
+                    ValueRef::Def(d) => Target::Def(*d),
+                    ValueRef::Ctor(c) => Target::Ctor(*c),
+                };
+                self.occ.push((last_word(self.text, t.span), target));
+            }
+            TypeKind::Lit(_) | TypeKind::Hole | TypeKind::Error => {}
             TypeKind::Tuple(ts)
             | TypeKind::Union(ts)
             | TypeKind::Inter(ts)
@@ -1265,6 +1355,9 @@ impl Walk<'_> {
                 .occ
                 .push((e.span, Target::Literal(BuiltinType::String))),
             ExprKind::Name(v) => {
+                if e.span.start == e.span.end {
+                    return;
+                }
                 let span = last_word(self.text, e.span);
                 let t = match v {
                     ValueRef::Local(v) => Target::Local(*v),
@@ -1394,6 +1487,7 @@ fn pattern_binders(p: &Pattern, out: &mut Vec<Binder>) {
         PatternKind::BitArray(segs) => segs.iter().for_each(|s| pattern_binders(&s.value, out)),
         _ => {}
     }
+    out.retain(|b| !b.name.starts_with('%'));
 }
 
 impl Scope<'_> {
@@ -1410,7 +1504,10 @@ impl Scope<'_> {
     fn block(&mut self, b: &Block) {
         for s in &b.stmts {
             let span = match s {
-                Stmt::Bind(b) => b.span,
+                Stmt::Bind(b) => Span::new(
+                    b.span.start.min(b.value.span.start),
+                    b.span.end.max(b.value.span.end),
+                ),
                 Stmt::Env { span, .. } => *span,
                 Stmt::Expr(e) => e.span,
             };

@@ -1,4 +1,4 @@
-import (
+(
 	i/core
 	pair = std/pair
 )

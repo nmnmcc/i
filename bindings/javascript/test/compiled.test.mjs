@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { compiledImports } from "../../../tests/browser/fixture-abi.mjs";
+import { compiledImports, checkOpaque } from "../../../tests/browser/fixture-abi.mjs";
 import { instantiate, GuestError, Stop } from "../ilang.mjs";
 
 const compiled = await readFile(new URL("../../../tests/browser/fixtures/compiled.wasm", import.meta.url));
@@ -41,24 +41,34 @@ test("async host services of a compiled module wait for the host", async () => {
   assert.equal(value.unusable, null);
 });
 
-test("the module traps when the host answers a function it does not wait for", async () => {
+test("the module traps when the host answers a request it does not wait for", async () => {
+  for (const [resume, args] of [
+    // The module waits for request 0 of `later`, not of `tick` (B.5).
+    ["tick", [0, 0, 0, 0]],
+    // Nor for another id of `later`.
+    ["later", [5, 0, 1, 0, 0]],
+  ]) {
+    const value = await guest([], { later: () => new Promise(() => {}) });
+    void value.callAsync("app/app.wait_sum", [1, 2]);
+    assert.throws(() => value.exports[`ilang_resume:app:clock/v1:${resume}`](...args), WebAssembly.RuntimeError);
+    // Keep the work pending: no SDK resume may use this instance after a trap.
+  }
   const value = await guest();
-  const waiting = value.callAsync("app/app.wait_sum", [1, 2]);
-  // The module waits for `later`, not for `tick` (B.5).
-  assert.throws(() => value.exports["ilang_resume:app:clock/v1:tick"](0, 0, 0), WebAssembly.RuntimeError);
-  assert.equal(await waiting, 3);
+  await value.callAsync("app/app.wait_sum", [1, 2]);
+  // Requests 0 and 1 were answered: their ids are stale now.
+  assert.throws(() => value.exports["ilang_resume:app:clock/v1:later"](1, 0, 1, 0, 0), WebAssembly.RuntimeError);
   const idle = await guest();
-  assert.throws(() => idle.exports["ilang_resume:app:clock/v1:later"](0, 1, 0, 0), WebAssembly.RuntimeError);
+  assert.throws(() => idle.exports["ilang_resume:app:clock/v1:later"](0, 0, 1, 0, 0), WebAssembly.RuntimeError);
 });
 
 test("an answer of the host that is not correct stops the program in the module", async () => {
   // By default the module checks the answer, and the stop has the position
   // of the call (B.2, §11.7).
   const value = await guest([], { later: async () => NaN });
-  await assert.rejects(value.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:35:50");
+  await assert.rejects(value.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:52:2");
   assert.ok(value.unusable);
   const sync = await instantiate(compiled, { imports: { ...compiledImports(GuestError), "app:math/v1": { hypot: () => Infinity } } });
-  assert.throws(() => sync.call("app/app.distance", [3, 4]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:32:35");
+  assert.throws(() => sync.call("app/app.distance", [3, 4]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:48:35");
   // With `checkReplies`, the host stops the program, with no positions.
   const checked = await instantiate(compiled, { imports: compiledImports(GuestError, [], { later: async () => NaN }), checkReplies: true });
   await assert.rejects(checked.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct");
@@ -71,4 +81,39 @@ test("an exception of a host function goes to the caller", async () => {
   const value = await guest([], { read: () => { throw failure; } });
   assert.throws(() => value.call("app/app.lookup", ["name"]), (error) => error === failure);
   assert.match(value.unusable, /the storage is gone/);
+});
+
+// Expected identity follows spec 4.1 and 11.4; display follows 11.8.
+test("compiled opaque imports and exports preserve nominal identity", async () => {
+  const reference = {};
+  for (const opaque of [reference, null]) {
+    const value = await guest([], { opaque });
+    assert.equal(await checkOpaque(value, reference, {}), true);
+  }
+});
+
+// Native 3.1 and N9.1/N9.5: consume the real compiler's separate plan, keep
+// restricted callbacks in one invocation, and dispose every created resource.
+test("compiler binding plan authorizes context registrations on the JS host", async () => {
+  const { authorizeBindings } = await import("../ilang.mjs");
+  const plan = JSON.parse(await readFile(new URL("../../../tests/browser/fixtures/compiled.bindings.json", import.meta.url), "utf8"));
+  // These checked-in fixture bytes and compiler output are the test embedding's
+  // explicit trust path. Production callers authenticate their build outputs.
+  const bindings = await authorizeBindings(compiled, plan, () => true);
+  const contexts = new Set();
+  let created = 0;
+  let disposed = 0;
+  const contextImports = Object.fromEntries(Object.entries(compiledImports(GuestError)).map(([namespace, fields]) => [namespace, Object.fromEntries(Object.entries(fields).map(([name, fn]) => [name, (context, ...args) => {
+    assert.equal(context.live, true);
+    contexts.add(context);
+    created++;
+    context.insert("fixture", {}, () => { disposed++; });
+    return fn(...args);
+  }]))]));
+  const value = await instantiate(bindings.module, { contextImports, bindings });
+  assert.equal(value.call("app/app.distance", [3, 4]), 5);
+  assert.equal(await value.callAsync("app/app.wait_sum", [1.5, 2]), 3.5);
+  assert.equal(contexts.size, 2);
+  assert.equal(disposed, created);
+  assert.ok([...contexts].every((context) => !context.live));
 });

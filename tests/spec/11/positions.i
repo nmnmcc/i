@@ -1,40 +1,45 @@
 // spec: 11.7
 // expect: stop "panic: deep"
-// at: spec/positions:13:45
-// at: spec/positions:20:14
-// at: spec/positions:29:7
-// at: spec/positions:38:3
+// at: spec/positions:17:19
+// at: spec/positions:25:13
+// at: spec/positions:34:4
+// at: spec/positions:43:2
 
-import (i/core)
+(
+	i/core
+)
 
 // `é` counts as one column.
 inner = (s: String) {
-  x = core.byte_size("éé")
-  case x > 100 { True -> s  False -> "é" <> panic("deep") }
+	x = core.byte_size("éé")
+	{ x > 100 } |> {
+		True  -> s
+		False -> "é" <> panic("deep")
+	}
 }
 
 // The call of `inner` is a tail call: it is not in the message.
 middle = (s) { inner(s) }
 
 outer = (s) {
-  r = "é" <> middle(s)
-  r
+	r = "é" <> middle(s)
+	r
 }
 
 each = (xs, f) {
-  case xs {
-    [] -> Nil
-    [x, ..rest] -> {
-      // A call through a value.
-      f(x)
-      // A tail call: `each` is not repeated in the message.
-      each(rest, f)
-    }
-  }
+	xs |> {
+		[] -> Nil
+		[x, ..rest] -> {
+			// A call through a value.
+			f(x)
+			// A tail call: `each` is not repeated in the message.
+			each(rest, f)
+		}
+	}
 }
 
 @main
 main = () {
-  each(["a", "b"], (s) { outer(s) })
-  Nil
+	each(["a", "b"], (s) { outer(s) })
+	Nil
 }

@@ -1,0 +1,6 @@
+# spec: 10.3
+# expect: pass
+name = "spec"
+
+[wasm]
+exports = ["spec/main.out"]

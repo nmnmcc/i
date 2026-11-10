@@ -1,0 +1,6 @@
+# spec: 4.8
+# expect: warning W0503
+name = "spec"
+
+[dependencies]
+std = { path = "../../../../std" }

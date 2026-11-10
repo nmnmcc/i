@@ -1,4 +1,3 @@
-f(x)
-Some(x) = y
-@external("m", "f")
-g = 1
+// old-syntax-check: E0101
+1
+Some(X) = Y

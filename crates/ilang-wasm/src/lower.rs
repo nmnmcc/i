@@ -39,7 +39,7 @@
 use crate::ir::Stmt;
 use crate::ir::{self, *};
 use ilang_check::hir::{self, *};
-use ilang_check::types::{Access, Head, HostType, Typed};
+use ilang_check::types::{Access, Head, HostType, LitValue, TestMember, TestValues, Typed};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast::{BinOp, UnOp};
 use ilang_syntax::span::{LineIndex, Span};
@@ -486,11 +486,22 @@ pub fn lower(
     typed: &Typed,
     options: Options,
 ) -> Result<ir::Program, Vec<Diagnostic>> {
+    lower_with_bindings(graph, program, typed, options).map(|(ir, _)| ir)
+}
+
+/// Capture every required resolved declaration before import coalescing. This
+/// plan is returned separately; it changes neither WAT nor ilang.abi (native 3.1).
+pub fn lower_with_bindings(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: Options,
+) -> Result<(ir::Program, Vec<serde_json::Value>), Vec<Diagnostic>> {
     let mut l = Lowerer::new(graph, program, typed, options);
     l.run();
     if l.diags.is_empty() {
         crate::control::split(&mut l.out);
-        Ok(l.out)
+        Ok((l.out, l.bindings))
     } else {
         Err(l.diags)
     }
@@ -517,10 +528,11 @@ struct Lowerer<'a> {
     lines: HashMap<ModuleId, LineIndex<'a>>,
     /// The service id of each service type constructor (§9.2).
     services: HashMap<TypeRef, u32>,
-    /// The function that calls each import (B.4).
-    import_funcs: HashMap<ImportId, FuncId>,
+    /// The function that calls each import with its declared result decoder (B.4).
+    import_funcs: HashMap<(ImportId, AbiType), FuncId>,
     /// Where each import is declared first, by its index in `out.imports`.
     import_sites: Vec<(ModuleId, Span)>,
+    bindings: Vec<serde_json::Value>,
     /// The function of each external function outside the library (§10.1),
     /// or `None` when it has a problem, which is told one time.
     external_funcs: HashMap<DefId, Option<FuncId>>,
@@ -556,6 +568,7 @@ impl<'a> Lowerer<'a> {
             services: HashMap::new(),
             import_funcs: HashMap::new(),
             import_sites: Vec::new(),
+            bindings: Vec::new(),
             external_funcs: HashMap::new(),
             out: ir::Program::default(),
             diags: Vec::new(),
@@ -998,9 +1011,16 @@ impl<'a> Lowerer<'a> {
             };
             let abi = host_abi(hf);
             let site = (def.module, label.span);
-            match self.import(&host.namespace, &label.name, abi, kind, site) {
+            match self.import(
+                &host.namespace,
+                &label.name,
+                abi,
+                kind,
+                site,
+                &format!("{}.{}", def.name, label.name),
+            ) {
                 Ok(import) => {
-                    let f = self.import_func(import);
+                    let f = self.import_func(import, hf.result);
                     self.constants.insert(f);
                     fields.push(f);
                 }
@@ -1046,12 +1066,19 @@ impl<'a> Lowerer<'a> {
             return None;
         };
         let site = (d.module, def.span);
-        match self.import(module, function, host_abi(hf), ImportKind::External, site) {
+        match self.import(
+            module,
+            function,
+            host_abi(hf),
+            ImportKind::External,
+            site,
+            &def.name,
+        ) {
             Ok(import) => {
                 // §11.4: each declaration is one value, so two declarations
                 // of one import have two functions, which call the same
                 // import.
-                Some(self.make_import_func(import))
+                Some(self.make_import_func(import, abi_type(hf.result)))
             }
             Err((module, span, message)) => {
                 self.error(module, span, message);
@@ -1072,6 +1099,7 @@ impl<'a> Lowerer<'a> {
         abi: ExportAbi,
         kind: ImportKind,
         site: (ModuleId, Span),
+        declaration: &str,
     ) -> Result<ImportId, (ModuleId, Span, String)> {
         if module == "ilang:host/v1" {
             return Err((
@@ -1090,6 +1118,56 @@ impl<'a> Lowerer<'a> {
                 ),
             ));
         }
+        if kind != ImportKind::WasiStdout {
+            let source_module = self.program.module(site.0);
+            let package = &self.graph.packages[source_module.package];
+            use ilang_package::lock::{FileKind, PackageFile, hash};
+            let module_file = PackageFile {
+                path: source_module.path.clone(),
+                kind: FileKind::Regular,
+                bytes: self
+                    .graph
+                    .sources
+                    .get(source_module.source)
+                    .text
+                    .as_bytes()
+                    .to_vec(),
+            };
+            let mut files: Vec<_> = package
+                .modules
+                .iter()
+                .map(|m| PackageFile {
+                    path: m.path.clone(),
+                    kind: FileKind::Regular,
+                    bytes: self.graph.sources.get(m.source).text.as_bytes().to_vec(),
+                })
+                .collect();
+            if let Some(source) = package.manifest_source {
+                files.push(PackageFile {
+                    path: "i.toml".into(),
+                    kind: FileKind::Regular,
+                    bytes: self.graph.sources.get(source).text.as_bytes().to_vec(),
+                });
+            }
+            let binding = serde_json::json!({
+                "package": package.location.as_ref().map(|p| p.hash.clone()).unwrap_or_else(|| hash(&files)),
+                "module": source_module.path,
+                "module_digest": hash(&[module_file]),
+                "declaration": declaration,
+                "namespace": module,
+                "name": name,
+                "kind": if kind == ImportKind::External { "external" } else { "service" },
+                "signature": {
+                    "params": abi.params.iter().map(|t| t.name()).collect::<Vec<_>>(),
+                    "result": abi.result.name(),
+                    "errors": abi.errors.iter().map(|t| t.name()).collect::<Vec<_>>(),
+                    "async": kind == ImportKind::AsyncService,
+                },
+            });
+            if !self.bindings.contains(&binding) {
+                self.bindings.push(binding);
+            }
+        }
         if let Some(i) = self
             .out
             .imports
@@ -1097,7 +1175,13 @@ impl<'a> Lowerer<'a> {
             .position(|x| x.module == module && x.name == name)
         {
             let x = &self.out.imports[i];
-            if x.abi == abi && x.kind == kind {
+            // B.4 coalesces wire signatures. The calling declaration keeps
+            // its own nominal result decoder in HostCall or HostReply.
+            if names(&x.abi.params) == names(&abi.params)
+                && x.abi.result.name() == abi.result.name()
+                && names(&x.abi.errors) == names(&abi.errors)
+                && x.kind == kind
+            {
                 return Ok(i as ImportId);
             }
             let first = self.import_sites[i];
@@ -1127,17 +1211,18 @@ impl<'a> Lowerer<'a> {
     /// The function that calls an import: its parameters go to the host
     /// encoded as in B.2, and its value or error comes back. An async
     /// import waits for the host at the root boundary (B.4, B.5).
-    fn import_func(&mut self, import: ImportId) -> FuncId {
-        if let Some(&f) = self.import_funcs.get(&import) {
+    fn import_func(&mut self, import: ImportId, result: HostType) -> FuncId {
+        let result = abi_type(result);
+        if let Some(&f) = self.import_funcs.get(&(import, result)) {
             return f;
         }
-        let f = self.make_import_func(import);
-        self.import_funcs.insert(import, f);
+        let f = self.make_import_func(import, result);
+        self.import_funcs.insert((import, result), f);
         f
     }
 
     /// A new function that calls an import, as `import_func`.
-    fn make_import_func(&mut self, import: ImportId) -> FuncId {
+    fn make_import_func(&mut self, import: ImportId, result: AbiType) -> FuncId {
         let x = self.out.imports[import as usize].clone();
         let n = x.abi.params.len() as u32;
         let args: Vec<Atom> = (0..n).map(Atom::Local).collect();
@@ -1148,7 +1233,11 @@ impl<'a> Lowerer<'a> {
                 locals.push(LocalType::Value);
                 body.push(Stmt::Let {
                     dst: n,
-                    value: Value::HostCall { import, args },
+                    value: Value::HostCall {
+                        import,
+                        args,
+                        result,
+                    },
                     site: None,
                 });
                 body.push(Stmt::Return(Atom::Local(n)));
@@ -1185,7 +1274,7 @@ impl<'a> Lowerer<'a> {
                 });
                 body.push(Stmt::Let {
                     dst: n + 3,
-                    value: Value::HostReply(import),
+                    value: Value::HostReply(ImportReply { import, result }),
                     site: None,
                 });
                 body.push(Stmt::Return(Atom::Local(n + 3)));
@@ -2101,6 +2190,25 @@ impl<'a> Lowerer<'a> {
                 body: cb,
             });
         }
+        if let [c] = clauses
+            && c.guard.is_none()
+        {
+            let span = c
+                .patterns
+                .first()
+                .unwrap()
+                .span
+                .to(c.patterns.last().unwrap().span);
+            if self
+                .typed
+                .may_fail
+                .get(&(fx.module, span))
+                .copied()
+                .unwrap_or(false)
+            {
+                self.assert_failure(fx, &mut body, span, s, span.start);
+            }
+        }
         // The clauses cover every value (§7.4).
         body.push(Stmt::Unreachable);
         out.push(Stmt::Block { label: end, body });
@@ -2128,7 +2236,7 @@ impl<'a> Lowerer<'a> {
                 if let Some(heads) = self.typed.type_tests.get(&(fx.module, p.span)) {
                     let cond = heads
                         .iter()
-                        .map(|h| self.head_cond(v.clone(), *h))
+                        .map(|m| self.test_cond(v.clone(), m))
                         .reduce(|a, b| Cond::Or(Box::new(a), Box::new(b)))
                         .unwrap_or(Cond::Tag(v.clone(), u32::MAX));
                     guard(out, cond, fail);
@@ -2206,6 +2314,29 @@ impl<'a> Lowerer<'a> {
     }
 
     /// The test of a type test `x: T` for one member of `T` (§7.1).
+    fn test_cond(&self, v: Atom, member: &TestMember) -> Cond {
+        let values = match &member.values {
+            TestValues::All => return self.head_cond(v, member.head),
+            TestValues::Only(values) | TestValues::Except(values) => values,
+        };
+        let equal = values
+            .iter()
+            .map(|value| match value {
+                LitValue::Int(n) => Cond::IsInt(v.clone(), n.clone()),
+                LitValue::Str(s) => Cond::IsString(v.clone(), s.clone()),
+            })
+            .reduce(|a, b| Cond::Or(Box::new(a), Box::new(b)))
+            .unwrap_or(Cond::Tag(v.clone(), u32::MAX));
+        match &member.values {
+            TestValues::Only(_) => equal,
+            TestValues::Except(_) => Cond::And(
+                Box::new(self.head_cond(v, member.head)),
+                Box::new(Cond::Not(Box::new(equal))),
+            ),
+            TestValues::All => unreachable!(),
+        }
+    }
+
     fn head_cond(&self, v: Atom, h: Head) -> Cond {
         match h {
             Head::Tuple(n) => Cond::Tuple(v, n),
@@ -2490,60 +2621,65 @@ impl<'a> Lowerer<'a> {
             body: matching,
         }];
         if fails {
-            let module = self.program.module(fx.module);
-            let text = &self.graph.sources.get(module.source).text;
-            let source = text
-                .get(p.span.start as usize..p.span.end as usize)
-                .unwrap_or("");
-            // §1.1: `\r\n` and `\r` are the same as `\n`.
-            let source = source.replace("\r\n", "\n").replace('\r', "\n");
-            let prefix = Atom::String(format!("pattern {source} did not match "));
-            let shown = let_value(
-                fx,
-                &mut body,
-                Value::Op(
-                    Op::Runtime {
-                        name: "core_inspect",
-                        arity: 1,
-                    },
-                    vec![v],
-                ),
-                None,
-            );
-            let m = let_value(
-                fx,
-                &mut body,
-                Value::Op(Op::StringAppend, vec![prefix, shown]),
-                None,
-            );
-            let failure = let_value(
-                fx,
-                &mut body,
-                Value::Record {
-                    ctor: 2,
-                    ty: 1,
-                    fields: vec![m],
-                },
-                None,
-            );
-            let a = let_value(fx, &mut body, Value::Service(fx.env, ASSERT_SERVICE), None);
-            let f = let_value(fx, &mut body, Value::Field(a, 0), None);
-            let site = self.site(fx, at);
-            let_value(
-                fx,
-                &mut body,
-                Value::Call {
-                    callee: Callee::Value(f),
-                    args: vec![failure],
-                    env: fx.env,
-                },
-                site,
-            );
+            self.assert_failure(fx, &mut body, p.span, v, at);
         }
         // `fail` never gives a value (§9.6); a pattern that can not fail
         // always matches.
         body.push(Stmt::Unreachable);
         out.push(Stmt::Block { label: ok, body });
+    }
+
+    /// Shared failure path of fitted patterns, including one-clause choices.
+    fn assert_failure(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, span: Span, v: Atom, at: u32) {
+        let module = self.program.module(fx.module);
+        let text = &self.graph.sources.get(module.source).text;
+        let source = text
+            .get(span.start as usize..span.end as usize)
+            .unwrap_or("");
+        // §1.1: `\r\n` and `\r` are the same as `\n`.
+        let source = source.replace("\r\n", "\n").replace('\r', "\n");
+        let prefix = Atom::String(format!("pattern {source} did not match "));
+        let shown = let_value(
+            fx,
+            out,
+            Value::Op(
+                Op::Runtime {
+                    name: "core_inspect",
+                    arity: 1,
+                },
+                vec![v],
+            ),
+            None,
+        );
+        let m = let_value(
+            fx,
+            out,
+            Value::Op(Op::StringAppend, vec![prefix, shown]),
+            None,
+        );
+        let failure = let_value(
+            fx,
+            out,
+            Value::Record {
+                ctor: 2,
+                ty: 1,
+                fields: vec![m],
+            },
+            None,
+        );
+        let a = let_value(fx, out, Value::Service(fx.env, ASSERT_SERVICE), None);
+        let f = let_value(fx, out, Value::Field(a, 0), None);
+        let site = self.site(fx, at);
+        let_value(
+            fx,
+            out,
+            Value::Call {
+                callee: Callee::Value(f),
+                args: vec![failure],
+                env: fx.env,
+            },
+            site,
+        );
     }
 
     /// Binds a pattern that `plain` takes.
@@ -2592,7 +2728,7 @@ fn abi_type(t: HostType) -> AbiType {
         HostType::Float => AbiType::Float,
         HostType::String => AbiType::String,
         HostType::BitArray => AbiType::BitArray,
-        HostType::Opaque(_) => AbiType::Externref,
+        HostType::Opaque(id) => AbiType::Externref(id.0),
     }
 }
 
@@ -2677,7 +2813,7 @@ fn abi_json(
         }
     }
     let mut abi = serde_json::json!({
-        "version": 2,
+        "version": 3,
         "entry": entry,
         "tests": tests,
         "exports": map,

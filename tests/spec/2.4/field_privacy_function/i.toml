@@ -1,0 +1,3 @@
+# spec: 2.4, 6.7; copying a callable field also takes apart the opaque value.
+# expect: compile-error E0204
+name = "app"

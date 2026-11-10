@@ -1,4 +1,4 @@
-src/a.i:1:9: error[E0214]: these modules import one another in a circle: app/a, app/b, app/c
-src/b.i:1:9: error[E0214]: these modules import one another in a circle: app/a, app/b, app/c
-src/c.i:1:9: error[E0214]: these modules import one another in a circle: app/a, app/b, app/c
-src/self.i:1:9: error[E0214]: these modules import one another in a circle: app/self
+src/a.i:2:2: error[E0214]: these modules import one another in a circle: app/a, app/b, app/c
+src/b.i:2:2: error[E0214]: these modules import one another in a circle: app/a, app/b, app/c
+src/c.i:2:2: error[E0214]: these modules import one another in a circle: app/a, app/b, app/c
+src/self.i:2:2: error[E0214]: these modules import one another in a circle: app/self

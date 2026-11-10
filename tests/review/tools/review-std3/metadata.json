@@ -1,0 +1,9 @@
+{
+  "python": "3.14.7",
+  "gmpy2": "2.3.2",
+  "mpfr": "MPFR 4.2.2",
+  "oracle_precision": 4096,
+  "compiler_sha256": "4acd9830e134d5134e76a9e55935ee92935cd708bc1caed0b6d1ba2e57ff1407",
+  "review_commit": "d3975a041f8a57e31cef593ce80e039b7a2f9da3",
+  "source_baseline": "b9173ce013405fd3a055ffa34edf3b8829672104"
+}

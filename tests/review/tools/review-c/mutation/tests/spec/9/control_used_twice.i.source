@@ -1,0 +1,18 @@
+// spec: 9.4, 11.7
+// expect: stop "control: continuation was already used"
+// at: spec/control_used_twice:13:7
+// at: spec/control_used_twice:10:3
+import (i/control)
+
+// §9.4 rule 5: `resume` and `cancel` together may be used one time.
+@main
+main = () {
+  control.boundary((b) {
+    control.suspend(b, (k) {
+      control.resume(k, Nil)
+      control.resume(k, Nil)
+      Nil
+    })
+  })
+  Nil
+}

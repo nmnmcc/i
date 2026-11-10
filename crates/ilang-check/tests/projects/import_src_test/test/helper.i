@@ -1,3 +1,5 @@
-import (app/main)
+(
+	app/main
+)
 
 y = main
