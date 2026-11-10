@@ -445,6 +445,10 @@ pub fn parse_expression(d: &Datum) -> Result<Expr> {
                 rhs: Box::new(parse_expression(b)?),
             },
             [constructor, dots, base, fields @ ..] if symbol(dots, "..") => {
+                let (_, name) = qualified(constructor)?;
+                if !name.name.starts_with(|c: char| c.is_ascii_uppercase()) {
+                    return Err(bad(constructor, "a record constructor"));
+                }
                 let fields = fields
                     .iter()
                     .map(|field| match round(field) {
@@ -707,6 +711,9 @@ fn item(d: &Datum) -> Result<Item> {
         }
         _ => return Err(bad(current, "an item")),
     };
+    if !attributes.is_empty() && matches!(kind, ItemKind::MacroItem { .. }) {
+        return Err(bad(d, "an attributed item"));
+    }
     Ok(Item {
         doc: Vec::new(),
         attributes,

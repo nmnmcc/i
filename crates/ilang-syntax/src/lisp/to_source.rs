@@ -1,5 +1,8 @@
 //! Position-directed conversion of datums to the normal surface.
 use super::{Datum, DatumKind as K, Document, show};
+use crate::ast::{Block, Expr, ExprKind, Stmt};
+use crate::span::Span;
+use crate::walk::{Visitor, Walk};
 use crate::{Code, Diagnostic};
 
 type Result<T> = std::result::Result<T, Diagnostic>;
@@ -83,6 +86,66 @@ pub fn normal_source(document: &Document) -> Result<String> {
     } else {
         format!("{}\n", lines.join("\n"))
     })
+}
+
+/// Convert to normal source and transfer standalone comments at item and
+/// statement boundaries. Return the spans of comments that cannot be kept.
+pub fn normal_with_comments(source: &str, document: &Document) -> Result<(String, Vec<Span>)> {
+    let output = normal_source(document)?;
+    let mut anchors = Vec::new();
+    for datum in &document.datums {
+        let mut item = datum.clone();
+        item.docs.clear();
+        let only = Document {
+            datums: vec![item],
+            trailing_docs: Vec::new(),
+        };
+        anchors.push((datum.span, normal_source(&only)?.trim_end().to_string()));
+    }
+    struct Statements(Vec<Span>);
+    impl Visitor for Statements {
+        fn expr(&mut self, e: &mut Expr, enter: bool) {
+            if !enter {
+                return;
+            }
+            let body: Option<&Block> = match &e.kind {
+                ExprKind::Block(b) => Some(b),
+                ExprKind::Fn(f) => Some(&f.body),
+                _ => None,
+            };
+            if let Some(body) = body {
+                for s in &body.stmts {
+                    self.0.push(match s {
+                        Stmt::Bind(b) => b.span,
+                        Stmt::Env { span, .. } => *span,
+                        Stmt::Expr(e) => e.span,
+                    });
+                }
+            }
+        }
+    }
+    let mut module = super::to_ast::parse_module(document)?;
+    let mut stmts = Statements(Vec::new());
+    module.walk(&mut stmts);
+    for span in stmts.0 {
+        if let Some(d) = document.datums.iter().find_map(|d| find_span(d, span)) {
+            anchors.push((span, statement(d)?));
+        }
+    }
+    Ok(super::comments::transfer(
+        source, output, anchors, true, false,
+    ))
+}
+fn find_span(d: &Datum, span: Span) -> Option<&Datum> {
+    if d.span == span {
+        return Some(d);
+    }
+    let children = match &d.kind {
+        K::Round(xs) | K::Square(xs) | K::Curly(xs) | K::Bits(xs) => xs.as_slice(),
+        K::Quote(x) | K::Unquote(x) | K::Splice(x) => std::slice::from_ref(x.as_ref()),
+        _ => &[],
+    };
+    children.iter().find_map(|child| find_span(child, span))
 }
 fn is_import(d: &Datum) -> bool {
     round(d).is_some_and(|xs| xs.iter().any(|x| symbol(x, "/") || is_import(x)))

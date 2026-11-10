@@ -9,12 +9,13 @@ use crate::token::{Token, TokenKind as T};
 use crate::{Code, Diagnostic};
 use num_bigint::BigUint;
 
+mod comments;
 mod from_ast;
 mod to_ast;
 mod to_source;
-pub use from_ast::print_module;
+pub use from_ast::{print_module, print_with_comments};
 pub use to_ast::{parse_expression, parse_module, parse_pattern, parse_type};
-pub use to_source::normal_source;
+pub use to_source::{normal_source, normal_with_comments};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Datum {
@@ -99,6 +100,15 @@ pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
         Ok(module) => (module, Vec::new()),
         Err(diags) => (crate::ast::Module::default(), diags),
     }
+}
+
+/// Format a Lisp module without discarding its ordinary comments.
+pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
+    let (module, diagnostics) = parse_source(source);
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+    Ok(from_ast::format_with_comments(source, &module))
 }
 
 struct Parser<'a> {

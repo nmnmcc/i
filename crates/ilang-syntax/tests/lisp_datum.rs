@@ -26,6 +26,22 @@ fn quote_rules_are_checked() {
 }
 
 #[test]
+fn invalid_datums_do_not_make_core_items() {
+    for source in [
+        "(@ (m) (= x 1))",
+        "(@ m (other 1))",
+        "(= x (1 .. 2))",
+        "(= x [.. 1])",
+    ] {
+        let document = parse(source).unwrap();
+        assert!(
+            ilang_syntax::lisp::parse_module(&document).is_err(),
+            "{source}"
+        );
+    }
+}
+
+#[test]
 fn direct_decode_accepts_expression_function_bodies() {
     let source = "(= plus_one (-> (x) _ (+ x 1)))";
     let document = parse(source).unwrap();
@@ -51,6 +67,42 @@ fn written_return_hole_is_not_inferred_return() {
         ilang_syntax::shape::canon(&module),
         ilang_syntax::shape::canon(&back)
     );
+}
+
+#[test]
+fn conversion_preserves_comments_before_items_and_statements() {
+    let source = "// item\nf = () {\n  // statement\n  x = 1\n  x // trailing\n}\n";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let (lisp, lost) = ilang_syntax::lisp::print_with_comments(source, &module);
+    assert!(lisp.contains("// item\n(= f"), "{lisp}");
+    assert!(lisp.contains("// statement\n(= x 1)"), "{lisp}");
+    assert_eq!(lost.len(), 1);
+    assert_eq!(
+        &source[lost[0].start as usize..lost[0].end as usize],
+        "// trailing"
+    );
+    let back = ilang_syntax::lisp::parse_module(&parse(&lisp).unwrap()).unwrap();
+    assert_eq!(
+        ilang_syntax::shape::canon(&module),
+        ilang_syntax::shape::canon(&back)
+    );
+    let doc = parse(&lisp).unwrap();
+    let (normal, lost) = ilang_syntax::lisp::normal_with_comments(&lisp, &doc).unwrap();
+    assert!(lost.is_empty(), "{lost:?}");
+    assert!(normal.contains("// item\nf ="), "{normal}");
+    assert!(normal.contains("// statement\nx = 1"), "{normal}");
+}
+
+#[test]
+fn lisp_formatter_keeps_all_comments_and_is_idempotent() {
+    let source =
+        "// before\n(= f (-> () _ { (= x 1) // trailing\n (+ x // inside\n 1) }))\n// end\n";
+    let formatted = ilang_syntax::lisp::format(source).unwrap();
+    for comment in ["// before", "// trailing", "// inside", "// end"] {
+        assert!(formatted.contains(comment), "{formatted}");
+    }
+    assert_eq!(ilang_syntax::lisp::format(&formatted).unwrap(), formatted);
 }
 
 #[test]

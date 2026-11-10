@@ -1960,3 +1960,177 @@ Wasm call. Teardown does not run i finals; explicit process exit is termination,
 not a way to detach work. WASI resource cleanup must finish before this call.
 
 The adapter reuses the runtime-owned fd_write/proc_exit imports; it does not declare duplicates. The independent runtime stop path, including startup stops, source positions, partial-write retries, LF and exit code 1, cannot call a replaceable Io. Replacing Io leaves this stop path intact.
+
+## Appendix C. The Lisp surface
+
+A module may be written in `.is` as the same core tree as `.i`. A module path has at most one of these files; two files for the same module are E0624. Imports and exports have the same meaning in both surfaces. The following tables define the Lisp surface.
+
+
+### C.1 Tokens
+
+The tokens are the tokens of spec §1 (names, discards, `UpName`s, literals, symbols, `//` comments), and two more symbols, `` ` `` and `~`. Documentation comments (`///`, `////`) work as in the normal surface.
+
+- The rule of lines (spec §1.7) is not used. Every line end is a space.
+- `,` is not used between parts. It is only the head of a tuple.
+- Tokens are cut by the longest match, as in spec §1.5. So a space is needed where two tokens would be read as one: between the head `<` or `>` and a `<<` after it, and between an integer and a `..` after it (`[1 ..]`, because `1.` begins a float).
+- The rule of spec §1.5 for digits after `.` is not used. In `(. e k)`, `k` is a `decimal`.
+
+### C.2 Datums
+
+```
+Datum   = Atom | Round | Square | Curly | Bits | Quote | Unquote | Splice .
+Atom    = name | discard | UpName | int_lit | float_lit | string_lit | Symbol .
+Round   = "(" { Datum } ")" .
+Square  = "[" { Datum } "]" .
+Curly   = "{" { Datum } "}" .
+Bits    = "<<" { Datum } ">>" .
+Quote   = "`" Datum .
+Unquote = "~" Datum .
+Splice  = "~" ".." Datum .
+Symbol  = (* a symbol of spec §1.5 that is not a bracket *) .
+```
+
+- A `.is` file is a list of datums.
+- `~` with `..` after it is always a `Splice`, never an `Unquote` of the atom `..`.
+- An `Unquote` or a `Splice` may only be inside a `Quote`. A `Quote` may be inside a `Quote` only when an `Unquote` or a `Splice` of the outer quote is around it, as in `` `(f ~..(map xs (-> (x) _ `(g ~x)))) ``.
+- The **head** of a `Round` is its first part.
+
+The parser changes datums into the core tree with the tables of Appendix C.3. The tables are read by **position**. The position of a datum says which rows may be used, and each row says which positions its parts are in. The positions are: import item, export item, item, attribute, constructor, field, type, function result, parameter, expression, statement, call argument, clause, clause head, pattern, bit array segment, and format. A datum that fits no row of its position is a compile error.
+
+### C.3 How each core form is written
+
+In the tables, `e` is an expression, `arg` a call argument (`e`, or `(: x e)` with a label, as in the row Call), `p` a pattern, `T` a type, `R`, `E`, and `V` the types in the places of a result, of the errors, and of the environment of a function (each may be any union of spec §3, as `Log | Http`, a hole, or a group), `N` a named type (`U`, `(. a U)`, `(U T…)`, or `((. a U) T…)`), used only in the environment statement and the environment parameter, `x` and `a` a name, `C` and `U` an `UpName`, and `…` zero or more of the thing before it.
+
+**Files and items**
+
+| Core form | Normal surface | Lisp surface |
+|---|---|---|
+| Imports | `(a/b/c, x = a/b, (C, y) = a/b, x = (C, y) = a/b)` | `(, (/ a b c) (= x (/ a b)) (= (, C y) (/ a b)) (= x (, C y) (/ a b)))` |
+| Exports | `(x, U, U(..))` | `(, x U (U ..))` |
+| Built-in attribute | `@deprecated("old") Item`, `@host("ns", "async") Item` | `(@ (deprecated "old") Item)`, `(@ (host "ns" "async") Item)` |
+| Macro before an item | `@m Item`, `@a.m Item`, `@m(arg…) Item`, `@a.m(arg…) Item` | `(@ m Item)`, `(@ (. a m) Item)`, `(@ (m arg…) Item)`, `(@ ((. a m) arg…) Item)` |
+| Custom type | `U { C1(T, x: T) C2 }` | `(U { (C1 T (: x T)) C2 })` |
+| Custom type with parameters | `U(A, B) { … }` | `((U A B) { … })` |
+| Type alias | `U = T`, `U(A) = T` | `(= U T)`, `(= (U A) T)` |
+| Binding | `p = e` | `(= p e)` |
+| Binding with type variables | `x(A, B) = e` | `(= (x A B) e)` |
+| Binding with type variables and a type | `x(A, B): T = e` | `(= (: (x A B) T) e)` |
+| Declaration | `x: T`, `x(A): T` | `(: x T)`, `(: (x A) T)` |
+| Macro call as an item | `m(arg…)`, `a.m(arg…)` | `(m arg…)`, `((. a m) arg…)` |
+| Items from an expansion | none | `{ Item… }` |
+
+- At the top level of a file, a `(, …)` is the imports when it has a `(/ …)` in it, and the exports when not. It may not be empty. As in §2.2, a file has at most one imports `(, …)` and at most one exports `(, …)`, they are the first datums of the file, and the imports come before the exports. Any other `(, …)` at the top level is a compile error.
+- `(x A …)` is the left part of a `(: …)` only in a declaration `(: (x A …) T)`, and directly under `=` in a binding item or a binding statement `(= (: (x A …) T) e)`. In every other place, as in a pattern, it is a compile error.
+- A module path `(/ …)` has two or more names. An import item `(= …)` has two parts, or three when it has both a name and a list of names. Every other `(= …)` has exactly two parts.
+- An item `(U { … })` or `((U A …) { … })` is a custom type. An
+  `(= U T)` is an alias. For `(= (U P …) rhs)`, apply §4.3 to the written
+  RHS before child expansion: a bare value type after groups makes an alias
+  pattern; every other RHS makes a generic alias. The outer U in a pattern
+  is a reference. Bare UpName parts bind fresh aliases; `_` skips; nested
+  named/tuple parts match shapes. Imported-name collisions are errors, not
+  tests. A qualified outer head remains an ordinary constructor-pattern
+  binding, as spec §4.3 requires. `AliasPart` is a separate position.
+
+- Every generated alias-pattern item is classified when it first becomes an
+  item. Once classified it cannot change kind by expanding a child.
+
+**Types**
+
+| Core form | Normal surface | Lisp surface |
+|---|---|---|
+| Union, intersection, difference | `A \| B \| C`, `A & B`, `A - B - C` | `(\| A B C)`, `(& A B)`, `(- A B C)` |
+| Function type | `(T1, x: T2) -> R` | `(-> (T1 (: x T2)) R)` |
+| With errors and environment | `(T) -> R ^ E ! V` | `(-> (T) (! (^ R E) V))` |
+| With errors only, environment only | `(T) -> R ^ E`, `(T) -> R ! V` | `(-> (T) (^ R E))`, `(-> (T) (! R V))` |
+| Tuple type | `(T1, T2)`, `(T)` | `(, T1 T2)`, `(, T)` |
+| Value type | `x`, `a.x` | `x`, `(. a x)` |
+| Record type | `(x: T)`, `(..R, -x, y: U)`, `Record` | `{ (: x T) }`, `{ .. R (- x) (: y U) }`, `Record` |
+| Named type | `U`, `a.U`, `U(T1, T2)`, `a.U(T)` | `U`, `(. a U)`, `(U T1 T2)`, `((. a U) T)` |
+| Hole | `_` | `_` |
+| Group | `{ T }` | `{ T }` |
+| Literal type | `"a"`, `1`, `-1` | `"a"`, `1`, `(- 1)` |
+| Macro call | `m(T, 3)`, `a.m(T)` | `(m T 3)`, `((. a m) T)` |
+
+- `|`, `&`, and `-` take two or more parts in a type. A part may be a `|`, `&`, or `-` form; that is the type with a group there, `A | { B | C }`.
+- A string/integer atom is a literal type; `(- k)` is a negative literal
+  type. Float types are invalid. Type macro arguments are exactly types, so
+  `m(-1)` is valid syntax by types-joint.md §5 and literal-types.md §5.9.
+  Bare lowercase names are value types; a joined call is always a type macro,
+  never runtime type application. AliasPart is a separate position: no calls
+  or records there, even though a bound alias may denote a record.
+- A function result is `R`, `(^ R E)`, `(! R V)`, or `(! (^ R E) V)`. No other use of `^` and `!` is correct there. So `(x) -> Int ! Log | Http { … }` is `(-> (x) (! Int (| Log Http)) …)`.
+- A named type with arguments has one or more arguments.
+
+**Expressions and statements**
+
+| Core form | Normal surface | Lisp surface |
+|---|---|---|
+| Literal | `1`, `1.5`, `"a"` | `1`, `1.5`, `"a"` |
+| Name, member of a module | `x`, `C`, `a.x`, `a.C` | `x`, `C`, `(. a x)`, `(. a C)` |
+| Call | `f(e1, x: e2)`, `f()` | `(f e1 (: x e2))`, `(f)` |
+| Binary operator | `e1 + e2` | `(+ e1 e2)` |
+| Unary operator | `-e`, `-.e` | `(- e)`, `(-. e)` |
+| Field, tuple part | `e.x`, `e.0` | `(. e x)`, `(. e 0)` |
+| Tuple | `(e1, e2)`, `(e)` | `(, e1 e2)`, `(, e)` |
+| Structural record | `()`, `(x: e)`, `(..e, x: v)` | `()`, `{ (: x e) }`, `{ .. e (: x v) }` |
+| Match | `e.{ p -> v }` | `(. e { (-> p v) })` |
+| List | `[e1, e2]`, `[e1, ..e2]` | `[e1 e2]`, `[e1 .. e2]` |
+| Bit array | `<<e1, e2: f, e3: f(e4)>>` | `<<e1 (: e2 f) (: e3 (f e4))>>` |
+| Block, group | `{ s1  s2  e }`, `{ e }` | `{ s1 s2 e }`, `{ e }` |
+| Binding statement | `p = e`, `x(A) = e`, `x(A): T = e` | `(= p e)`, `(= (x A) e)`, `(= (: (x A) T) e)` |
+| Environment statement | `! N = e` | `(! N e)` |
+| Clause block | `{ p1 -> e1  p2 -> e2 }`, `{}` | `{ (-> p1 e1) (-> p2 e2) }`, `{}` |
+| Clause with choices | `p1 \| p2 \| p3 -> e` | `(-> (\| p1 p2 p3) e)` |
+| Clause with a guard | `p ? g -> e`, `p1 \| p2 ? g -> e` | `(-> (? p g) e)`, `(-> (? (\| p1 p2) g) e)` |
+| Function with no `->` part | `(p1, p2) { e }` | `(-> (p1 p2) _ e)` |
+| Function with a `->` part | `(p) -> R ^ E ! V { e }` | `(-> (p) (! (^ R E) V) e)` |
+| Environment parameter | `x ! N` | `(! x N)` |
+| Record update | `C(..e, x: e2)`, `a.C(..e)` | `(C .. e (: x e2))`, `((. a C) .. e)` |
+| Quote | none | `` `d `` |
+
+- A `Round` with one or more parts whose head is not a symbol is a call, but when its second part is `..` it is a record update. The head is the function. A binary operator takes exactly two parts; `-` and `-.` may take one.
+- **Functions and clauses.** In the position of an expression, a `(-> …)` has three parts: the parameters, the result, and the body. The body is one expression. The result `_` means that the function has no `->` part, so its value, errors, and environment are all inferred (spec §6.8). Any other result is a `->` part, in which a missing `^` or `!` means `Never`; the normal `(x) -> _ { e }` is `(-> (x) (^ _ Never) e)`. The result `_` is only the bare atom: a `{ _ }` there is a compile error, in both surfaces. A clause is a `(-> …)` with two parts, and it is only in a clause block. A function type also has two parts, and it is only in the position of a type. A macro that looks at a `(-> a b)` must know its position to know which of the two it is.
+- **Records and blocks.** In expression/type position a nonempty Curly starting with a labelled field or `..` is a structural record, before any group test. Empty record is the empty Round `()` only in expression position; its type is `Record`, and there is no empty-record pattern. Record field labels are text, including String labels and label parameters in types. Spread and forgetting keep source order. Other curly datums use the following rule. A `{ }` in the position of an expression is a clause block when it is empty, or when its first part is a `(-> …)` with two parts. Then every part must be a clause. When not, it is a block, and it has one or more parts.
+- A clause block with one clause, `{ (-> p e) }`, and the function `(-> (p) _ e)` are two distinct trees with the same function-value meaning. Rewriting a direct postfix match into a call is not an identity: preserve its tail-frame and known-constructor rules (spec §§6.12, 7.5, 11.6).
+- A clause head is `p`, `(| p1 p2 …)` with two or more choices, or `(? head g)` with a head of the first two kinds. `(| …)` is a compile error in every other position of a pattern. A choice that **ends in a type test** may only be the last choice, because the normal surface reads `x: T | p` as a union type, and a pattern has no group to stop it. A pattern ends in a type test when it is `(: x T)`, or `(= x p)` where `p` ends in a type test: `(| (= a (: b Int)) Unit)` would be `a = b: Int | Unit`, which is the one pattern `a = b: { Int | Unit }`. A clause block whose first clause head is a type test, as `{ n: Int -> … }`, is read as a clause block by §6.1.
+- `(. a x)` is a member of a module or a field, as `a.x` is in the normal surface (§2.3). `(. a C)` is a constructor that is a member of a module, so `opt.Some(1)` is `((. opt Some) 1)`.
+- **String interpolation**  has no row. It takes only `String` values, so it is sugar for `<>`: the parser of the normal surface changes it into the `<>` of its parts, from the left, with empty string parts left out, before the core tree. `"user-\(n)"` is `(<> "user-" n)`, and `"a\(x)b"` is `(<> (<> "a" x) "b")`. A string whose only part is one expression keeps one empty string part, so that the type of the expression is still checked as `String`: `"\(x)"` is `(<> "" x)`. So a macro sees the names in it, and the printer of the normal surface writes the `<>` form back, as it writes `16` for `0x10`. The Lisp surface has no interpolation.
+
+**Patterns**
+
+| Core form | Normal surface | Lisp surface |
+|---|---|---|
+| Name, discard | `x`, `_`, `__rest` | `x`, `_`, `__rest` |
+| Type test or annotation | `x: T`, `_: T` | `(: x T)`, `(: _ T)` |
+| Literal | `1`, `-1`, `-.1.5`, `"a"` | `1`, `(- 1)`, `(-. 1.5)`, `"a"` |
+| String prefix | `"a" <> x` | `(<> "a" x)` |
+| String suffix  | `x <> "a"` | `(<> x "a")` |
+| Constructor | `C`, `a.C`, `C()`, `C(p1, p2)`, `a.C(p)`, `C(p, ..)`, `C(..)` | `C`, `(. a C)`, `(C)`, `(C p1 p2)`, `((. a C) p)`, `(C p ..)`, `(C ..)` |
+| Tuple | `(p1, p2)`, `(p)` | `(, p1 p2)`, `(, p)` |
+| List | `[p1, p2]`, `[p, ..]`, `[p, ..x]`, `[..]`, `[..x]` | `[p1 p2]`, `[p ..]`, `[p .. x]`, `[..]`, `[.. x]` |
+| Bit array | `<<p1, p2: f, p3: f(e)>>` | `<<p1 (: p2 f) (: p3 (f e))>>` |
+| Two patterns for one value | `x = p` | `(= x p)` |
+| Quote pattern | none | `` `d `` |
+
+- In `(: x T)`, in `(<> "a" x)` and `(<> x "a")`, and in `[p .. x]` and `[.. x]`, `x` is a name or a discard, as in spec §7.1. The `(: (x A …) T)` of a binding with type variables and a type is not a pattern. In `(= x p)`, `x` is a name. In `(- k)` and `(-. k)`, `k` is a literal of the kind of the operator.
+- The statement `a = (x, y) = e` is `(= (= a (, x y)) e)`.
+
+**Datums that are compile errors.** These fit no row: `()` outside an expression or a list of parameters; `(,)` in every data/type/pattern position; a named type or a type head with no arguments in brackets, `(U)` or `((U) { … })`; a constructor of a type definition with no fields in brackets, `(C1)`; a binding head with no type variables, `(= (x) e)` or `(= (: (x) T) e)`; a `(: (x A …) T)` that is not a declaration or directly under `=` in a binding; a `(, …)` at the top level that is not the one imports group or the one exports group at the start of the file; an empty list of import names, `(= (,) (/ a b))`; a list that begins with `..` in the position of an expression, `[.. e]`; a part of a record update with no label, `(C .. e 1)`; an attribute with empty brackets, `(@ (m) Item)` or `(@ ((. a m)) Item)`; an attribute before a macro call as an item or before a `Curly` of items, `(@ A (m …))` or `(@ A { … })`; a pattern of a bit array segment that is or ends in a type test, with or without a format, as `<<(= x (: y Int))>>` or `<<(: (= x (: y Int)) u8)>>`, because in a segment of the normal surface a `:` always begins the format (spec §8.1), so `<<x = y: Int>>` is the pattern `x = y` with the format `Int`.
+
+### C.4 An example
+
+```i
+fact = (n) {
+  n.{
+    0 -> 1
+    _ -> n * fact(n - 1)
+  }
+}
+```
+
+```lisp
+(= fact (-> (n) _
+  (. n {
+    (-> 0 1)
+    (-> _ (* n (fact (- n 1)))) })))
+```

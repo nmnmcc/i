@@ -91,6 +91,9 @@ enum Command {
         /// Write nothing; list the files that would change, and fail if any.
         #[arg(long)]
         check: bool,
+        /// Convert the source to the specified surface.
+        #[arg(long, value_parser = ["i", "is"])]
+        to: Option<String>,
         /// Files or directories to format instead.
         paths: Vec<PathBuf>,
     },
@@ -129,8 +132,9 @@ fn main() -> ExitCode {
         Command::Fmt {
             project,
             check,
+            to,
             paths,
-        } => commands::fmt::run(&project, check, &paths),
+        } => commands::fmt::run(&project, check, to.as_deref(), &paths),
     };
     match result {
         Ok(code) => code,
