@@ -515,3 +515,38 @@ fn written_definition_answers_give_parameters_their_own_binder() {
     assert_eq!(head[1].scope_identity(), field[2].scope_identity());
     assert!(ctor[0].scope_identity().is_none());
 }
+
+#[test]
+fn copied_definition_freshens_its_binders_and_uses_together() {
+    use ilang_syntax::lisp::definitions::{builtin_definition, freshen_parameters};
+    use ilang_syntax::lisp::syntax::{Node, ScopeIdentity};
+    let like = root("x");
+    let original = builtin_definition("Result", like.scope(), like.span(), 3).unwrap();
+    let copy = freshen_parameters(&original, 3, 8);
+    let Node::Round(parts) = copy.node() else {
+        panic!("item")
+    };
+    let Node::Round(head) = parts[0].node() else {
+        panic!("head")
+    };
+    let Node::Curly(constructors) = parts[1].node() else {
+        panic!("body")
+    };
+    let Node::Round(ok) = constructors[0].node() else {
+        panic!("constructor")
+    };
+    assert!(matches!(
+        head[1].scope_identity(),
+        Some(ScopeIdentity::DefinitionParameter {
+            answer: 8,
+            parameter: 0,
+            ..
+        })
+    ));
+    assert_eq!(head[1].scope_identity(), ok[1].scope_identity());
+    assert!(matches!(
+        head[0].scope_identity(),
+        Some(ScopeIdentity::Builtin { .. })
+    ));
+    assert!(copy.same_code(&original));
+}

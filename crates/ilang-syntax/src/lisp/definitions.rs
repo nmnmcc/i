@@ -158,3 +158,40 @@ pub fn source_definition(
     let syntax = super::item_syntax(item, scope, source);
     annotate(&syntax, &sites, answer).as_answer()
 }
+
+/// Freshen one copied definition's bound parameter identities as a unit.
+/// Names from other answers and builtin identities retain their identity.
+pub fn freshen_parameters(definition: &Syntax, old_answer: u64, new_answer: u64) -> Syntax {
+    assert_ne!(
+        old_answer, new_answer,
+        "a copied definition needs a fresh answer identity"
+    );
+    fn walk(syntax: &Syntax, old_answer: u64, new_answer: u64) -> Syntax {
+        if let Some(ScopeIdentity::DefinitionParameter {
+            answer,
+            parameter,
+            name,
+        }) = syntax.scope_identity()
+            && *answer == old_answer
+        {
+            return syntax.replace_scope_identity(ScopeIdentity::DefinitionParameter {
+                answer: new_answer,
+                parameter: *parameter,
+                name: name.clone(),
+            });
+        }
+        let children = |xs: &[Syntax]| xs.iter().map(|s| walk(s, old_answer, new_answer)).collect();
+        let node = match syntax.node() {
+            Node::Round(xs) => Node::Round(children(xs)),
+            Node::Square(xs) => Node::Square(children(xs)),
+            Node::Curly(xs) => Node::Curly(children(xs)),
+            Node::Bits(xs) => Node::Bits(children(xs)),
+            Node::Quote(x) => Node::Quote(walk(x, old_answer, new_answer)),
+            Node::Unquote(x) => Node::Unquote(walk(x, old_answer, new_answer)),
+            Node::Splice(x) => Node::Splice(walk(x, old_answer, new_answer)),
+            leaf => leaf.clone(),
+        };
+        syntax.with_node(node)
+    }
+    walk(definition, old_answer, new_answer)
+}

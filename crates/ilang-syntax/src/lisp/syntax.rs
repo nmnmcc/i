@@ -238,6 +238,16 @@ impl Syntax {
     pub fn identity_key(&self) -> usize {
         Arc::as_ptr(&self.0) as usize
     }
+    pub(super) fn replace_scope_identity(&self, identity: ScopeIdentity) -> Self {
+        Self(Arc::new(SyntaxData {
+            node: self.node().clone(),
+            scope: self.scope().clone(),
+            span: self.span(),
+            provenance: self.provenance(),
+            identity: Some(identity),
+            origin: Arc::new(()),
+        }))
+    }
     /// Find a descendant by its original source span.
     pub fn at_span(&self, span: Span) -> Option<&Syntax> {
         if self.span() == span {
