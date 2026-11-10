@@ -235,6 +235,8 @@ impl Walk for PatternKind {
 impl Walk for TypeKind {
     fn walk(&mut self, v: &mut impl Visitor) {
         match self {
+            Self::Lit(LitValue::Str(s)) => s.walk(v),
+            Self::Lit(LitValue::Int(_)) => {}
             Self::Named { module, name, args } => {
                 module.walk(v);
                 name.walk(v);
@@ -261,18 +263,6 @@ impl Walk for TypeKind {
                 ret.walk(v);
                 err.walk(v);
                 env.walk(v);
-            }
-        }
-    }
-}
-impl Walk for TypeArg {
-    fn walk(&mut self, v: &mut impl Visitor) {
-        match self {
-            Self::Type(t) => t.walk(v),
-            Self::Int(_, s) => s.walk(v),
-            Self::String(t, s) => {
-                t.walk(v);
-                s.walk(v);
             }
         }
     }

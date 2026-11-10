@@ -1,14 +1,14 @@
-one : Int
+one : 1
 pi : Float
-hello : String
-pair : (Int, String)
+hello : "hello"
+pair : (1, "a")
 unit : ()
-ints : List(Int)
-mixed : List(Int | String)
+ints : List(1 | 2 | 3)
+mixed : List(1 | "a")
 empty : List(Never)
 sum : Int
 ratio : Float
-neg : Int
+neg : -1
 both : Bool
 cmp : Bool
 text : String
@@ -20,6 +20,6 @@ inc : (x: A & Int) -> A
 apply : (f: (A) -> B ? E ! N, x: A) -> B ? E ! N
 compose : (f: (A) -> B ? E ! N, g: (C) -> A ? E2 ! N2) -> (x: C) -> B ? E2 | E ! N2 | N
 twice : (f: (A | B) -> B & C ? E ! N, x: A) -> C ? E ! N
-ignore : (x: A) -> Int
-30:8: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
+ignore : (x: A) -> 1
+30:8: error[E0520]: both sides are constants, `1` and `"a"`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
 40:2: warning[W0502]: this value is not used, and working it out does nothing

@@ -38,6 +38,8 @@ pub(crate) struct VarState {
 pub(crate) enum FailKind {
     /// The left side is not a subtype of the right side.
     Mismatch,
+    /// Only an Int/String value-set inclusion failed.
+    Values,
     /// Function types with different numbers of parameters.
     Arity,
     /// Two forms of a type constructor whose parameter does not change, with
@@ -86,6 +88,9 @@ impl Pol {
 
 pub(crate) struct Solver {
     pub vars: Vec<VarState>,
+    /// Peak concrete bounds of one head, on either side of one variable.
+    #[cfg(test)]
+    peak_bound_count: usize,
     /// The level of new variables: one more than the level of the binding
     /// whose value is being typed, for a binding that is generalized.
     pub level: u32,
@@ -104,10 +109,38 @@ pub(crate) struct Solver {
     pub type_names: Vec<String>,
 }
 
+/// One member per scalar head, joined before the ordinary union loop.
+/// Display uses the same batch operation; no solver state is consulted.
+pub(crate) fn join_literals(ms: Vec<Ty>) -> Vec<Ty> {
+    let mut groups: [Option<(usize, Vec<super::lits::ValueSet>)>; 2] = [None, None];
+    let mut out = Vec::new();
+    for m in ms {
+        let i = match m.scalar() {
+            Some(BuiltinType::Int) => Some(0),
+            Some(BuiltinType::String) => Some(1),
+            _ => None,
+        };
+        if let Some(i) = i {
+            if let Some((_, sets)) = &mut groups[i] {
+                sets.push(m.values().clone());
+                continue;
+            }
+            groups[i] = Some((out.len(), vec![m.values().clone()]));
+        }
+        out.push(m);
+    }
+    for (i, sets) in groups.into_iter().flatten() {
+        out[i] = out[i].with_values(Some(super::lits::ValueSet::join_all(&sets)));
+    }
+    out
+}
+
 impl Solver {
     pub fn new(variance: StdHashMap<TypeId, Vec<Variance>>, type_names: Vec<String>) -> Solver {
         Solver {
             vars: Vec::new(),
+            #[cfg(test)]
+            peak_bound_count: 0,
             level: 0,
             cache: HashSet::default(),
             compared: HashSet::default(),
@@ -158,6 +191,8 @@ impl Solver {
             }
         }
         self.var_mut(v).upper = upper;
+        #[cfg(test)]
+        self.observe_bounds(v, false);
     }
 
     /// Sets the lower bounds of a new variable.
@@ -168,6 +203,8 @@ impl Solver {
             }
         }
         self.var_mut(v).lower = lower;
+        #[cfg(test)]
+        self.observe_bounds(v, true);
     }
 
     fn var(&self, v: V) -> &VarState {
@@ -203,7 +240,7 @@ impl Solver {
     pub fn level_of(&self, t: &Ty) -> u32 {
         match t {
             Ty::Var(v) => self.var(*v).level,
-            Ty::Con(_, args) => args.iter().map(|a| self.level_of(a)).max().unwrap_or(0),
+            Ty::Con(_, _, args) => args.iter().map(|a| self.level_of(a)).max().unwrap_or(0),
             Ty::Fn(f) => f
                 .params
                 .iter()
@@ -263,15 +300,17 @@ impl Solver {
                 }
             }
             (Ty::Var(v), _) if self.level_of(r) <= self.var(*v).level => {
-                self.add_bound(*v, r.clone(), false, env);
-                for lb in self.var(*v).lower.clone() {
-                    self.constrain_in(&lb, r, env);
+                if self.add_bound(*v, r.clone(), false, env) {
+                    for lb in self.var(*v).lower.clone() {
+                        self.constrain_in(&lb, r, env);
+                    }
                 }
             }
             (_, Ty::Var(v)) if self.level_of(l) <= self.var(*v).level => {
-                self.add_bound(*v, l.clone(), true, env);
-                for ub in self.var(*v).upper.clone() {
-                    self.constrain_in(l, &ub, env);
+                if self.add_bound(*v, l.clone(), true, env) {
+                    for ub in self.var(*v).upper.clone() {
+                        self.constrain_in(l, &ub, env);
+                    }
                 }
             }
             (Ty::Var(v), _) => {
@@ -317,13 +356,38 @@ impl Solver {
             (_, Ty::Both(_, b)) => self.constrain_in(l, &b.clone(), env),
             (_, Ty::Union(ms)) => self.route(l, ms, env),
             (_, Ty::Diff(a, h)) => {
-                if h.iter().any(|m| m.head() == l.head()) {
-                    self.fail(FailKind::Mismatch, l, r);
+                if h.iter()
+                    .any(|m| m.head() == l.head() && !m.values().disjoint(l.values()))
+                {
+                    let partial = !l.values().is_all()
+                        || h.iter()
+                            .any(|m| m.head() == l.head() && !m.values().is_all());
+                    self.fail(
+                        if partial && !env {
+                            FailKind::Values
+                        } else {
+                            FailKind::Mismatch
+                        },
+                        l,
+                        r,
+                    );
                 } else {
                     self.constrain_in(l, a, env);
                 }
             }
-            (Ty::Con(h1, a1), Ty::Con(h2, a2)) if h1 == h2 && a1.len() == a2.len() => {
+            (Ty::Con(h1, s1, a1), Ty::Con(h2, s2, a2)) if h1 == h2 && a1.len() == a2.len() => {
+                if (env && s1 != s2) || (!env && !s1.subset(s2)) {
+                    self.fail(
+                        if env {
+                            FailKind::EnvForms
+                        } else {
+                            FailKind::Values
+                        },
+                        l,
+                        r,
+                    );
+                    return;
+                }
                 if env {
                     // §4.5 rule 4: service arguments are equal.
                     for (x, y) in a1.iter().zip(a2) {
@@ -382,7 +446,46 @@ impl Solver {
     /// upper bounds of one type constructor, as a parameter used at many
     /// calls, would make a number of constraints that grows with the
     /// square of their number.
-    fn add_bound(&mut self, v: V, t: Ty, lower: bool, env: bool) {
+    fn add_bound(&mut self, v: V, t: Ty, lower: bool, env: bool) -> bool {
+        // Only argumentless Con bounds can fuse without touching variables,
+        // variance, or service argument comparisons.
+        let fusion = if let Ty::Con(h, values, args) = &t {
+            let state = self.var(v);
+            let bounds = if lower { &state.lower } else { &state.upper };
+            if args.is_empty() {
+                if let Some((i, old)) = bounds
+                    .iter()
+                    .enumerate()
+                    .find(|(_, b)| matches!(b, Ty::Con(g, _, xs) if g == h && xs.is_empty()))
+                {
+                    let old_values = old.values();
+                    if !env
+                        && if lower {
+                            values.subset(old_values)
+                        } else {
+                            old_values.subset(values)
+                        }
+                    {
+                        return false;
+                    }
+                    if env {
+                        None
+                    } else if lower {
+                        Some((i, old_values.union(values)))
+                    } else {
+                        // Never is skipped by reach(), so preserve both bounds
+                        // when their intersection is empty.
+                        old_values.meet(values).map(|set| (i, set))
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         self.touched.push(v);
         let level = self.var(v).level;
         // The variables whose bounds now have `t` too, and their bounds.
@@ -404,8 +507,19 @@ impl Solver {
         }
         let s = self.var_mut(v);
         let bounds = if lower { &mut s.lower } else { &mut s.upper };
+        if let Some((i, values)) = fusion {
+            let Ty::Con(h, _, args) = &t else {
+                unreachable!()
+            };
+            bounds[i] = Ty::Con(*h, values, args.clone());
+            return true;
+        }
         if !bounds.contains(&t) {
             bounds.push(t.clone());
+            #[cfg(test)]
+            if t.head().is_some() {
+                self.observe_bounds(v, lower);
+            }
             if let Ty::Var(w) = &t {
                 if lower {
                     self.var_mut(*w).into.push(v);
@@ -414,6 +528,24 @@ impl Solver {
                 }
             }
         }
+        true
+    }
+
+    #[cfg(test)]
+    fn observe_bounds(&mut self, v: V, lower: bool) {
+        let bounds = if lower {
+            &self.var(v).lower
+        } else {
+            &self.var(v).upper
+        };
+        let mut counts = HashMap::default();
+        let mut peak = 0;
+        for h in bounds.iter().filter_map(Ty::head) {
+            let n = counts.entry(h).or_insert(0);
+            *n += 1;
+            peak = peak.max(*n);
+        }
+        self.peak_bound_count = self.peak_bound_count.max(peak);
     }
 
     /// The variables reached from `starts` through bounds that are
@@ -470,7 +602,7 @@ impl Solver {
                     self.join(&f.env, &g.env, level, true);
                 }
             }
-            (Ty::Con(h, xs), Ty::Con(_, ys)) if xs.len() == ys.len() => {
+            (Ty::Con(h, _, xs), Ty::Con(_, _, ys)) if xs.len() == ys.len() => {
                 let vs = self.variances(*h, xs.len());
                 for ((x, y), var) in xs.iter().zip(ys).zip(&vs) {
                     if env {
@@ -517,12 +649,28 @@ impl Solver {
         let mut flat = Vec::new();
         flatten_union(ms, &mut flat);
         let h = l.head();
+        let mut rest = None;
         if h.is_some()
             && let Some(m) = flat.iter().find(|m| m.head() == h)
         {
-            let m = m.clone();
-            self.constrain_in(l, &m, env);
-            return;
+            if l.scalar().is_some() && !env {
+                // A raw union need not have passed union_in. Join all scalar
+                // members of this head before splitting its uncovered part.
+                let sets: Vec<_> = flat
+                    .iter()
+                    .filter(|m| m.head() == h)
+                    .map(|m| m.values().clone())
+                    .collect();
+                let covered = super::lits::ValueSet::join_all(&sets);
+                if l.values().subset(&covered) {
+                    return;
+                }
+                rest = Some(l.with_values(l.values().minus(&covered)));
+            } else {
+                let m = m.clone();
+                self.constrain_in(l, &m, env);
+                return;
+            }
         }
         let vars: Vec<&Ty> = flat
             .iter()
@@ -531,9 +679,17 @@ impl Solver {
         match vars.len() {
             1 => {
                 let m = vars[0].clone();
-                self.constrain_in(l, &m, env);
+                self.constrain_in(rest.as_ref().unwrap_or(l), &m, env);
             }
-            0 => self.fail(FailKind::Mismatch, l, &Ty::Union(ms.to_vec())),
+            0 => self.fail(
+                if rest.is_some() {
+                    FailKind::Values
+                } else {
+                    FailKind::Mismatch
+                },
+                l,
+                &Ty::Union(ms.to_vec()),
+            ),
             _ => self.fail(FailKind::Ambiguous, l, &Ty::Union(ms.to_vec())),
         }
     }
@@ -547,6 +703,22 @@ impl Solver {
             Ty::Union(ms) => {
                 for m in ms {
                     self.diff_left(m, h, r, env);
+                }
+            }
+            Ty::Con(..) if a.scalar().is_some() => {
+                let sets: Vec<_> = h
+                    .iter()
+                    .filter(|m| m.head() == a.head())
+                    .map(|m| m.values().clone())
+                    .collect();
+                if sets.is_empty() {
+                    self.constrain_in(a, r, env);
+                } else {
+                    let excluded = super::lits::ValueSet::join_all(&sets);
+                    if !a.values().subset(&excluded) {
+                        let rest = a.with_values(a.values().minus(&excluded));
+                        self.constrain_in(&rest, r, env);
+                    }
                 }
             }
             Ty::Con(..) | Ty::Fn(_) => match h.iter().find(|m| m.head() == a.head()) {
@@ -647,14 +819,14 @@ impl Solver {
     ) -> Ty {
         match t {
             Ty::Var(_) | Ty::Never | Ty::Top => t.clone(),
-            Ty::Con(h, args) => {
+            Ty::Con(h, values, args) => {
                 let vs = self.variances(*h, args.len());
                 let args = args
                     .iter()
                     .zip(vs)
                     .map(|(a, v)| f(self, a, pol.by(v)))
                     .collect();
-                Ty::Con(*h, args)
+                Ty::Con(*h, values.clone(), args)
             }
             Ty::Fn(fun) => Ty::Fn(Box::new(FnTy {
                 params: fun
@@ -698,6 +870,9 @@ impl Solver {
     fn union_in(&mut self, ms: Vec<Ty>, env: bool) -> Ty {
         let mut flat = Vec::new();
         flatten_union(&ms, &mut flat);
+        if !env {
+            flat = join_literals(flat);
+        }
         let mut out: Vec<Ty> = Vec::new();
         for m in flat {
             if matches!(m, Ty::Never) || out.contains(&m) {
@@ -711,6 +886,10 @@ impl Solver {
                 .and_then(|h| out.iter().position(|o| o.head() == Some(h)))
             {
                 Some(i) if env => {
+                    if out[i].values() != m.values() {
+                        out.push(m);
+                        continue;
+                    }
                     // Two forms of a service: their arguments must be equal
                     // (§9.2). When they are not, both stay, as they are.
                     let before = self.failures.len();
@@ -782,6 +961,9 @@ impl Solver {
                         Some(c) if c.head() == m.head() => self.merge(c, m, false, env),
                         Some(_) => return Ty::Never,
                     });
+                    if matches!(con, Some(Ty::Never)) {
+                        return Ty::Never;
+                    }
                 }
                 m if !out.contains(&m) => out.push(m),
                 _ => {}
@@ -800,13 +982,28 @@ impl Solver {
     /// arguments must be equal (§9.2).
     fn merge(&mut self, a: Ty, b: Ty, union: bool, env: bool) -> Ty {
         match (a, b) {
-            (Ty::Con(h, xs), Ty::Con(_, ys)) if xs.len() == ys.len() => {
+            (Ty::Con(h, values, xs), Ty::Con(_, other, ys)) if xs.len() == ys.len() => {
                 if env {
+                    if values != other {
+                        self.fail(
+                            FailKind::EnvForms,
+                            &Ty::Con(h, values.clone(), xs.clone()),
+                            &Ty::Con(h, other, ys.clone()),
+                        );
+                    }
                     for (x, y) in xs.iter().zip(&ys) {
                         self.equal(x, y, FailKind::EnvForms);
                     }
-                    return Ty::Con(h, xs);
+                    return Ty::Con(h, values, xs);
                 }
+                let values = if union {
+                    values.union(&other)
+                } else {
+                    let Some(values) = values.meet(&other) else {
+                        return Ty::Never;
+                    };
+                    values
+                };
                 let vs = self.variances(h, xs.len());
                 let args = xs
                     .into_iter()
@@ -814,7 +1011,7 @@ impl Solver {
                     .zip(vs)
                     .map(|((x, y), v)| self.merge_arg(x, y, v, union))
                     .collect();
-                Ty::Con(h, args)
+                Ty::Con(h, values, args)
             }
             (Ty::Fn(f), Ty::Fn(g)) if f.params.len() == g.params.len() => {
                 let f = *f;
@@ -889,6 +1086,19 @@ impl Solver {
                     .map(|m| self.diff_in(m, hs.clone(), env))
                     .collect();
                 self.union_in(parts, env)
+            }
+            Ty::Con(..) if a.scalar().is_some() && !env => {
+                let sets: Vec<_> = hs
+                    .iter()
+                    .filter(|m| m.head() == a.head())
+                    .map(|m| m.values().clone())
+                    .collect();
+                if sets.is_empty() {
+                    a
+                } else {
+                    let excluded = super::lits::ValueSet::join_all(&sets);
+                    a.with_values(a.values().minus(&excluded))
+                }
             }
             Ty::Con(..) | Ty::Fn(_) => match hs.iter().find(|m| m.head() == a.head()) {
                 Some(m) => {
@@ -1207,7 +1417,7 @@ fn edge_vars(s: &Solver, (v, p): (V, bool)) -> Vec<(V, bool, bool)> {
 fn bound_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, bool)>) {
     match t {
         Ty::Var(v) => out.push((*v, pos, con)),
-        Ty::Con(h, args) => {
+        Ty::Con(h, _, args) => {
             let vs = s.variances(*h, args.len());
             for (a, v) in args.iter().zip(vs) {
                 match v {
@@ -1247,7 +1457,7 @@ fn bound_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, 
 /// both sides.
 fn env_vars(s: &Solver, t: &Ty, pos: bool, out: &mut Vec<(V, bool, bool)>) {
     match t {
-        Ty::Con(_, args) => {
+        Ty::Con(_, _, args) => {
             for a in args {
                 bound_vars(s, a, true, true, out);
                 bound_vars(s, a, false, true, out);
@@ -1266,7 +1476,7 @@ fn env_vars(s: &Solver, t: &Ty, pos: bool, out: &mut Vec<(V, bool, bool)>) {
 /// environments must be checked when the bounds are put together.
 fn needs_join(t: &Ty) -> bool {
     match t {
-        Ty::Con(_, args) => !args.is_empty(),
+        Ty::Con(_, _, args) => !args.is_empty(),
         Ty::Never | Ty::Top => false,
         _ => true,
     }
@@ -1289,5 +1499,356 @@ pub(crate) fn builtin_variance(b: BuiltinType) -> Vec<Variance> {
         BuiltinType::Boundary => vec![Inv, Inv, Inv],
         BuiltinType::Continuation => vec![Contra, Co, Co, Co],
         _ => Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod literal_tests {
+    use super::*;
+    use crate::types::lits::ValueSet;
+    use std::sync::Arc;
+
+    fn solver() -> Solver {
+        Solver::new(StdHashMap::new(), Vec::new())
+    }
+
+    fn strings(values: &[&str]) -> Ty {
+        ValueSet::only(values.iter().map(|s| Arc::from(*s)))
+            .map_or(Ty::Never, |set| Ty::lit(BuiltinType::String, set))
+    }
+
+    fn except(values: &[&str]) -> Ty {
+        Ty::lit(
+            BuiltinType::String,
+            ValueSet::except(values.iter().map(|s| Arc::from(*s))),
+        )
+    }
+
+    fn variable(t: &Ty) -> V {
+        let Ty::Var(v) = t else {
+            panic!("not a variable")
+        };
+        *v
+    }
+
+    #[test]
+    fn literal_subtyping_and_right_difference() {
+        // literal-types §5.1 rule 1 and §10's solver cases.
+        for (a, b, ok) in [
+            (strings(&["a"]), strings(&["a", "b"]), true),
+            (strings(&["a", "b"]), except(&[]), true),
+            (except(&[]), strings(&["a"]), false),
+            (except(&["a"]), strings(&["b"]), false),
+            (strings(&["b"]), except(&["a"]), true),
+            (strings(&["a"]), except(&["a"]), false),
+            (
+                strings(&["a"]),
+                Ty::Diff(Box::new(except(&[])), vec![strings(&["a"])]),
+                false,
+            ),
+            (
+                strings(&["b"]),
+                Ty::Diff(Box::new(except(&[])), vec![strings(&["a"])]),
+                true,
+            ),
+        ] {
+            let mut s = solver();
+            s.constrain(&a, &b);
+            assert_eq!(
+                s.failures.is_empty(),
+                ok,
+                "{a:?} <: {b:?}: {:?}",
+                s.failures
+            );
+        }
+    }
+
+    #[test]
+    fn route_only_the_uncovered_values() {
+        // §5.1 rule 3: S <: X | v iff S - X <: v.
+        let mut s = solver();
+        let v = s.fresh();
+        s.constrain(&except(&[]), &Ty::Union(vec![strings(&["a"]), v.clone()]));
+        assert!(s.failures.is_empty(), "{:?}", s.failures);
+        assert_eq!(s.var(variable(&v)).lower, [except(&["a"])]);
+
+        let mut s = solver();
+        let v = s.fresh();
+        // This raw union deliberately has two members of the same head.
+        s.constrain(
+            &except(&[]),
+            &Ty::Union(vec![strings(&["a"]), strings(&["b"]), v.clone()]),
+        );
+        assert_eq!(s.var(variable(&v)).lower, [except(&["a", "b"])]);
+        assert!(s.failures.is_empty());
+
+        let mut s = solver();
+        let (v, w) = (s.fresh(), s.fresh());
+        s.constrain(&except(&[]), &Ty::Union(vec![strings(&["a"]), v, w]));
+        assert_eq!(s.failures.len(), 1);
+        assert_eq!(s.failures[0].kind, FailKind::Ambiguous);
+
+        let mut s = solver();
+        s.constrain(
+            &except(&[]),
+            &Ty::Union(vec![strings(&["a"]), Ty::tuple(Vec::new())]),
+        );
+        assert_eq!(s.failures.len(), 1);
+        assert_eq!(s.failures[0].kind, FailKind::Values);
+        assert_eq!(s.failures[0].lhs, except(&[]));
+    }
+
+    #[test]
+    fn difference_left_all_three_splits_and_later_bounds() {
+        // §5.1 rule 4: subset, disjoint, and partially overlapping sets.
+        for (source, expected) in [
+            (strings(&["a"]), Vec::new()),
+            (strings(&["b"]), vec![strings(&["b"])]),
+            (strings(&["a", "b"]), vec![strings(&["b"])]),
+        ] {
+            let mut s = solver();
+            let out = s.fresh();
+            s.diff_left(&source, &[strings(&["a"])], &out, false);
+            assert!(s.failures.is_empty());
+            assert_eq!(s.var(variable(&out)).lower, expected);
+        }
+        let mut s = solver();
+        let (v, out) = (s.fresh(), s.fresh());
+        s.diff_left(&v, &[strings(&["a"])], &out, false);
+        s.constrain(&except(&[]), &v);
+        assert_eq!(s.var(variable(&out)).lower, [except(&["a"])]);
+        assert!(s.failures.is_empty());
+        // The public difference constructor leaves its variable live too.
+        let mut s = solver();
+        let v = s.fresh();
+        let diff = s.diff(v.clone(), vec![strings(&["a"])]);
+        s.constrain(&diff, &except(&["a"]));
+        s.constrain(&except(&[]), &v);
+        assert!(s.failures.is_empty(), "{:?}", s.failures);
+    }
+
+    #[test]
+    fn scalar_boolean_algebra_and_never_intersections() {
+        // §5.1 rules 5–7; assertions follow the set equations in §4.
+        let mut s = solver();
+        assert_eq!(s.inter(vec![strings(&["a"]), strings(&["b"])]), Ty::Never);
+        assert_eq!(
+            s.inter(vec![strings(&["a", "b"]), except(&["a"])]),
+            strings(&["b"])
+        );
+        assert_eq!(s.diff(except(&[]), vec![strings(&["a"])]), except(&["a"]));
+        assert_eq!(s.diff(strings(&["a"]), vec![except(&[])]), Ty::Never);
+        assert_eq!(s.union(vec![strings(&["a"]), except(&["a"])]), except(&[]));
+        assert_eq!(
+            s.union(vec![strings(&["a"]), strings(&["b"]), strings(&["a"])]),
+            strings(&["a", "b"])
+        );
+        assert_eq!(
+            s.diff(except(&[]), vec![strings(&["a"]), strings(&["b"])]),
+            except(&["a", "b"])
+        );
+        let v = s.fresh();
+        assert_eq!(
+            s.inter(vec![v, strings(&["a"]), strings(&["b"])]),
+            Ty::Never
+        );
+        assert!(s.failures.is_empty());
+    }
+
+    #[test]
+    fn bounds_fuse_without_losing_constraints() {
+        // §5.1 rule 8: one bound for 1000 literals, and all propagated checks.
+        let mut s = solver();
+        let v = s.fresh();
+        for i in 0..1000 {
+            s.constrain(&strings(&[&i.to_string()]), &v);
+        }
+        let bounds = &s.var(variable(&v)).lower;
+        assert_eq!(bounds.len(), 1);
+        assert_eq!(bounds[0].values().items().count(), 1000);
+        assert!(s.failures.is_empty());
+        s.constrain(&v, &strings(&["x", "y"]));
+        assert!(!s.failures.is_empty());
+
+        let mut s = solver();
+        let v = s.fresh();
+        s.constrain(&v, &strings(&["a", "b", "c"]));
+        s.constrain(&v, &strings(&["b", "c", "d"]));
+        assert_eq!(s.var(variable(&v)).upper, [strings(&["b", "c"])]);
+        s.constrain(&strings(&["b"]), &v);
+        assert!(s.failures.is_empty());
+        s.constrain(&strings(&["a"]), &v);
+        assert_eq!(s.failures.len(), 1);
+
+        let mut s = solver();
+        let v = s.fresh();
+        s.constrain(&v, &strings(&["a"]));
+        s.constrain(&v, &strings(&["b"]));
+        assert_eq!(s.var(variable(&v)).upper.len(), 2);
+        s.constrain(&strings(&["b"]), &v);
+        assert_eq!(s.failures.len(), 1);
+    }
+
+    #[test]
+    fn fused_bounds_propagate_through_variable_links() {
+        let mut s = solver();
+        let (v, w) = (s.fresh(), s.fresh());
+        s.constrain(&v, &w);
+        s.constrain(&strings(&["a"]), &v);
+        s.constrain(&strings(&["b"]), &v);
+        s.constrain(&w, &strings(&["a"]));
+        assert!(!s.failures.is_empty());
+        // A late link must check the complete fused lower bound.
+        let mut s = solver();
+        let (v, w) = (s.fresh(), s.fresh());
+        s.constrain(&strings(&["a"]), &v);
+        s.constrain(&strings(&["b"]), &v);
+        s.constrain(&w, &strings(&["a"]));
+        s.constrain(&v, &w);
+        assert!(!s.failures.is_empty());
+    }
+
+    #[test]
+    fn service_equality_does_not_widen_literal_arguments() {
+        // §5.1 rule 1 and §10: service forms are equal, not covariant.
+        let counter = TypeId(0);
+        let make = |arg| Ty::named(TypeRef::Custom(counter), vec![arg]);
+        let zero = Ty::lit(BuiltinType::Int, ValueSet::only([Arc::from("0")]).unwrap());
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+        let mut s = solver();
+        s.variance.insert(counter, vec![Variance::Co]);
+        s.constrain_env(&make(zero.clone()), &make(int.clone()));
+        assert!(!s.failures.is_empty());
+        assert!(s.failures.iter().all(|f| f.kind == FailKind::EnvForms));
+        s.failures.clear();
+        s.constrain_env(&make(int.clone()), &make(int.clone()));
+        assert!(s.failures.is_empty());
+        s.constrain(&make(zero), &make(int));
+        assert!(s.failures.is_empty());
+    }
+
+    #[test]
+    fn ordinary_bounds_do_not_skip_a_later_environment_check() {
+        // §5.1 rule 1 requires equality in env mode, even if ordinary
+        // subtyping already accepted the same literal as a lower bound.
+        let mut s = solver();
+        let v = s.fresh();
+        s.constrain(&strings(&["a"]), &v);
+        s.constrain(&v, &except(&[]));
+        assert!(s.failures.is_empty());
+        s.constrain_env(&strings(&["a"]), &v);
+        assert_eq!(s.failures.len(), 1);
+        assert_eq!(s.failures[0].kind, FailKind::EnvForms);
+    }
+}
+
+#[cfg(test)]
+mod literal_stress_tests {
+    use crate::hir::{ExprKind, PatternKind, Stmt};
+    use crate::types::infer::Checker;
+    use crate::types::{Head, Ty};
+
+    fn stress(part: &str, n: usize) {
+        // literal-types §9: check real programs and observe peak counts,
+        // not just the final (possibly simplified) type of a definition.
+        let dir = tempfile::tempdir().unwrap();
+        let script =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/t1/gen-stress.py");
+        assert!(
+            std::process::Command::new("python3")
+                .arg(script)
+                .arg(dir.path())
+                .arg(n.to_string())
+                .arg(part)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let (graph, ds) = ilang_package::load(dir.path());
+        assert!(ds.is_empty(), "{ds:?}");
+        let (p, ds) = crate::resolve_program(&graph);
+        assert!(ds.is_empty(), "{ds:?}");
+        let p = p.unwrap();
+        let mut checker = Checker::new(&p, &graph.sources);
+        checker.keep_locals = true;
+        let start = std::time::Instant::now();
+        let (typed, ds) = checker.run();
+        let elapsed = start.elapsed();
+        assert!(ds.is_empty(), "{ds:?}");
+        let locals = typed.locals.unwrap();
+        let solver = locals.s.lock().unwrap();
+        assert!(
+            solver.peak_bound_count <= 2,
+            "{part}({n}): peak {}",
+            solver.peak_bound_count
+        );
+        if part == "calls" {
+            // §6.10: the local function must be indirect and monomorphic.
+            let module = p
+                .modules
+                .iter()
+                .find(|m| Some(m.package) == graph.root)
+                .unwrap();
+            let ExprKind::Fn(f) = &module.bindings[0].binding.value.kind else {
+                panic!("calls function")
+            };
+            let Stmt::Bind(b) = &f.body.stmts[0] else {
+                panic!("local binding")
+            };
+            assert!(!b.direct);
+            let PatternKind::Var(v) = &b.pattern.kind else {
+                panic!("f binder")
+            };
+            let Ty::Fn(f) = &locals.types[&v.var] else {
+                panic!("shared function shape")
+            };
+            let Ty::Var(v) = &f.params[0].1 else {
+                panic!("one shared parameter")
+            };
+            let bound = solver.vars[v.0 as usize]
+                .lower
+                .iter()
+                .find(|t| {
+                    t.head()
+                        == Some(Head::Named(crate::hir::TypeRef::Builtin(
+                            crate::hir::BuiltinType::String,
+                        )))
+                })
+                .unwrap();
+            assert_eq!(
+                bound.values().items().count(),
+                n,
+                "all calls reach the same parameter"
+            );
+        }
+        eprintln!(
+            "{part} n={n}: {elapsed:?}, peak bounds/head/side={}",
+            solver.peak_bound_count
+        );
+    }
+
+    #[test]
+    #[ignore = "literal-types §9 performance gate"]
+    fn t1_stress_match_2000() {
+        stress("pick", 2000);
+    }
+
+    #[test]
+    #[ignore = "literal-types §9 performance gate"]
+    fn t1_stress_calls_5000() {
+        stress("calls", 2500);
+        stress("calls", 5000);
+    }
+
+    #[test]
+    #[ignore = "literal-types §9 performance gate"]
+    fn t1_stress_alias_1000() {
+        stress("alias", 1000);
+    }
+
+    #[test]
+    #[ignore = "literal-types §9 performance gate"]
+    fn t1_stress_nested_50_by_50() {
+        stress("nested", 50);
     }
 }

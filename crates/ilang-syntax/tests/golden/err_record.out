@@ -3,6 +3,6 @@ a = {}
 b = {}
 --- errors ---
 E0114 @2:5 `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`
-E0101 @2:13 expected a type, found `1`
+E0101 @2:15 expected `->`, found `}`
 E0114 @3:5 `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`
 E0101 @3:26 expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`

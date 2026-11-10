@@ -1,6 +1,6 @@
 one : (n: A) -> A
-many : (A) -> Int
-blocks : List((A) -> Int)
+many : (A) -> 1 | 2
+blocks : List((A) -> 0 | 1 | 2 | 3)
 loop : (Int) -> Done
 local : () -> Done
 mutual : () -> (Bool, Bool)

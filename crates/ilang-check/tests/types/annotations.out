@@ -2,7 +2,7 @@ exact : (x: Int) -> Int
 general : (x: A) -> A
 holes : (x: List(A)) -> List(A)
 inner : (x: A) -> A
-apart : () -> (Int, String)
+apart : () -> (1, "s")
 typed_value : Int
 fn_type : (Int) -> Int
 union_arg : (x: Int | String) -> Int | String
@@ -14,5 +14,5 @@ alias_use : (p: (Int, Int)) -> (Int, Int)
 pair_use : (p: (String, String)) -> (String, String)
 wrong : String
 wrong_ret : (x: Int) -> String
-53:1: error[E0501]: `Int` is not a subtype of `String`
+53:1: error[E0501]: `1` is not a subtype of `String`
 55:29: error[E0501]: `Int` is not a subtype of `String` (the type at 55:20 needs it)
