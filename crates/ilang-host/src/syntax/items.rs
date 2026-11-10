@@ -212,11 +212,29 @@ pub(super) fn install(
     Ok(())
 }
 
-/// Flip the run mark on an entire successful journal, preserving sharing
-/// between syntax values in different requests.
+/// Flip a successful result and its journal as one graph, so shared syntax
+/// values remain identical across the result and all requests.
+pub fn flip_output_and_requests(
+    output: &Syntax,
+    requests: &[ItemRequest],
+    mark: u64,
+) -> (Syntax, Vec<ItemRequest>) {
+    use ilang_syntax::lisp::syntax::flip_mark_all;
+    let mut roots = vec![output.clone()];
+    append_roots(requests, &mut roots);
+    let mut flipped = flip_mark_all(&roots, mark).into_iter();
+    let output = flipped.next().expect("output root exists");
+    (output, rebuild_requests(requests, &mut flipped))
+}
+
+/// Flip a journal when there is no result to transform with it.
 pub fn flip_requests(requests: &[ItemRequest], mark: u64) -> Vec<ItemRequest> {
     use ilang_syntax::lisp::syntax::flip_mark_all;
     let mut roots = Vec::new();
+    append_roots(requests, &mut roots);
+    rebuild_requests(requests, &mut flip_mark_all(&roots, mark).into_iter())
+}
+fn append_roots(requests: &[ItemRequest], roots: &mut Vec<Syntax>) {
     for request in requests {
         match request {
             ItemRequest::Add {
@@ -228,7 +246,11 @@ pub fn flip_requests(requests: &[ItemRequest], mark: u64) -> Vec<ItemRequest> {
             ItemRequest::Expose { name } => roots.push(name.clone()),
         }
     }
-    let mut flipped = flip_mark_all(&roots, mark).into_iter();
+}
+fn rebuild_requests(
+    requests: &[ItemRequest],
+    flipped: &mut impl Iterator<Item = Syntax>,
+) -> Vec<ItemRequest> {
     requests
         .iter()
         .map(|request| match request {

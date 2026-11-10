@@ -696,7 +696,7 @@ not_item = () -> Nil ! Assert {
 
 #[test]
 fn committed_item_requests_flip_marks_without_losing_shared_identity() {
-    use ilang_host::syntax::{ItemRequest, flip_requests};
+    use ilang_host::syntax::{ItemRequest, flip_output_and_requests, flip_requests};
     let target = Syntax::from_datum(
         &parse("entry").unwrap()[0],
         &Scope {
@@ -732,4 +732,13 @@ fn committed_item_requests_flip_marks_without_losing_shared_identity() {
     assert!(collection.identical(named));
     assert!(collection.identical(at));
     assert!(collection.identical(name));
+    let (output, shared) = flip_output_and_requests(&target, &requests, 7);
+    let ItemRequest::Add { target, .. } = &shared[0] else {
+        panic!("add")
+    };
+    let ItemRequest::Expose { name } = &shared[1] else {
+        panic!("expose")
+    };
+    assert!(output.identical(target));
+    assert!(output.identical(name));
 }
