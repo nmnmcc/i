@@ -81,7 +81,8 @@ fn charges_are_identical_before_and_after_optimization() {
 
 #[test]
 fn the_same_export_counts_longer_paths_and_ignores_the_program_target() {
-    let source = "(measure)\nmeasure = (n: Int) -> Int { n |> { 0 -> 0 _ -> measure(n - 1) + 1 } }\n";
+    let source =
+        "(measure)\nmeasure = (n: Int) -> Int { n |> { 0 -> 0 _ -> measure(n - 1) + 1 } }\n";
     let manifest = "name = \"app\"\n[wasm]\nexports = [\"app/main.measure\"]\n";
     let native = compile_project(source, manifest, false, ilang_wasm::Target::Ilang);
     let wasi = compile_project(source, manifest, false, ilang_wasm::Target::Wasi);
@@ -166,5 +167,64 @@ fn frame_accounting_restores_after_errors_and_continuation_resume() {
         assert!(matches!(outcome.unwrap(), Outcome::Ok(_)));
         assert_eq!(budget.exceeded(), None);
         assert_eq!(budget.usage().frames, 0);
+    }
+}
+
+#[test]
+fn control_and_error_handlers_preserve_frame_accounting() {
+    let source = include_str!("../../../tests/spec/9/control.i");
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir_all(dir.path().join("test")).unwrap();
+    std::fs::write(dir.path().join("test/main.i"), source).unwrap();
+    let (graph, diags) = ilang_package::load(dir.path());
+    assert!(diags.is_empty(), "{diags:?}");
+    let checked = ilang_check::check(&graph);
+    let errors: Vec<_> = checked.diags.iter().filter(|d| d.is_error()).collect();
+    assert!(errors.is_empty(), "{errors:?}");
+    let (wasm, _) = ilang_wasm::compile_macro(
+        &graph,
+        checked.program.as_ref().unwrap(),
+        checked.types.as_ref().unwrap(),
+        ilang_wasm::Options {
+            tests: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let optimized = ilang_cli::optimize(&wasm, ilang_binaryen::Level::O2).unwrap();
+    let programs = [
+        Program::from_bytes(&wasm).unwrap(),
+        Program::from_bytes(&optimized).unwrap(),
+    ];
+    for name in [
+        "generator",
+        "values",
+        "again",
+        "nested_boundaries",
+        "cancel",
+        "cancel_runs_final_functions",
+        "environment",
+        "errors",
+        "pulled",
+        "paused_again",
+        "through_inner_boundaries",
+    ] {
+        let mut counts = Vec::new();
+        for program in &programs {
+            let budget = MacroBudget::default();
+            let mut imports = HostImports::default();
+            imports.set_macro_budget(budget.clone());
+            let result =
+                program.run_test_with(&format!("app/main.{name}"), HostOptions::new(imports));
+            assert!(
+                matches!(result, ilang_host::TestResult::Passed),
+                "{name}: {result:?}"
+            );
+            assert_eq!(budget.exceeded(), None, "{name}");
+            assert_eq!(budget.usage().frames, 0, "{name}");
+            counts.push(budget.usage());
+        }
+        assert_eq!(counts[0], counts[1], "{name}");
     }
 }
