@@ -839,3 +839,73 @@ ring baseline (qa-baseline-equivalence.json records every tree/blob ID and
 the binary hash). Std, hello and bench still have 2,197/5/23 bindings,
 with exactly the same three std row-order permutations and no missing or
 added bindings (types-qa-comparison.json).
+
+
+## QA verification and incidents
+
+The complete pre-final replay passes at source head 14fa7651:
+H env UPDATE=1 cargo test -p ilang-check --test types --locked;
+H env ILANG_BROWSER_PORT=4185 ./scripts/dev-verify;
+H cargo test -p ilang-cli --test spec --locked;
+H env WAT_DUMP=<lane scratch> cargo test -p ilang-cli --test wat_dump --locked;
+and old-syntax-check outside that outer wrapper. H is the heavy/dev-shell
+wrapper defined earlier. The gate includes all 1,935 corpus projects: 1,098
+accepted, 837 rejected, five explicit XFAIL entries (three T3 held and two
+T1 runtime observations), zero failed requirements and zero checker timeouts.
+The short model run passes inside dev-verify, alongside all Rust/i/JS/browser
+checks. All 242 spec cases pass at both optimization levels. The syntax sweep
+parses 3,683 extracted snippets with exact diagnostics and 20 inherited
+future-track entries.
+
+All 906 redesign export records, including 577 actual WAT modules, remain
+byte-identical. Only the same four generic_service_rows exports are added.
+No existing checker golden changes in this follow-up. The corpus observations
+are regenerated explicitly; all 1,855 old records have new compiler/binary
+metadata and a ten-second budget (two K4 stress records use sixty seconds).
+Those metadata changes are counted separately from the 976 changed outcomes.
+Resource budgets are observation caps under docs/testing.md, not weakened
+performance checks. Successfully promoted K4 cases now require completion;
+none retains a known-failure exemption.
+
+The integrity command verifies 1,880 preserved payload occurrences, 1,456
+maintained mappings and 4,108 historical tools/evidence payloads with zero
+failures. Long-generation model counts, verdicts, permutations, annotations
+and report-only results are identical to the stored long run. Benchmark
+output hashes differ only for the formerly censored service ring and std's
+three canonical row permutations.
+
+New failed checks/incidents in this follow-up:
+
+- The initial full corpus run fails against pre-K4 observations and known
+  markers, intentionally exposing XPASS and changed diagnostics/types. It
+  also exposes the genuine T1 scalar-error subtraction regression, fixed
+  in 3e3ccc6f. The temporary traced check reproduces that E0515; the fixed
+  check and both runtime optimizations then pass.
+- The first migration lookup compared formatted new bytes with unformatted
+  preserved bytes and reused no projects. It was corrected to canonicalize
+  temporary copies for matching; only its own newly generated duplicates
+  were removed. No original review source was changed or lost.
+- The initial three-second observations time out on several finite stress
+  cases. Explicit ten-/sixty-second observations establish their completion;
+  these are not claimed as isolated timing measurements. The two T1 runtime
+  observations remain censored and visible.
+- The prior-art document is absent from redesign despite the ledger's
+  landed statement. The immutable 3beae77 note and all requested reference
+  functions were read directly; none was edited or built.
+
+No verification run was interrupted in this follow-up. No global config,
+lockfile, shared checkout, reference implementation or other lane changed.
+Per-command environment variables expired normally. Scratch logs and normal
+browser dependencies remain in this lane. The final-head replay is recorded
+separately in target/k4d-checks/qa-final-head-gates.log after the derived-files
+commit; no source changes are planned after that commit.
+
+Follow-ups outside this integration: the coordinator/Std-2 owner must promote
+the five waiting logging probes in std/src/log.i, std/test/log_test.i and
+docs/design/std-2.md after K4 lands; the coordinator should restore the missing
+prior-art note to redesign. The stored wide-union performance increase is
+reported as a measurement follow-up, with no inferred source attribution.
+Only Solver::handle changes in compiler source in this QA follow-up. Other
+new functions are the migration/audit helpers and corpus selection, runtime
+observation and requirement checks; the earlier complete compiler function
+inventory still applies to K4 as a whole.
