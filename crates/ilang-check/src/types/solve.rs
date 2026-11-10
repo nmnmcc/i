@@ -398,22 +398,25 @@ impl Solver {
     /// square of their number.
     fn add_bound(&mut self, v: V, t: Ty, lower: bool, env: bool) {
         self.touched.push(v);
-        let level = self.var(v).level;
-        // The variables whose bounds now have `t` too, and their bounds.
-        let preds = self.reach(vec![v], !lower).0;
-        let mut others = self.reach(preds, lower).1;
-        if !lower {
-            let mut heads = HashSet::default();
-            others.retain(|b| heads.insert(b.head()));
-        }
         let new = match &t {
             Ty::Var(u) => self.reach(vec![*u], lower).1,
             Ty::Con(..) | Ty::Fn(_) => vec![t.clone()],
             _ => Vec::new(),
         };
-        for a in &new {
-            for b in &others {
-                self.compare(a, b, lower, env, level);
+        // No constructor pairs need checking when the new bound has none.
+        if !new.is_empty() {
+            let level = self.var(v).level;
+            // The variables whose bounds now have `t` too, and their bounds.
+            let preds = self.reach(vec![v], !lower).0;
+            let mut others = self.reach(preds, lower).1;
+            if !lower {
+                let mut heads = HashSet::default();
+                others.retain(|b| heads.insert(b.head()));
+            }
+            for a in &new {
+                for b in &others {
+                    self.compare(a, b, lower, env, level);
+                }
             }
         }
         let s = self.var_mut(v);
