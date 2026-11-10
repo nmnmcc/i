@@ -1193,3 +1193,23 @@ fn host_identity_is_weak_and_does_not_keep_a_prior_run_alive() {
             .identical(&syntax)
     );
 }
+
+#[test]
+fn deeply_nested_syntax_marks_and_drops_without_host_stack_growth() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            use ilang_syntax::lisp::syntax::{Node, Syntax};
+            let mut syntax = root("x");
+            for _ in 0..20_000 {
+                syntax = Syntax::make(Node::Round(vec![syntax.clone()]), &syntax).unwrap();
+            }
+            let marked = syntax.flip_mark(7);
+            assert!(marked.scope().marks.contains(&7));
+            drop(marked);
+            drop(syntax);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}

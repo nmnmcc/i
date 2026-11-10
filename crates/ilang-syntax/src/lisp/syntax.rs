@@ -57,6 +57,36 @@ struct SyntaxData {
     host_identity: Mutex<Option<Weak<dyn std::any::Any + Send + Sync>>>,
 }
 
+// Deep syntax trees are disposed iteratively: each otherwise-unique child is
+// emptied before its Arc is released, so dropping a macro result uses constant
+// host stack even when the syntax is very deeply nested.
+impl Drop for SyntaxData {
+    fn drop(&mut self) {
+        fn collect(node: Node, pending: &mut Vec<Syntax>) {
+            match node {
+                Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                    pending.extend(xs)
+                }
+                Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => pending.push(x),
+                _ => {}
+            }
+        }
+        let mut pending = Vec::new();
+        collect(
+            std::mem::replace(&mut self.node, Node::Round(Vec::new())),
+            &mut pending,
+        );
+        while let Some(syntax) = pending.pop() {
+            if let Ok(mut data) = Arc::try_unwrap(syntax.0) {
+                collect(
+                    std::mem::replace(&mut data.node, Node::Round(Vec::new())),
+                    &mut pending,
+                );
+            }
+        }
+    }
+}
+
 /// Name provenance determines which foreign declarations `make` may reach.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Provenance {
@@ -700,43 +730,64 @@ pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), S
 /// Flip one expansion mark on a set of values, preserving shared value identity.
 pub fn flip_mark_all(values: &[Syntax], mark: u64) -> Vec<Syntax> {
     use std::collections::HashMap;
-    fn flip(value: &Syntax, mark: u64, seen: &mut HashMap<usize, Syntax>) -> Syntax {
+    let mut seen = HashMap::<usize, Syntax>::new();
+    let mut pending = Vec::new();
+    for value in values.iter().rev() {
+        pending.push((value, false));
+    }
+    while let Some((value, finish)) = pending.pop() {
         let key = Arc::as_ptr(&value.0) as usize;
-        if let Some(result) = seen.get(&key) {
-            return result.clone();
+        if seen.contains_key(&key) {
+            continue;
         }
-        let map = |items: &[Syntax], seen: &mut HashMap<usize, Syntax>| {
-            items.iter().map(|item| flip(item, mark, seen)).collect()
+        if !finish {
+            pending.push((value, true));
+            match value.node() {
+                Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                    for child in xs.iter().rev() {
+                        pending.push((child, false));
+                    }
+                }
+                Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => pending.push((x, false)),
+                _ => {}
+            }
+            continue;
+        }
+        let mapped = |child: &Syntax| {
+            seen.get(&(Arc::as_ptr(&child.0) as usize))
+                .expect("child was flipped first")
+                .clone()
         };
+        let map = |items: &[Syntax]| items.iter().map(mapped).collect();
         let node = match value.node() {
-            Node::Round(xs) => Node::Round(map(xs, seen)),
-            Node::Square(xs) => Node::Square(map(xs, seen)),
-            Node::Curly(xs) => Node::Curly(map(xs, seen)),
-            Node::Bits(xs) => Node::Bits(map(xs, seen)),
-            Node::Quote(x) => Node::Quote(flip(x, mark, seen)),
-            Node::Unquote(x) => Node::Unquote(flip(x, mark, seen)),
-            Node::Splice(x) => Node::Splice(flip(x, mark, seen)),
+            Node::Round(xs) => Node::Round(map(xs)),
+            Node::Square(xs) => Node::Square(map(xs)),
+            Node::Curly(xs) => Node::Curly(map(xs)),
+            Node::Bits(xs) => Node::Bits(map(xs)),
+            Node::Quote(x) => Node::Quote(mapped(x)),
+            Node::Unquote(x) => Node::Unquote(mapped(x)),
+            Node::Splice(x) => Node::Splice(mapped(x)),
             leaf => leaf.clone(),
         };
         let mut scope = value.scope().clone();
         if !scope.marks.insert(mark) {
             scope.marks.remove(&mark);
         }
-        let result = Syntax(Arc::new(SyntaxData {
-            node,
-            scope,
-            span: value.span(),
-            provenance: value.provenance(),
-            identity: value.scope_identity().cloned(),
-            origin: value.0.origin.clone(),
-            host_identity: Mutex::new(None),
-        }));
-        seen.insert(key, result.clone());
-        result
+        seen.insert(
+            key,
+            Syntax(Arc::new(SyntaxData {
+                node,
+                scope,
+                span: value.span(),
+                provenance: value.provenance(),
+                identity: value.scope_identity().cloned(),
+                origin: value.0.origin.clone(),
+                host_identity: Mutex::new(None),
+            })),
+        );
     }
-    let mut seen = HashMap::new();
     values
         .iter()
-        .map(|value| flip(value, mark, &mut seen))
+        .map(|value| seen[&(Arc::as_ptr(&value.0) as usize)].clone())
         .collect()
 }
