@@ -1129,19 +1129,30 @@ So for an export, the host makes the parameter buffers with `ilang_alloc`, frees
 
 - **External functions** (§10.1): the import module and name of the `@external` attribute, encoded as in §B.2.
 - **Functions of host services** (§9.7): the import module is the namespace and the name is the field label, encoded as in §B.2.
-- **Async functions of host services**: the import has the parameters of §B.2 and no results. The host starts the work and returns at once. The result comes later through `ilang_resume` (§B.5).
+- **Async functions of host services**: the import has an `i32` **request id** first, then the parameters of §B.2, and no results. The host copies the parameters, keeps the request, and returns at once. The answer comes later through `ilang_resume` (§B.5). Until then the request is **outstanding**.
+  - The host calls the service during the import, and waits for its work only after the import has returned. So a service can fix anything that depends on the time of the call, such as the deadline of a sleep, during the import. The parameters are copied then too.
+  - The module chooses the id: a number of 0 or more that no other outstanding request of the instance has. After a request is answered, cancelled or dropped (§B.5), its id may be used again.
+  - The module calls an async function only during a call of an async entry point, of `ilang_resume:…` or of `ilang_continue`, and not while an import runs (also not from a call such as `ilang_alloc` that the host makes during an import). So it does not call one during `ilang_start` (§B.1) either. If it calls one at another time, or with an id that is below 0 or already outstanding, the import traps and the host does not use the instance again.
+  - On the WASI target none of this holds: there, as §B.7 says, an async function is a blocking import, with no request id.
 - **Runtime imports**, with the import module `ilang:host/v1`:
   - `panic(address: i32, length: i32)` gives the stop message (§11.7) as UTF-8. Then the module traps.
   - `reference_id(reference: externref) -> i64` gives a number for a host reference: the same number for the same reference, different numbers for different references, and 0 for null. It is used by `==` (§11.4).
+  - `cancel(id: i32)` drops the outstanding request `id` (above): the host stops its work if it can and never answers it, and the id may be used again. It may be called at the same times as an async function. With an id that is not outstanding, it traps and the host does not use the instance again.
 
 ### B.5 Exports
 
 - **Host exports** (§10.2) have the name written in `[wasm].exports`, for example `app/math.add`, and are encoded as in §B.2.
 - **The program entry and tests** have the name `module path.function name`, no parameters, and no results.
 - A function that is both a host export and the program entry or a test, or both the program entry and a test, or a function named two times in `[wasm].exports`, is a compile error, because their export names would be the same.
-- **Async entry points** (§10.2) have the parameters above and one result, an `i32` **status**: 0 means done, 1 means waiting. When the status is 1, the program is waiting for exactly one host function that it has started. When that work is done, the host calls the export `ilang_resume:namespace:label` of that function. Its parameters are the results of the function as in §B.2, and its result is a status again. When the status is 0, the host calls the export `ilang_result:name` of the entry point, with no parameters, to get its results as in §B.2.
-- While an async entry point is waiting, the host may only call `ilang_resume:…`, `ilang_alloc`, and `ilang_free`.
-- When the program stops, the export traps after the `panic` import (§B.4). After a trap, the host may not use that instance of the module again; it makes a new instance and calls `ilang_start` on it.
+- **Async entry points** (§10.2) have the parameters above and one result, an `i32` **status**. 0 means the entry point has ended. 1 means it is **waiting**: it has one or more outstanding requests (§B.4), and it goes on only when the host answers one. 2 means it is **runnable**: it can go on without an answer. Another status is a fault of the module.
+- When the status is 2, the host lets its own work run once without waiting, then answers a request whose work is done, if there is one. If there is none, it calls the export `ilang_continue() -> i32`, with no parameters, whose result is a status again. The host calls `ilang_continue` only then, right after status 2; a call at another time breaks the instance. A module that gives status 2 has this export; if it does not, it is a fault of the module. The names `ilang_continue`, `ilang_start`, `ilang_alloc`, `ilang_free`, `memory` and those that start with `ilang_resume:` or `ilang_result:` are reserved: the metadata may not use them for host exports or entry points.
+- The host answers a request by calling the export `ilang_resume:namespace:label` of the function that started it. The first parameter is the request id, and the others are the results of the function as in §B.2. The result is a status again. The host may answer outstanding requests in any order, but one at a time. It makes the result buffers with `ilang_alloc` just before the call that gives them. A module that starts a request of a function and has no such export for it, or one of the wrong type, has a fault, and the host does not use the instance again.
+- A call of `ilang_resume:…` with an id that is not outstanding, or that another function started, traps.
+- When the status is 1 and no request is outstanding, the program can never go on. This is a fault of the module, and the host does not use the instance again.
+- When the status is 0, the host calls the export `ilang_result:name` of the entry point, with no parameters, to get its results as in §B.2. Requests that are still outstanding are dropped: the host stops their work if it can and never answers them. This lets a program end work that it no longer needs; a module made by this compiler has no outstanding request at that point.
+- When the work of an async function fails in the host (not an error of its `? E`, which is an answer), the host drops every outstanding request and does not use the instance again.
+- While an async entry point is waiting or runnable, the host may only call `ilang_resume:…`, `ilang_continue`, `ilang_alloc`, and `ilang_free`. So an instance runs one async entry point at a time. The module does not check every export for this; a host that calls another export breaks the instance.
+- When the program stops, the export traps after the `panic` import (§B.4). After a trap, the host may not use that instance of the module again. Every outstanding request is dropped, and an answer that comes later is ignored. The host makes a new instance and calls `ilang_start` on it.
 
 ### B.6 Metadata
 
@@ -1149,7 +1160,7 @@ The custom section `ilang.abi` is UTF-8 JSON in this form:
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "entry": { "name": "app/main.main", "async": false },
   "tests": [ { "name": "app/math_test.add", "async": false } ],
   "exports": {
@@ -1166,6 +1177,7 @@ The custom section `ilang.abi` is UTF-8 JSON in this form:
 }
 ```
 
+- `version` is 3. A host refuses a module with another version, so a module of an older version must be built again. Version 3 differs from version 2 in these ways: an async function has a request id; status 1 means one or more outstanding requests, not exactly one, and the host may answer them in any order; status 2 and the export `ilang_continue` are new, and `ilang_continue` is a reserved export name; the runtime import `cancel` is new; outstanding requests are dropped when the entry point ends, on a trap, and when the work fails in the host; and an async function may only be called during an async entry point, a resume or `ilang_continue` (§B.4). A runtime import, status or export that a host must handle is added only with a new version.
 - Type names are `nil`, `bool`, `int`, `float`, `string`, `bit_array`, and `externref`. `errors` is in the canonical order (§B.2).
 - `entry` is `null` when the program has no `@main`. `tests` is empty unless tests were compiled.
 - `services` lists every host service function that the entry points need, and `externals` every external function.
