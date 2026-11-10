@@ -921,3 +921,25 @@ fn template_rebuild_preserves_origin_and_cannot_forge_foreign_attributes() {
     assert!(validate_expansion(&altered, std::slice::from_ref(&attribute)).is_err());
     validate_expansion(&attribute.flip_mark(8), &[attribute]).unwrap();
 }
+
+#[test]
+fn expanded_definition_preserves_attributes_and_parameter_identities() {
+    use ilang_syntax::lisp::definitions::expanded_definition;
+    use ilang_syntax::lisp::syntax::{Node, ScopeIdentity};
+    let item = root("(@ (deprecated \"old\") ((Box A) { (Box A) }))");
+    let answer = expanded_definition(&item, 90).unwrap();
+    let Node::Round(outer) = answer.node() else {
+        panic!("attribute")
+    };
+    assert!(outer[1].same_code(&root("(deprecated \"old\")")));
+    let Node::Round(core) = outer[2].node() else {
+        panic!("definition")
+    };
+    let Node::Round(head) = core[0].node() else {
+        panic!("head")
+    };
+    assert!(matches!(
+        head[1].scope_identity(),
+        Some(ScopeIdentity::DefinitionParameter { answer: 90, .. })
+    ));
+}

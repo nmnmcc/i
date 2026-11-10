@@ -3,9 +3,8 @@ use super::definition_schedule::Mode;
 use super::definitions::{
     TypeQuery, builtin_definition, freshen_parameters, source_definition, type_query,
 };
-use super::syntax::{Scope, Syntax, SyntaxError};
+use super::syntax::{Scope, Syntax};
 use crate::ast::{Item, ItemKind};
-use crate::span::Span;
 use std::collections::HashMap;
 use std::hash::Hash;
 
@@ -41,6 +40,13 @@ pub enum Lookup<Key> {
     Missing,
 }
 
+/// A query failure keeps the actual syntax node, including its source module.
+#[derive(Clone, Debug)]
+pub struct QueryError {
+    pub message: String,
+    pub at: Syntax,
+}
+
 #[derive(Clone, Debug)]
 pub enum QueryResult<Key> {
     Answer {
@@ -49,12 +55,12 @@ pub enum QueryResult<Key> {
     },
     /// The run must be discarded and retried with a fresh mark.
     Deferred {
-        span: Span,
+        at: Syntax,
     },
     /// A catchable `SyntaxError` raised by `definition`.
-    Error(SyntaxError),
+    Error(QueryError),
     /// A source compile error that the macro cannot catch.
-    CompileError(SyntaxError),
+    CompileError(QueryError),
 }
 
 /// Maps resolved identities to definitions. Lookup is injected by the
@@ -123,25 +129,30 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
     ) -> QueryResult<Key> {
         let parsed = match type_query(of) {
             Ok(query) => query,
-            Err(error) => return QueryResult::Error(error),
+            Err(error) => {
+                return QueryResult::Error(QueryError {
+                    message: error.message,
+                    at: of.clone(),
+                });
+            }
         };
         for atom in parsed.module.iter().chain(std::iter::once(&parsed.name)) {
             if !atom.valid_scope_identity() {
-                return QueryResult::CompileError(SyntaxError {
+                return QueryResult::CompileError(QueryError {
                     message: "a made name cannot change a compiler-provided name identity".into(),
-                    span: atom.span(),
+                    at: atom.clone(),
                 });
             }
         }
-        let error = |message: &str| SyntaxError {
+        let error = |message: &str| QueryError {
             message: message.into(),
-            span: parsed.name.span(),
+            at: parsed.name.clone(),
         };
         let key = match lookup(&parsed, mode) {
             Lookup::Found(key) => key,
             Lookup::Deferred => {
                 return QueryResult::Deferred {
-                    span: parsed.name.span(),
+                    at: parsed.name.clone(),
                 };
             }
             Lookup::TypeParameter => {
@@ -162,7 +173,7 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
             Definition::Written { ready: false, .. }
             | Definition::Expanded { ready: false, .. } => {
                 return QueryResult::Deferred {
-                    span: parsed.name.span(),
+                    at: parsed.name.clone(),
                 };
             }
             Definition::Written {
