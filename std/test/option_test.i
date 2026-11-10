@@ -1,4 +1,4 @@
-import (
+(
 	i/core
 	i/fail
 	option = (Some, None) = std/option
@@ -239,14 +239,14 @@ all_long_test = () {
 }
 
 build = (n, acc) {
-	case n {
+	n |> {
 		0 -> acc
 		_ -> build(n - 1, [Some(n), ..acc])
 	}
 }
 
 build_plain = (n, acc) {
-	case n {
+	n |> {
 		0 -> acc
 		_ -> build_plain(n - 1, [n, ..acc])
 	}
@@ -258,7 +258,7 @@ known_types_test = () {
 	// The field `name` is known from the type of `option.map`.
 	assert(option.map(user, (u) { u.name }) == Some("ann"))
 	assert(option.then(user, (u) {
-		case u.age > 18 {
+		{ u.age > 18 } |> {
 			True  -> Some(u.age)
 			False -> None
 		}

@@ -1,4 +1,4 @@
-import (
+(
 	i/core
 	i/fail
 	dict = std/dict
@@ -283,7 +283,7 @@ upsert_existing_test = () {
 	d = dict.from_list([("a", 0), ("b", 1), ("c", 2)])
 
 	inc_or_zero = (x) {
-		case x {
+		x |> {
 			Some(i) -> i + 1
 			None    -> 0
 		}
@@ -301,7 +301,7 @@ upsert_existing_b_test = () {
 	d = dict.from_list([("a", 0), ("b", 1), ("c", 2)])
 
 	inc_or_zero = (x) {
-		case x {
+		x |> {
 			Some(i) -> i + 1
 			None    -> 0
 		}
@@ -319,7 +319,7 @@ upsert_new_test = () {
 	d = dict.from_list([("a", 0), ("b", 1), ("c", 2)])
 
 	inc_or_zero = (x) {
-		case x {
+		x |> {
 			Some(i) -> i + 1
 			None    -> 0
 		}
@@ -372,7 +372,7 @@ each_test = () {
 	d = dict.from_list([("a", 1), ("b", 2), ("c", 3), ("d", 4)])
 
 	assert(dict.each(d, (k, v) {
-		True = case (k, v) {
+		True = (k, v) |> {
 			("a", 1) | ("b", 2) | ("c", 3) | ("d", 4) -> True
 			_                                         -> False
 		}
@@ -382,9 +382,9 @@ each_test = () {
 }
 
 range = (start, end, a) {
-	case end - start {
-		n if n < 1 -> a
-		_          -> range(start, end - 1, [end - 1, ..a])
+	end - start |> {
+		n ? n < 1 -> a
+		_         -> range(start, end - 1, [end - 1, ..a])
 	}
 }
 
@@ -880,14 +880,14 @@ test_random_operations_loop = (
 	proplist: List((Int, Int))
 	d: dict.Dict(Int, Int)
 ) -> Nil {
-	case remaining > 0 {
+	{ remaining > 0 } |> {
 		False -> assert_dict_matches_proplist(d, proplist, initial_seed)
 		True -> {
 			seed1 = prng(seed)
 			op_choice = seed1 % 2
 			seed2 = prng(seed1)
 			key = seed2 % key_space
-			case op_choice {
+			op_choice |> {
 				// Insert
 				0 -> test_random_operations_loop(
 					initial_seed
@@ -899,7 +899,7 @@ test_random_operations_loop = (
 				)
 				// Delete
 				_ -> {
-					new_proplist = case list.key_pop(proplist, key) {
+					new_proplist = list.key_pop(proplist, key) |> {
 						Some((_, rest)) -> rest
 						None            -> proplist
 					}
@@ -924,7 +924,7 @@ run_many_random_tests = (
 	initial: dict.Dict(Int, Int)
 ) -> Nil {
 	go = (n, seed) {
-		case n {
+		n |> {
 			0 -> Nil
 			_ -> {
 				test_random_operations(seed, ops_per_test, key_space, initial)
@@ -973,12 +973,12 @@ range_dict = (size) {
 
 prng = (state: Int) -> Int { { state * 48_271 } % 0x7FFFFFFF }
 
-assert_dict_matches_proplist = (
-	d: dict.Dict(k, v)
-	proplist: List((k, v))
+assert_dict_matches_proplist(K, V) = (
+	d: dict.Dict(K, V)
+	proplist: List((K, V))
 	seed: Int
 ) -> Nil {
-	case dict.size(d) == list.length(proplist) {
+	{ dict.size(d) == list.length(proplist) } |> {
 		True -> Nil
 		False -> panic(
 			"Size mismatch with seed " <>
@@ -992,7 +992,7 @@ assert_dict_matches_proplist = (
 	list.each(proplist, (pair) {
 		(key, value) = pair
 		got = dict.get(d, key)
-		case got == Some(value) {
+		{ got == Some(value) } |> {
 			True -> Nil
 			False -> panic(
 				"Get mismatch with seed " <>
@@ -1006,7 +1006,7 @@ assert_dict_matches_proplist = (
 			)
 		}
 	})
-	case d == dict.from_list(proplist) {
+	{ d == dict.from_list(proplist) } |> {
 		True -> Nil
 		False -> panic(
 			"Structural equality failed with seed " <> int.to_string(seed)
@@ -1064,7 +1064,7 @@ many_keys_test = () {
 	assert(dict.get(d, n + 1) == None)
 	assert(list.all(list.range(1, n), (i) { dict.get(d, i) == Some(i * i) }))
 	d2 = list.fold(list.range(1, n), d, (d, i) {
-		case i % 2 {
+		i % 2 |> {
 			0 -> dict.delete(d, i)
 			_ -> d
 		}
@@ -1120,7 +1120,7 @@ upsert_update_test = () {
 	count = (words) {
 		list.fold(words, dict.new(), (d, w) {
 			dict.upsert(d, w, (x) {
-				case x {
+				x |> {
 					Some(n) -> n + 1
 					None    -> 1
 				}

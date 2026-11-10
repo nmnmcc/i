@@ -8,7 +8,9 @@ b = () { Nil }
 c: (Int) -> Int
 
 @host("app:h/v1", "sync")
-H { H(f: () -> Nil) }
+H {
+	H(f: () -> Nil)
+}
 
 @deprecated
 d = 1
@@ -17,7 +19,9 @@ d = 1
 e = 1
 
 @main
-T { T }
+T {
+	T
+}
 
 @deprecated("old")
 @deprecated("older")

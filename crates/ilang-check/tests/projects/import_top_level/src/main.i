@@ -1,9 +1,14 @@
-import (
-  (v, T, U) = app/lib
-  i/fail
+(
+	(v, T, U) = app/lib
+	i/fail
 )
 
 v = 2
-T { Other }
+
+T {
+	Other
+}
+
 U = Int
+
 fail = 3

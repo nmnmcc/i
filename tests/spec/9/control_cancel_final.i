@@ -4,18 +4,23 @@
 // at: spec/control_cancel_final:14:5
 // at: spec/control_cancel_final:15:37
 // at: spec/control_cancel_final:13:3
-import (i/control, i/resource)
+(
+	i/control
+	i/resource
+)
 
 // `cancel` unwinds the paused computation: its final functions run (§9.5),
 // on top of the place of `cancel`.
 @main
 main = () {
-  control.boundary((b) {
-    resource.ensure(
-      () { control.suspend(b, (k) { control.cancel(k)  Nil }) },
-      () { panic("final") },
-    )
-    Nil
-  })
-  Nil
+	control.boundary((b) {
+		resource.ensure(() {
+			control.suspend(b, (k) {
+				control.cancel(k)
+				Nil
+			})
+		}, () { panic("final") })
+		Nil
+	})
+	Nil
 }

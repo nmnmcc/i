@@ -4,12 +4,12 @@
 //// `or` are the same as functions, for example for `list.fold`. They do
 //// both sides, because the arguments of a call are always worked out.
 
-import (
+(
 	i/core
 	order = (Order, Less, Equal, Greater) = std/order
 )
 
-export (
+(
 	not
 	and
 	or
@@ -47,7 +47,7 @@ exclusive_nor = (a: Bool, b: Bool) -> Bool { a == b }
 
 /// `"True"` or `"False"`.
 to_string = (bool: Bool) -> String {
-	case bool {
+	bool |> {
 		True  -> "True"
 		False -> "False"
 	}
@@ -55,7 +55,7 @@ to_string = (bool: Bool) -> String {
 
 /// `1` for `True` and `0` for `False`.
 to_int = (bool: Bool) -> Int {
-	case bool {
+	bool |> {
 		True  -> 1
 		False -> 0
 	}
@@ -63,7 +63,7 @@ to_int = (bool: Bool) -> Int {
 
 /// Compares two bools, with `False < True`.
 compare = (a: Bool, with: Bool) -> Order {
-	case (a, with) {
+	(a, with) |> {
 		(True, False) -> Greater
 		(False, True) -> Less
 		_             -> Equal
@@ -76,20 +76,24 @@ compare = (a: Bool, with: Bool) -> Order {
 /// ```i
 /// bool.guard(when: n < 0, return: "negative", otherwise: () { "positive" })
 /// ```
-guard = (when: Bool, return: a, otherwise: () -> a ? e ! n) -> a ? e ! n {
-	case when {
+guard(A, E, N) = (
+	when: Bool
+	return: A
+	otherwise: () -> A ? E ! N
+) -> A ? E ! N {
+	when |> {
 		True  -> return
 		False -> otherwise()
 	}
 }
 
 /// Like `guard`, but the value for `True` is made by a function too.
-lazy_guard = (
+lazy_guard(A, E, N) = (
 	when: Bool
-	return: () -> a ? e ! n
-	otherwise: () -> a ? e ! n
-) -> a ? e ! n {
-	case when {
+	return: () -> A ? E ! N
+	otherwise: () -> A ? E ! N
+) -> A ? E ! N {
+	when |> {
 		True  -> return()
 		False -> otherwise()
 	}

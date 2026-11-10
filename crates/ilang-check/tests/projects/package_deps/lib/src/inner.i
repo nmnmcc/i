@@ -1,3 +1,5 @@
-export (bang)
+(
+	bang
+)
 
 bang = (s: String) { s <> "!" }

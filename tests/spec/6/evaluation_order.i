@@ -8,6 +8,6 @@ pair = (a: Int, b: Int) { a + b }
 
 @main
 main = () {
-  x = 1
-  pair(b: panic("first"), a: panic("second"))
+	x = 1
+	pair(b: panic("first"), a: panic("second"))
 }

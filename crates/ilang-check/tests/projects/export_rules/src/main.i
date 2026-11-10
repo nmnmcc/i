@@ -1,5 +1,15 @@
-export (nope, Nope, Alias(..), Real(..), x)
+(
+	nope
+	Nope
+	Alias(..)
+	Real(..)
+	x
+)
 
 Alias = Int
-Real { Real }
+
+Real {
+	Real
+}
+
 x = 1

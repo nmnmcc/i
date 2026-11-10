@@ -1,13 +1,19 @@
 // Generalized bindings are used from other modules with fresh types.
-export (map, Pair(..), swap)
+(
+	map
+	Pair(..)
+	swap
+)
 
-Pair(a, b) { Pair(left: a, right: b) }
-
-map = (xs, f) {
-  case xs {
-    [] -> []
-    [x, ..rest] -> [f(x), ..map(rest, f)]
-  }
+Pair(A, B) {
+	Pair(left: A, right: B)
 }
 
-swap = (p: Pair(a, b)) { Pair(left: p.right, right: p.left) }
+map = (xs, f) {
+	xs |> {
+		[]          -> []
+		[x, ..rest] -> [f(x), ..map(rest, f)]
+	}
+}
+
+swap(A, B) = (p: Pair(A, B)) { Pair(left: p.right, right: p.left) }

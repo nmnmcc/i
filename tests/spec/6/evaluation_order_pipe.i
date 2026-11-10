@@ -7,7 +7,7 @@ pick = (n: Int) -> (Int, Int) -> Int { panic("callee") }
 
 @main
 main = () {
-  n = 1
-  panic("left") |> pick(n)(panic("argument"))
-  Nil
+	n = 1
+	panic("left") |> pick(n)(panic("argument"))
+	Nil
 }

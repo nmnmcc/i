@@ -7,6 +7,6 @@ second = ((1, x)) { x }
 
 @main
 main = () {
-  second((2, 3))
-  Nil
+	second((2, 3))
+	Nil
 }

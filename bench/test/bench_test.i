@@ -2,7 +2,7 @@
 //// at `--opt 2` and prints how long each one takes. Each one checks its
 //// result, so that no work can be left out.
 
-import (
+(
 	i/core
 	dict = std/dict
 	int = std/int
@@ -16,7 +16,7 @@ size = 1_000_000
 // a small Int.
 randoms = (n: Int) -> List(Int) {
 	go = (i, x, acc) {
-		case i {
+		i |> {
 			0 -> acc
 			_ -> {
 				y = x * 75 + 74
@@ -28,7 +28,7 @@ randoms = (n: Int) -> List(Int) {
 }
 
 check = (ok: Bool, what: String) -> Nil {
-	case ok {
+	ok |> {
 		True  -> Nil
 		False -> panic(what)
 	}
@@ -63,11 +63,11 @@ list_sort = () {
 
 // A merge of two sorted lists, written out.
 merge = (xs: List(Int), ys: List(Int), acc: List(Int)) -> List(Int) {
-	case xs {
+	xs |> {
 		[] -> list.append(list.reverse(acc), ys)
-		[x, ..xs2] -> case ys {
+		[x, ..xs2] -> ys |> {
 			[] -> list.append(list.reverse(acc), xs)
-			[y, ..ys2] -> case x > y {
+			[y, ..ys2] -> { x > y } |> {
 				True  -> merge(xs, ys2, [y, ..acc])
 				False -> merge(xs2, ys, [x, ..acc])
 			}
@@ -116,7 +116,7 @@ equality = () {
 	xs = list.map(list.range(1, 100_000), with: (x) { (x, "a") })
 	ys = list.map(list.range(1, 100_000), with: (x) { (x, "a") })
 	n = list.fold(list.range(1, 20), from: 0, with: (acc, _) {
-		case xs == ys {
+		{ xs == ys } |> {
 			True  -> acc + 1
 			False -> acc
 		}

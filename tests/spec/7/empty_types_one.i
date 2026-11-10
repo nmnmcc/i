@@ -4,26 +4,27 @@
 // one at its place, or tested together with the others.
 
 Window {}
+
 Socket {}
 
 kind = (h: Window | Int) {
-  case h {
-    _: Window -> "window"
-    _ -> "other"
-  }
+	h |> {
+		_: Window -> "window"
+		_         -> "other"
+	}
 }
 
 both = (h: Window | Socket | Int) {
-  case h {
-    _: Window | Socket -> "host"
-    _ -> "other"
-  }
+	h |> {
+		_: Window | Socket -> "host"
+		_                  -> "other"
+	}
 }
 
 @test
 t = () {
-  case (kind(1), both(2)) {
-    ("other", "other") -> Nil
-    _ -> panic("no")
-  }
+	(kind(1), both(2)) |> {
+		("other", "other") -> Nil
+		_                  -> panic("no")
+	}
 }

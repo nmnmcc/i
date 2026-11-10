@@ -3,6 +3,4 @@
 // at: spec/test_stops:7:3
 
 @main
-main = () {
-  panic("the entry stops")
-}
+main = () { panic("the entry stops") }

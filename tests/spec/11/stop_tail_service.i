@@ -7,16 +7,16 @@
 // A tail call of a function of a service keeps its position as the first
 // one; the tail call of `check` is gone.
 check = (c: Bool, a ! Assert) {
-  case c {
-    True -> Nil
-    False -> a.fail(AssertionFailure("mine"))
-  }
+	c |> {
+		True  -> Nil
+		False -> a.fail(AssertionFailure("mine"))
+	}
 }
 
 apply = (f, x) { [f(x)] }
 
 @main
 main = () {
-  apply((v) { check(v == 0) }, 1)
-  Nil
+	apply((v) { check(v == 0) }, 1)
+	Nil
 }

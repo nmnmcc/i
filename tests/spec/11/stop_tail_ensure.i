@@ -2,15 +2,15 @@
 // expect: stop "panic: body"
 // at: spec/stop_tail_ensure:9:28
 // at: spec/stop_tail_ensure:14:3
-import (i/resource)
+(
+	i/resource
+)
 
 // A call of `resource.ensure` in tail position counts as a tail call.
-guarded = () {
-  resource.ensure(() { 1 + panic("body") }, () { Nil })
-}
+guarded = () { resource.ensure(() { 1 + panic("body") }, () { Nil }) }
 
 @main
 main = () {
-  guarded()
-  Nil
+	guarded()
+	Nil
 }

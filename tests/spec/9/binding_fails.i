@@ -4,12 +4,12 @@
 // at: spec/binding_fails:13:3
 
 first = (r: Result(Int, Int)) {
-  Ok(v) = r
-  v
+	Ok(v) = r
+	v
 }
 
 @main
 main = () {
-  first(Error(7))
-  Nil
+	first(Error(7))
+	Nil
 }

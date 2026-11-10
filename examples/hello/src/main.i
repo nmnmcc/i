@@ -2,11 +2,11 @@
 //// (§9.7), and `i run` gives it, so the program can print: `i run` prints
 //// `Hello from i!`.
 
-import (
+(
 	(Io) = i/io
 )
 
-export (
+(
 	Greeting(..)
 	greet
 	repeat
@@ -18,7 +18,7 @@ Greeting {
 
 /// `text` `times` times, with `sep` between.
 repeat = (text: String, times: Int, sep: String) -> String {
-	case times {
+	times |> {
 		0 -> ""
 		1 -> text
 		_ -> text <> sep <> repeat(text, times - 1, sep)

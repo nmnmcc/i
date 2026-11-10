@@ -1,7 +1,7 @@
 // §4.5 rule 4: service arguments must be equal, even for a Sink whose
 // ordinary parameter goes in the other direction under rule 6.
-Sink(a) {
-	Sink(put: (a) -> Nil)
+Sink(A) {
+	Sink(put: (A) -> Nil)
 }
 
 needs_int = (s ! Sink(Int)) { s.put(1) }
@@ -13,8 +13,8 @@ unsound = () {
 }
 
 // Ordinary invariant arguments must also remain equal (§4.5 rule 6).
-Cell(a) {
-	Cell(run: (a) -> a)
+Cell(A) {
+	Cell(run: (A) -> A)
 }
 
 wrong_cell = (c: Cell(Int)) -> Cell(Never) { c }

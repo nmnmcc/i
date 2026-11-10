@@ -264,7 +264,7 @@ fn unqualified_types_equal_the_actual_builtin_and_prelude_sets() {
         .iter()
         .map(|t| t.name().to_string())
         .collect();
-    let module = ilang_syntax::parse_module_old(include_str!("../../../lib/prelude.i")).0;
+    let module = ilang_syntax::parse_module(include_str!("../../../lib/prelude.i")).0;
     expected.extend(module.items.into_iter().filter_map(|i| {
         if let ast::ItemKind::TypeDef(t) = i.kind {
             Some(t.name.name)
@@ -301,7 +301,10 @@ fn r4_preserves_resolved_owners_and_name_targets() {
     let (mut parsed, _) = ilang_check::parse(&graph);
     let module = parsed.iter().position(|p| p.path == "app/main").unwrap();
     let mut tested = 0;
-    for (path, source) in corpus::corpus() {
+    for (path, source) in corpus::corpus()
+        .into_iter()
+        .chain(corpus::baseline_corpus())
+    {
         let (old, errors) = ilang_syntax::parse_module_old(&source);
         let old = if errors.is_empty() {
             old

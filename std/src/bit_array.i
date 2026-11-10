@@ -4,12 +4,12 @@
 //// that count bytes say so. The `base16` and `base64` functions work on
 //// whole bytes: they first fill the last byte with zero bits.
 
-import (
+(
 	i/core
 	order = (Order, Less, Equal, Greater) = std/order
 )
 
-export (
+(
 	from_string
 	to_string
 	is_utf8
@@ -46,7 +46,7 @@ to_string = (bits: BitArray) -> Result(String, Nil) {
 
 /// `True` when the bits are whole bytes of correct UTF-8.
 is_utf8 = (bits: BitArray) -> Bool {
-	case core.bit_array_to_string(bits) {
+	core.bit_array_to_string(bits) |> {
 		Ok(_)    -> True
 		Error(_) -> False
 	}
@@ -77,9 +77,9 @@ concat = (bit_arrays: List(BitArray)) -> BitArray {
 	core.bit_array_concat(bit_arrays)
 }
 
-reverse = (list: List(a)) -> List(a) {
+reverse(A) = (list: List(A)) -> List(A) {
 	go = (rest, acc) {
-		case rest {
+		rest |> {
 			[]        -> acc
 			[x, ..xs] -> go(xs, [x, ..acc])
 		}
@@ -96,13 +96,13 @@ reverse = (list: List(a)) -> List(a) {
 /// bit_array.slice(<<1, 2, 3, 4>>, at: 3, take: -2)  // Ok(<<2, 3>>)
 /// ```
 slice = (from: BitArray, at: Int, take: Int) -> Result(BitArray, Nil) {
-	(start, length) = case take < 0 {
+	(start, length) = { take < 0 } |> {
 		True  -> (at + take, -take)
 		False -> (at, take)
 	}
-	case start < 0 || { start + length } * 8 > core.bit_size(from) {
+	{ start < 0 || { start + length } * 8 > core.bit_size(from) } |> {
 		True -> Error(Nil)
-		False -> case from {
+		False -> from |> {
 			<<_:bytes(start), part:bytes(length), _:bits>> -> Ok(part)
 			_                                              -> Error(Nil)
 		}
@@ -112,7 +112,7 @@ slice = (from: BitArray, at: Int, take: Int) -> Result(BitArray, Nil) {
 /// `True` when the bit array starts with the bits of `prefix`.
 starts_with = (bits: BitArray, prefix: BitArray) -> Bool {
 	n = core.bit_size(prefix)
-	case bits {
+	bits |> {
 		<<start:bits(n), _:bits>> -> start == prefix
 		_                         -> False
 	}
@@ -120,7 +120,7 @@ starts_with = (bits: BitArray, prefix: BitArray) -> Bool {
 
 /// The bit array with zero bits after it, up to a whole number of bytes.
 pad_to_bytes = (bits: BitArray) -> BitArray {
-	case core.bit_size(bits) % 8 {
+	core.bit_size(bits) % 8 |> {
 		0 -> bits
 		r -> <<bits:bits, 0:u(8 - r)>>
 	}
@@ -136,8 +136,8 @@ pad_to_bytes = (bits: BitArray) -> BitArray {
 /// bit_array.compare(<<4:u8>>, <<4:u5>>)  // Greater
 /// ```
 compare = (a: BitArray, with: BitArray) -> Order {
-	case (a, with) {
-		(<<x, xs:bits>>, <<y, ys:bits>>) -> case x == y {
+	(a, with) |> {
+		(<<x, xs:bits>>, <<y, ys:bits>>) -> { x == y } |> {
 			True  -> compare(xs, ys)
 			False -> int_order(x, y)
 		}
@@ -147,18 +147,18 @@ compare = (a: BitArray, with: BitArray) -> Order {
 		_ -> {
 			m = core.bit_size(a)
 			n = core.bit_size(with)
-			case (a, with) {
-				(<<x:u(m)>>, <<y:u(n)>>) if x != y -> int_order(x, y)
-				_                                  -> int_order(m, n)
+			(a, with) |> {
+				(<<x:u(m)>>, <<y:u(n)>>) ? x != y -> int_order(x, y)
+				_                                 -> int_order(m, n)
 			}
 		}
 	}
 }
 
 int_order = (a: Int, b: Int) -> Order {
-	case a == b {
+	{ a == b } |> {
 		True -> Equal
-		False -> case a < b {
+		False -> { a < b } |> {
 			True  -> Less
 			False -> Greater
 		}
@@ -175,7 +175,7 @@ inspect = (bits: BitArray) -> String { core.inspect(bits) }
 hex_digits = "0123456789ABCDEF"
 
 char_at = (alphabet: String, i: Int) -> String {
-	case core.byte_slice(alphabet, i, 1) {
+	core.byte_slice(alphabet, i, 1) |> {
 		Ok(s)    -> s
 		Error(_) -> ""
 	}
@@ -188,7 +188,7 @@ char_at = (alphabet: String, i: Int) -> String {
 /// ```
 base16_encode = (bits: BitArray) -> String {
 	go = (rest, acc) {
-		case rest {
+		rest |> {
 			<<high:u4, low:u4, more:bits>> -> go(
 				more
 				[char_at(hex_digits, low), char_at(hex_digits, high), ..acc]
@@ -200,11 +200,11 @@ base16_encode = (bits: BitArray) -> String {
 }
 
 hex_value = (byte: Int) -> Int {
-	case byte >= 48 && byte <= 57 {
+	{ byte >= 48 && byte <= 57 } |> {
 		True -> byte - 48
-		False -> case byte >= 65 && byte <= 70 {
+		False -> { byte >= 65 && byte <= 70 } |> {
 			True -> byte - 55
-			False -> case byte >= 97 && byte <= 102 {
+			False -> { byte >= 97 && byte <= 102 } |> {
 				True  -> byte - 87
 				False -> -1
 			}
@@ -220,12 +220,12 @@ hex_value = (byte: Int) -> Int {
 /// ```
 base16_decode = (input: String) -> Result(BitArray, Nil) {
 	go = (rest, acc) {
-		case rest {
+		rest |> {
 			<<>> -> Ok(concat(reverse(acc)))
 			<<a, b, more:bytes>> -> {
 				x = hex_value(a)
 				y = hex_value(b)
-				case x >= 0 && y >= 0 {
+				{ x >= 0 && y >= 0 } |> {
 					True  -> go(more, [<<{ x * 16 + y }>>, ..acc])
 					False -> Error(Nil)
 				}
@@ -241,13 +241,13 @@ standard = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 url_safe = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
 encode64 = (bits: BitArray, alphabet: String, padding: Bool) -> String {
-	pad = case padding {
+	pad = padding |> {
 		True  -> "="
 		False -> ""
 	}
 	c = (i) { char_at(alphabet, i) }
 	go = (rest, acc) {
-		case rest {
+		rest |> {
 			<<a:u6, b:u6, x:u6, d:u6, more:bits>> -> go(
 				more
 				[c(d), c(x), c(b), c(a), ..acc]
@@ -283,15 +283,15 @@ base64_url_encode = (input: BitArray, padding: Bool) -> String {
 // The value of a base 64 character, or -1. `62` and `63` are the characters
 // for 62 and 63 in this alphabet.
 value64 = (byte: Int, c62: Int, c63: Int) -> Int {
-	case byte >= 65 && byte <= 90 {
+	{ byte >= 65 && byte <= 90 } |> {
 		True -> byte - 65
-		False -> case byte >= 97 && byte <= 122 {
+		False -> { byte >= 97 && byte <= 122 } |> {
 			True -> byte - 71
-			False -> case byte >= 48 && byte <= 57 {
+			False -> { byte >= 48 && byte <= 57 } |> {
 				True -> byte + 4
-				False -> case byte == c62 {
+				False -> { byte == c62 } |> {
 					True -> 62
-					False -> case byte == c63 {
+					False -> { byte == c63 } |> {
 						True  -> 63
 						False -> -1
 					}
@@ -305,26 +305,26 @@ decode64 = (input: String, c62: Int, c63: Int) -> Result(BitArray, Nil) {
 	v = (byte) { value64(byte, c62, c63) }
 	ok = (a, b) { a >= 0 && b >= 0 }
 	go = (rest, acc) {
-		case rest {
+		rest |> {
 			<<>> -> Ok(concat(reverse(acc)))
-			<<a, b, c, d, more:bytes>> if c != 61 && d != 61 -> {
+			<<a, b, c, d, more:bytes>> ? c != 61 && d != 61 -> {
 				(w, x, y, z) = (v(a), v(b), v(c), v(d))
-				case ok(w, x) && ok(y, z) {
+				{ ok(w, x) && ok(y, z) } |> {
 					True  -> go(more, [<<w:u6, x:u6, y:u6, z:u6>>, ..acc])
 					False -> Error(Nil)
 				}
 			}
 			// The end, with or without `=`: 3 or 2 characters for 2 or 1 bytes.
-			<<a, b, c>> | <<a, b, c, 61>> if c != 61 -> {
+			<<a, b, c>> | <<a, b, c, 61>> ? c != 61 -> {
 				(w, x, y) = (v(a), v(b), v(c))
-				case ok(w, x) && y >= 0 {
+				{ ok(w, x) && y >= 0 } |> {
 					True  -> go(<<>>, [<<w:u6, x:u6, { y / 4 }:u4>>, ..acc])
 					False -> Error(Nil)
 				}
 			}
 			<<a, b>> | <<a, b, 61, 61>> -> {
 				(w, x) = (v(a), v(b))
-				case ok(w, x) {
+				ok(w, x) |> {
 					True  -> go(<<>>, [<<w:u6, { x / 16 }:u2>>, ..acc])
 					False -> Error(Nil)
 				}

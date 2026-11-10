@@ -1,6 +1,6 @@
 //// The operations that are not written in i (§13).
 
-export (
+(
 	not
 	to_float
 	truncate
@@ -142,8 +142,8 @@ bit_array_concat: (List(BitArray)) -> BitArray
 
 /// The text form of the value (§11.8).
 @external("ilang:core", "inspect")
-inspect: (a) -> String
+inspect(A): (A) -> String
 
 /// A number from 0 to 2^32 - 1; values that are the same give the same number.
 @external("ilang:core", "hash")
-hash: (a) -> Int
+hash(A): (A) -> Int

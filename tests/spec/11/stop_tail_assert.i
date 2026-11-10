@@ -9,6 +9,6 @@ positive = (n: Int) { assert(n > 0) }
 
 @main
 main = () {
-  positive(-1)
-  Nil
+	positive(-1)
+	Nil
 }

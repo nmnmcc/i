@@ -10,21 +10,21 @@ add: (a: Int, b: Int) -> Int
 plus: (a: Int, b: Int) -> Int
 
 check = (c: Bool, what: String) {
-  case c {
-    True -> Nil
-    False -> panic(what)
-  }
+	c |> {
+		True  -> Nil
+		False -> panic(what)
+	}
 }
 
 same = (f: (Int, Int) -> Int, g: (Int, Int) -> Int) { f == g }
 
 @test
 declarations_are_values = () {
-  check(add == add, "add is add")
-  check(same(add, add), "add is add as a value")
-  check(same(add, plus) == False, "add is not plus")
-  check(add != plus, "add is not plus with !=")
-  check(add(1, 2) == plus(1, 2), "both call the import")
-  f = plus
-  check(same(f, plus), "plus is plus")
+	check(add == add, "add is add")
+	check(same(add, add), "add is add as a value")
+	check(same(add, plus) == False, "add is not plus")
+	check(add != plus, "add is not plus with !=")
+	check(add(1, 2) == plus(1, 2), "both call the import")
+	f = plus
+	check(same(f, plus), "plus is plus")
 }

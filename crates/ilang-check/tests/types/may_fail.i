@@ -1,81 +1,105 @@
 // §7.3 with rules 4 and 10: a binding or a parameter needs `Assert` exactly
 // when its pattern may fail for the type of its value.
-User { User(name: String, age: Int) }
+User {
+	User(name: String, age: Int)
+}
 
 // Bindings.
 pair = (t) {
-  (a, b) = t
-  a
+	(a, b) = t
+	a
 }
+
 pair_written = (t: (Int, String)) {
-  (a, b) = t
-  b
+	(a, b) = t
+	b
 }
+
 first = (r) {
-  Ok(v) = r
-  v
+	Ok(v) = r
+	v
 }
+
 annotated = () {
-  x: Int = 5
-  x
+	x: Int = 5
+	x
 }
+
 literal = (n) {
-  1 = n
-  n
+	1 = n
+	n
 }
+
 single = (u: User) {
-  User(name, ..) = u
-  name
+	User(name, ..) = u
+	name
 }
+
 // `Error(Never)` has no values, so `Ok(v)` matches every value.
 only_ok = (r: Result(Int, Never)) {
-  Ok(v) = r
-  v
+	Ok(v) = r
+	v
 }
+
 nested = (p: (Result(Int, Never), Bool)) {
-  (Ok(x), b) = p
-  x
+	(Ok(x), b) = p
+	x
 }
+
 from_value = () {
-  Ok(v) = Ok(1)
-  v
+	Ok(v) = Ok(1)
+	v
 }
+
 list = (xs) {
-  [x, ..] = xs
-  x
+	[x, ..] = xs
+	x
 }
+
 list_rest = (xs) {
-  [..rest] = xs
-  rest
+	[..rest] = xs
+	rest
 }
+
 prefix = (s) {
-  "" <> rest = s
-  rest
+	"" <> rest = s
+	rest
 }
+
 prefix_some = (s) {
-  "a" <> rest = s
-  rest
+	"a" <> rest = s
+	rest
 }
+
 named = (r) {
-  whole = Ok(_) = r
-  whole
+	whole = Ok(_) = r
+	whole
 }
+
 typed_part = (p) {
-  (x: Int, y) = p
-  y
+	(x: Int, y) = p
+	y
 }
+
 bits = (b) {
-  <<x>> = b
-  x
+	<<x>> = b
+	x
 }
+
 float = (f) {
-  1.0 = f
-  f
+	1.0 = f
+	f
 }
+
 // Parameters.
-type_var = (x: a) -> a { x }
+type_var(A) = (x: A) -> A { x }
+
 param_tuple = ((a, b)) { a }
+
 param_user = (User(name, ..)) { name }
+
 param_ctor = (Ok(v)) { v }
+
 param_literal = (0) { 1 }
+
 param_list = ([]) { 1 }

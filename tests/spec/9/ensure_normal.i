@@ -1,7 +1,9 @@
 // spec: 9.5, 11.7
 // expect: stop "panic: final"
 // at: spec/ensure_normal:6:14
-import (i/resource)
+(
+	i/resource
+)
 
 final = () { panic("final") }
 
@@ -9,6 +11,4 @@ final = () { panic("final") }
 // in tail position, so it counts as a tail call: its position is gone
 // (§11.7).
 @main
-main = () {
-  resource.ensure(() { 1 }, final)
-}
+main = () { resource.ensure(() { 1 }, final) }

@@ -1,4 +1,4 @@
-import (
+(
 	i/core
 	set = std/set
 	int = std/int
@@ -247,7 +247,7 @@ symmetric_difference_test = () {
 @test
 each_test = () {
 	assert([1, 2, 3] |> set.from_list |> set.each((member) {
-		case member {
+		member |> {
 			1 | 2 | 3 -> Nil
 			_         -> panic("unexpected value")
 		}

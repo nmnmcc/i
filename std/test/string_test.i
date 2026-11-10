@@ -1,4 +1,4 @@
-import (
+(
 	i/core
 	dict = std/dict
 	result = std/result
@@ -1124,10 +1124,10 @@ capitalise_unicode_test = () {
 	Nil
 }
 
-InspectType(a, b) {
+InspectType(A, B) {
 	InspectTypeZero
-	InspectTypeOne(a)
-	InspectTypeTwo(a, b)
+	InspectTypeOne(A)
+	InspectTypeTwo(A, B)
 }
 
 @test

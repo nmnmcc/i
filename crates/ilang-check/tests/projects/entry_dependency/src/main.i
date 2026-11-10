@@ -1,4 +1,6 @@
-import (u/x)
+(
+	u/x
+)
 
 @main
 main = () { x.main(1) }

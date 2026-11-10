@@ -5,15 +5,17 @@
 
 // A value from the host that is not correct stops the program.
 @host("test:bad/v1")
-Bad { Bad(nan: () -> Float) }
+Bad {
+	Bad(nan: () -> Float)
+}
 
 half = (bad ! Bad) {
-  x = bad.nan()
-  x /. 2.0
+	x = bad.nan()
+	x /. 2.0
 }
 
 @main
 main = () {
-  half()
-  Nil
+	half()
+	Nil
 }

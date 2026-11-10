@@ -1,6 +1,6 @@
 //// Errors (§9.3).
 
-export (
+(
 	raise
 	catch
 	from_result
@@ -9,23 +9,26 @@ export (
 
 /// Ends the computation with `error`.
 @external("ilang:fail", "raise")
-raise: (error: e) -> Never ? e
+raise(E): (error: E) -> Never ? E
 
 /// Changes every error into `Error(…)`.
 @external("ilang:fail", "catch")
-catch: (body: () -> a ? e ! n) -> Result(a, e) ! n
+catch(A, E, N): (body: () -> A ? E ! N) -> Result(A, E) ! N
 
 /// Gives the error `x` for `Error(x)`.
-from_result = (result: Result(a, e)) -> a ? e {
-	case result {
+from_result(A, E) = (result: Result(A, E)) -> A ? E {
+	result |> {
 		Ok(value)    -> value
 		Error(error) -> raise(error)
 	}
 }
 
 /// Changes the errors.
-map_error = (body: () -> a ? e ! n, with: (e) -> e2 ! n) -> a ? e2 ! n {
-	case catch(body) {
+map_error(A, E, N, E2) = (
+	body: () -> A ? E ! N
+	with: (E) -> E2 ! N
+) -> A ? E2 ! N {
+	catch(body) |> {
 		Ok(value)    -> value
 		Error(error) -> raise(with(error))
 	}

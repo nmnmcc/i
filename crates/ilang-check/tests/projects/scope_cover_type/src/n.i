@@ -1,22 +1,25 @@
-import ((S) = app/m)
+(
+	(S) = app/m
+)
 
 // A local name covers a module name (§2.3), in types too.
 f = (m: Int) {
-  y: m.T = m
-  y
+	y: m.T = m
+	y
 }
 
 g = (m) {
-  ! m.S = S(get: () { 1 })
-  h = (s ! m.S) { 1 }
-  h
+	! m.S = S(get: () { 1 })
+	h = (s ! m.S) { 1 }
+	h
 }
 
 // Not covered before the local is bound: the module.
 ok: m.T = 1
+
 ok_fn = (x: m.T) {
-  y: m.T = x
-  m = 1
-  z: m.T = m
-  z
+	y: m.T = x
+	m = 1
+	z: m.T = m
+	z
 }

@@ -5,12 +5,12 @@
 //// `remainder`, `modulo`, and `floor_divide` give `Error(Nil)` for `0`
 //// instead.
 
-import (
+(
 	i/core
 	order = (Order, Less, Equal, Greater) = std/order
 )
 
-export (
+(
 	to_string
 	parse
 	parse_base
@@ -75,10 +75,10 @@ parse = (text: String) -> Result(Int, Nil) { parse_base(text, 10) }
 /// int.parse_base("ff", 16)  // Ok(255)
 /// ```
 parse_base = (text: String, base: Int) -> Result(Int, Nil) {
-	case base >= 2 && base <= 36 {
+	{ base >= 2 && base <= 36 } |> {
 		False -> Error(Nil)
-		True -> case <<text:utf8>> {
-			<<45, rest:bytes>> -> case parse_digits(rest, base, 0, False) {
+		True -> <<text:utf8>> |> {
+			<<45, rest:bytes>> -> parse_digits(rest, base, 0, False) |> {
 				Ok(n)    -> Ok(-n)
 				Error(e) -> Error(e)
 			}
@@ -94,14 +94,14 @@ parse_digits = (
 	acc: Int
 	seen: Bool
 ) -> Result(Int, Nil) {
-	case bytes {
-		<<>> -> case seen {
+	bytes |> {
+		<<>> -> seen |> {
 			True  -> Ok(acc)
 			False -> Error(Nil)
 		}
 		<<byte, rest:bytes>> -> {
 			d = digit_value(byte)
-			case d >= 0 && d < base {
+			{ d >= 0 && d < base } |> {
 				True  -> parse_digits(rest, base, acc * base + d, True)
 				False -> Error(Nil)
 			}
@@ -112,11 +112,11 @@ parse_digits = (
 
 // The value of one ASCII digit or letter, or -1.
 digit_value = (byte: Int) -> Int {
-	case byte >= 48 && byte <= 57 {
+	{ byte >= 48 && byte <= 57 } |> {
 		True -> byte - 48
-		False -> case byte >= 97 && byte <= 122 {
+		False -> { byte >= 97 && byte <= 122 } |> {
 			True -> byte - 87
-			False -> case byte >= 65 && byte <= 90 {
+			False -> { byte >= 65 && byte <= 90 } |> {
 				True  -> byte - 55
 				False -> -1
 			}
@@ -132,23 +132,23 @@ digit_value = (byte: Int) -> Int {
 /// int.to_base(-5, 2)    // Ok("-101")
 /// ```
 to_base = (x: Int, base: Int) -> Result(String, Nil) {
-	case base >= 2 && base <= 36 {
+	{ base >= 2 && base <= 36 } |> {
 		False -> Error(Nil)
 		True  -> Ok(base_string(x, base))
 	}
 }
 
 base_string = (x: Int, base: Int) -> String {
-	case x {
+	x |> {
 		0 -> "0"
 		_ -> {
 			go = (n, acc) {
-				case n {
+				n |> {
 					0 -> acc
 					_ -> go(n / base, [digit_char(n % base), ..acc])
 				}
 			}
-			case x < 0 {
+			{ x < 0 } |> {
 				True  -> core.concat(["-", ..go(-x, [])])
 				False -> core.concat(go(x, []))
 			}
@@ -157,7 +157,7 @@ base_string = (x: Int, base: Int) -> String {
 }
 
 digit_char = (d: Int) -> String {
-	case core.byte_slice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", d, 1) {
+	core.byte_slice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", d, 1) |> {
 		Ok(s)    -> s
 		Error(_) -> "?"
 	}
@@ -180,7 +180,7 @@ to_float = (x: Int) -> Float { core.to_float(x) }
 
 /// The number without its sign.
 abs = (x: Int) -> Int {
-	case x < 0 {
+	{ x < 0 } |> {
 		True  -> -x
 		False -> x
 	}
@@ -191,7 +191,7 @@ negate = (x: Int) -> Int { -x }
 
 /// The smaller of two numbers.
 min = (a: Int, b: Int) -> Int {
-	case a < b {
+	{ a < b } |> {
 		True  -> a
 		False -> b
 	}
@@ -199,7 +199,7 @@ min = (a: Int, b: Int) -> Int {
 
 /// The greater of two numbers.
 max = (a: Int, b: Int) -> Int {
-	case a > b {
+	{ a > b } |> {
 		True  -> a
 		False -> b
 	}
@@ -212,13 +212,13 @@ max = (a: Int, b: Int) -> Int {
 /// int.clamp(40, min: 50, max: 60)  // 50
 /// ```
 clamp = (x: Int, min: Int, max: Int) -> Int {
-	(low, high) = case min <= max {
+	(low, high) = { min <= max } |> {
 		True  -> (min, max)
 		False -> (max, min)
 	}
-	case x < low {
+	{ x < low } |> {
 		True -> low
-		False -> case x > high {
+		False -> { x > high } |> {
 			True  -> high
 			False -> x
 		}
@@ -231,9 +231,9 @@ clamp = (x: Int, min: Int, max: Int) -> Int {
 /// int.compare(1, 2)  // Less
 /// ```
 compare = (a: Int, with: Int) -> Order {
-	case a == with {
+	{ a == with } |> {
 		True -> Equal
-		False -> case a < with {
+		False -> { a < with } |> {
 			True  -> Less
 			False -> Greater
 		}
@@ -253,17 +253,17 @@ is_odd = (x: Int) -> Bool { x % 2 != 0 }
 /// int.power(2, of: 10)  // Ok(1024)
 /// ```
 power = (base: Int, of: Int) -> Result(Int, Nil) {
-	case of < 0 {
+	{ of < 0 } |> {
 		True  -> Error(Nil)
 		False -> Ok(int_power(base, of, 1))
 	}
 }
 
 int_power = (base: Int, exponent: Int, acc: Int) -> Int {
-	case exponent {
+	exponent |> {
 		0 -> acc
 		_ -> {
-			next = case exponent % 2 {
+			next = exponent % 2 |> {
 				0 -> acc
 				_ -> acc * base
 			}
@@ -278,7 +278,7 @@ int_power = (base: Int, exponent: Int, acc: Int) -> Int {
 /// int.square_root(16)  // Ok(4.0)
 /// ```
 square_root = (x: Int) -> Result(Float, Nil) {
-	case x < 0 {
+	{ x < 0 } |> {
 		True  -> Error(Nil)
 		False -> Ok(core.sqrt(core.to_float(x)))
 	}
@@ -287,7 +287,7 @@ square_root = (x: Int) -> Result(Float, Nil) {
 /// The sum of the numbers. The sum of no numbers is `0`.
 sum = (numbers: List(Int)) -> Int {
 	go = (rest, acc) {
-		case rest {
+		rest |> {
 			[]        -> acc
 			[x, ..xs] -> go(xs, acc + x)
 		}
@@ -298,7 +298,7 @@ sum = (numbers: List(Int)) -> Int {
 /// The product of the numbers. The product of no numbers is `1`.
 product = (numbers: List(Int)) -> Int {
 	go = (rest, acc) {
-		case rest {
+		rest |> {
 			[]        -> acc
 			[x, ..xs] -> go(xs, acc * x)
 		}
@@ -313,11 +313,11 @@ product = (numbers: List(Int)) -> Int {
 /// int.digits(234, 10)  // Ok([2, 3, 4])
 /// ```
 digits = (x: Int, base: Int) -> Result(List(Int), Nil) {
-	case base < 2 {
+	{ base < 2 } |> {
 		True -> Error(Nil)
 		False -> {
 			go = (n, acc) {
-				case n < base {
+				{ n < base } |> {
 					True  -> [n, ..acc]
 					False -> go(n / base, [n % base, ..acc])
 				}
@@ -335,13 +335,13 @@ digits = (x: Int, base: Int) -> Result(List(Int), Nil) {
 /// int.undigits([2, 3, 4], 10)  // Ok(234)
 /// ```
 undigits = (numbers: List(Int), base: Int) -> Result(Int, Nil) {
-	case base < 2 {
+	{ base < 2 } |> {
 		True -> Error(Nil)
 		False -> {
 			go = (rest, acc) {
-				case rest {
+				rest |> {
 					[] -> Ok(acc)
-					[d, ..ds] -> case d >= 0 && d < base {
+					[d, ..ds] -> { d >= 0 && d < base } |> {
 						True  -> go(ds, acc * base + d)
 						False -> Error(Nil)
 					}
@@ -354,7 +354,7 @@ undigits = (numbers: List(Int), base: Int) -> Result(Int, Nil) {
 
 /// `a / by`, rounded toward zero, or `Error(Nil)` when `by` is `0`.
 divide = (a: Int, by: Int) -> Result(Int, Nil) {
-	case by {
+	by |> {
 		0 -> Error(Nil)
 		_ -> Ok(a / by)
 	}
@@ -367,7 +367,7 @@ divide = (a: Int, by: Int) -> Result(Int, Nil) {
 /// int.remainder(-13, by: 3)  // Ok(-1)
 /// ```
 remainder = (a: Int, by: Int) -> Result(Int, Nil) {
-	case by {
+	by |> {
 		0 -> Error(Nil)
 		_ -> Ok(a % by)
 	}
@@ -380,11 +380,11 @@ remainder = (a: Int, by: Int) -> Result(Int, Nil) {
 /// int.modulo(-13, by: 3)  // Ok(2)
 /// ```
 modulo = (a: Int, by: Int) -> Result(Int, Nil) {
-	case by {
+	by |> {
 		0 -> Error(Nil)
 		_ -> {
 			r = a % by
-			case r != 0 && { r < 0 } != { by < 0 } {
+			{ r != 0 && { r < 0 } != { by < 0 } } |> {
 				True  -> Ok(r + by)
 				False -> Ok(r)
 			}
@@ -398,11 +398,11 @@ modulo = (a: Int, by: Int) -> Result(Int, Nil) {
 /// int.floor_divide(-7, by: 2)  // Ok(-4)
 /// ```
 floor_divide = (a: Int, by: Int) -> Result(Int, Nil) {
-	case by {
+	by |> {
 		0 -> Error(Nil)
 		_ -> {
 			q = a / by
-			case a % by != 0 && { a < 0 } != { by < 0 } {
+			{ a % by != 0 && { a < 0 } != { by < 0 } } |> {
 				True  -> Ok(q - 1)
 				False -> Ok(q)
 			}
@@ -443,18 +443,18 @@ bitwise_shift_right = (x: Int, y: Int) -> Int { core.shift_right(x, y) }
 /// ```i
 /// int.range(from: 0, to: 3, with: [], run: (acc, i) { [i, ..acc] })  // [2, 1, 0]
 /// ```
-range = (
+range(Acc, E, N) = (
 	from: Int
 	to: Int
-	with: acc
-	run: (acc, Int) -> acc ? e ! n
-) -> acc ? e ! n {
-	step = case from <= to {
+	with: Acc
+	run: (Acc, Int) -> Acc ? E ! N
+) -> Acc ? E ! N {
+	step = { from <= to } |> {
 		True  -> 1
 		False -> -1
 	}
 	go = (i, acc) {
-		case i == to {
+		{ i == to } |> {
 			True  -> acc
 			False -> go(i + step, run(acc, i))
 		}

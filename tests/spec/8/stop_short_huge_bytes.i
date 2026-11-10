@@ -8,12 +8,12 @@
 id = (n: Int) { n }
 
 make = (b: BitArray) {
-  x = <<b:bytes(id(1152921504606846976))>>
-  x
+	x = <<b:bytes(id(1152921504606846976))>>
+	x
 }
 
 @main
 main = () {
-  make(<<1>>)
-  Nil
+	make(<<1>>)
+	Nil
 }

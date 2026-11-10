@@ -4,12 +4,12 @@
 // at: spec/assert_main:13:3
 
 positive = (n) {
-  assert(n > 0)
-  n
+	assert(n > 0)
+	n
 }
 
 @main
 main = () {
-  positive(0)
-  Nil
+	positive(0)
+	Nil
 }

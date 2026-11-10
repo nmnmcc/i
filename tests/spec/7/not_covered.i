@@ -1,10 +1,14 @@
 // spec: 7.4
 // expect: compile-error E0516
 
-Color { Red Green }
+Color {
+	Red
+	Green
+}
 
 name = (c: Color) {
-  case c {
-    Red -> "red"
-   Green if False -> "green" }
+	c |> {
+		Red           -> "red"
+		Green ? False -> "green"
+	}
 }

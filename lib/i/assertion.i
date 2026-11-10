@@ -1,10 +1,10 @@
 //// Taking `Assert` failures (§9.6).
 
-import (
+(
 	i/control
 )
 
-export (
+(
 	catch
 )
 
