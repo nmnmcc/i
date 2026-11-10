@@ -1043,3 +1043,31 @@ fn scoped_virtual_source_uses_utf8_byte_boundaries() {
     );
     assert_eq!(source.origin(span).unwrap().syntax.show(), "\"你好\"");
 }
+
+#[test]
+fn lisp_source_definition_answers_keep_parameter_scope() {
+    use ilang_syntax::lisp::definitions::source_definition;
+    use ilang_syntax::lisp::syntax::Node;
+    let source = "((Pair A B) {(Pair (: left A) (: right B))})";
+    let (module, errors) = ilang_syntax::lisp::parse_source(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let like = root("x");
+    let answer = source_definition(&module.items[0], source, like.scope(), 27);
+    let Node::Round(parts) = answer.node() else {
+        panic!("item")
+    };
+    let Node::Round(head) = parts[0].node() else {
+        panic!("head")
+    };
+    let Node::Curly(body) = parts[1].node() else {
+        panic!("body")
+    };
+    let Node::Round(constructor) = body[0].node() else {
+        panic!("constructor")
+    };
+    let Node::Round(field) = constructor[1].node() else {
+        panic!("field")
+    };
+    assert_eq!(head[1].scope_identity(), field[2].scope_identity());
+    assert!(head[1].scope_identity().is_some());
+}

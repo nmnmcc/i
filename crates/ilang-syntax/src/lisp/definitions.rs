@@ -60,6 +60,16 @@ pub fn source_definition(
     let ItemKind::TypeDef(def) = &item.kind else {
         panic!("definition query requires a type definition")
     };
+    if source[item.span.start as usize..item.span.end as usize].starts_with('(') {
+        let document = super::parse(source).expect("a parsed Lisp source remains valid");
+        let datum = document
+            .iter()
+            .find(|datum| datum.span == item.span)
+            .expect("a Lisp source item has its original datum");
+        return expanded_definition(&Syntax::from_datum(datum, scope), answer)
+            .expect("a parsed type definition has valid syntax");
+    }
+
     let parameters: HashMap<_, _> = def
         .params
         .iter()
@@ -317,6 +327,7 @@ pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
             Node::Square(xs) => s.with_node(Node::Square(
                 xs.iter().map(|x| ty(x, binders, answer)).collect(),
             )),
+            Node::Curly(xs) if xs.len() == 1 => ty(&xs[0], binders, answer),
             Node::Curly(xs) => s.with_node(Node::Curly(
                 xs.iter().map(|x| ty(x, binders, answer)).collect(),
             )),
