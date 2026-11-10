@@ -1161,3 +1161,11 @@ both reporting the same E0522. Those observations were updated on that basis.
 The remaining six showed the same order-only change; after updating those
 observations, the entire 38-case review-r2 run passed, with the intentionally
 divergent case retained as one censored observation.
+
+After UNUSED was merged, W0504 identified the dead `need` helper and the two
+private entry wrappers called by compiler-generated code. The dead helper was
+removed; the compiler-owned wrappers use the ordinary `_` exemption and the
+lowerer calls those renamed definitions. No warning rule is specialized for a
+library. The 8 runtime tests, all 78 section 9.9 cases at O0/O2, and all 38
+review-r2 observations passed after this change. ABI fixtures regenerated with
+no diff; the library type inventory was regenerated for the renamed wrappers.
