@@ -202,8 +202,7 @@ fn invoke(name: &str, args: &[Value]) -> Result<Value> {
             get::<DefinitionResult>(result)?
                 .0
                 .as_ref()
-                .err()
-                .expect("definition result is not an error")
+                .expect_err("definition result is not an error")
                 .0
                 .clone(),
         )),
@@ -211,8 +210,7 @@ fn invoke(name: &str, args: &[Value]) -> Result<Value> {
             get::<DefinitionResult>(result)?
                 .0
                 .as_ref()
-                .err()
-                .expect("definition result is not an error")
+                .expect_err("definition result is not an error")
                 .1
                 .clone(),
         )),

@@ -1005,3 +1005,22 @@ fn scoped_conversion_reports_the_actual_scoped_bad_node() {
     assert_eq!(error.origin.syntax.show(), "(,)");
     assert!(error.origin.call_site.same_code(&call));
 }
+
+#[test]
+fn definition_errors_retain_the_exact_name_node_and_scope() {
+    use ilang_syntax::lisp::definition_schedule::Mode;
+    use ilang_syntax::lisp::definition_table::{DefinitionTable, Lookup, QueryResult};
+    use ilang_syntax::lisp::syntax::{Node, Syntax};
+    let module = root("mod");
+    let name = root("Hidden").flip_mark(31);
+    let dot = root(".");
+    let query = Syntax::make(Node::Round(vec![dot, module, name.clone()]), &name).unwrap();
+    let table: DefinitionTable<u32> = DefinitionTable::default();
+    let QueryResult::Error(error) =
+        table.query(&query, Mode::Normal, 1, |_, _| Lookup::ConstructorsHidden)
+    else {
+        panic!("expected catchable error")
+    };
+    assert!(error.at.identical(&name));
+    assert_eq!(error.at.scope(), name.scope());
+}
