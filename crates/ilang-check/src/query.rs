@@ -670,7 +670,7 @@ impl<'a> Query<'a> {
     /// a module, the exported members of `m`. After `v.`, the fields of the
     /// known type of `v` (§4.8, §6.7). Else the local names in scope, the
     /// top-level names and types of the module, the imported names, the
-    /// built-in names, and the keywords.
+    /// built-in names.
     pub fn completions_at(&self, m: ModuleId, offset: u32) -> Vec<Completion> {
         let text = self.text(m);
         let bytes = text.as_bytes();
@@ -967,13 +967,6 @@ impl<'a> Query<'a> {
         }
         for b in BuiltinType::ALL {
             out.push(self.type_completion(TypeRef::Builtin(b)));
-        }
-        for k in ["case", "if", "import", "export"] {
-            out.push(Completion {
-                label: k.to_string(),
-                kind: CompletionKind::Keyword,
-                detail: None,
-            });
         }
         // A name covers the names after it with the same name and kind.
         let mut seen = HashSet::new();

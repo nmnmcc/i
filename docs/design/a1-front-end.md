@@ -584,6 +584,26 @@ Source at old tags (the `syntax.md` A3 note of that name). A published version i
 - `i publish`: in `earlier_interface` (`crates/ilang-cli/src/commands/package.rs`), when the source of the newest earlier tag has errors and every file with an error has `old_syntax_marks`, `i publish` prints "the interface of `<tag>` is in the syntax from before <the A3 version of i> and cannot be compared; check the interface by hand", and goes on as when that tag has no package ("nothing to compare with"), so `compare_with` is not run and no new major version is asked for (§2.7). When some file with an error has no marks, the error is reported as today.
 - Two tests in `crates/ilang-cli/tests/package_commands.rs`: `i publish` against an earlier tag in the old syntax expects the message and a published patch version; `i build` with a dependency at such a tag expects the parse errors and the note. Their old-syntax sources are written in the test as plain strings, since A3 has no old reader.
 
+### A3 corrections from the coordinator
+
+The spec wins over the old-form error requirement in the plan: §1.4 says
+"any `name` may be used as a name", and §2.2 reads top-level calls in full as
+forms kept for macros. An old spelling that is also valid new syntax keeps
+that grammar. An unambiguous old form gets a parse error with a migration
+hint; an overlapping call gets a hint on its ordinary compile error. The
+four former words have no parser exception. Lowercase names in types are
+read as value-type forms and get E0237 until T2, as §3 requires.
+
+The repository tool is `scripts/old-syntax-check`. It parses every extracted
+snippet. Deliberately invalid fixtures document their expected diagnostic
+codes beside the source; the tool's data records and checks the exact ordered
+codes and messages. Accepted examples of later syntax stay in the design
+notes. Their data entries name the owning track and the current diagnostic;
+the check fails when an entry starts to parse or its diagnostic changes, so
+that its owner must remove it when that syntax lands. This corrects
+the plan's unconditional "all must parse" requirement, which cannot apply to
+negative parser fixtures or accepted later-track examples.
+
 ## 10. Corrections to the `syntax.md` notes (committed at S4)
 
 - A match is `Case { syntax: New }`, built by the parser (D5).

@@ -255,11 +255,11 @@ fn an_editor_session() {
         .iter()
         .map(|i| i["label"].as_str().unwrap())
         .collect();
-    for name in [
-        "x", "y", "add", "greet", "util", "User", "Int", "panic", "case",
-    ] {
+    for name in ["x", "y", "add", "greet", "util", "User", "Int", "panic"] {
         assert!(labels.contains(&name), "{name} in {labels:?}");
     }
+
+    assert!(!labels.contains(&"case"));
 
     // A change with an error: the problem is published, with its code.
     let broken = MAIN.replace("x + y", "x + z");

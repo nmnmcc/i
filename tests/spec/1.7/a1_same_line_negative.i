@@ -1,3 +1,4 @@
+// old-syntax-check: E0101
 // spec: 1.7
 // expect: compile-error E0101
 (main)

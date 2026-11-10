@@ -91,18 +91,6 @@ enum Command {
         /// Write nothing; list the files that would change, and fail if any.
         #[arg(long)]
         check: bool,
-        /// Read the old grammar and check the migration before writing.
-        #[arg(long)]
-        from_old: bool,
-        /// Migrate tokens while preserving bytes outside the edits.
-        #[arg(long, conflicts_with = "from_old")]
-        keep_layout: bool,
-        /// Print migration entries on standard error.
-        #[arg(long)]
-        report: bool,
-        /// Keep choices together in parser-only fixtures.
-        #[arg(long)]
-        no_choices_split: bool,
         /// Files or directories to format instead.
         paths: Vec<PathBuf>,
     },
@@ -141,22 +129,8 @@ fn main() -> ExitCode {
         Command::Fmt {
             project,
             check,
-            from_old,
-            keep_layout,
-            report,
-            no_choices_split,
             paths,
-        } => commands::fmt::run(
-            &project,
-            check,
-            &paths,
-            commands::fmt::Options {
-                from_old,
-                keep_layout,
-                report,
-                choices_split: !no_choices_split,
-            },
-        ),
+        } => commands::fmt::run(&project, check, &paths),
     };
     match result {
         Ok(code) => code,
@@ -361,17 +335,7 @@ fn check(project: &Path, offline: bool, types: bool) -> ExitCode {
             }
         }
     }
-    for diagnostic in &mut diags {
-        if diagnostic.is_error()
-            && diagnostic.code.starts_with("E01")
-            && let Some(source) = diagnostic.source
-            && let Some(hint) = ilang_syntax::old_syntax_hint(&graph.sources.get(source).text)
-        {
-            diagnostic.message.push_str("; ");
-            diagnostic.message.push_str(hint);
-        }
-    }
-    for line in graph.sources.render_all(&diags) {
+    for line in ilang_cli::diagnostic_lines(&graph, &diags) {
         eprintln!("{line}");
     }
     let errors = diags.iter().filter(|d| d.is_error()).count();

@@ -21,12 +21,10 @@
 
 use crate::ast::*;
 use crate::lexer::{Comment, lex};
-use crate::migrate::{self, Env, Plan};
 use crate::print::{is_match, level, type_prec};
 use crate::span::Span;
 use crate::token::{Token, TokenKind as T};
-use crate::{Code, Diagnostic, old_syntax_hint, parse_module, parse_module_old};
-use std::collections::HashSet;
+use crate::{Diagnostic, parse_module};
 
 /// The width that the layout tries to keep to.
 pub const WIDTH: usize = 80;
@@ -34,71 +32,16 @@ pub const WIDTH: usize = 80;
 /// The columns that a tab counts for when lines are measured.
 pub const TAB_WIDTH: usize = 4;
 
-/// Formats a source file. A file with syntax errors is not formatted; its
-/// errors are given back. Each node keeps the syntax it is written in.
-///
-/// Until stream A3, the parser reads the old and the new syntax. A file that
-/// the old syntax reads in another way, with no error, is not formatted: a
-/// lowercase name before a `(` on its line in a type is a `TypeCall` in the
-/// new syntax, but may end an old item before a binding that starts with
-/// `(`.
+/// Formats a source file. Syntax errors leave the source untouched.
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
-    format_migration(source, false, "module", true).map(|(out, _)| out)
-}
-
-pub fn format_from_old(source: &str) -> Result<String, Vec<Diagnostic>> {
-    format_migration(source, true, "module", true).map(|(out, _)| out)
-}
-
-/// Formats with the same pure plan used by the byte splicer and the tree
-/// transform. Only --from-old needs the write check on this path.
-pub fn format_migration(
-    source: &str,
-    from_old: bool,
-    module_name: &str,
-    choices_split: bool,
-) -> Result<(String, Plan), Vec<Diagnostic>> {
-    let module = parse_for_format(source, from_old)?;
-    let mut env = Env::new(&module);
-    env.module = module_name.into();
-    env.choices_split = choices_split;
-    let plan = migrate::plan(&module, &env);
-    if let Some(refused) = &plan.refused {
-        return Err(vec![migrate::refused_diagnostic(refused)]);
-    }
-    let out = format_planned(source, &module, &plan);
-    if from_old {
-        migrate::check_written(&module, &plan, &out)?;
-    }
-    Ok((out, plan))
-}
-
-fn parse_for_format(source: &str, from_old: bool) -> Result<Module, Vec<Diagnostic>> {
-    let (module, mut diags) = if from_old {
-        parse_module_old(source)
-    } else {
-        parse_module(source)
-    };
+    let (module, diags) = parse_module(source);
     if !diags.is_empty() {
-        if let Some(hint) = old_syntax_hint(source) {
-            for d in &mut diags {
-                d.message.push_str("; ");
-                d.message.push_str(hint);
-            }
-        }
         return Err(diags);
     }
-    if !from_old && let Some(span) = lower_type_call(&module) {
-        let (old, old_diags) = parse_module_old(source);
-        if old_diags.is_empty() && crate::shape::shape(&old) != crate::shape::shape(&module) {
-            let msg = "this file reads differently in the old syntax; run `i fmt --from-old`";
-            return Err(vec![Diagnostic::new(Code::DualAmbiguous, span, msg)]);
-        }
-    }
-    Ok(module)
+    Ok(format_module(source, &module))
 }
 
-pub(crate) fn format_planned(source: &str, module: &Module, plan: &Plan) -> String {
+fn format_module(source: &str, module: &Module) -> String {
     let lexed = lex(source);
     let mut f = Formatter {
         src: source,
@@ -109,187 +52,12 @@ pub(crate) fn format_planned(source: &str, module: &Module, plan: &Plan) -> Stri
         hard: 0,
         one_line: false,
         fn_next: false,
-        plan,
-        expanding: HashSet::new(),
-        printing_function: HashSet::new(),
     };
     let doc = f.module(module);
     debug_assert_eq!(f.next, f.comments.len(), "every comment is printed");
     render(&doc, WIDTH)
 }
 
-/// The span of the first `TypeCall` in `module` with a lowercase name and
-/// no module name.
-fn lower_type_call(module: &Module) -> Option<Span> {
-    let mut found = None;
-    for item in &module.items {
-        match &item.kind {
-            ItemKind::TypeDef(def) => {
-                def.head.iter().for_each(|t| find_ty(t, &mut found));
-                match &def.body {
-                    TypeBody::Alias(t) => find_ty(t, &mut found),
-                    TypeBody::Custom(cs) => cs
-                        .iter()
-                        .flat_map(|c| &c.fields)
-                        .for_each(|f| find_ty(&f.ty, &mut found)),
-                }
-            }
-            ItemKind::Binding(b) => {
-                find_pat(&b.pattern, &mut found);
-                find_expr(&b.value, &mut found);
-            }
-            ItemKind::Declaration { ty, .. } => find_ty(ty, &mut found),
-            ItemKind::MacroItem { args, .. } => {
-                args.iter().for_each(|a| find_expr(&a.value, &mut found))
-            }
-        }
-        for a in &item.attributes {
-            if let Some((args, _)) = &a.call {
-                args.iter().for_each(|a| find_expr(&a.value, &mut found));
-            }
-        }
-    }
-    found
-}
-
-fn find_ty(t: &TypeExpr, found: &mut Option<Span>) {
-    match &t.kind {
-        TypeKind::Call { module, args, .. } => {
-            if module.is_none() && found.is_none() {
-                *found = Some(t.span);
-            }
-            for a in args {
-                if let TypeArg::Type(t) = a {
-                    find_ty(t, found);
-                }
-            }
-        }
-        TypeKind::Named { args, .. } => args.iter().for_each(|a| find_ty(a, found)),
-        TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
-            ts.iter().for_each(|a| find_ty(a, found))
-        }
-        TypeKind::Fn {
-            params,
-            ret,
-            err,
-            env,
-        } => {
-            params.iter().for_each(|p| find_ty(&p.ty, found));
-            find_ty(ret, found);
-            err.iter().chain(env).for_each(|a| find_ty(a, found));
-        }
-        TypeKind::Var(_) | TypeKind::ValueOf { .. } | TypeKind::Hole => {}
-    }
-}
-
-fn find_pat(p: &Pattern, found: &mut Option<Span>) {
-    match &p.kind {
-        PatternKind::Typed { ty, .. } => find_ty(ty, found),
-        PatternKind::Named { pattern, .. } => find_pat(pattern, found),
-        PatternKind::Constructor { args: ps, .. } | PatternKind::Tuple(ps) => {
-            ps.iter().for_each(|a| find_pat(a, found))
-        }
-        PatternKind::List { items, .. } => items.iter().for_each(|a| find_pat(a, found)),
-        PatternKind::BitArray(segs) => {
-            for s in segs {
-                find_pat(&s.value, found);
-                if let Some(arg) = s.format.as_ref().and_then(|f| f.arg.as_deref()) {
-                    find_expr(arg, found);
-                }
-            }
-        }
-        _ => {}
-    }
-}
-
-fn find_block(b: &Block, found: &mut Option<Span>) {
-    for s in &b.stmts {
-        match s {
-            Stmt::Bind(b) => {
-                find_pat(&b.pattern, found);
-                find_expr(&b.value, found);
-            }
-            Stmt::Env { ty, value, .. } => {
-                find_ty(ty, found);
-                find_expr(value, found);
-            }
-            Stmt::Expr(e) => find_expr(e, found),
-        }
-    }
-}
-
-fn find_expr(e: &Expr, found: &mut Option<Span>) {
-    match &e.kind {
-        ExprKind::Fn(f) => {
-            for p in &f.params {
-                match p {
-                    Param::Pattern(p) => find_pat(p, found),
-                    Param::Env { ty, .. } => find_ty(ty, found),
-                }
-            }
-            if let Some(r) = &f.ret {
-                find_ty(&r.value, found);
-                r.err.iter().chain(&r.env).for_each(|t| find_ty(t, found));
-            }
-            find_block(&f.body, found);
-        }
-        ExprKind::Block(b) => find_block(b, found),
-        ExprKind::Case {
-            subject, clauses, ..
-        } => {
-            find_expr(subject, found);
-            find_clauses(clauses, found);
-        }
-        ExprKind::Clauses(clauses) => find_clauses(clauses, found),
-        ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_) | ExprKind::Name { .. } => {}
-        ExprKind::Tuple(items) => items.iter().for_each(|x| find_expr(x, found)),
-        ExprKind::List { items, rest } => items
-            .iter()
-            .chain(rest.as_deref())
-            .for_each(|x| find_expr(x, found)),
-        ExprKind::BitArray(segs) => {
-            for s in segs {
-                find_expr(&s.value, found);
-                if let Some(arg) = s.format.as_ref().and_then(|f| f.arg.as_deref()) {
-                    find_expr(arg, found);
-                }
-            }
-        }
-        ExprKind::Call { callee, args } => {
-            find_expr(callee, found);
-            args.iter().for_each(|a| find_expr(&a.value, found));
-        }
-        ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
-            find_expr(target, found)
-        }
-        ExprKind::RecordUpdate {
-            constructor,
-            base,
-            fields,
-        } => {
-            find_expr(constructor, found);
-            find_expr(base, found);
-            fields.iter().for_each(|(_, x)| find_expr(x, found));
-        }
-        ExprKind::Unary { expr, .. } => find_expr(expr, found),
-        ExprKind::Binary { lhs, rhs, .. } => {
-            find_expr(lhs, found);
-            find_expr(rhs, found);
-        }
-    }
-}
-
-fn find_clauses(clauses: &[Clause], found: &mut Option<Span>) {
-    for c in clauses {
-        c.patterns.iter().for_each(|p| find_pat(p, found));
-        c.guard.iter().for_each(|g| find_expr(g, found));
-        find_expr(&c.body, found);
-    }
-}
-
-// ---- Documents ----
-
-/// What a column of aligned lines lines up (gofmt's elastic tabstops).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Align {
     /// The part after `label:` of a field or an argument.
@@ -673,9 +441,6 @@ struct Formatter<'a> {
     /// Set while a clause pattern is printed that `?` or `|` comes after,
     /// which a function type at its end would take (§7.1).
     fn_next: bool,
-    plan: &'a Plan,
-    expanding: HashSet<Span>,
-    printing_function: HashSet<Span>,
 }
 
 /// How blank lines between the lines of a list of statements, clauses,
@@ -1037,31 +802,22 @@ impl<'a> Formatter<'a> {
 
     fn module(&mut self, m: &Module) -> Doc {
         enum Thing<'m> {
-            Import(u32, HeaderStyle, &'m [ImportItem]),
-            Export(u32, HeaderStyle, &'m [ExportItem]),
+            Import(u32, &'m [ImportItem]),
+            Export(u32, &'m [ExportItem]),
             Item(&'m Item),
         }
         let mut things = Vec::new();
         let mut spans = Vec::new();
-        let header = [
-            (m.imports_span, m.imports_style, true),
-            (m.exports_span, m.exports_style, false),
-        ];
-        for (span, style, is_import) in header {
+        let header = [(m.imports_span, true), (m.exports_span, false)];
+        for (span, is_import) in header {
             let Some(span) = span else { continue };
-            if (is_import && self.plan.drop_imports) || (!is_import && self.plan.drop_exports) {
-                continue;
-            }
-            let mut at = self.tok_index(span.start);
-            if style == HeaderStyle::Keyword {
-                at += 1;
-            }
+            let at = self.tok_index(span.start);
             let paren = self.toks[at].span.start;
             spans.push((span.start, span.end));
             things.push(if is_import {
-                Thing::Import(paren, HeaderStyle::Group, &m.imports)
+                Thing::Import(paren, &m.imports)
             } else {
-                Thing::Export(paren, HeaderStyle::Group, &m.exports)
+                Thing::Export(paren, &m.exports)
             });
         }
         for item in &m.items {
@@ -1070,18 +826,18 @@ impl<'a> Formatter<'a> {
         }
         let end = self.src.len() as u32;
         let mut lines = self.lines(None, end, &spans, Blank::Top, |f, i| match &things[i] {
-            Thing::Import(paren, style, items) => f.import(*paren, *style, items),
-            Thing::Export(paren, style, items) => f.export(*paren, *style, items),
+            Thing::Import(paren, items) => f.import(*paren, items),
+            Thing::Export(paren, items) => f.export(*paren, items),
             Thing::Item(item) => f.item(item),
         });
         lines.push(Doc::Hard);
         cat(lines)
     }
 
-    fn import(&mut self, paren: u32, style: HeaderStyle, items: &[ImportItem]) -> Doc {
+    fn import(&mut self, paren: u32, items: &[ImportItem]) -> Doc {
         let close = self.closer(paren);
         let spans: Vec<_> = items.iter().map(|i| (i.span.start, i.span.end)).collect();
-        let list = self.seq("(", ")", paren, close, &spans, true, |f, i| {
+        self.seq("(", ")", paren, close, &spans, true, |f, i| {
             let item = &items[i];
             let mut out = Vec::new();
             if let Some(alias) = &item.alias {
@@ -1107,28 +863,20 @@ impl<'a> Formatter<'a> {
             let path: Vec<&str> = item.path.iter().map(|p| p.name.as_str()).collect();
             out.push(text(path.join("/")));
             cat(out)
-        });
-        match style {
-            HeaderStyle::Keyword => cat(vec![text("import "), list]),
-            HeaderStyle::Group => list,
-        }
+        })
     }
 
-    fn export(&mut self, paren: u32, style: HeaderStyle, items: &[ExportItem]) -> Doc {
+    fn export(&mut self, paren: u32, items: &[ExportItem]) -> Doc {
         let close = self.closer(paren);
         let spans: Vec<_> = items.iter().map(|i| (i.span.start, i.span.end)).collect();
-        let list = self.seq("(", ")", paren, close, &spans, true, |_, i| {
+        self.seq("(", ")", paren, close, &spans, true, |_, i| {
             let e = &items[i];
             text(format!(
                 "{}{}",
                 e.name.name,
                 if e.constructors { "(..)" } else { "" }
             ))
-        });
-        match style {
-            HeaderStyle::Keyword => cat(vec![text("export "), list]),
-            HeaderStyle::Group => list,
-        }
+        })
     }
 
     fn item(&mut self, item: &Item) -> Doc {
@@ -1176,11 +924,7 @@ impl<'a> Formatter<'a> {
             } => {
                 out.push(self.leading(name.span.start));
                 out.push(text(name.name.as_str()));
-                out.push(if let Some(params) = self.plan.params.get(&name.span) {
-                    text(format!("({})", params.join(", ")))
-                } else {
-                    self.type_params(name, type_params)
-                });
+                out.push(self.type_params(name, type_params));
                 out.push(text(": "));
                 out.push(self.ty(ty));
             }
@@ -1252,14 +996,8 @@ impl<'a> Formatter<'a> {
                 .iter()
                 .map(|n| (n.span.start, n.span.end))
                 .collect();
-            out.push(self.seq("(", ")", open, close, &spans, false, |f, i| {
-                text(
-                    f.plan
-                        .renames
-                        .get(&def.params[i].span)
-                        .unwrap_or(&def.params[i].name)
-                        .clone(),
-                )
+            out.push(self.seq("(", ")", open, close, &spans, false, |_, i| {
+                text(&def.params[i].name)
             }));
             after = close + 1;
         }
@@ -1301,40 +1039,7 @@ impl<'a> Formatter<'a> {
         cat(vec![name, fields])
     }
 
-    fn binding(&mut self, b: &Binding, top: bool) -> Doc {
-        if self.plan.splits.contains(&b.span) {
-            let (PatternKind::Tuple(ps), ExprKind::Tuple(es)) = (&b.pattern.kind, &b.value.kind)
-            else {
-                unreachable!()
-            };
-            let mut docs = Vec::new();
-            for (p, value) in ps.iter().zip(es) {
-                if !docs.is_empty() {
-                    docs.push(Doc::Hard);
-                    if top {
-                        docs.push(Doc::Hard);
-                    }
-                }
-                let params: Vec<_> = self.plan.params[&b.span]
-                    .iter()
-                    .filter(|n| {
-                        self.plan.renames.iter().any(|(span, value_name)| {
-                            *n == value_name
-                                && ((p.span.start <= span.start && span.end <= p.span.end)
-                                    || (value.span.start <= span.start
-                                        && span.end <= value.span.end))
-                        })
-                    })
-                    .cloned()
-                    .collect();
-                docs.push(self.binding_part(p, value, &params));
-            }
-            return cat(docs);
-        }
-        if let Some(params) = self.plan.params.get(&b.span) {
-            return self.binding_part(&b.pattern, &b.value, params);
-        }
-
+    fn binding(&mut self, b: &Binding, _top: bool) -> Doc {
         let head = match (&b.pattern.kind, b.type_params.is_empty()) {
             (PatternKind::Var(n), false) => {
                 let name = Ident {
@@ -1363,25 +1068,6 @@ impl<'a> Formatter<'a> {
             _ => self.pattern(&b.pattern, false),
         };
         cat(vec![head, text(" = "), self.expr(&b.value, 0)])
-    }
-
-    fn binding_part(&mut self, pattern: &Pattern, value: &Expr, params: &[String]) -> Doc {
-        let (name, ty) = match &pattern.kind {
-            PatternKind::Var(n) => (n.as_str(), None),
-            PatternKind::Typed { binder, ty } => (binder.name.as_str(), Some(ty)),
-            _ => unreachable!(),
-        };
-        let mut docs = vec![self.leading(pattern.span.start), text(name)];
-        if !params.is_empty() {
-            docs.push(text(format!("({})", params.join(", "))));
-        }
-        if let Some(ty) = ty {
-            docs.push(text(": "));
-            docs.push(self.ty(ty));
-        }
-        docs.push(text(" = "));
-        docs.push(self.expr(value, 0));
-        cat(docs)
     }
 
     fn stmt(&mut self, s: &Stmt) -> Doc {
@@ -1442,38 +1128,9 @@ impl<'a> Formatter<'a> {
 
     /// `e` where an expression of at least level `min` is needed (§6.9).
     fn expr(&mut self, e: &Expr, min: u8) -> Doc {
-        if let Some(name) = self.plan.replacements.get(&e.span)
-            && !self.printing_function.contains(&e.span)
-        {
-            return self.continued(e.span.start, |_| text(name.clone()));
-        }
-        if let Some(extract) = self.plan.extractions.get(&e.span)
-            && !self.expanding.contains(&e.span)
-        {
-            self.expanding.insert(e.span);
-            self.printing_function.insert(extract.function.span);
-            let value = self.expr(&extract.function, 0);
-            self.printing_function.remove(&extract.function.span);
-            let rest = self.expr(e, 0);
-            self.expanding.remove(&e.span);
-            let (a, b, c) = (self.hard(), self.hard(), self.hard());
-            return group(cat(vec![
-                text("{"),
-                nest(cat(vec![
-                    a,
-                    text(format!("{} = ", extract.name)),
-                    value,
-                    b,
-                    rest,
-                ])),
-                c,
-                text("}"),
-            ]));
-        }
-
         self.continued(e.span.start, |f| {
             // A match is an operation at level 6 (§6.9).
-            if level(e) < min || is_match(e) && min > 6 || self.plan.groups.contains(&e.span) {
+            if level(e) < min || is_match(e) && min > 6 {
                 let before = f.hard;
                 let body = f.expr_raw(e);
                 if f.hard == before {
@@ -1545,31 +1202,15 @@ impl<'a> Formatter<'a> {
             }
             ExprKind::Block(b) => self.block(b, false),
             ExprKind::Fn(func) => self.function(func, span.start),
-            ExprKind::Case {
-                subject,
-                clauses,
-                syntax: Syntax::Old,
-            } => {
-                let subject_doc = self.expr(subject, 0);
-                let open = self.tok_after(subject.span.end).span.start;
-                let body = self.clause_block(open, span.end - 1, clauses, Syntax::New);
-                cat(vec![subject_doc, text(" |> "), body])
-            }
-            ExprKind::Case {
-                subject,
-                clauses,
-                syntax: Syntax::New,
-            } => {
+            ExprKind::Case { subject, clauses } => {
                 // §6.9: `|>` is stronger than the operators of levels 1 to 5.
                 let subject_doc = self.expr(subject, 6);
                 let open = self.tok_after(subject.span.end);
                 let open = self.tok_after(open.span.end).span.start;
-                let body = self.clause_block(open, span.end - 1, clauses, Syntax::New);
+                let body = self.clause_block(open, span.end - 1, clauses);
                 cat(vec![subject_doc, text(" |> "), body])
             }
-            ExprKind::Clauses(clauses) => {
-                self.clause_block(span.start, span.end - 1, clauses, Syntax::New)
-            }
+            ExprKind::Clauses(clauses) => self.clause_block(span.start, span.end - 1, clauses),
             ExprKind::Call { callee, args } => {
                 let head = self.expr(callee, 10);
                 let open = self.tok_after(callee.span.end).span.start;
@@ -1767,36 +1408,17 @@ impl<'a> Formatter<'a> {
 
     /// The clauses of a `case` or a clause block, from the `{` at `open` to
     /// the `}` at `close`, one clause per line.
-    fn clause_block(&mut self, open: u32, close: u32, clauses: &[Clause], syntax: Syntax) -> Doc {
+    fn clause_block(&mut self, open: u32, close: u32, clauses: &[Clause]) -> Doc {
         let spans: Vec<_> = clauses.iter().map(|c| (c.span.start, c.span.end)).collect();
-        let split =
-            clauses.len() == 1 && self.plan.choices.iter().any(|span| span.end == close + 1);
-        self.braced_lines(open, close, &spans, |f, i| {
-            if split {
-                let c = &clauses[i];
-                let mut docs = Vec::new();
-                for p in &c.patterns {
-                    if !docs.is_empty() {
-                        docs.push(Doc::Hard);
-                    }
-                    docs.push(f.pattern(p, true));
-                    docs.push(Doc::Tab(Align::Arrow));
-                    docs.push(text("-> "));
-                    docs.push(f.expr(&c.body, 0));
-                }
-                cat(docs)
-            } else {
-                f.clause(&clauses[i], syntax)
-            }
-        })
+        self.braced_lines(open, close, &spans, |f, i| f.clause(&clauses[i]))
     }
 
     /// A clause. Its patterns are not broken inside; when they do not fit
     /// on one line, each choice after the first begins a line with `|`,
     /// which goes on from the line before (§1.7).
-    fn clause(&mut self, c: &Clause, syntax: Syntax) -> Doc {
+    fn clause(&mut self, c: &Clause) -> Doc {
         let saved = std::mem::replace(&mut self.one_line, true);
-        let guard = syntax == Syntax::New && c.guard.is_some();
+        let guard = c.guard.is_some();
         self.fn_next = c.patterns.len() > 1 || guard;
         let first = self.pattern(&c.patterns[0], true);
         let mut more = Vec::new();
@@ -1816,10 +1438,7 @@ impl<'a> Formatter<'a> {
         self.one_line = saved;
         let mut out = vec![group(cat(vec![first, nest(cat(more))]))];
         if let Some(g) = &c.guard {
-            out.push(text(match syntax {
-                Syntax::Old => " if ",
-                Syntax::New => " ? ",
-            }));
+            out.push(text(" ? "));
             out.push(self.expr(g, 0));
         }
         out.push(Doc::Tab(Align::Arrow));
@@ -1997,7 +1616,6 @@ impl<'a> Formatter<'a> {
                 let list = self.types(open, t.span.end - 1, args);
                 return cat(vec![head, list]);
             }
-            TypeKind::Var(n) => return text(self.plan.renames.get(&t.span).unwrap_or(n).clone()),
             TypeKind::ValueOf { module, name } => {
                 return match module {
                     Some(m) => text(format!("{}.{}", m.name, name.name)),

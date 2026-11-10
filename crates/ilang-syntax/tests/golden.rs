@@ -5,12 +5,12 @@
 mod common;
 
 use ilang_syntax::print::{print_module, print_module_explicit};
-use ilang_syntax::{parse_module, parse_module_old, span::LineIndex};
+use ilang_syntax::{parse_module, span::LineIndex};
 use std::fs;
 use std::path::Path;
 
-fn render(src: &str, old: bool) -> String {
-    let parse = if old { parse_module_old } else { parse_module };
+fn render(src: &str) -> String {
+    let parse = parse_module;
     let (module, diags) = parse(src);
     let mut out = print_module(&module);
     let explicit = print_module_explicit(&module);
@@ -26,9 +26,7 @@ fn render(src: &str, old: bool) -> String {
         out.push('\n');
     }
     if diags.is_empty() {
-        if !old {
-            assert_eq!(ilang_syntax::print::unprintable(&module), None);
-        }
+        assert_eq!(ilang_syntax::print::unprintable(&module), None);
         let (again, diags2) = parse(&print_module(&module));
         assert!(
             diags2.is_empty(),
@@ -56,21 +54,21 @@ fn render(src: &str, old: bool) -> String {
 
 #[test]
 fn golden() {
-    check_goldens(false);
+    check_goldens();
 }
 
-#[test]
-fn golden_old() {
-    check_goldens(true);
-}
-
-fn check_goldens(old: bool) {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join(if old {
-        "tests/golden_old"
-    } else {
-        "tests/golden"
-    });
+fn check_goldens() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden");
     let update = std::env::var_os("UPDATE").is_some();
+    let retired = dir.with_file_name("golden_old");
+    if update && retired.exists() {
+        for entry in fs::read_dir(&retired).unwrap() {
+            let path = entry.unwrap().path();
+            assert_eq!(path.extension().and_then(|e| e.to_str()), Some("out"));
+            fs::remove_file(path).unwrap();
+        }
+        fs::remove_dir(retired).unwrap();
+    }
     // Removing a parser input also removes its derived output on regeneration.
     for entry in fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
@@ -89,7 +87,7 @@ fn check_goldens(old: bool) {
     let mut failed = Vec::new();
     for path in &paths {
         let src = fs::read_to_string(path).unwrap();
-        let actual = render(&src, old);
+        let actual = render(&src);
         let out = path.with_extension("out");
         if update {
             fs::write(&out, &actual).unwrap();

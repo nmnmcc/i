@@ -4,7 +4,7 @@ mod common;
 
 use ilang_syntax::ast::*;
 use ilang_syntax::print::{print_module, unprintable};
-use ilang_syntax::{Code, parse_module, parse_module_old, parse_stats};
+use ilang_syntax::{Code, parse_module, parse_stats};
 
 fn module(src: &str) -> Module {
     let (m, d) = parse_module(src);
@@ -26,69 +26,6 @@ fn value(m: &Module) -> &Expr {
         panic!("expected binding")
     };
     &b.value
-}
-
-#[test]
-fn old_blocks_never_silently_change_meaning() {
-    // D4: exact Old tree, with only E0113 in Both mode.
-    for src in [
-        "a = { (x) -> Int { x } }",
-        "r = { (x) -> Int { x + n }(1) }",
-        "a = { (x) -> (y) { y } }",
-        "a = { (a, b) -> (x) { x + a } }",
-        "a = v |> { (a, b) -> (x) { x + a } }(1)",
-        "main = () { 5 |> { (a) -> Int { a }  pair }.0(1) }",
-        "h = (x, r) { x |> { (a) -> (b) { a } }.g(1) }",
-    ] {
-        let (old, od) = parse_module_old(src);
-        assert!(od.is_empty(), "{src}\n{od:?}");
-        let (both, bd) = parse_module(src);
-        assert_eq!(bd.len(), 1, "{src}\n{bd:?}");
-        assert_eq!(bd[0].code, Code::DualAmbiguous);
-        assert!(bd[0].message.contains("g: (Int) -> T"));
-        assert_eq!(common::shape(&old), common::shape(&both), "{src}");
-        assert!(
-            ilang_syntax::format::format(src).unwrap_err()[0]
-                .message
-                .contains("--from-old")
-        );
-    }
-    // D4's pattern precondition and §3.5 tests 2, 3, 6.
-    for expr in [
-        "{ (n, log ! Log) -> Int { log.write(n)  n } }",
-        "{ go = (n, log ! Log) -> Int { log.write(n)  n }  go(1) }",
-        "{ k = 2  g = (x) -> Int { x * k }  g(1) }",
-        "{ x = y  f = (a) -> Int { a }  f(x) }",
-    ] {
-        let src = format!("a = {expr}");
-        let m = module(&src);
-        assert!(matches!(value(&m).kind, ExprKind::Block(_)), "{src}");
-        let (old, od) = parse_module_old(&src);
-        assert!(od.is_empty());
-        assert_eq!(common::shape(&old), common::shape(&m));
-    }
-    // D4 skips test 1a for a bare clause block right after `|>`.
-    for expr in [
-        "v |> { (a, b) -> (x) { x + a } }",
-        "hs |> { (name, _) -> (x) { log(name, x) }  _ -> (x) { x } }",
-        "v |> { (a, b) -> (x) -> Int { x + a } }",
-    ] {
-        let src = format!("a = {expr}");
-        let m = module(&src);
-        assert!(matches!(
-            value(&m).kind,
-            ExprKind::Case {
-                syntax: Syntax::New,
-                ..
-            }
-        ));
-        assert!(
-            parse_module_old(&src)
-                .1
-                .iter()
-                .any(|d| d.code == Code::PipeTarget)
-        );
-    }
 }
 
 #[test]
@@ -143,18 +80,30 @@ fn brace_decisions_follow_the_ordered_tests() {
     ));
     // §3.5 test 4 and test 5: records vs a clause with a wrong pattern.
     for (src, code) in [
-        ("a = { x: 1 -> 2 }", Code::RecordReserved),
-        ("a = { p: (Int, Int) -> e }", Code::RecordReserved),
-        ("a = x |> { -y -> 1 }", Code::BadPattern),
-        ("a = b |> { <<x: Int>> -> 1 }", Code::Unexpected),
+        (
+            /* old-syntax-check: E0114,E0101 */ "a = { x: 1 -> 2 }",
+            Code::RecordReserved,
+        ),
+        (
+            /* old-syntax-check: E0114,E0101 */ "a = { p: (Int, Int) -> e }",
+            Code::RecordReserved,
+        ),
+        (
+            /* old-syntax-check: E0108 */ "a = x |> { -y -> 1 }",
+            Code::BadPattern,
+        ),
+        (
+            /* old-syntax-check: E0101 */ "a = b |> { <<x: Int>> -> 1 }",
+            Code::Unexpected,
+        ),
     ] {
         let d = parse_module(src).1;
         assert_eq!(d.first().map(|d| d.code), Some(code), "{src}\n{d:?}");
     }
     // The tuple note is required in later clauses too (§3.6).
     for src in [
-        "a = v |> { 0 -> 1  p: (Int, Int) -> e }",
-        "a = { 0 -> 1  p: (Int, Int) -> e }",
+        /* old-syntax-check: E0101 */ "a = v |> { 0 -> 1  p: (Int, Int) -> e }",
+        /* old-syntax-check: E0101 */ "a = { 0 -> 1  p: (Int, Int) -> e }",
     ] {
         let d = parse_module(src).1;
         assert!(!d.is_empty());
@@ -169,22 +118,15 @@ fn brace_decisions_follow_the_ordered_tests() {
 fn header_groups_and_attributes() {
     // §3.4: content, not position, distinguishes exports and imports.
     let m = module("(a = (T, f) = pkg/mod)\n(main, T(..))\n(x, y) = (1, 2)\nmain = () { f(x) }");
-    assert_eq!(m.imports_style, HeaderStyle::Group);
-    assert_eq!(m.exports_style, HeaderStyle::Group);
     assert_eq!(m.imports[0].path[0].name, "pkg");
     assert_eq!(m.items.len(), 2);
-    // §3.4 keeps empty keyword headers until A3; §3.13 requires every
-    // diagnostic-free parser tree to round-trip, including their spans.
-    for src in ["import ()", "export ()", "import ()\nexport ()\na = 1"] {
-        module(src);
-    }
     for src in [
         "()",
-        "(main)\n(i/fail)",
+        /* old-syntax-check: E0115 */ "(main)\n(i/fail)",
         "(main)\n(main)",
-        "(i/fail)\n(i/core)",
-        "x = 1\n(main)",
-        "@deprecated\n(\"x\")\nmain = () { Nil }",
+        /* old-syntax-check: E0115 */ "(i/fail)\n(i/core)",
+        /* old-syntax-check: E0115 */ "x = 1\n(main)",
+        /* old-syntax-check: E0115 */ "@deprecated\n(\"x\")\nmain = () { Nil }",
     ] {
         let d = parse_module(src).1;
         assert_eq!(d.len(), 1, "{src}\n{d:?}");
@@ -204,7 +146,7 @@ fn header_groups_and_attributes() {
 }
 
 #[test]
-fn new_forms_need_both_mode_and_joined_parentheses() {
+fn new_forms_and_joined_parentheses() {
     for src in [
         "(i/fail)\nf = 1",
         "f = {}",
@@ -220,7 +162,6 @@ fn new_forms_need_both_mode_and_joined_parentheses() {
         "f = (p: m(Int, 1, \"s\")) { p }",
     ] {
         module(src);
-        assert!(!parse_module_old(src).1.is_empty(), "{src}");
     }
     for src in [
         "f(A) = x",
@@ -228,29 +169,10 @@ fn new_forms_need_both_mode_and_joined_parentheses() {
         "main = () { k = 1  wrap(A) = (x: A) { Some(x) }  wrap(k) }",
     ] {
         let m = module(src);
-        assert!(!parse_module_old(src).1.is_empty());
         assert!(format!("{m:?}").contains("type_params: [Ident { name: \"A\""));
     }
     // §3.7: a line break prevents a lower TypeCall; inside () it is a comma.
     module("f = (\n x: a\n (y, z)\n) { x }");
-    let m = module("f = () { g\n(A) = x\nA }");
-    assert_eq!(
-        common::shape(&m),
-        common::shape(&parse_module_old("f = () { g\n(A) = x\nA }").0)
-    );
-    // J1's two forms, §6.1 (vii): one parse error, one formatter refusal.
-    for src in [
-        "Id(a) = a  (p, q) = (1, 2)",
-        "@external(\"m\", \"f\") f: a  (p) = 1",
-    ] {
-        assert!(parse_module_old(src).1.is_empty());
-        assert!(
-            ilang_syntax::format::format(src)
-                .unwrap_err()
-                .iter()
-                .any(|d| d.message.contains("--from-old"))
-        );
-    }
 }
 
 #[test]
@@ -259,28 +181,10 @@ fn guards_and_pipe_binding_strength() {
     // Choices or a guard prevent the function reading of that head.
     module("f = { n = (x) | n = (x) -> (y) { y } }");
     module("f = { (x) ? True -> (y) { y } }");
-    // §3.6, including the `if` token in brace test 2.
     for src in [
-        "a = v |> { x if c -> 1 }",
-        "a = v |> { 0 -> 1  x if c -> 2 }",
-    ] {
-        assert!(
-            parse_module(src)
-                .1
-                .iter()
-                .any(|d| d.message == "a guard in a clause block is written with `?`")
-        );
-    }
-    assert!(
-        parse_module("a = case v { x ? c -> 1 }")
-            .1
-            .iter()
-            .any(|d| d.message.contains("expected `->`"))
-    );
-    for src in [
-        "a = n |> { 0 -> 1  _ -> 2 } * 10",
-        "a = opt |> { _ -> 1 }.name",
-        "a = opt |> { _ -> 1 }.0",
+        /* old-syntax-check: E0111 */ "a = n |> { 0 -> 1  _ -> 2 } * 10",
+        /* old-syntax-check: E0111 */ "a = opt |> { _ -> 1 }.name",
+        /* old-syntax-check: E0111 */ "a = opt |> { _ -> 1 }.0",
     ] {
         assert!(
             parse_module(src)
@@ -462,19 +366,9 @@ fn core_printer_adds_only_required_groups() {
         kind: ExprKind::Clauses(clauses.clone()),
         span: match_e.span,
     };
-    assert!(print_core(e).contains("-> {"));
-    // A chain-to-tuple first pattern needs a group in a new match, but no
-    // clause grouping rule applies to an old Case.
-    let mut m = parse_module_old("a = case v { n = (x) -> (y) { y } }").0;
-    let old = print_module(&m);
-    assert!(old.contains("-> (y)"));
-    let ItemKind::Binding(b) = &mut m.items[0].kind else {
-        unreachable!()
-    };
-    let ExprKind::Case { syntax, .. } = &mut b.value.kind else {
-        unreachable!()
-    };
-    *syntax = Syntax::New;
+    assert!(print_core(e).contains("-> (y)"));
+    // A chain-to-tuple first pattern still needs a group (§6.1).
+    let m = module("a = v |> { n = (x) -> { (y) { y } } }");
     assert!(print_core(value(&m).clone()).contains("-> {"));
     // Negative/tuple patterns are on a new line (§1.7), independent of
     // spans or whether the tree came from the normal surface.
@@ -490,32 +384,16 @@ fn core_printer_adds_only_required_groups() {
 fn unprintable_core_trees_report_their_span() {
     // §3.13: groups cannot save these trees, and the printer must never
     // invent a g binding (which would take the expected type away).
-    let m = parse_module_old("a = { (x) -> Int { x }(1)  2 }").0;
-    assert_eq!(unprintable(&m), Some(value(&m).span));
-    let m = parse_module_old("a = case v { (a) -> (x) -> Int { x } }").0;
-    let ExprKind::Case { clauses, .. } = &value(&m).kind else {
-        unreachable!()
-    };
-    let span = clauses[0].body.span;
-    let mut lone = module("a = {}");
-    let ItemKind::Binding(b) = &mut lone.items[0].kind else {
-        unreachable!()
-    };
-    b.value.kind = ExprKind::Clauses(clauses.clone());
-    assert_eq!(unprintable(&lone), Some(span));
-    assert!(!print_module(&lone).contains("g ="));
-    let mut m = parse_module_old("a = case v { n = (a) -> (x) -> Int { x } }").0;
+    let mut m = module("a = v |> { n = (a) -> { g = (x) -> Int { x }  g } }");
+    let body = core_value("a = (x) -> Int { x }");
     let ItemKind::Binding(b) = &mut m.items[0].kind else {
         unreachable!()
     };
-    let ExprKind::Case {
-        syntax, clauses, ..
-    } = &mut b.value.kind
-    else {
+    let ExprKind::Case { clauses, .. } = &mut b.value.kind else {
         unreachable!()
     };
-    *syntax = Syntax::New;
-    let span = clauses[0].body.span;
+    let span = body.span;
+    clauses[0].body = body;
     assert_eq!(unprintable(&m), Some(span));
     // D4 excludes functions whose parameters are not patterns. The strict
     // round-trip guarantee of §3.13 applies to these parser trees too.
@@ -549,7 +427,7 @@ fn a_type_annotation_before_another_choice_has_no_same_code_text() {
         "a = { f: { (Int) -> Int } ? ok -> f }",
         "a = { f: Int ? ok -> f }",
         "a = { whole = f: Int ? ok -> f }",
-        "a = case v { f: Int if ok -> f }",
+        "a = v |> { f: Int ? ok -> f }",
     ] {
         let mut m = module(src);
         let next = core_value("a = { f: String -> f }");
@@ -571,4 +449,79 @@ fn a_type_annotation_before_another_choice_has_no_same_code_text() {
     // An annotation in a constructor argument ends at `)`, so this parsed
     // tree is representable and must keep the strict round trip.
     module("a = { Some(f: Int) | Some(f: String) -> f }");
+}
+
+#[test]
+fn names_and_line_breaks_have_no_keyword_exceptions() {
+    // Spec §1.4: every word is a name, and any name may be used as a name.
+    for word in ["import", "export", "case", "if"] {
+        let m = module(&format!("{word} = (x) {{ x }}\nuse = () {{ {word}(1) }}"));
+        assert_eq!(m.items.len(), 2);
+        let tokens = ilang_syntax::lex(&format!("x\n{word}"));
+        assert!(tokens.tokens[1].brk);
+    }
+    // A3 ruling 1: old header-shaped calls use the same MacroItem grammar.
+    for src in ["export(x)", "import(i/core)", "case(x)"] {
+        let m = module(src);
+        assert!(matches!(m.items[0].kind, ItemKind::MacroItem { .. }));
+    }
+}
+
+#[test]
+fn old_tag_marks_use_tokens_and_do_not_choose_a_grammar() {
+    use ilang_syntax::old_syntax_marks;
+    for src in [
+        "import (i/core)",
+        "export (x)",
+        /* old-syntax-check: E0101 */ "x = case n { 0 -> 1  _ -> 2 }",
+        /* old-syntax-check: E0101 */ "x = case f(n) { Some(x) -> x }",
+    ] {
+        assert!(old_syntax_marks(src), "{src}");
+    }
+    for src in [
+        "// import (i/core)\nx = 1",
+        "x = \"case n { 0 -> 1 }\"",
+        "import = (x) { x }",
+        "x = () { export(x) }",
+        /* old-syntax-check: E0101,E0101 */ "case\nn { 0 -> 1 }",
+        /* old-syntax-check: E0101 */ "x = case n { f(0 -> 1) }",
+    ] {
+        assert!(!old_syntax_marks(src), "{src}");
+    }
+}
+
+#[test]
+fn structural_shape_keeps_all_string_payloads() {
+    // Part 1 review finding b remains a regression after the migration API goes.
+    for source in [
+        "x = \"@1..2\"",
+        "/// @1..2\nx = 1",
+        "@external(\"@1..2\", \"f\")\nf: () -> Nil",
+        "f = { \"@1..2\" -> 1  _ -> 2 }",
+    ] {
+        let original = module(source);
+        let changed = module(&source.replace("@1..2", "@3..4"));
+        assert_ne!(
+            ilang_syntax::shape::canon(&original),
+            ilang_syntax::shape::canon(&changed)
+        );
+    }
+}
+
+#[test]
+fn brace_cache_and_uncached_parser_agree() {
+    for (path, source) in [
+        ("guards", "f = { (x) ? True -> (y) { y } }"),
+        ("nested", "f = { <<x:u({ 8 })>> -> 0  _ -> 1 }"),
+        (
+            "chain",
+            /* old-syntax-check: E0101 */ "f = { n = (a) -> { (x) -> Int { x } } }",
+        ),
+    ] {
+        assert_eq!(
+            parse_module(source),
+            ilang_syntax::parser::parse_module_uncached(source),
+            "{path}"
+        );
+    }
 }

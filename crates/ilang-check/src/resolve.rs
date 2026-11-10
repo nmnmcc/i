@@ -103,7 +103,6 @@ struct Frame {
 
 struct TyFrame {
     names: HashMap<String, TyVarId>,
-    declared: bool,
 }
 
 struct TyDefMode {
@@ -207,149 +206,18 @@ fn ungroup(e: &ast::Expr) -> &ast::Expr {
     }
 }
 
-/// The names of the type variables written in a type.
-fn type_vars(t: &ast::TypeExpr, out: &mut Vec<String>) {
-    use ast::TypeKind as T;
-    match &t.kind {
-        T::Var(n) => out.push(n.clone()),
-        T::Named { args, .. } => args.iter().for_each(|a| type_vars(a, out)),
-        T::ValueOf { .. } | T::Hole => {}
-        T::Call { args, .. } => {
-            for arg in args {
-                if let ast::TypeArg::Type(ty) = arg {
-                    type_vars(ty, out);
-                }
-            }
-        }
-        T::Tuple(ts) | T::Union(ts) | T::Inter(ts) | T::Diff(ts) => {
-            ts.iter().for_each(|a| type_vars(a, out))
-        }
-        T::Fn {
-            params,
-            ret,
-            err,
-            env,
-        } => {
-            params.iter().for_each(|p| type_vars(&p.ty, out));
-            type_vars(ret, out);
-            err.iter().chain(env).for_each(|a| type_vars(a, out));
-        }
-    }
-}
-
-/// The type variables in the annotations of a binding (§4.7): in its
-/// pattern and value, but not inside an inner binding statement.
-fn annotation_vars(pattern: &ast::Pattern, value: &ast::Expr) -> Vec<String> {
-    let mut out = Vec::new();
-    pattern_annotations(pattern, &mut out);
-    expr_annotations(value, &mut out);
-    out
-}
-
-fn pattern_annotations(p: &ast::Pattern, out: &mut Vec<String>) {
-    use ast::PatternKind as P;
-    match &p.kind {
-        P::Typed { ty, .. } => type_vars(ty, out),
-        P::Named { pattern, .. } => pattern_annotations(pattern, out),
-        P::Constructor { args, .. } | P::Tuple(args) => {
-            args.iter().for_each(|a| pattern_annotations(a, out))
-        }
-        P::List { items, .. } => items.iter().for_each(|a| pattern_annotations(a, out)),
-        P::BitArray(segs) => {
-            for s in segs {
-                pattern_annotations(&s.value, out);
-                if let Some(arg) = s.format.as_ref().and_then(|f| f.arg.as_ref()) {
-                    expr_annotations(arg, out);
-                }
-            }
-        }
-        _ => {}
-    }
-}
-
-fn expr_annotations(e: &ast::Expr, out: &mut Vec<String>) {
-    use ast::ExprKind as E;
-    match &e.kind {
-        E::Int(_) | E::Float(_) | E::String(_) | E::Name { .. } => {}
-        E::Tuple(items) => items.iter().for_each(|x| expr_annotations(x, out)),
-        E::List { items, rest } => items
-            .iter()
-            .chain(rest.as_deref())
-            .for_each(|x| expr_annotations(x, out)),
-        E::BitArray(segs) => {
-            for s in segs {
-                expr_annotations(&s.value, out);
-                if let Some(arg) = s.format.as_ref().and_then(|f| f.arg.as_ref()) {
-                    expr_annotations(arg, out);
-                }
-            }
-        }
-        E::Block(b) => block_annotations(b, out),
-        E::Fn(f) => {
-            for p in &f.params {
-                match p {
-                    ast::Param::Pattern(p) => pattern_annotations(p, out),
-                    ast::Param::Env { ty, .. } => type_vars(ty, out),
-                }
-            }
-            if let Some(r) = &f.ret {
-                type_vars(&r.value, out);
-                r.err.iter().chain(&r.env).for_each(|t| type_vars(t, out));
-            }
-            block_annotations(&f.body, out);
-        }
-        E::Case {
-            subject, clauses, ..
-        } => {
-            expr_annotations(subject, out);
-            for c in clauses {
-                c.patterns.iter().for_each(|p| pattern_annotations(p, out));
-                c.guard.iter().for_each(|g| expr_annotations(g, out));
-                expr_annotations(&c.body, out);
-            }
-        }
-        E::Clauses(clauses) => {
-            for c in clauses {
-                c.patterns.iter().for_each(|p| pattern_annotations(p, out));
-                c.guard.iter().for_each(|g| expr_annotations(g, out));
-                expr_annotations(&c.body, out);
-            }
-        }
-        E::Call { callee, args } => {
-            expr_annotations(callee, out);
-            args.iter().for_each(|a| expr_annotations(&a.value, out));
-        }
-        E::Field { target, .. } | E::TupleIndex { target, .. } => expr_annotations(target, out),
-        E::RecordUpdate { base, fields, .. } => {
-            expr_annotations(base, out);
-            fields.iter().for_each(|(_, x)| expr_annotations(x, out));
-        }
-        E::Unary { expr, .. } => expr_annotations(expr, out),
-        E::Binary { lhs, rhs, .. } => {
-            expr_annotations(lhs, out);
-            expr_annotations(rhs, out);
-        }
-    }
-}
-
-fn block_annotations(b: &ast::Block, out: &mut Vec<String>) {
-    for s in &b.stmts {
-        match s {
-            ast::Stmt::Bind(_) => {}
-            ast::Stmt::Env { ty, value, .. } => {
-                type_vars(ty, out);
-                expr_annotations(value, out);
-            }
-            ast::Stmt::Expr(e) => expr_annotations(e, out),
-        }
-    }
-}
-
 impl<'a> Resolver<'a> {
     // ---- Helpers ----
 
     fn error(&mut self, code: &'static str, span: Span, message: impl Into<String>) {
         let source = self.p.module(self.cur).source;
+        let mut message = message.into();
+        if matches!(code, code::UNKNOWN_NAME | code::MACRO_RESERVED)
+            && let Some(hint) = ilang_syntax::old_syntax_hint(&self.graph.sources.get(source).text)
+        {
+            message.push_str("; ");
+            message.push_str(hint);
+        }
         self.diags
             .push(Diagnostic::error(code, Some(source), span, message));
     }
@@ -521,12 +389,15 @@ impl<'a> Resolver<'a> {
                     });
                     Slot::Binding(index)
                 }
-                ast::ItemKind::MacroItem { .. } => {
-                    self.error(
-                        code::MACRO_RESERVED,
-                        item.span,
-                        "a call at the top level is kept for macros",
-                    );
+                ast::ItemKind::MacroItem { name, args, .. } => {
+                    let message = if args.is_empty()
+                        && matches!(name.name.as_str(), "import" | "export")
+                    {
+                        "a call at the top level is kept for macros; if this was an old empty header, omit it"
+                    } else {
+                        "a call at the top level is kept for macros"
+                    };
+                    self.error(code::MACRO_RESERVED, item.span, message);
                     Slot::None
                 }
                 ast::ItemKind::Declaration {
@@ -1182,6 +1053,13 @@ impl<'a> Resolver<'a> {
                     if alias { "the left side of an alias that is not a list of type parameters is kept for alias patterns" }
                     else { "a type parameter is an `UpName` with no module name and no arguments" },
                 );
+                if def
+                    .head
+                    .iter()
+                    .any(|t| matches!(t.kind, ast::TypeKind::ValueOf { module: None, .. }))
+                {
+                    self.diags.last_mut().unwrap().message.push_str("; old lowercase type parameters are now declared as UpNames, as in `Box(A) { Box(A) }` or `Id(A) = A`");
+                }
                 continue;
             }
             let mut clashes = false;
@@ -1490,11 +1368,11 @@ impl<'a> Resolver<'a> {
                     None => TypeKind::Error,
                 }
             }
-            T::ValueOf { .. } => {
+            T::ValueOf { module, .. } => {
                 self.error(
-                    code::TYPE_OF_VALUE_RESERVED,
+                    if module.is_some() { code::TYPE_OF_VALUE_RESERVED } else { code::LOWERCASE_TYPE_RESERVED },
                     t.span,
-                    "`p.name` in a type is kept for the type of a value",
+                    "a lowercase name in a type is kept for the type of a value; declare a type variable as an UpName, as in `f(A) = …`",
                 );
                 TypeKind::Error
             }
@@ -1506,7 +1384,6 @@ impl<'a> Resolver<'a> {
                 );
                 TypeKind::Error
             }
-            T::Var(n) => self.ty_var(n, t.span),
             T::Hole => TypeKind::Hole,
             T::Tuple(ts) => TypeKind::Tuple(ts.iter().map(|x| self.ty(x)).collect()),
             T::Union(ts) => TypeKind::Union(ts.iter().map(|x| self.ty(x)).collect()),
@@ -1531,37 +1408,6 @@ impl<'a> Resolver<'a> {
             },
         };
         Type { kind, span: t.span }
-    }
-
-    fn ty_var(&mut self, name: &str, span: Span) -> TypeKind {
-        if let Some(mode) = &mut self.ty_def {
-            return match mode.params.get(name) {
-                Some(&v) => {
-                    mode.used.insert(v);
-                    TypeKind::Var(v)
-                }
-                None => {
-                    self.error(
-                        code::TYPE_VAR_NOT_PARAM,
-                        span,
-                        format!("the type variable `{name}` is not a parameter of this type"),
-                    );
-                    TypeKind::Error
-                }
-            };
-        }
-        if let Some(v) = self.ty_frames.iter().rev().find_map(|f| f.names.get(name)) {
-            return TypeKind::Var(*v);
-        }
-        if self.ty_frames.last().is_some_and(|f| f.declared) {
-            self.error(code::TYPE_VAR_MIXED, span, format!("this binding declares its type variables, so `{name}` must be declared too, as an `UpName`: `f(A, …) = …`"));
-            return TypeKind::Error;
-        }
-        let v = self.new_ty_var(name);
-        if let Some(f) = self.ty_frames.last_mut() {
-            f.names.insert(name.to_string(), v);
-        }
-        TypeKind::Var(v)
     }
 
     /// The type that the alias `t` stands for, with its arguments put in
@@ -1849,13 +1695,7 @@ impl<'a> Resolver<'a> {
                     },
                     Slot::Decl(d),
                 ) => {
-                    let vars = if type_params.is_empty() {
-                        let mut names = Vec::new();
-                        type_vars(ty, &mut names);
-                        self.push_ty_frame(&names)
-                    } else {
-                        self.push_declared_frame(type_params)
-                    };
+                    let vars = self.push_declared_frame(type_params);
                     let t = self.ty(ty);
                     self.ty_frames.pop();
                     // The operations of the library are not host imports
@@ -1904,26 +1744,6 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// Pushes a frame with the type variables in `names` that are not
-    /// variables of an outer binding, and gives them back.
-    fn push_ty_frame(&mut self, names: &[String]) -> Vec<TyVarId> {
-        let mut frame = HashMap::new();
-        let mut vars = Vec::new();
-        for n in names {
-            if frame.contains_key(n) || self.ty_frames.iter().any(|f| f.names.contains_key(n)) {
-                continue;
-            }
-            let v = self.new_ty_var(n);
-            frame.insert(n.clone(), v);
-            vars.push(v);
-        }
-        self.ty_frames.push(TyFrame {
-            names: frame,
-            declared: false,
-        });
-        vars
-    }
-
     /// A quiet lookup, after imports are known (§3.10 and §3.11).
     fn unqualified_type(&self, name: &str) -> Option<TypeRef> {
         self.scopes[self.cur.0 as usize]
@@ -1959,10 +1779,7 @@ impl<'a> Resolver<'a> {
             names.insert(param.name.clone(), var);
             vars.push(var);
         }
-        self.ty_frames.push(TyFrame {
-            names,
-            declared: true,
-        });
+        self.ty_frames.push(TyFrame { names });
         vars
     }
 
@@ -1970,12 +1787,7 @@ impl<'a> Resolver<'a> {
     /// its pattern; in a block, the caller makes them visible from the next
     /// statement (§6.10).
     fn binding(&mut self, b: &ast::Binding, top: bool) -> (Binding, Vec<Binder>) {
-        let ty_vars = if b.type_params.is_empty() {
-            let names = annotation_vars(&b.pattern, &b.value);
-            self.push_ty_frame(&names)
-        } else {
-            self.push_declared_frame(&b.type_params)
-        };
+        let ty_vars = self.push_declared_frame(&b.type_params);
         let direct = self.is_direct(&b.value);
         let mut binders = Vec::new();
         let pattern = self.pattern(&b.pattern, &mut binders, None);
@@ -2223,19 +2035,10 @@ impl<'a> Resolver<'a> {
             E::Block(b) => ExprKind::Block(self.block(b)),
             E::Fn(f) => ExprKind::Fn(Box::new(self.function(f, e.span))),
             E::Clauses(clauses) => self.clause_function(clauses, e.span),
-            E::Case {
-                subject,
-                clauses,
-                syntax: ast::Syntax::New,
-            } if clauses.len() == 1 && clauses[0].guard.is_none() => {
+            E::Case { subject, clauses } if clauses.len() == 1 && clauses[0].guard.is_none() => {
                 let clause = &clauses[0];
                 if clause.patterns.len() != 1 {
                     self.one_clause_choices(e.span)
-                } else if crate::ONE_CLAUSE_AS_CASE {
-                    ExprKind::Case {
-                        subject: Box::new(self.expr(subject)),
-                        clauses: clauses.iter().map(|c| self.clause(c)).collect(),
-                    }
                 } else {
                     // §3.9: the subject precedes the new scope; no type frame,
                     // no generalization, and the binding stops at the pattern.
@@ -2387,7 +2190,6 @@ impl<'a> Resolver<'a> {
                             span: synthetic,
                         }),
                         clauses: clauses.to_vec(),
-                        syntax: ast::Syntax::Old,
                     },
                     span: case_span,
                 },

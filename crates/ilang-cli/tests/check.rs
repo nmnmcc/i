@@ -41,11 +41,6 @@ fn check_reports_type_errors() {
 }
 
 #[test]
-fn normal_build_never_enables_the_equivalence_feature() {
-    assert!(!std::hint::black_box(ilang_check::ONE_CLAUSE_AS_CASE));
-}
-
-#[test]
 fn blind_expected_subject_is_checked_before_audit_codegen() {
     // S4 ruling 2: even the old-rule audit must report a normal diagnostic
     // when it cannot give this new match subject its expected type.
@@ -54,36 +49,24 @@ fn blind_expected_subject_is_checked_before_audit_codegen() {
     let (graph, diags) = ilang_cli::load(dir.path(), true, true);
     assert!(!diags.iter().any(ilang_package::Diagnostic::is_error));
     let checked = ilang_check::check(&graph);
-    if ilang_check::ONE_CLAUSE_AS_CASE {
-        let diagnostics = graph.sources.render_all(&checked.diags).join("\n");
-        assert!(diagnostics.contains("error[E0506]"), "{diagnostics}");
-        assert!(
-            diagnostics.contains("`.name` needs a known type"),
-            "{diagnostics}"
-        );
-        assert!(
-            checked.types.is_none(),
-            "an incomplete field access must not reach lowering"
-        );
-    } else {
-        assert!(
-            !checked
-                .diags
-                .iter()
-                .any(ilang_package::Diagnostic::is_error)
-        );
-        for target in [ilang_wasm::Target::Ilang, ilang_wasm::Target::Wasi] {
-            ilang_wasm::compile_wat(
-                &graph,
-                checked.program.as_ref().unwrap(),
-                checked.types.as_ref().unwrap(),
-                ilang_wasm::Options {
-                    tests: true,
-                    target,
-                },
-            )
-            .unwrap();
-        }
+
+    assert!(
+        !checked
+            .diags
+            .iter()
+            .any(ilang_package::Diagnostic::is_error)
+    );
+    for target in [ilang_wasm::Target::Ilang, ilang_wasm::Target::Wasi] {
+        ilang_wasm::compile_wat(
+            &graph,
+            checked.program.as_ref().unwrap(),
+            checked.types.as_ref().unwrap(),
+            ilang_wasm::Options {
+                tests: true,
+                target,
+            },
+        )
+        .unwrap();
     }
 }
 
@@ -150,37 +133,40 @@ fn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {
 }
 
 #[test]
-fn check_old_joined_type_call_explains_the_migration_path() {
-    // D10: a parse error in an otherwise valid old file names --from-old.
-    let dir = front_end_project("Id(a) = a  (p, q) = (1, 2)");
+fn old_forms_have_helpful_errors_without_reserving_names() {
+    // A3 ruling 1: valid new calls stay calls; hints belong to errors only.
+    for (source, hint) in [
+        ("export(x)", "header groups"),
+        ("export()", "old empty header, omit it"),
+        ("import()", "old empty header, omit it"),
+        ("x = case(1)", "e |>"),
+        ("import(i/core)", "header groups"),
+        (
+            /* old-syntax-check: E0101 */ "x = case 1 { 0 -> 1  _ -> 2 }",
+            "e |>",
+        ),
+        (
+            /* old-syntax-check: E0111,E0101 */ "x = 1 |> { n if True -> n }",
+            "? condition",
+        ),
+        ("id = (x: a) { x }", "type of a value"),
+    ] {
+        let dir = front_end_project(source);
+        let out = Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(["check", "--project"])
+            .arg(dir.path())
+            .output()
+            .unwrap();
+        let err = String::from_utf8(out.stderr).unwrap();
+        assert!(!out.status.success(), "{source}");
+        assert!(err.contains(hint), "{source}: {err}");
+    }
+    let dir = front_end_project(
+        "import = (x) { x }\nexport = import\ncase = export\nif = case\nx = if(1)\n",
+    );
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
         .args(["check", "--project"])
         .arg(dir.path())
-        .output()
-        .unwrap();
-    assert!(!out.status.success());
-    assert!(
-        String::from_utf8(out.stderr)
-            .unwrap()
-            .contains("i fmt --from-old")
-    );
-}
-
-#[test]
-fn migration_flags_check_before_writing_and_keep_layout() {
-    let source = "// heading\nexport (id)\nid = (x: a) { x } // tail\n";
-    let dir = front_end_project(source);
-    let file = dir.path().join("src/main.i");
-    let out = Command::new(env!("CARGO_BIN_EXE_i"))
-        .args(["fmt", "--from-old", "--check", "--report"])
-        .arg(&file)
-        .output()
-        .unwrap();
-    assert!(!out.status.success());
-    assert_eq!(std::fs::read_to_string(&file).unwrap(), source);
-    let out = Command::new(env!("CARGO_BIN_EXE_i"))
-        .args(["fmt", "--keep-layout"])
-        .arg(&file)
         .output()
         .unwrap();
     assert!(
@@ -188,15 +174,21 @@ fn migration_flags_check_before_writing_and_keep_layout() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    let result = std::fs::read_to_string(&file).unwrap();
-    assert!(result.contains("id(A) = (x: A) { x } // tail"));
-    assert!(result.starts_with("// heading\n"));
-    assert!(!result.contains("export"));
-    let out = Command::new(env!("CARGO_BIN_EXE_i"))
-        .args(["fmt", "--from-old"])
-        .arg(&file)
-        .output()
-        .unwrap();
-    assert!(!out.status.success());
-    assert_eq!(std::fs::read_to_string(&file).unwrap(), result);
+}
+
+#[test]
+fn migration_flags_are_removed() {
+    for flag in [
+        "--from-old",
+        "--keep-layout",
+        "--report",
+        "--no-choices-split",
+    ] {
+        let out = Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(["fmt", flag])
+            .output()
+            .unwrap();
+        assert!(!out.status.success());
+        assert!(String::from_utf8_lossy(&out.stderr).contains("unexpected argument"));
+    }
 }

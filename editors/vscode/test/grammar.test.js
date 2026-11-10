@@ -106,10 +106,13 @@ test("token scopes of sample.i", async () => {
 
   has("////", "comment.line.documentation.module.i");
   has("///", "comment.line.documentation.i");
-  has("import", "keyword.control.import.i");
-  has("export", "keyword.control.import.i");
-  has("case", "keyword.control.conditional.i");
-  has("if", "keyword.control.conditional.i");
+  has("(", "punctuation.definition.header.begin.i");
+  has("?", "keyword.operator.guard.i");
+  has("|>", "keyword.operator.match.i");
+  has("A", "entity.name.type.parameter.i");
+  for (const word of ["import", "export", "case", "if"]) {
+    assert.ok(scopesOf(tokens, word).every((s) => !s.some((x) => x.startsWith("keyword.control"))));
+  }
   has("@", "punctuation.definition.annotation.i");
   for (const a of ["main", "test", "external", "host", "deprecated"]) {
     has(a, "storage.type.annotation.i");
@@ -161,4 +164,11 @@ test("token scopes of sample.i", async () => {
     fs.writeFileSync(snapshotPath, actual);
   }
   assert.strictEqual(actual, fs.readFileSync(snapshotPath, "utf8"));
+});
+
+
+test("header scopes stop at the first item", async () => {
+  const grammar = await loadGrammar();
+  const tokens = tokenize(grammar, "f = () {\n  (a, b) = (1, 2)\n  a\n}\n");
+  assert.ok(!tokens.some((t) => t.includes("meta.header.i")));
 });

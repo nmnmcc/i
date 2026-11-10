@@ -2,9 +2,7 @@
 //! the meaning needs them, so printing and then parsing gives the same tree.
 //! The explicit mode also puts every operator inside another one in `{ }`.
 //!
-//! Each node is printed in the syntax it was written in: an old `case` and
-//! the old header keywords in the old syntax (until stream A3), and the new
-//! forms in the new syntax. A tree that does not come from the parser (from
+//! A tree that does not come from the parser (from
 //! another surface or a macro) may have no groups; the printer adds a group
 //! only where the parser would read the text without it in another way.
 //! [`unprintable`] finds the trees that have no text with the same meaning.
@@ -69,29 +67,9 @@ fn is_simple(e: &Expr) -> bool {
     }
 }
 
-/// An expression with a function without `->` outside all brackets, which
-/// would end too early after `case` (§1.7).
-pub(crate) fn has_open_fn(e: &Expr) -> bool {
-    match &e.kind {
-        ExprKind::Fn(f) => f.ret.is_none(),
-        ExprKind::Binary { lhs, rhs, .. } => has_open_fn(lhs) || has_open_fn(rhs),
-        ExprKind::Unary { expr: e, .. }
-        | ExprKind::Call { callee: e, .. }
-        | ExprKind::Field { target: e, .. }
-        | ExprKind::TupleIndex { target: e, .. } => has_open_fn(e),
-        _ => false,
-    }
-}
-
 /// A match `e |> { … }` (§6.12).
 pub(crate) fn is_match(e: &Expr) -> bool {
-    matches!(
-        e.kind,
-        ExprKind::Case {
-            syntax: Syntax::New,
-            ..
-        }
-    )
+    matches!(e.kind, ExprKind::Case { .. })
 }
 
 /// The function that `e` starts with, through operators, calls, `.f`, and
@@ -109,9 +87,8 @@ pub(crate) fn leading_fn(e: &Expr) -> Option<&Function> {
 
 /// Whether the first clause of a clause block is in a place where a clause
 /// expression that starts with a function would be read in another way
-/// (§6.1): (1) a lone clause block whose first pattern starts with `(`
-/// (until stream A3, E0113), and (2) a first pattern `n1 = … = ( … )`.
-pub(crate) fn first_clause_needs_group(clauses: &[Clause], lone: bool) -> bool {
+/// (§6.1): a first pattern `n1 = … = ( … )`.
+pub(crate) fn first_clause_needs_group(clauses: &[Clause]) -> bool {
     if clauses
         .first()
         .is_some_and(|c| c.guard.is_some() || c.patterns.len() != 1)
@@ -122,7 +99,6 @@ pub(crate) fn first_clause_needs_group(clauses: &[Clause], lone: bool) -> bool {
         return false;
     };
     match &first.kind {
-        PatternKind::Tuple(_) => lone,
         PatternKind::Named { .. } => {
             let mut p = first;
             while let PatternKind::Named { pattern, .. } = &p.kind {
@@ -194,12 +170,7 @@ fn find_unprintable(e: &Expr, found: &mut Option<Span>) {
                     }
                 }
             }
-            let lone = matches!(e.kind, ExprKind::Clauses(_));
-            let new = lone || is_match(e);
-            if new
-                && first_clause_needs_group(cs, lone)
-                && leading_fn(&cs[0].body).is_some_and(fn_with_tail)
-            {
+            if first_clause_needs_group(cs) && leading_fn(&cs[0].body).is_some_and(fn_with_tail) {
                 note(cs[0].body.span);
             }
         }
@@ -340,10 +311,7 @@ impl Printer {
             self.w(&format!("////{d}\n"));
         }
         if !m.imports.is_empty() || m.imports_span.is_some() {
-            self.w(match m.imports_style {
-                HeaderStyle::Keyword => "import (",
-                HeaderStyle::Group => "(",
-            });
+            self.w("(");
             self.indent += 1;
             for item in &m.imports {
                 self.nl();
@@ -362,10 +330,7 @@ impl Printer {
             self.w("\n)\n");
         }
         if !m.exports.is_empty() || m.exports_span.is_some() {
-            self.w(match m.exports_style {
-                HeaderStyle::Keyword => "export (",
-                HeaderStyle::Group => "(",
-            });
+            self.w("(");
             self.list(&m.exports, |p, e| {
                 p.w(&e.name.name);
                 if e.constructors {
@@ -586,22 +551,13 @@ impl Printer {
             }
             ExprKind::Block(b) => self.block(b),
             ExprKind::Fn(f) => self.function(f),
-            ExprKind::Case {
-                subject,
-                clauses,
-                syntax: Syntax::Old,
-            } => self.case(subject, clauses),
-            ExprKind::Case {
-                subject,
-                clauses,
-                syntax: Syntax::New,
-            } => {
+            ExprKind::Case { subject, clauses } => {
                 // §6.9: `|>` is stronger than the operators of levels 1 to 5.
                 self.expr(subject, 6);
                 self.w(" |> ");
-                self.clauses(clauses, false);
+                self.clauses(clauses);
             }
-            ExprKind::Clauses(clauses) => self.clauses(clauses, true),
+            ExprKind::Clauses(clauses) => self.clauses(clauses),
             ExprKind::Call { callee, args } => {
                 self.expr(callee, 10);
                 self.args(args);
@@ -681,29 +637,16 @@ impl Printer {
         self.block(&f.body);
     }
 
-    fn case(&mut self, subject: &Expr, clauses: &[Clause]) {
-        self.w("case ");
-        if has_open_fn(subject) {
-            self.w("{ ");
-            self.expr(subject, 0);
-            self.w(" }");
-        } else {
-            self.expr(subject, 0);
-        }
-        self.w(" ");
-        self.clause_lines(clauses, Syntax::Old, false);
-    }
-
     /// A clause block, lone or after `|>`.
-    fn clauses(&mut self, clauses: &[Clause], lone: bool) {
-        self.clause_lines(clauses, Syntax::New, lone);
+    fn clauses(&mut self, clauses: &[Clause]) {
+        self.clause_lines(clauses);
     }
 
-    fn clause_lines(&mut self, clauses: &[Clause], syntax: Syntax, lone: bool) {
+    fn clause_lines(&mut self, clauses: &[Clause]) {
         if clauses.is_empty() {
             return self.w("{}");
         }
-        let group_first = syntax == Syntax::New && first_clause_needs_group(clauses, lone);
+        let group_first = first_clause_needs_group(clauses);
         self.w("{");
         self.indent += 1;
         for (n, c) in clauses.iter().enumerate() {
@@ -712,16 +655,13 @@ impl Printer {
                 if i > 0 {
                     self.w(" | ");
                 }
-                let guard = syntax == Syntax::New && c.guard.is_some();
+                let guard = c.guard.is_some();
                 self.fn_next = i + 1 < c.patterns.len() || guard;
                 self.pattern(p, true);
                 self.fn_next = false;
             }
             if let Some(g) = &c.guard {
-                self.w(match syntax {
-                    Syntax::Old => " if ",
-                    Syntax::New => " ? ",
-                });
+                self.w(" ? ");
                 self.expr(g, 0);
             }
             self.w(" -> ");
@@ -892,7 +832,6 @@ impl Printer {
                 }
                 return;
             }
-            TypeKind::Var(n) => return self.w(n),
             TypeKind::ValueOf { module, name } => {
                 if let Some(m) = module {
                     self.w(&format!("{}.", m.name));

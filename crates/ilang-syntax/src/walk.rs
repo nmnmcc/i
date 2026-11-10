@@ -53,7 +53,7 @@ macro_rules! fields {
     };
 }
 fields!(Ident { name, span } skip {});
-fields!(Module { doc, imports, exports, items, imports_span, exports_span } skip { imports_style, exports_style });
+fields!(Module { doc, imports, exports, items, imports_span, exports_span } skip {  });
 fields!(ImportItem { alias, names, path, span } skip {});
 fields!(ExportItem { name, span } skip { constructors });
 fields!(Item { doc, attributes, kind, span } skip {});
@@ -158,11 +158,7 @@ impl Walk for ExprKind {
             Self::BitArray(ss) => ss.walk(v),
             Self::Block(b) => b.walk(v),
             Self::Fn(f) => f.walk(v),
-            Self::Case {
-                subject,
-                clauses,
-                syntax: _,
-            } => {
+            Self::Case { subject, clauses } => {
                 subject.walk(v);
                 clauses.walk(v);
             }
@@ -244,7 +240,6 @@ impl Walk for TypeKind {
                 name.walk(v);
                 args.walk(v);
             }
-            Self::Var(s) => s.walk(v),
             Self::ValueOf { module, name } => {
                 module.walk(v);
                 name.walk(v);

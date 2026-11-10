@@ -1,3 +1,4 @@
+// old-syntax-check: E0106
 // spec: 1.7
 // expect: compile-error E0106
 (main)

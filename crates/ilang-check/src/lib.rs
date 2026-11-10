@@ -51,7 +51,7 @@ pub mod code {
     pub const TYPE_PARAM_FORM: &str = "E0232";
     pub const ALIAS_PATTERN_RESERVED: &str = "E0233";
     pub const MACRO_RESERVED: &str = "E0234";
-    pub const TYPE_VAR_MIXED: &str = "E0236";
+    pub const LOWERCASE_TYPE_RESERVED: &str = "E0237";
     pub const CHOICES_ONE_CLAUSE: &str = "E0235";
     // Attributes and entry points.
     pub const UNKNOWN_ATTRIBUTE: &str = "E0301";
@@ -171,13 +171,8 @@ pub fn check(graph: &PackageGraph) -> Checked {
     let types = match &program {
         Some(p) if !diags.iter().any(Diagnostic::is_error) => {
             let (typed, more) = types::check(p, &graph.sources);
-            // The old-rule audit can remove an expected type from a new
-            // match subject. Keep E0506, but do not let audit codegen use
-            // the incomplete field/call information after that diagnostic.
-            let audit_needs_type =
-                ONE_CLAUSE_AS_CASE && more.iter().any(|d| d.code == code::NEEDS_KNOWN_TYPE);
             diags.extend(more);
-            (!audit_needs_type).then_some(typed)
+            Some(typed)
         }
         _ => None,
     };
@@ -187,7 +182,3 @@ pub fn check(graph: &PackageGraph) -> Checked {
         diags,
     }
 }
-
-/// Only for the E2 equivalence audit. A3 removes this feature.
-pub const ONE_CLAUSE_AS_CASE: bool = cfg!(feature = "one-clause-as-case");
-const _: () = assert!(!(ONE_CLAUSE_AS_CASE && !cfg!(debug_assertions)));

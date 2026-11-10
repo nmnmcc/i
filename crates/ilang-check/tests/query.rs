@@ -287,6 +287,7 @@ fn definitions() {
 fn definitions_with_a_syntax_error() {
     let f = Fixture::new(&[(
         "src/main.i",
+        /* old-syntax-check: E0101 */
         "f = (n) { n + 1 }\ng = () { f(1) }\nh = (x) { x + }\n",
     )]);
     assert!(f.checked.diags.iter().any(|d| d.is_error()));
@@ -310,10 +311,11 @@ fn completions_in_scope() {
     ] {
         assert!(ls.contains(&name), "{name} in {ls:?}");
     }
-    // Built-in names and types, and keywords.
-    for name in ["panic", "assert", "True", "Ok", "Int", "List", "case"] {
+    // Built-in names and types.
+    for name in ["panic", "assert", "True", "Ok", "Int", "List"] {
         assert!(ls.contains(&name), "{name} in {ls:?}");
     }
+    assert!(!ls.contains(&"case"));
     // Names of other functions are not in scope.
     assert!(!ls.contains(&"label") && !ls.contains(&"a"), "{ls:?}");
     assert!(cs.contains(&("z".into(), CompletionKind::Local)));

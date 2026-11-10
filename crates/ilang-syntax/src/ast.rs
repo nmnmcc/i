@@ -17,29 +17,9 @@ pub struct Module {
     pub imports: Vec<ImportItem>,
     pub exports: Vec<ExportItem>,
     pub items: Vec<Item>,
-    /// The imports with their keyword, if any, and their group.
+    /// The imports group.
     pub imports_span: Option<Span>,
     pub exports_span: Option<Span>,
-    pub imports_style: HeaderStyle,
-    pub exports_style: HeaderStyle,
-}
-
-/// How the imports or the exports of a file are written: after the old
-/// keyword `import` or `export`, or as a group alone (§2.2). The keywords go
-/// in stream A3.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum HeaderStyle {
-    #[default]
-    Keyword,
-    Group,
-}
-
-/// The syntax a node was written in: the old one, until stream A3, or the
-/// new one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Syntax {
-    Old,
-    New,
 }
 
 /// `[alias =] [(A, b) =] a/b/c` (§2.3).
@@ -99,8 +79,7 @@ pub enum ItemKind {
 }
 
 /// `T(A, B) { C1 C2 }` or `T(A) = Type` (§4.3). `params` holds a head of
-/// plain names: all lowercase (the old form, until stream A3) or all
-/// `UpName`s with no module and no arguments. `head` holds any other head,
+/// plain `UpName`s with no module and no arguments. `head` holds any other head,
 /// and `params` is then empty.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeDef {
@@ -262,11 +241,10 @@ pub enum ExprKind {
     BitArray(Vec<Segment<Expr>>),
     Block(Block),
     Fn(Box<Function>),
-    /// `case e { … }` (old) or the match `e |> { … }` (new, §6.12).
+    /// The match `e |> { … }` (§6.12).
     Case {
         subject: Box<Expr>,
         clauses: Vec<Clause>,
-        syntax: Syntax,
     },
     /// A clause block that is not the right side of `|>` (§6.12).
     Clauses(Vec<Clause>),
@@ -431,8 +409,7 @@ pub enum TypeKind {
         name: Ident,
         args: Vec<TypeExpr>,
     },
-    Var(String),
-    /// `a.x` with a lowercase `x`, kept for the type of a value (§3).
+    /// `name` or `a.x` with a lowercase `x`, kept for the type of a value (§3).
     ValueOf {
         module: Option<Ident>,
         name: Ident,

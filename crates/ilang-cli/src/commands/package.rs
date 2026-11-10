@@ -115,7 +115,7 @@ pub fn run(command: PackageCommand) -> Result<ExitCode> {
 fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
     if !is_name(name) || name == "i" {
         bail!(
-            "the package name `{name}` must be a name (§1.3): a lowercase letter, then lowercase letters, digits and `_`; and it may not be `i` or a keyword"
+            "the package name `{name}` must be a name (§1.3): a lowercase letter, then lowercase letters, digits and `_`; and it may not be `i`"
         );
     }
     let dir = path.unwrap_or_else(|| PathBuf::from(name));
@@ -1022,6 +1022,28 @@ fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interfac
         );
     }
     let dir = tmp.path().join(prefix);
+    let (graph, mut diags) = ilang_package::load_with(
+        &dir,
+        &LoadOptions {
+            tests: false,
+            write_lock: false,
+            ..LoadOptions::from_env()
+        },
+    );
+    diags.extend(ilang_check::check(&graph).diags);
+    let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
+    if !errors.is_empty()
+        && errors.iter().all(|d| {
+            d.source
+                .is_some_and(|s| ilang_syntax::old_syntax_marks(&graph.sources.get(s).text))
+        })
+    {
+        println!(
+            "the interface of `{tag}` is in the syntax from before {} (A3) and cannot be compared; check the interface by hand",
+            env!("CARGO_PKG_VERSION")
+        );
+        return Ok(None);
+    }
     Ok(Some(interface_of(&dir, false)?))
 }
 

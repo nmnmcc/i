@@ -14,21 +14,10 @@ use std::collections::HashMap;
 
 type PResult<X> = Result<X, Diagnostic>;
 
-/// The mode of the parser. `Old` reads only the old syntax, and `Both` reads
-/// the old and the new syntax. Stream A3 removes `Old` with the old syntax.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Mode {
-    Old,
-    Both,
-}
-
 /// What a `{` that begins an expression begins (§6.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Brace {
     Block,
-    /// A block whose first statement starts with `( … ) -> T {`, which the
-    /// two syntaxes read in different ways (E0113, until stream A3).
-    Ambiguous,
     Clauses,
     /// `{ name: … }`, kept for records (E0114); read as clauses.
     Record,
@@ -43,35 +32,27 @@ pub struct ParseStats {
     pub braces: usize,
 }
 
-/// Parses a module in the old and the new syntax. The module is complete as
+/// Parses a module in the syntax of §2.2. The module is complete as
 /// far as the source allows; the diagnostics say what was wrong, sorted by
 /// position.
 pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
-    let (module, diags, _) = run(source, Mode::Both, true);
-    (module, diags)
-}
-
-/// Parses a module in the old syntax only, as the parser did before the new
-/// syntax: every `{` that begins an expression is a block. For the migration
-/// and the tests; stream A3 removes it.
-pub fn parse_module_old(source: &str) -> (Module, Vec<Diagnostic>) {
-    let (module, diags, _) = run(source, Mode::Old, true);
+    let (module, diags, _) = run(source, true);
     (module, diags)
 }
 
 #[doc(hidden)]
 pub fn parse_stats(source: &str) -> ParseStats {
-    run(source, Mode::Both, true).2
+    run(source, true).2
 }
 
 /// Parses without reusing brace decisions, for the cache equivalence test.
 #[doc(hidden)]
 pub fn parse_module_uncached(source: &str) -> (Module, Vec<Diagnostic>) {
-    let (module, diags, _) = run(source, Mode::Both, false);
+    let (module, diags, _) = run(source, false);
     (module, diags)
 }
 
-fn run(source: &str, mode: Mode, cache: bool) -> (Module, Vec<Diagnostic>, ParseStats) {
+fn run(source: &str, cache: bool) -> (Module, Vec<Diagnostic>, ParseStats) {
     let lexed = lex(source);
     let mut parser = Parser {
         toks: &lexed.tokens,
@@ -80,9 +61,7 @@ fn run(source: &str, mode: Mode, cache: bool) -> (Module, Vec<Diagnostic>, Parse
         doc_pos: 0,
         pos: 0,
         diags: Vec::new(),
-        no_brace: false,
         guard: false,
-        mode,
         decided: HashMap::new(),
         decisions: 0,
         tuple_type: false,
@@ -98,10 +77,16 @@ fn run(source: &str, mode: Mode, cache: bool) -> (Module, Vec<Diagnostic>, Parse
     diags.sort_by_key(|d| d.span.start);
     // Recovery may go on at the token that failed, and fail there again.
     diags.dedup();
+    if !diags.is_empty()
+        && let Some(hint) = crate::old_syntax_hint(source)
+    {
+        for d in &mut diags {
+            d.message.push_str("; ");
+            d.message.push_str(hint);
+        }
+    }
     (module, diags, stats)
 }
-
-const DUAL_AMBIGUOUS: &str = "until the old syntax is removed, a `{` whose first statement starts with `( … ) -> T {` is not allowed: the old syntax reads it as a block that starts with a function, and the new syntax as a clause block. For a function, bind it to a name first, and write its type on the name when the place gave it one: `g: (Int) -> T = (x) -> T { … }`. For a clause whose expression starts with a function, put that expression in a group: `(x) -> { (y) { y } }`; when that function has a `->` part, also bind it to a name with its type inside the group: `(x) -> { g: (Int) -> Int = (y) -> Int { y }  g }`";
 
 const RECORD_RESERVED: &str =
     "`{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`";
@@ -115,15 +100,11 @@ struct Parser<'a> {
     doc_pos: usize,
     pos: usize,
     diags: Vec<Diagnostic>,
-    /// Set in the expression after `case`: a `{` after a complete expression
-    /// ends it (§1.7). Cleared inside brackets.
-    no_brace: bool,
     /// Set in a guard: a `->` ends the clause head, so it never makes a `( )`
     /// a function (§6.1). Cleared inside brackets.
     guard: bool,
-    mode: Mode,
     /// The decision for each `{` that begins an expression, by the index of
-    /// its token. A decision depends only on the tokens and the mode, so it
+    /// its token. A decision depends only on the tokens, so it
     /// holds after a speculative parse goes back.
     decided: HashMap<usize, Brace>,
     decisions: usize,
@@ -188,24 +169,19 @@ fn starts_with_clauses(e: &Expr) -> bool {
 }
 
 /// The parameters of a type definition head when it is a list of plain
-/// names: all lowercase (old, until stream A3) or all `UpName`s with no
+/// `UpName`s with no
 /// module and no arguments (§4.3).
 fn head_params(types: &[TypeExpr]) -> Option<Vec<Ident>> {
-    let lower = types.iter().all(|t| matches!(t.kind, TypeKind::Var(_)));
     let upper = types
         .iter()
         .all(|t| matches!(&t.kind, TypeKind::Named { module: None, args, .. } if args.is_empty()));
-    if !(lower || upper) {
+    if !upper {
         return None;
     }
     Some(
         types
             .iter()
             .map(|t| match &t.kind {
-                TypeKind::Var(n) => Ident {
-                    name: n.clone(),
-                    span: t.span,
-                },
                 TypeKind::Named { name, .. } => name.clone(),
                 _ => unreachable!(),
             })
@@ -322,13 +298,12 @@ impl Parser<'_> {
         Ok(Some(module))
     }
 
-    /// Runs `f` inside brackets, where the `case` and guard restrictions do
-    /// not hold.
+    /// Runs `f` inside brackets, where the guard restriction does not hold.
     fn nested<X>(&mut self, f: impl FnOnce(&mut Self) -> PResult<X>) -> PResult<X> {
-        let saved = (self.no_brace, self.guard);
-        (self.no_brace, self.guard) = (false, false);
+        let saved = self.guard;
+        self.guard = false;
         let result = f(self);
-        (self.no_brace, self.guard) = saved;
+        self.guard = saved;
         result
     }
 
@@ -370,9 +345,8 @@ impl Parser<'_> {
     fn recover(&mut self, start: usize, end: usize) {
         let failed = self.pos;
         let top = end + 1 == self.toks.len();
-        let resumes = |t: &Token| {
-            t.brk && !(top && matches!(t.kind, T::LBrace | T::Bang | T::DotDot | T::Case))
-        };
+        let resumes =
+            |t: &Token| t.brk && !(top && matches!(t.kind, T::LBrace | T::Bang | T::DotDot));
         let mut i = start;
         while i < end && !(i > start && i >= failed && resumes(&self.toks[i])) {
             i = match self.close[i] {
@@ -419,41 +393,28 @@ impl Parser<'_> {
         loop {
             let start = self.pos;
             let from = self.start();
-            let keyword = if self.at(&T::Import) && !imports && !exports {
-                Some(true)
-            } else if self.at(&T::Export) && !exports {
-                Some(false)
+            let is_import = if self.at_header_group() {
+                let close = self.close[self.pos].unwrap() as usize;
+                let is_import = self.slash_inside(self.pos, close);
+                let msg = if close == self.pos + 1 {
+                    Some("a file with nothing to import or export leaves the group out")
+                } else if is_import && exports {
+                    Some("the imports come before the exports")
+                } else if is_import && imports || !is_import && exports {
+                    Some("a file has at most one imports group and one exports group")
+                } else {
+                    None
+                };
+                if let Some(msg) = msg {
+                    let span = Span::new(from, self.toks[close].span.end);
+                    self.diags
+                        .push(Diagnostic::new(Code::HeaderGroup, span, msg));
+                    self.pos = (close + 1).min(eof);
+                    continue;
+                }
+                is_import
             } else {
-                None
-            };
-            let (is_import, style) = match keyword {
-                Some(is_import) => {
-                    self.bump();
-                    (is_import, HeaderStyle::Keyword)
-                }
-                None if self.mode == Mode::Both && self.at_header_group() => {
-                    // both: old gave E0101 here (a tuple without `=` is not an item).
-                    let close = self.close[self.pos].unwrap() as usize;
-                    let is_import = self.slash_inside(self.pos, close);
-                    let msg = if close == self.pos + 1 {
-                        Some("a file with nothing to import or export leaves the group out")
-                    } else if is_import && exports {
-                        Some("the imports come before the exports")
-                    } else if is_import && imports || !is_import && exports {
-                        Some("a file has at most one imports group and one exports group")
-                    } else {
-                        None
-                    };
-                    if let Some(msg) = msg {
-                        let span = Span::new(from, self.toks[close].span.end);
-                        self.diags
-                            .push(Diagnostic::new(Code::HeaderGroup, span, msg));
-                        self.pos = (close + 1).min(eof);
-                        continue;
-                    }
-                    (is_import, HeaderStyle::Group)
-                }
-                None => break,
+                break;
             };
             if is_import {
                 imports = true;
@@ -461,7 +422,6 @@ impl Parser<'_> {
                     Ok(items) => {
                         module.imports = items;
                         module.imports_span = Some(self.span_from(from));
-                        module.imports_style = style;
                     }
                     Err(d) => {
                         self.diags.push(d);
@@ -474,7 +434,6 @@ impl Parser<'_> {
                     Ok(items) => {
                         module.exports = items;
                         module.exports_span = Some(self.span_from(from));
-                        module.exports_style = style;
                     }
                     Err(d) => {
                         self.diags.push(d);
@@ -518,7 +477,7 @@ impl Parser<'_> {
         false
     }
 
-    /// The group of imports, after the keyword if there is one.
+    /// The imports group.
     fn import(&mut self) -> PResult<Vec<ImportItem>> {
         self.expect(&T::LParen)?;
         self.seq(T::RParen, true, |p| {
@@ -556,7 +515,7 @@ impl Parser<'_> {
         })
     }
 
-    /// The group of exports, after the keyword if there is one.
+    /// The exports group.
     fn export(&mut self) -> PResult<Vec<ExportItem>> {
         self.expect(&T::LParen)?;
         self.seq(T::RParen, true, |p| {
@@ -586,10 +545,6 @@ impl Parser<'_> {
     }
 
     fn item(&mut self) -> PResult<Item> {
-        if matches!(self.kind(), T::Import | T::Export) {
-            let msg = "`import` and `export` come first in a file, `import` before `export`, at most once each";
-            return Err(Diagnostic::new(Code::ImportPlacement, self.tok().span, msg));
-        }
         let mut doc = self.take_docs();
         let start = self.start();
         let mut attributes = Vec::new();
@@ -598,9 +553,7 @@ impl Parser<'_> {
             // §1.2: a `///` after an attribute is still before the item.
             doc.extend(self.take_docs());
         }
-        let both = self.mode == Mode::Both;
-        // both: old gave E0101 here (no pattern is followed by `=`).
-        if both && self.at_header_group() {
+        if self.at_header_group() {
             let close = self.close[self.pos].unwrap() as usize;
             let span = Span::new(self.start(), self.toks[close].span.end);
             let msg = if attributes.is_empty() {
@@ -611,18 +564,9 @@ impl Parser<'_> {
             self.pos = (close + 1).min(self.toks.len() - 1);
             return Err(Diagnostic::new(Code::HeaderGroup, span, msg));
         }
-        let kind = if !both && attributes.iter().any(|a| a.name.name == "external") {
-            let name = self.name()?;
-            self.expect(&T::Colon)?;
-            ItemKind::Declaration {
-                name,
-                type_params: Vec::new(),
-                ty: self.ty()?,
-            }
-        } else if matches!(self.kind(), T::UpName(_)) {
+        let kind = if matches!(self.kind(), T::UpName(_)) {
             ItemKind::TypeDef(self.type_def()?)
-        } else if both && self.at_type_params() {
-            // both: old gave E0101 here (`name(A)` is not followed by `=`).
+        } else if self.at_type_params() {
             let bstart = self.start();
             let (name, type_params, ty) = self.declared_head()?;
             match ty {
@@ -643,8 +587,7 @@ impl Parser<'_> {
                     })
                 }
             }
-        } else if both && self.at_macro_item() {
-            // both: old gave E0101 here (a call is not an item).
+        } else if self.at_macro_item() {
             let module = if *self.nth(1) == T::Dot {
                 let module = self.name()?;
                 self.bump();
@@ -783,28 +726,6 @@ impl Parser<'_> {
 
     fn attribute(&mut self) -> PResult<Attribute> {
         let start = self.bump().start;
-        if self.mode == Mode::Old {
-            let name = self.name()?;
-            let mut args = Vec::new();
-            if self.at_joined(&T::LParen) {
-                self.bump();
-                args = self.seq(T::RParen, false, |p| match p.kind() {
-                    T::Str(s) => {
-                        let s = s.clone();
-                        Ok((s, p.bump()))
-                    }
-                    _ => p.error("a string"),
-                })?;
-            }
-            return Ok(Attribute {
-                module: None,
-                name,
-                args,
-                call: None,
-                span: self.span_from(start),
-            });
-        }
-        // both: old gave E0101 here for a module, a call, and `()`.
         let module = if matches!(self.kind(), T::Name(_))
             && *self.nth(1) == T::Dot
             && matches!(self.nth(2), T::Name(_))
@@ -850,15 +771,10 @@ impl Parser<'_> {
         let mut head = Vec::new();
         if self.at_joined(&T::LParen) {
             self.bump();
-            if self.mode == Mode::Old {
-                params = self.seq(T::RParen, false, Self::name)?;
-            } else {
-                // both: old gave E0101 here for a head that is not names.
-                let types = self.seq(T::RParen, false, Self::ty)?;
-                match head_params(&types) {
-                    Some(names) => params = names,
-                    None => head = types,
-                }
+            let types = self.seq(T::RParen, false, Self::ty)?;
+            match head_params(&types) {
+                Some(names) => params = names,
+                None => head = types,
             }
         }
         if self.eat(&T::Eq) {
@@ -971,8 +887,7 @@ impl Parser<'_> {
             let span = self.span_from(start);
             return Ok(Stmt::Env { ty, value, span });
         }
-        if self.mode == Mode::Both && self.at_type_params() {
-            // both: old gave E0101 here (`name(A)` is not followed by `=`).
+        if self.at_type_params() {
             let (name, type_params, ty) = self.declared_head()?;
             let pattern = Self::declared_pattern(name, ty);
             self.expect(&T::Eq)?;
@@ -1051,11 +966,9 @@ impl Parser<'_> {
             }
             self.bump();
             let rhs = self.binary(op.level())?;
-            if self.mode == Mode::Both
-                && op == BinOp::Pipe
+            if op == BinOp::Pipe
                 && let ExprKind::Clauses(_) = rhs.kind
             {
-                // both: old gave E0111 here (a block after `|>`).
                 let ExprKind::Clauses(clauses) = rhs.kind else {
                     unreachable!()
                 };
@@ -1063,7 +976,6 @@ impl Parser<'_> {
                     kind: ExprKind::Case {
                         subject: Box::new(lhs),
                         clauses,
-                        syntax: Syntax::New,
                     },
                     span: self.span_from(start),
                 };
@@ -1072,9 +984,7 @@ impl Parser<'_> {
             if op == BinOp::Pipe
                 && !(is_name(&rhs) || matches!(rhs.kind, ExprKind::Call { .. } | ExprKind::Fn(_)))
             {
-                let msg = if self.mode == Mode::Old {
-                    "the right side of `|>` must be a name, a call, or a function"
-                } else if matches!(
+                let msg = if matches!(
                     rhs.kind,
                     ExprKind::Binary { .. } | ExprKind::Field { .. } | ExprKind::TupleIndex { .. }
                 ) && starts_with_clauses(&rhs)
@@ -1242,16 +1152,8 @@ impl Parser<'_> {
                     p.segment(value, start)
                 })?)
             }
-            // both: old gave E0101 after a clause pattern, or E0105 for
-            // `{}`. E0113 keeps the old Block reading where both hold.
-            T::LBrace if self.mode == Mode::Both => match self.decide() {
+            T::LBrace => match self.decide() {
                 Brace::Block => ExprKind::Block(self.block()?),
-                Brace::Ambiguous => {
-                    let at = self.toks[self.pos + 1].span;
-                    self.diags
-                        .push(Diagnostic::new(Code::DualAmbiguous, at, DUAL_AMBIGUOUS));
-                    ExprKind::Block(self.block()?)
-                }
                 Brace::Clauses => ExprKind::Clauses(self.clauses()?),
                 Brace::Record => {
                     let at = self.tok().span;
@@ -1260,8 +1162,6 @@ impl Parser<'_> {
                     ExprKind::Clauses(self.clauses()?)
                 }
             },
-            T::LBrace => ExprKind::Block(self.block()?),
-            T::Case => self.case()?,
             _ => return self.error("an expression"),
         };
         Ok(Expr {
@@ -1299,8 +1199,7 @@ impl Parser<'_> {
         let start = self.start();
         let is_fn = self.close[self.pos].is_some_and(|c| {
             let next = &self.toks[c as usize + 1];
-            next.kind == T::Arrow && !self.guard
-                || next.kind == T::LBrace && !next.brk && !self.no_brace
+            next.kind == T::Arrow && !self.guard || next.kind == T::LBrace && !next.brk
         });
         self.bump();
         let kind = if is_fn {
@@ -1377,36 +1276,17 @@ impl Parser<'_> {
         })
     }
 
-    /// The old `case e { clauses }` (§6.12), until stream A3.
-    fn case(&mut self) -> PResult<ExprKind> {
-        self.bump();
-        let saved = std::mem::replace(&mut self.no_brace, true);
-        let subject = self.expr();
-        self.no_brace = saved;
-        let subject = Box::new(subject?);
-        if !self.at_joined(&T::LBrace) {
-            return self.error("`{` after the expression of `case`");
-        }
-        let clauses = self.braced(|p| p.clause(Syntax::Old))?;
-        Ok(ExprKind::Case {
-            subject,
-            clauses,
-            syntax: Syntax::Old,
-        })
-    }
-
     /// The clauses of a clause block, from its `{` (§6.12).
     fn clauses(&mut self) -> PResult<Vec<Clause>> {
-        self.braced(|p| p.clause(Syntax::New))
+        self.braced(Self::clause)
     }
 
-    /// `Pattern { "|" Pattern } [ guard ] "->" Expr`. The guard is `if e` in
-    /// an old `case` and `? e` in a clause block.
-    fn clause(&mut self, syntax: Syntax) -> PResult<Clause> {
+    /// `Pattern { "|" Pattern } [ "?" Expr ] "->" Expr`.
+    fn clause(&mut self) -> PResult<Clause> {
         let start = self.start();
         self.tuple_type = false;
         let patterns = self.clause_patterns();
-        let note = syntax == Syntax::New && self.tuple_type;
+        let note = self.tuple_type;
         let noted = |mut d: Diagnostic| {
             if note {
                 d.message.push_str(TUPLE_NOTE);
@@ -1414,7 +1294,7 @@ impl Parser<'_> {
             d
         };
         let patterns = patterns.map_err(noted)?;
-        let (guard, body) = self.clause_tail(syntax).map_err(noted)?;
+        let (guard, body) = self.clause_tail().map_err(noted)?;
         Ok(Clause {
             patterns,
             guard,
@@ -1431,16 +1311,8 @@ impl Parser<'_> {
         Ok(patterns)
     }
 
-    fn clause_tail(&mut self, syntax: Syntax) -> PResult<(Option<Expr>, Expr)> {
-        let word = match syntax {
-            Syntax::Old => T::If,
-            Syntax::New => T::Question,
-        };
-        if syntax == Syntax::New && self.at(&T::If) {
-            let msg = "a guard in a clause block is written with `?`";
-            return Err(Diagnostic::new(Code::Unexpected, self.tok().span, msg));
-        }
-        let guard = if self.eat(&word) {
+    fn clause_tail(&mut self) -> PResult<(Option<Expr>, Expr)> {
+        let guard = if self.eat(&T::Question) {
             self.guard = true;
             let guard = self.expr();
             self.guard = false;
@@ -1490,10 +1362,6 @@ impl Parser<'_> {
         if self.at_type_params() {
             return Brace::Block;
         }
-        // 1a: `( … ) -> T {`, which the old syntax reads as a function.
-        if self.at(&T::LParen) && !self.skips_1a(at, end) && self.fn_with_tail() {
-            return Brace::Ambiguous;
-        }
         // 2: the longest pattern, and what follows it.
         self.pos = s;
         let mut chain = 0;
@@ -1515,7 +1383,7 @@ impl Parser<'_> {
         if let Some(e) = p_end {
             self.pos = e;
             let follows = self.kind().clone();
-            if matches!(follows, T::Pipe | T::Question | T::Arrow | T::If) {
+            if matches!(follows, T::Pipe | T::Question | T::Arrow) {
                 if chain > 0 && last_is_tuple && follows == T::Arrow {
                     self.bump();
                     if self.arrow_tail().is_ok() && self.at_joined(&T::LBrace) {
@@ -1549,30 +1417,6 @@ impl Parser<'_> {
         }
         // 6.
         Brace::Block
-    }
-
-    /// Test 1a is not made for the `{` at `at`, which ends at `end`, when it
-    /// is the right side of `|>` and nothing that `postfix` goes on with
-    /// comes after its `}`: the old syntax never reads a block there.
-    fn skips_1a(&self, at: usize, end: usize) -> bool {
-        let after = &self.toks[(end + 1).min(self.toks.len() - 1)];
-        at > 0
-            && self.toks[at - 1].kind == T::PipeGt
-            && !(after.kind == T::LParen && !after.brk)
-            && after.kind != T::Dot
-    }
-
-    /// At `(`: a pattern `( … )`, then `->`, a `->` part, and a `{` on the
-    /// same line.
-    fn fn_with_tail(&mut self) -> bool {
-        let Some(close) = self.close[self.pos] else {
-            return false;
-        };
-        self.pattern_in(false).is_ok()
-            && self.pos == close as usize + 1
-            && self.eat(&T::Arrow)
-            && self.arrow_tail().is_ok()
-            && self.at_joined(&T::LBrace)
     }
 
     /// A `->` outside brackets from `s` to the next break or to `end`.
@@ -1908,12 +1752,10 @@ impl Parser<'_> {
             }
             T::Name(_) if self.at_qualified() => return self.named_type(),
             T::UpName(_) => return self.named_type(),
-            // both: J1 for a lowercase name before a `(` on its line; old
             // gave an error here for `a.x`.
             T::Name(_)
-                if self.mode == Mode::Both
-                    && (*self.nth(1) == T::Dot && matches!(self.nth(2), T::Name(_))
-                        || *self.nth(1) == T::LParen && !self.toks[self.pos + 1].brk) =>
+                if (*self.nth(1) == T::Dot && matches!(self.nth(2), T::Name(_))
+                    || *self.nth(1) == T::LParen && !self.toks[self.pos + 1].brk) =>
             {
                 let module = if *self.nth(1) == T::Dot {
                     let module = self.name()?;
@@ -1937,10 +1779,10 @@ impl Parser<'_> {
                     TypeKind::ValueOf { module, name }
                 }
             }
-            T::Name(n) => {
-                self.bump();
-                TypeKind::Var(n)
-            }
+            T::Name(_) => TypeKind::ValueOf {
+                module: None,
+                name: self.name()?,
+            },
             T::Discard(d) if d == "_" => {
                 self.bump();
                 TypeKind::Hole

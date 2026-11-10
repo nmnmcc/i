@@ -16,11 +16,11 @@ fn checked(src: &str) -> (ilang_package::PackageGraph, ilang_check::Checked) {
 
 #[test]
 fn declared_frames_hide_outer_variables_and_generalize() {
-    // §3.10: every declared frame makes fresh variables, while an old
-    // variable already found in an outer frame remains that variable.
+    // §3.10: every declared frame makes fresh variables, while a variable
+    // used from an outer frame remains that variable.
     let (_, c) = checked(
         "outer(A) = (x: A) { inner(A) = (y: A) { y }
- (inner(1), inner(True), x) }\nold = (x: a) { inner(B) = (y: B, z: a) { (y, z) }  inner(1, x) }\nid(A) = (x: A) { y: A = x  y }\nuses = () { (id(1), id(True)) }",
+ (inner(1), inner(True), x) }\nnested(A) = (x: A) { inner(B) = (y: B, z: A) { (y, z) }  inner(1, x) }\nid(A) = (x: A) { y: A = x  y }\nuses = () { (id(1), id(True)) }",
     );
     let p = c.program.as_ref().unwrap();
     let m = p.module(common::module(p, "app/main"));
@@ -169,7 +169,7 @@ fn temporary_choices_error_and_kept_form_messages_are_independent_checks() {
         ("f(A) = (x: A(Int)) { x }", "E0230", "takes no arguments"),
         ("f(A, A) = 1", "E0226", "declared more than once"),
         ("f(Int) = 1", "E0231", "name of a type"),
-        ("f(A) = (x: a) { x }", "E0236", "must be declared too"),
+        ("f(A) = (x: a) { x }", "E0237", "type of a value"),
         (
             "f = (x: Missing) { x }",
             "E0202",

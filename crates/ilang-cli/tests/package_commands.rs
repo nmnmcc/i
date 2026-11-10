@@ -276,7 +276,7 @@ fn new_with_a_path_and_bad_names() {
     // The directory is not empty now.
     let err = w.fails(&["new", "tool", "--path", "nested/place"]);
     assert!(err.contains("not empty"), "{err}");
-    for bad in ["i", "Big", "1x", "import", "a-b"] {
+    for bad in ["i", "Big", "1x", "__bad", "a-b"] {
         let err = w.fails(&["new", bad]);
         assert!(err.contains("must be a name"), "{bad}: {err}");
     }
@@ -367,7 +367,7 @@ fn add_checks_the_names() {
     lib_repo(&w);
     let dir = app(&w);
     let project = dir.display().to_string();
-    for bad in ["i", "app", "Lib", "case"] {
+    for bad in ["i", "app", "Lib", "bad-name"] {
         let err = w.fails(&["add", bad, "example.com/lib@1.0.0", "--project", &project]);
         assert!(err.contains("§2.6"), "{bad}: {err}");
     }
@@ -1236,4 +1236,66 @@ fn add_over_a_dependency_written_as_a_table_keeps_its_comments() {
         read(&dir.join("i.toml")),
         "name = \"app\"\n\n[dependencies]\nother = \"example.com/lib@2.0.0\"\n# the util\nlib = \"example.com/lib@1.2.0\" # mine\n"
     );
+}
+
+#[test]
+fn build_and_check_explain_an_old_syntax_dependency_tag() {
+    let w = World::new();
+    // old-syntax-check: intentional old tag; parser E0101 for the old match.
+    let old = /* old-syntax-check: E0101 */ "import ((inspect) = i/core)\nexport (f)\nf = () { case 1 { 0 -> 0  _ -> 1 } }\n";
+    w.repo(
+        "legacy",
+        &[(
+            "1.0.0",
+            &[("i.toml", "name = \"legacy\"\n"), ("src/api.i", old)],
+        )],
+    );
+    let dir = w.project(
+        "app",
+        &[
+            (
+                "i.toml",
+                "name = \"app\"\n[dependencies]\nlegacy = \"example.com/legacy@1.0.0\"\n",
+            ),
+            ("src/main.i", "(legacy/api)\nx = api.f()\n"),
+        ],
+    );
+    for command in ["build", "check"] {
+        let err = w.fails(&[command, "--project", dir.to_str().unwrap()]);
+        assert!(err.contains("error[E0101]"), "{err}");
+        assert_eq!(
+            err.matches("this version of `legacy` (`v1.0.0`)").count(),
+            1,
+            "{err}"
+        );
+        assert!(
+            err.contains("use a newer version of the package, or an older version of `i`"),
+            "{err}"
+        );
+    }
+}
+
+#[test]
+fn publish_skips_an_old_syntax_interface_and_allows_a_patch() {
+    let w = World::new();
+    // old-syntax-check: intentional old tag; export is a reserved MacroItem.
+    let dir = w.project(
+        "legacy",
+        &[
+            ("i.toml", "name = \"legacy\"\n"),
+            ("src/api.i", "export (f)\nf = () { 1 }\n"),
+        ],
+    );
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "old syntax");
+    git(&dir, &["tag", "v1.0.0"]);
+    write(&dir, &[("src/api.i", "(f)\nf = () { 1 }\n")]);
+    commit(&dir, "new syntax");
+    let out = w.ok(&["publish", "1.0.1", "--project", dir.to_str().unwrap()]);
+    assert!(
+        out.contains("the interface of `v1.0.0` is in the syntax from before"),
+        "{out}"
+    );
+    assert!(out.contains("check the interface by hand"), "{out}");
+    assert_eq!(git(&dir, &["tag", "--list", "v1.0.1"]), "v1.0.1");
 }

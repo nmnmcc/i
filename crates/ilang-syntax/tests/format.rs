@@ -105,9 +105,7 @@ fn check(src: &str) -> Result<(), String> {
     if !diags.is_empty() {
         return Err(format!("the output has errors: {diags:?}\n{out}"));
     }
-    let plan = ilang_syntax::migrate::plan(&module, &ilang_syntax::migrate::Env::new(&module));
-    let expected = ilang_syntax::migrate::apply(&plan, module);
-    if ilang_syntax::shape::canon(&expected) != ilang_syntax::shape::canon(&again) {
+    if ilang_syntax::shape::canon(&module) != ilang_syntax::shape::canon(&again) {
         return Err(format!("the output has another tree:\n{out}"));
     }
     if kept_comments(src) != comments(&out) {
@@ -122,10 +120,6 @@ fn check(src: &str) -> Result<(), String> {
         return Err(format!(
             "not idempotent:\n--- once ---\n{out}--- twice ---\n{twice}"
         ));
-    }
-    let next_plan = ilang_syntax::migrate::plan(&again, &ilang_syntax::migrate::Env::new(&again));
-    if !next_plan.is_empty() {
-        return Err(format!("output still needs migration: {next_plan:?}"));
     }
     let raw = raw_string_lines(&out);
     let docs = doc_lines(&out);
@@ -158,22 +152,9 @@ fn format_properties() {
     let mut failed = Vec::new();
     let mut skipped = Vec::new();
     for (name, src) in &sources {
-        let (module, diags) = parse_module(src);
+        let (_, diags) = parse_module(src);
         if !diags.is_empty() {
             skipped.push(format!("parse {name}"));
-            continue;
-        }
-        let plan = ilang_syntax::migrate::plan(&module, &ilang_syntax::migrate::Env::new(&module));
-        if let Some(refused) = &plan.refused {
-            skipped.push(format!("refused {name} {}", refused.reason));
-            continue;
-        }
-        if let Err(diags) = format(src)
-            && diags
-                .iter()
-                .any(|d| d.message.contains("reads differently in the old syntax"))
-        {
-            skipped.push(format!("refused {name} joined-type-call"));
             continue;
         }
         checked += 1;
