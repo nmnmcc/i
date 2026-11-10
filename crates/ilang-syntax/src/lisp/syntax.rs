@@ -24,6 +24,7 @@ struct SyntaxData {
     scope: Scope,
     span: Span,
     provenance: Provenance,
+    origin: Arc<()>,
 }
 
 /// Name provenance determines which foreign declarations `make` may reach.
@@ -102,6 +103,7 @@ impl Syntax {
             scope: scope.clone(),
             span,
             provenance: Provenance::Written,
+            origin: Arc::new(()),
         }))
     }
     pub fn from_datum(d: &Datum, scope: &Scope) -> Self {
@@ -127,6 +129,7 @@ impl Syntax {
             scope: scope.clone(),
             span: d.span,
             provenance: Provenance::Written,
+            origin: Arc::new(()),
         }))
     }
     pub fn node(&self) -> &Node {
@@ -147,6 +150,7 @@ impl Syntax {
             scope: self.scope().clone(),
             span: self.span(),
             provenance: self.provenance(),
+            origin: Arc::new(()),
         }))
     }
 
@@ -168,6 +172,7 @@ impl Syntax {
             scope: self.scope().clone(),
             span: self.span(),
             provenance: Provenance::Answer,
+            origin: Arc::new(()),
         }))
     }
     pub fn identical(&self, other: &Self) -> bool {
@@ -277,6 +282,7 @@ impl Syntax {
                     Provenance::Answer | Provenance::Made { from_answer: true }
                 ),
             },
+            origin: Arc::new(()),
         })))
     }
 
@@ -302,7 +308,13 @@ impl Syntax {
             scope,
             span: self.span(),
             provenance: self.provenance(),
+            origin: self.0.origin.clone(),
         }))
+    }
+
+    /// Whether two nodes are the same written or constructed node across mark changes.
+    pub fn same_origin(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0.origin, &other.0.origin)
     }
 
     /// Compare datums, ignoring provenance, scopes, and value identity.
@@ -467,4 +479,75 @@ impl Syntax {
             span: self.span(),
         }
     }
+}
+
+/// Validate the authority and datum restrictions on one macro result (§4.3).
+/// The inputs must be the syntax arguments of that run. Mark changes preserve
+/// node origins; rebuilding even an identical attribute does not.
+pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), SyntaxError> {
+    use std::collections::HashSet;
+    fn restricted(s: &Syntax) -> Option<&str> {
+        let Node::Round(xs) = s.node() else {
+            return None;
+        };
+        let [head, attr, _] = xs.as_slice() else {
+            return None;
+        };
+        if !matches!(head.node(), Node::Symbol(x) if x == "@") {
+            return None;
+        }
+        let name = match attr.node() {
+            Node::Name(name) => name.as_str(),
+            Node::Round(parts) => match parts.first().map(Syntax::node) {
+                Some(Node::Name(name)) => name.as_str(),
+                _ => return None,
+            },
+            _ => return None,
+        };
+        matches!(name, "external" | "host" | "js" | "macro").then_some(name)
+    }
+    fn descend<'a>(
+        root: &'a Syntax,
+        f: &mut impl FnMut(&'a Syntax) -> Result<(), SyntaxError>,
+    ) -> Result<(), SyntaxError> {
+        f(root)?;
+        match root.node() {
+            Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                for child in xs {
+                    descend(child, f)?;
+                }
+            }
+            Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => descend(x, f)?,
+            _ => {}
+        }
+        Ok(())
+    }
+    let mut allowed = HashSet::new();
+    for arg in arguments {
+        descend(arg, &mut |s| {
+            if restricted(s).is_some_and(|name| name != "macro") {
+                allowed.insert(Arc::as_ptr(&s.0.origin) as usize);
+            }
+            Ok(())
+        })?;
+    }
+    let mut used = HashSet::new();
+    descend(result, &mut |s| {
+        if matches!(
+            s.node(),
+            Node::Quote(_) | Node::Unquote(_) | Node::Splice(_)
+        ) {
+            return Err(s.error("a macro result cannot contain a quote, unquote, or splice"));
+        }
+        if let Some(name) = restricted(s) {
+            if name == "macro" {
+                return Err(s.error("a macro result cannot define a macro"));
+            }
+            let origin = Arc::as_ptr(&s.0.origin) as usize;
+            if !allowed.contains(&origin) || !used.insert(origin) {
+                return Err(s.error("a foreign attribute must come unchanged from an argument and occur at most once"));
+            }
+        }
+        Ok(())
+    })
 }

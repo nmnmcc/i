@@ -510,6 +510,10 @@ pub fn lower_with_bindings(
     }
 }
 
+type Entry = (String, bool);
+type HostExport = (String, ExportAbi, bool);
+type Entries = (Option<Entry>, Vec<Entry>, Vec<HostExport>);
+
 struct Lowerer<'a> {
     graph: &'a PackageGraph,
     program: &'a hir::Program,
@@ -848,13 +852,7 @@ impl<'a> Lowerer<'a> {
 
     /// The program entry, the tests, and the host exports (§10.2, B.5),
     /// and the host services that they need (§9.7).
-    fn entries(
-        &mut self,
-    ) -> (
-        Option<(String, bool)>,
-        Vec<(String, bool)>,
-        Vec<(String, ExportAbi, bool)>,
-    ) {
+    fn entries(&mut self) -> Entries {
         let program = self.program;
         let mut entry = None;
         let mut tests = Vec::new();

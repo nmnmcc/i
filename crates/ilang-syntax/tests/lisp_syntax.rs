@@ -194,3 +194,27 @@ fn made_atoms_are_one_valid_token_and_keep_origin() {
         Provenance::Made { from_answer: true }
     );
 }
+
+#[test]
+fn expansion_cannot_create_or_duplicate_foreign_authority() {
+    use ilang_syntax::lisp::syntax::{Node, Syntax, validate_expansion};
+    let argument = root("(@ (external \"env\" \"f\") (: f (-> () Int)))");
+    let marked = argument.flip_mark(7);
+    let returned = marked.flip_mark(7);
+    assert!(argument.same_origin(&returned));
+    validate_expansion(&returned, std::slice::from_ref(&argument)).unwrap();
+    let duplicate = Syntax::make(
+        Node::Curly(vec![returned.clone(), returned.clone()]),
+        &returned,
+    )
+    .unwrap();
+    assert!(validate_expansion(&duplicate, std::slice::from_ref(&argument)).is_err());
+    let Node::Round(parts) = returned.node() else {
+        panic!("attribute is round")
+    };
+    let rebuilt = Syntax::make(Node::Round(parts.clone()), &returned).unwrap();
+    assert!(!argument.same_origin(&rebuilt));
+    assert!(validate_expansion(&rebuilt, std::slice::from_ref(&argument)).is_err());
+    assert!(validate_expansion(&root("`x"), &[]).is_err());
+    assert!(validate_expansion(&root("(@ macro (= f x))"), &[]).is_err());
+}
