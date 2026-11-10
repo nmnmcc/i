@@ -153,6 +153,41 @@ impl Registry {
         Ok(Self { modules })
     }
 
+    /// Whether this visible value is a module alias, after lexical shadowing.
+    pub fn is_module(
+        &self,
+        caller: SourceId,
+        atom: &Syntax,
+        locals: &[hygiene::Binding<()>],
+    ) -> bool {
+        let locals = locals
+            .iter()
+            .map(|b| hygiene::Binding {
+                text: b.text.clone(),
+                scope: b.scope.clone(),
+                identity: b.identity.clone(),
+                target: Value::Other,
+            })
+            .collect::<Vec<_>>();
+        matches!(
+            hygiene::lookup(
+                atom,
+                caller.0,
+                &locals,
+                &[],
+                |module, text| self.modules.get(&module)?.values.get(text).map(
+                    |(target, exported)| hygiene::ModuleName {
+                        target: target.clone(),
+                        exported: *exported
+                    }
+                ),
+                |_| None,
+                |_| None
+            ),
+            hygiene::Lookup::Found(Value::Module(_))
+        )
+    }
+
     /// Resolve a name in its source scope, checking exact lexical scopes first.
     /// A module-qualified call resolves its alias by the same value lookup.
     pub fn resolve(

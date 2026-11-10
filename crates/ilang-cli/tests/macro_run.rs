@@ -567,7 +567,7 @@ fn expansion_preserves_sharing_between_output_and_item_request() {
                 message: "unexpected query".into(),
                 at: at.clone(),
             }),
-            |_, syntax| {
+            |_, syntax, _budget| {
                 Ok(Expanded {
                     syntax,
                     transactions: Vec::new(),
@@ -647,7 +647,7 @@ fn separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged() {
                 &format!("{path}.{name}"),
                 templates.clone(),
                 resolver.clone(),
-                |_, syntax| {
+                |_, syntax, _budget| {
                     Ok(Expanded {
                         syntax,
                         transactions: Vec::new(),
@@ -738,4 +738,61 @@ fn macro_registry_respects_imports_exports_and_scoped_shadowing() {
         target: (),
     }];
     assert!(registry.resolve(caller, None, &exported, &locals).is_none());
+}
+
+#[test]
+fn body_engine_expands_real_imported_macro_before_checking_arguments() {
+    use ilang_host::syntax::DefinitionReply;
+    use ilang_macro::{body_engine::BodyEngine, body_walk, registry::Registry};
+    use ilang_syntax::lisp::scoped::ScopedSource;
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, ignore outer)\n(@ macro (= ignore (-> ((: x (. syntax Syntax))) (. syntax Syntax) `123)))\n(@ macro (= outer (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nmain = () { m.outer(m.ignore(unknown(1))) }\n",
+    )
+    .unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let registry = Registry::new(&graph, &parsed).unwrap();
+    let module = parsed.iter().find(|p| p.path == "app/main").unwrap();
+    let mut ast = module.ast.clone();
+    let source = module.source;
+    let scoped = ScopedSource::new(graph.sources.get(source).text.clone());
+    let resolver = Arc::new(|at: &Syntax, _: &ilang_host::macro_budget::MacroBudget| {
+        DefinitionReply::CompileError {
+            message: "unexpected definition".into(),
+            at: at.clone(),
+        }
+    });
+    let mut session = ilang_macro::session::Session::default();
+    let mut engine = BodyEngine::new(
+        &graph,
+        &parsed,
+        &registry,
+        source,
+        scoped,
+        resolver,
+        &mut session,
+    );
+    body_walk::expressions(&mut ast, &mut engine).unwrap();
+    let ilang_syntax::ast::ItemKind::Binding(binding) = &ast.items[0].kind else {
+        panic!("binding expected")
+    };
+    let ilang_syntax::ast::ExprKind::Fn(fun) = &binding.value.kind else {
+        panic!("function expected")
+    };
+    let ilang_syntax::ast::Stmt::Expr(expr) = &fun.body.stmts[0] else {
+        panic!("expression expected")
+    };
+    let ilang_syntax::ast::ExprKind::Int(value) = &expr.kind else {
+        panic!("macro result was not an integer")
+    };
+    assert_eq!(value.to_string(), "123");
+    assert!(engine.scoped.origin(expr.span).is_some());
 }

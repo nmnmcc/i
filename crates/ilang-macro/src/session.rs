@@ -56,7 +56,11 @@ impl Session {
         export: &str,
         templates: Arc<[Syntax]>,
         resolver: Arc<DefinitionResolver>,
-        expand_result: impl FnOnce(&mut Self, Syntax) -> Result<Expanded, Failure>,
+        expand_result: impl FnOnce(
+            &mut Self,
+            Syntax,
+            &ilang_host::macro_budget::MacroBudget,
+        ) -> Result<Expanded, Failure>,
     ) -> Result<Expanded, Failure> {
         if self.depth == 256 {
             return Err(Failure::Syntax(SyntaxError {
@@ -89,7 +93,7 @@ impl Session {
                 templates,
                 context.clone(),
                 items.clone(),
-                budget,
+                budget.clone(),
             )
             .map_err(Failure::Host)?;
             let syntax = match outcome {
@@ -104,7 +108,7 @@ impl Session {
             let (syntax, requests) =
                 ilang_host::syntax::flip_output_and_requests(&syntax, &requests, mark);
             let notes = context.take_notes();
-            let mut expanded = expand_result(self, syntax)?;
+            let mut expanded = expand_result(self, syntax, &budget)?;
             expanded
                 .transactions
                 .insert(0, Transaction { notes, requests });
