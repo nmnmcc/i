@@ -6,8 +6,9 @@
 13:1: error[E0302]: the arguments of `@external` are string literals given by position: `@external("module", "function")`
 15:1: error[E0303]: `@external` may only be on a declaration `name: Type`
 17:1: error[E0308]: a declaration with no `@external` is kept for macros
-18:8: error[E0233]: the left side of an alias that is not a list of type parameters is kept for alias patterns
-19:7: error[E0233]: the left side of an alias that is not a list of type parameters is kept for alias patterns
-2:13: error[E0229]: a lowercase name in a type is kept for the type of a value; declare a type variable as an UpName, as in `f(A) = …`
+20:1: error[E0208]: the type `User` is defined more than once in this module
+18:19: error[E0201]: `user` is not defined
+19:7: error[E0231]: a type parameter may not have the name of a type
+2:13: error[E0207]: `p` is a pending value, not a module
 3:18: error[E0234]: a call in a type is kept for macros
 17:18: error[E0317]: the type of an external function may not have type variables (§10.1)
