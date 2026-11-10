@@ -58,7 +58,6 @@ impl ValueSet {
 
     // Source literals start using these constructors in stage 7. Until then
     // their behavior is tested without adding unused production entry points.
-    #[cfg(test)]
     pub fn only(items: impl IntoIterator<Item = Arc<str>>) -> Option<Self> {
         Self::from_set(false, Set::from_items(items))
     }
@@ -217,7 +216,6 @@ fn item_hash(s: &str) -> u64 {
 }
 
 impl Set {
-    #[cfg(test)]
     fn from_items(items: impl IntoIterator<Item = Arc<str>>) -> Self {
         let mut keys: Vec<_> = items.into_iter().collect();
         keys.sort_unstable();

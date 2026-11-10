@@ -353,3 +353,31 @@ per-frame rules there. s/top retain whole String/Int until stage 7; written
 keeps its annotation (§4.8 rule 4). Both diagnostic lines are exactly the
 deferred E0501 required by §5.3, at the literal patterns, with Never from
 the top-level and written function environment restrictions.
+
+### Stage 6b: pattern preparation
+
+Rule 11 now holds only Values failures until its own coverage check. Other
+constraints still report E0501 immediately. Source: §5.1 rule 11 calls
+Values a failure “only from value sets”, and §5.3 says “no failure is ever
+lost”: check_case drops held failures only after reporting E0516.
+
+Shared places are computed from written fields, expanding aliases and
+counting occurrences across every constructor. Descendants of list items
+and shared fields stay shared. The regression includes 80 nested tuples
+around an aliased repeated parameter; only alias expansion consumes the
+existing recursion budget. Source: §5.3 says “counting each occurrence,
+also two in one field, and with aliases expanded”. Literal candidates
+and their top-place-only fast path remain behind LITERAL_CANDIDATES=false.
+The known filter subtracts actual types rather than dropping their heads.
+No source inference creates restricted sets yet.
+
+Gate: full dev-verify exited 0 (19 direct checker tests, 169 spec cases at
+O0/O2, 1399 std tests per level, 33 browser tests). Existing type goldens
+are unchanged. old-syntax-check passed 1091 snippets and 20 future entries.
+The stage-6a generated output remains untracked for the last derived commit.
+
+Failed checks: the first compile used owned alias arguments where subst
+requires references; corrected. The first full gate found collapsible_if;
+corrected. A superseded full run was interrupted after adding the deep
+field regression, to prevent duplicate browser use of port 4181. The final
+source ran the whole gate successfully. No persistent environment changed.

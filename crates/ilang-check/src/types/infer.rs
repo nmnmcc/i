@@ -120,6 +120,7 @@ pub(crate) struct Checker<'a> {
     function_depth: usize,
     group_level: Option<u32>,
     pending_failures: Vec<PendingFailure>,
+    pub shared_fields: HashMap<CtorRef, Vec<bool>>,
 }
 
 impl<'a> Checker<'a> {
@@ -161,6 +162,7 @@ impl<'a> Checker<'a> {
             function_depth: 0,
             group_level: None,
             pending_failures: Vec::new(),
+            shared_fields: HashMap::new(),
         }
     }
 
@@ -787,6 +789,18 @@ impl<'a> Checker<'a> {
         self.flush(span, None);
     }
 
+    /// Hold only value-set failures belonging to rule 11 until its own coverage check.
+    pub fn sub_case(&mut self, l: &Ty, r: &Ty, span: Span) -> Vec<(super::solve::Failure, Span)> {
+        self.s.constrain(l, r);
+        let failures = std::mem::take(&mut self.s.failures);
+        let (held, ordinary): (Vec<_>, Vec<_>) = failures
+            .into_iter()
+            .partition(|f| f.kind == FailKind::Values);
+        self.s.failures = ordinary;
+        self.flush(span, None);
+        held.into_iter().map(|f| (f, span)).collect()
+    }
+
     /// `l <: r`, where `r` comes from the written type at `other`.
     pub fn sub2(&mut self, l: &Ty, r: &Ty, span: Span, other: Span) {
         self.s.constrain(l, r);
@@ -805,7 +819,7 @@ impl<'a> Checker<'a> {
             display::show(&self.s, &f.rhs),
         );
         let (code, mut message) = match f.kind {
-            FailKind::Mismatch => (
+            FailKind::Mismatch | FailKind::Values => (
                 code::TYPE_MISMATCH,
                 format!("`{l}` is not a subtype of `{r}`"),
             ),

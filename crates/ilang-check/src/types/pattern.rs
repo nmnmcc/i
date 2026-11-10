@@ -11,6 +11,8 @@ use crate::hir::*;
 use ilang_syntax::span::Span;
 use std::collections::HashMap;
 
+const LITERAL_CANDIDATES: bool = false;
+
 /// A catch-all is a name, a discard, or `x = q` where `q` is one (§4.8).
 pub(crate) fn catch_all(p: &Pattern) -> bool {
     match &p.kind {
@@ -75,6 +77,8 @@ struct Place {
     /// the clause, whether it has no guard, the head, and its number of
     /// arguments.
     seen: Vec<(usize, bool, Head, usize)>,
+    scalar_seen: Vec<(usize, bool, Ty, Pat)>,
+    shared: bool,
 }
 
 /// A catch-all in a clause pattern, to be narrowed (rule 12).
@@ -93,6 +97,7 @@ pub(crate) struct PendingCase {
     pub span: Span,
     /// Each clause: its choices, whether it has a guard, and its place.
     pub clauses: Vec<(Pat, bool, Span)>,
+    pub held: Vec<(super::solve::Failure, Span)>,
 }
 
 /// What a clause pass needs while it visits patterns.
@@ -419,6 +424,8 @@ impl Checker<'_> {
             parent: None,
             children: Vec::new(),
             seen: Vec::new(),
+            scalar_seen: Vec::new(),
+            shared: false,
         }];
         let mut rows: Vec<Vec<Pat>> = Vec::new();
         let mut v = Visit {
@@ -441,6 +448,7 @@ impl Checker<'_> {
         }
         // `B <: P`, or `B <: P | r - P` when a clause without a guard has a
         // catch-all at the place or above it.
+        let mut held = Vec::new();
         let mut slack = vec![false; places.len()];
         for i in 0..places.len() {
             slack[i] = places[i].catch_here || places[i].parent.is_some_and(|p| slack[p]);
@@ -457,7 +465,7 @@ impl Checker<'_> {
                 p
             };
             let b = places[i].ty.clone();
-            self.sub(&b, &want, if i == 0 { subject.span } else { span });
+            held.extend(self.sub_case(&b, &want, if i == 0 { subject.span } else { span }));
         }
         // Rule 12: each catch-all gets `B - H`, and its known type less the
         // members that are taken (§4.8).
@@ -468,15 +476,8 @@ impl Checker<'_> {
             self.bind_catch_all(pattern, &t, true);
             let known = match taken {
                 None => Ty::Never,
-                Some(hs) => {
-                    let ms = known::members(&places[place].known)
-                        .into_iter()
-                        .filter(|m| m.head().is_none_or(|h| !hs.contains(&h)))
-                        .collect();
-                    match &places[place].known {
-                        Ty::Top => Ty::Top,
-                        _ => self.kunion(ms),
-                    }
+                Some(taken) => {
+                    super::display::known_diff(&self.s, places[place].known.clone(), taken)
                 }
             };
             self.fit_known(pattern, &known, true);
@@ -533,6 +534,7 @@ impl Checker<'_> {
         let module = self.module;
         self.cases.push(PendingCase {
             module,
+            held,
             subject: a,
             span: subject.span,
             clauses: rows
@@ -568,7 +570,7 @@ impl Checker<'_> {
         choice: usize,
         id: u32,
         place: &Place,
-    ) -> (Ty, Option<Vec<Head>>) {
+    ) -> (Ty, Option<Vec<Ty>>) {
         let earlier: Vec<Vec<Pat>> = (0..ci)
             .filter(|i| clauses[*i].guard.is_none())
             .map(|i| vec![Pat::Or(rows[i].clone())])
@@ -592,11 +594,9 @@ impl Checker<'_> {
             }
         }
         let mut taken = Vec::new();
-        let mut heads = Vec::new();
         for (h, n) in candidates {
             let q = coverage::replace(&rows[ci][choice], id, &Pat::Head(h, n));
             if self.useful(&earlier, &[q], &[Col::Any]).is_none() {
-                heads.push(h);
                 let args: Vec<Ty> = (0..n).map(|_| self.s.fresh()).collect();
                 taken.push(match h {
                     Head::Fn => Ty::Fn(Box::new(FnTy {
@@ -609,12 +609,24 @@ impl Checker<'_> {
                 });
             }
         }
-        if taken.is_empty() {
-            return (place.ty.clone(), Some(heads));
+        if LITERAL_CANDIDATES {
+            for (earlier_clause, unguarded, candidate, pat) in &place.scalar_seen {
+                if *earlier_clause >= ci || !unguarded || taken.contains(candidate) {
+                    continue;
+                }
+                let fast = place.parent.is_none() && (0..ci).any(|i| clauses[i].guard.is_none() && rows[i].iter().any(|row| matches!((row,pat),(Pat::Ctor(Ctor::Lit(a),_),Pat::Ctor(Ctor::Lit(b),_)) if a == b)));
+                let q = coverage::replace(&rows[ci][choice], id, pat);
+                if fast || self.useful(&earlier, &[q], &[Col::Any]).is_none() {
+                    taken.push(candidate.clone());
+                }
+            }
         }
-        let t = self.s.diff(place.ty.clone(), taken);
+        if taken.is_empty() {
+            return (place.ty.clone(), Some(taken));
+        }
+        let t = self.s.diff(place.ty.clone(), taken.clone());
         self.flush(place_span(clauses, ci), None);
-        (t, Some(heads))
+        (t, Some(taken))
     }
 
     /// Checks the coverage (§7.4) of a `case`, and warns about the clauses
@@ -628,17 +640,30 @@ impl Checker<'_> {
                 .useful(&rows, std::slice::from_ref(pat), &col)
                 .is_none()
             {
-                self.warning(
-                    code::NEVER_USED,
-                    *span,
-                    "this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)",
-                );
+                let mut message = "this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)".to_string();
+                if let Ok(t) =
+                    super::display::shown(&self.s, &c.subject, super::display::Opts::default())
+                {
+                    let ms = known::members(&t);
+                    if let [m] = ms.as_slice()
+                        && m.scalar().is_some()
+                        && m.values().is_finite()
+                        && m.values().items().count() == 1
+                    {
+                        message.push_str(&format!(
+                            "; the value matched is always `{}`",
+                            super::display::show_known(&self.s, m)
+                        ));
+                    }
+                }
+                self.warning(code::NEVER_USED, *span, message);
             }
             if !guarded {
                 rows.push(vec![pat.clone()]);
             }
         }
-        if let Some(w) = self.useful(&rows, &[Pat::Wild(None)], &col) {
+        let missing = self.useful(&rows, &[Pat::Wild(None)], &col);
+        if let Some(w) = missing {
             let text = self.show_pat(&w[0]);
             self.error(
                 code::CASE_NOT_COVERED,
@@ -647,7 +672,53 @@ impl Checker<'_> {
                     "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `{text}`"
                 ),
             );
+        } else {
+            for (failure, span) in c.held {
+                self.s.failures.push(failure);
+                self.flush(span, None);
+            }
         }
+    }
+
+    fn field_shared(&mut self, ctor: CtorRef, index: usize) -> bool {
+        if !self.shared_fields.contains_key(&ctor)
+            && let TypeBody::Custom(ctors) = &self.p.ty(ctor.ty).body
+        {
+            let fields: Vec<Vec<Vec<TyVarId>>> = ctors
+                .iter()
+                .map(|c| {
+                    c.fields
+                        .iter()
+                        .map(|f| {
+                            let mut out = Vec::new();
+                            field_vars(self.p, &f.ty, &mut out, 0);
+                            out
+                        })
+                        .collect()
+                })
+                .collect();
+            let mut counts = HashMap::new();
+            for v in fields.iter().flatten().flatten() {
+                *counts.entry(*v).or_insert(0usize) += 1;
+            }
+            for (i, fields) in fields.into_iter().enumerate() {
+                self.shared_fields.insert(
+                    CtorRef {
+                        ty: ctor.ty,
+                        index: i as u32,
+                    },
+                    fields
+                        .into_iter()
+                        .map(|vars| vars.iter().any(|v| counts[v] > 1))
+                        .collect(),
+                );
+            }
+        }
+        self.shared_fields
+            .get(&ctor)
+            .and_then(|xs| xs.get(index))
+            .copied()
+            .unwrap_or(false)
     }
 
     /// The place below `at` by `step`, with the type `ty` and the known
@@ -663,6 +734,12 @@ impl Checker<'_> {
         if let Some((_, i)) = places[at].children.iter().find(|c| c.0 == step) {
             return *i;
         }
+        let shared = places[at].shared
+            || matches!(step, Step::Item(_))
+            || match step {
+                Step::Field(c, i) => self.field_shared(c, i as usize),
+                _ => false,
+            };
         places.push(Place {
             ty,
             known,
@@ -672,6 +749,8 @@ impl Checker<'_> {
             parent: Some(at),
             children: Vec::new(),
             seen: Vec::new(),
+            scalar_seen: Vec::new(),
+            shared,
         });
         let i = places.len() - 1;
         places[at].children.push((step, i));
@@ -902,6 +981,26 @@ impl Checker<'_> {
                 self.fit_known(q, &k, true);
                 let pat = match coverage::literal(q) {
                     Some(l) => {
+                        if LITERAL_CANDIDATES {
+                            let value = match &l {
+                                coverage::Lit::Int(n) => Some((BuiltinType::Int, n.as_str())),
+                                coverage::Lit::Str(s) => Some((BuiltinType::String, s.as_str())),
+                                _ => None,
+                            };
+                            if let Some((b, text)) = value {
+                                let t = Ty::lit(
+                                    b,
+                                    super::lits::ValueSet::only([std::sync::Arc::from(text)])
+                                        .unwrap(),
+                                );
+                                places[at].scalar_seen.push((
+                                    v.clause,
+                                    v.unguarded,
+                                    t,
+                                    Pat::Ctor(Ctor::Lit(l.clone()), Vec::new()),
+                                ));
+                            }
+                        }
                         let c = Ctor::Lit(l);
                         places[at].seen.push((v.clause, v.unguarded, c.head(), 0));
                         Pat::Ctor(c, Vec::new())
@@ -950,4 +1049,140 @@ fn ctor_binders(p: &Pattern, out: &mut Vec<(VarId, Option<CtorRef>)>) {
 fn place_span(clauses: &[Clause], ci: usize) -> Span {
     let c = &clauses[ci];
     c.patterns.first().map_or(c.span, |p| p.span)
+}
+
+fn field_vars(p: &Program, t: &Type, out: &mut Vec<TyVarId>, depth: usize) {
+    if depth > 64 {
+        return;
+    }
+    match &t.kind {
+        TypeKind::Var(v) => out.push(*v),
+        TypeKind::Named {
+            ty: TypeRef::Custom(id),
+            args,
+        } if matches!(p.ty(*id).body, TypeBody::Alias(_)) => {
+            let TypeBody::Alias(body) = &p.ty(*id).body else {
+                unreachable!()
+            };
+            let map = p
+                .ty(*id)
+                .params
+                .iter()
+                .map(|(_, v)| *v)
+                .zip(args.iter())
+                .collect();
+            field_vars(p, &crate::resolve::subst(body, &map), out, depth + 1);
+        }
+        TypeKind::Named { args, .. }
+        | TypeKind::Tuple(args)
+        | TypeKind::Union(args)
+        | TypeKind::Inter(args)
+        | TypeKind::Diff(args) => {
+            for t in args {
+                field_vars(p, t, out, depth);
+            }
+        }
+        TypeKind::Fn {
+            params,
+            ret,
+            err,
+            env,
+        } => {
+            for pty in params {
+                field_vars(p, &pty.ty, out, depth);
+            }
+            field_vars(p, ret, out, depth);
+            for t in [err, env].into_iter().flatten() {
+                field_vars(p, t, out, depth);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+mod shared_place_tests {
+    use super::*;
+    #[test]
+    fn written_occurrences_include_other_constructors_and_aliases() {
+        // literal-types §5.3: count every written occurrence after aliases,
+        // across every constructor of the family, before inference.
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::create_dir(root.path().join("src")).unwrap();
+        std::fs::write(
+            root.path().join("src/main.i"),
+            r#"
+Pair(A) { Pair(A, A) }
+Event(A) { Start(A) Stop(A) }
+Two(A) = (A, A)
+Wrapped(A) { Wrapped(Two(A)) }
+Solo(A) { Solo(A, Int) }
+"#,
+        )
+        .unwrap();
+        let (graph, diags) = ilang_package::load(root.path());
+        assert!(diags.is_empty());
+        let checked = crate::check(&graph);
+        assert!(checked.diags.is_empty(), "{:?}", checked.diags);
+        let mut p = checked.program.unwrap();
+        let wrapped = p.types.iter().position(|t| t.name == "Wrapped").unwrap();
+        if let TypeBody::Custom(cs) = &mut p.types[wrapped].body {
+            for _ in 0..80 {
+                let inner = cs[0].fields[0].ty.clone();
+                cs[0].fields[0].ty.kind = TypeKind::Tuple(vec![inner]);
+            }
+        }
+        let mut c = Checker::new(&p, &graph.sources);
+        let id = |name| TypeId(p.types.iter().position(|t| t.name == name).unwrap() as u32);
+        assert!(c.field_shared(
+            CtorRef {
+                ty: id("Pair"),
+                index: 0
+            },
+            0
+        ));
+        assert!(c.field_shared(
+            CtorRef {
+                ty: id("Pair"),
+                index: 0
+            },
+            1
+        ));
+        assert!(c.field_shared(
+            CtorRef {
+                ty: id("Event"),
+                index: 0
+            },
+            0
+        ));
+        assert!(c.field_shared(
+            CtorRef {
+                ty: id("Event"),
+                index: 1
+            },
+            0
+        ));
+        assert!(c.field_shared(
+            CtorRef {
+                ty: id("Wrapped"),
+                index: 0
+            },
+            0
+        ));
+        assert!(!c.field_shared(
+            CtorRef {
+                ty: id("Solo"),
+                index: 0
+            },
+            0
+        ));
+        assert!(!c.field_shared(
+            CtorRef {
+                ty: id("Solo"),
+                index: 0
+            },
+            1
+        ));
+    }
 }

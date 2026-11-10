@@ -38,6 +38,8 @@ pub(crate) struct VarState {
 pub(crate) enum FailKind {
     /// The left side is not a subtype of the right side.
     Mismatch,
+    /// Only an Int/String value-set inclusion failed.
+    Values,
     /// Function types with different numbers of parameters.
     Arity,
     /// Two forms of a type constructor whose parameter does not change, with
@@ -348,7 +350,18 @@ impl Solver {
                 if h.iter()
                     .any(|m| m.head() == l.head() && !m.values().disjoint(l.values()))
                 {
-                    self.fail(FailKind::Mismatch, l, r);
+                    let partial = !l.values().is_all()
+                        || h.iter()
+                            .any(|m| m.head() == l.head() && !m.values().is_all());
+                    self.fail(
+                        if partial && !env {
+                            FailKind::Values
+                        } else {
+                            FailKind::Mismatch
+                        },
+                        l,
+                        r,
+                    );
                 } else {
                     self.constrain_in(l, a, env);
                 }
@@ -359,7 +372,7 @@ impl Solver {
                         if env {
                             FailKind::EnvForms
                         } else {
-                            FailKind::Mismatch
+                            FailKind::Values
                         },
                         l,
                         r,
@@ -638,7 +651,15 @@ impl Solver {
                 let m = vars[0].clone();
                 self.constrain_in(rest.as_ref().unwrap_or(l), &m, env);
             }
-            0 => self.fail(FailKind::Mismatch, l, &Ty::Union(ms.to_vec())),
+            0 => self.fail(
+                if rest.is_some() {
+                    FailKind::Values
+                } else {
+                    FailKind::Mismatch
+                },
+                l,
+                &Ty::Union(ms.to_vec()),
+            ),
             _ => self.fail(FailKind::Ambiguous, l, &Ty::Union(ms.to_vec())),
         }
     }
@@ -1543,7 +1564,7 @@ mod literal_tests {
             &Ty::Union(vec![strings(&["a"]), Ty::tuple(Vec::new())]),
         );
         assert_eq!(s.failures.len(), 1);
-        assert_eq!(s.failures[0].kind, FailKind::Mismatch);
+        assert_eq!(s.failures[0].kind, FailKind::Values);
         assert_eq!(s.failures[0].lhs, except(&[]));
     }
 
