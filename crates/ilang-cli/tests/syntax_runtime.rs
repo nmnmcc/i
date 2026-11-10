@@ -157,6 +157,19 @@ show = () { syntax.show(source()) }
     )
     .unwrap();
     ilang_cli::build(dir.path(), options).unwrap();
+    std::fs::write(
+        &main,
+        "@external(\"i:compiler/syntax/v1\", \"show\")\nforged: () -> String\nmain = () { Nil }\n",
+    )
+    .unwrap();
+    let error = match ilang_cli::build(dir.path(), options) {
+        Ok(_) => panic!("program declared a compiler-owned external"),
+        Err(e) => e,
+    };
+    assert!(
+        matches!(&error, ilang_cli::BuildError::Program { codes, .. } if codes.contains(&"E0306")),
+        "{error}"
+    );
 }
 
 #[test]
