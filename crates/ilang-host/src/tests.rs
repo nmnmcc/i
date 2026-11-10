@@ -1426,6 +1426,7 @@ fn a_wrong_resume_traps() {
     call(&mut instance, resume, &answer(0));
     // A module built by the compiler, answered for another import.
     let mut imports = gate_imports(&gates);
+    imports.merge(opaque_imports(Value::NullExternref)).unwrap();
     imports
         .async_service("app:clock/v1", "tick", |_| async {
             Ok(Ok(Value::Int(1.into())))
@@ -2212,7 +2213,6 @@ fn a_nested_store_in_the_allocator_gets_its_own_thread() {
 // when the host passes one object (or null) through both declarations.
 #[test]
 fn compiled_opaque_boundaries_preserve_nominal_identity() {
-    const COMPILED: &[u8] = include_bytes!("../../../tests/browser/fixtures/compiled.wasm");
     let reference = HostReference::new(42);
     let raw = Value::Externref(reference.clone());
     let other = Value::Externref(HostReference::new(42));
@@ -2223,26 +2223,7 @@ fn compiled_opaque_boundaries_preserve_nominal_identity() {
                 Ok(Ok(Value::Int(42.into())))
             })
             .unwrap();
-        let get = seed.clone();
-        imports
-            .external("app:opaque/v1", "get", move |_| Ok(get.clone()))
-            .unwrap();
-        imports
-            .external("app:opaque/v1", "echo", |args| Ok(args[0].clone()))
-            .unwrap();
-        for label in ["get_a", "get_b"] {
-            let get = seed.clone();
-            imports
-                .service("app:opaque-sync/v1", label, move |_| Ok(Ok(get.clone())))
-                .unwrap();
-            let get = seed.clone();
-            imports
-                .async_service("app:opaque-async/v1", label, move |_| {
-                    let get = get.clone();
-                    async move { Ok(Ok(get)) }
-                })
-                .unwrap();
-        }
+        imports.merge(opaque_imports(seed)).unwrap();
         let mut instance = Program::from_bytes(COMPILED)
             .unwrap()
             .instantiate(HostOptions::new(imports))
@@ -2326,4 +2307,30 @@ fn compiled_opaque_boundaries_preserve_nominal_identity() {
             );
         }
     }
+}
+
+/// The additional host functions of the compiled opaque boundary fixture.
+fn opaque_imports(seed: Value) -> HostImports {
+    let mut imports = HostImports::default();
+    let get = seed.clone();
+    imports
+        .external("app:opaque/v1", "get", move |_| Ok(get.clone()))
+        .unwrap();
+    imports
+        .external("app:opaque/v1", "echo", |args| Ok(args[0].clone()))
+        .unwrap();
+    for label in ["get_a", "get_b"] {
+        let get = seed.clone();
+        imports
+            .service("app:opaque-sync/v1", label, move |_| Ok(Ok(get.clone())))
+            .unwrap();
+        let get = seed.clone();
+        imports
+            .async_service("app:opaque-async/v1", label, move |_| {
+                let get = get.clone();
+                async move { Ok(Ok(get)) }
+            })
+            .unwrap();
+    }
+    imports
 }
