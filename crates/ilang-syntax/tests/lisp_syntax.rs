@@ -333,3 +333,24 @@ fn macro_item_results_accept_only_a_single_item_or_a_flat_curly_list() {
     assert!(parse_items(&parse("{ { (= a 1) } }").unwrap()[0]).is_err());
     assert!(parse_items(&parse("(, a b)").unwrap()[0]).is_err());
 }
+
+#[test]
+fn macro_declarations_have_a_lisp_binding_and_named_parameters() {
+    use ilang_syntax::lisp::{expansion::definitions, parse_source};
+    let (module, errors) = parse_source("(@ macro (= m (-> (x y) _ x)))");
+    assert!(errors.is_empty(), "{errors:?}");
+    let found = definitions(&module, true).unwrap();
+    assert_eq!(found[0].name, "m");
+    assert_eq!(found[0].parameters, ["x", "y"]);
+    assert!(definitions(&module, false).is_err());
+    for source in [
+        "(@ macro (= m 1))",
+        "(@ macro (= m (-> ((, x y)) _ x)))",
+        "(@ (macro) (= m (-> (x) _ x)))",
+        "(: m Int) (@ macro (= m (-> (x) _ x)))",
+    ] {
+        let (module, errors) = parse_source(source);
+        assert!(errors.is_empty(), "{source}: {errors:?}");
+        assert!(definitions(&module, true).is_err(), "{source}");
+    }
+}
