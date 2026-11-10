@@ -723,3 +723,24 @@ fn definition_schedule_expands_new_items_before_later_siblings() {
     assert!(problems.is_empty());
     assert_eq!(state, ["outer", "inner1", "inner2", "sibling"]);
 }
+
+#[test]
+fn alias_pattern_query_preserves_the_written_definition() {
+    use ilang_syntax::lisp::definitions::source_definition;
+    use ilang_syntax::lisp::syntax::{Node, Position};
+    let source = "Shape(Left, Right) = value";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let like = root("x");
+    let result = source_definition(&module.items[0], source, like.scope(), 9);
+    let Node::Round(parts) = result.node() else {
+        panic!("alias")
+    };
+    assert!(matches!(parts[0].node(), Node::Symbol(s) if s == "="));
+    let Node::Round(head) = parts[1].node() else {
+        panic!("alias head")
+    };
+    assert!(head[1].scope_identity().is_none());
+    assert!(head[2].scope_identity().is_none());
+    assert!(result.show_as(Position::Item).unwrap().contains("value"));
+}
