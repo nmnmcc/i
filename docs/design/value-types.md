@@ -1,266 +1,286 @@
-# Value types and alias patterns (S6)
+# Value types and alias patterns (T2)
 
-Status: draft for review (study S6 of the redesign plan). When it is accepted at gate G2/G3, track T2 puts the spec text of part 7 into `docs/spec.md` and makes the changes of parts 8 to 10. Code facts are from commit c69515c. Line numbers are at that commit; A1, A3 and T1 move many of them.
+Status: revised design for G2/G3, not an implemented feature. This note replaces the interrupted S6 draft. T2 installs §7 in the spec before implementation. All examples use the accepted syntax. Code references below were checked in this lane at `f745f9fa3d8f59f371c422f0c9dcfed763cfca42`; numbers refer to that tree, before A1/A3/T1.
 
-T2 lands after A1 and A3 (the new syntax in the spec and in the parser, `ast::TypeKind::Value`, UpName type variables) and is merged after T1 (plan: T1 → T2 → T3 on the hot files). The spec text below is written in the new syntax, on top of syntax.md's replacement text.
+## 1. Problem and sources
 
-## 1. The problem
-
-syntax.md keeps a lowercase name in a type for "the type of a value", and makes it a compile error until T2. meta.md keeps `m(…)` and `a.m(…)` in a type for macro calls. The plan names the main use: a library builds a value, and code takes its type apart without writing it again. In records.md 5.9:
+A library should be able to build a value and let its caller name a part of its type:
 
 ```i
 user = object |> field("name", string) |> field("age", int)
-Codec(User, _) = user        // User is { age: Int, name: String }
+Schema(User, _) = user
 ```
 
-So T2 must say:
+This is type checking, with no execution of `user`. `User` names a set of values, not a new nominal type. The same features support a schema's decoded type, a parser's result type, and a callback annotation that follows another function's signature. Literal constants and protocol descriptions are further uses. None needs a compiler rule for that library.
 
-- which type `x` in a type is, in an annotation and in a type definition, for generalized names, for names that are not generalized, for locals and for `m.x`;
-- how a type can depend on the inferred type of a value, when the checker resolves types before values (`resolve.rs`), builds groups only from expressions (`order.rs`), and expands aliases lazily (`infer.rs` `conv`, `known.rs` `kconv`);
-- how `Codec(User, _) = user` (a pattern) is told from `Pair(A) = (A, A)` (a generic alias), in a way that an import can never change;
-- what `_` means on the left of an alias pattern;
-- what this does to §2.4, §2.5, §3, §4.3, §4.7, §4.8, to queries, to the package interface, to records, literal types and macros.
+Controlling sources, in order:
 
-The design must be sound first. It must keep principal types, add no keyword, and treat no library in a special way.
+- `docs/spec.md`: §2.4 exports, §2.5 runtime needs, §4.3 transparent aliases, §4.4 places, §4.7 principal inference and the value restriction, §4.8 schemes and known types, §5 scope.
+- `docs/design/syntax.md`: §3 reserves lowercase types and lowercase calls separately; §4.3 deliberately leaves alias-pattern classification to T2; §4.7 requires declared UpName variables.
+- Accepted `docs/design/literal-types.md` decisions 4, 6, 7 and its §4.8 replacement: no widening; a known type can differ from the inferred type.
+- Accepted `docs/design/records.md` §§5.9, 8.2, 11, 15.6: decode-side extraction, groups versus records, label restrictions, canonical interfaces. The ledger accepts its check of places on shown monomorphic types.
+- Plan `/home/agent/.claude/plans/twinkling-swinging-perlis.md`, “已定的设计” and T2: value types, structural extraction, UpName variables, no cycles; A3 → T2 → M2 in resolution/order, T1 → T2 → T3 on types.
+- Binding ledger `/home/agent/Programming/i/.rd/cache/ledger.md`: lowercase head followed by `(` means a macro call; one-part braces group a type unless the record syntax applies.
+- Macro draft read with `git show lane/note-meta:docs/design/meta.md`, at `44021cc52e7fc0d3b3c6646067d29f81157c577d`: §§2.3, 4.4, 5, 6, 7.3–7.4. It is an integration contract proposed here, not a source that overrides the accepted notes.
 
-## 2. The decisions
+The difficult part is a value whose scheme contains shared, non-generalized inference variables. Reading a temporary display of those variables as a permanent alias is wrong. The earlier draft tried to solve this by replacing variables inside the solver. This revision keeps the explicit fixation rule but implements it with ordinary checked constraints (§4), preserving their existing relationships.
 
-Each decision has its reason.
+## 2. Code checked, and implications
 
-1. **`x`, `a.x` and `{ x }` in a type are the type of the value.** The name is found as an expression name is found at that place (§5, the same covering rules, the same hygiene marks). *Reason:* no keyword, and one lookup rule for names. `{ x }` is `x` because a `{ }` with one part only groups (records.md 8.2, meta.md).
-2. **It is the type, never the known type.** *Reason:* a known type may have fewer values than the type. literal-types allows this (its decision 7 and its §4.8 text for rule 13: after `x = "a" = s` with `s: String`, `x` has the type `String` and the known type `"a"`). A type written from `x` must let in every value that `x` may hold, so it must be the type.
-3. **There are two readings.** In an annotation, `x` is an *instance*, like the expression `x` (§4.8 rule 3). In a type definition, `x` must be *closed*: no type variable and no `_`. *Reason:* an annotation is only another source of constraints, as `_` holes are, so it is sound and keeps principal types. A type definition stands for one type; with variables in it, two uses could pick two types for one part (the hole `Box { Box(id) }`: build with `Int`, take apart as `String`).
-4. **A top-level binding that is not generalized is read through its fixed type, and a read in its own module fixes it.** At the end of its group, each type variable of the group in a part that some type *of the same module* reads becomes the union of the types that came to it, which is the type §4.7 already shows for it. The solver then holds that variable to that type for good (it is *pinned*, part 3.3), as if the type had been written at the binding. A type in another module never pins; it may read only parts that are already pinned. A variable that nothing has come to yet, a variable of an earlier group that is not pinned (also one that sits inside a type or a scheme), and a group whose typing touched a variable of an earlier group that is not pinned, are *not fixed*, and reading them is an error. *Reason for the module limit:* a pin restricts later code. If a type in a consumer module could pin, a correct library (std included) or production code could fail only when some consumer or test module reads its value, and the error would be in code that the reader does not own. With the limit, what a module accepts and what its interface shows depend only on the module and what it imports. *Reason:* a rule based on where a variable sits (input or output places) does not hold in this solver: service arguments in an environment are compared both ways (§4.5 rule 4), and `add_bound` compares bounds on the same side of related variables, so a variable "at output places only" can still gain lower bounds later. Pinning does not depend on any such rule: after the pin, every later constraint on the variable is a check against a closed type. Without a fixed type, `y: user = c` would add lower bounds to the decode variable of `user`; one annotation would change another binding's type, and `Codec(User, _) = user` would depend on the order of the groups. The cost of pinning is stated plainly: reading the type of `x` can make later code that would widen `x`'s type an error, exactly as writing the type at `x` would.
-5. **A type use of a value is a new kind of edge, in the group graph only.** It is never a need and never changes the init order (§2.5). A cycle with a type edge in it is an error, E0530. *Reason:* a type reads no value at run time. Since every such cycle is an error, the groups of a correct program are the same as today (part 3.4).
-6. **An item is an alias pattern exactly when its right side, as written, is a value type.** The right side alone decides it, never the names in scope, and never what a macro gives. So the class is known when items are collected, before any macro runs. *Reason:* an import can then turn a correct program into an error, but never give it a new meaning. Nothing is lost: a generic alias whose whole body is one value type is always an error (its parameters are unused, E0221, and a value type in a definition must be closed).
-7. **Inside a pattern, a plain `UpName` always defines a new type, `_` skips its part.** *Reason:* the same as a lowercase name in a value pattern, which always binds. If `User` could mean an existing type when one is in scope, an import would change the meaning.
-8. **The head of a pattern may be an alias that stands for one named type.** *Reason:* a library may rename `Codec`; a user should still be able to take its values apart. The alias body is put in, and its parts become parts of the pattern (part 3.5).
-9. **Value types are not allowed in constructor fields, external declarations, host types and environment types** (E0531), also through an alias. *Reason:* these are trusted, or converted before any group (`infer.rs` around :157-215, `variances`), or checked eagerly in resolve (`env_type` :1445, `host_part` :1568), or read by field access `v.f` with no syntactic use to order by. Custom types stay complete before inference, as meta.md §4.4 promises.
-10. **A pattern is matched, and a definition with a value type is read, once, at the end of the group of its source.** *Reason:* the order of errors and `Typed.alias_types` must not depend on who reads a binder first, and a pattern nobody reads must still be checked.
-11. **`a.x` in a type is always a member of a module, never a field.** When `a` names a value at that place, it is an error (E0207, "a type may name a value, not a field of a value; write the field's type"). This holds for a local that covers the module `a`, and also for a name that is not yet in scope there but is being bound by the same pattern or parameter list (V4): `(p: User, q: p.name)` is E0207 whether or not a module `p` is imported. *Reason:* it never silently changes meaning, and a field type would need the known type, which decision 2 rules out.
-12. **`x(` and `a.m(` in a type stay macro calls** (meta.md). `f(A)` on a value name is never type application. *Reason:* one meaning per form.
-13. **Each binder of a pattern is an ordinary `TypeDef` whose body is an alias of a new `hir::TypeKind::Of`.** There is no new `TypeBody` variant. *Reason:* exports, E0208, query targets and meta `Definitions` keep working unchanged.
-14. **T2 takes the codes E0530–E0537.** T1 keeps E0523–E0529, T3 keeps E0540–E0549. *Reason:* the streams merge in different orders and must not collide. records.md line 715 ("T1 and T2 number their new codes from E0523 upward") is updated when T2 lands (checklist step 0).
-15. **No cost for programs without value types.** No new edges, no new passes, no new solver variables, no allocation beyond empty vectors. *Reason:* std and most programs never use the feature.
-16. **Code that a typed macro makes may not hold a value type** (E0531), and may name an alias that uses one only when every value it reads is in a group that comes before the call's group in the group graph. *Reason:* a typed macro is expanded while its binding's group is typed (meta.md §7.3), after the groups are ordered. A value type in its result would have no order edge, no pin and no E0530 check.
+These are facts from reading code, not claims that T2 already works.
 
-## 3. Exact rules
-
-### 3.1 Form and lookup
-
-- **V1.** In a written type, a lowercase `name` with no `(` after it, or `a.x` with a lowercase `x` and no `(` after it, is a **value type**. `{ x }` and `{ a.x }` are the same as `x` and `a.x`. `{ x: T }` is a record type (T3). With `(` after it, it is a `TypeCall` (macros).
-- **V2.** `x` is looked up as a value name at the place of the type: locals, then top-level names of the module, then imported names, then built-in values (§2.3, §5). A name that is a module is E0205. An unknown name is E0201.
-- **V3.** `a.x` is the member `x` of the module `a` (`member()`, resolve.rs :1853). It must be exported (E0204, E0203). Before `a` is looked up as a module, it is looked up as a value name with the V4 stack: when `a` is a local in scope, or a name on the `pending_binders` stack (a name of the same pattern or parameter list, or the own value), it is E0207 with the message of decision 11. So `(p: User, q: p.name)` and `(p: User) -> p.name { … }` are E0207 also when a module `p` is imported, as syntax.md §3 says.
-- **V4. Own scope.** A value type may not name:
-  - a name bound by the same pattern (a binding pattern, a parameter pattern, a clause pattern): `(x, y: x)`, `x: { x } = …`, `{ (a, b: a) -> … }`;
-  - a parameter of the same function, in that function's parameter types or its `->`, `?` and `!` parts: `(x) -> x { … }`;
-  - a name inside its own value: a local `f = (g: f) { g }`, or a top-level `f = (g: f) { g }`.
-
-  Each is **E0536**. The same stack is checked for the `a` of `a.x`, which gives E0207 (V3), not E0536. The message names the outer binding that the name would otherwise have found, if there is one: "`x` is bound by this parameter list, so a type here may not name it; without this rule it would name the top-level `x` at line 3". *Reason:* at c69515c, `function()` (resolve.rs :2133) resolves parameter patterns, with their types, before it pushes the parameter frame, and resolves the `->` part before it too; a block binding's type is resolved before its name is bound. So without V4 these names would silently find an outer `x`. Left-to-right scoping (`(a, b: a) -> a`) is a later extension that cannot change meaning, because today it is an error (open question 3).
-- **V5.** A value type that names a binding with label parameters is E0542 (records L5), and one that names a key parameter is E0543 (records L2a). T3 checks both in resolve; T2 gives it the names (part 3.9).
-
-### 3.2 The two readings
-
-Every value type in HIR is `Of { value, site, part }` (part 8). Its **site** says which reading it has.
-
-- **Annotation reading.** Any type written in a binding: the type of its pattern, parameter types, `->`, `?` and `!` parts, clause patterns and type tests, and the same places in inner bindings. (Environment types, `Stmt::Env` and env params may not hold a value type, decision 9.) Here `Of(x)` is:
-  - **A1.** `x` is top-level (this module or another), a declaration, or a built-in: the **read scheme** `read[x]` (part 3.3). Each general variable becomes a new variable at the current level, one per variable for this place (all occurrences of one general variable at this place share it). An annotation uses the whole type, so every variable in it that is not general must be pinned (F4, F6); otherwise it is **unfixed** and gives **E0534**. For an `x` of another module, only pins made by sites in `x`'s own module count (F2).
-  - **A2.** `x` is a generalized local whose binding is finished: `instantiate(scheme)`. A variable of a finished top-level group found in the result is pinned (the solver reads it as its fixed type) or gives E0534. A local is read at a place inside the same top-level binding, so this needs no new pin: the variables of an earlier group that a local's scheme holds were pinned or not at that group's end.
-  - **A3.** `x` is a parameter, a clause name, or a local that is not generalized, all inside the top-level binding being typed: its holder type, **shared**. So `(xs) { acc: xs = [] … }` gives `acc` and `xs` one type. The annotation puts that type on the right of a constraint (`List(Never) <: τxs`), so the value of `acc` must fit in the type of `xs`, and every use of `acc` asks the same of `xs`. This is sound: the holder is a variable of the binding being typed, and it is linked to other variables only by constraints that the binding's own code made. A pinned variable of an earlier group is a closed type to the solver (F5), so no constraint through the holder can change it. A key parameter is never read this way: it is E0543 (V5).
-- **Definition reading.** The body of an alias (`T = x`, and also `x` deeper in the body, as in `T = List(x)`), or the source of an alias pattern. `Of(x)` is `read[x]`, and every part that is used must be **closed**: no general variable, no `Top`, no variable that is not pinned. Otherwise **E0533** (a general variable or `Top`) or **E0534** (unfixed). The message says which part is open, shows it with the written name of the alias, never with `_`, and says "write the type of `x`". For an alias pattern, only the parts below a binder are used (part 3.5). The result is closed, so it is stored once and each use is a clone (part 3.6).
-
-### 3.3 Fixed types (solver terms)
-
-An earlier draft decided which variables are fixed by where they sit (only at output places, only at input places). That does not hold in this solver: service arguments in an environment are compared for equality both ways (`constrain_in`, the `env` arm, §4.5 rule 4), and `add_bound` (solve.rs :385) calls `compare` on the bounds on the same side of the variables it reaches, which makes invariant arguments equal and joins covariant ones. So a variable that sits only at output places can still gain lower bounds from later code. The rules below do not depend on places. A variable that a type reads is **pinned**: the solver reads it as a closed type from then on.
-
-- **F1. When.** At the end of `Checker::group` (infer.rs :233), after the holders are linked and after `generalize` (:2108), for a group that has a **read target** (`program.read_targets`, part 3.6). Other groups do nothing.
-- **F2. Read parts.** `program.read_parts[x]` says which parts of `x`'s type the sites **in `x`'s own module** use. Every `Of(x)` site there gives `Whole`: an annotation site, a plain alias `T = x`, and `x` anywhere deeper in an alias body (`T = List(x)`), also when that alias is never used. The one exception is the source of an alias pattern: it gives the paths (argument positions from the top) of the binders of the pattern and of its exact parts (P2). A part under `_` only is never read. Sites in other modules are not counted: they never pin, and they read only what `x`'s module pinned (F6). *Reason:* see decision 4. A consumer package, a test module or the editor's set of modules can then never change what a module accepts.
-- **F3. Open groups.** At the start of `group`, record `first_var`, the number of solver variables. A variable with an index below `first_var` is **earlier**. While the group is typed, the solver sets `group_open` when a constraint meets an earlier variable that is not general and not pinned: as an operand of `constrain_in`, or as a variable bound reached by `add_bound` and `reach`. When `group_open` is set, every variable that is not general in a read part of a read target of the group is **unfixed**. *Reason:* such an earlier variable may have gained bounds from a group that is not an ancestor of this one, so what came to this group's variables would depend on the order of the groups. The E0534 message says "the type of `x` shares a part with an earlier binding whose type is not fixed; write the type of `x`, or of the binding it uses". F3 does not see an earlier variable that is only carried inside a type, with no constraint on it (the scheme `() -> τc` of `get = () { c }`, or the lower bound `Cell(α)` of a tuple `(e, 0)`); F4 finds those.
-- **F4. Fixed forms and pins.** F4 walks each read part of each read target of the group, and the bounds it reaches. It meets three kinds of variables that are not general:
-  - a variable of the group (index at least `first_var`): it gets a fixed form, below;
-  - an earlier variable that is pinned: its pinned type;
-  - an earlier variable that is not pinned: it is **unfixed**, and so is every part that holds it. F4 never pins an earlier variable: its group has ended, and a pin made now would depend on which groups came between.
-
-  For a variable `v` of the group, `fixed(v)` is the union of the fixed forms of **all** its lower bounds. The fixed form of one bound is the bound with each variable inside replaced as above, whatever its form: a type constructor, a function type, a union, an intersection, a difference, `Never` (which adds nothing), or a variable bound `u` (`fixed(u)`, or nothing when `u` has no lower bound). After the replacement the solver's own normal form is taken (`union_in`, `inter_in`, `diff_in` on closed operands), so `Diff(Cell(Int) | Nil, [Nil])` is `Cell(Int)`. A bound is never dropped: a form that F4 has no arm for, or that is not closed after the replacement, makes `v` unfixed. (T3 adds the arms for the record forms, part 3.9.)
-
-  `v` is **unfixed** when the union is empty (nothing has come to `v` yet), when a part of one of its bounds is unfixed, or when the form would hold `v` itself (a recursive bound; the message notes "a type that has itself inside it"). Otherwise `fixed(v)` is closed, and `v`, with every variable of the group whose form was used to make it, is **pinned**: `pinned[v] = (fixed(v), site)`, where `site` is the first site that reads `v` in source order. `fixed(v) <: v` holds already (it is the union of all of `v`'s lower bounds), and `v <: fixed(v)` holds for every value that has come, because no bound was left out; a debug assertion checks that the constraint `v <: fixed(v)` gives no failure. Unfixed variables are not pinned. They are listed, with the reason for the message, in `unfixed: HashMap<V, Reason>`.
-- **F5. A pinned variable is a closed type.** `Solver.pinned: HashMap<V, Ty>` (empty when there are no value types). `constrain_in` replaces a pinned variable operand by its type before it matches. `reach` and `compare` read a pinned variable met as a bound as its type, a bound with a type constructor. `extrude` and `freshen` never meet one, because it is replaced first. So every later constraint on `v` is a check of a closed type against `fixed(v)`, and nothing that `add_bound` derives can flow through `v`'s old bound lists. A later failure against a pinned type gets the note "the type of `x` was fixed at line N, where a type reads it". The solver `Ty` gets no new variant.
-- **F6. The read scheme.** For each read target `x` of the group: `read[x]` is its scheme with every pinned variable replaced by its type. General variables stay as general variables. Every other variable stays as a variable, and a read that uses a part holding one is E0534. The test is "not general and not pinned", not "in `unfixed`": pins are made only at the end of the group of their variable, so a variable that is not pinned when its group has ended stays so for good, and a read in a later group or another module sees the same answer. `unfixed` only gives the reason for the message; a variable with no entry there (a part that no site of `x`'s module reads, read from another module) gets the message "`m.x` is read in another module, but its own module does not fix this part of its type; write the type of `x` in `m`, or read it there, for example `Codec(U, _) = x`". Parts outside `read_parts[x]` are not looked at by F4.
-- **F7. Showing.** The fixed forms may be made simpler with `display::simplify` for showing only. What is fixed is decided by F3–F4 on raw bounds, never by what simplify removes.
-
-**The read type is the shown type.** §4.7 shows a variable that is not generalized as the union of the types that come to it. After the pin, nothing more can come to it, so the type shown for `x` (hover, `value m.x` in the package interface, messages) and the type that `x` stands for in a type are the same. A variable that nothing has come to is shown as `Never`, and reading it is E0534; it is never read as `Never`, and never as the types it goes to.
-
-**Why fixed types do not change.** Not because of a rule that every feature must keep, but because the solver reads a pinned variable as its type (F5). The one rule for later code: a bound is added to a variable only through `constrain`, `add_bound` or `compare`, never pushed onto its lists directly. A debug assertion in `add_bound` checks that the variable is not pinned.
-
-**Why the order of groups does not matter.** At the end of a group, the bounds of its own variables come from its own code, from new instances of general schemes, from closed types, from pinned variables, which are closed types, and from earlier variables that are not pinned. Such an earlier variable makes the group open when a constraint meets it (F3), and makes every read part that holds it unfixed when it is only carried inside a type or a scheme (F4). Pins are made only for variables of the group. So the pins, read types and errors of a group do not depend on the order of the groups that are not its ancestors. A later group can only meet a pinned variable as a closed type, so its errors are its own.
-
-Two cases that a rule based only on constraints would get wrong, both with `Cell(A) { Cell(get: () -> A, set: (A) -> Nil) }` and a group `{c}` with `c = cell(1)` and no read of `c`:
-
-- `get = () { c }` is generalized, with the scheme `() -> τc`, and `G = get` reads it. No constraint meets `τc` in `get`'s group. F4 meets `τc` inside the scheme: it is earlier and not pinned, so `G = get` is E0534 whether `init = () { c.set("s") }` is typed before `get` or after it.
-- `f = (c, 0)` with `F = f`: `f`'s type has `Cell(α)` inside a tuple, with no constraint on `α`. `F = f` is E0534 in every order, and `c.set(2)` in another group is never an error.
-
-**What pinning costs.** A pin restricts later code as a written type would. With `Cell(A) { Cell(get: () -> A, set: (A) -> Nil) }`, `r = cell(1)` and `C = r` in the same module, the variable of `r` is pinned to the literal type `1` (literal types are not widened, K2), so a later `r.set(2)` and `r.set("s")` are both E0501 with the note above. Without `C`, `r` would get the type `Cell(1 | 2 | "s")`. This is the same as writing `r: Cell(1) = cell(1)`, and the note tells where the type was fixed. To get `Cell(Int)`, write it: `r: Cell(Int) = cell(1)`. A read in another module never pins: there, `C = m.r` is E0534 unless `m` itself reads `r` or writes its type.
-
-**Example (after T3).** In records.md 5.9, `user` is a call, so it is not generalized. Its type is `Codec(D, E)`. `field` returns `Codec({ ..R, K: V }, …)` and takes `Codec(V, V)`, so the `V` of each field has the lower bound and the upper bound `String` or `Int`: its fixed form is that type. After the second call, `D` has the lower bound `Without(R2, {age}) & { age: V2 }`, and `R2` the lower bound `{ name: V1 }` from the first call. This is an intersection with a difference, not a type constructor. F4 takes it whole: with T3's arms for record forms, the fixed form of `R2` is `{ name: String }`, and the fixed form of the bound is T3's normal form of `Without({ name: String }, {age}) & { age: Int }`, which is `{ age: Int, name: String }`. So `fixed(D) = { age: Int, name: String }`. The pattern `Codec(User, _) = user` reads only the decode part, so `D`, `R2`, `V1` and `V2` are pinned, and `User = { age: Int, name: String }`. `E` is not read and not pinned: later `user.encode(u)` still works. Before T3 has these arms, the same bound makes `D` unfixed (E0534), never a smaller type. In T2 itself the same steps are shown with `size` (the example of part 7.4): `Codec(Size, _) = size` pins the decode variable to `Int`.
-
-**Nothing has come.** `Codec(_, Enc) = size` reads `E`, the encode variable of `size`, which has only the upper bound `Int` (nothing has come to it), so it is E0534: "nothing has come to this part of the type of `size` yet; write the type of `size`". For the same reason every reading of the whole of `size` is E0534: `(c: size)`, `check: size = size`, `S = size`.
-
-**Properties that the tests check.** For every top-level `x` whose read type is closed, `x`'s type and its read type are equal, because every variable in it is pinned to its fixed form; so `check_x: x = x` in `x`'s module is accepted. When the read type is not closed, `check_x: x = x` is E0534, like any other reading of the whole type. Typing the groups in another topological order (a debug option of order.rs that breaks ties the other way) gives the same read types and the same errors.
-
-### 3.4 Order and cycles
-
-- **O1. Type needs of definitions.** In resolve, after `alias_circles` (:1175), compute for each `TypeId` the set `value_deps[t]` of top-level `DefId`s that the definition reads: by `Of` in its body, by an alias pattern's source, and, transitively, through the aliases it names (alias bodies and alias-pattern heads). Aliases have no cycles once the circular ones are removed, so a memoised DFS computes it in O(aliases + edges). `uses_value_type[t]` is `!value_deps[t].is_empty()` or "names a declaration or a value of another module". Most entries are empty.
-- **O2. Type uses of a binding.** `type_uses(b)` is the set of top-level bindings `d` of the same module such that a type written anywhere in `b` has `Of(Def(d))` or names an alias `t` with `d ∈ value_deps[t]`. The walker is one generic visitor, `hir::for_each_type_in_binding`, that visits every `hir::Type` in a binding: typed patterns (bindings, parameters, clause patterns, type tests), `->`, `?`, `!` parts, env params and `Stmt::Env` (they hold no `Of` after E0531, but they may name aliases), and every inner binding statement. Both order.rs and the debug check of O6 use this one visitor, so no kind of place can be missed by one and seen by the other. The Lisp surface lowers to the same core tree and HIR, so it needs nothing more.
-- **O3. Groups.** Groups are the SCCs of the **use edges only**, as today (order.rs :188-228). Then a second graph is made over the groups: an edge for each use between groups and for each type use between groups. Groups are typed in a topological order of that graph.
-- **O4. E0530.** A type use whose two ends are in one group (a self loop included, through an alias), or a cycle of groups in the second graph, is **E0530**. The message names the chain: "the type of `num` is used in a type in `check` (through the alias `N`), but `num` and `check` are typed together: `num` uses `check`. A type may only use the type of a value that is already typed. Write the type, or move the use out of this group." The type uses in the cycle are dropped for ordering, and the sites that read them are marked `Failed`: definition sites and binders in `def_reads` and `bound`, annotation sites in `site_failed` (part 3.6). A `Failed` site gives `Error` with no second message. So in `a = (n: b) { n }` with `b = a(1)`, the site `b` in `a` is `Failed` before `a` is typed, and `conv` gives `Error` for it, not the internal error of O6.
-- **O5. Groups do not change.** A correct program has no E0530, so the groups are those of today and only their order is fixed. Needs, init order and E-needs-itself (`needs()`, order.rs :137) are computed from `uses()` only and do not change at all. A unit test compares the groups with and without type edges.
-- **O6. No read before typing.** A read of a top-level value that is not typed yet, at a site that is not `Failed`, is an **internal error**, never a fresh variable, when no error was reported before inference. When resolve or order reported an error (an import circle E0214, E0530, E0531, or any other), such a read is marked `Failed` and gives `Error` with no message: `check_for_queries` runs inference after errors (under `catch_unwind`), and one bad read must not lose the types of the whole program for the editor. In `conv`, an `Of` never reaches the `alias_depth > 64` fallback (infer.rs :858), and in `kconv` never the `Top` fallback (known.rs :108). A debug assertion, on only when no error was reported before inference, checks that every annotation-reading `Of(Def(d))` finds `typed[d]` or a `Failed` mark.
-- **O7. Locals and other modules.** Locals need no edges: statements are typed in order, and V4 covers the cases that would read too early. Values of other modules are typed first (`module_order`, order.rs :255), so their read schemes exist, except in an import circle (E0214), where `module_order` puts the modules of the circle in id order. `i check` stops before inference after E0214; the query path does not, and O6 makes those reads `Failed`.
-- **O8. Alias graph.** A binder gets edges to the head of its pattern and to every `TypeRef` inside the pattern, in the graph of `alias_circles`. So `Schema(A, B) = Codec(User, B)` with `Schema(User, _) = user` is ALIAS_CIRCLE (E-existing).
-- **O9.** Records' L6 group check (T3, in order.rs) is not changed, because the groups are not changed.
-
-### 3.5 Alias patterns
-
-- **P1. Telling them apart.** When items are collected, before any macro runs, an item `UpName [ "(" Type, … ")" ] "=" Type` is, by how its right side is written:
-  - a **plain alias with a value type** `T = x`, when there is no head and the right side, with its `{ }` groups removed, is a value type. This is the definition reading of `x`.
-  - an **alias pattern**, when there is a head and the right side, with its groups removed, is a value type (`x` or `a.x`).
-  - otherwise a type definition whose head is a **list of type parameters**, with the existing rules of syntax.md §4.3: each part an `UpName` with no module and no arguments, and not the name of a type that may be written with no module name in the module.
-
-  The class depends only on the written right side, so the binders of every pattern are known as types of the module from the start. A macro step 1 run (meta.md §6) that asks `definition(User)` is never put off for them. A right side that is a macro call (`Codec(User, _) = mac(…)`) is not a value type as written, so the head is a list of type parameters, and the usual type-parameter errors apply (`_` is not an `UpName`); a macro can never turn an item into a pattern. The parts of a pattern are pattern places, not type places, so macro step 1 does not expand a call there (P3). When M1 has landed, the Lisp surface follows the same rule: `(= (Codec User _) user)` is a pattern and `(= (Pair A) (, A A))` is not (M1 adds that row, part 3.9).
-  - **For macros (meta.md §2.3).** An alias pattern is its own kind of item in the syntax tree, `AliasPattern(head, parts, value)`, not an alias with parameters. `definition(User)` returns that item, and the item lists `User` among its binders, so a macro can see which names it defines. T2 adds the row to meta.md §2.3.
-- **P2. The head.** The `UpName` before the head must be written with no module name. An item that starts with `a.` is a binding (§2.2): `json.Codec(User, _) = user` is a binding with a constructor pattern. When such a binding gets an error and its value is a lone value name, the message gets the hint: "to take apart the type of `user`, import `Codec` and write `Codec(User, _) = user`". The head is looked up as a type and is not defined by the item. It is either:
-  - a custom or built-in type with as many parameters as the head has parts (else TYPE_ARITY);
-  - or an alias whose expansion, through aliases, is a single named custom or built-in type or a tuple type, which does not use a value type (else **E0532**). Its body is put in, with its parameters replaced by the parts of the head. Each parameter must be used at most once in that body and only at a place that is a pattern place (an argument of a named type or a part of a tuple); else E0532 with the hint "the alias `MyCodec` stands for `Codec((D) -> Int, D)`; write the custom type it stands for".
-  - The tuple case is how a top-level tuple is taken apart. A tuple has no name to write as a head, and an item that starts with `(` is a binding (P6), so `(Tree, _) = parsed` is a binding with a tuple pattern. With `Pair(A, B) = (A, B)`, the item `Pair(Tree, _) = parsed` takes the type of `parsed` apart. No new syntax is needed. When a binding whose pattern is a tuple of `UpName`s and `_` gets an error and its value is a lone value name, the message gets the hint: "to take apart the type of `parsed`, write an alias such as `Pair(A, B) = (A, B)` and then `Pair(Tree, _) = parsed`". A function type has no such alias form, because a parameter of a function type is not a pattern place (open question 4). The parts of the body with no parameter become **exact parts**: the part read there must be closed and equal to them (`τ <: T` and `T <: τ` on closed types), else E0534 when it is not closed and E0535 when it differs. An exact part is a read part of the source (F2), so it is pinned at the end of the source's group before it is compared, and later code can not widen it after the check.
-- **P3. Parts (TypePattern).**
-  - A plain `UpName` (no module, no arguments) is a **binder**. It defines a type of the module with that name. A second definition in the module is E0208. The same binder twice in one pattern is E0208. A binder with the name of a type that may be written with no module name (imported or built-in) is **E0537**: "`Int` is a type; a name in an alias pattern defines a new type; use `_` to skip a part".
-  - `_` is a **skip**: nothing is read or checked there, and that part may hold general variables or unfixed parts. It is `TypePat::Skip`, never `TypeKind::Hole`.
-  - `m.T`, `T(P, …)` and `m.T(P, …)`, where `T` is a custom or built-in type, take that type apart. An alias there follows P2.
-  - `(P1, …, Pn)` takes a tuple apart.
-  - Anything else is **E0532**: a union, an intersection, a difference, a literal, a function type, a record type (T3 may add record patterns), a value type.
-  - A macro call in a part (`Codec(pick(User), _) = user`) is E0532 too: "a part of an alias pattern is a pattern, and a macro may not make it". The parts are pattern places, so macro step 1 does not expand them, and every binder is known when items are collected (P1). Allowing macros in parts is open question 7.
-- **P4. Matching.** Let τ be `read[x]` (the definition reading of the source), with no closedness required yet. Then, from the top:
-  - at a named pattern `C(P1 … Pn)`: τ, made simpler and with aliases at its top expanded, must be exactly one member, a named type with the type constructor of `C` and n arguments (not a union, intersection or difference). Each `Pi` is matched with the i-th argument.
-  - at a tuple pattern: one member, a tuple with the same number of parts.
-  - at an exact part (P2): equal, as above.
-  - at a binder: the part must be closed (E0533 or E0534). The binder becomes a **structural alias** of that closed type. It has no parameters and no constructors (`User(..)` in the exports is the existing error for aliases).
-  - at a skip: nothing.
-  - a general variable or an unfixed part where a named type or a tuple is needed: E0533 or E0534. Anything else: **E0535**: "the type of `n` is `5`, which does not match `List(E)` (§4.3)".
-- **P5. When.** Each pattern, and each definition-reading site, is handled **once**, at the end of the group that types the last of its value deps. Sites whose deps are all in other modules, declarations or built-ins are handled by a **module-start pass**, which runs for every module in `module_order`, whether or not the module has any group. (A module with no top-level bindings, such as one that only has `Codec(Size, _) = m.size`, has no groups: `Checker::run` only calls `group` for `p.order.groups`. So the pass is a step of the module loop in `run`, not of `group`.) At each of these points, items are handled in source order. The export check (part 3.8) runs at the same point. So the errors come at the definitions, in a fixed order, whether or not anyone reads the binder.
-- **P6. Top level only.** Blocks have no type definitions, and an item that starts with `(` or `{` is a binding.
-- **P7. Two meanings of `_`.** On the left of an alias pattern, `_` skips a part. Everywhere else in a type it is a hole that inference fills. A skip never reaches `show_type`, the interface, or `TypeKind::Hole`.
-
-### 3.6 The cache and the cost
-
-- `program.has_value_types` is true when the program has any `Of` or alias pattern. When it is false: order.rs does not walk types, `group` pins nothing, the solver sets no `group_open` flag and `pinned` stays empty, no tables are filled. Edge counts and std check time do not change (a check in the tests).
-- `program.read_targets: HashSet<DefId>`: every def named by an `Of` or a pattern source, in any module. Only these get `read[x]`, and only their read parts (`program.read_parts`, F2) are pinned.
-- `Checker.def_reads: Vec<DefRead>`, indexed by `OfId` for definition sites, and the binders' entries in `Checker.bound: HashMap<TypeId, DefRead>`. `DefRead` is `Pending | Closed(Ty) | Failed`. P5 fills them. A use in `conv`, `kconv`, `expand` or `check_places_ty` clones a `Closed` entry. `Failed` gives `Error` with no new message. `Pending` gives `Error` when an error was reported before inference (O6), and otherwise an internal error (and a debug panic).
-- `Checker.site_failed: BitSet` over all `OfId`s, for annotation sites, which have no `DefRead`. It is set by O4 (a site in a cycle) and by O6 (a read of a value not typed after an earlier error). `conv` and `kconv` check it before they look at `read[x]`, and give `Error` with no message.
-
-### 3.7 Known types, places, literal types
-
-- **K1. Known type** of a value type (`kconv`, known.rs :102):
-  - top-level, imported, a declaration, a built-in, or a finished generalized local: `read[x]` (or the instance) with general variables, `Top` and unfixed parts as `_`;
-  - a name still being worked out (A3): the known type that `fit_known` (known.rs :457) gave that name from its own pattern, which is the part of the written type at the name's place (for `(a, b): (Int, String)`, `a` gets `Int`), and `_` when the name has none. So in `(p: User) { q: p = p ⏎ q.name }`, `q` has the known type `User`, and `q.name` works; in `((a, b): (Int, String)) { q: a = a ⏎ q == 1 }`, `q` has the known type `Int`, not `(Int, String)`, so `q == 1` is not E0520.
-  - a definition reading: the known form of the `Closed` entry.
-
-  It is never the known type of the name. After `x = "a" = s`, the name `x` has the known type `"a"`, but `y: x = t` lets any `String` in (the type of `x` is `String`), so the known type of `y` is `String`, and `y == "b"` is not E0520.
-- **K2. Literal types.** The type is read with no widening: `port = 8080` then `Port = port` makes `Port` the type `8080`. To get `Int`, write the type at the source (`port: Int = 8080`). The same holds for pins: with `r = cell(1)` and `C = r`, the variable of `r` is pinned to `1`, not `Int`, so `r.set(2)` is E0501 too (part 3.3). And for records (after T3): `p = { name: "a" }` gives `{ name: "a" }`.
-- **K3. Places (§4.4, E0518).** `check_places` walks HIR types and treats `Of` as opaque. A new `check_places_ty(&Ty, Pol)` checks the read type at the polarity of the place where `Of` is written, before general variables and `Top` are replaced: a general variable counts as a written type variable, and `Top` as `_` (which is allowed anywhere). `use = (f: pick) { f(1, 2, True) }`, with `pick: (A, B, Bool) -> A | B`, is E0518, because `(f: (A, B, Bool) -> A | B)` would be. A closed type always passes.
-- **K4. Type tests.** `x: user` in a clause pattern is allowed. `Typed.type_tests` heads come from the read `Ty`, so lower.rs needs no change. A debug assertion checks that a `Head` is never a binder `TypeId`, because `head_cond`'s alias fallback would give `Tag(u32::MAX)`.
-
-### 3.8 Exports, the interface, queries
-
-- **X1. §2.4.** An exported binding whose top annotation uses a value type, directly (`Of`) or through an alias `t` with `uses_value_type[t]` (also a private binder, such as `y: Inner` with `Box(Inner) = b`), counts as not written (`self.written`, infer.rs :85, :989), so its inferred type goes through `exported_type` (:569) and EXPORT_HIDDEN_TYPE. An exported binder, and an exported alias with `Of` in it (directly or through aliases), is checked at P5 on its read type with the same rule. The message names the source: "`User` is exported, but the type that `Codec(User, _) = user` gives it uses `Secret`, which is not exported". `hidden_types` (resolve.rs :2460) skips `Of` and these aliases, so infer must check every annotation that reaches them; the test for `uses_value_type` through aliases is the same for exported aliases and for exported bindings.
-- **X2. `Typed.alias_types: HashMap<TypeId, ShownType>`** holds the read body of each binder and of each alias with `Of` in it, with the alias parameters shown as their written names.
-- **X3. package.rs.** `TypeShow::head` for such a type prints `Name(Params) = ` and `canonical_type(alias_types[t])`. So a change in a private source's type is a change to `type m.User`. That is correct and stated in §2.4. `TypeShow::ty` gets an `Of` arm that prints the written name, only for text that is not canonical (written types of host and external entries cannot hold `Of`, E0531). `value m.y` with `y: x` already compares the inferred scheme.
-- **X4. query.rs.**
-  - `show_type_prec`: `Of` prints `user` or `m.user`.
-  - `Walk::ty`: `Of` pushes `Target::Local(v)` or `Target::Def(d)` at its span; the `m.` part already works through `target_at`. The head of a pattern pushes `Target::Type`; each binder is its own `TypeDef`.
-  - `type_definition` of a binder: `User = <alias_types>` when types exist, else the written item `Codec(User, _) = user` (inference may be `None` under catch_unwind).
-  - `symbols()`: the type symbols of an item come from `module.types` inside the item's span, so binders are listed.
-  - `named_types`: an `Of` arm that expands through `alias_types` when present, and gives nothing when not.
-- **X5. Shown type variables must be UpName before T2.** `display.rs` Namer and package.rs `TypeShow::param` (A2 phase 0, syntax.md notes) must show `A, B`; otherwise a shown `a` would read back as a value type. Checklist step 1 stops if this is missing.
-
-### 3.9 Records, macros, Lisp
-
-- **Records (T3).** `{ x }` is `x`; `{ x: T }` is a record type. T2 resolves every `Of` to `ValueRef::Local` or `ValueRef::Def` in resolve, and collects, per binding, `type_value_names: Vec<(ValueRef, Span)>`, the hook for T3's resolve-time L5 (E0542) and L2a (E0543) checks. This answers records.md open question 10. Under A3, `{ k }` for a key parameter `k: K` would be the shared holder of `k`, so L2a is really needed; before T3 lands there are no key parameters. A read type with `Param` labels or a spread base variable is not closed, so it is E0533 in a definition. T3 merges after T2, so T2 has no record types and no record bounds. T3 adds to F4 the arms for its record forms (`Rec`, and the spread forms `Without` and `Inter` that `{ ..R, K: V }` gives): with closed operands, the fixed form is T3's normal form of the record, and any other case makes the variable unfixed, never drops the bound. T3 also adds the records.md 5.9 tests of part 10 ("after T3"). Until then, the 5.9 codec gives E0534, which is safe.
-- **Macros.** `x(…)` and `a.m(…)` in a type are TypeCalls. `{ f }(…)` is not a type form. A value type in a template is a value name, with hygiene by marks (meta §5). `Definitions.definition(User)` returns the alias pattern item as written (P1), so no inference result leaks into macro step 1. Syntax macros (step 1) expand before resolve, so a value type in their result is seen by resolve and order.rs like any other.
-- **Typed macros (meta.md §7.3, §7.4).** A typed macro is expanded while its binding's group is typed, after order.rs has fixed the order of groups. So its result gets no type edges, no E0530 check and no read parts. The rule (decision 16): when the result is resolved in place, a value type in it is **E0531** ("a type of a value may not be in code that a typed macro makes, because that code is typed after the order of types is fixed; write the type"). A name of an alias `t` with `value_deps[t]` not empty, or of a binder, is allowed only when the group of every value in `value_deps[t]` is an ancestor of the call's group in the group graph of O3 (there is a path of edges, so it is typed before in every order); otherwise it is E0531 with the hint "use `T` in a type written in this binding, so that the binding is typed after `x`". The same holds for what `Types` (meta §7.4) shows of such an alias or binder: its read body when the ancestor test holds, and the E0531 at the call when it does not. Without this rule, the read would be of a value that is not typed yet (the internal error of O6), or of a group that is typed but not pinned for that site.
-- **Lisp rows for meta.md §2.3 (M1).** Value type: `x`, `a.x`, `{ x }` are written `x`, `(. a x)`, `{ x }` in type position; a lowercase symbol, or a lowercase last part, is a value type, and a list with a lowercase head is a macro call. Alias pattern: `(= (Codec User _) user)`, told apart by P1. These rows are added by M1 (or by T2, if M1 has landed first).
-
-## 4. Errors
-
-| Code | Name | When |
+| Code and lines | Fact | Consequence for T2 |
 |---|---|---|
-| E0530 | VALUE_TYPE_CIRCLE | a type use inside one group, or a cycle of groups through a type use (O4); message with the chain |
-| E0531 | VALUE_TYPE_PLACE | a value type, or an alias that uses one, in a constructor field, a declaration, a host type or an environment type; a value type in code that a typed macro makes, or an alias there whose values are not in ancestor groups (part 3.9) |
-| E0532 | TYPE_PATTERN_FORM | a part that is not a type pattern (a macro call included); a head that is an alias not standing for one named type |
-| E0533 | VALUE_TYPE_OPEN | a general variable or `Top` in a used part of a definition reading |
-| E0534 | VALUE_TYPE_NOT_FIXED | a variable that is not general and not pinned is read: nothing has come to it yet, its form holds itself, one of its bounds has a form that is not closed, it is an earlier variable that is not pinned, its group met such a variable (F3, F4), or it is read from another module and its own module did not pin it (F6) |
-| E0535 | TYPE_PATTERN_MISMATCH | the type does not match the pattern, or an exact part differs |
-| E0536 | VALUE_TYPE_OWN_SCOPE | V4: same pattern, same parameter list, own value |
-| E0537 | TYPE_PATTERN_BINDER_IS_TYPE | a binder has the name of an imported or built-in type |
+| `crates/ilang-check/src/resolve.rs:44–63`, `:421–448`, `:528–592` | Names/exports and imports are collected before type bodies, and type bodies before values. | Collect pattern binders early; resolve a value reference without inferring it. |
+| `resolve.rs:1098–1147`, `:1175–1209`, `:1329–1379` | Alias bodies remain HIR types; alias cycles follow named aliases. | Add `Of`, and alias-pattern edges, rather than eagerly converting bodies. |
+| `resolve.rs:1834–1849`, `:1853–1888`, `:2138–2202` | Value lookup checks locals before module scope; members check exports; parameter and result types are resolved before parameter locals are pushed. | Use the ordinary value lookup, plus an explicit pending-name check to prevent accidental outer capture. |
+| `resolve.rs:1445–1467`, `:1568–1600` | Service heads and host forms are inspected during resolution. | Reject value-dependent aliases there before those checks. |
+| `crates/ilang-check/src/order.rs:17–26`, `:36–85`, `:188–251` | The use walker visits patterns/expressions, not their types; expression uses form SCCs; initialization is computed separately from needs. | Add a second graph over existing groups, keeping runtime needs separate. |
+| `crates/ilang-check/src/types/infer.rs:155–191`, `:233–355` | External types are converted first; groups allocate holders, infer/link their values, generalize, then finish known types and coverage. | Complete value-type reads at explicit group/module events, not in a lazy alias conversion. |
+| `infer.rs:42–56`, `:1000–1005`, `:2052–2100` | A scheme has a level; mono schemes use `u32::MAX`; instantiation copies only quantified variables; local bindings are checked in order. | Keep the same instantiation and sharing rules for annotations. |
+| `infer.rs:852–870`, `:953–970`; `types/known.rs:102–137` | `conv` and `kconv` expand aliases lazily, with depth fallbacks to a fresh variable and `Top`. | Value-dependent definitions need a completed cache; a depth fallback must never invent their meaning. |
+| `infer.rs:2108–2120`; `types/display.rs:515–555` | Generalization preserves weak variables; mono display follows lower bounds **and** reverse `from` links. | Display is not evidence that a weak variable is immutable; a closure walk must include reverse links. |
+| `types/solve.rs:245–285`, `:326–345`, `:385–447`, `:452–507` | Constraints propagate both ways through bound lists; environment arguments compare equally; same-side bounds can create more constraints. | Covariant occurrence alone cannot prove a read stable. Keep existing propagation when fixing a variable. |
+| `types/solve.rs:153–170`, `:577–608`, `:618–633` | Extrusion and freshening also write bound lists directly. | A check only in `add_bound` cannot enforce the earlier draft's replacement invariant. |
+| `infer.rs:569–597`, `:983–989`; `resolve.rs:2394–2486` | Written exported annotations are checked in resolve and skipped by the inferred export check. | Value-dependent annotations must be deferred to the inferred check instead. |
+| `resolve.rs:797–803`; `crates/ilang-check/src/lib.rs:35` | `Alias(..)` is accepted as `Alias`. | Pattern binders retain that behavior; they do not gain constructors. |
+| `crates/ilang-syntax/src/ast.rs:327–338`; `types/pattern.rs:157–185` | A typed pattern binds a name/discard; a whole tuple is not followed by a type annotation. | Use individually annotated tuple parts in examples; no new pattern grammar. |
+| `crates/ilang-check/src/query.rs:26–48`, `:342–346`, `:492–545`, `:991–1053` | Queries infer after errors, use HIR type spans for targets, and collect symbols within item spans. | Failed reads need explicit recovery; give each binder its own span and preserve its whole source item. |
+| `crates/ilang-cli/src/commands/package.rs:1063–1104`, `:1235–1249`, `:1306–1323` | Value interfaces use inferred types; alias interfaces print written bodies; canonical names are separate from display names. | Serialize resolved alias bodies, not a private source's spelling. |
+| `crates/ilang-check/src/hir.rs:167–192`, `:273–296`, `:349–357`; `types/mod.rs:148–199` | Aliases have ordinary TypeIds; value references distinguish local/def/constructor; Typed has no alias-body table. | Reuse TypeDef/ValueRef and add a result table. |
+| `crates/ilang-wasm/src/lower.rs:2209–2237` | Type-test lowering expects real heads; an unexpanded alias can fall back to an impossible tag. | Assert that extraction aliases never survive into runtime type-test heads. |
 
-Codes used again: E0201, E0203, E0204, E0205, E0207, E0208, E0221, E0227, E0501, E0518, TYPE_ARITY, ALIAS_CIRCLE. A3's code for "a lowercase name in a type" is removed with its tests in the same change; those tests become value-type tests.
+## 3. Alternatives and choice
 
-## 5. Why it is sound (summary)
+Criteria: the same set-of-values explanation in every use; principal inference under explicit rules; the schema example; no order- or consumer-dependent meaning; import-stable parsing; a practical implementation in the checked compiler.
 
-- In the annotation reading, a value type is only another source of constraints, like `_` holes linked to each other. Holes and rule 3 are already sound.
-- In the definition reading, the type is closed, so every use of an alias means the same type.
-- Trusted places are excluded (E0531).
-- A value is never read before it is typed (O6), and E0530 catches every cycle.
-- Fixed types do not go stale: a read variable is pinned, and the solver reads it as its closed type from then on (F5). This does not rest on where variables sit, so service arguments compared both ways and the checks of `add_bound` cannot break it.
-- A pin is never smaller than what came: it is the union of all lower bounds, each taken whole; a bound that F4 cannot close makes the variable unfixed (F4).
-- The result does not depend on the order of groups that are not ancestors of each other: a group that met an earlier variable that is not pinned gives no fixed type (F3), a read part that carries one is unfixed (F4), and only variables of the group are pinned.
-- A module's result does not depend on its consumers: only sites in the module pin its variables (F2).
-- Code that is typed after the order is fixed (typed macros) reads only values of ancestor groups (part 3.9).
-- Principal types are kept: every value type is a function of a principal scheme found earlier, or of a variable shared inside the same binding (like a declared type variable). So the binding that uses it is typed by plain MLsub.
+| Design | Advantages | Failure or cost |
+|---|---|---|
+| A. Read §4.8's known type everywhere. | Simple shape information; available early for some locals. | A fitted literal may have known type `"a"` but inferred type `String`. Other names have no known type. It does not mean the type of the value's scheme. |
+| B. Instantiate/share the live scheme everywhere, including aliases. | Closest to expression lookup; preserves ordinary constraints. | A permanent alias may contain a weak variable changed by later uses, or instantiate an identity function independently at incompatible uses. It is not a fully determined structural alias. |
+| C. Only read already closed or generalized schemes; reject every remaining weak variable. | Small and sound; no new commitment rule. | Rejects records.md §5.9's non-generalized builder. Requiring the user to rewrite its full record type defeats that accepted example. |
+| D. Give top-level read parts an explicit completion point; close them there, using checked equalities. | Stable aliases and imports; supports partial codec extraction; uses the ordinary solver. | Reading can restrict later uses; ambiguous/unfilled parts are errors. Requires scheduling and a careful closure walk. |
 
-## 6. Records 5.9, step by step (after T3)
+Choose **D**, with B's ordinary annotation instantiation and local sharing, C's rejection of unresolved parts, and A's early *shape* information for locals, without substituting their narrowed known types for their inferred types.
 
-This needs T3's record types and `field`; it is the main use, but its tests come with T3. In T2 the same steps run with `size` and `Codec(Size, _) = size`.
+Fixation is a language rule, equivalent to adding a determined type annotation at the source's completion point. It is not a claim that a lower-bound snapshot is the most general unconstrained solution. Once these specified equations are added, inference still computes the principal solution of the constraints; it does not search for a solution to make a pattern match. The spec must describe this commitment explicitly (§7.5). A rule that silently adds bounds while merely printing a type is excluded.
+
+## 4. Exact rules
+
+### 4.1 Names, sites and scope (V)
+
+**V1.** A lowercase `x`, or `m.x` with lowercase final name, in a type and without following `(`, means a **value type**. `{ x }` groups it. `{ x: T }` is a record type after T3. With following `(`, `x(…)` and `m.x(…)` are TypeCalls reserved for macros. Imports never change that classification.
+
+**V2.** Resolve `x` as an expression name at that place: locals, the module's own/imported value scope, then built-ins. Built-ins are ordinary prelude definitions (HIR `ValueRef`, `hir.rs:349–355`). A module used alone gives E0205; an unknown name gives E0201. `m.x` is only a module member, with the normal export check. A value named `m` gives E0207; no field projection is available in a type. This does not inspect `x`'s runtime value.
+
+**V3.** Before resolving the types of a pattern or function header, collect its pending value binders. In those types, a name of that same pattern or parameter list is E0536, even if it would otherwise find an outer name. The function header includes `->`, `?`, and `!`. Inside a binding's own value, a type may not refer to that binding's own value names, at any nesting depth; ordinary recursive *expression* uses remain legal. Remove the function-header pending names on entry to the body, where parameters become available. For the qualifier of `m.x`, a pending value name gives E0207.
+
+Thus `(x, y: x)`, `(x) -> x { x }`, and `f = (g: f) { g }` are errors. In `f = (x: Int) { y: x = x  y }`, the reference to `x` is allowed. Local bindings and clause patterns follow the same rule. Use two scope mechanisms: a current-pattern/header pending set, checked before outer lookup, and an own-binding reserved frame installed for its RHS. Inner binders that have entered scope cover that reserved frame. Expression lookup ignores reserved frames; type lookup reports E0536 on them. Thus an inner parameter named f may be read in its body even inside the outer binding f; a non-direct local RHS cannot silently capture an outer f as its own type. Track binder identities and lexical depth, not a global set of forbidden text.
+
+**V4.** A value type names `ValueRef::Local` or `ValueRef::Def`, never a constructor. Definitions are top-level only. T3 reuses these resolved references to reject a binding with label parameters (E0542, records L5) or a key parameter (E0543, L2a), including pattern sources. This agrees with records.md question 10.
+
+### 4.2 What is read (R)
+
+**R1. Annotations.** For a completed generalized binding, take a fresh instance of its scheme, exactly as for an expression use (§4.8 rule 3). One quantified variable becomes one fresh variable per occurrence of the value type, shared within that occurrence. Separate occurrences do not share their instantiations. This applies to generalized locals, top-level names, imports and built-ins alike. The resulting annotation does not make its own binder polymorphic.
+
+For a parameter, clause binder or non-generalized local in the current top-level group, share its existing monotype. This includes weak variables captured by a local scheme: they remain shared, as they do in an expression use. They are not copied or completed by a local annotation. A completed local scheme's quantified variables alone are freshened.
+
+For a completed top-level definition, the read parts of its scheme use the fixed forms of R3–R5 below. Quantified variables are still instantiated, not fixed. A weak part not fixed by its source module is E0534. Reading through a local does not turn an unfixed *top-level* read into an allowed fresh copy: shared weak variables stay shared; no structural alias can escape from such a local.
+
+**R2. Definitions.** In an alias body, every `Of(x)` must give a closed type: no quantified variable, unresolved weak variable, label parameter, `Top` or hole. This applies to `T = x` and to occurrences deeper in `T(A) = (A, x)`. The alias's own formal parameters remain formal parameters; the closure requirement concerns the value-derived part.
+
+For an alias pattern, only a binder's part, an exact part introduced by expanding a head alias, and the shapes needed to reach them are demanded. A skip demands no content. Quantified variables under a skip are fine. A used quantified variable gives E0533. There is no “pick an instance that matches” operation.
+
+**R3. Completion point and ownership.** Collect demands before inference, including unused aliases/patterns. Only a demand *written in the source definition's own module* can fix that source's weak parts. Transitive uses of an imported alias do not count as new demands in its source module. Imported readers never fix another module. They may read a closed structural part or a part already fixed there; otherwise E0534 at the reader.
+
+At the end of a source's ordinary expression group, after linking and generalization, take a single snapshot for **all** its module's demands. Record the first solver-variable index before allocating the group's holders. All demands in that group see that snapshot, so one pattern cannot supply information to another. An earlier successfully fixed variable has its recorded closed form.
+
+A group that constrains any earlier, unfixed weak variable is **open**: no weak variable of that group can be fixed. Detect this throughout constraint propagation, including `compare`, `reach`, extrusion and reverse links, not just at the initial operands. Also reject a demanded part that merely carries an earlier unfixed weak variable, even when no constraint touched it. “Earlier” uses allocation ownership, not the current level. Quantification is relative to the source's Scheme.level, not a global “general” flag. These conservative checks prevent unrelated earlier groups from changing a snapshot.
+
+**R4. Closed forms.** For a demanded weak variable of this group:
+
+1. Follow its lower-variable edges **and reverse `from` edges**, and collect every lower bound. Pure variable SCCs are collapsed; they are not recursive types. The checked display walk includes both kinds of edge (`display.rs:531–538`).
+2. Replace each weak variable needed inside a bound by its closed form, regardless of polarity. Earlier fixed variables use their recorded forms. A quantified variable needed here, an earlier unfixed weak variable, `Top`, an unsupported form or a structural recursive dependency makes the part unavailable.
+3. Keep every bound, including unions, intersections, differences and function types. Normalize only with exact type equalities. There is no “ignore an unfamiliar bound” arm. T1 value sets are kept exactly. T3 adds record/Without forms with its exact rewrites.
+4. The candidate is the union of those closed bounds. No concrete lower bound means E0534; do not invent `Never` or take an intersection of upper bounds. An explicit closed `Never` is allowed. A pure-variable SCC with no concrete lower bound is unfilled.
+5. Stage equalities `v <: candidate` and `candidate <: v` for every variable whose form was needed. Check the **whole batch** with the ordinary solver, retaining all original bounds, caches and reverse links. Also stage the structural-shape checks of P4. Check occurs and places. Commit only if the batch succeeds and touches no earlier unfixed weak variable. Otherwise give E0534 and discard the trial state. Never assert that these equalities must succeed.
+
+Candidate collection reads an immutable snapshot. Closed-form normalization and exact-part subtype comparisons must use pure closed-type operations or an isolated scratch solver; they may not add source bounds or feed trial-derived information back into candidate selection. Every normalization result is checked to remain closed.
+
+A solver checkpoint/trial copy is an implementation choice; its rollback includes variables, levels, bounds, reverse links, constraint/comparison caches, touched/reported sets and failures. No trial failures leak into the main diagnostic stream. This path runs only for demanded weak parts, not for every binding. Adding Solver cloning for a first implementation is acceptable; measure before adding an undo log.
+
+**R5. Fixing means constraining.** Keep the equations in the ordinary solver and record `fixed[v] = (closed_type, reading_site)` for extraction, display and diagnostic notes. Do **not** replace a variable at `constrain_in`, erase its old bounds, bypass `reach`, or forbid later bound insertion. Existing relationships must keep propagating. A later incompatible use gives the ordinary type error with “this type was fixed here” at the reading site. Extending a source annotation to a wider type is the remedy.
+
+Fixation never generalizes a weak variable. Variables not demanded remain shared and unfixed. A foreign top-level type read adds no fixation equations to its source. Adding only such reads cannot change the library's completion results. Ordinary expression uses and local monotype sharing can still constrain shared weak variables, as §4.7 already permits; this rule does not introduce separate compilation or make every shown weak scheme consumer-independent.
+
+**R6. Examples and cost.** With `id = (x) { x }`, `twice = (f: id, n: Int) { f(f(n)) }` instantiates `id`; `Same = id` is E0533. `g = id(id)` is weak and unfilled, so `G = g` is E0534. With `port = 8080`, `Port = port` is `8080`, never `Int`; write `port: Int = 8080` to obtain `Int`.
+
+With an invariant `Cell(A) { Cell(get: () -> A, set: (A) -> Nil) }`, `r = cell(1)` and `C = r` in one module fix the demanded parameter to `1` if the batch checks. A later `r.set(2)` fails. Without the read, later constraints may widen that parameter. This is a deliberate, visible cost of D; it is not ordinary display simplification.
+
+### 4.3 Alias patterns (P)
+
+**P1. Classification is syntactic.** An item with an UpName head and `=` has an alias-pattern head exactly when it has arguments and its *written* right side, after stripping type groups, is a value type. No arguments gives a plain alias `T = x`. Every other definition head is a list of type parameters, checked by syntax.md §4.3.
+
+Thus `Pair(A) = (A, A)` is generic; `Schema(User) = user` is a pattern even before importing anything. An import can make a binder conflict, or a head unknown, but cannot change which item it is. `Schema(User, _) = make_type()` remains a generic-alias form with an invalid parameter `_`; expanding its right side cannot turn it into a pattern.
+
+Both parsers store this distinction in the core tree **before expanding children**. An item macro may create a new alias-pattern item, classified when its output becomes an item. A macro cannot change an existing generic alias into a pattern by expanding its body. An `AliasPattern` node has a head reference and its binder list; `Definitions.definition(User)` returns that written item without needing its inferred type.
+
+**P2. Heads.** The outer head is an unqualified type reference, not a definition. `m.Schema(User, _) = user` starts with a lowercase name and is an ordinary constructor-pattern binding under accepted §2.2. On a failing such binding with a lone value RHS, suggest importing the type and writing the unqualified head.
+
+A head is a custom/built-in type with the right arity, or a transparent alias that expands to one named type or tuple. A head alias must not depend on a value type, contain a hole or have any free variable other than its declared parameters. Each formal parameter occurs at most once, only through named arguments or tuple parts. Replace formal parameters with the corresponding pattern parts. A parameter below a function, union, intersection or difference is E0532. Constant subtrees become exact checks: the source part must be closed and equal in both subtype directions. This supports renaming and tuple projection:
 
 ```i
-user = object |> field("name", string) |> field("age", int)
-Codec(User, _) = user
-show = (u: User) { u.name }
+Pair(A, B) = (A, B)
+Pair(Tree, _) = parsed
 ```
 
-1. resolve: P1 makes the item a pattern; `Codec` is a custom type of arity 2; `User` is a binder; `_` is a skip. `value_deps[User] = { user }`. `type_uses(show) = { user }`.
-2. order: `show` is typed after `user`'s group; groups are unchanged.
-3. infer: at the end of `user`'s group, F2 says only the decode part is read. F4 gives the `V` of each field its one bound (`String`, `Int`), `R2` the form `{ name: String }`, and `D`, whose bound is `Without(R2, {age}) & { age: V2 }`, the form `{ age: Int, name: String }` (T3's arms); they are pinned. `E` is not read, so it is not pinned, and `user.encode` keeps working. P5 matches the pattern: `User` is `Closed({ age: Int, name: String })`.
-4. `show`: `(u: User)` converts the binder through the cache.
+There is no new tuple-item grammar. `(Tree, _) = parsed` is still a value binding. Recursive aliases are E0223, not a depth-limit fallback.
 
-## 7. Spec text
+**P3. Parts.** A bare unqualified UpName binds a fresh zero-parameter structural alias, even if that text already names a type. A duplicate module definition is E0208; a collision with an imported/built-in type is E0537. It never silently becomes an exact type test.
 
-### 7.1 §2.4 Exports (add after the last bullet)
+`_` is a skip node, never a type hole. `m.T`, `T(P, …)`, `m.T(P, …)`, and tuple patterns recursively match shapes. A qualified zero-argument type is therefore an exact nominal-head test. Nested aliases follow P2. Records, functions, literals, unions, intersections, differences, value types and macro calls are not pattern forms in T2 (E0532). A record may still be the closed type bound by `User`; T3 adds no record-pattern syntax in this note.
 
-> - When a type uses the type of a value (§3), the type it stands for is checked after inference: an alias whose body uses one, directly or through other aliases, a type defined by an alias pattern (§4.3), and the type written at the top of an exported binding. The value need not be exported, but the types it gives must be. So the type that an alias pattern gives an exported type is part of what the module exports, and a change to the value it reads, also when that value is not exported, changes the exported type.
+**P4. Matching is observation, then checked completion.** From the source scheme, expose the demanded outer structure without choosing a type for a quantified variable. A weak variable's lower-variable SCC may expose its normalized lower bounds; an unfilled variable gives E0534. At each named/tuple node require exactly one normalized member with that head/arity. Do not discard extra union members or select a convenient alternative. Mismatch is E0535.
 
-### 7.2 §2.5 Top-level bindings (add after the paragraph on the order of values)
+Record every weak variable traversed to expose a shape. If it is not already fixed, it must be owned by this group and not open (R3). In the trial batch, require it to be a subtype of the observed skeleton, **reusing its original argument variables**, and recheck that skeleton after the batch. This closes the observed outer shape without closing a skipped argument. No fresh “hole” is made for a skip. An ambiguous choice needed to expose a skeleton, or an unknown head, fails; no search is permitted. Do not inspect skipped contents for matching or impose a new written-type place check inside them. The source's ordinary checks still apply. Do not stage a fresh argument to replace an existing weak variable, even when that argument occurs only under a skip.
 
-> **Types that use values.** A type may use the type of a value (§3). Such a use does not run code, so it is not a need, and it does not change the order in which values are worked out. It changes only the order of inference: a binding whose types use the type of `x`, directly or through aliases (§4.3), is typed after the group of `x` (§4.7). If `x` is in the binding's own group, or is the binding itself, it is a compile error, and the message names the chain of uses.
+At a binder, compute a closed form by R2–R4 and store it as the alias body. At an exact subtree, close first and compare with the already closed expected type; the expected type cannot fill in missing information. At a skip, do nothing to that argument. A skip's variable may nevertheless be fixed if the same solver variable is also demanded elsewhere; skipping never breaks existing sharing.
 
-### 7.3 §3 Type syntax
+Example: a source with type `Schema(D, E)` and closed decode candidate `Int` gives `Schema(Size, _) = size` the alias `Size = Int`. It leaves the distinct `E` variable live. A source `Schema(A, A)` cannot promise that its second argument stays unfixed: both arguments are the same variable.
 
-In the grammar, `Prim` gets `ValueType`:
+**P5. Completion is eager, dependency ordered.** Check every pattern, even one with no binders, and every value-dependent alias, even unused. A site becomes ready after all its source groups and dependent alias sites complete. Process dependencies before dependents; use source order only to break ties. This matters for `A = List(B)` written before a pattern defining `B` from the same source.
+
+At module start, complete sites whose sources are declarations, built-ins or completed imported modules. Do this also for a module with **no value bindings**. After each group, complete newly ready sites. Store Pending / Ready / Failed; each successful definition is read once. All sites use the pre-batch snapshot of their source's group (R3), not the solver as changed by whichever alias happened to be used first.
+
+### 4.4 Order and cycles (O)
+
+**O1. Resolution before inference.** Phase 1 collects DefIds and pattern binder TypeIds. Phase 3 resolves value types in definitions using the already collected/imported value scope; it never asks for a type. Phase 4 resolves annotation value references and locals. After the alias graph is checked, compute dependency summaries for aliases/pattern binders and walk **all types** in every binding, including inner bindings, parameter/clause patterns, type tests and return/effect types. Keep a single reusable HIR visitor.
+
+Dependency summaries include the aliases named in pattern heads/parts as well as their sources. They include declarations/imported definitions for readiness even though these need no same-module binding edge. A memoized traversal avoids repeated expansion; materializing transitive sets costs at least their output size, not necessarily linear time.
+
+**O2. Two graphs.** Compute ordinary expression-use SCCs exactly as before. Over those groups, add ordinary dependency edges and type-read edges: the reader depends on every same-module source group reached through its annotations/aliases. A type edge within one SCC, a self edge, or a cycle in this second graph gives E0530. Never merge groups on type edges, since that could change generalization.
+
+Runtime needs, full needs and initialization continue to use only expression uses. A type lookup can require compile-time completion without requiring runtime initialization. Imported modules complete first under the existing module DAG.
+
+**O3. Diagnostics.** Keep edge provenance: annotation span, alias chain, source binding and expression-use path. For:
+
+```i
+a = (n: b) { n }
+b = a(1)
+```
+
+report E0530 at `b` in the annotation: “the type of b is needed to type a, but b uses a; write the type instead.” For `A = List(A)`, give E0223; for imports in a circle, retain E0214. Do not turn any of these into “type not known”, a fresh variable or a depth-limit result.
+
+**O4. Recovery.** Mark definition sites, pattern binders and annotation sites in a bad dependency component Failed before inference. Dependents propagate failure without another diagnostic. Normal checking stops after resolution/order errors (`lib.rs:160–169`), but query checking continues (`query.rs:36–41`). Pass an explicit prior-error flag to the checker; don't infer it from an empty inference diagnostic vector. In recovery only, a missing dependency gives Failed/Error and preserves unrelated query results. A Pending read in an otherwise valid program is an internal scheduling error.
+
+### 4.5 Known types, places and forbidden contexts (K)
+
+**K1.** `Of` reads inferred schemes/monotypes, never a narrower flow fact. For a completed generalized scheme, its known form erases quantified variables to `_`, keeping relationships only in inference. A completed fixed part has that closed known form.
+
+For a current parameter or monomorphic local, kconv uses a pure **inferred-shape conversion** of its stored monotype: substitute already fixed closed forms, retain its structural nodes, and erase every remaining inference variable to a hole, without following its temporary bounds. A written type on that name is already present in this monotype (`types/pattern.rs:178–185`). For completed generalized locals use the simplified principal scheme while preserving weak variables, then erase remaining variables; do not substitute a value-known fact for a weak variable.
+
+No separate flow-shape table is needed. Never use fit_known's kvars, expected known types, or the known type of a value matched by a compound pattern as the inferred type read by Of. They can be narrower (`known.rs:457–466`; T1 §4.8). An unannotated source parameter stays unknown here even when its callback has a narrower expected known type. Ordinary expression checking still uses expected types as before.
+
+```i
+copy = (s: String) {
+  x = "a" = s
+  y: x = "b"
+  y
+}
+```
+
+With `"a"` as input this gives `"b"`; the fitted binding needs Assert in its environment. The inferred type of x is String, its value-known type is "a", and y uses String. The inferred-shape conversion must not copy that narrower fitted-literal fact. Likewise, `((a: Int, b: String)) { q: a = a  q == 1 }` uses `Int`, not the whole tuple. Conversion to known information never shares or commits new inference constraints.
+
+**K2. Places.** Check the **whole expanded annotation**, including its surrounding union/intersection, with value types represented by their inferred shape before quantified variables are freshly instantiated. Treat unfilled shared local holders as type variables. Checking each `Of` independently misses `a | b` when both are variable members. Reuse §4.4's polarity and T3's spread restrictions; no new choice in input places. A `pick(A, B)` of type `(A, B, Bool) -> A | B` cannot be smuggled into a parameter annotation through `(f: pick)` (E0518).
+
+Keep T3's check on shown types of non-generalized bindings as well. Alias extraction and fixing never waive that accepted check. Type tests retain §7.1's ban on a variable member; T1's literal test members keep their value sets.
+
+**K3. Early/trusted contexts.** Directly or through an alias, a value type is E0531 in a custom constructor field, an external declaration, a host declaration/type, or a service/environment type, including `!` components, environment parameters and statements. Check this before early conversion, reporting E0531 without an additional shape/ABI error. It also rules out embedding an extraction alias in such a field. This is an ordering limit, not a special rule for a library.
+
+Ordinary annotation parameter/result/error types and type tests are allowed. Reading an ordinary function scheme that has an environment is allowed; writing a new value type *inside* an environment type is not. The inferred environment continues to obey ordinary service equality. Constructor fields stay complete before inference, as the macro draft's step 1 promises.
+
+### 4.6 Exports, queries and package interfaces (X)
+
+**X1.** Pattern binders are ordinary alias TypeDefs with their binder spans and no constructors/parameters. `(User)` exports the alias; `(User(..))` has the same effect. Neither exports constructors of a nominal type that the alias happens to name. The source value need not be exported.
+
+**X2.** After completion check exported extraction aliases, all exported aliases transitively using them, and exported top annotations transitively using value types against §2.4. Private nominal types of the exporting module may not leak. Written types with no value dependency retain the existing resolve check. With a value dependency, defer the annotation's entire hidden-type check; remove it from the “already checked written annotation” exemption in inference. Expand private aliases and retain source provenance in messages.
+
+**X3.** Add `Typed.alias_types: Map<TypeId, ShownType>` for each extraction binder and value-dependent alias, parameterized by its own written formal parameters. Package interfaces compare the completed structural body, with canonical nominal identities, complete literal sets and canonical formal-parameter identities. Never serialize `= private_value`, solver variable ids, source locations, fixation metadata, or shortened hover text. A change to a private source can change its exported alias. A source rename with the same read type does not. T3's label canonicalization remains in force.
+
+**X4.** Query type printing shows the written value name in annotations. Hover on that reference shows the source's scheme; go-to-definition uses its resolved local/DefId. A pattern head targets its existing type; each binder targets its own TypeId. Hover on a completed binder shows `User = <structural type>`; on a failed/pending binder show its written pattern and available diagnostic, never an invented hole alias. The outline lists every binder even when the item has several. Resolve source references even when inference failed. Completion/type navigation uses completed alias bodies when available.
+
+### 4.7 Records and macros (M)
+
+**M1.** The records.md §5.9 builder gives a weak `Codec(D, E)`. Demand only its decode part and the Codec shape. Normalize `Without(R, {age}) & { age: Int }` after closing its dependencies; T3's exact rewrites yield `{ age: Int, name: String }`. Fix that decode part through checked equations. Leave the distinct encode variable unfixed; `user.encode(u)` still constrains it normally. Reading `Codec(_, Enc) = user` with no encode lower bounds is E0534. No case for “schema” or “codec” exists in the algorithm.
+
+T3 must add closure, provenance and inferred-shape arms for records/Without, rerun its L2a/L5 checks on `Of`, and test this builder. T2 itself tests an ordinary nominal Codec with closed scalar decode output. Until T3 adds those forms, unsupported closure is an explicit failure, never a partial type.
+
+**M2.** Syntax-macro output is resolved and ordered like written code. Hygiene marks apply to value references, head type references and binder definitions. Classification is stored as P1 says; pattern parts are not type positions and cannot be macro calls. `Definitions` returns written items, not `Typed.alias_types`. A type definition is available for syntactic inspection before its inferred alias body is ready.
+
+The Lisp reader/printer needs rows for value type `x` / `(. m x)`, and pattern item `(= (Schema User _) user)`, with a distinct pattern-part position. Add these in whichever of M1/T2 lands second. Groups do not change classification. This agrees with the draft's core-tree/group rule (§1).
+
+**M3. Typed macro boundary, for M4.** Expansion happens after ordering. A newly generated direct value type gives E0531, including a local one in this first version. A generated reference to an existing value-dependent alias is allowed only when its completed definition is guaranteed available: every same-module source is in a strict ancestor group of the call, and every imported source's module has completed. A coincidentally earlier group in one tie-break order is insufficient. A module-start alias with no binding sources is available. Apply the same rule to type syntax read by `Types`; no “not ready yet” depending on scheduling.
+
+Never add demands or fixation equations during typed expansion: M4's “no new bounds on caller variables” rule remains intact. M4 reuses T2's readiness/context checks and T3's label checks. These are additional, explicit answers to meta.md's T2 question; that draft must be updated before M4 lands.
+
+## 5. Errors
+
+T2 proposes E0530–E0537, leaving E0523–E0529 to T1 and E0540–E0549 to T3. Confirm the allocation at integration; only T3's block is already reserved by its accepted note.
+
+| Code | Meaning |
+|---|---|
+| E0530 VALUE_TYPE_CIRCLE | Type dependency inside a value SCC, or cycle between groups. Include a chain. |
+| E0531 VALUE_TYPE_PLACE | Forbidden early/trusted context, or unsafe typed-expansion read. |
+| E0532 TYPE_PATTERN_FORM | Invalid pattern, macro part, or non-projectable head alias. |
+| E0533 VALUE_TYPE_OPEN | Used quantified variable, hole, Top or label parameter in a definition read. |
+| E0534 VALUE_TYPE_NOT_FIXED | Unfilled/recursive/unsupported weak closure, open group, foreign unfixed part, or failed completion equations. Say which source part and suggest its annotation. |
+| E0535 TYPE_PATTERN_MISMATCH | Wrong head/arity/union, or closed exact part not equal. |
+| E0536 VALUE_TYPE_OWN_SCOPE | Same pattern/header or own binding value. Explain an outer name that would otherwise be captured. |
+| E0537 TYPE_PATTERN_BINDER_IS_TYPE | A new pattern binder conflicts with an imported/built-in type. |
+
+Reuse E0201/E0203–E0205/E0207/E0208, E0221–E0224, E0227, E0501/E0503/E0515/E0518 and T3's E0542/E0543. A later failure caused by fixation retains its ordinary mismatch/invariant/environment code plus the fixation note. A3's temporary lowercase-type error and A1's “reserved alias pattern” error are removed with the feature, not reassigned to these cases.
+
+## 6. Why the rules meet the language requirements
+
+A value type is a way to write a set of values already described by a scheme/monotype. An alias pattern projects that structural description; it never examines runtime data or invents a nominal identity. Schemas, parsers and callback wiring exercise unrelated uses.
+
+Annotation instantiation, monomorphic sharing and the value restriction are unchanged. A definition read cannot create polymorphism. Fixation adds deterministic closed equations at a stated boundary; matching never constrains an unknown to make it fit. All constraints then use the same subtype solver and place restrictions. This is the principal-inference argument for the proposed language rule, not a machine-checked proof.
+
+A closed alias cannot change after being published. Equality constraints retain all source relationships, so a hidden setter or service use must still agree with it. Module ownership and rejection of earlier open variables make the completion and its failure independent of unrelated groups and consumers' new fixation demands. Existing expression constraints and local monotype sharing remain shared; the claim does not cover the display of uncompleted weak parts. Type edges cannot enlarge a recursive group or change runtime initialization.
+
+## 7. Replacement spec text
+
+Apply after syntax.md and T1's replacements; T3 subsequently adds record syntax/places. Keep existing section numbers. The following is normative proposed text; implementation names above are not part of it.
+
+### 7.1 §2.4 Exports: add bullets
+
+> - A type defined by an alias pattern (§4.3) is exported as an alias. It has no constructors of its own; exporting it with `(..)` has the same effect as exporting it without `(..)`.
+> - An exported alias or top annotation that uses the type of a value, directly or through aliases, is checked after that type is found (§4.7). It must obey the same rule about private types. Its source value need not be exported. Changing a private value can therefore change an exported structural alias.
+> - Reading a value's type from another module never fixes a part of that value's type (§4.7). Adding a consumer or a test module cannot change the types fixed by its source module.
+
+### 7.2 §2.5 Top-level bindings: add after Order
+
+> **Type dependencies.** A type may name a value (§3). This does not work out that value or add it to runtime needs or full needs. It only orders type inference: a binding whose annotations use the type of a value of its module, directly or through aliases, is typed after that value's group (§4.7). A type dependency within one group, including on itself, or a cycle between groups is a compile error. The message gives the chain of dependencies.
+
+### 7.3 §3 Type syntax: grammar and bullets
+
+Keep `TypeCall` and its reservation from syntax.md, and literals from T1. Name the existing lowercase alternative:
 
 ```
-Prim      = FnType | TupleType | NamedType | TypeCall | ValueType | Literal | "_" | "{" Type "}" .
+Prim      = FnType | TupleType | NamedType | TypeCall | ValueType
+          | Literal | "_" | "{" Type "}" .
 ValueType = [ name "." ] name .
 ```
 
-The bullet "A lowercase `name` in a type, or `a.x` … is kept for a later use, the type of a value, and is a compile error. …" becomes:
+Replace the temporary lowercase-type error bullet:
 
-> - A lowercase `name` in a type, with no `(` after it, is the **type of a value**: the type of the value that `name` names at the place of the type. It is found as the name in an expression at that place is found (§5). `a.x`, with a lowercase `x` and no `(` after it, is the type of the member `x` of the module `a` (§2.3), which must be exported. It is never a field of a value: when a local name covers the module `a`, `a.x` in a type is a compile error, so `(p: User, q: p.name) { q }` is a compile error. `{ x }` is the same as `x`. §4.7 says which type it is.
-> - A type of a value may not name a name bound by the same pattern, a parameter of the same function in that function's own parameter types or its `->`, `?` and `!` parts, or a name inside its own value. So `(x, y: x)` and `(x) -> x { x }` are compile errors, also when there is an outer `x`.
-> - The type of a value is a way to write a type that inference finds. It is not a new kind of type, and it never makes a value general: `(f: id)` gives `f` one type in the whole body, as `(f: (A) -> A)` with a new `A` would.
-> - A type of a value may not be used in a field of a custom type (§4.3), in the type of a declaration (§10.1), in an environment type (§9.2), or in a host type (§9.7). The same holds for an alias that uses one, directly or through other aliases. These types must be known before types are inferred.
+> - A lowercase `x` in a type, without `(` after it, means the type of the value named `x` at that place. The name follows value scope (§5). `m.x` means an exported value of module `m`, never a field of a value. If `m` names a value, it is a compile error. `{ x }` groups the same type. A lowercase name or member followed by `(` remains a macro call, not a value type or a type application.
+> - A type may not name a value bound by that same pattern; a parameter in the types of that function's own header, including its `->`, `?` and `!` parts; or its own binding's reserved name inside that binding's value. A distinct inner binder that has entered scope may cover that reserved name. This is a compile error even if an outer value has the same name. Those parameters may be named in types in the body. For example, `(x, y: x)` and `(x) -> x { x }` are errors, but `(x: Int) { y: x = x  y }` is allowed.
+> - A value type is not its known type (§4.8). It follows the scheme, instantiation and completion rules of §4.7. It never makes a monomorphic value polymorphic.
+> - A value type, directly or through aliases, may not occur in a custom constructor field, an external or host declaration, or a service/environment type. Those types must be complete before inference.
+> - A type variable is an UpName declared after a binding, declaration, or type-definition name (§4.7). Lowercase names do not declare type variables.
 
-The bullet on `(` after a lowercase name (macro calls) keeps its text.
-
-### 7.4 §4.3 Custom types (full text)
+### 7.4 §4.3 Custom types: replace with this grammar and bullets
 
 ```
 TypeDef     = UpName [ TypeHead ] TypeBody .
@@ -269,195 +289,202 @@ TypeBody    = "{" { Constructor } "}" | "=" Type .
 Constructor = UpName [ "(" Field { "," Field } [ "," ] ")" ] .
 Field       = [ name ":" ] Type .
 TypePattern = UpName | "_"
-            | [ name "." ] UpName [ "(" TypePattern { "," TypePattern } [ "," ] ")" ]
+            | [ name "." ] UpName "(" TypePattern { "," TypePattern } [ "," ] ")"
+            | name "." UpName
             | "(" [ TypePattern { "," TypePattern } [ "," ] ] ")" .
 ```
 
-> - `T { C1 C2 … }` is a custom type. Every constructor has zero or more fields. A field may have a label.
-> - `T {}` is a type with no constructors. i code may not make its values. They only come from the host (§10).
-> - `T = Type` is a type alias. `T` is the same as the type on the right. An alias may not use itself, directly or through other aliases or alias patterns.
-> - **Which form.** An item `T( … ) = V`, whose right side is only the type of a value (§3), also inside `{ }`, is an **alias pattern**. Every other head is a **list of type parameters**. Which reading an item has depends only on how its right side is written, never on the names in scope, so an import may make an item an error but never changes what it means.
-> - In a list of type parameters, every part must be an `UpName` with no module name and no arguments, and it may not be the name of a type that may be written with no module name in the module (a type of the module, an imported `UpName`, or a built-in type). When a part is not such an `UpName`, as in `Box(a)` or `Box(List(A))`, the message says that a type parameter is an `UpName`. When it is the name of a type, as in `Pair(Int) = (Int, Int)`, the message says that a type parameter may not have the name of a type.
-> - The type parameters are the type variables of the definition: `Option(A) { Some(A) None }`. Every type parameter must be used on the right, and every type variable on the right must be a parameter. The type parameters of one definition must have different names.
-> - A type of a value (§3) in an alias stands for one type, with no type variable and no `_` in it (§4.7). So `Same = id`, with `id = (x) { x }`, is a compile error. A type of a value may not be used in a field of a custom type, even through an alias.
-> - **Alias pattern.** In `T(P1, …, Pn) = v`, `T` is a type that already exists, written with no module name; it is not defined by the item. (`a.T(…) = v` is a binding, §2.2; to take apart a type of another module, import its name.) `T` is a custom type or a built-in type with n parameters, or an alias that stands for one such named type or for a tuple type. The item takes apart the type of the value `v` (§4.7). Each `Pi` is a type pattern:
->   - An `UpName` with no module name and no arguments always defines a new alias with that name, the same as a lowercase name in a value pattern always binds. It is a type of the module, defined one time only, and it may not have the name of an imported or built-in type. It stands for the part of the type at its place, which must have no type variable and no `_` in it.
->   - `_` takes any part and defines nothing. It is not a hole.
->   - A named type with a module name or with arguments takes apart a type with exactly one member, of that type constructor, and matches its parts with the type arguments.
->   - A tuple pattern takes apart a tuple type with the same number of parts.
+> - `T { C1 C2 … }` defines a nominal custom type. Each constructor has zero or more fields, which may have labels. Two custom type definitions are different types even if their fields are the same.
+> - `T {}` has no constructors; i code cannot make its values. They come from the host (§10).
+> - `T = Type` is a transparent alias. Aliases may not use themselves, directly or through other aliases or alias patterns.
+> - An item `T(P1, …, Pn) = v` is an **alias pattern** exactly when its written right side is a value type (§3), after removing groups. Otherwise its head is a list of type parameters. This classification is made before expanding the right side; it never depends on imports or on what a macro returns there.
+> - In a list of type parameters, each part is a different, unqualified UpName with no arguments, and must not already name an accessible type. Every parameter must be used in the body, and every type variable in the body must be a declared parameter.
+> - In an alias pattern, the unqualified head names an existing type, with the written arity; the item does not define that head. It may be a custom or built-in type, or a transparent alias expanding to one named type or tuple. In a head alias each parameter is used at most once, only as a named argument or tuple part. Constant subtrees of that alias require an equal, fully determined source part.
+> - A bare unqualified UpName in a pattern always defines a new zero-parameter structural alias. Its part of the source type must be fully determined (§4.7). It may not duplicate a definition or conflict with an imported or built-in type. It never tests an existing type with that name.
+> - `_` in an alias pattern skips a part and binds nothing; it is not an inference hole. Elsewhere in a type, `_` remains a hole. Shared type variables remain shared even if one occurrence is skipped.
+> - A named pattern with arguments, or a qualified named pattern, requires exactly one member with that type constructor and matches its arguments. A tuple pattern requires one tuple of the same size. No union member is discarded to make a match. A mismatch is a compile error. Function, record, literal, union, intersection, difference, value-type and macro-call patterns are compile errors.
+> - Every pattern and every value-dependent alias is checked, also when unused, after its sources and alias dependencies are complete. A definition read may not choose an instance of a generalized variable to make its pattern fit.
+> - Blocks have no type definitions. An item beginning with `(` or `{` is a value binding; `m.T(…) = v` is also a value binding under §2.2. Import `T` to use it as an alias-pattern head.
+
+```i
+Codec(D, E) { Codec(decode: (String) -> D, encode: (E) -> String) }
+make(D, E) = (d: (String) -> D, e: (E) -> String) {
+  Codec(decode: d, encode: e)
+}
+size = make((s) { string.length(s) }, (n: Int) { int.to_string(n) })
+Codec(Size, _) = size
+// Size = Int; the distinct encode part is not fixed.
+
+Pair(A, B) = (A, B)
+Pair(Tree, _) = parsed
+// If parsed has the closed type (Ast, List(Warning)), Tree = Ast.
+```
+
+### 7.5 §4.7 Type inference: add after groups, and refine variable declarations
+
+> **Reading types of values.**
 >
->   When the type does not have the form of the pattern, it is a compile error. Any other form in a pattern, such as a union, a function type or a literal type, is a compile error.
->
->   ```i
->   Codec(D, E) { Codec(decode: (String) -> D, encode: (E) -> String) }
->   make(D, E) = (d: (String) -> D, e: (E) -> String) { Codec(decode: d, encode: e) }
->   size = make((s) { string.length(s) }, (n: Int) { int.to_string(n) })
->   Codec(Size, _) = size     // Size is Int
->   Pair(A, B) = (A, B)
->   Pair(Tree, _) = parsed    // with parsed: (Ast, List(Warning)), Tree is Ast
->   ```
-> - A name defined by an alias pattern is an alias: it has no parameters and no constructors, and it is exported as `T`.
-> - Custom types are **nominal**: two different definitions make two different types, even if they have the same form.
+> - In an annotation, a completed generalized value is read as a fresh instance of its scheme (§4.8 rule 3), separately for each occurrence. A parameter, clause name or local monomorphic value shares its one type. Generalized local schemes also keep their non-general variables shared. A value type never generalizes its source or its annotated binder.
+> - In an alias body or alias pattern, every used value-derived part must be closed: it has no generalized variable, unresolved type variable or hole. The alias's own declared formal parameters remain parameters. A skip demands no contents, but the shapes needed to reach the used parts must also be determined.
+> - A top-level value's group has one **completion point**, after its values are typed and linked and its generalization is decided. All value-type demands written in its own module are collected before inference, even in unused type definitions. At this point their weak parts are fixed as follows. A demand in another module never fixes them.
+> - For a demanded non-general variable, collect all types that come to it, including through variable relationships. Put them together by union, replacing the non-general variables needed inside them by their fixed types. Pure cycles of variable relationships count once. A structural recursive type, an unfilled part, a generalized variable needed inside this replacement, or a part that cannot be made closed is a compile error. An explicit closed `Never` is allowed; the absence of any information does not invent `Never`. Literal types are never widened.
+> - Fixing adds both subtype constraints between the variable and the resulting closed type, keeping every previous constraint. Every needed variable is fixed together, and the usual occurs and place rules apply. If these equations cannot hold, it is a compile error. Pattern shape checks use the original argument variables, so skipping a distinct argument leaves it shared and unfixed. The pattern cannot supply a type to fill an unknown.
+> - A group that constrains an earlier non-general variable that was not fixed cannot fix its own non-general parts. A demanded part carrying such an earlier variable also cannot be fixed. This conservative rule makes the result independent of unrelated groups' inference order.
+> - From then on, later uses must agree with each fixed part. A use that would widen it incompatibly is a type error with a note at the place that fixed it. Write a wider annotation at the source when needed. For example, reading `r = cell(1)` may fix its invariant argument to `1`; write `r: Cell(Int) = cell(1)` to allow other Int values.
+> - In another module, a read may use the source's generalized variables by instantiation, or its closed/fixed parts. A demanded weak part that the source module did not fix is a compile error at that read. Adding foreign fixation demands cannot change the source module's completion result. Ordinary expression constraints and local monomorphic sharing remain shared as elsewhere in this section; this rule does not fix the display of every uncompleted weak part.
+> - A permanent alias denotes the completed closed part. It does not change when later bindings are checked. Definitions are completed before their dependents, even if written later in the source.
+> - The whole annotation after value types and aliases are read must obey §4.4's rules of places. A value-type spelling does not hide variable members from that check.
 
-### 7.5 §4.7 Type inference (add after the bullet on groups)
+Replace syntax.md's declaration bullet ending “after the name of a type definition” with:
 
-> - **Types of values.** A type of a value `x` (§3) is read from the type that inference finds for `x`.
->   - **In an annotation.** In a type written in a binding (on its pattern, in parameters, `->` parts, clause patterns, and inner bindings), `x` has the type that the name `x` has as an expression at that place (§4.8 rule 3). Each general type variable of `x` becomes a new type variable, one for each variable, at each place where `x` is written, as `_` does. For example, with `id = (x) { x }`, `twice = (f: id, n: Int) { f(f(n)) }` gives `f` the type `(A) -> A` for a new `A`.
->   - **A name being worked out.** A parameter, a name of a clause pattern, or a local binding that is not generalized has one type, and the annotation shares it. So in `(xs: List(Int)) { acc: xs = [] … }`, `acc` and `xs` have one type: the value of `acc` must fit in the type of `xs`, and what code asks of `acc` it asks of `xs`.
->   - **In a type definition.** In an alias or an alias pattern (§4.3), the type must have no type variable and no `_` in the parts that are used. `Same = id` is a compile error; `Codec(Size, _) = size` is correct.
->   - **The fixed type.** A top-level binding that is not generalized is read through its **fixed type**: the type that is shown for it (the bullet of this section on how types are shown: a type variable that is not generalized is shown as the union of the types that come to it), taken when its group is typed. Each type variable in a part that is read becomes the union of the types that have come to it. Example: with `size` as in §4.3, the decode side of the type of `size` is `Int`. Literal types are not made wider: with `r = cell(1)`, the part is `1`, not `Int`.
->   - **Reading fixes the type.** A type in the binding's own module that reads a part fixes it. From then on, the binding keeps that type in that part, as if the type had been written at the binding. Later code that would give such a part a wider type is a compile error, and the message says where the type was fixed. Parts that no type of the module reads, such as a part under `_` in an alias pattern, are not fixed.
->   - **Other modules.** A type in another module never fixes a part. It may only read parts that the binding's own module fixed, or that have no type variable that is not generalized. So what a module accepts, and the interface it has (§2.4), never depend on the modules that use it.
->   - **Not fixed.** A part is not fixed when no type has come to its type variable yet, when its type would hold itself, when it holds a type variable of an earlier binding that is not fixed, or when the binding's group uses a part of an earlier binding that is not fixed. A type that reads such a part is a compile error. Write the type of the binding. Examples: `g = id(id)` is not generalized, and nothing has come to the `A` of its type `(A) -> A`, so `(h: g)` is a compile error. With `size` as above, `Codec(_, Enc) = size` and `(c: size)` are compile errors, because no value has yet been given to the encode side. With `c = cell(1)` and nothing that reads `c`, `get = () { c }` has the type `() -> Cell(…)` with the part of `c` in it, so `G = get` is a compile error.
->   - **Why fixed types do not change, and do not depend on order.** A fixed part is a type with no type variable, and every later use is checked against it. Its value depends only on the binding's group and the groups it uses, never on other groups typed before it, and never on other modules that use it.
->   - **Typed macros.** Code that a typed macro makes may not have a type of a value in it. It may use an alias that uses one only when the bindings it reads are typed before the binding of the call in every order. (This bullet is put in by the track that adds typed macros to this document, M4; T2 gives the rule.)
->   - The type that is read must keep the rules of places of §4.4 at the place where it is put, as a written type must.
-> - **Order.** A type of a value is read when the value is typed. A binding whose types use the type of a top-level binding of its module, directly or through an alias, is typed after the group of that binding. A type never puts two bindings in one group: when the types of a binding use the type of a binding of its own group, or its own type, it is a compile error.
-> - The value restriction is the same for types of values: a binding that is not generalized gives no general type variable, and a type of a value never makes a value general.
+> - A type variable is declared after a binding name, a declaration name, or in the list of type parameters of a type definition. The parts of an alias pattern are not declarations of type variables: its bare UpNames define structural aliases.
 
-### 7.6 §4.8 Typing rules (edits)
+Keep the principal-type and value-restriction bullets. Completion equations above are explicit typing constraints, not an operation of type display. Do not describe this as merely substituting a shown string.
 
-- In the pattern types, "`x: T`: `T`, with a new type variable in place of each `_` in it" becomes "`x: T`: `T`, with a new type variable in place of each `_` in it, and each type of a value in it read as §4.7 says".
-- In **Names in patterns**, after "The name `x` of `x: T` gets `T`", add:
+### 7.6 §4.8 Known types and pattern types: edits
 
-> A type of a value `y` in `T` gives, as a known type, the type that §4.7 reads for `y`, with `_` for each type variable in it. For a parameter, a name of a clause pattern, or a local binding that is not generalized, it is the known type that the name gets from its own pattern (the part of the written type at the name's place), or `_` when there is none: in `(p: User) { q: p = p … }`, `q` has the known type `User`, and in `((a, b): (Int, String)) { q: a = a … }`, `q` has the known type `Int`. It is never the known type of the name `y`, which may have fewer values: after `y = "a" = s`, `z: y = t` gives `z` the known type `String`, not `"a"`.
+Replace the pattern-type bullet for `x: T`:
 
-### 7.7 §4.7 and §5 bullets of syntax.md's replacement text (edits)
+> - `x: T`: `T`, with new variables for holes and value types read as §4.7 says; `x` gets that type.
 
-syntax.md's text for type variables is put into the spec by A1. Two of its bullets must change, or they give an alias pattern a second meaning:
+Add under Names in patterns:
 
-- "A type variable is **declared** in one of three places: … or after the name of a type definition (§4.3)." becomes "… or in the list of type parameters after the name of a type definition (§4.3). The parts of an alias pattern (§4.3) are not type variables: an `UpName` there defines a new type, and `_` skips a part."
-- "A type parameter of a type definition may be used in that definition (§4.3)." becomes "A type parameter of a type definition may be used in that definition (§4.3). An alias pattern has no type parameters."
+> A value type in an annotation uses the inferred type of its source, not a narrower known type at the use. A completed scheme gives its known structural form, with `_` for general variables. For a local source still being inferred, use its stored structural monotype with unresolved variables erased to `_`. A written type on the source name is part of that monotype. The known type of a matched value does not supply a type for a name inside its pattern. Do not infer a smaller shape from temporary lower bounds. Later literal tests or clause narrowing do not refine this shape. Thus `((a: Int, b: String)) { q: a = a  q == 1 }` gives `q` the known type `Int`. For `x = "a" = s` with `s: String`, x's inferred type is String even though its known type is "a"; an annotation naming x uses String.
 
-### 7.8 §2.4 Exports (one more bullet)
+### 7.7 §5 and future macro text
 
-> - A type in another module may read the type of an exported binding that is not generalized only in the parts that the binding's own module fixes (§4.7). A module that uses another never changes what that module accepts or what its interface shows.
+Add to the type-variable scope bullet: “An alias pattern has no type parameters; its binders are types of the module.”
 
-## 8. Representation and files
+When M4 adds typed-macro rules, insert M3 verbatim in its spec section with language-level dependency terminology. T2 does not add an implemented macro facility or change the reservation of TypeCall in §3.
 
-### 8.1 HIR (`crates/ilang-check/src/hir.rs`, around :189 and :273)
+## 8. Representation and files to change
 
-- `TypeKind::Of { value: ValueRef, site: OfId, part: Option<OfPart> }`. `ValueRef` is `Local(VarId)` or `Def(DefId)` (never `Ctor`: the name is lowercase). `OfPart { pattern: AliasPatId, binder: u32 }` is set only in the body of a binder.
-- `Program.of_sites: Vec<OfSite { module, span, value: ValueRef, reading: Reading }>`, with `Reading::Annotation | Reading::Definition(TypeId)`.
-- `Program.alias_patterns: Vec<AliasPattern { module, span, head: TypeRef, head_span, pattern: Vec<TypePat>, value: ValueRef, value_span, binders: Vec<TypeId> }>`.
-- `TypePat = Bind(TypeId, Span) | Skip(Span) | Named { ty: TypeRef, args: Vec<TypePat>, span } | Tuple(Vec<TypePat>, Span) | Exact(Type) | Error`. `Exact` only comes from an alias head (P2).
-- Each binder is an ordinary `TypeDef { name, span: binder span, params: [], body: TypeBody::Alias(Type { kind: Of { value, site, part: Some(..) } }) }`. No new `TypeBody` variant.
-- `Program.value_deps: Vec<Box<[DefId]>>` and `uses_value_type: Vec<bool>`, indexed by `TypeId`; `read_targets: HashSet<DefId>`; `read_parts` (F2, from sites in the source's own module only); `has_value_types: bool`; `type_value_names` per binding (the T3 hook).
-- `hir::for_each_type_in_binding` (O2).
+Paths below are proposed changes, not changes made by this note.
 
-### 8.2 Files and regions
+- `crates/ilang-syntax/src/ast.rs`, parser/type-head region and formatter/printer arms: retain A3's value-type node; add the P1 core-tree distinction and binder/part structure. Validate pattern forms after classification, not by consulting imports. Keep group-insensitive classification and TypeCall. Remove temporary A1/A3 errors. Update `crates/ilang-check/tests/hir.rs` and syntax round-trip fixtures.
+- `crates/ilang-check/src/hir.rs:56–79,167–192,273–296`: add `TypeKind::Of { value: ValueRef, site: OfId, projection: Option<ProjectionId> }`, site/context/provenance tables and the shared type visitor. Add AliasPattern and TypePat (Bind/Skip/Named/Tuple/Exact/Error). Each binder remains TypeBody::Alias(Of(...)), with no new TypeBody variant. Store its full item separately for queries/Definitions.
+- `resolve.rs:391–592,773–803,1098–1209,1329–1379`: collect pattern binders before exports/imports; resolve definition sources from the value scope; add pattern alias edges, summaries and demands. Do not register the head as a new type. Check E0537 after imports. Collect an AliasPattern slot for items with multiple binders.
+- `resolve.rs:1445–1660,1680–1755,1834–1905,2133–2202,2392–2486`: pending identities, value lookup and forbidden contexts; defer value-dependent hidden-type checks. Reuse one context/readiness check for M4 and one resolved-reference list for T3. All child/substitution/named-type walkers need Of arms.
+- `order.rs:17–135,188–251`: keep the old use graph and initialization; add the group dependency graph and provenance. Store source completion events and alias-site dependency order, including modules with no groups. Add an alternate topological tie-break mode for tests.
+- `types/infer.rs:72–149,155–228,233–355`: add demand snapshots, ownership/availability, completed read schemes, definition-site states, alias results, and a module loop around group processing. Completion must run after generalization and ordinary group checks; failed groups publish Failed, never partial aliases. Process module-start events even without groups.
+- `types/infer.rs:603–687,852–970,1000–1005,1926–1992,2052–2120`: inferred-shape place checking, Of annotation instantiation/local sharing, closed definition cache, and pure inferred-shape conversion for locals. Replace the depth fallback for any alias chain involving value-dependent aliases with checked cache lookup; ordinary alias cycle recovery remains explicit.
+- New `types/value_types.rs` or `types/alias_pattern.rs`: projection, closed-form collection including pure-variable SCCs/from edges, snapshot batch construction, P4 matching, failure provenance.
+- `types/solve.rs:87–105,245–285,385–507,577–633`: trial/checkpoint support and optional group-origin observation for open-group checks. **No replacement-variable semantics and no bypass of bound propagation.** Existing constraints implement fixation. Include normalization operations in the observed trial state.
+- `types/known.rs:102–162,433–515`: Of known conversion from stored inferred monotypes/schemes, never narrowed `kvars`; no solver-variable allocation in kconv.
+- `types/mod.rs:148–210`, `types/display.rs:515–555`: alias results and exact fixed forms for extraction/display; preserve full typed value sets. Keep fixation metadata out of canonical types.
+- `types/infer.rs:569–597,983–989`: deferred export checks and the written-type exemption. Check aliases even without exported value bindings.
+- `query.rs:331–463,492–545,991–1053,1137–1147,1218–1249`: alias hover/fallback, binder outline, value-reference navigation and completed-body expansion. `query.rs:26–48` and checker entry plumbing pass prior-error recovery state.
+- `crates/ilang-cli/src/commands/package.rs:1063–1198,1235–1385`: pass alias results to TypeShow and canonicalize completed bodies/formals. Human output uses UpName parameters; canonical identities may use internal numbered names. `TypeShow::param` currently prints lowercase (`:1281–1286`), so check A2's migration rather than assuming it was done.
+- `crates/ilang-check/src/lib.rs:18–99`: diagnostic codes and prior-error state. `crates/ilang-wasm/src/lower.rs:2209–2237`: assertion/tests that alias TypeIds do not reach type-test heads; T1's literal test members remain intact.
+- Spec sections in §7; syntax.md's temporary reservations become pointers to the implemented rules. Update records.md §11's code-allocation sentence and §19 question 10; meta.md's core-form/Lisp table, readiness rule and T2 question. These documentation edits belong to T2/M integration after this note is accepted; this lane changes only this note.
 
-- **ilang-syntax** (after A3): `ast::TypeKind::Value` exists. The A3 error for a lowercase name in a type is removed. The A1 error for an alias whose head is not a list of type parameters ("the head is kept for alias patterns", syntax.md §4.3 and the notes for A1), which the parser reports and resolve reports again for a part that names a type, is removed in both places: P1 classifies the item, and a head on a right side that is not a value type gets the type-parameter messages of the new §4.3 ("a type parameter is an `UpName`", "a type parameter may not have the name of a type"). `type_vars()` never collects `Value`. The P1 classification is made on the core tree; the Lisp printer and reader get the rows of 3.9. The `json.Codec(…) = user` hint is added where the binding's error is reported (resolve).
-- **resolve.rs:**
-  - `collect_type` (:528): P1. For a pattern, register each binder as a `TypeDef`, with E0208 and E0537; do not register the head.
-  - `type_defs` (:1098): resolve the head (P2) and the parts (P3, E0532), and the value name to a `ValueRef::Def` (DefIds exist in phase 3; scope values and `defs_by_name`).
-  - `ty` (:1329): a `Value` arm. In annotations, `find` (:1834) with V4 (a `pending_binders` stack checked first, E0536); in definitions, the phase-3 lookup. `a.x` through `member` (:1853), E0207 when `a` is a local in scope or on `pending_binders` (V3).
-  - `function` (:2133) and block statements: push the names being bound onto `pending_binders` while their types are resolved; mark the own value of a binding.
-  - `alias_circles` (:1175): binder edges to the head and the parts (O8). After it: `value_deps`, `uses_value_type` (memoised DFS), `read_targets`, `has_value_types`.
-  - E0531 checks, using `uses_value_type`, in constructor fields, `external_type`, `env_type` (:1445), `host_part` (:1568), `host_fn`, `host_type`. A hit is E0531 only, not ENV_TYPE or EXTERNAL_HOST_TYPE.
-  - Exhaustive arms: `named_types`, `for_each_child`, `subst` (`Of` stays), `hidden_types` (:2460, skip), `expand_alias` (:1412, never reaches env and host paths after E0531), `type_vars` (never collect).
-  - `type_value_names` per binding.
-  - The resolve entry that typed macros (M4) use for their results: a `Value` arm that gives E0531, and the ancestor test of part 3.9 for aliases with value deps. T2 writes the check as a function that M4 calls; T2 has no typed macros to test it with.
-- **order.rs:** `type_uses` with the shared visitor; the group graph of O3 next to `tarjan_scc` (:220); E0530 with a BFS chain; `needs()` (:137) and init (:230) unchanged; the unit test of O5.
-- **types/infer.rs:**
-  - `Checker`: `first_var`, `unfixed: HashMap<V, Reason>`, `read: HashMap<DefId, Ty>`, `def_reads`, `bound`, `site_failed`.
-  - `group` (:233): F1–F6 at its end, then P5 for the sites and patterns it completes.
-  - `run`: the module-start pass of P5, in the loop over `module_order`, for every module, also one with no groups.
-  - `read_value_type(site, level)`: A1–A3 and the definition reading.
-  - `conv` (:852): an `Of` arm; no `alias_depth` fallback for `Of` (O6).
-  - `expand` (:953) and `check_places` (:603): `Of` is opaque; `check_places_ty` (K3).
-  - `walk_variance` and `variances`: `Of` adds nothing (it never appears in a field, E0531).
-  - P4 matching (a new `alias_pattern.rs` next to `infer.rs`), E0533–E0535.
-  - `written` (:989) and `exported_type` (:569): X1. `Typed.alias_types`.
-- **types/solve.rs:** `pinned: HashMap<V, Ty>` and the replacement of a pinned variable in `constrain_in`, `reach` and `compare` (F5); the `group_open` flag and `first_var` (F3); the note on failures against a pinned type; the debug assertions of 3.3 (no bound pushed onto a pinned variable, the pin's own constraint gives no failure).
-- **types/known.rs:** `kconv` (:102) arm (K1), which takes the name's known type from `fit_known` for A3 names.
-- **types/mod.rs:** `Typed.alias_types`.
-- **query.rs:** X4.
-- **crates/ilang-cli/src/commands/package.rs:** X3.
-- **crates/ilang-check/tests/hir.rs** (the printer): `Of` and the patterns.
-- **lib.rs:** codes E0530–E0537.
-- **docs:** spec §2.4, §2.5, §3, §4.3, §4.7, §4.8 (part 7), and the two bullets of 7.7; syntax.md summary bullets become "done in T2", and its §4.7 bullets get the text of 7.7; meta.md §2.3 gets the `AliasPattern` item row (P1) and §11 question 2 answered, and meta.md §7.3 gets a pointer to the typed-macro rule of part 3.9; records.md open question 10 answered and line 715 changed to the code split of decision 14.
+No-value-type programs bypass demand collection/closure/trial work. Do not promise literally zero allocations or an unchanged timing without measurement; existing code still receives new exhaustive-match arms and a disabled observation hook.
 
-## 9. Ordered checklist for T2
+## 9. Ordered T2 checklist
 
-0. Confirm the code split with the coordinator and T1 (T1 E0523–E0529, T2 E0530–E0537, T3 E0540–E0549). Change records.md line 715 to say so.
-1. Rebase on A1, A3 and T1. Confirm `ast::TypeKind::Value`, the head of `ast::TypeDef` read as types, and UpName shown type variables (display.rs Namer, package.rs `TypeShow::param`, query.rs `builtin_head`). **Stop and ask if any of these is missing.**
-2. Add the codes E0530–E0537 to lib.rs `code`.
-3. Add the HIR types (`TypeKind::Of`, `OfSite`, `AliasPattern`, `TypePat`, the tables, the visitor). Add arms to every exhaustive match: resolve, infer, known, query, package, tests/hir.rs. Each new arm reports an internal error until its step below; there is no silent fallback.
-4. resolve.rs: P1–P3 and binders, the `Value` arm, `a.x`, V4 and E0536, alias graph edges, `value_deps`, `uses_value_type`, `read_targets`, E0531, the `json.Codec` hint, the T3 hook. Remove A3's lowercase error and its tests, and the A1 "kept for alias patterns" error in the parser and in resolve with its tests; those tests become alias-pattern tests or get the new type-parameter messages.
-5. order.rs: type uses with the shared visitor, the group graph, E0530 with the chain. Unit test: groups, needs and init are unchanged with and without type edges.
-6. solve.rs first: `pinned`, `group_open`, and their unit tests. Then infer.rs and known.rs: read parts from own-module sites only, fixed forms over all lower-bound forms with the earlier-variable rule, and pins of group variables only (F1–F6); A1–A3 and the definition reading; `conv` and `kconv` with `site_failed`; `check_places_ty`; P4–P5 with the module-start pass in `run`; the caches; the exported checks (X1 through aliases).
-7. `Typed.alias_types`; query.rs; package.rs.
-8. Spec text (part 7) and the doc edits of 8.2.
-9. Tests (part 10), except those marked "after T3" or "with M4", which those tracks add. Run `check-all.sh` and the std checker. Confirm no change in goldens without value types, and that std check time is unchanged within noise (S2's script).
+1. Rebase on A1/A3 and T1; map the cited regions to the new code. Verify UpName declaration/display migration and the AST value/head forms. Implement any missing prerequisite within the approved T2 integration scope; report a scope conflict to the coordinator.
+2. Confirm code allocation and cross-track edits; land §7 spec text first. Agree the fixation semantics, early-context limit and M4 boundary with G3.
+3. Add core/HIR representations, early binder collection and error states, including multi-binder slots. Give every exhaustive match a deliberate arm; no new silent fresh-variable fallback.
+4. Implement syntactic classification, lookup/pending scope, pattern validation, alias-cycle edges, forbidden contexts, summaries and the shared type visitor.
+5. Add group ordering and diagnostics without altering SCC membership or runtime needs/init. Schedule dependency-ordered alias/module events.
+6. Add trial state and provenance observation; implement closure/equality batches and shape checks on pre-batch snapshots. Test reverse links, pure-variable SCCs and preserved constraints before wiring alias reads.
+7. Wire annotation instance/sharing, definition reads, kconv's inferred-shape conversion, whole-annotation places, recovery and cache completion. Eagerly check unused definitions.
+8. Add deferred exports, Typed.alias_types, queries and canonical package comparison, including parameterized aliases containing a closed Of.
+9. Run the T2 tests in §10. With T1 integrated, run spec tests and `scripts/dev-verify rust`; compare existing checker/interface goldens. Use the coordinator's heavy wrapper for **every** cargo invocation. No Rust implementation or compiler run is part of this design-note commit.
+10. T3 adds record/Without closure and shape arms, label checks, shown-place checks and the §5.9 builder test. M1/M2 add or reconcile the Lisp/Definitions rows; M4 applies the expansion restrictions. Each track owns and runs its deferred tests.
+11. Run std/spec with reversed independent-group tie breaking and with recovery enabled. Measure std time with the accepted T1 measurement procedure; investigate any regression. Audit WAT for existing programs and for type-only changes, allowing only differences justified by changed inferred runtime tests.
 
-## 10. Tests
+## 10. Tests and expected results
 
-**tests/spec:**
+These are implementation requirements, not tests reported as passing. Each expectation names its governing rule. Run runtime/type-test cases at O0 and O2. Use complete project fixtures for module/export cases.
 
-- `3/value_type.i` (run): `twice = (f: id, n: Int) { f(f(n)) }`; `(xs: List(Int)) { acc: xs = [] … }`; `{ x }` is `x`; `m.x` from an imported module.
-- `3/value_type_errors.i`: `x(Int)` in a type is still the macro error; a local `a` covering module `a` in `a.x` is E0207 with the field message; `(p: User, q: p.name)` and `(p: User) -> p.name { … }` are E0207, also with an imported module `p` that exports `name`; `m.private` is E0204.
-- `3/value_type_own_scope.i`: E0536 for `(x, y: x)` with a top-level `x` (the message names it), `(x) -> x { x }`, a block `x: { x } = 1` with an outer `x`, a clause pattern `{ (a, b: a) -> … }`, and a local `f = (g: f) { g }`.
-- `3/value_type_places.i`: E0531 for a constructor field, an alias used in a constructor field, `@external` with `(user) -> Int`, `! T = e`, `x ! T`, a host service type.
-- `4.3/alias_pattern.i` (run): the Codec example (`Size` is `Int`, `(n: Size)` accepts `1`); `List(E) = xs`; `Pair((A, _), _) = p`; `Codec(_, _) = size`; `T = size_fn` (plain); a head alias `MyCodec(D) = Codec(D, Int)` with `sized: Codec(Int, Int) = size` and `MyCodec(S) = sized` (`S` is `Int`; the exact part `Int` is closed because the type of `sized` is written); a tuple through a head alias, `Pair(A, B) = (A, B)` with `Pair(Tree, _) = parsed`.
-- `4.3/alias_pattern_errors.i`: E0532 for `Codec(Int | String, _) = size`, for a head alias `F(A) = Box((A) -> Int)`, for a function-type part, and for a macro call in a part, `Codec(pick(User), _) = size` (a TypeCall form, so it needs no macro to exist); E0534 for `MyCodec(S) = size` with `MyCodec(D) = Codec(D, Int)`, since nothing has come to the exact part; E0535 for `List(E) = n` with `n = 5`, and for an exact part that differs; E0533 for `Same = id` and `Codec(D2, _) = poly`; E0537 for `Codec(Int, _) = size`; E0208 for `Pair(A, A) = p` and for a binder that is also a custom type of the module; ALIAS_CIRCLE for `Schema(A, B) = Codec(User, B)` with `Schema(User, _) = size`.
-- `4.3/alias_pattern_qualified_head.i`: `json.Codec(U, _) = u` parses as a binding, and its error has the import hint; `(Tree, _) = parsed` is a binding, and its error has the `Pair` hint of P2.
-- `4.3/alias_head_old_error.i`: `Pair(Int) = (Int, Int)` gives the message that a type parameter may not have the name of a type, and `Box(List(A)) = …` the message that a type parameter is an `UpName`; the A1 "kept for alias patterns" message never appears.
-- `4.3/alias_pattern_no_bindings/` (project): module `m` has `size` (part 7.4), `Codec(MSize, _) = size` (which pins the decode part in `m`) and `count: Int = 3`. Module `types` has no top-level bindings, only the import of `m`, `Codec(Size, _) = m.size`, `Count = m.count` and the export `(Size, Count)`; another module uses `types.Size` and `types.Count`. The binders are read and the export is checked, with no internal error. A second copy without `Codec(MSize, _) = size` in `m` gives E0534 at the item in `types`, with the message that `m` does not fix this part.
-- `4.3/alias_head_import/` (project of two modules): `Pair(A) = (A, A)` is correct; after importing a type `A`, it is the type-parameter error, not a pattern. `Codec(User, _) = user` is correct; after importing a type `User`, it is E0537, not a test against `User`.
-- `4.3/alias_pattern_unread.i`: a pattern that nobody reads still gives its E0535, at the item, in source order.
-- `4.7/value_type_order.i`: a reader written before its source is typed after it; the init order is unchanged (prints show the source order); no E-needs-itself from type uses alone.
-- `4.7/value_type_circle.i`, E0530: `x: T = 1` with `T = x`; `a = (n: b) { n }` with `b = a(1)` (one E0530, and `a` is typed with `Error` for `n`, no internal error); `user: Codec(User, _) = …` with `Codec(User, _) = user`; a chain through two aliases (the message names it).
-- `4.7/value_type_fixed.i` (run): `Codec(Size, _) = size` gives `Int`, and `size.encode(5)` still works after it (the encode side is not read, so not pinned). No other reading of `size` is in this file.
-- `4.7/value_type_unfixed.i`: with the same `size`, `(c: size)`, `check: size = size` and `S = size` are E0534 (nothing has come to the encode side); `Codec(_, Enc) = size` is E0534 with "write the type of `size`"; `g = id(id)` used in `(h: g)` is E0534.
-- `4.7/value_type_nested_def.i`: `c = cell(1)`, `T = List(c)` and `f = (xs: T) { list.each(xs, (k) { k.set("s") }) }`: `T` pins `c` to `Cell(1)` (a site deeper in an alias body is a whole read), so `k.set("s")` is E0501 with the note at `T`, in every order of groups.
-- `4.7/value_type_earlier.i`: with `c = cell(1)` and nothing that reads `c`: `get = () { c }` with `G = get`, and `init = () { c.set("s") }`, give E0534 at `G` and no other error; `e = cell(1)`, `f = (e, 0)`, `F = f` and `g = e.set(2)` give E0534 at `F` and no E0501. Both run in both tie-break orders with the same errors.
-- `4.7/value_type_fixed_records.i` (after T3): the records.md 5.9 `user` gives `User = { age: Int, name: String }` (each field's `V` has one lower and one upper bound; `D`'s bound is an intersection with a difference); `user.encode(u)` still works; before T3's F4 arms the same program is E0534, never a smaller type.
-- `4.7/value_type_pin.i`: with `Cell(A) { Cell(get: () -> A, set: (A) -> Nil) }`, `r = cell(1)` and `C = r`, `C` is `Cell(1)`, and later `r.set(2)` and `r.set("s")` are E0501 with the note that `C` fixed the type of `r`; without `C`, the same file is accepted and `r` is shown as `Cell(1 | 2 | "s")`; with `r: Cell(Int) = cell(1)` and `C = r`, `r.set(2)` is accepted. The services case: with `State(S) { State(get: () -> S) }`, `get_s(S) = (st ! State(S)) { st.get() }` and `reader = id(get_s)`, `R = reader` is E0534, and `use = () { ! State(Int) = State(get: () { 5 })  reader() }` is accepted in either order. The `compare` case: `Box(A) { Box(get: () -> A, put: (A) -> Nil) }`, `p = { b = make_box()  (b, () { unbox(b) }) }` with `P = p`, and a later use of `p.0` where `Box((γ) -> Int)` is expected; it is accepted, and `P` stays `(Box((String) -> Int), () -> (String) -> Int)`.
-- `4.7/value_type_fixed_shared/` (project): variables shared across groups and across modules: `a = ref_like()` in module m, `b = wrap(m.a)` in module n, `B = b` is E0534 (the group of `b` met the variable of `m.a`, which is not pinned); with `A = a` also in module m, `a` is pinned in m, and then `B = b` is read. `A = m.a` written in module n instead pins nothing and is E0534 at n. Run with the order.rs debug option that breaks ties the other way: the same errors and read types.
-- `4.7/value_type_consumer/` (project of two packages and a test module): package `lib` has `r = cell(1)` and an exported `reset = () { r.set("s") }`; `i check` in `lib` passes, and its interface shows `value state.r: Cell(1 | "s")`. Package `app` depends on `lib` and writes `C = state.r`: the error is E0534 at `app`, and no error is reported in `lib`. A test module of `lib` with `C = state.r` gives the same E0534 in the test module under `i test`, and `i check` and `i build` of `lib` are unchanged.
-- `4.7/value_type_typed_macro.i` (with M4): a typed macro whose result has `t: later = 1` is E0531 at the call; one whose result names an alias `T = x` with `x` in an ancestor group is accepted; with `x` in a group that is not an ancestor, it is E0531 with the hint.
-- `4.8/value_type_known_parts.i`: `f = ((a, b): (Int, String)) { q: a = a  q == 1 }` and the clause form `v |> { (a, b): (Int, String) -> { q: a = a  q == 1 } }` give no E0520 and no E0501.
-- `4.7/value_type_import_circle/` (project, query test): `app/a` and `app/b` import each other, `a` has `T = b.x` and `y: T = 1`. `i check` gives E0214 only; `check_for_queries` gives types for the rest of the program (hover works), with no panic.
-- `4.7/value_type_places.i`: `use = (f: pick) { f(1, 2, True) }` is E0518.
-- `4.8/value_type_known.i` (run): `(p: User) { q: p = p ⏎ q.name }`; after `x = "a" = s`, `y: x = t` then `y == "b"` gives no E0520; `port = 8080 ⏎ Port = port ⏎ bad: Port = 8081` is E0501.
-- `2.4/export_value_type/`: an exported binder bound to a private custom type is E0227 with the source in the message; an exported `y: secret_val` whose type uses a private type is E0227; an exported `y: Inner = Secret(2)` with a private binder `Box(Inner) = b`, `b = Box(Secret(1))` and a private `Secret` is E0227; a private source with only exported types is fine.
+| Test | Program or change | Expected result and rule |
+|---|---|---|
+| Annotation instance | `id = (x) { x }`; `twice = (f: id, n: Int) { f(f(n)) }`; call with identity and 3. | Result 3; R1. Separate `id` occurrences admit separate instances; one annotated parameter remains monomorphic. |
+| Open alias | `Same = id`; separately `g = id(id)` and `G = g`. | E0533 and E0534 respectively; R2/R4. |
+| Local sharing | `f = (xs: List(Int)) { acc: xs = []  acc }`; call with `[1]`. | Result []; R1. A local alias of a weak captured value still shares its variables, rather than freshening them. |
+| Inferred, not narrowed | K1's `copy` with `"a"` under Assert; tuple parameter with individually annotated parts. | Result `"b"`, no E0520; projected `q` has known Int; K1. Also test an unannotated outer parameter narrowed by a type test: its shape stays unknown, not the tested type. |
+| Shadowed own name | An outer f contains an inner function with parameter f: Int and body `y: f = f`. | Allowed; the inner parameter identity covers the outer own-binding marker. In the inner header itself `(f, y: f)` remains E0536; V3. |
+| Matched-value known type | `Box(A) { Box(A) }`; `f = (p: Box(Int)) { Box(a) = id(p)  y: a = "s"  y == "s" }`. | Result True; the non-generalized a holder is shared, while Of(a) has unknown shape. Do not copy p's known Int field into the inferred-shape conversion; R1/K1. |
+| Expected known type | `list.map(["a"], (x) { y: x = "b"  y == "b" })`. | Result [True], no false E0520 from a source shape of "a"; K1. The inferred holder stays shared, and its unknown shape is erased. |
+| Literal exactness | `port = 8080`; `Port = port`; `bad: Port = 8081`. | E0501; with source annotated Int, both values accepted; R6/T1. |
+| Nominal extraction | §7.4's size fixture. | Size = Int; encoding an Int remains legal. Reading the untouched encode part is E0534; P4/M1. |
+| Skip sharing | `s: PairType(Int, Int)` with two distinct fixed parts; separately a fixture with the same weak variable in both arguments. | Skip never allocates/copies a variable; a distinct skipped part remains live, a shared demanded variable is fixed in both places; P4. |
+| Lower-bound graph | Hand-built weak v with a concrete predecessor only in `from`; a pure-variable cycle with one concrete Int bound; same cycle with none. | Int, Int, E0534; R4. No bound disappears. |
+| Old constraints | In solver tests retain `v <: w`, fix v to 1, then constrain 2 <: w (allowed), and separately 2 <: v (fails). Include structural/invariant/env links and extrusion. | The first does not force w equal to v; the second retains the existing error. Fixing cannot detach the graph; R5. |
+| Failed batch | Lower-bound substitutions that conflict with an upper bound; unsupported form; structural recursion. Compare solver state before/after failure. | E0534 with unchanged main solver, no assertion/panic or leaked failures; R4. |
+| Shape traversal | Source root is a weak variable with lower bound Codec(D,E), not a direct Con. | Decode projection succeeds after the skeleton check; a later incompatible root member fails; skipped E stays shared; P4. |
+| Fixation restriction | Invariant Cell fixture below, `C = r` then `later = () { r.set(2) }`. | Later mismatch with note at C; source annotated Cell(Int) permits it; R5/R6. |
+| Earlier weak value | `c = cell(1)`; `get = () { c }`; `G = get`; unrelated `later = () { c.set("s") }`. | E0534 at G in either independent-group order; no fixation error in later; R3. |
+| Consumer isolation | Module lib exports r/reset with `r = cell(1)`, reset sets `"s"`, and no lib type read. App or a test module adds `C = lib.r`. | E0534 only at the consumer; library check/interface unchanged; R3/X3. With a source annotation Cell(Int), a consumer read is allowed. |
+| Scope | Own pattern/header/value examples V3; local m covers imported m in `m.x`; module-only `m`; private member. | E0536, E0207, E0205, E0204 respectively; V2/V3. Pending qualifier stays E0207 after adding an import. |
+| Import-stable item | Add/remove an import of User around `Schema(User, _) = user`; add it around `Pair(A) = (A,A)`. | First remains a pattern and gains E0537 on collision; second remains generic; P1/P3. |
+| Pattern shapes | Tuple through Pair alias; wrong head; union with Nil; exact head-alias part; duplicate binder; invalid macro part. | Correct projection; E0535; E0535; equality or mismatch without filling an unknown; E0208; E0532; P2–P4. |
+| Eager order | Unused mismatching pattern; `A = List(B)` before a pattern defining B; module containing only an imported-source pattern. | Unused error is reported; A completes after B; no-group module still completes; P5. |
+| Cycles | O3 example; self Of through alias; two type edges between groups; pure alias circle; import circle. | E0530 with chain for the first three, E0223 and E0214 for the last two; O2/O3. SCCs/needs/init unaffected on valid fixtures. |
+| Recovery | Query all preceding bad-cycle fixtures and an unrelated valid binding. | No panic/fresh inferred alias; Failed propagates, unrelated hover/navigation survives; O4/X4. |
+| Early places | `T = x` under constructor field, service/env parameter/statement, host and external declaration, also through multiple aliases. | One E0531 at the use; K3. A completed cached body does not evade the ban. |
+| Whole places | `(f: pick)`; outer function with annotation `List(a \| b)` using distinct local variable holders a,b in an input place. | E0518; K2. Standalone Of checking must not miss surrounding unions. Retain T3's shown-type tests. |
+| Hidden exports | Export a binder/alias/top annotation whose result contains private Secret; repeat through private aliases. | E0227 after completion; exporting only the source value is insufficient; X2. Private source with public resulting types is allowed. |
+| Alias exports | Export User and User(..) in separate fixtures; attempt to use underlying private constructors. | Same exported alias, no extra constructor access; X1. |
+| Package comparison | Change private source Int → String; rename it only; reorder union/record fields; rename alias formal parameters. | Exported alias changes only in first case; X3/T3 canonicalization. `T(A) = (A, port)` keeps A formal and port's literal exact. |
+| Queries | Head/source/binder navigation, multi-binder outline, inferred/failed hover. | Existing head target, source binding target, individual alias targets; stable outline without inference; X4. |
+| Macros (M2/M4) | Body macro yielding a value name in a generic alias; generated direct Of; generated alias from ancestor/non-ancestor/imported source. | No reclassification; E0531; accepted/E0531/accepted only after imported completion; P1/M3. Definitions returns the written item, not an inferred body. |
+| Records (T3) | records.md §5.9 codec plus later encode calls; read encode side without lower bounds; read record key/label-parameter binding. | User = { age: Int, name: String }; encode calls work; E0534; E0543/E0542; M1/V4. |
+| No feature | Existing std/spec without Of or patterns; reverse independent order. | Same accepted programs, canonical types, needs and init; no demand batches; O2. Measure rather than assume timing. |
 
-**Checker goldens** (`crates/ilang-check/tests/types/value_types.i`, `alias_patterns.i`): the shown schemes of readers, the read types with UpName variables.
+A complete, ordinary i fixture for the invariant Cell tests (no host or mutable primitive is required to exercise invariant type constraints):
 
-**Unit tests:** order.rs, groups equal with and without type edges and needs/init unchanged; fixed forms and pins on hand-built solvers (recursive bounds, variable bounds with no lower bound, a pinned variable met by `constrain_in`, `reach` and `compare`, env arguments, `group_open` set by an earlier variable that is not pinned and not set by a pinned one); `alias_pattern.rs` matching; the assertion fires on a bound pushed onto a pinned variable by hand.
+```i
+Cell(A) { Cell(get: () -> A, set: (A) -> Nil) }
+cell(A) = (x: A) {
+  Cell(get: () { x }, set: (y: A) { Nil })
+}
+r = cell(1)
+C = r
+later = () { r.set(2) }
+```
 
-**Query tests:** hover on `size` in a type shows its scheme; hover on a binder `User` shows `User = { … }`, and the written pattern when inference fails; go to definition from `User` goes to the binder, and from `user` in a type to the binding; the outline lists the binders.
+The setter may ignore its argument; its type still makes A invariant. This fixture tests typing restrictions, not mutable-cell runtime behavior.
 
-**Package test** (`crates/ilang-cli/tests/package_commands.rs`): changing a private `size` to give `String` reports `type m.Size` as changed; an exported alias `T = List(x)` is compared by its read body; nothing changes when nothing changed.
+## 11. Self-attack record
 
-**Property test:** for every top-level binding of std whose read type is closed, a generated `check_x: x = x` is accepted. With the debug solver assertions on, the whole std and the spec tests run with no assertion failure.
+All programs here use the proposed syntax. “Checked by reading” means the indicated implementation path was inspected. No T2 compiler exists in this lane; acceptance/rejection below is a prediction of these rules, not a claimed executable result.
 
-**Performance:** std check time unchanged within noise; edge counts equal for programs with no `Of`.
+### Discovery pass: confirmed problems and corrections
 
-## 11. Risks
+1. **Soundness/constraints: replacing a pinned variable detaches existing relations.** With a hand-built constraint `v <: w`, a read fixes v while a later bound reaches it through w/structural relationships. The old proposal replaced variable operands and stopped walking their old lists. It supplied no proof that every propagated constraint survived. Reading `solve.rs:245–285,385–447,577–608` confirmed multiple propagation/direct-write paths. **Fix:** retain the original variables and add checked equalities; no solver replacement invariant (R4/R5). Do not assert that a candidate always checks.
+2. **Cannot build: reverse bounds and pure cycles.** A variable can receive values through `from` without those being in its own lower list (`display.rs:531–538`). Literal-only collection can miss them; recursive DFS can reject a mere variable equality cycle. **Fix:** follow both edges and collapse pure-variable SCCs, failing only unfilled or structural cycles (R4).
+3. **Cannot build: lazy completion misses empty modules and alias order.** A module containing only `Codec(Size, _) = imported.size` has no group; `A = List(B)` may be written before the pattern defining B from the same source. Source-order completion either never runs or reads Pending. `infer.rs:188–191` confirms the current group-only loop. **Fix:** module-start events and dependency-before-source ordering (P5/O4).
+4. **Source conflict: alias exports.** The prior draft called `User(..)` an error. `resolve.rs:797–803` explicitly accepts it. **Fix:** preserve the alias export rule and add a regression (X1/§7.1).
+5. **Soundness/known types: a fitted literal narrows a value fact without changing its type.** K1's copy program would reject its `"b"` annotation, or produce a false E0520, if kconv used narrowed kvars. T1 explicitly distinguishes these facts. **Fix:** pure inferred-shape conversion of stored monotypes/schemes; no fitted-literal or branch fact feeds value-type conversion (K1/§7.6).
+6. **Cannot build: a pattern traverses a weak root while skipping an open argument.** Fixing the whole Codec closes encode unnecessarily; fixing only D leaves the observed root shape unchecked. **Fix:** retain observed-skeleton constraints with original argument identities, while closing only demanded leaves. A skip never creates an independent hole (P4).
+7. **Known-type conflict: expected types can also be narrower than an inferred holder.** In `list.map(["a"], (x) { y: x = "b"  y == "b" })`, the callback's expected known parameter may be "a", while the shared inferred holder must also accept "b" from y's annotation. Using that expected literal for Of's known conversion would give a false E0520. **Fix:** no expected-known fallback for an unannotated source parameter. Only its stored structural monotype provides type shape; written source annotations are part of that monotype (K1). Add the corresponding test. This is distinct from ordinary callback expected-type checking.
+8. **Scope conflict: a global pending-name set over-rejects shadowing.** `f = () { g = (f: Int) { y: f = f  y }  g(1) }` must read the inner parameter's type. Keeping the outer f text globally forbidden would give E0536. **Fix:** own-binding reserved frames participate in lexical type lookup and may be covered by inner binders; current-header pending names remain a separate check (V3).
+9. **Source conflict: a tuple-pattern annotation in the inherited examples is not legal.** The old examples put a type after the entire tuple pattern. Spec §7.1 and `ilang-syntax/src/ast.rs:327–338` only allow a typed name/discard. **Fix:** use `((a: Int, b: String)) { q: a = a  q == 1 }`, annotating individual parts; no pattern-syntax extension is proposed.
 
-- **E0531 on constructor fields** limits nominal wrappers such as `Account { Account(User) }` with `User` from a pattern. Users must use aliases (or records after T3). Lifting it needs a sound order for field access by label.
-- **Reading fixes the type.** A pin restricts later code as a written type would (part 3.3, "What pinning costs"). Only a site in `r`'s own module pins `r` (F2), so the author who adds `C = r` owns `r` and can write its type; the pin can make code in that module, or in modules that use it, that widens `r` an error, with a note at the reading site. A consumer package, a test module or the editor's set of modules never pins, so a library that checks alone checks the same way inside every program, and its interface is the same. The cost is the other way: a consumer can not read a part that the library did not fix, and gets E0534 with the hint to ask the library for a written type (open question 8).
-- **Literal pins are strict.** With literal types, `r = cell(1)` and `C = r` pin `r` to `Cell(1)`, so `r.set(2)` is an error. The message should suggest writing `r: Cell(Int) = …`.
-- **Pins in the solver are new code with soundness weight.** Every path that walks bounds (`constrain_in`, `reach`, `compare`, `extrude`, `freshen`, display) must replace a pinned variable. A missed path could let a pinned variable gain a bound. The assertion in `add_bound` and the tests of `value_type_pin.i` target this.
-- **Open groups are coarse.** A group that meets any earlier variable that is not pinned gives no fixed type for any of its read targets, also for parts that do not depend on that variable. The fix is to write a type; a finer rule (per connected part) can come later without changing correct programs.
-- **check_places_ty** checks solver types, not written ones. Read types simplified differently from written types (the `has_both` fallback in `generalize`) may be rejected or accepted in surprising ways.
-- **The head needs an `UpName` with no module name.** `json.Codec(User, _) = user` is a binding. The hint helps, but a correct binding of that form gets no hint.
-- **Literal types are not widened.** `Port = port` is `8080`, and through exported aliases a private value's body change can change the interface. Intended, but a new source of interface churn.
-- **Head aliases** (P2) add exact parts and an equality test on closed types. It is a small new piece of the matcher.
-- **Codes.** If T1 needs more than seven codes, or the split is not confirmed, the codes clash on merge.
-- **Order with T3.** T3's resolve-time checks must walk `Of` (the hook). The plan keeps T2 before T3, and there are no key parameters before T3, so there is no gap.
-- **A3 and A2 prerequisites.** Without UpName shown variables, hover and interface text read as value types (step 1 stops).
-- **Nothing has come yet.** A part with nothing coming to it is E0534, not `Never`. So `(c: size)` is an error while `size.encode` has never been called, and a call added later elsewhere does not fix it (the read happens at the end of `size`'s group). The message says to write the type.
+### Attack pass 1 after those corrections
 
-## 12. Open questions
+- **Soundness:** `Box(A) { Box(get: () -> A, put: (A) -> Nil) }`; extract from a weak Box then pass it to incompatible invariant contexts. R4 checks both equality directions with the original graph; later incompatible constraints still fail. A skipped occurrence of that same A cannot escape fixation. The expected-known callback counterexample is also rechecked with an unannotated holder: its shape stays unknown while its monotype is shared. The inner-f shadowing example follows lexical reserved frames. No further serious issue found by tracing `constrain_in`, `compare` and the proposed scope rules.
+- **Buildability:** `A = List(B)`, then `Pair(B, _) = pair`, with pair's result behind a weak root and an unused encode-like part. Module/group events and dependency order complete B before A without forcing the skipped part. No Pending fallback is needed.
+- **Sources:** `Schema(User, _) = m()` with a syntax macro returning `user`, and a later import of User. The stored generic classification gives a parameter-form error throughout; no import/expansion changes meaning. A newly generated whole pattern item is classified as such. This keeps the macro draft's syntactic definition service and accepted macro reservation. No further serious issue found.
 
-1. Should value types be allowed in constructor fields later, with a "prelude group" rule that types the sources before the custom type is used?
-2. Answered: a part with nothing coming to it is E0534, never `Never` and never the types it goes to (part 3.3). Open: should a part with only upper bounds be read as their intersection when the user asks for it, for example with a later form for input types?
-3. Left-to-right scoping of parameters in types (`(a, b: a) -> a`) as a later extension. It cannot change meaning, because today it is E0536.
-4. Function-type patterns and record patterns (T3) in alias patterns. A top-level tuple is taken apart through a head alias (`Pair(A, B) = (A, B)`, P2); a function type has no such alias, so taking apart a function-typed value needs a function-type pattern.
-5. Should matching relax "exactly one member" for a union with `Nil`, as known-type matching does?
-6. A lint for a correct binding `a.C(…) = x` that looks like an alias pattern.
-7. Macro calls in the parts of an alias pattern (E0532 in T2). Allowing them needs binders that are known only after macro step 1, and a rule for `definition(User)` while they are not known.
-8. Should a module be able to say that a consumer may fix a part, for example with a written export form? Today a consumer can only read parts the module fixed (F2).
+### Attack pass 2
+
+- **Soundness/order:** lib's `r = cell(1)` and `reset = () { r.set("s") }`; add `C = lib.r` only in app/test, and permute independent groups. The consumer cannot add equations; G from a captured earlier weak c fails even when it merely carries c without constraining it. Library typing remains unchanged. This assertion concerns completion/fixation, not the final display of other weak parts after ordinary consumer expression uses. No further serious issue found under R3.
+- **Buildability/recovery:** `a = (n: b) { n }`, `b = a(1)`, plus a valid independent binding; also an alias-only module in an import cycle. Failed sites and prior-error state are set before query inference, so no new variable or missing-ready panic is required. Checked against `query.rs:26–48`. No further serious issue found.
+- **Sources/interface:** export an extraction alias with `(..)`; rename its private source without changing the inferred type; then change the source's literal set. X1/X3 preserve constructor privacy, ignore the rename and detect the type change. T3 label binders/key parameters still fail before inference; record closure uses its exact rewrites. No further serious issue found.
+
+These are two dry passes of design reasoning, not independent reviews or a solver proof. Implementation/RF must still execute §10, especially the rollback, alias-only module, weak-root projection and permutation tests.
+
+## 12. Risks and coordinator questions
+
+1. **Approve explicit fixation at completion? Recommended: yes, with the exact §7.5 wording.** Reading a weak type can reject later widening. This is the substantive semantic decision inherited from the draft, now made ordinary checked constraints. If G3 rejects that cost, use design C and require a closed source annotation; do not silently publish a mutable snapshot. C would need reconciliation with records.md §5.9.
+2. **Confirm the early-context limit? Recommended: retain E0531 for T2.** A nominal wrapper around an extracted User is therefore unavailable; a structural alias works. Supporting such fields later requires ordering field-dependent inference and revisiting variance and macro readiness, not just an extra conv arm.
+3. **Confirm T2's code block and file scope? Recommended: E0530–E0537 and the solver/checker/export/interface work in §8.** T2's plan file list alone understates the required changes. Do not change other lanes' code or notes in this note-only task.
+4. **Accept the M4 boundary? Recommended: yes for the first version.** Direct value types in expansion are rejected; already completed dependency-safe aliases work. Coordinate the update on lane/note-meta before M4, including imported/module-start aliases and preserving the blackbox rule.
+5. **Extend parameter or pattern forms now? Recommended: no.** Keep own-header reads E0536; defer left-to-right parameter types, function/record type patterns, union matching, macro-generated pattern parts and consumer fixation. Each needs its own inference/readiness rule. Tuple extraction and renamed heads already work.
+
+The largest implementation risk is proving that trial batches preserve all prior relationships and roll back completely. Snapshot copies may be expensive for large sources; no timing or memory bound was measured here. Open-group rejection is deliberately coarse and can reject a disjoint read in a group that touches an earlier weak variable.
+
+Verified here: source/branch/status reads, the listed code paths, accepted note/ledger contracts, section/fence/path checks and git diff --check. Not verified: new-syntax compilation, proposed diagnostics, solver transactions, the T3 builder, macros, query recovery or package comparison under T2. Those facilities are not implemented by this note. No cargo build, runtime test, performance result or formal principal-type proof is claimed.
