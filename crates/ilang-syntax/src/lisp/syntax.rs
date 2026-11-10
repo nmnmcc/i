@@ -178,6 +178,10 @@ impl Syntax {
     pub fn identical(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
     }
+    /// Stable identity while this value is alive, for host reference interning.
+    pub fn identity_key(&self) -> usize {
+        Arc::as_ptr(&self.0) as usize
+    }
     /// Find a descendant by its original source span.
     pub fn at_span(&self, span: Span) -> Option<&Syntax> {
         if self.span() == span {

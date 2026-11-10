@@ -1,5 +1,6 @@
 //! Compiler syntax services carried over the ordinary opaque-reference ABI.
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use anyhow::{Context, Result, bail};
 use ilang_syntax::lisp::syntax::{Node, Position, Syntax};
@@ -28,7 +29,33 @@ fn get<T: Send + Sync + 'static>(value: &Value) -> Result<&T> {
 }
 /// Give a syntax value to a macro instance through the opaque-reference ABI.
 pub fn encode(value: Syntax) -> Value {
-    opaque(value)
+    struct Cache {
+        references: HashMap<usize, Weak<dyn std::any::Any + Send + Sync>>,
+        next_cleanup: usize,
+    }
+    static CACHE: OnceLock<Mutex<Cache>> = OnceLock::new();
+    let mut cache = CACHE
+        .get_or_init(|| {
+            Mutex::new(Cache {
+                references: HashMap::new(),
+                next_cleanup: 1024,
+            })
+        })
+        .lock()
+        .expect("syntax reference cache lock poisoned");
+    let key = value.identity_key();
+    if let Some(reference) = cache.references.get(&key).and_then(Weak::upgrade) {
+        return Value::Externref(HostReference(reference));
+    }
+    if cache.references.len() >= cache.next_cleanup {
+        cache
+            .references
+            .retain(|_, reference| reference.strong_count() != 0);
+        cache.next_cleanup = cache.references.len().saturating_mul(2).max(1024);
+    }
+    let reference = HostReference::new(value);
+    cache.references.insert(key, Arc::downgrade(&reference.0));
+    Value::Externref(reference)
 }
 /// Read a syntax value returned by a macro instance.
 pub fn decode(value: &Value) -> Result<&Syntax> {
@@ -121,7 +148,7 @@ fn invoke(name: &str, args: &[Value]) -> Result<Value> {
             }
             _ => bail!("syntax node is not a bracket"),
         },
-        ("child", [value, index]) => Ok(opaque(child(get(value)?, number(index)?)?.clone())),
+        ("child", [value, index]) => Ok(encode(child(get(value)?, number(index)?)?.clone())),
         ("list_new", []) => Ok(opaque(List(None))),
         ("list_push", [list, value]) => Ok(opaque(List(Some(Arc::new(Link {
             value: get::<Syntax>(value)?.clone(),
@@ -181,7 +208,7 @@ fn invoke(name: &str, args: &[Value]) -> Result<Value> {
             Ok(result(Syntax::make(node, get(like)?)))
         }
         ("syntax_ok", [value]) => Ok(Value::Bool(get::<SyntaxResult>(value)?.0.is_ok())),
-        ("syntax_value", [value]) => Ok(opaque(
+        ("syntax_value", [value]) => Ok(encode(
             get::<SyntaxResult>(value)?
                 .0
                 .as_ref()
@@ -226,7 +253,7 @@ fn invoke(name: &str, args: &[Value]) -> Result<Value> {
                 .0
                 .clone(),
         )),
-        ("text_error_at", [value]) => Ok(opaque(
+        ("text_error_at", [value]) => Ok(encode(
             get::<TextResult>(value)?
                 .0
                 .as_ref()

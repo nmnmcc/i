@@ -22,6 +22,10 @@ exercise = () -> Nil ^ syntax.SyntaxError ! Assert {
   assert(syntax.show(value) == "(f x)")
   syntax.node(value).{
     syntax.Round([first, second]) -> {
+      syntax.node(value).{
+        syntax.Round([again, _]) -> assert(first == again)
+        _ -> panic("unexpected syntax node")
+      }
       assert(syntax.show(first) == "f")
       assert(syntax.show(second) == "x")
     }
