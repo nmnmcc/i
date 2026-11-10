@@ -176,7 +176,14 @@ fn render_comments(
             .push((m.items[0].span, print_module(&m).trim_end().to_string()));
     }
     module.clone().walk(&mut candidates);
-    super::comments::transfer(source, print_module(module), candidates.0, lisp, keep_all)
+    super::comments::transfer(
+        source,
+        print_module(module),
+        candidates.0,
+        lisp,
+        keep_all,
+        true,
+    )
 }
 
 fn head(n: &Ident, params: &[Ident]) -> String {

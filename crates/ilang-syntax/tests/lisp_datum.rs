@@ -106,6 +106,19 @@ fn lisp_formatter_keeps_all_comments_and_is_idempotent() {
 }
 
 #[test]
+fn comment_anchors_do_not_match_text_inside_documentation() {
+    let source = "/// Example: (= f (-> () _ {1}))\n// item\nf = () { 1 }\n";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let (out, lost) = ilang_syntax::lisp::print_with_comments(source, &module);
+    assert!(lost.is_empty(), "{lost:?}");
+    assert!(
+        out.contains("/// Example: (= f (-> () _ {1}))\n\n// item\n(= f"),
+        "{out}"
+    );
+}
+
+#[test]
 fn dots_and_spreads_are_separate_datums() {
     let xs = parse("(. a 12) [1 .. x] <<1 (: 2 u8)>>").unwrap();
     let DatumKind::Round(parts) = &xs[0].kind else {

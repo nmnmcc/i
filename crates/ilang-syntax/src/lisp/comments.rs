@@ -7,6 +7,7 @@ pub(super) fn transfer(
     mut candidates: Vec<(Span, String)>,
     lisp: bool,
     keep_all: bool,
+    output_lisp: bool,
 ) -> (String, Vec<Span>) {
     let lexed = if lisp {
         crate::lexer::lex_lisp(source)
@@ -14,10 +15,23 @@ pub(super) fn transfer(
         crate::lexer::lex(source)
     };
     candidates.sort_by_key(|(s, _)| (s.start, std::cmp::Reverse(s.end)));
+    let output_lexed = if output_lisp {
+        crate::lexer::lex_lisp(&output)
+    } else {
+        crate::lexer::lex(&output)
+    };
+    let starts: std::collections::HashSet<usize> = output_lexed
+        .tokens
+        .iter()
+        .map(|token| token.span.start as usize)
+        .collect();
     let mut positions = Vec::with_capacity(candidates.len());
     let mut cursor = 0;
     for (_, text) in &candidates {
-        let position = output[cursor..].find(text).map(|offset| cursor + offset);
+        let position = output[cursor..]
+            .match_indices(text)
+            .map(|(offset, _)| cursor + offset)
+            .find(|pos| starts.contains(pos));
         if let Some(pos) = position {
             cursor = pos;
         }

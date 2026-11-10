@@ -54,22 +54,22 @@ pub fn normal_source(document: &Document) -> Result<String> {
                 doc.text
             ));
         }
-        if let Some([first, rest @ ..]) = round(datum) {
-            if symbol(first, ",") {
-                if items_started || rest.is_empty() || headers == 2 {
-                    return Err(bad(datum, "a module header"));
-                }
-                let imports = rest.iter().any(is_import);
-                if imports && headers != 0 {
-                    return Err(bad(datum, "an imports header"));
-                }
-                headers = if imports { 1 } else { 2 };
-                lines.push(format!(
-                    "({})",
-                    joined(rest, if imports { import } else { export }, ", ")?
-                ));
-                continue;
+        if let Some([first, rest @ ..]) = round(datum)
+            && symbol(first, ",")
+        {
+            if items_started || rest.is_empty() || headers == 2 {
+                return Err(bad(datum, "a module header"));
             }
+            let imports = rest.iter().any(is_import);
+            if imports && headers != 0 {
+                return Err(bad(datum, "an imports header"));
+            }
+            headers = if imports { 1 } else { 2 };
+            lines.push(format!(
+                "({})",
+                joined(rest, if imports { import } else { export }, ", ")?
+            ));
+            continue;
         }
         items_started = true;
         lines.push(item(datum)?);
@@ -133,7 +133,7 @@ pub fn normal_with_comments(source: &str, document: &Document) -> Result<(String
         }
     }
     Ok(super::comments::transfer(
-        source, output, anchors, true, false,
+        source, output, anchors, true, false, false,
     ))
 }
 fn find_span(d: &Datum, span: Span) -> Option<&Datum> {
@@ -167,10 +167,11 @@ fn import(d: &Datum) -> Result<String> {
     }
 }
 fn import_part(d: &Datum) -> Result<String> {
-    if let Some([h, rest @ ..]) = round(d) {
-        if symbol(h, ",") && !rest.is_empty() {
-            return Ok(format!("({})", joined(rest, import_name, ", ")?));
-        }
+    if let Some([h, rest @ ..]) = round(d)
+        && symbol(h, ",")
+        && !rest.is_empty()
+    {
+        return Ok(format!("({})", joined(rest, import_name, ", ")?));
     }
     label(d)
 }
@@ -181,10 +182,10 @@ fn import_name(d: &Datum) -> Result<String> {
     }
 }
 fn export(d: &Datum) -> Result<String> {
-    if let Some([n, spread]) = round(d) {
-        if symbol(spread, "..") {
-            return Ok(format!("{}(..)", import_name(n)?));
-        }
+    if let Some([n, spread]) = round(d)
+        && symbol(spread, "..")
+    {
+        return Ok(format!("{}(..)", import_name(n)?));
     }
     import_name(d)
 }
@@ -224,15 +225,16 @@ fn is_upper_head(d: &Datum) -> bool {
     matches!(d.kind, K::UpName(_)) || round(d).is_some_and(|x| x.first().is_some_and(is_upper_head))
 }
 fn item_head(d: &Datum) -> Result<String> {
-    if let Some([h, left, ty]) = round(d) {
-        if symbol(h, ":") {
-            return Ok(format!("{}: {}", item_head(left)?, typ(ty)?));
-        }
+    if let Some([h, left, ty]) = round(d)
+        && symbol(h, ":")
+    {
+        return Ok(format!("{}: {}", item_head(left)?, typ(ty)?));
     }
-    if let Some([h, args @ ..]) = round(d) {
-        if matches!(h.kind, K::Name(_) | K::UpName(_)) && !args.is_empty() {
-            return Ok(format!("{}({})", show(h), joined(args, typ, ", ")?));
-        }
+    if let Some([h, args @ ..]) = round(d)
+        && matches!(h.kind, K::Name(_) | K::UpName(_))
+        && !args.is_empty()
+    {
+        return Ok(format!("{}({})", show(h), joined(args, typ, ", ")?));
     }
     pattern(d)
 }
@@ -248,22 +250,23 @@ fn constructor(d: &Datum) -> Result<String> {
     }
 }
 fn field_type(d: &Datum) -> Result<String> {
-    if let Some([h, n, t]) = round(d) {
-        if symbol(h, ":") {
-            return Ok(format!("{}: {}", label(n)?, typ(t)?));
-        }
+    if let Some([h, n, t]) = round(d)
+        && symbol(h, ":")
+    {
+        return Ok(format!("{}: {}", label(n)?, typ(t)?));
     }
     typ(d)
 }
 fn attribute(d: &Datum) -> Result<String> {
-    if let Some([h, args @ ..]) = round(d) {
-        if !args.is_empty() && !symbol(h, ".") {
-            return Ok(format!(
-                "{}({})",
-                callee_name(h)?,
-                joined(args, argument, ", ")?
-            ));
-        }
+    if let Some([h, args @ ..]) = round(d)
+        && !args.is_empty()
+        && !symbol(h, ".")
+    {
+        return Ok(format!(
+            "{}({})",
+            callee_name(h)?,
+            joined(args, argument, ", ")?
+        ));
     }
     callee_name(d)
 }
@@ -321,10 +324,10 @@ fn typ(d: &Datum) -> Result<String> {
             _ => {}
         }
     }
-    if let K::Curly(xs) = &d.kind {
-        if xs.len() == 1 {
-            return Ok(format!("{{ {} }}", typ(&xs[0])?));
-        }
+    if let K::Curly(xs) = &d.kind
+        && xs.len() == 1
+    {
+        return Ok(format!("{{ {} }}", typ(&xs[0])?));
     }
     Err(bad(d, "a type"))
 }
@@ -345,10 +348,10 @@ fn return_type(d: &Datum) -> Result<String> {
     typ(d)
 }
 fn argument(d: &Datum) -> Result<String> {
-    if let Some([h, n, value]) = round(d) {
-        if symbol(h, ":") {
-            return Ok(format!("{}: {}", label(n)?, expr(value)?));
-        }
+    if let Some([h, n, value]) = round(d)
+        && symbol(h, ":")
+    {
+        return Ok(format!("{}: {}", label(n)?, expr(value)?));
     }
     expr(d)
 }
@@ -475,10 +478,10 @@ fn sequence(xs: &[Datum], f: fn(&Datum) -> Result<String>) -> Result<String> {
     Ok(parts.join(", "))
 }
 fn expression_segment(d: &Datum) -> Result<String> {
-    if let Some([h, val, fmt]) = round(d) {
-        if symbol(h, ":") {
-            return Ok(format!("{}: {}", expr(val)?, format_spec(fmt)?));
-        }
+    if let Some([h, val, fmt]) = round(d)
+        && symbol(h, ":")
+    {
+        return Ok(format!("{}: {}", expr(val)?, format_spec(fmt)?));
     }
     expr(d)
 }
@@ -489,10 +492,10 @@ fn format_spec(d: &Datum) -> Result<String> {
     label(d)
 }
 fn parameter(d: &Datum) -> Result<String> {
-    if let Some([h, n, t]) = round(d) {
-        if symbol(h, "!") {
-            return Ok(format!("{} ! {}", label(n)?, typ(t)?));
-        }
+    if let Some([h, n, t]) = round(d)
+        && symbol(h, "!")
+    {
+        return Ok(format!("{} ! {}", label(n)?, typ(t)?));
     }
     pattern(d)
 }
@@ -579,10 +582,10 @@ fn pattern(d: &Datum) -> Result<String> {
     }
 }
 fn pattern_segment(d: &Datum) -> Result<String> {
-    if let Some([h, val, fmt]) = round(d) {
-        if symbol(h, ":") {
-            return Ok(format!("{}: {}", pattern(val)?, format_spec(fmt)?));
-        }
+    if let Some([h, val, fmt]) = round(d)
+        && symbol(h, ":")
+    {
+        return Ok(format!("{}: {}", pattern(val)?, format_spec(fmt)?));
     }
     pattern(d)
 }

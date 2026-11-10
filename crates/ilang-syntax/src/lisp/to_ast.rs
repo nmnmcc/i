@@ -69,13 +69,13 @@ pub fn parse_type(d: &Datum) -> Result<TypeExpr> {
                 let params = ps
                     .iter()
                     .map(|p| {
-                        if let Some([h, n, t]) = round(p) {
-                            if symbol(h, ":") {
-                                return Ok(FnParamType {
-                                    label: Some(ident(n)?),
-                                    ty: parse_type(t)?,
-                                });
-                            }
+                        if let Some([h, n, t]) = round(p)
+                            && symbol(h, ":")
+                        {
+                            return Ok(FnParamType {
+                                label: Some(ident(n)?),
+                                ty: parse_type(t)?,
+                            });
                         }
                         Ok(FnParamType {
                             label: None,
@@ -293,13 +293,13 @@ fn segment<T>(d: &Datum, parse: fn(&Datum) -> Result<T>) -> Result<Segment<T>> {
     })
 }
 fn argument(d: &Datum) -> Result<Arg> {
-    if let Some([h, n, e]) = round(d) {
-        if symbol(h, ":") {
-            return Ok(Arg {
-                label: Some(ident(n)?),
-                value: parse_expression(e)?,
-            });
-        }
+    if let Some([h, n, e]) = round(d)
+        && symbol(h, ":")
+    {
+        return Ok(Arg {
+            label: Some(ident(n)?),
+            value: parse_expression(e)?,
+        });
     }
     Ok(Arg {
         label: None,
@@ -405,13 +405,13 @@ pub fn parse_expression(d: &Datum) -> Result<Expr> {
                 let params = params
                     .iter()
                     .map(|p| {
-                        if let Some([h, n, ty]) = round(p) {
-                            if symbol(h, "!") {
-                                return Ok(Param::Env {
-                                    name: ident(n)?,
-                                    ty: parse_type(ty)?,
-                                });
-                            }
+                        if let Some([h, n, ty]) = round(p)
+                            && symbol(h, "!")
+                        {
+                            return Ok(Param::Env {
+                                name: ident(n)?,
+                                ty: parse_type(ty)?,
+                            });
                         }
                         Ok(Param::Pattern(parse_pattern(p)?))
                     })
@@ -577,25 +577,25 @@ pub fn parse_module(document: &Document) -> Result<Module> {
                 module.doc.push(doc.text.clone());
             }
         }
-        if let Some([h, rest @ ..]) = round(d) {
-            if symbol(h, ",") {
-                if stage >= 2 || rest.is_empty() {
-                    return Err(bad(d, "a module header"));
-                }
-                if rest.iter().any(is_import) {
-                    if stage != 0 {
-                        return Err(bad(d, "an imports header"));
-                    }
-                    module.imports = rest.iter().map(import).collect::<Result<_>>()?;
-                    module.imports_span = Some(d.span);
-                    stage = 1;
-                } else {
-                    module.exports = rest.iter().map(export).collect::<Result<_>>()?;
-                    module.exports_span = Some(d.span);
-                    stage = 2;
-                }
-                continue;
+        if let Some([h, rest @ ..]) = round(d)
+            && symbol(h, ",")
+        {
+            if stage >= 2 || rest.is_empty() {
+                return Err(bad(d, "a module header"));
             }
+            if rest.iter().any(is_import) {
+                if stage != 0 {
+                    return Err(bad(d, "an imports header"));
+                }
+                module.imports = rest.iter().map(import).collect::<Result<_>>()?;
+                module.imports_span = Some(d.span);
+                stage = 1;
+            } else {
+                module.exports = rest.iter().map(export).collect::<Result<_>>()?;
+                module.exports_span = Some(d.span);
+                stage = 2;
+            }
+            continue;
         }
         stage = 3;
         let mut item = item(d)?;
@@ -621,22 +621,22 @@ fn import(d: &Datum) -> Result<ImportItem> {
     let mut alias = None;
     let mut names = Vec::new();
     let mut path = d;
-    if let Some([h, a, b]) = round(d) {
-        if symbol(h, "=") {
-            if matches!(a.kind, K::Name(_)) {
-                alias = Some(ident(a)?);
-            } else {
-                names = import_names(a)?;
-            }
-            path = b;
-        }
-    }
-    if let Some([h, a, ns, p]) = round(d) {
-        if symbol(h, "=") {
+    if let Some([h, a, b]) = round(d)
+        && symbol(h, "=")
+    {
+        if matches!(a.kind, K::Name(_)) {
             alias = Some(ident(a)?);
-            names = import_names(ns)?;
-            path = p;
+        } else {
+            names = import_names(a)?;
         }
+        path = b;
+    }
+    if let Some([h, a, ns, p]) = round(d)
+        && symbol(h, "=")
+    {
+        alias = Some(ident(a)?);
+        names = import_names(ns)?;
+        path = p;
     }
     let Some([h, parts @ ..]) = round(path) else {
         return Err(bad(path, "a module path"));
