@@ -442,6 +442,20 @@ def report(args):
             continue
         lines += ['- ' + requirement['finding'], '  Required: ' + requirement['outcome'] + '.', '  Source: ' + requirement['source'], '  Cases: ' + ', '.join(c['id'] for c in manifest['cases'] if re.search(requirement['pattern'], c['id'])), '']
     (CORPUS / 'known-failures.md').write_text('\n'.join(lines) + '\n')
+    if args.verification_log:
+        log = args.verification_log.read_text()
+        decoder = json.JSONDecoder()
+        short_runs = []
+        for match in re.finditer(r'\{\n  "compiler":', log):
+            try:
+                value, _ = decoder.raw_decode(log[match.start():])
+            except json.JSONDecodeError:
+                continue
+            if value.get('mode') == 'short' and 'counts' in value and 'rules' in value:
+                short_runs.append(value)
+        if len(short_runs) != 1:
+            raise SystemExit('verification log must contain exactly one short-generation report')
+        dump(CORPUS / 'generation-short.json', short_runs[0])
     print(json.dumps({'counts': counts, 'incidents': len(incidents)}, indent=2))
 
 
@@ -505,7 +519,8 @@ def main():
     run.add_argument('--missing-only', action='store_true')
     run.add_argument('--jobs', type=int, default=1)
     sub.add_parser('parse-register')
-    sub.add_parser('report')
+    reporting = sub.add_parser('report')
+    reporting.add_argument('--verification-log', type=Path)
     snap = sub.add_parser('snapshot')
     snap.add_argument('--label', required=True)
     snap.add_argument('--filter', default='')

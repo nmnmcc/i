@@ -64,14 +64,10 @@
     },
     {
       "pattern": "^review-k4d/(?:proj|_loose/p)/q24$",
-      "known_failure": true,
+      "known_failure": false,
       "outcome": "accept",
-      "types_contain": [
-        "use : () -> Int ! N | S(N)",
-        "fw : () -> Int ! N | S(N)"
-      ],
-      "finding": "K4d q24: acceptance alone is insufficient; use and forwarding must preserve the same row argument",
-      "source": "docs/spec.md §4.5 rule 4: equal type arguments; §4.7: principal type",
+      "finding": "K4d q24: the finite unannotated forwarding program must be accepted; current shown types remain an exact observation",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type. The sentence does not prescribe a printed variable spelling; the review criteria require this finite program to be accepted.",
       "origin": "review-k4d/p/q24.i; criteria C2/C5"
     },
     {

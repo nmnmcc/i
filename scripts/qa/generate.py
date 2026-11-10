@@ -89,10 +89,12 @@ def service_case(seed):
     declarations = ['Svc(A) { Svc(f: () -> A, m: (A) -> Nil) }',
                     'ask(A) = (s ! Svc(A)) { s.f() }',
                     'run(A, N) = (body: () -> A ! N) { body() }',
+                    'pass = (x: Int) -> Int { x }',
                     'h0 = () { ask() }']
     declarations += [f'h{i} = () {{ run(() {{ h{i-1}() }}) }}' for i in range(1, n)]
-    declarations += [f'@main\nmain = () {{\n ! Svc(Int) = Svc(() {{ 7 }}, (_: Int) {{ Nil }})\n assert(h{n-1}() == 7)\n Nil\n}}']
-    return {'name': f'k4-services-{seed}', 'declarations': declarations, 'accept': True, 'annotation': None}
+    declarations += [f'@main\nmain = () {{\n ! Svc(Int) = Svc(() {{ 7 }}, (_: Int) {{ Nil }})\n assert(pass(h{n-1}()) == 7)\n Nil\n}}']
+    return {'name': f'k4-services-{seed}', 'declarations': declarations, 'accept': True,
+            'annotation': ('pass = (x: Int) -> Int { x }', 'pass = (x) { x }')}
 
 
 def validate(binary, project, case, bound):
