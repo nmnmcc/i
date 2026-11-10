@@ -1065,6 +1065,11 @@ struct Entry {
         ilang_check::types::AliasArtifact,
         std::sync::Arc<Vec<String>>,
     )>,
+    scheme: Option<(
+        ilang_check::types::SchemeArtifact,
+        std::sync::Arc<Vec<String>>,
+        String,
+    )>,
 }
 
 /// The public interface of the `src/` modules of a package: for each
@@ -1160,6 +1165,11 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                     shown: format!("{import}{ty}"),
                     canonical: format!("{import}{canonical}"),
                     alias: None,
+                    scheme: typed
+                        .scheme_artifacts
+                        .get(&id)
+                        .cloned()
+                        .map(|a| (a, artifact_names.clone(), import)),
                 },
             );
         }
@@ -1211,6 +1221,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                         .get(&t)
                         .cloned()
                         .map(|a| (a, artifact_names.clone())),
+                    scheme: None,
                 },
             );
             if (def.constructors_exported || def.host.is_some())
@@ -1226,6 +1237,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                         shown: all(&shown),
                         canonical: all(&canonical),
                         alias: None,
+                        scheme: None,
                     },
                 );
             }
@@ -1239,6 +1251,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                 shown: join(shown),
                 canonical: join(canonical),
                 alias: None,
+                scheme: None,
             },
         );
     }
@@ -1561,25 +1574,85 @@ impl Diff {
             changed: Vec::new(),
             added: Vec::new(),
         };
+        let mut correspondences: Vec<Vec<Vec<(usize, usize)>>> = Vec::new();
+        let grouped = shared_scheme_groups(old, new)?;
         for (k, v) in old {
             match new.get(k) {
                 None => d.removed.push((k.clone(), v.clone())),
                 Some(n) => {
-                    let equal = match (&v.alias, &n.alias) {
-                        (Some((left, left_names)), Some((right, right_names))) => left
-                            .equivalent(
-                                right,
-                                &mut |t| match t {
-                                    TypeRef::Builtin(b) => b.name().into(),
-                                    TypeRef::Custom(id) => left_names[id.0 as usize].clone(),
-                                },
-                                &mut |t| match t {
-                                    TypeRef::Builtin(b) => b.name().into(),
-                                    TypeRef::Custom(id) => right_names[id.0 as usize].clone(),
-                                },
-                            )
-                            .map_err(|e| anyhow!("cannot compare {k}: {e}"))?,
-                        _ => n.canonical == v.canonical,
+                    let equal = if let Some(equal) = grouped.get(k) {
+                        *equal
+                    } else {
+                        match (&v.scheme, &n.scheme) {
+                            (
+                                Some((left, left_names, left_import)),
+                                Some((right, right_names, right_import)),
+                            ) if left_import == right_import
+                                && (left.needs_semantic_comparison()
+                                    || right.needs_semantic_comparison()
+                                    || !left.external_ids_used().is_empty()
+                                    || !right.external_ids_used().is_empty()) =>
+                            {
+                                use ilang_check::types::SchemeComparison;
+                                match left
+                                    .compare(
+                                        right,
+                                        &mut |t| match t {
+                                            TypeRef::Builtin(b) => b.name().into(),
+                                            TypeRef::Custom(id) => {
+                                                left_names[id.0 as usize].clone()
+                                            }
+                                        },
+                                        &mut |t| match t {
+                                            TypeRef::Builtin(b) => b.name().into(),
+                                            TypeRef::Custom(id) => {
+                                                right_names[id.0 as usize].clone()
+                                            }
+                                        },
+                                    )
+                                    .map_err(|e| anyhow!("cannot compare {k}: {e}"))?
+                                {
+                                    SchemeComparison::Equivalent(options) => {
+                                        correspondences.push(options);
+                                        true
+                                    }
+                                    SchemeComparison::Different => false,
+                                    SchemeComparison::Unknown => bail!(
+                                        "could not prove whether the complete scheme of {k} changed"
+                                    ),
+                                    SchemeComparison::ResourceLimit => {
+                                        bail!("the proof budget was exhausted while comparing {k}")
+                                    }
+                                }
+                            }
+                            (Some((_, _, left_import)), Some((_, _, right_import)))
+                                if left_import == right_import =>
+                            {
+                                n.canonical == v.canonical
+                            }
+                            (Some(_), Some(_)) => false,
+                            (Some(_), None) | (None, Some(_)) => false,
+                            (None, None) => match (&v.alias, &n.alias) {
+                                (Some((left, left_names)), Some((right, right_names))) => left
+                                    .equivalent(
+                                        right,
+                                        &mut |t| match t {
+                                            TypeRef::Builtin(b) => b.name().into(),
+                                            TypeRef::Custom(id) => {
+                                                left_names[id.0 as usize].clone()
+                                            }
+                                        },
+                                        &mut |t| match t {
+                                            TypeRef::Builtin(b) => b.name().into(),
+                                            TypeRef::Custom(id) => {
+                                                right_names[id.0 as usize].clone()
+                                            }
+                                        },
+                                    )
+                                    .map_err(|e| anyhow!("cannot compare {k}: {e}"))?,
+                                _ => n.canonical == v.canonical,
+                            },
+                        }
                     };
                     if !equal {
                         d.changed.push((k.clone(), v.clone(), n.clone()))
@@ -1591,6 +1664,11 @@ impl Diff {
             if !old.contains_key(k) {
                 d.added.push((k.clone(), v.clone()));
             }
+        }
+        if !consistent_external_mapping(&correspondences)? {
+            bail!(
+                "could not prove the shared nongeneralized-variable relationship between interfaces"
+            );
         }
         Ok(d)
     }
@@ -1618,6 +1696,128 @@ impl Diff {
         for (k, v) in &self.added {
             println!("  added {k}: {}", v.shown);
         }
+    }
+}
+
+fn shared_scheme_groups(old: &Interface, new: &Interface) -> Result<BTreeMap<String, bool>> {
+    let common: Vec<_> = old
+        .iter()
+        .filter_map(|(key, entry)| {
+            let next = new.get(key)?;
+            Some((key, entry.scheme.as_ref()?, next.scheme.as_ref()?))
+        })
+        .collect();
+    let mut parents: Vec<_> = (0..common.len()).collect();
+    fn root(parents: &[usize], mut i: usize) -> usize {
+        while parents[i] != i {
+            i = parents[i];
+        }
+        i
+    }
+    for side in 0..2 {
+        let mut owner = BTreeMap::new();
+        for (i, (_, left, right)) in common.iter().enumerate() {
+            let artifact = if side == 0 { &left.0 } else { &right.0 };
+            for id in artifact.external_ids_used() {
+                if let Some(previous) = owner.insert(id, i) {
+                    let a = root(&parents, i);
+                    let b = root(&parents, previous);
+                    if a != b {
+                        parents[a] = b;
+                    }
+                }
+            }
+        }
+    }
+    let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for i in 0..common.len() {
+        groups.entry(root(&parents, i)).or_default().push(i);
+    }
+    let mut result = BTreeMap::new();
+    for members in groups.values().filter(|members| members.len() > 1) {
+        let left: Vec<_> = members.iter().map(|&i| common[i].1.0.clone()).collect();
+        let right: Vec<_> = members.iter().map(|&i| common[i].2.0.clone()).collect();
+        let left_names = &common[members[0]].1.1;
+        let right_names = &common[members[0]].2.1;
+        let same_imports = members.iter().all(|&i| common[i].1.2 == common[i].2.2);
+        let equal = if !same_imports {
+            false
+        } else {
+            use ilang_check::types::SchemeComparison;
+            match ilang_check::types::compare_scheme_group(
+                &left,
+                &right,
+                &mut |t| match t {
+                    TypeRef::Builtin(b) => b.name().into(),
+                    TypeRef::Custom(id) => left_names[id.0 as usize].clone(),
+                },
+                &mut |t| match t {
+                    TypeRef::Builtin(b) => b.name().into(),
+                    TypeRef::Custom(id) => right_names[id.0 as usize].clone(),
+                },
+            )
+            .map_err(|e| anyhow!("cannot compare shared exported schemes: {e}"))?
+            {
+                SchemeComparison::Equivalent(_) => true,
+                SchemeComparison::Different => false,
+                SchemeComparison::Unknown => {
+                    bail!("could not prove whether shared exported schemes changed")
+                }
+                SchemeComparison::ResourceLimit => {
+                    bail!("the proof budget was exhausted while comparing shared exported schemes")
+                }
+            }
+        };
+        for &i in members {
+            result.insert(common[i].0.clone(), equal);
+        }
+    }
+    Ok(result)
+}
+
+fn consistent_external_mapping(options: &[Vec<Vec<(usize, usize)>>]) -> Result<bool> {
+    let mut forward = BTreeMap::new();
+    let mut reverse = BTreeMap::new();
+    let mut choices = vec![0usize; options.len()];
+    let mut applied: Vec<Vec<(usize, usize)>> = vec![Vec::new(); options.len()];
+    let mut depth = 0usize;
+    let mut work = 0usize;
+    loop {
+        if depth == options.len() {
+            return Ok(true);
+        }
+        if choices[depth] >= options[depth].len() {
+            choices[depth] = 0;
+            if depth == 0 {
+                return Ok(false);
+            }
+            depth -= 1;
+            for (a, b) in applied[depth].drain(..) {
+                forward.remove(&a);
+                reverse.remove(&b);
+            }
+            continue;
+        }
+        work += 1;
+        if work > 65_536 {
+            bail!("the proof budget was exhausted while comparing shared interface variables");
+        }
+        let option = &options[depth][choices[depth]];
+        choices[depth] += 1;
+        if option.iter().any(|(a, b)| {
+            forward.get(a).is_some_and(|value| value != b)
+                || reverse.get(b).is_some_and(|value| value != a)
+        }) {
+            continue;
+        }
+        for &(a, b) in option {
+            if let std::collections::btree_map::Entry::Vacant(entry) = forward.entry(a) {
+                entry.insert(b);
+                reverse.insert(b, a);
+                applied[depth].push((a, b));
+            }
+        }
+        depth += 1;
     }
 }
 
@@ -1849,5 +2049,98 @@ mod value_type_interfaces {
             "(T)\nT = (a: (a: Int) -> Int)",
             "(T)\nT = (a: (b: Int) -> Int)"
         ));
+    }
+
+    #[test]
+    fn exported_record_schemes_compare_labels_and_value_types() {
+        let a = interface("(f)\nf(K) = (r: (K: Int), key: K) -> Int { 1 }");
+        let same = interface("(f)\nf(Key) = (r: (Key: Int), key: Key) -> Int { 1 }");
+        let changed = interface("(f)\nf(Key) = (r: (Key: String), key: Key) -> Int { 1 }");
+        assert!(Diff::new(&a, &same).unwrap().changed.is_empty());
+        assert!(!Diff::new(&a, &changed).unwrap().changed.is_empty());
+    }
+
+    #[test]
+    fn inferred_record_polymorphism_is_not_a_concrete_field_scheme() {
+        let generic = interface("(f)\nf = (r) { r.a }");
+        let concrete = interface("(f)\nf = (r: (a: Int)) { r.a }");
+        assert!(!Diff::new(&generic, &concrete).unwrap().changed.is_empty());
+        let annotated = interface("(f)\nf(A) = (r: (a: A)) -> A { r.a }");
+        assert!(Diff::new(&generic, &annotated).unwrap().changed.is_empty());
+    }
+
+    #[test]
+    fn key_parameter_and_field_type_parameter_are_compared_together() {
+        let generic =
+            interface("(i/record)\n(f)\nf(K,V) = (r: (K: V), key: K) -> V { record.get(r, key) }");
+        let concrete = interface(
+            "(i/record)\n(f)\nf(K) = (r: (K: Int), key: K) -> Int { record.get(r, key) }",
+        );
+        assert!(!Diff::new(&generic, &concrete).unwrap().changed.is_empty());
+        let renamed = interface(
+            "(i/record)\n(f)\nf(Key,Item) = (r: (Key: Item), key: Key) -> Item { record.get(r, key) }",
+        );
+        assert!(Diff::new(&generic, &renamed).unwrap().changed.is_empty());
+    }
+
+    #[test]
+    fn generic_record_update_schemes_compare_after_binder_renaming() {
+        let a = interface(
+            "(i/record)\n(f)\nf(R,K,V) = (r: R & Record, key: K, value: V) -> (..R, K: V) { record.put(r, key, value) }",
+        );
+        let b = interface(
+            "(i/record)\n(f)\nf(Row,Key,Item) = (r: Row & Record, key: Key, value: Item) -> (..Row, Key: Item) { record.put(r, key, value) }",
+        );
+        assert!(Diff::new(&a, &b).unwrap().changed.is_empty());
+    }
+
+    #[test]
+    fn record_scheme_comparison_is_independent_of_distributed_graph_shape() {
+        let joined = interface("(f)\nf = (r: (a: Int | String)) { r }");
+        let split = interface("(f)\nf = (r: (a: Int) | (a: String)) { r }");
+        assert!(Diff::new(&joined, &split).unwrap().changed.is_empty());
+    }
+
+    #[test]
+    fn key_parameter_can_collide_with_a_written_record_field() {
+        let both = interface("(f)\nf(K) = (r: (K: Int, fixed: String), key: K) -> Int { 1 }");
+        let override_field =
+            interface("(f)\nf(K) = (r: (..(K: Int), fixed: String), key: K) -> Int { 1 }");
+        assert!(
+            !Diff::new(&both, &override_field)
+                .unwrap()
+                .changed
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn distinct_key_parameters_may_receive_the_same_string() {
+        let both = interface("(f)\nf(K,J) = (r: (K: Int, J: String), k: K, j: J) -> Int { 1 }");
+        let override_field =
+            interface("(f)\nf(K,J) = (r: (..(K: Int), J: String), k: K, j: J) -> Int { 1 }");
+        assert!(
+            !Diff::new(&both, &override_field)
+                .unwrap()
+                .changed
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn unchanged_shared_nongeneralized_exports_compare_together() {
+        let source = "(a, b)\nmake = (f) { (f, f) }\n(a, b) = make((x) { x })\n";
+        let a = interface(source);
+        let b = interface(source);
+        assert!(Diff::new(&a, &b).unwrap().changed.is_empty());
+        let reordered = interface("(a, b)\nmake = (f) { (f, f) }\n(b, a) = make((x) { x })\n");
+        assert!(Diff::new(&a, &reordered).unwrap().changed.is_empty());
+    }
+
+    #[test]
+    fn changing_shared_nongeneralized_exports_changes_interface() {
+        let old = interface("(a, b)\nmake = (f) { (f, f) }\n(a, b) = make((x) { x })\n");
+        let new = interface("(a, b)\nmake = (f) { f }\na = make((x) { x })\nb = make((x) { x })\n");
+        assert!(!Diff::new(&old, &new).unwrap().changed.is_empty());
     }
 }

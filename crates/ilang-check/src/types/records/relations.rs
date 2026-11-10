@@ -39,6 +39,24 @@ fn record_proof_preserves_environment_mode_inside_nominal_arguments() {
         super::Verdict::Proven
     );
 }
+
+#[test]
+fn read_only_proof_distinguishes_error_rows_from_environments() {
+    let s = solver();
+    let one = Ty::literal(&crate::types::LitValue::Int(1u32.into()));
+    let integer = int();
+    let proof = |mode| {
+        super::prove_mode(
+            &s,
+            &one,
+            &integer,
+            mode,
+            &mut super::Demand::new(super::Demand::LIMIT, true),
+        )
+    };
+    assert_eq!(proof(Mode::Row), super::Verdict::Proven);
+    assert_ne!(proof(Mode::Env), super::Verdict::Proven);
+}
 fn int() -> Ty {
     Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new())
 }

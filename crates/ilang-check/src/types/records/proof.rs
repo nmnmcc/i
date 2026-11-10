@@ -479,18 +479,41 @@ struct Engine<'a> {
 }
 
 pub(crate) fn prove(s: &Solver, lhs: &Ty, rhs: &Ty, demand: &mut Demand) -> Verdict {
-    prove_with_cache(s, lhs, rhs, demand, true)
+    prove_mode(s, lhs, rhs, Mode::Value, demand)
 }
 
+pub(crate) fn prove_mode(
+    s: &Solver,
+    lhs: &Ty,
+    rhs: &Ty,
+    mode: Mode,
+    demand: &mut Demand,
+) -> Verdict {
+    prove_with_cache_mode(s, lhs, rhs, mode, demand, true)
+}
+
+#[cfg(test)]
 fn prove_with_cache(s: &Solver, lhs: &Ty, rhs: &Ty, demand: &mut Demand, cache: bool) -> Verdict {
+    prove_with_cache_mode(s, lhs, rhs, Mode::Value, demand, cache)
+}
+
+fn prove_with_cache_mode(
+    s: &Solver,
+    lhs: &Ty,
+    rhs: &Ty,
+    mode: Mode,
+    demand: &mut Demand,
+    cache: bool,
+) -> Verdict {
     let pool = s.records.clone();
     let a = pool.import(lhs);
     let b = pool.import(rhs);
     let mut e = Engine::new(s, demand, cache);
-    match e.run(Goal::Rel(a, b, Mode::Value)) {
+    match e.run(Goal::Rel(a, b, mode)) {
         Ok(Answer::Rel(true)) => Verdict::Proven,
         Err(_) => Verdict::ResourceLimit,
-        _ => e.coverage(a, b).unwrap_or(Verdict::ResourceLimit),
+        _ if mode == Mode::Value => e.coverage(a, b).unwrap_or(Verdict::ResourceLimit),
+        _ => Verdict::Unknown,
     }
 }
 
@@ -598,7 +621,19 @@ impl Engine<'_> {
 
     fn rel(&self, a: Id, b: Id, env: Mode, f: &mut Frame) -> Result<bool, Pause> {
         match self.need(Goal::Rel(a, b, env), f)? {
-            Answer::Rel(v) => Ok(v),
+            Answer::Rel(true) => Ok(true),
+            Answer::Rel(false)
+                if env == Mode::Value
+                    && self.pool.record_domain(a)
+                    && self.pool.record_domain(b) =>
+            {
+                match self.need(Goal::Empty(vec![a], vec![b]), f)? {
+                    Answer::Empty(Empty::Yes) => Ok(true),
+                    Answer::Empty(_) => Ok(false),
+                    _ => unreachable!(),
+                }
+            }
+            Answer::Rel(false) => Ok(false),
             _ => unreachable!(),
         }
     }

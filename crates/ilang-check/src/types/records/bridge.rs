@@ -212,7 +212,13 @@ impl Pool {
                 continue;
             }
             let node = remap(node, &done);
-            let id2 = self.intern(node);
+            // A child order canonical in one arena need not stay canonical
+            // after its children acquire IDs in another arena.
+            let id2 = match node {
+                Node::Union(a, b) => self.0.write().expect("type pool").union(a, b),
+                Node::Inter(a, b) => self.0.write().expect("type pool").inter(a, b),
+                node => self.intern(node),
+            };
             done.insert(id, id2);
         }
         done[&g.id]

@@ -17,7 +17,7 @@ pub(crate) use bdd::{Demand, ResourceLimit};
 pub(crate) use bridge::{Field, Graph, Pool};
 pub(crate) use graph::LabelParam;
 pub(crate) use graph::{Id, Label, Node};
-pub(crate) use proof::{Verdict, prove};
+pub(crate) use proof::{Verdict, prove, prove_mode};
 
 pub(crate) fn written_label(label: &crate::hir::RecordLabel, level: u32) -> Label {
     match label.parameter {
