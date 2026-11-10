@@ -109,6 +109,7 @@ pub(crate) struct Checker<'a> {
     /// With `keep_locals`: for each `v.f`, by its span, the constructors
     /// that may have made `v` (`LocalTypes::field_ctors`).
     field_ctors: HashMap<(ModuleId, Span), Vec<CtorRef>>,
+    coalescing_failed: bool,
 }
 
 impl<'a> Checker<'a> {
@@ -147,6 +148,7 @@ impl<'a> Checker<'a> {
             cases: Vec::new(),
             keep_locals: false,
             field_ctors: HashMap::new(),
+            coalescing_failed: false,
         }
     }
 
@@ -189,6 +191,7 @@ impl<'a> Checker<'a> {
         for group in &p.order.groups {
             self.group(group);
         }
+        self.report_coalescing(Span::default());
         self.entry_points();
         // The shown type schemes (§4.7).
         let mut typed = std::mem::take(&mut self.out);
@@ -199,31 +202,61 @@ impl<'a> Checker<'a> {
                     module: ModuleId(mi as u32),
                     index: di as u32,
                 };
-                let Some(scheme) = self.defs.get(&id) else {
+                let Some(scheme) = self.defs.get(&id).cloned() else {
+                    self.s.coalescing_failed.set(true);
+                    self.report_coalescing(d.span);
                     continue;
                 };
                 let opts = display::Opts {
                     mono: true,
                     written: matches!(d.kind, DefKind::External { .. }),
                 };
-                // A type with itself inside it has been reported by the
-                // occurs check, and is not shown.
+                // A partial result may omit a recursive scheme only after
+                // the failure has been diagnosed.
                 if let Ok(shown) = display::scheme(&self.s, &scheme.ty, opts) {
                     typed.schemes.insert(id, shown.text(&self.s.type_names));
                     if d.exported || opts.written {
                         typed.scheme_types.insert(id, shown);
                     }
+                } else {
+                    self.report_coalescing(d.span);
                 }
-                self.exported_type(d, &scheme.ty.clone(), opts);
+                self.exported_type(d, &scheme.ty, opts);
             }
         }
         if self.keep_locals {
+            // Query fallbacks are only recovery for a diagnosed program.
+            // Check both sides, also for unused local values, before the
+            // immutable query snapshot leaves the checker.
+            for scheme in self.locals.values() {
+                let both = Ty::Both(Box::new(scheme.ty.clone()), Box::new(scheme.ty.clone()));
+                let _ = display::shown(&self.s, &both, display::Opts::default());
+                let _ = display::shown(
+                    &self.s,
+                    &both,
+                    display::Opts {
+                        mono: true,
+                        written: false,
+                    },
+                );
+            }
+            self.report_coalescing(Span::default());
             typed.locals = Some(std::sync::Arc::new(super::LocalTypes {
+                diagnosed: self.diags.iter().any(Diagnostic::is_error),
                 types: self.locals.into_iter().map(|(v, s)| (v, s.ty)).collect(),
                 known: self.kvars,
                 fields: self.field_ctors,
                 s: std::sync::Mutex::new(self.s),
             }));
+        }
+        typed.diagnosed = self.diags.iter().any(Diagnostic::is_error);
+        if self.coalescing_failed {
+            typed.coalescing_errors = self
+                .diags
+                .iter()
+                .filter(|d| d.is_error())
+                .cloned()
+                .collect();
         }
         (typed, self.diags)
     }
@@ -312,12 +345,12 @@ impl<'a> Checker<'a> {
             self.set_module(d.module);
             self.check_occurs(mark, *span);
         }
-        for (d, _, t, _) in types {
+        for (d, _, t, span) in types {
             self.set_module(d.module);
             let scheme = if direct {
                 Scheme {
                     level: 0,
-                    ty: self.generalize(&t, 0),
+                    ty: self.generalize(&t, 0, span),
                 }
             } else {
                 Scheme::mono(t)
@@ -351,6 +384,11 @@ impl<'a> Checker<'a> {
         // §7.4: coverage, with the types of the group.
         for c in std::mem::take(&mut self.cases) {
             self.check_case(c);
+        }
+        if self.s.coalescing_failed.get() {
+            let b = group[0];
+            self.set_module(b.module);
+            self.report_coalescing(p.binding(b).binding.span);
         }
     }
 
@@ -388,6 +426,7 @@ impl<'a> Checker<'a> {
             written: false,
         };
         let Ok(t) = display::shown(&self.s, &scheme.ty, opts) else {
+            self.report_coalescing(span);
             return;
         };
         let show = |c: &Self, t: &Ty| display::show_known(&c.s, t);
@@ -574,6 +613,7 @@ impl<'a> Checker<'a> {
             return;
         }
         let Ok(shown) = display::shown(&self.s, t, opts) else {
+            self.report_coalescing(d.span);
             return;
         };
         let mut found = Vec::new();
@@ -734,6 +774,22 @@ impl<'a> Checker<'a> {
                 span,
                 "this type has itself inside it, through a type variable (§4.7)",
             );
+        }
+        self.report_coalescing(span);
+    }
+
+    /// Unknown-type and partial-scheme fallbacks are only recovery after
+    /// a diagnostic. A successful checker result must never contain one.
+    fn report_coalescing(&mut self, span: Span) {
+        if self.s.coalescing_failed.replace(false) {
+            self.coalescing_failed = true;
+            if !self.diags.iter().any(Diagnostic::is_error) {
+                self.error(
+                    code::TYPE_OCCURS,
+                    span,
+                    "this type has itself inside it, through a type variable (§4.7)",
+                );
+            }
         }
     }
 
@@ -2107,7 +2163,7 @@ impl<'a> Checker<'a> {
             let level = self.s.level;
             for v in &binders {
                 if let Some(s) = self.locals.get(v).cloned() {
-                    let ty = self.generalize(&s.ty, level);
+                    let ty = self.generalize(&s.ty, level, b.pattern.span);
                     // §4.8: a generalized name has its type scheme, with the
                     // parts of the known type of its value for the
                     // variables that are not generalized.
@@ -2118,17 +2174,20 @@ impl<'a> Checker<'a> {
                 }
             }
         }
+        self.report_coalescing(b.pattern.span);
     }
 
     /// Rule 14: the type scheme of a generalized binding, in its simpler
     /// form (§4.7): the bounds of its variables are coalesced and simplified
     /// once, so that each use copies only the simplified type. Variables at
     /// `level` or below are not generalized and are kept as they are.
-    fn generalize(&mut self, t: &Ty, level: u32) -> Ty {
+    fn generalize(&mut self, t: &Ty, level: u32, span: Span) -> Ty {
         let simple = match display::simplify(&self.s, t, Some(level)) {
             Ok(simple) => simple,
-            // Reported by the occurs check of the binding.
-            Err(()) => return t.clone(),
+            Err(()) => {
+                self.report_coalescing(span);
+                return t.clone();
+            }
         };
         if has_both(&simple) {
             // An argument that does not change, with different bounds as

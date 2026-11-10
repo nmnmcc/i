@@ -1119,11 +1119,19 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                 module,
                 index: index as u32,
             };
-            let ty = typed.schemes.get(&id).map_or("_", String::as_str);
-            let canonical = typed
-                .scheme_types
+            let ty = typed
+                .schemes
                 .get(&id)
-                .map_or_else(|| "_".to_string(), |t| canonical_type(t, &canonical_names));
+                .context("internal compiler error: a checked definition has no inferred type")?;
+            let canonical = if d.exported || matches!(d.kind, DefKind::External { .. }) {
+                let t = typed
+                    .scheme_types
+                    .get(&id)
+                    .context("internal compiler error: a checked interface has no exported type")?;
+                canonical_type(t, &canonical_names)
+            } else {
+                String::new()
+            };
             // The host gives an external function by its module and name.
             let import = match &d.kind {
                 DefKind::External {

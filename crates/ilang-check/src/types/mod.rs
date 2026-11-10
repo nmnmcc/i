@@ -146,6 +146,11 @@ pub enum Access {
 /// node in the HIR, which is unique among the nodes of one kind.
 #[derive(Clone, Debug, Default)]
 pub struct Typed {
+    /// Diagnostics retained when coalescing could not produce a finite
+    /// type. IDEs may use the partial result; lowering must reject it.
+    pub(crate) coalescing_errors: Vec<Diagnostic>,
+    /// Missing schemes are allowed only in a diagnosed partial result.
+    pub(crate) diagnosed: bool,
     /// The type scheme of each top-level name, simplified and shown in the
     /// syntax of §3 (§4.7).
     pub schemes: HashMap<DefId, String>,
@@ -203,6 +208,7 @@ pub struct Typed {
 /// every name bound by a pattern or a parameter, so that the type of a
 /// local name can be shown when it is asked for.
 pub struct LocalTypes {
+    diagnosed: bool,
     /// In a lock, because the names of the types are set for the module
     /// where a type is shown.
     s: std::sync::Mutex<solve::Solver>,
@@ -259,7 +265,13 @@ impl LocalTypes {
                 (Ty::Top, t.clone())
             };
             let both = Ty::Both(Box::new(a), Box::new(b));
-            display::scheme_in(&s, &both, context, display::Opts::default()).ok()
+            match display::scheme_in(&s, &both, context, display::Opts::default()) {
+                Ok(t) => Some(t),
+                Err(()) => {
+                    assert!(self.diagnosed, "accepted local types must coalesce");
+                    None
+                }
+            }
         };
         // The side is chosen from the name alone: in the context, a
         // parameter is also an input of the binding, so it would not be
@@ -304,7 +316,10 @@ impl LocalTypes {
         let s = self.s.lock().unwrap_or_else(|e| e.into_inner());
         match display::shown(&s, &both, display::Opts::default()) {
             Ok(t) => heads(&display::both(&t)),
-            Err(()) => Vec::new(),
+            Err(()) => {
+                assert!(self.diagnosed, "accepted local types must coalesce");
+                Vec::new()
+            }
         }
     }
 }
@@ -333,6 +348,11 @@ pub struct HostSignature {
 }
 
 impl Typed {
+    /// Errors that prevent lowering an incomplete coalesced type result.
+    pub fn coalescing_errors(&self) -> &[Diagnostic] {
+        &self.coalescing_errors
+    }
+
     /// `module/path.name : type` for each top-level name of the module, in
     /// source order.
     pub fn lines(&self, program: &Program, module: ModuleId) -> Vec<String> {
@@ -340,7 +360,13 @@ impl Typed {
         (0..m.defs.len() as u32)
             .filter_map(|index| {
                 let d = DefId { module, index };
-                let t = self.schemes.get(&d)?;
+                let Some(t) = self.schemes.get(&d) else {
+                    assert!(
+                        self.diagnosed,
+                        "accepted definitions must have type schemes"
+                    );
+                    return None;
+                };
                 Some(format!("{}.{} : {t}", m.path, m.defs[index as usize].name))
             })
             .collect()

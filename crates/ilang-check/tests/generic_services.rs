@@ -26,6 +26,38 @@ fn accepts(source: &str, name: &str, expected: &str) {
         "{:?}",
         types.lines(&program, module)
     );
+
+    // Every positive K4 fixture also runs through entry validation. Remove
+    // its supplied services: §4.8 retains the requirements, and §10.2 must
+    // reject an entry with no provider. Specialize its value parameter to
+    // Int where the fixture has one (§4.8 rule 3).
+    let mut missing = source
+        .lines()
+        .filter(|line| !line.trim_start().starts_with('!'))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let arg = if expected.starts_with("()") { "" } else { "1" };
+    missing.push_str(
+        &"\n@main\nmain = () { call(argument) }\n"
+            .replace("call", name)
+            .replace("argument", arg),
+    );
+    let (graph, checked) = check(&missing);
+    let errors: Vec<_> = checked.diags.iter().filter(|d| d.is_error()).collect();
+    assert!(
+        !errors.is_empty() && errors.iter().all(|d| d.code == "E0522"),
+        "{name}: {:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    let program = checked.program.unwrap();
+    let types = checked.types.unwrap();
+    assert!(
+        types
+            .lines(&program, common::module(&program, "app/main"))
+            .iter()
+            .any(|line| line.starts_with("app/main.main : ")),
+        "an entry type must not disappear"
+    );
 }
 
 #[test]
