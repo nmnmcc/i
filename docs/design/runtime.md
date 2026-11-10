@@ -1,6 +1,9 @@
 # Runtime: random, tasks, and standalone IO
 
-Status: proposed joint design for R1, R2, and IO. Read against `1e0d910`.
+Status: proposed joint design for R1, R2, and IO, revised after the coordinator
+review of aa20548. Code references remain at `1e0d910` unless another commit is
+named. The coordinator has accepted contextual top and blocking WASI, rejected
+universal async entries, and required the join/Owner corrections recorded below.
 This note changes no implementation. Examples use the accepted syntax, including
 capital type parameters, imports in parentheses, and clause blocks.
 
@@ -47,14 +50,13 @@ Read facts at the base commit (line references below always mean this commit):
 
 These are reading results, not claims that the proposed APIs already compile.
 The scheduler, request-value representation, new service implementations, and
-examples below have not been run. The final ledger reread also records K1, a
-coordinator-reported invariant-generalization fault and a required fix before
-T1. R2 keys/handles depend on that repair. Reading confirms that generalization
-passes through display simplification (`crates/ilang-check/src/types/infer.rs:2104–2120`)
-and invariant arguments pass through two directional bounds
-(`crates/ilang-check/src/types/display.rs:558–575`); this note did not reproduce
-or locate the precise K1 fault. It does not assume the current checker already
-implements the required principal schemes correctly. Section 12 records the checks actually run.
+examples below have not been run. K1 has landed on redesign at `578a17d`.
+I read its first-parent patch: `crates/ilang-check/src/types/display.rs:993–1040`
+now counts invariant arguments on both sides during normalization. This lane
+still has the older compiler; R2 must consume K1 rather than weaken key
+invariance. The old generalization path is `types/infer.rs:2104–2120` and
+`types/display.rs:558–575`. K1's coordinator-run tests are not tests run here.
+Section 12 separates model checks from implementation evidence.
 
 ## 2. Alternatives and choice
 
@@ -119,17 +121,29 @@ resume updates one request cell before resuming that one loop. Reason: C §6.4
 and `emit/host.rs:23–48`. A slot index alone is not a language handle: cells
 have identity and a fresh GC identity token for their generation, so an old alias cannot cancel a reused slot.
 
-**D5. All entry points receive a default run.** On the ilang target every entry
-is marked async in metadata and invokes the same ordinary i `task.run` wrapper,
-even if it returns status 0 immediately. Each invocation has fresh run identity,
-root path `[]`, FIFO policy and seed `random.from_seed(0)`. It receives Scheduler,
-Runner, Await, Owner, Assert, and the host services its type needs. Reason: ledger
-G2(S7); giving services does not change the inferred type of the function.
-There is no automatic entropy draw. Programs wanting entropy explicitly obtain
-it from Process and replace Runner with `task.top(seed)`. A test's fresh instance
-rule remains. Async host exports still obey §10.3 for parameters/results/errors.
-This deliberately changes metadata for previously synchronous ilang exports;
-the ABI version stays 3 because v3 already represents these async entries.
+**D5. Provision entry services from the inferred environment.** Let N be the
+entry function's ordinary inferred environment. On the ilang target the entry
+is async exactly when N contains an async/request host service or Scheduler or
+Runner from i/task. Otherwise it remains synchronous. No reachability guess,
+attribute on the entry, or change to its principal type is needed. Task services
+in N request the default FIFO task run, with root path [] and seed
+random.from_seed(0). Async host services without task needs use a direct root
+Await handler and request context; they do not set up a scheduler. Pure entries
+set up neither a task run nor a host hand-off. Await/Owner/Root alone, for
+example for completed fakes, do not turn an entry async; a low-level wait/poll
+that tries to hand off there stops with request: no active entry.
+
+This is one narrow entry-point rule for the resolved standard services,
+authorized by the coordinator and ledger G2(S7). It is a deliberate provision
+for i/task and request services; an arbitrary user scheduler is not implicitly
+bootstrapped. IO service values are given only as the inferred needs require,
+like Assert and Io today. Channel and scheduling operations remain ordinary i.
+The host-import and request primitives themselves have no IO namespace rule.
+A pure task run can have async metadata yet finish with status 0 on its first
+call: scheduler switches alone never cause a host yield. Progress polling below
+requires an actual task waiting for host work; idle waiting also counts
+unawaited requests. There is no automatic entropy draw. Contextual top(seed)
+keeps the current Runner's route/prefix; it changes only the seed.
 
 **D6. Scopes use module functions, not polymorphic methods.** Write
 `task.go(s, body)`, `task.join(t)`, `task.share(s, x)`, and `task.send(c, x)`.
@@ -153,9 +167,12 @@ portable scopes constrain their children. Reason: S7 §3.3, §6–8, §18 rules 
 unwinds its own inner boundary, leaving its scheduling boundary active. Finals
 may yield, await IO, and open scopes; they cannot raise, and they are shielded
 from a second cancellation. Reason: S7 §6 and the active-boundary behavior read
-at `emit/control.rs:260–295`. There is no public cancel-one-task operation in v1:
-join therefore needs no invented Cancelled error case. Race uses a private
-scope-success signal and structured cancellation, not a public task kill.
+at `emit/control.rs:260–295`. There is no public cancel-one-task operation in v1.
+join keeps its type: cancellation takes priority for a joiner it can unwind; a
+shielded joiner of a dropped/cancelled child stops with
+`panic("task: join of a cancelled task")` as soon as cancellation is accepted.
+Shielded finals invalidate the older argument that every joiner can be
+cancelled. Race uses a private scope-success signal and structured cancellation, not a public task kill.
 
 **D9. IO services start requests; ordinary wrappers await and translate errors.**
 Opaque files, listeners, streams and children are host references. The portable
@@ -173,8 +190,9 @@ fixed fake inputs, not just a fixed random seed. Reason: S7 rules 17 and 22.
 
 The following is the normative API table. Signatures are schemes in the new i
 syntax; implementations are bindings, not bare non-external declarations.
-Generator's constructor is private. Its values contain a seed, tagged stream,
-and nonnegative draw index; equality is ordinary structural equality.
+Generator's constructor is private. Its values contain a normalized seed,
+SplitMix state, tagged derivation history, and nonnegative draw index; equality
+is ordinary structural equality. No service or i/task import is needed.
 
 | Name | Type |
 |---|---|
@@ -186,52 +204,72 @@ and nonnegative draw index; equality is ordinary structural equality.
 | `at_path` | `(g: Generator, path: List(Int)) -> Generator ? RandomError` |
 
 `RandomError { InvalidBound(Int) InvalidPath(List(Int)) }` is exported with its
-constructors. `int` requires below > 0, including arbitrarily large bounds;
-`at_path` requires strictly positive path indices. They raise the shown error
-without a draw when invalid. `at_path` appends P steps; `split` appends S(1)
-and S(2). Both reset the draw index to zero, using the entire input state,
-including its current draw index, as a derivation prefix. Thus splitting a used
-generator differs from splitting its initial state. Neither advances its input.
-`task.random` derives from the root's complete generator, not only its seed.
+constructors. int requires below > 0, including arbitrarily large bounds;
+at_path requires strictly positive path indices. Invalid arguments raise the
+shown error without a draw. at_path(g, []) is identity. task.random derives
+from the root's complete generator, including previous draws/splits.
 
-Fix an algorithm so replay is stable across compiler versions. Use the 20-round
-Threefry2x64 permutation, specified by the [Random123 reference](https://www.thesalmons.org/john/random123/releases/1.09/docs/threefry_8h_source.html),
-as the two-word compression below. Threefry is a non-cryptographic generator;
-[its authors](https://www.thesalmons.org/john/random123/releases/1.09/docs/group__ThreefryNxW.html)
-do not present it as suitable for cryptography. No statistical claim about our
-stream derivation follows from that reference.
+### 4.1 Published generator
 
-Let W = 2^64. All permutation arithmetic is modulo W. For key (k0,k1),
-k2 = k0 xor k1 xor 0x1bd11bdaa9fc1a22. Add k0/k1 to the input words. Repeat
-20 mix rounds: x0 += x1; x1 = rotl(x1,r) xor x0, with rotations
-16,42,12,31,16,32,24,21 repeated. After every four rounds inject the next
-cyclic key pair, adding the injection index (1 through 5) to the second word.
+Use **SplitMix**, Steele, Lea and Flood's published splittable PRNG
+([OOPSLA 2014](https://gee.cs.oswego.edu/dl/papers/oopsla14.pdf)), specifically the
+init/nextWord64/splitSMGen variant pinned by the maintained Haskell
+[splitmix-0.1.3.1 source](https://hackage-content.haskell.org/package/splitmix-0.1.3.1/docs/src/System.Random.SplitMix.html).
+Replace the earlier custom Threefry compression completely. Pinning a version
+matters: the two mixers' roles differ between this variant and Java's.
 
-Our encoding is defined here, independently of that reference. Encode any Int
-as zigzag (2*n for n >= 0, -2*n-1 otherwise). Encode a nonnegative integer as
-its count of base-W limbs followed by its least-significant-first limbs; zero
-has zero limbs. Encode a generator history as a sequence of integer fields:
-version 1, seed, count of derivation steps, then each step. A step has tag
-1=P(index), 2=S(side), or 3=D(previous draw index); tag and argument are each
-encoded as nonnegative integers. Before appending P or S to derive a generator,
-append D(current draw index), including zero. A multi-index `at_path` appends
-one D and then all its P steps; `at_path(g, [])` is identity. A word's fields
-end with tag 4 and the current draw index. Counts/tags are encoded too, so
-boundaries are unambiguous. Do not truncate seeds, indices, or histories.
+Here is the numerical contract. W=2^64; shifts are unsigned and additions and
+multiplications reduce modulo W. M(x) applies xor-shift 33, multiply by
+0xff51afd7ed558ccd, xor-shift 33, multiply by 0xc4ceb9fe1a85ec53, xor-shift 33.
+V(x) uses shifts 30/27/31 and multipliers 0xbf58476d1ce4e5b9/0x94d049bb133111eb.
+G(x) sets V(x)'s low bit; if popcount(z xor (z >> 1)) < 24, xor z with
+0xaaaaaaaaaaaaaaaa. For n reduced to 0..W-1, initial state is
+(M(n),G(n+0x9e3779b97f4a7c15)). A state (s,gamma) draws M(s+gamma), then becomes
+(s+gamma,gamma). Native splitting gives continuation (s+2*gamma,gamma) and
+new child (M(s+gamma),G(s+2*gamma)). These are the pinned variant's operations.
 
-Start compression key at (0,0). For each encoded 64-bit limb w, replace key by
-Threefry(key, (w, 0)); append an encoded integer 5 as an end marker and compress
-it too. The first resulting word is `word`'s number in [0,W). Its next generator
-has index q+1. This specifies a reproducible stream family, not a guarantee that
-two distinct streams never give equal words or equal compressed keys. “Independent
-streams” means domain-separated pseudorandom streams, not disjoint output sets.
-A statistical review of this derivation is an R1 acceptance gate.
+from_seed normalizes an arbitrary Int by Euclidean remainder modulo W;
+seeds differing by W intentionally give the same generator. word uses that
+published next operation and increments the logical draw index. Reusing the
+same immutable input repeats the same output; callers thread the next state.
+This is not a cryptographic generator. The published family's known gamma
+weaknesses are discussed by the authors in their
+[2017 follow-up](https://labs.oracle.com/pls/apex/f?p=94065%3A10%3A4081129589733%3A5391).
+Choosing a published algorithm does not waive the independent statistical gate.
 
-For `int(g,n)`, use the least k with W^k >= n, at least one. Draw k words in
+### 4.2 Tagged streams by splitting, not a new hash
+
+The only adapter is deterministic navigation of the published split tree.
+Define fork(h) by native-splitting h into (rest,a), then native-splitting rest
+into (_,b); return the two new children (a,b). Thus an edge 0/1 selects a fresh
+published child, not the continuation of the parent's draw sequence. Each fork
+uses two published splits and introduces no mixer or key derivation.
+
+Give S(1) code 00 and S(2) code 01. For a positive index i, give P(i) code 1
+followed by Elias gamma(i): write the binary representation of i, with k-1 zeros
+before its k bits. Examples: P(1)=11, P(2)=1010, P(3)=1011. These code words are
+prefix-free. Select the fork child for each bit, using the entire current state.
+Public split returns the states at S(1) and S(2); at_path traverses P(i) for
+successive list elements. Append the corresponding tagged steps to the logical
+history, recording the previous draw index at each derivation; reset the new
+index to zero. Deriving after a draw therefore differs from deriving its input.
+Consecutive path components are handled identically whether supplied by one
+at_path call or by several. Task paths use only P steps; explicit splits use S
+steps. Prefix-free concatenation keeps those addresses distinct at every depth,
+including arbitrarily large Int indices. Runtime scheduling never selects bits.
+
+This adapter only chooses nodes made by published splitting. It makes no new
+statistical theorem: distinct logical streams can give equal words or, with
+finite-state PRNGs, colliding states. The R1 review must test this exact traversal,
+weak-gamma cases, interleaved tasks, deep split trees and rejection sampling.
+Use stable cross-implementation vectors, and do not land R1 if the independent
+review rejects the chosen variant or traversal.
+
+For int(g,n), use the least k with W^k >= n, at least one. Draw k words in
 least-significant-first order to form u; let limit = W^k - (W^k % n). Reject
 u >= limit and draw another group. Return u % n and the generator after all
 accepted and rejected draws. This avoids modulo bias under the word model.
-`float` draws one word u and returns floor(u/2^11) / 2^53 as a Float, with its
+float draws one word u and returns floor(u/2^11) / 2^53 as a Float, with its
 next generator; the result is in [0,1). At most 53 bits enter the conversion.
 
 ## 5. R2a: requests, Await, and the ABI hand-off
@@ -245,16 +283,20 @@ functions; it does not redeclare or re-export the primitive types.
 
 ```i
 Await { Await(wait: (ticket: Ticket) -> Nil) }
-Owner { Owner(key: Key(Nil)) }
+Root { Root(key: Key(Nil)) }
+Owner { Owner(key: Key(Nil), root: Root) }
 RequestState(A) { Waiting Ready(A) Cancelled Taken }
 ```
 
 | Function | Type | Rule |
 |---|---|---|
-| `open_owner` | `() -> Owner` | Register a fresh live request group, identified by a key |
+| `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
+| `close_root` | `(root: Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+| `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
 | `close_owner` | `(owner: Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
 | `outstanding` | `(owner: Owner) -> List(Ticket)` | Current outstanding requests in this group, in start order |
-| `within(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+| `outstanding_root` | `(root: Root) -> List(Ticket)` | Outstanding requests of every group of this root, in start order |
+| `within(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
 | `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
 | `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
 | `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
@@ -276,32 +318,64 @@ by identity. Terminal tickets make it return immediately. It must keep waiting
 through answers of unlisted requests, which are stored for later use. All-listed
 cancelled tickets count as settled. No root continuation is stored on a cell.
 
-Every raw host start takes the normal Owner service and records that group.
-A group key is portable data, not a boundary or host request. The primitive table
-keeps only live groups and outstanding slots; absence means the owner is gone.
-Starting under a closed Owner stops with `panic("request: owner is gone")`.
-request.within is ordinary i: open_owner, bind Owner in a retained frame,
-resource.ensure the body with close_owner. The entry wrapper and each task.run
-use one such group, so nested runs enumerate only their own raw requests.
-A Ready cell is already detached from the group and remains owned by its handle;
-close_owner cancels outstanding work but does not discard a detached Ready answer.
-Raw callers must own those answers, just as they own files returned by open.
-Completed cells retain decoded i values only while handles are reachable;
-the outstanding table does not root completed cells. A caller must arrange
-resource cleanup for a returned host reference. Low-level request cancellation
-cannot roll back a host side effect or run i final functions.
+Cancellation ownership and run affiliation are separate. Root identifies a
+request run and its enclosing entry context. The runtime creates the initial
+Root only for an entry whose inferred needs require request/task support.
+open_root needs an existing live Root to retain that entry context; it does
+not require the new root to share the old root's request count. A dispatcher
+can thus open an independent root without inventing a second entry. The
+initial bootstrap is part of the narrow entry provision, not a public unscoped
+root allocator. Entry request contexts and each task.run open a fresh Root and
+bind it for their whole lifetime. open_owner uses that Root, not the currently
+bound Owner, to register its group. request.within opens/binds a fresh Owner and
+ensures close_owner on exit; it leaves Root unchanged. Thus custom groups of a
+run have the same root, and a nested task.run has a different root. Both Root
+and Owner are ordinary portable key-bearing service values, not host requests.
+
+Every raw host start records its Owner group and that group's immutable root.
+close_owner cancels only its own group. close_root closes all groups registered
+at that root; no subgroup or old Owner binding escapes it. outstanding(owner)
+enumerates one cancellation group; outstanding_root(root) enumerates every group
+of the run, including groups made inside request.within and groups retained by
+go. Enumeration of a closed group/root gives []; opening a group under a closed
+Root stops with request: root is gone; a host start under a closed Owner stops
+with request: owner is gone, before making the ABI import. The registries retain
+only live roots/groups and outstanding cells; absence supplies the gone check.
+
+Root is kept at go sites as a normal service. Changing Owner alone cannot move
+a group/request to another run. open_owner under a nested run's Root makes a
+nested group even if user code temporarily rebinds an outer Owner. Explicitly
+using a previously made outer Owner for a raw start still charges that outer
+group/root; this is a capability use, not a transfer of the group. Borrowed
+request tickets may be awaited by another run on the same worker. Opening or
+rebinding an independent Root is the public low-level operation for writing a
+separate request dispatcher, like calling root wait directly; it does not
+silently reaffiliate an existing i/task run's stored root or its old groups.
+The default task scheduler counts the root it owns, not whichever Owner is
+bound at an idle point. An independent request dispatcher must drive its root.
+
+A Ready cell has left its group and belongs to its handle. Closing a group/root
+does not discard such an answer; raw callers must own it just as they own files
+returned by open. Completed cells retain decoded i values only while handles
+are reachable, not through the outstanding table. Low-level cancellation cannot
+roll back a host side effect or run i final functions. Closing a root after its
+structured tasks/finals end cancels any still-outstanding unowned raw work.
 
 Root wait/poll require an active async entry context when they must hand off;
-otherwise they stop with `panic("request: no active entry")`. An immediate wait
+otherwise they stop with `panic("request: no active entry")`. Test async-live,
+not only the non-null host-root pointer: the old pointer can survive a completed
+async call (`emit/host.rs:78–80`, `:125–165`). A later synchronous export must
+not hand off through that stale boundary. An immediate wait
 on completed fake requests works without that context. They are public primitives
 for writing dispatchers, batch IO, or request races. Direct use inside a task
 pauses that entire run until it returns; normal await uses Await instead. This
 is explicit control use, like suspending to an outer boundary, and does not
 create multiple scheduler histories.
 
-Owner is an ordinary service, not a primitive type or a built-in name.
-It uses Key(Nil) and is portable; outstanding request values remain non-portable.
-Owner acquisition/closing and enumeration work without an ABI import. Generic
+Root and Owner are ordinary services, not primitive types or built-in names.
+They use Key(Nil) and are portable; outstanding request values remain non-portable.
+Root/group registration and enumeration require no ABI import; closing live
+work uses only v3 cancel. Generic
 request groups also serve batch cancellation, request timeouts, and host plugin
 cleanup, independently of tasks. Request operations introduce no new error-row
 or environment polymorphism. Ticket
@@ -341,8 +415,15 @@ behavior, with Await and Owner now visible in their inferred service requirement
 
 Replace the C region as one change, including every caller identified in
 `emit/host.rs:23–52`. The module keeps a growable table and a free list. Each
-outstanding slot contains import index, ABI id, a fresh GC generation token, and a reference to
-its request cell. Each import also keeps its source answer shape (plain A or
+outstanding slot contains import index, ABI id, a fresh GC generation token,
+Owner group key, immutable Root key, and a reference to its request cell.
+Root/group indexes must remove a request on answer or cancel; completed cells
+are not retained by either index. Root enumeration spans every live group,
+while closing a group touches only its own slots. Normal entry-context exit
+retires every root/group registered in that context, including an independent
+root its caller forgot to close. Clearing requests at status 0 must clear those
+registrations too; a synchronous fake-only context uses the same registry
+epilogue without a host hand-off. Detached Ready handles retain their answers. Each import also keeps its source answer shape (plain A or
 Result(A,E)), independently of whether the ABI error list happens to be empty;
 Request(Result(A,Never)) must still decode Ok(A). A cell contains identity, generation, Waiting/Ready/Cancelled/Taken,
 and a decoded eqref answer. The id is a nonnegative i32 slot index; the table
@@ -417,14 +498,14 @@ portability by the normal walk. The library creates no event that captures its
 Scheduler or mutable loop state. A join event keeps its task's scope handle.
 
 Schemes below declare their capital variables on their bindings. N is the body
-service requirement; supplying Scheduler/Runner/Await/Owner discharges those members.
+service requirement; supplying Scheduler/Runner/Await/Owner/Root discharges those members.
 Assert and user host services remain in N where the body needs them.
 
 | Binding | Type |
 |---|---|
 | `top` | `(seed: random.Generator) -> Runner ! Runner` |
-| `run(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Runner \| N - Scheduler - Runner - request.Await - request.Owner` |
-| `test(A,E,N)` | `(seed: random.Generator, choices: List(List(Int)), body: () -> A ? E ! N) -> A ? E \| ScheduleError ! Runner \| N - Scheduler - Runner - request.Await - request.Owner` |
+| `run(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
+| `test(A,E,N)` | `(seed: random.Generator, choices: List(List(Int)), body: () -> A ? E ! N) -> A ? E \| ScheduleError ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
 | `scope(A,E,N)` | `(body: (s: Scope(E)) -> A ? E ! N) -> A ? E ! N \| Scheduler` |
 | `local_scope(A,E,N)` | Same scheme as scope |
 | `go(A,E,N)` | `(s: Scope(E), body: () -> A ? E ! N) -> Task(A,E) ! Scheduler \| N - Scheduler - Runner - request.Await` |
@@ -460,7 +541,8 @@ are exported in v1. Local callers write a local_scope explicitly.
 The differences in the go/keep/combinator environments matter: their wrappers
 supply Scheduler/Runner/Await themselves, so requiring all of N at their call
 sites would overstate their principal needs. Owner is kept, and is not subtracted
-there. run/test supply their own Owner too, so they subtract it. test still needs
+there. Root is kept there too. run/test supply a fresh Root and default Owner,
+so they subtract both. test still needs
 the calling Runner for its nested path/wait route. Attribute expansion for host
 fields happens before ordinary constraint generation; it adds fixed ordinary
 service types, not a type-dependent constraint. Keys are invariant and obey the
@@ -502,7 +584,11 @@ all unwind operations, including scopes created by finals. Choose the least
 path among actual failures; a prefix sorts before its extensions and the scope
 body has the opener's path. A cancellation is not a failure. Types accumulate
 ordinary error unions; stops cannot be caught. A go accepted while cancelling
-creates an unstarted, immediately dropped child.
+creates an unstarted, immediately dropped child and its ordinary Task(A,E)
+handle. A shielded final receives that handle; its body never runs. If that
+scope's cancellation can unwind the caller, the command delivers cancellation
+instead of returning the handle. This priority also applies at a valid join.
+A cancelling scope never starts new user work just to manufacture a join value.
 
 R3. On a normal scope exit, join every live child before returning its body
 value. Before either successful or failing return, free the scope's channels,
@@ -525,6 +611,42 @@ unwind flag excludes that task from a second cancel, including cancellation
 of scopes it creates while unwinding. Such new scopes still obey their own
 internal failure/normal-exit rules. The outer cancel waits for them to end.
 A final that waits forever can keep cancellation waiting forever.
+
+R4a. Keep outcome and cleanup completion separate. A task outcome is pending,
+success, failure or cancelled; drop sets cancelled immediately, and a started
+task sets cancelled when its home scheduler accepts cancellation, before running
+its unwind. A mere cancellation request not yet accepted is not a cancelled
+outcome: that task can still finish first. Normal success/failure is recorded
+after its final functions end. Scope exit still waits for cleanup completion,
+independently of the outcome. Keep dropped/cancelled records until scope exit.
+A cancelled outcome retains its causing scope and cancellation epoch, so a join
+can apply that cause even before its caller receives a cancel message. Do not
+use only a worker-local “cancel delivered” flag to decide whether to stop.
+join's type remains `(Task(A,E)) -> A ? E ! Scheduler`. After the run/chain checks, process any applicable scope cancellation
+before observing a target's cancellation outcome. A joiner still cancellable by
+that cancellation is unwound; it never races between this path and a join panic.
+This includes a final executing a fresh scope body that the fresh scope can
+cancel: unwind that inner body, not the already-shielded outer final. A cleanup
+scope and its children are exempt from the older cancellation as R4 requires.
+
+A joiner shielded from the target scope's cancellation cannot obtain A or E
+from a dropped/cancelled child. It stops immediately with
+`panic("task: join of a cancelled task")` when that outcome is known; it does
+not wait for the cancelled target's final functions. If it joined while the
+outcome was still pending, accepting cancellation wakes that join immediately.
+This also avoids cycles between shielded finals joining one another. The stop
+ends the run and, as with any stop, may abandon remaining i finals. In a valid
+structured exit without that stop, scopes still wait for all cleanup to finish.
+An already recorded success or failure gives ordinary A or E. No Cancelled
+error value, aggregate error, or changed join signature is introduced. A join
+can wait for genuinely live work, but never for an already cancelled outcome.
+
+A join_event has the same rule when selected/committed. A known cancelled
+outcome makes that alternative ready, even if cleanup is not complete; it is not a prevalidation fault of a losing
+alternative. A cancellable syncing task processes cancellation first. A shielded
+syncing task stops only if that join alternative wins; losing map functions
+still do not execute. This preserves CML selection and prevents an invalid
+stop from racing cancellation of an ordinary joiner.
 
 R5. A race commits the first successful child completion observed by its
 scope. Commit atomically records the winner and initiates the ordinary scope
@@ -593,8 +715,8 @@ all tasks execute from the loop rather than from their parent task's stack.
 Before keep_env, go replaces Scheduler, Runner and Await with portable detached
 stand-ins. It then keeps every service, including user services it does not use.
 Its one parameter is the new Scheduler, whose private fields supply that task's
-Runner and Await. Inside the retained frame it binds all three real routing services. It keeps Owner unchanged as a normal
-portable user service; a user request.within group at the go site must not be
+Runner and Await. Inside the retained frame it binds all three real routing services. It keeps Root and Owner unchanged as normal
+portable user services; a user request.within group at the go site must not be
 overridden by the run's default group.
 This extends S7's Scheduler substitution to the two routing services introduced
 here: otherwise they would retain the parent's boundary and pin every child.
@@ -634,32 +756,67 @@ raise, await, spawn, or stop; it cannot roll back the message. No guard or nack
 operation is exported. Cancelling a sync unregisters all leaves before unwinding.
 
 go appends the child to the FIFO queue and returns to the parent in the same
-turn, after a cancellation/host poll; it does not yield the parent. yield ends
-the current turn and queues the caller at the tail. A blocking command removes
+turn, after cancellation checks and a host poll only if a task needs host
+progress; it does not yield the parent. yield ends the current turn and queues the caller at the tail. A blocking command removes
 its task until ready; a nonblocking sync/join still makes a scheduling point.
 A completion queues waiters FIFO. Cancellation bookkeeping runs before another
 normal task turn; a task already unwinding is queued normally. Scope ends,
 async awaits, and each loop switch are poll points too. path/random are not.
 
-Before each task turn, the production loop polls through Runner once (at the
-entry this uses status 2; in a nested run it yields the calling outer task), and scans
-its ticket waiters after control returns. Then it chooses a task even if more
-host answers might exist. This interleaving prevents an infinite `yield` loop
-from starving IO, and a flood of completions from starving runnable tasks.
-When no task is runnable, scan terminal tickets first. Union the outstanding
-tickets of this run's Owner with tickets its tasks explicitly await (including
-borrowed tickets from another owner). If that set is nonempty, Runner.wait waits
-for one of them, and then rescans. Even an unawaited raw request prevents deadlock
-until it settles; its Ready answer is retained only by its caller's handle.
-If the set is empty, stop with `panic("task: deadlock")`. Never return status 1
-with zero outstanding requests, or poll in a busy loop while no task can run.
-CPU code with no suspend can monopolize this M:1 worker. Fairness requires a task to yield, block, or end its turn; a loop of go calls
-alone may postpone running its children. Fairness is cooperative, not preemption, and it gives no bounded wall-time guarantee for final functions.
+At every switch, first run cancellation bookkeeping and scan terminal ticket
+waiters. Build the progress-interest set from tasks actually suspended in
+Await.wait on Waiting tickets, including interests forwarded by nested runs.
+Root-level Runner.poll calls request.poll once only when this set is nonempty.
+Otherwise skip it, including before the first task turn. Pure go/yield/join/
+scope operations and merely starting an unawaited raw request do not by
+themselves return status 2. A task/run which never blocks, and makes no explicit
+root wait/poll call, therefore never yields to the host. A pure Scheduler-only
+entry can return async status 0 immediately. A runnable pure task can of course
+share its run with a sibling needing host progress: that sibling's wait causes
+the run's hand-off. This is service of an existing wait, not an implicit yield
+added to the pure task.
+
+While there is progress interest and a task is runnable, poll once before its
+next turn, using status 2. Scan settled tickets, then run a task even if further
+host answers might be ready. This keeps an infinite yielding task from starving
+an IO-waiting sibling, without making pure task switches pay an event-loop yield.
+Unawaited raw work alone does not force progress hand-offs during a runnable
+loop; its caller must eventually wait/poll explicitly or let the run become
+idle. S7 rule 17 still counts it at idle as specified next.
+
+A nested loop's private Runner.poll passes its current interest tickets to the
+outer Scheduler with its nested-run id, then yields only its calling outer task.
+The outer loop keeps that interest registration while the nested run lives and
+forwards it in turn if nested again. Thus an inner IO waiter alongside an inner
+CPU-yielding task can receive host answers even when the outer caller is runnable.
+Terminal tickets are filtered; each poll replaces that run's prior interests,
+and an error-free final removes the registration on every nested-run exit.
+Cancellation removes a nested registration before completing the calling task's
+unwind; borrowed tickets themselves are not cancelled by unregistering interest.
+No new ABI operation is needed: these are private ordinary Scheduler commands.
+The root Runner's poll takes the aggregated tickets; it never scans all instance
+requests to invent a wait. Explicit low-level request.poll still intentionally
+hands off, and stops request: no active entry from a synchronous entry.
+
+When no task is runnable, scan terminal tickets first. Union
+outstanding_root(the_run_root) with Waiting tickets its tasks explicitly await,
+including borrowed tickets from another root. Run affiliation comes from every
+group's registered root, not from the current Owner or just the default group.
+If the union is nonempty, Runner.wait waits for one and then rescans. An
+unawaited raw request in any custom group prevents deadlock until it settles.
+Its detached Ready answer is retained only by its handle. If the set is empty,
+stop with `panic("task: deadlock")`, even if an unrelated root has work. Nested
+runs therefore neither count all instance requests nor miss their subgroups.
+Never return status 1 with zero outstanding requests, or busy-poll when no task
+can run. CPU code without suspension can monopolize M:1; a go-only loop may
+postpone children. No bounded wall-time guarantee is made for final functions.
 
 ### 6.5 Runner, nested runs, and testing
 
 The runtime supplies an initial portable Runner: prefix, full seed generator,
-policy, and constant functions implementing root wait/poll. `top(seed)` replaces
+policy, the enclosing request-context Root, and constant functions implementing
+root wait/poll. run uses that Root while opening its fresh run Root, so its
+public environment still needs Runner rather than an extra Root argument. `top(seed)` replaces
 only the seed in the current Runner and preserves its path allocator and wait
 route. This is why its scheme needs Runner: rebinding a seed inside a task must
 not reset its nested-run prefix or make its nested wait bypass the outer loop.
@@ -669,16 +826,17 @@ The ledger supplies this initial service, so a fixed-seed test can write
 routes wait/poll to the outer Scheduler and takes paths from that task's shared
 spawn/run counter. That per-task Runner is non-portable; go's detached substitution
 above prevents accidental retention in children. Explicit run inside the entry's
-default root task is nested, as S7 requires. Each run opens and binds its own portable request.Owner around its entire loop,
-in a retained frame. Tasks keep the Owner at their go site. The run closes its
-group after all tasks/finals end, not before they unwind.
+default root task is nested, as S7 requires. Each run opens a fresh request.Root and its default Owner around its entire
+loop, in a retained frame. Tasks keep Root and their go-site Owner. Custom
+within groups remain registered to that root. The run closes the entire root
+after all tasks/finals end, not just its default group.
 Only the runtime-created entry run
 is eligible for future multicore execution; v1 has one worker throughout.
 
 A nested loop owns fresh run identity and FIFO state on the caller task's stack.
 Nested children do not execute an outer task's channel commands: all handle
 uses check their run key. Its wait hands tickets to the outer task's Scheduler;
-its poll yields that calling task. Only that task is paused; other outer tasks
+its poll yields that calling task without directly yielding to the host. Only that task is paused; other outer tasks
 continue. When nested work ends it cancels remaining requests/children before
 return. A nested deadlock is detected from that nested run's own tasks and
 waitable requests. It does not return status 1 from a task stack. Chains do not
@@ -1131,7 +1289,7 @@ custom definitions under rule 6, as specified by the API in §9.9.
 
 **§9.2.** Retain the S7 keep_env addition. Add:
 
-> Await and Owner (§9.11), Scheduler and Runner (§9.9) are normal service values.
+> Await, Root and Owner (§9.11), Scheduler and Runner (§9.9) are normal service values.
 > Replacing a host service in i uses an environment statement as for any
 > service. Replacing a random seed with task.top keeps the run route of the
 > current Runner. Entry defaults do not change call-site service lookup.
@@ -1172,8 +1330,10 @@ Add after them:
 > both service requirements. No particular scheduler is built into this rule.
 >
 > In request form, every field has type `(P...) -> Request(T)` with no written errors
-> or environment. T is an ABI result type, or Result(A,E) for an ABI result
-> type A and ABI error type E. The ABI signature is the corresponding async
+> or written environment. Before inference, its callable type becomes
+> `(P...) -> Request(T) ! request.Owner`; interface display shows that effect.
+> T is an ABI result type, or Result(A,E) for an ABI result type A and ABI error
+> type E. The ABI signature is the corresponding async
 > signature, without Request/Result. Its call returns the request handle
 > immediately. Only this outer Request and optional Result have this rule;
 > Request is not an ABI value type.
@@ -1203,7 +1363,7 @@ to programs; Rust implementation choices elsewhere in §8.1 do not enter the spe
 
 **§9.8.** Use S7's Keys text unchanged. R2 supplies its implementations.
 
-**New §9.9.** Copy the public API/type text in §6.1, R1–R6 in §6.2, and the event,
+**New §9.9.** Copy the public API/type text in §6.1, R1–R6 including R4a in §6.2, and the event,
 FIFO, fairness, nested-run and test-scheduler rules in §6.4–§6.5. Do not copy the
 implementation argument of §6.3. Prepend:
 
@@ -1226,11 +1386,11 @@ implementation argument of §6.3. Prepend:
 > results may change between runs or worker counts. Tests must either avoid
 > that dependence or list the allowed outcomes. No task API observes workers.
 
-**New §9.10.** Copy §4, from “The following is the normative API table” through
-its final float rule, excluding the two linked-source sentences and their
-statistical commentary. Replace those sentences with “The word permutation is
-the 20-round Threefry2x64 defined below. It is not a cryptographic generator.”
-The stream derivation and all constants remain part of the normative text.
+**New §9.10.** Copy §4's API, numerical contract, tagged split-tree adapter,
+validation, rejection sampling and float rules. Retain the published SplitMix
+variant/version and reference, but omit the review commentary about replacing
+the old draft and statistical acceptance. Include the seed-modulo-W rule and
+state that distinct streams are not guaranteed to have disjoint outputs.
 
 **New §9.11.** Copy §5.1's public definitions, tables, state transitions,
 cancellation/wait/alias rules, and dynamic-context rule, including Owner groups. Copy §5.4's implicit
@@ -1249,20 +1409,31 @@ resource guards. Exclude the discussion of compiler frame/table layout.
 > their module and take/return only the types of §10.3, including their errors.
 >
 > Entry environment parameters and needs may contain host services, Assert,
-> request.Await, request.Owner, task.Scheduler, and task.Runner. No other unsupplied service
-> is allowed. The runtime gives each entry a fresh structured FIFO run, initial
-> seed random.from_seed(0), root path [], Assert, and the necessary host
-> service values. Scheduler, Runner, Await and Owner belong to the calling task in
-> that run. The defaults are service values; ordinary environment statements
-> may replace them. task.top(seed) changes a Runner seed while preserving
-> its wait route and path allocation. User service constructors need no
-> special entry rule; callers bind them before the entry body needs them.
+> request.Await, request.Root, request.Owner, task.Scheduler, and task.Runner.
+> No other unsupplied service is allowed. The runtime binds only the defaults
+> requested by the ordinary inferred environment. Inferred Scheduler or Runner
+> needs request the default structured FIFO run, fresh identity/path [], seed
+> random.from_seed(0), and its internal request context. Async/request host
+> needs without task needs get a direct request context/Await handler, without
+> a task scheduler. Await/Root/Owner-only needs may use completed fakes in a
+> synchronous entry. These resolved standard-service entry defaults are the
+> one narrow library provision; another library gets no implicit bootstrap.
 >
-> Entry wrapping does not change the principal type of a function. Errors
-> from main/tests stop after structured cleanup; a host export gives its error
-> to the host after cleanup. Stops run no final functions. On the ilang target
-> every entry is async and its host follows ABI v3, even if it ends immediately
-> with status 0. On the WASI target entry wrapping runs synchronously (§B.7).
+> Entry wrapping does not change a function's principal type. The default
+> values can be replaced by ordinary environment statements. task.top(seed)
+> changes a Runner's seed while retaining its route and prefix. An unsupplied
+> user State service remains an entry error. Main/test errors stop after
+> cleanup; host-export errors reach the host after cleanup. Stops run no finals.
+>
+> On the ilang target, let N be the entry's inferred environment: the entry is
+> async exactly when N contains an async or request-mode host service, or
+> task.Scheduler or task.Runner. Otherwise it is a synchronous export, including
+> a pure comparator usable by a synchronous host callback. No body-reachability
+> analysis or universal async wrapping is used. Even an async entry may finish
+> with status 0 on its first call. Scheduler progress polling yields to the host only for actual host waiters,
+> including nested waiters; idle waits also count unawaited work. Pure task
+> switches alone do not yield there.
+> On WASI, all entry calls and host imports remain synchronous (§B.7).
 
 **§10.3.** Keep the existing boundary value/error lists, and append:
 
@@ -1293,7 +1464,7 @@ Add this row to §12's built-in name table, beside the S7 Key/Keyed row:
 
 > | Request Ticket | Built-in types operated on by i/request | §9.11 |
 
-Await, Owner, Scheduler, Runner and IO types require imports, using qualified
+Await, Root, Owner, Scheduler, Runner and IO types require imports, using qualified
 names when wanted; the entry rule refers to their resolved definitions, not spellings.
 
 **§B.4–B.6.** Keep ABI v3 and all H rules. In §B.5 replace only “a module made by
@@ -1301,7 +1472,7 @@ this compiler has no outstanding request at that point” with “structured ent
 cleanup normally leaves no outstanding request; a deliberately unowned raw
 request is dropped by the host at status 0”. Request-mode and async declarations
 produce the same v3 async signature; metadata lists the unwrapped signature and
-marks every ilang entry async. A completed cell is not an outstanding id.
+derives each entry's async flag from its inferred environment as §10.2 says. A completed cell is not an outstanding id.
 
 **§B.7.** Keep the existing target rules, and append:
 
@@ -1314,6 +1485,63 @@ marks every ilang entry async. A completed cell is not an outstanding id.
 > no-op; no request uses a resume export or ABI cancel. i/random is pure and
 > i/task can interleave computations at its explicit scheduling points, but
 > a blocking host operation blocks that worker. Legacy i/io is unchanged.
+
+### 10.1 Coordinated edits to the accepted multicore note
+
+Only runtime.md is edited in this lane. When integrating these coordinator-
+approved rules, apply the following exact replacements in multicore.md too.
+
+In §18 rule 8, old sentence:
+
+> No join is ever left waiting for a dropped or cancelled task.
+
+New sentence:
+
+> At a valid join or selected join event for a dropped or cancelled task, an
+> applicable scope cancellation first unwinds a joiner it can still cancel;
+> a joiner shielded from that cancellation stops with
+> `panic("task: join of a cancelled task")` immediately once the target is
+> dropped or its cancellation is accepted, without waiting for its unwind,
+> so no join remains waiting for a cancelled outcome without a result.
+
+In that same rule, old sentence:
+
+> A `go` on a cancelling scope makes a task that is dropped at once.
+
+New sentence:
+
+> A `go` on a cancelling scope makes an unstarted task that is dropped at
+> once; a caller shielded from that scope's cancellation receives its
+> `Task(A,E)` handle, while a caller still cancellable by it is unwound before
+> it can observe the handle.
+
+The supporting argument in §6 “Who may join” must agree. Its old sentence is:
+
+> Every such joiner is cancelled when `s` is cancelled (below), so no join ever
+> waits for a task that was dropped or cancelled.
+
+Replace it with:
+
+> A joiner still cancellable by `s` is unwound before it can observe a dropped
+> or cancelled result; a joiner shielded from that cancellation, including a
+> final function or its protected cleanup work, stops with
+> `panic: task: join of a cancelled task` immediately once the target is
+> dropped or its cancellation is accepted.
+
+The unchanged public join type needs no Cancelled case. This is smaller than
+adding a typed cancellation result to every join and combinator; a stop is
+already allowed for a function with no corresponding error type (§11.7).
+Do not stop an ordinary joiner merely because cancellation delivery lost a race
+with the target's drop. R4a's applicable-cancellation check is part of processing
+the command, including when a new scope body inside a final is cancellable.
+
+Rule 17's unawaited-request/deadlock guarantee is unchanged. “Of the run” counts
+all Owner groups registered to its Root, not one default cancellation group or
+the whole instance. A nested run establishes another Root. The §5 counter-based
+PRF implementation sketch is replaced by the published SplitMix split-tree
+choice in §4 of this note, following the coordinator's preference; the tagged
+P/S stream promise of §18 rule 11 remains. R1 must reconcile that sketch when
+landing its algorithm text rather than leave two algorithm prescriptions.
 
 ## 11. Files, ownership, merge order, and ordered implementation checklists
 
@@ -1338,14 +1566,16 @@ none is quietly charged to C. S7 already requires the key/keep_env/portable work
 Request-mode host fields and Owner/Await expansion add checker changes to R2;
 those are a real prerequisite, not something i/task alone can express today.
 Generated host-field references add ordinary dependency edges to i/request;
-generated entry wrappers add dependencies on i/task before ordering/reachability.
+entry wrappers add i/task dependencies only when N requests task services;
+request-only wrappers depend on i/request. Add these edges before ordering/
+reachability, using inferred service needs rather than scanning function bodies.
 Assign the corresponding edge construction in the checker/driver to R2 (after
 T2's ordering changes), so dead-code elimination or module ordering cannot drop
 the runtime definitions merely because user source did not import i/task.
 
 Merge constraints:
 
-1. K1 must land before T1, as the updated ledger requires; preserve its
+1. K1 has landed on redesign at 578a17d; require it before R2 and preserve its
    display.rs order K1 -> A2 Namer -> T1 -> T3. Do not work around the invariant
    generalization fault by weakening key invariance or a public type scheme.
    A1+A2 provides new syntax. B's implementation precedes R2 and its keep_env
@@ -1364,16 +1594,18 @@ Merge constraints:
    of the matching phase. Final registration/list edits happen once, in stdio.
 5. R2 and IO then gate E2E-echo. Std-2 adds real time.now after clock lands.
    M2 waits for the completed R2 behavior; compiler sandbox runs use a fixed
-   test Runner and no host services. MC keeps Owner keys portable and gives
-   every worker the run's live-owner registration; closing a group coordinates
+   test Runner and no host services. MC keeps Root/Owner keys portable and gives
+   every worker the run's live-root/group registrations; closing a group coordinates
    its requests across workers. No host request itself becomes portable.
 
 Ordered R1 checklist:
 
 1. [ ] Commit §9.10 spec text; resolve the stream-derivation quality question.
-2. [ ] Implement pure Threefry, canonical history encoding and immutable Generator.
+2. [ ] Implement the pinned published SplitMix variant and tagged split-tree
+   navigation, with immutable Generator and explicit 64-bit seed normalization.
 3. [ ] Implement draw/split/path and arbitrary-bound rejection; no task dependency.
-4. [ ] Independently write permutation/encoding vectors and reject tests.
+4. [ ] Independently check published SplitMix vectors, prefix-code traversal,
+   weak-gamma cases and rejection tests; retain the statistical review gate.
 5. [ ] Run spec tests and the appropriate i/Rust verification through heavy,
    at O0/O2; compare replay across targets; release to Std-3.
 
@@ -1383,17 +1615,21 @@ Ordered R2 checklist:
 2. [ ] Verify K1's invariant-generalization repair, then implement keys/variance/
    value restriction, portable including cycles, and
    keep_env with retained environment frames; run all S7 single-worker tests.
-3. [ ] Implement Request/Ticket/Owner cells and table replacement together with
+3. [ ] Implement Request/Ticket cells, Root/group registries and table replacement together with
    per-cell answer decoding, raw/async host adapters, cancel and continue.
 4. [ ] Prove the monomorphic keyed prototype by type-checking two channel element
    types and heterogeneous child results. Reject any need for a cast or forall field.
-5. [ ] Implement the i loop, per-task boundaries, Owner groups, Runner/top,
-   task.keep and default entry wrapping. Check O0/O2 WAT for retained frames.
+5. [ ] Implement the i loop, per-task boundaries, rooted Owner groups, Runner/top,
+   task.keep and inferred-needs entry provisioning. Preserve synchronous exports
+   and suppress host progress polls when no task waits for IO. Include nested
+   progress-interest forwarding and guaranteed registration cleanup. Check O0/O2 WAT for retained frames.
 6. [ ] Add scope chains/local witnesses, joins, body cancellation, shielded finals,
-   run-key checks, channel/share lifetime and error arbitration.
+   run-key checks, channel/share lifetime and error arbitration; add R4a
+   cancellation-priority joins and shielded dropped/cancelled-join stops.
 7. [ ] Add CML registration/commit/map, combinators and deterministic script policy.
-8. [ ] Integrate every async user host service through Await, test nested waits,
-   root poll fairness and unowned raw requests. Audit the host/control seam.
+8. [ ] Integrate every async user host service through Await; require review
+   tests J/E/O, nested subgroup and borrowed-ticket cases, root poll fairness,
+   and synchronous callback/first-turn no-yield tests. Audit the host/control seam.
 9. [ ] Run deadlock/cancel/fairness/alias/IO stress cases 200 times on Rust and JS,
    related spec tests and full required verification; inspect WAT changes.
 
@@ -1431,7 +1667,7 @@ The acceptance server in §9 is a complete module.
 | Stub words for n=10: W-1, then 7 | Reject W-1, give 7 with two draws; §4 rejection rule |
 | Split initial root vs child path [1] | Their histories contain S(1) vs P(1), not equal generators; §4 domain tags (not an assertion that words must differ) |
 | `task.random() == task.random()` in one task | True; D1 and S7 rule 11; no draw counter in Scheduler |
-| All-zero Threefry key/input | Words 0xc2b6e3a8c2c69865 and 0x6f81ed42f350084d; §4 permutation, [independent reference vector](https://raw.githubusercontent.com/DEShawResearch/random123/main/tests/kat_vectors) |
+| Published SplitMix seed 1337, first three words | 0xb5c19e300e8b07b3, 0xd600e0e216c0ac76, 0xc54efc3b3cc5af29; §4.1 pinned source vectors |
 | Request ready(7); state, take, state, take | Ready(7), 7, Taken, panic request: taken; §5.1 one transfer |
 | Take Int and String request handles stored together only as tickets | Read each original typed handle correctly; Ticket has no answer operation; D2 |
 | Cancel an old cell, reuse its slot, cancel the old alias again | New request remains Waiting and receives its own answer; D4 cell identity/generation |
@@ -1455,8 +1691,9 @@ The acceptance server in §9 is a complete module.
 | Parent fake Clock used after child's third resume and in its final | Fake result survives; keep_env plus retained frame, D16 workaround |
 | Nested wait_flag while an outer sibling sets the flag | Both complete, no global hang; §6.5 Runner wait delegates to outer task |
 | Rebind Runner with top(seed) inside a task, then nested run | New seed, preserved nested prefix/outer wait route; §6.5 contextual top |
-| Nested raw request with no task waiters; all tasks block on channel | Wait for that run's raw request to settle, then deadlock; §6.4 Owner enumeration |
-| Infinite yield task plus a completed host accept | Accept handler eventually gets a turn; §6.4 poll-before-turn |
+| Nested raw request in request.within, with no task waiters; tasks block on channel | Wait for the request in that run's Root, then deadlock; §6.4 all-group root enumeration |
+| Infinite yield task plus an outstanding accept | Conditional status-2 polls for the waiting accept task deliver completion and its handler gets a turn; §6.4 |
+| Pure task path/yield/join operations with no host requests | No host poll, status 2, or macrotask yield; task entry can return status 0 immediately; D5/§6.4 |
 | test with script selecting nonexistent path [99] | NotRunnable([99]) of type ScheduleError after cleanup; §6.5 |
 | test with real pending timer rather than a fake | task: test needs fake IO; D10; fixed seed alone does not fix host time |
 | Net read(0); fs write with partial byte; process NUL argument | Typed invalid errors with the named operation; §7 validation |
@@ -1466,7 +1703,7 @@ The acceptance server in §9 is a complete module.
 | Process args codec for ["a","é"] | Bytes `<<2,0,0,0,1,0,0,0,97,2,0,0,0,195,169>>`; §7.4 UTF-8 framing |
 | Missing env variable; browser raw TCP | ProcessError(...,"not_found"); NetError(...,"unsupported"); §7 and target matrix |
 | WASI pure tasks/random; WASI module requiring Fs | Pure calculations work; report ordinary blocking imports requiring an embedder; §B.7, no fake fd-as-externref |
-| @main needs user State with no binding vs needs Scheduler/Runner/Await/Owner | First is entry compile error; second accepted with unchanged inferred type; §10.2 |
+| @main needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
 | Existing async user service, not an IO namespace, used in two children | Overlap via Await, same request table as IO; D3, no namespace rule |
 
 Preserve all S7 single-worker tests T1–T12/T20/T21/T24–T27 as assigned there,
@@ -1555,11 +1792,12 @@ A(yield; raise A) and B(raise B) give A. Fixed go to start the child in the queu
 without ending the parent's turn; cancellation/host polls still occur. The
 required FIFO example now gives B.
 
-**Raw request deadlock and nesting.** Ignoring unawaited requests would declare
+**Raw request deadlock and nesting (initial assessment).** Ignoring unawaited requests would declare
 deadlock while host work was outstanding, against S7 rule 17. Enumerating the
 whole instance would make a nested run wait for unrelated outer work, against
-rule 5. Fixed with general Owner groups and per-run outstanding enumeration.
-The group capability is portable; request cells remain non-portable. This is
+rule 5. The first draft tried to fix this with Owner groups and per-run
+enumeration, but missed custom groups as the later review showed. The corrected
+Root affiliation and all-group enumeration are in §5.1/§6.4. The group capability is portable; request cells remain non-portable. This is
 also useful to ordinary non-task batch/timeout libraries.
 
 ### 12.3 Attack round 2: adversarial programs after those fixes
@@ -1597,7 +1835,7 @@ that run as §5 says; it still has only one root history.
 with handle of another run. An outer raw request may deliberately be awaited
 there: its Ticket is a request capability on the same worker, not a task/run
 handle; the nested Runner forwards that wait to the outer loop. Closing the
-nested Owner must not cancel an outer-owned request. The union-of-own-and-awaited
+nested Root must not cancel an outer-owned request. The union-of-own-and-awaited
 wait set gives exactly that behavior.
 
 **Source and boundary conflicts.** Returning Request from a host export still
@@ -1639,8 +1877,8 @@ blocking stdin after entry cancellation: abortable timers and a detached broker
 must not keep the run waiting for abandoned work. Those are explicit host gates,
 not an inference that cancellation stops all OS activity.
 
-No serious remaining semantic or source conflict found in this first clean
-pass after the fixes in rounds 1 and 2. The buildability gate and actual OS tests remain necessary;
+This was an initial pass at aa20548. The independent review later found the
+join, entry and subgroup defects despite this earlier clean assessment. The buildability gate and actual OS tests remain necessary;
 reasoning cannot certify their implementation.
 
 ### 12.5 Attack round 4: final typing, ownership and entry pass
@@ -1670,58 +1908,260 @@ removes the original unstarted-resource gap without weakening S7's cancel rule.
 A stop is still allowed to skip i finals and relies on instance destruction
 for host cleanup.
 
-No serious new issue found. Rounds 3 and 4 are the two consecutive clean passes
-after the latest fixes. These are source/type/ownership arguments; the mandatory
+This was the second initial clean assessment at aa20548, superseded by the
+independent review and the new attacks below. These are source/type/ownership arguments; the mandatory
 implementation prototype and OS tests remain unverified.
 
-### 12.6 What was actually checked
+### 12.6 Independent review: findings checked and required examples
 
-Read the base code and binding design regions cited in §1 and §11. Inspected
-branch/status and confirmed the lane began at 1e0d910. Ran a small independent
-Python model of the specified Threefry permutation, rejection boundary, request
-state/slot aliasing, FIFO example, and select self-pair exclusion; results: all assertions passed. Threefry(0,0) gave the vector in §12.1. Our
-stream word vectors were seed=0/q=0: 0x8f196e9718d4183f, seed=0/q=1:
-0x48c110b1999c8a18, split-left: 0x07aa41077fcf46cd, path-child [1]:
-0xfad9a78d3e45715d. These are model vectors for independently checking an i
-implementation, not outputs from an i program. Ran cargo metadata through heavy and confirmed workspace_root is this lane.
-Ran a structural Markdown/API consistency check, per-owner wait-set model, and
-git diff --cached --check after staging the note. No cargo tests, new-syntax
-parser check, generated WAT, network server, JS service factory, or process/
-stdin cleanup test was run for this documentation-only change. The current
-lane has not landed A1+A2 or any of these new APIs; claiming their execution
-would be misleading. Implementation checklists name those gates explicitly.
+I read the whole report at
+`/home/agent/Programming/i/.rd/cache/gpt/report-review-runtime.md`, including its
+retained decisions, implementation limits and echo assessment. Each finding
+was checked separately before changing the rules:
 
-## 13. Risks and coordinator questions
+1. **Dropped join in a shielded final: confirmed.** At aa20548, R2 dropped the
+   child, R4 shielded its joining final, and no completion arm could produce
+   its A/E. The control code only reactivates the scheduling boundary
+   (`emit/control.rs:260–295`); it supplies no task completion. R4a now resolves
+   that protocol hole and §10.1 gives the exact S7 sentence changes.
+2. **Universal async and first-turn polling: confirmed.** The inferred env is
+   already available to entry_point (`types/infer.rs:405–429`) and lower's
+   entry_async (`lower.rs:916–938`). The JS call/callAsync guards explicitly
+   separate synchronous and async signatures (`bindings/javascript/ilang.mjs:965–981`);
+   status 2 takes a macrotask at `:894–902`. My old D5 and unconditional
+   first-turn poll would therefore break synchronous callbacks. D5 and §6.4
+   now preserve them and gate host polling on outstanding requests. The review
+   executed the comparator baseline; I independently read those paths, but did
+   not repeat that execution against a new implementation.
+3. **Custom groups missed by idle accounting: confirmed.** The old within made
+   a group absent from the default Owner's table; the old idle union counted
+   neither it nor an unawaited request in it. Root is now separate from Owner,
+   and the idle union enumerates all groups of the run. Progress-interest tickets
+   affect polling only, never substitute for all-group deadlock accounting.
+4. **Request-mode Owner effect omitted from replacement §9.7: confirmed.** The
+   old §5.2 added Owner while the replacement paragraph did not. Both now give
+   the callable type `(P...) -> Request(T) ! request.Owner` before inference;
+   ordinary field-function copying/display therefore sees the same effect.
 
-1. **Contextual top signature.** Recommend `(Generator) -> Runner ! Runner`,
-   preserving route/prefix while changing seed. Runtime entry provisioning has
-   removed the need for a pure bootstrap top. Confirm this refinement against
-   S7's older portable-top prose; do not weaken nested-run paths/waits instead.
-2. **Entry metadata policy.** Recommend all ilang entries async, including pure
-   exports. It avoids an unsound reachability guess for higher-order request
-   operations and supplies the default scheduler uniformly. V3 hosts already
-   support it, but embedders using call rather than callAsync must migrate.
-3. **WASI scope.** Recommend keep the existing blocking/custom-import contract,
-   report required imports, and make i run the full standalone host. If the
-   coordinator wants standalone preview-1 clock/fs/process/stdio now, assign a
-   separate adapter/opaque-reference design rather than hiding it in these
-   five service files. Raw TCP/spawn still require a target decision.
-4. **Random stream quality.** Recommend independent statistical review of the
-   exact Threefry compression derivation before R1 lands, plus stable reference
-   vectors; this note settles functional semantics but has not measured quality
-   or speed. Do not advertise cryptographic security or collision-free streams.
-5. **Scope of extra files.** Recommend assign request/key/compiler type expansion
-   to R2 and the JS standard factories/target-import report to IO as §11 lists.
-   These are necessary to keep the scheduler ordinary i. No ABI-v4 work is needed.
+The report's three programs are required implementation tests, not merely
+illustrations. Use these exact accepted-syntax forms and a host completion gate
+where specified.
 
-Material risks that are not unanswered semantic rules: retained environment
-frames must survive O2; keep_env walks all services and can pin unrelated tasks;
-long-lived scopes retain channel state and child completion state until exit;
-the simple echo demonstrates overlap but does not establish bounded memory for
-an indefinitely long-lived server. Portable sends/completions pay a graph walk.
-An M:1 CPU loop can starve siblings; a final can block cancellation indefinitely.
-Detached blocking work and child supervision require careful ownership. A
-per-source default stdin broker avoids a fresh blocked reader per destroyed
-instance; distinct custom sources and unkillable children can still retain
-private workers until their OS work ends. Every unsupported target operation
-needs a real typed stub, not a missing import. All are implementation/RF gates.
+**Review test J: shielded final joins its dropped child.**
+
+```i
+(i/task, i/resource, i/fail)
+
+probe = () {
+  fail.catch(() {
+    task.scope((s) {
+      gate = task.channel()
+      parked = task.channel()
+
+      task.go(s, () {
+        resource.ensure(
+          () {
+            task.send(gate, Nil)
+            task.receive(parked)
+            Nil
+          }
+          () {
+            t = task.go(s, () { Nil })
+            fail.catch(() { task.join(t) })
+            Nil
+          }
+        )
+      })
+
+      task.receive(gate)
+      fail.raise("boom")
+    })
+  })
+}
+```
+
+Call probe from a test harness. The rendezvous installs the final before boom.
+go in that shielded final returns a dropped Task(Nil,E), without running its
+body; join stops with **panic: task: join of a cancelled task**. Neither
+fail.catch catches that stop, and the result is not Error("boom") or deadlock.
+This follows R2/R4a even though join's public type is unchanged. Run at O0/O2,
+including scheduler orders that delay cancellation delivery to ordinary tasks.
+
+**Review test E: a pure synchronous export remains a comparator.**
+
+```i
+(cmp)
+
+cmp = (a: Float, b: Float) { a -. b }
+```
+
+Compile/export cmp through wasm.exports. Its inferred environment is Never;
+metadata says async=false. The following supported JS use returns [1,2,3]
+synchronously, with no task run, status 2 or macrotask yield:
+
+```js
+[3, 1, 2].sort((a, b) => guest.call("app/main.cmp", [a, b]));
+```
+
+Also test a pure main, a Scheduler-only entry doing path/yield/join with no host
+requests, and a host async-only entry. Expected: pure main is synchronous;
+Scheduler-only is async in metadata but completes with status 0 without a host
+yield; host-only awaits its request without initializing the task scheduler.
+An imported but unused task module must not change any classification. Replacing
+an async service with completed fake functions removes that service from N;
+Await/Owner/Root alone do not make such an entry async. These are D5/§6.4 tests.
+
+**Review test O: unawaited request in a custom Owner.**
+
+```i
+(i/request, i/task)
+
+@host("review:work", "request")
+Work { Work(finish: () -> Request(Nil)) }
+
+@main
+main = (w ! Work) {
+  request.within(() {
+    r = w.finish()
+    c: task.Channel(Nil) = task.channel()
+    task.receive(c)
+    request.take(r)
+  })
+}
+```
+
+The fixture holds finish pending beyond the next host poll and then completes
+it on command. The run first waits for that request (status 1 once no task is
+runnable), even though it is unawaited and belongs to a custom cancellation
+group. After finish completes, it stops with **panic: task: deadlock** because
+nothing can send on c. request.take(r) is unreachable. It must not stop before
+finish completes. Repeat inside a nested task.run with an unrelated outer
+request: the nested root counts every nested subgroup, but not the outer work.
+The outer request cannot postpone a genuine nested deadlock. This is the
+unchanged S7 rule 17 interpreted through Root affiliation.
+
+The changed parts were attacked again. A candidate fix that waited for a
+cancelled target's cleanup before stopping was rejected: two shielded finals
+joining each other could wait forever. The chosen rule records cancellation
+at acceptance and stops that join immediately; cleanup completion remains a
+separate scope-exit condition. The following two passes were repeated with
+that fix and the refined progress-interest polling rule.
+
+### 12.7 New self-attack, pass 1: cancellation and nested ownership
+
+Attack J with an ordinary, still-cancellable joiner instead of a final: let one
+worker mark the target dropped before another worker delivers the scope cancel.
+The join command must see the applicable cancellation and unwind its caller;
+it never tests “target cancelled” first and stops. A shielded final can still
+stop because it cannot be unwound by that cancel. Attack a final which opens a
+fresh cleanup scope whose child fails while the final joins a sibling: the new
+scope can cancel its body, so R4a unwinds that inner body before a join panic.
+The older outer cancellation still cannot reach the new cleanup scope.
+
+Attack select with always(1) before a cancelled join alternative: cancelled is a
+ready completion, not an invalid handle; the first ready alternative wins and
+gives 1. Reverse them in a shielded final and the selected join stops. In an
+ordinary task cancellable by the target scope, scope cancellation wins before
+selection, in either order. Attack go on a cancelling scope: no child body runs;
+a shielded final receives a dropped handle, whereas a cancellable body unwinds
+before observing it. No missing A/E remains and no synthetic error is introduced.
+
+Attack O with two custom groups, then close only one. outstanding_root still
+counts the other. Close the whole root and no group escapes its cancellation.
+After a result becomes Ready, closing the group/root does not discard the
+handle's answer. Rebind an outer Owner inside a nested run, then call within:
+open_owner uses the nested Root, so the new subgroup cannot inherit the outer
+Owner's affiliation. Deliberately starting under an already-made outer Owner
+still uses that original group, whose tickets may be borrowed explicitly.
+None of these cases uses instance-wide request count to decide nested deadlock.
+Also make two shielded finals join one another after both cancellations are
+accepted: each join is ready to stop, rather than waiting for the other unwind.
+Keeping outcome separate from cleanup supplies that result without returning a
+value early. No serious new rule conflict found in this pass.
+
+### 12.8 New self-attack, pass 2: effects, polling and split addresses
+
+Attack E through a wrapper `cmp2 = (a: Float, b: Float) { cmp(a,b) }` and through
+an unrelated imported task module: N is still Never and both exports stay sync.
+A higher-order helper called only with pure functions keeps a pure instantiated
+environment; used with a task/async operation, its inferred environment carries
+that need. No body scan is required. An explicit low-level poll from a sync
+entry stops request: no active entry rather than silently changing its ABI.
+Also call that synchronous export after an earlier async call ended: the stale
+host-root pointer cannot authorize polling when async-live is zero.
+A fake-only Await can complete synchronously; the default root handler checks
+settled tickets before attempting any host hand-off.
+
+Attack a pure Scheduler-only root on its first turn: its progress-interest set
+is empty, so it returns status 0 without status 2. Even raw unawaited work does
+not force host progress polls in a runnable task which never waits. Once the
+run is idle, that same work prevents deadlock and becomes its explicit wait.
+Attack a nested IO waiter alongside a CPU-yielding sibling: nested Runner.poll
+forwards that waiter ticket, and the outer root services the interest while
+still running other tasks. Cancel/exit the nested run while it borrowed an outer
+ticket: remove its interest registration without cancelling the borrowed work.
+Only actual live waiter registrations authorize progress polls; idle/deadlock
+still counts every group in each Root. On WASI, blocking results are already
+Ready and host polling remains a no-op.
+
+Attack the SplitMix adapter with S(1), S(2), P(1), P(2), and mixed multi-step
+paths. Their bit codes are 00, 01, 11, 1010; prefix-free concatenation gives
+unambiguous typed addresses. Each edge selects a newly spawned published child,
+so it does not merely advance the parent's continuation stream by two words.
+Native odd gamma, 64-bit masking and the corrected low-transition gamma test
+must match the pinned variant, including negative and oversized seed reduction.
+These are functional/address checks, not statistical independence evidence.
+No serious new rule conflict found in this second consecutive clean pass.
+
+### 12.9 What was actually checked
+
+Read the full independent report and checked the four old-text/source findings
+as above. Read K1's first-parent patch at 578a17d without changing this lane's
+base. Earlier checks at aa20548 covered a Threefry model; those vectors are
+superseded and supply no verification of SplitMix. This revision's independent
+Python models passed:
+
+- The pinned source's first three seed-1337 words and seed-42 state, 64-bit
+  masking, odd gamma, seed normalization, rejection boundary and float range.
+- 1,026 prefix-free S/P codes, two-step address uniqueness and a 201-bit path
+  index. Model word vectors for seed 0 are root 0x9474f0eb06d79fd8,
+  S(1) 0x5223018439128278, P(1) 0xdbcefe01be55b171; these are model vectors,
+  not i executions or statistical evidence.
+- Inferred entry-service classification, pure/fake-only synchronous cases,
+  task/host-only async cases, and no host poll for pure or raw-only runnable
+  work. Nested waiter interests forward, update and unregister without
+  cancelling borrowed requests.
+- Cancellation-priority joins, immediate shielded cancelled-join stops,
+  fresh cancellable cleanup bodies, dropped go handles and selected join events.
+- All custom groups counted by Root, group-close isolation, nested exclusion,
+  borrowed tickets and review O's wait-before-deadlock outcome; scoped subroot
+  allocation and retirement at entry-context exit.
+- Thirteen Markdown tables, balanced fences, accepted-syntax token checks,
+  the exact old S7 sentence anchors, all three review programs, and the Owner
+  effect in replacement §9.7. git diff --check passed.
+
+The proposed i scheduler, request/Root primitives, revised source programs,
+O0/O2 WAT, JS callback fixture, OS cleanup and real echo fixture remain unrun in
+this design lane. The statistical gate remains unverified. Reading the existing
+entry/host code establishes the baseline and needed edit regions, not that the
+new implementation exists. No implementation or other note is changed here. No cargo or host integration
+tests were run for this documentation-only revision.
+
+
+## 13. Coordinator decisions and remaining gates
+
+The coordinator has settled the five questions: contextual top is accepted;
+universal async entries are rejected; blocking-import WASI is accepted;
+independent statistical review is mandatory with a named published splittable
+generator preferred; R2 owns requests/compiler work and IO owns JS factories/
+target reporting. This revision chooses SplitMix as pinned in §4. K1 landed on
+redesign at 578a17d. There is no outstanding permission request for these edits.
+
+The implementation still must validate principal inference with the keyed
+prototype, retained environments at O0/O2, cancellation-priority joins including
+new cleanup scopes, rooted-group accounting, synchronous JS callbacks and real
+IO overlap/cleanup. SplitMix's exact traversal and known weak-gamma cases still
+need independent statistical review before R1 lands. Keep the existing risks:
+long-lived scope storage, portability walks, cooperative fairness, unbounded
+final duration, detached host cleanup and real unsupported-target stubs. A
+published generator does not prove those gates or supply cryptographic security.
