@@ -1585,8 +1585,12 @@ fn status_two_gives_ready_answers() {
     let program = program();
     let mut imports = imports(&Log::default());
     imports = {
-        let mut ready = HostImports::default();
-        for ((module, name), function) in imports.0 {
+        let mut ready = HostImports {
+            unrestricted: imports.unrestricted,
+            grants: imports.grants,
+            ..HostImports::default()
+        };
+        for ((module, name), function) in imports.functions {
             if name != "later" {
                 ready.insert(module, name, function).unwrap();
             }
@@ -2206,4 +2210,351 @@ fn a_nested_store_in_the_allocator_gets_its_own_thread() {
         "both allocation and free enter the inner store"
     );
     assert!(recorded.iter().all(|(_, id)| *id != outer), "{recorded:?}");
+}
+
+// BG interpretation: native 3.1 authorizes each resolved declaration before
+// coalescing, including external aliases; N9.1/N9.5 own each invocation.
+fn bg_plan(program: &Program) -> bindings::BindingPlan {
+    let mut declarations = Vec::new();
+    for (kind, table) in [
+        ("service", &program.abi.services),
+        ("external", &program.abi.externals),
+    ] {
+        for (namespace, fields) in table {
+            for (name, signature) in fields {
+                declarations.push(bindings::BindingDeclaration {
+                    package: "fixture-content".into(),
+                    module: "fixture/host".into(),
+                    module_digest: bindings::artifact_digest(FIXTURE),
+                    declaration: format!("{kind}.{name}"),
+                    namespace: namespace.clone(),
+                    name: name.clone(),
+                    kind: kind.into(),
+                    signature: signature.clone(),
+                });
+            }
+        }
+    }
+    bindings::BindingPlan {
+        artifact_digest: program.artifact_digest.clone(),
+        declarations,
+    }
+}
+
+#[test]
+fn bg_grants_check_every_declaration_before_coalescing() {
+    let program = program();
+    let mut plan = bg_plan(&program);
+    let original = plan
+        .declarations
+        .iter()
+        .find(|d| d.kind == "external")
+        .unwrap()
+        .clone();
+    let mut alias = original.clone();
+    alias.declaration = "another_external_alias".into();
+    plan.declarations.push(alias.clone());
+    let program = program.with_binding_plan(plan.clone()).unwrap();
+    let mut imports = imports(&Log::default());
+    // Replace the deliberate legacy authority with a restricted registration.
+    let key = (original.namespace.clone(), original.name.clone());
+    imports.functions.remove(&key);
+    imports.unrestricted.remove(&key);
+    imports
+        .context_external(&key.0, &key.1, |_, _| Ok(Value::Float(5.0)))
+        .unwrap();
+    imports.grant(&plan, &original);
+    let expected = format!(
+        "ungranted host import {} {} declared by {} {}",
+        alias.namespace, alias.name, alias.module, alias.declaration
+    );
+    assert_eq!(
+        program
+            .instantiate(HostOptions::new(imports.clone()))
+            .err()
+            .unwrap()
+            .to_string(),
+        expected
+    );
+    imports.grant(&plan, &alias);
+    program
+        .instantiate(HostOptions::new(imports.clone()))
+        .unwrap();
+    // Duplicate entries do not acquire another declaration's authority.
+    let mut twice = plan.clone();
+    twice.declarations.push(original.clone());
+    self::program()
+        .with_binding_plan(twice)
+        .unwrap()
+        .instantiate(HostOptions::new(imports))
+        .unwrap();
+}
+
+#[test]
+fn bg_grants_are_bound_to_artifact_package_module_declaration_and_signature() {
+    let p = program();
+    let plan = bg_plan(&p);
+    let mut changed = plan.clone();
+    changed.artifact_digest.push('0');
+    assert!(p.with_binding_plan(changed).is_err());
+    for field in 0..4 {
+        let p = program();
+        let mut changed = plan.clone();
+        let d = &mut changed.declarations[0];
+        match field {
+            0 => d.package.push('x'),
+            1 => d.module.push('x'),
+            2 => d.module_digest.push('x'),
+            _ => d.declaration.push('x'),
+        }
+        let p = p.with_binding_plan(changed).unwrap();
+        let mut imports = imports(&Log::default());
+        imports.unrestricted.clear();
+        imports.grant_package(&plan, "fixture-content");
+        assert!(
+            p.instantiate(HostOptions::new(imports))
+                .err()
+                .unwrap()
+                .to_string()
+                .starts_with("ungranted host import")
+        );
+    }
+    let mut missing = plan.clone();
+    missing.declarations.pop();
+    assert!(program().with_binding_plan(missing).is_err());
+    let mut wrong = plan;
+    wrong.declarations[0].signature.params.push(AbiType::Int);
+    assert!(program().with_binding_plan(wrong).is_err());
+}
+
+#[test]
+fn bg_failed_duplicate_registration_cannot_broaden_a_grant() {
+    let mut imports = HostImports::default();
+    imports
+        .context_external("app:math/v1", "hypot", |_, _| Ok(Value::Float(0.0)))
+        .unwrap();
+    assert!(
+        imports
+            .external("app:math/v1", "hypot", |_| Ok(Value::Float(0.0)))
+            .is_err()
+    );
+    assert!(
+        !imports
+            .unrestricted
+            .contains(&("app:math/v1".into(), "hypot".into()))
+    );
+}
+
+fn bg_context_imports(
+    contexts: Arc<Mutex<Vec<(ResourceContext, BigInt)>>>,
+    disposed: Arc<std::sync::atomic::AtomicUsize>,
+) -> HostImports {
+    let mut imports = imports(&Log::default());
+    let key = ("app:console/v1".into(), "print".into());
+    imports.functions.remove(&key);
+    imports.unrestricted.remove(&key);
+    imports
+        .context_service("app:console/v1", "print", move |context, _| {
+            let disposed = disposed.clone();
+            let id = context.insert("fixture", (), move |_, _| {
+                disposed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            })?;
+            contexts.lock().unwrap().push((context, id));
+            Ok(Ok(Value::Nil))
+        })
+        .unwrap();
+    imports
+}
+
+#[test]
+fn bg_sequential_invocations_and_instances_have_fresh_tables() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let p = program();
+    let plan = bg_plan(&p);
+    let p = p.with_binding_plan(plan.clone()).unwrap();
+    let contexts = Arc::new(Mutex::new(Vec::new()));
+    let disposed = Arc::new(AtomicUsize::new(0));
+    let mut imports = bg_context_imports(contexts.clone(), disposed.clone());
+    imports.grant_package(&plan, "fixture-content");
+    let options = HostOptions::new(imports);
+    for _ in 0..2 {
+        let mut instance = p.instantiate(options.clone()).unwrap();
+        for _ in 0..2 {
+            instance
+                .call("print", &[Value::String("test".into())])
+                .unwrap();
+        }
+        instance.dispose();
+    }
+    let contexts = contexts.lock().unwrap();
+    assert_eq!(contexts.len(), 6); // Two initializations and four invocations.
+    assert_eq!(disposed.load(Ordering::SeqCst), 6);
+    for pair in contexts.windows(2) {
+        assert!(pair[0].1 < pair[1].1);
+    }
+    for (context, id) in contexts.iter() {
+        assert!(!context.is_live());
+        assert!(matches!(
+            context.acquire::<()>(id, "fixture", "read"),
+            Err(resources::ResourceError::Closed)
+        ));
+    }
+}
+
+#[test]
+fn bg_stop_failure_and_abandoned_future_teardown_captured_contexts() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    for mode in 0..3 {
+        let p = program();
+        let plan = bg_plan(&p);
+        let p = p.with_binding_plan(plan.clone()).unwrap();
+        let contexts = Arc::new(Mutex::new(Vec::new()));
+        let disposed = Arc::new(AtomicUsize::new(0));
+        let mut imports = imports(&Log::default());
+        let key = ("app:clock/v1".into(), "later".into());
+        imports.functions.remove(&key);
+        imports.unrestricted.remove(&key);
+        let saved = contexts.clone();
+        let count = disposed.clone();
+        imports
+            .context_async_service("app:clock/v1", "later", move |context, _| {
+                let count = count.clone();
+                let id = context
+                    .insert("fixture", (), move |_, _| {
+                        count.fetch_add(1, Ordering::SeqCst);
+                    })
+                    .unwrap();
+                saved.lock().unwrap().push((context, id));
+                async move {
+                    if mode == 0 {
+                        return Ok(Ok(Value::Float(1.0)));
+                    }
+                    if mode == 1 {
+                        bail!("fixture host failure");
+                    }
+                    std::future::pending::<()>().await;
+                    Ok(Ok(Value::Float(1.0)))
+                }
+            })
+            .unwrap();
+        imports.grant_package(&plan, "fixture-content");
+        let mut instance = p.instantiate(HostOptions::new(imports)).unwrap();
+        if mode == 0 {
+            assert!(matches!(
+                block_on(instance.call_async("app/async.stop_mid", &[])).unwrap(),
+                Outcome::Stop(_)
+            ));
+        } else if mode == 1 {
+            assert!(
+                block_on(instance.call_async("app/async.later", &[Value::Float(1.0)])).is_err()
+            );
+        } else {
+            let mut future = Box::pin(instance.call_async("app/async.later", &[Value::Float(1.0)]));
+            let waker = std::task::Waker::noop();
+            assert!(
+                future
+                    .as_mut()
+                    .poll(&mut std::task::Context::from_waker(waker))
+                    .is_pending()
+            );
+            drop(future);
+        }
+        assert_eq!(
+            disposed.load(Ordering::SeqCst),
+            contexts.lock().unwrap().len()
+        );
+        assert!(!contexts.lock().unwrap().is_empty());
+        for (context, _) in contexts.lock().unwrap().iter() {
+            assert!(!context.is_live());
+        }
+    }
+}
+
+#[test]
+fn bg_two_concurrent_runs_in_one_host_are_independent() {
+    let p = program();
+    let plan = bg_plan(&p);
+    let p = p.with_binding_plan(plan.clone()).unwrap();
+    let ids = Arc::new(Mutex::new(Vec::new()));
+    let barrier = Arc::new(std::sync::Barrier::new(2));
+    let mut imports = imports(&Log::default());
+    let key = ("app:console/v1".into(), "print".into());
+    imports.functions.remove(&key);
+    imports.unrestricted.remove(&key);
+    imports
+        .context_service("app:console/v1", "print", move |context, args| {
+            if !matches!(args, [Value::String(s)] if s == "run") {
+                return Ok(Ok(Value::Nil));
+            }
+            let id = context.insert("fixture", (), |_, _| {})?;
+            ids.lock().unwrap().push(id.clone());
+            barrier.wait();
+            for number in ids.lock().unwrap().iter() {
+                let result = context.acquire::<()>(number, "fixture", "read");
+                if number == &id {
+                    result.unwrap().commit(()).unwrap();
+                } else {
+                    assert!(matches!(result, Err(resources::ResourceError::Closed)));
+                }
+            }
+            barrier.wait();
+            Ok(Ok(Value::Nil))
+        })
+        .unwrap();
+    imports.grant_package(&plan, "fixture-content");
+    let options = HostOptions::new(imports);
+    std::thread::scope(|scope| {
+        for _ in 0..2 {
+            let options = options.clone();
+            let p = &p;
+            scope.spawn(move || {
+                let mut instance = p.instantiate(options).unwrap();
+                instance
+                    .call("print", &[Value::String("run".into())])
+                    .unwrap();
+            });
+        }
+    });
+}
+
+#[test]
+fn bg_close_while_a_request_is_outstanding_rejects_its_late_success() {
+    let p = program();
+    let plan = bg_plan(&p);
+    let p = p.with_binding_plan(plan.clone()).unwrap();
+    let captured = Arc::new(Mutex::new(None));
+    let save = captured.clone();
+    let mut imports = imports(&Log::default());
+    let key = ("app:clock/v1".into(), "later".into());
+    imports.functions.remove(&key);
+    imports.unrestricted.remove(&key);
+    imports
+        .context_async_service("app:clock/v1", "later", move |context, _| {
+            let id = context.insert("test", (), |_, _| {}).unwrap();
+            let lease = context.acquire::<()>(&id, "test", "read").unwrap();
+            *save.lock().unwrap() = Some((context, id));
+            async move {
+                lease.closed().await;
+                assert!(matches!(
+                    lease.commit(Value::Float(1.0)),
+                    Err(resources::ResourceError::Closed)
+                ));
+                Ok(Err(Value::String("closed".into())))
+            }
+        })
+        .unwrap();
+    imports.grant_package(&plan, "fixture-content");
+    let mut instance = p.instantiate(HostOptions::new(imports)).unwrap();
+    let args = [Value::Float(1.0)];
+    let mut call = Box::pin(instance.call_async("app/async.later", &args));
+    assert!(
+        call.as_mut()
+            .poll(&mut std::task::Context::from_waker(std::task::Waker::noop()))
+            .is_pending()
+    );
+    let (context, id) = captured.lock().unwrap().take().unwrap();
+    block_on(context.close(&id, "test"));
+    assert!(
+        matches!(block_on(call).unwrap(), Outcome::Err(GuestError(Value::String(s))) if s == "closed")
+    );
 }

@@ -124,12 +124,17 @@ pub struct CleanupDone {
 impl Drop for CleanupDone {
     fn drop(&mut self) {
         if let Some(table) = self.table.upgrade() {
-            table.lock().unwrap().closing.remove(&self.id);
+            let mut table = table.lock().unwrap();
+            table.closing.remove(&self.id);
+            table.jobs.remove(&self.id);
         }
         self.receipt.0.complete();
     }
 }
 impl CleanupDone {
+    pub fn receipt(&self) -> CloseReceipt {
+        self.receipt.clone()
+    }
     pub fn complete(self) {}
 }
 
@@ -145,6 +150,26 @@ struct Table {
     ended: bool,
     entries: BTreeMap<BigInt, Entry>,
     closing: BTreeMap<BigInt, (String, CloseReceipt)>,
+    jobs: BTreeMap<BigInt, CloseReceipt>,
+    work: BTreeMap<usize, Arc<dyn CancelWork>>,
+}
+
+impl Drop for Table {
+    fn drop(&mut self) {
+        for work in std::mem::take(&mut self.work).into_values() {
+            work.cancel();
+        }
+        for (id, entry) in std::mem::take(&mut self.entries) {
+            for lease in entry.leases.into_values() {
+                lease.complete();
+            }
+            (entry.cleanup)(CleanupDone {
+                receipt: CloseReceipt::default(),
+                table: Weak::new(),
+                id,
+            });
+        }
+    }
 }
 
 /// One immutable invocation identity, shared by all its workers and request roots.
@@ -156,6 +181,24 @@ pub struct ResourceContext {
 impl ResourceContext {
     pub fn is_live(&self) -> bool {
         !self.table.lock().unwrap().ended
+    }
+
+    /// Register a host-owned creation/cleanup job before starting OS work.
+    /// Its independent owner keeps this token until even late-created resources
+    /// have been cleaned. Teardown joins the receipt, not a request future.
+    pub fn cleanup_job(&self) -> Result<CleanupDone, ResourceError> {
+        let id = self.host.allocate()?;
+        let mut table = self.table.lock().unwrap();
+        if table.ended {
+            return Err(ResourceError::Closed);
+        }
+        let receipt = CloseReceipt(Signal::pending());
+        table.jobs.insert(id.clone(), receipt.clone());
+        Ok(CleanupDone {
+            receipt,
+            table: Arc::downgrade(&self.table),
+            id,
+        })
     }
 
     /// Insert before exposing a reply. On exhaustion or a late creation, cleanup
@@ -303,8 +346,13 @@ impl ResourceContext {
             .closing
             .values()
             .map(|(_, receipt)| receipt.clone())
+            .chain(table.jobs.values().cloned())
             .collect();
+        let pending_work = std::mem::take(&mut table.work);
         drop(table);
+        for pending in pending_work.into_values() {
+            pending.cancel();
+        }
         for (cleanup, done) in work {
             cleanup(done);
         }
@@ -330,17 +378,20 @@ impl<T> Lease<T> {
     }
     pub fn commit<A>(self, answer: A) -> Result<A, ResourceError> {
         let table = self.table.upgrade().ok_or(ResourceError::Closed)?;
-        let table = table.lock().unwrap();
-        let live = table
+        let mut table = table.lock().unwrap();
+        let entry = table
             .entries
-            .get(&self.id)
-            .and_then(|e| e.leases.get(&self.lane))
-            .is_some_and(|s| Arc::ptr_eq(s, &self.revoked));
-        if live {
-            Ok(answer)
-        } else {
-            Err(ResourceError::Closed)
+            .get_mut(&self.id)
+            .ok_or(ResourceError::Closed)?;
+        if !entry
+            .leases
+            .get(&self.lane)
+            .is_some_and(|s| Arc::ptr_eq(s, &self.revoked))
+        {
+            return Err(ResourceError::Closed);
         }
+        entry.leases.remove(&self.lane);
+        Ok(answer)
     }
 }
 impl<T> Drop for Lease<T> {
@@ -580,4 +631,166 @@ mod tests {
             });
         });
     }
+}
+
+#[cfg(test)]
+#[test]
+fn teardown_joins_a_creation_job_before_a_resource_exists() {
+    let context = ResourceHost::default().context();
+    let job = context.cleanup_job().unwrap();
+    let receipt = job.receipt();
+    assert_eq!(context.teardown().len(), 1);
+    assert!(!receipt.is_complete());
+    assert!(matches!(context.cleanup_job(), Err(ResourceError::Closed)));
+    let done = Arc::new(Mutex::new(None));
+    let save = done.clone();
+    assert_eq!(
+        context.insert("late", (), move |_, cleanup| *save.lock().unwrap() =
+            Some((job, cleanup))),
+        Err(ResourceError::Closed)
+    );
+    assert!(!receipt.is_complete());
+    drop(done.lock().unwrap().take());
+    assert!(receipt.is_complete());
+    assert!(context.teardown().is_empty());
+}
+
+trait CancelWork: Send + Sync {
+    fn cancel(&self);
+}
+struct PendingWork<T> {
+    future: Option<Pin<Box<dyn Future<Output = T> + Send>>>,
+    wake: Option<Waker>,
+    cancelled: bool,
+}
+struct FutureCell<T> {
+    pending: Mutex<PendingWork<T>>,
+}
+impl<T> CancelWork for FutureCell<T> {
+    fn cancel(&self) {
+        let (future, wake) = {
+            let mut pending = self.pending.lock().unwrap();
+            pending.cancelled = true;
+            (pending.future.take(), pending.wake.take())
+        };
+        // Destructors and poll callbacks never run under a host lock. Work
+        // already inside poll sees cancellation when that finite poll returns.
+        drop(future);
+        if let Some(wake) = wake {
+            wake.wake();
+        }
+    }
+}
+/// Request work owned independently of a Store. Teardown drops its underlying
+/// future immediately, even if no worker ever polls this wrapper again.
+pub struct ResourceFuture<T> {
+    cell: Arc<FutureCell<T>>,
+    table: Weak<Mutex<Table>>,
+    key: usize,
+}
+impl<T> Future for ResourceFuture<T> {
+    type Output = Option<T>;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut future = {
+            let mut pending = self.cell.pending.lock().unwrap();
+            if pending.cancelled {
+                return Poll::Ready(None);
+            }
+            pending.wake = Some(cx.waker().clone());
+            let Some(future) = pending.future.take() else {
+                return Poll::Ready(None);
+            };
+            future
+        };
+        let result = future.as_mut().poll(cx);
+        {
+            let mut pending = self.cell.pending.lock().unwrap();
+            if pending.cancelled {
+                return Poll::Ready(None);
+            }
+            if result.is_pending() {
+                pending.future = Some(future);
+                return Poll::Pending;
+            }
+            pending.wake = None;
+        }
+        drop(future);
+        if let Some(table) = self.table.upgrade() {
+            table.lock().unwrap().work.remove(&self.key);
+        }
+        result.map(Some)
+    }
+}
+impl<T> Drop for ResourceFuture<T> {
+    fn drop(&mut self) {
+        if let Some(table) = self.table.upgrade() {
+            table.lock().unwrap().work.remove(&self.key);
+        }
+        self.cell.cancel();
+    }
+}
+impl ResourceContext {
+    pub fn own_future<T: Send + 'static>(
+        &self,
+        future: impl Future<Output = T> + Send + 'static,
+    ) -> Result<ResourceFuture<T>, ResourceError> {
+        let cell = Arc::new(FutureCell {
+            pending: Mutex::new(PendingWork {
+                future: Some(Box::pin(future)),
+                wake: None,
+                cancelled: false,
+            }),
+        });
+        let key = Arc::as_ptr(&cell) as usize;
+        let mut table = self.table.lock().unwrap();
+        if table.ended {
+            drop(table);
+            cell.cancel();
+            return Err(ResourceError::Closed);
+        }
+        table.work.insert(key, cell.clone());
+        Ok(ResourceFuture {
+            cell,
+            table: Arc::downgrade(&self.table),
+            key,
+        })
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn controller_drops_request_work_without_a_store_or_another_poll() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    struct Dropped(Arc<AtomicBool>);
+    impl Drop for Dropped {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+    let context = ResourceHost::default().context();
+    let dropped = Arc::new(AtomicBool::new(false));
+    let guard = Dropped(dropped.clone());
+    let work = context
+        .own_future(async move {
+            let _guard = guard;
+            std::future::pending::<()>().await;
+        })
+        .unwrap();
+    context.teardown();
+    assert!(dropped.load(Ordering::SeqCst));
+    assert!(crate::block_on(work).is_none());
+}
+
+#[cfg(test)]
+#[test]
+fn a_host_future_can_reenter_its_controller_without_a_lock_cycle() {
+    let context = ResourceHost::default().context();
+    let controller = context.clone();
+    let work = context
+        .own_future(async move {
+            controller.teardown();
+            42
+        })
+        .unwrap();
+    assert_eq!(crate::block_on(work), None);
 }

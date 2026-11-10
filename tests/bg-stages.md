@@ -52,3 +52,32 @@ The lane was clean at b9173ce. There was no interrupted uncommitted work.
 - `node --test bindings/javascript/test/resources.test.mjs`: 5 passed.
 - The expectations above come from N9.1–N9.5, not generated expected outputs.
 - `cargo metadata --no-deps --format-version 1`: workspace root is this lane.
+
+## Stage 2 results
+
+- `cargo test -p ilang-host --locked`: 66 passed, no ignored tests.
+- `cargo clippy -p ilang-host -p ilang-cli --all-targets --locked -- -D warnings`:
+  passed. The first Clippy run found one test initializer style error, corrected
+  without changing any assertion.
+- `npm test`: 58 passed. `npm run test:browser -- tests/browser/bg.spec.mjs`:
+  6 passed across Chromium, Firefox and WebKit on port 4184.
+- The first JS lifecycle run failed two compatibility tests: ending the startup
+  context too early, and throwing synchronously from an async wrapper. Corrected;
+  the existing assertions pass. The initial private HostImports layout update
+  also caused an E0609 test build error, corrected in that owned test file.
+- The first complete Rust host run found missing-import diagnostic precedence
+  and a test rebuilding registrations without preserving their authority.
+  Corrected; missing registrations still report the original load error.
+- An initial JS concurrent-run test hung because the existing fixture starts
+  two requests per call. Terminated that test process, corrected its deterministic
+  gate, and reran successfully. This was a test-harness correction, not a runtime
+  semantic change.
+- Request futures now have controller-owned cells: teardown drops pending work
+  and wakes idle waiters without a Store borrow or another worker poll. Active
+  finite polls finish outside every host lock and cannot publish after teardown.
+- New regression tests cover close during an outstanding request, late success,
+  reentrant teardown, creation jobs before a resource exists, and both sequential
+  and concurrent invocations. Expectations are N9.1–N9.5 and native 3.1.
+- Test logs were initially written to temporary files outside the lane; they
+  have been moved into this lane's ignored target/bg directory. No temporary
+  logs remain at their original paths. No other checkout was edited.

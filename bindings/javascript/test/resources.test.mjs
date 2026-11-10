@@ -98,3 +98,18 @@ test("N9.4/N9.5: provisional disposal, delivered ownership, late creation and id
   assert.throws(create, code("closed"));
   assert.equal(disposed, 3);
 });
+
+test("N9.4/N9.5: teardown joins a creation job before its resource exists", async () => {
+  const context = new ResourceHost().context();
+  const job = context.cleanupJob();
+  let ended = false;
+  const end = context.teardown().then(() => { ended = true; });
+  await Promise.resolve();
+  assert.equal(ended, false);
+  assert.throws(() => context.cleanupJob(), /closed/);
+  let cleaned = false;
+  assert.throws(() => context.insert("late", {}, () => { cleaned = true; job.complete(); }), /closed/);
+  await end;
+  assert.equal(cleaned, true);
+  assert.equal(ended, true);
+});
