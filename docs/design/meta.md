@@ -134,16 +134,17 @@ In the tables, `e` is an expression, `p` a pattern, `T` a type, `x` and `a` a na
 |---|---|---|
 | Union, intersection, difference | `A \| B \| C`, `A & B`, `A - B - C` | `(\| A B C)`, `(& A B)`, `(- A B C)` |
 | Function type | `(T1, x: T2) -> R` | `(-> (T1 (: x T2)) R)` |
-| With errors and environment | `(T) -> R ? E ! N` | `(-> (T) (! (? R E) N))` |
-| With errors only, environment only | `(T) -> R ? E`, `(T) -> R ! N` | `(-> (T) (? R E))`, `(-> (T) (! R N))` |
-| Tuple type | `(T1, T2)`, `()` | `(, T1 T2)`, `(,)` |
+| With errors and environment | `(T) -> R ^ E ! N` | `(-> (T) (! (^ R E) N))` |
+| With errors only, environment only | `(T) -> R ^ E`, `(T) -> R ! N` | `(-> (T) (^ R E))`, `(-> (T) (! R N))` |
+| Tuple type | `(T1, T2)`, `(T1)` | `(, T1 T2)`, `(, T1)` |
 | Named type | `U`, `a.U`, `U(T1, T2)`, `a.U(T)` | `U`, `(. a U)`, `(U T1 T2)`, `((. a U) T)` |
+| Record top type | `Record` | `Record` |
 | Hole | `_` | `_` |
 | Group | `{ T }` | `{ T }` |
 | Macro call | `m(T, 3)`, `a.m(T)` | `(m T 3)`, `((. a m) T)` |
 
 - `|`, `&`, and `-` take two or more parts in a type. A part may be a `|`, `&`, or `-` form; that is the type with a group there, `A | { B | C }`.
-- A function result is `R`, `(? R E)`, `(! R N)`, or `(! (? R E) N)`. No other use of `?` and `!` is correct there.
+- A function result is `R`, `(^ R E)`, `(! R N)`, or `(! (^ R E) N)`. No other use of `^` and `!` is correct there.
 - A named type with arguments has one or more arguments.
 
 **Expressions and statements**
@@ -153,10 +154,12 @@ In the tables, `e` is an expression, `p` a pattern, `T` a type, `x` and `a` a na
 | Literal | `1`, `1.5`, `"a"` | `1`, `1.5`, `"a"` |
 | Name, member of a module | `x`, `C`, `a.x` | `x`, `C`, `(. a x)` |
 | Call | `f(e1, x: e2)`, `f()` | `(f e1 (: x e2))`, `(f)` |
+| Pipe | `x \| f` | `(\| x f)` |
+| Match | `x.{ p -> e }` | `(. x { (-> p e) })` |
 | Binary operator | `e1 + e2` | `(+ e1 e2)` |
 | Unary operator | `-e`, `-.e` | `(- e)`, `(-. e)` |
 | Field, tuple part | `e.x`, `e.0` | `(. e x)`, `(. e 0)` |
-| Tuple | `(e1, e2)`, `()` | `(, e1 e2)`, `(,)` |
+| Tuple | `(e1, e2)`, `(e1)` | `(, e1 e2)`, `(, e1)` |
 | List | `[e1, e2]`, `[e1, ..e2]` | `[e1 e2]`, `[e1 .. e2]` |
 | Bit array | `<<e1, e2: f, e3: f(e4)>>` | `<<e1 (: e2 f) (: e3 (f e4))>>` |
 | Block, group | `{ s1  s2  e }`, `{ e }` | `{ s1 s2 e }`, `{ e }` |
@@ -166,13 +169,13 @@ In the tables, `e` is an expression, `p` a pattern, `T` a type, `x` and `a` a na
 | Clause with choices | `p1 \| p2 \| p3 -> e` | `(-> (\| p1 p2 p3) e)` |
 | Clause with a guard | `p ? g -> e`, `p1 \| p2 ? g -> e` | `(-> (? p g) e)`, `(-> (? (\| p1 p2) g) e)` |
 | Function with no `->` part | `(p1, p2) { e }` | `(-> (p1 p2) _ e)` |
-| Function with a `->` part | `(p) -> R ? E ! N { e }` | `(-> (p) (! (? R E) N) e)` |
+| Function with a `->` part | `(p) -> R ^ E ! N { e }` | `(-> (p) (! (^ R E) N) e)` |
 | Environment parameter | `x ! T` | `(! x T)` |
 | Record update | `C(..e, x: e2)`, `a.C(..e)` | `(C .. e (: x e2))`, `((. a C) .. e)` |
 | Quote | none | `` `d `` |
 
 - A `Round` with one or more parts whose head is not a symbol is a call, but when its second part is `..` it is a record update. The head is the function. A binary operator takes exactly two parts; `-` and `-.` may take one.
-- **Functions and clauses.** In the position of an expression, a `(-> …)` has three parts: the parameters, the result, and the body. The body is one expression. The result `_` means that the function has no `->` part, so its value, errors, and environment are all inferred (spec §6.8). Any other result is a `->` part, in which a missing `?` or `!` means `Never`; the normal `(x) -> _ { e }` is `(-> (x) (? _ Never) e)`. A clause is a `(-> …)` with two parts, and it is only in a clause block. A function type also has two parts, and it is only in the position of a type. A macro that looks at a `(-> a b)` must know its position to know which of the two it is.
+- **Functions and clauses.** In the position of an expression, a `(-> …)` has three parts: the parameters, the result, and the body. The body is one expression. The result `_` means that the function has no `->` part, so its value, errors, and environment are all inferred (spec §6.8). Any other result is a `->` part, in which a missing `^` or `!` means `Never`; the normal `(x) -> _ { e }` is `(-> (x) (^ _ Never) e)`. A clause is a `(-> …)` with two parts, and it is only in a clause block. A function type also has two parts, and it is only in the position of a type. A macro that looks at a `(-> a b)` must know its position to know which of the two it is.
 - **Blocks.** A `{ }` in the position of an expression is a clause block when it is empty, or when its first part is a `(-> …)` with two parts. Then every part must be a clause. When not, it is a block, and it has one or more parts.
 - A clause block with one clause, `{ (-> p e) }`, and the function `(-> (p) _ e)` are two core trees with one meaning (`docs/design/syntax.md` §6.12).
 - A clause head is `p`, `(| p1 p2 …)` with two or more choices, or `(? head g)` with a head of the first two kinds. `(| …)` is a compile error in every other position of a pattern. A type test `(: x T)` may only be the last choice, because the normal surface reads `x: T | p` as a union type.
@@ -187,7 +190,7 @@ In the tables, `e` is an expression, `p` a pattern, `T` a type, `x` and `a` a na
 | Literal | `1`, `-1`, `-.1.5`, `"a"` | `1`, `(- 1)`, `(-. 1.5)`, `"a"` |
 | String prefix | `"a" <> x` | `(<> "a" x)` |
 | Constructor | `C`, `a.C`, `C()`, `C(p1, p2)`, `a.C(p)`, `C(p, ..)`, `C(..)` | `C`, `(. a C)`, `(C)`, `(C p1 p2)`, `((. a C) p)`, `(C p ..)`, `(C ..)` |
-| Tuple | `(p1, p2)`, `()` | `(, p1 p2)`, `(,)` |
+| Tuple | `(p1, p2)`, `(p1)` | `(, p1 p2)`, `(, p1)` |
 | List | `[p1, p2]`, `[p, ..]`, `[p, ..x]`, `[..]`, `[..x]` | `[p1 p2]`, `[p ..]`, `[p .. x]`, `[..]`, `[.. x]` |
 | Bit array | `<<p1, p2: f, p3: f(e)>>` | `<<p1 (: p2 f) (: p3 (f e))>>` |
 | Two patterns for one value | `x = p` | `(= x p)` |
@@ -351,13 +354,13 @@ A **macro call** is written in one of these ways, in both surfaces. `m` is a nam
 
 | Position | Written | Arguments | The result must be |
 |---|---|---|---|
-| Expression | `m(args)`, `e \|> m`, `e \|> m(args)` | Expressions, with or without labels | An expression |
+| Expression | `m(args)`, `e \| m`, `e \| m(args)` | Expressions, with or without labels | An expression |
 | Item at the top level | `m(args)` | Expressions | An item, or a `Curly` of zero or more items |
 | Before an item | `@m Item`, `@m(args) Item` | Expressions, and then the item as the last argument | See below |
 | Type | `m(args)` | Types, integer literals, and strings, with no labels | A type |
 
 - The parser does not know which names are macros. The arguments are always read by the grammar of the position, as in the table, so a file can be read and formatted with no other file. From this, an argument in the position of an expression cannot be a type such as `Int | Nil` or `(Int) -> String`, a discard, or a list pattern with `..`.
-- `e |> m` is the macro call `m(e)`, and `e |> m(args)` is the macro call `m(e, args)`, as `|>` works for every call (spec §6.9). This is only in the position of an expression.
+- `e | m` is the macro call `m(e)`, and `e | m(args)` is the macro call `m(e, args)`, as `|` works for every call (spec §6.9). This is only in the position of an expression.
 - The number of arguments must be the number of parameters of the macro. An argument with a label goes to the parameter with that label, by the rule of calls (spec §6.6), and the macro gets it with no label.
 - The arguments are not worked out. The macro gets their `Syntax`, and its result says if and when each of them is worked out.
 - A name in a bit array format, as `size` in `<<x: size(8)>>`, is never a macro call.
@@ -376,7 +379,7 @@ A **macro call** is written in one of these ways, in both surfaces. `m` is a nam
 **Limits on what a result may have.**
 
 - Imports and exports cannot be in a result.
-- The attributes `@external`, `@js`, `@host`, `@main`, and `@test` may be in a result only when the attribute came from the code of the caller (it has no marks, §5). So a macro of a package that the program depends on cannot add a host import or an entry point that the caller did not write.
+- The attributes `@external`, `@js`, `@host`, `@test` may be in a result only when the attribute came from the code of the caller (it has no marks, §5). So a macro of a package that the program depends on cannot add a host import or an entry point that the caller did not write.
 - A `Curly` directly inside the `Curly` of a result of items is a compile error.
 
 ### 4.4 Expanding
@@ -500,7 +503,7 @@ A **typed macro** is a declaration and a binding with the same name in a `.is` f
 
 A typed macro is used only in the position of an expression, written as in §4.3. For type checking, the call is a call of a function with the type of the signature:
 
-- The arguments are checked as the arguments of that function. Labels, expected types (spec §4.8), and `|>` work as for a function.
+- The arguments are checked as the arguments of that function. Labels, expected types (spec §4.8), and `|` work as for a function.
 - The call has the result type, the errors, and the environment of the signature, with its type variables filled in by inference as for any call. The errors and the environment of the arguments are part of the call, as for any call, also when the macro does not use an argument.
 - So the types of the code around the call depend only on the signature, never on the result of the macro. Whether a binding is a direct value, and how it is generalized (spec §4.7, §6.10), are decided before any typed macro is expanded.
 
@@ -589,7 +592,7 @@ A type is given to a macro, and taken from a macro, as the `Syntax` of a written
 
 **What is in the compiled program.** A **compile-time binding** is a top-level binding that has `@macro`, or whose full needs have a quote or a function of `i/syntax` in them.
 
-- Compile-time bindings are not in a program that is compiled for `@main` or for host exports. It is a compile error when such a program needs one.
+- Compile-time bindings are not in a program that is compiled for the program entry or for host exports. It is a compile error when such a program needs one.
 - Every other binding of a module with macros is in the program as for any module (spec §2.5). So in §4.2, `failed` is in a program that uses `check.that`.
 - `i test` runs tests with the functions of `i/syntax`, so a test may call the normal functions that a macro is made of, give its own `Definitions` or `Types`, and compare results with `same_code`. In a test, a quote gives the scope of its module with no marks.
 
@@ -631,7 +634,7 @@ A type is given to a macro, and taken from a macro, as the `Syntax` of a written
 
 This is not a small addition. Today the compiler reads all modules, resolves them, orders them, and checks them as one program, and makes one Wasm module. Macros need the compiler to work module by module in the order of imports, and to compile and run macro programs in the middle of that. Typed macros need the checker to keep a type for each expression, to give types as written types, to check a piece of code in the middle of a binding, and to check without adding bounds. None of these is in `ilang-check` today.
 
-- **Spec.** §0 and §2.1 (file names, the library module `i/syntax`, the order of modules), §1.1, §1.5 (`` ` ``, `~`), §2.2 (attributes: `@macro`, a macro before an item, two items with one name), §2.4 (exports checked after expanding), §2.5 (a declaration with `@macro`; compile-time bindings), §3 (a macro call in a type), §6.9 (`|>` with a macro), §10.2 (the macro entry point), §11.7 (stops in expanded code), §13 (`hash` in a macro program), a new section for macros, and a new appendix for the Lisp surface.
+- **Spec.** §0 and §2.1 (file names, the library module `i/syntax`, the order of modules), §1.1, §1.5 (`` ` ``, `~`), §2.2 (attributes: `@macro`, a macro before an item, two items with one name), §2.4 (exports checked after expanding), §2.5 (a declaration with `@macro`; compile-time bindings), §3 (a macro call in a type), §6.9 (`|` with a macro), §10.2 (the macro entry point), §11.7 (stops in expanded code), §13 (`hash` in a macro program), a new section for macros, and a new appendix for the Lisp surface.
 - **`ilang-syntax`.** A parser and a printer for the Lisp surface; datums; quote; the attribute form; a macro call as an item and in a type.
 - **A new driver** over the parser, `ilang-check`, `ilang-wasm`, and `ilang-host`: the order of modules, the two steps of §4.4, marks and the lookup of §5, putting off, the limits, and kept results.
 - **`ilang-check`.** The work named above, and resolving names with scopes.
