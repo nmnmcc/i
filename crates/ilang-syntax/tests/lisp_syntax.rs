@@ -570,3 +570,156 @@ fn definition_query_accepts_only_type_names_and_keeps_atom_scopes() {
     assert!(type_query(&root("value")).is_err());
     assert!(type_query(&root("(. mod value)")).is_err());
 }
+
+#[test]
+fn definition_schedule_retries_fresh_runs_after_a_contribution() {
+    use ilang_syntax::lisp::definition_schedule::{Attempt, schedule};
+    use std::collections::BTreeMap;
+    let mut state = BTreeMap::new();
+    let mut attempts = Vec::new();
+    let mut session = ilang_syntax::lisp::expansion::ExpansionSession::default();
+    let mut marks = Vec::new();
+    let like = root("call");
+    let problems: Vec<ilang_syntax::lisp::definition_schedule::Problem<_, _, _, ()>> = schedule(
+        &mut state,
+        ["uses", "defines"],
+        |state, call, _| {
+            attempts.push(*call);
+            session
+                .run(
+                    &[],
+                    &like,
+                    |_, mark| {
+                        marks.push(mark);
+                        Ok(like.clone())
+                    },
+                    |_, result| Ok(result),
+                )
+                .unwrap();
+            match *call {
+                "uses" if !state.contains_key("T") => Attempt::Deferred {
+                    query: "T",
+                    span: ilang_syntax::span::Span::new(4, 5),
+                },
+                "uses" => Attempt::Complete {
+                    product: ("U", 2),
+                    answers: vec![],
+                },
+                _ => Attempt::Complete {
+                    product: ("T", 1),
+                    answers: vec![],
+                },
+            }
+        },
+        |state, _, (name, value)| {
+            state.insert(name, value);
+            vec![]
+        },
+        |state, query| state.get(query).copied(),
+    );
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(attempts, ["uses", "defines", "uses"]);
+    assert_eq!(marks, [0, 1, 2]);
+    assert_eq!(state.get("U"), Some(&2));
+}
+
+#[test]
+fn definition_schedule_reports_waiters_and_changed_fallback_answers() {
+    use ilang_syntax::lisp::definition_schedule::{Attempt, Mode, Problem, schedule};
+    use ilang_syntax::span::Span;
+    use std::collections::BTreeMap;
+    let mut state = BTreeMap::new();
+    let problems: Vec<Problem<_, _, _, ()>> = schedule(
+        &mut state,
+        ["left", "right"],
+        |_, call, _| Attempt::Deferred {
+            query: if *call == "left" { "B" } else { "A" },
+            span: if *call == "left" {
+                Span::new(1, 2)
+            } else {
+                Span::new(3, 4)
+            },
+        },
+        |_, _, ()| vec![],
+        |state: &BTreeMap<&str, i32>, query| state.get(query).copied(),
+    );
+    assert_eq!(
+        problems,
+        vec![
+            Problem::Waiting {
+                call: "left",
+                query: "B",
+                span: Span::new(1, 2)
+            },
+            Problem::Waiting {
+                call: "right",
+                query: "A",
+                span: Span::new(3, 4)
+            }
+        ]
+    );
+    let mut state = BTreeMap::new();
+    let problems: Vec<Problem<_, _, _, ()>> = schedule(
+        &mut state,
+        ["ask", "define"],
+        |_, call, mode| match (*call, mode) {
+            ("ask", Mode::Fallback) => Attempt::Complete {
+                product: None,
+                answers: vec![("T", 1)],
+            },
+            ("define", Mode::Normal) => Attempt::Deferred {
+                query: "T",
+                span: Span::new(5, 6),
+            },
+            ("define", Mode::Fallback) => Attempt::Complete {
+                product: Some(("T", 2)),
+                answers: vec![],
+            },
+            _ => Attempt::Deferred {
+                query: "T",
+                span: Span::new(2, 3),
+            },
+        },
+        |state, _, product| {
+            if let Some((name, value)) = product {
+                state.insert(name, value);
+            }
+            vec![]
+        },
+        |state, query| state.get(query).copied(),
+    );
+    assert_eq!(
+        problems,
+        vec![Problem::Changed {
+            call: "ask",
+            query: "T",
+            before: 1,
+            after: Some(2)
+        }]
+    );
+}
+
+#[test]
+fn definition_schedule_expands_new_items_before_later_siblings() {
+    use ilang_syntax::lisp::definition_schedule::{Attempt, Problem, schedule};
+    let mut state = Vec::new();
+    let problems: Vec<Problem<_, (), (), ()>> = schedule(
+        &mut state,
+        ["outer", "sibling"],
+        |_, call, _| Attempt::Complete {
+            product: *call,
+            answers: vec![],
+        },
+        |state, _, name| {
+            state.push(name);
+            if name == "outer" {
+                vec!["inner1", "inner2"]
+            } else {
+                vec![]
+            }
+        },
+        |_, _| None,
+    );
+    assert!(problems.is_empty());
+    assert_eq!(state, ["outer", "inner1", "inner2", "sibling"]);
+}
