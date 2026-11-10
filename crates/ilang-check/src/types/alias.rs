@@ -29,6 +29,25 @@ fn has_algebra(t: &Ty) -> bool {
     }
 }
 
+fn has_record(t: &Ty) -> bool {
+    match t {
+        Ty::Graph(g) => g.nodes().into_iter().any(|(_, node)| {
+            matches!(
+                node,
+                super::records::Node::Rec(_) | super::records::Node::Without(..)
+            )
+        }),
+        Ty::Con(_, _, parts) | Ty::Union(parts) | Ty::Inter(parts) => parts.iter().any(has_record),
+        Ty::Fn(f) => {
+            f.params.iter().any(|(_, t)| has_record(t))
+                || [&f.ret, &f.err, &f.env].into_iter().any(has_record)
+        }
+        Ty::Diff(base, heads) => has_record(base) || heads.iter().any(has_record),
+        Ty::Both(a, b) => has_record(a) || has_record(b),
+        Ty::Var(_) | Ty::Never | Ty::Top => false,
+    }
+}
+
 impl Template {
     pub fn apply(&self, args: Vec<Ty>, mut hole: impl FnMut() -> Ty) -> Ty {
         let mut slots = args;
@@ -124,7 +143,7 @@ impl Checker<'_> {
                 slots,
             });
             if let Some(template) = template {
-                if def.exported {
+                if def.exported && has_record(&template.ty) {
                     self.out.alias_artifacts.insert(
                         id,
                         super::scheme_wire::AliasArtifact::new(template.clone(), &self.s, id),

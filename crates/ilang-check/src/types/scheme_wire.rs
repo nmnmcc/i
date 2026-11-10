@@ -11,23 +11,51 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock},
 };
 
 /// A complete, share-preserving interface scheme. Nominal identities are
 /// supplied by its consumer so package paths remain stable across programs.
 #[derive(Clone, Debug)]
 pub struct SchemeArtifact {
-    pub(super) solver: Arc<Mutex<Solver>>,
+    pub(super) catalog: Arc<SchemeCatalog>,
     pub(super) scheme: Scheme,
+}
+
+#[derive(Debug)]
+pub(super) struct SchemeCatalog {
+    pub(super) solver: Mutex<Solver>,
+    pub(super) schemes: Vec<Scheme>,
+    pub(super) externals: OnceLock<FxHashMap<V, usize>>,
+}
+
+impl SchemeCatalog {
+    fn external_ids(&self) -> &FxHashMap<V, usize> {
+        self.externals.get_or_init(|| {
+            let solver = self.solver.lock().expect("scheme catalog");
+            let mut ids = FxHashMap::default();
+            for scheme in &self.schemes {
+                let (vars, _, _) = scheme_roots(&solver, scheme);
+                for v in vars {
+                    if solver.vars[v.0 as usize].level <= scheme.level {
+                        let next = ids.len();
+                        ids.entry(v).or_insert(next);
+                    }
+                }
+            }
+            ids
+        })
+    }
 }
 
 impl SchemeArtifact {
     pub fn text_with(&self, type_name: &mut impl FnMut(TypeRef) -> String) -> String {
+        let external_ids = self.catalog.external_ids();
         encode(
-            &self.solver.lock().expect("scheme snapshot"),
+            &self.catalog.solver.lock().expect("scheme snapshot"),
             &self.scheme,
             type_name,
+            external_ids,
         )
     }
 
@@ -35,17 +63,61 @@ impl SchemeArtifact {
         text: &str,
         type_ref: &mut impl FnMut(&str) -> Option<TypeRef>,
     ) -> Result<Self, String> {
-        let mut solver = Solver::new(HashMap::new(), Vec::new());
+        SchemeEnvironment::default().read(text, type_ref)
+    }
+}
+
+/// Reads schemes belonging to one interface while preserving nongeneralized
+/// variables shared by several exports.
+pub struct SchemeEnvironment {
+    solver: Solver,
+    externals: FxHashMap<usize, V>,
+    next_label: u32,
+}
+
+impl Default for SchemeEnvironment {
+    fn default() -> Self {
+        Self {
+            solver: Solver::new(HashMap::new(), Vec::new()),
+            externals: FxHashMap::default(),
+            next_label: 0,
+        }
+    }
+}
+
+impl SchemeEnvironment {
+    pub fn read(
+        &mut self,
+        text: &str,
+        type_ref: &mut impl FnMut(&str) -> Option<TypeRef>,
+    ) -> Result<SchemeArtifact, String> {
+        let wire: Bundle = serde_json::from_str(text).map_err(|e| e.to_string())?;
+        let mut externals = self.externals.clone();
+        let mut next_label = self.next_label;
         let scheme = decode(
             text,
-            &mut solver,
+            &mut self.solver,
             0,
             type_ref,
-            &mut |i| TyVarId(u32::try_from(i).expect("label binder overflow")),
-            &mut |_, s| Some(s.fresh_at(0)),
+            &mut |_| {
+                let id = TyVarId(next_label);
+                next_label = next_label.checked_add(1).expect("label binder overflow");
+                id
+            },
+            &mut |index, solver| {
+                let id = wire.variables.get(index)?.external?;
+                Some(*externals.entry(id).or_insert_with(|| solver.fresh_at(0)))
+            },
         )?;
-        Ok(Self {
-            solver: Arc::new(Mutex::new(solver)),
+        self.externals = externals;
+        self.next_label = next_label;
+        let ids: FxHashMap<V, usize> = self.externals.iter().map(|(id, v)| (*v, *id)).collect();
+        Ok(SchemeArtifact {
+            catalog: Arc::new(SchemeCatalog {
+                solver: Mutex::new(self.solver.scheme_snapshot()),
+                schemes: vec![scheme.clone()],
+                externals: OnceLock::from(ids),
+            }),
             scheme,
         })
     }
@@ -107,6 +179,7 @@ fn read_variance(code: u8) -> Result<Variance, String> {
 #[derive(Serialize, Deserialize)]
 struct Variable {
     depth: Option<u32>,
+    external: Option<usize>,
     name: Option<String>,
     label: Option<usize>,
     mode: u8,
@@ -130,17 +203,12 @@ fn add_label(labels: &mut Vec<TyVarId>, names: &mut Vec<String>, id: TyVarId, na
     }
 }
 
-/// Encode all roots together so a binder, node, or constraint shared between
-/// the visible type and its bounds has one identity in the bundle.
-pub(super) fn encode(
-    s: &Solver,
-    scheme: &Scheme,
-    type_name: &mut impl FnMut(TypeRef) -> String,
-) -> String {
+fn scheme_roots(s: &Solver, scheme: &Scheme) -> (Vec<V>, FxHashMap<V, usize>, Vec<Ty>) {
     let mut vars = Vec::new();
     let mut index = FxHashMap::default();
     let mut roots = vec![scheme.ty.clone()];
     let mut cursor = 0;
+    let mut processed = 0;
     while cursor < roots.len() {
         let graph = s.records.graph(&roots[cursor]);
         for v in graph.variables() {
@@ -150,27 +218,33 @@ pub(super) fn encode(
             }
         }
         cursor += 1;
-        // Also visit bounds and variable-to-variable edges until closure.
-        let mut i = 0;
-        while i < vars.len() {
-            let state = &s.vars[vars[i].0 as usize];
+        // Visit each discovered variable, its edges and its bound roots once.
+        while processed < vars.len() {
+            let state = &s.vars[vars[processed].0 as usize];
+            processed += 1;
             for v in state.from.iter().chain(&state.into) {
-                if !index.contains_key(v) {
-                    index.insert(*v, vars.len());
+                if let std::collections::hash_map::Entry::Vacant(entry) = index.entry(*v) {
+                    entry.insert(vars.len());
                     vars.push(*v);
                 }
             }
-            i += 1;
-        }
-        // Each variable contributes its bound roots once.
-        let included = (roots.len() - 1) / 3;
-        for v in &vars[included..] {
-            let state = &s.vars[v.0 as usize];
             roots.push(Ty::tuple(state.lower.clone()));
             roots.push(Ty::tuple(state.upper.clone()));
             roots.push(Ty::tuple(state.handled.clone()));
         }
     }
+    (vars, index, roots)
+}
+
+/// Encode all roots together so a binder, node, or constraint shared between
+/// the visible type and its bounds has one identity in the bundle.
+pub(super) fn encode(
+    s: &Solver,
+    scheme: &Scheme,
+    type_name: &mut impl FnMut(TypeRef) -> String,
+    external_ids: &FxHashMap<V, usize>,
+) -> String {
+    let (vars, index, roots) = scheme_roots(s, scheme);
     let mut labels: Vec<TyVarId> = Vec::new();
     let mut label_names = Vec::new();
     for (id, _) in &scheme.key_slots {
@@ -204,6 +278,7 @@ pub(super) fn encode(
         let st = &s.vars[v.0 as usize];
         metadata.push(Variable {
             depth: (st.level > scheme.level).then(|| st.level - scheme.level),
+            external: (st.level <= scheme.level).then(|| external_ids[v]),
             name: st.name.clone(),
             label: st.label_key.map(label_index),
             mode: mode_code(st.row),
@@ -263,7 +338,7 @@ pub(super) fn encode(
         },
     );
     serde_json::to_string(&Bundle {
-        version: 1,
+        version: 2,
         graph: wire,
         variables: metadata,
         labels: label_names,
@@ -288,8 +363,16 @@ pub(super) fn decode(
     external: &mut impl FnMut(usize, &mut Solver) -> Option<V>,
 ) -> Result<Scheme, String> {
     let bundle: Bundle = serde_json::from_str(text).map_err(|e| e.to_string())?;
-    if bundle.version != 1 {
+    if bundle.version != 2 {
         return Err("invalid scheme version".into());
+    }
+    let mut external_ids = std::collections::HashSet::new();
+    for variable in &bundle.variables {
+        match (variable.depth, variable.external) {
+            (Some(depth), None) if depth > 0 => (),
+            (None, Some(id)) if external_ids.insert(id) => (),
+            _ => return Err("invalid scheme variable scope".into()),
+        }
     }
     let mut s = solver.clone();
     for nominal in &bundle.nominals {
@@ -423,6 +506,12 @@ pub(super) fn decode(
         st.handled = bounds[i][2].clone();
         st.from = from;
         st.into = into;
+        if meta.external.is_some()
+            && (vars[i].0 as usize) < solver.vars.len()
+            && *st != solver.vars[vars[i].0 as usize]
+        {
+            return Err("shared external variable has inconsistent constraints".into());
+        }
         if !st.handled.is_empty() {
             s.has_handlers = true;
         }
@@ -454,6 +543,20 @@ mod tests {
     use crate::hir::TypeId;
     use crate::types::FnTy;
     use std::collections::HashMap;
+    fn encode_test(
+        s: &Solver,
+        scheme: &Scheme,
+        names: &mut impl FnMut(TypeRef) -> String,
+    ) -> String {
+        let (vars, _, _) = scheme_roots(s, scheme);
+        let ids = vars
+            .into_iter()
+            .filter(|v| s.vars[v.0 as usize].level <= scheme.level)
+            .enumerate()
+            .map(|(i, v)| (v, i))
+            .collect();
+        encode(s, scheme, names, &ids)
+    }
 
     #[test]
     fn nominal_identity_variance_and_row_modes_survive_transfer() {
@@ -470,7 +573,7 @@ mod tests {
             ty,
             key_slots: vec![],
         };
-        let text = encode(&solver, &scheme, &mut |t| match t {
+        let text = encode_test(&solver, &scheme, &mut |t| match t {
             TypeRef::Builtin(b) => b.name().into(),
             TypeRef::Custom(_) => "pkg:api.Box".into(),
         });
@@ -490,6 +593,149 @@ mod tests {
         .unwrap();
         assert_eq!(destination.variance[&TypeId(99)], [Variance::Inv]);
         assert_eq!(destination.row_params[&TypeId(99)], [Mode::Env]);
+    }
+
+    #[test]
+    fn decoded_hidden_handler_obligations_reject_different_service_forms() {
+        let service = TypeId(17);
+        let mut solver = Solver::new(HashMap::new(), Vec::new());
+        solver.variance.insert(service, vec![Variance::Co]);
+        let row = solver.fresh_at(1);
+        let state = &mut solver.vars[row.0 as usize];
+        state.row = Mode::Env;
+        state.difference = true;
+        state.handled.push(Ty::named(
+            TypeRef::Custom(service),
+            vec![Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![])],
+        ));
+        solver.has_handlers = true;
+        let scheme = Scheme {
+            level: 0,
+            ty: Ty::Var(row),
+            key_slots: vec![],
+        };
+        let text = encode_test(&solver, &scheme, &mut |t| match t {
+            TypeRef::Builtin(b) => b.name().into(),
+            TypeRef::Custom(_) => "pkg:Svc".into(),
+        });
+        let mut restored = Solver::new(HashMap::new(), Vec::new());
+        let decoded = decode(
+            &text,
+            &mut restored,
+            0,
+            &mut |name| match name {
+                "Int" => Some(TypeRef::Builtin(BuiltinType::Int)),
+                "pkg:Svc" => Some(TypeRef::Custom(TypeId(99))),
+                _ => None,
+            },
+            &mut |_| unreachable!(),
+            &mut |_, _| None,
+        )
+        .unwrap();
+        let good = Ty::named(
+            TypeRef::Custom(TypeId(99)),
+            vec![Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![])],
+        );
+        let bad = Ty::named(
+            TypeRef::Custom(TypeId(99)),
+            vec![Ty::named(TypeRef::Builtin(BuiltinType::String), vec![])],
+        );
+        let mut accepted = restored.clone();
+        accepted.constrain_env(&good, &decoded.ty);
+        assert!(accepted.failures.is_empty());
+        restored.constrain_env(&bad, &decoded.ty);
+        assert!(!restored.failures.is_empty());
+    }
+
+    #[test]
+    fn scheme_bounds_follow_long_shared_variable_chains() {
+        let mut solver = Solver::new(HashMap::new(), Vec::new());
+        let vars: Vec<_> = (0..1000).map(|_| solver.fresh_at(1)).collect();
+        for pair in vars.windows(2) {
+            solver.vars[pair[0].0 as usize].from.push(pair[1]);
+            solver.vars[pair[1].0 as usize].into.push(pair[0]);
+        }
+        let scheme = Scheme {
+            level: 0,
+            ty: Ty::Var(vars[0]),
+            key_slots: vec![],
+        };
+        let encoded = encode_test(&solver, &scheme, &mut |_| unreachable!());
+        let bundle: Bundle = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(bundle.variables.len(), vars.len());
+        let mut decoded = Solver::new(HashMap::new(), Vec::new());
+        decode(
+            &encoded,
+            &mut decoded,
+            0,
+            &mut |_| None,
+            &mut |_| unreachable!(),
+            &mut |_, _| None,
+        )
+        .unwrap();
+        assert_eq!(decoded.vars.len(), vars.len());
+        assert_eq!(decoded.vars[0].from, vec![V(1)]);
+        assert_eq!(decoded.vars[999].into, vec![V(998)]);
+    }
+
+    #[test]
+    fn exported_schemes_keep_one_shared_nongeneralized_variable() {
+        let mut solver = Solver::new(HashMap::new(), Vec::new());
+        let shared = solver.fresh_at(0);
+        solver.vars[shared.0 as usize].input = true;
+        solver.vars[shared.0 as usize]
+            .upper
+            .push(Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]));
+        let first = Scheme {
+            level: 0,
+            ty: Ty::Var(shared),
+            key_slots: vec![],
+        };
+        let second = Scheme {
+            level: 0,
+            ty: Ty::tuple(vec![Ty::Var(shared)]),
+            key_slots: vec![],
+        };
+        let catalog = Arc::new(SchemeCatalog {
+            solver: Mutex::new(solver),
+            schemes: vec![first.clone(), second.clone()],
+            externals: OnceLock::new(),
+        });
+        let a = SchemeArtifact {
+            catalog: catalog.clone(),
+            scheme: first,
+        }
+        .text_with(&mut |t| match t {
+            TypeRef::Builtin(b) => b.name().into(),
+            _ => unreachable!(),
+        });
+        let b = SchemeArtifact {
+            catalog,
+            scheme: second,
+        }
+        .text_with(&mut |t| match t {
+            TypeRef::Builtin(b) => b.name().into(),
+            _ => unreachable!(),
+        });
+        let mut env = SchemeEnvironment::default();
+        let resolver =
+            &mut |name: &str| (name == "String").then_some(TypeRef::Builtin(BuiltinType::String));
+        let one = env.read(&a, resolver).unwrap();
+        let two = env.read(&b, resolver).unwrap();
+        assert_eq!(env.externals.len(), 1);
+        assert_eq!(
+            scheme_roots(&one.catalog.solver.lock().unwrap(), &one.scheme).0,
+            [V(0)]
+        );
+        assert_eq!(
+            scheme_roots(&two.catalog.solver.lock().unwrap(), &two.scheme).0,
+            [V(0)]
+        );
+        let mut malformed: serde_json::Value = serde_json::from_str(&b).unwrap();
+        malformed["variables"][0]["input"] = serde_json::Value::Bool(false);
+        let previous = env.solver.vars.clone();
+        assert!(env.read(&malformed.to_string(), resolver).is_err());
+        assert_eq!(env.solver.vars, previous);
     }
 
     #[test]
@@ -527,7 +773,7 @@ mod tests {
             TypeRef::Builtin(b) => b.name().to_string(),
             _ => unreachable!(),
         };
-        let encoded = encode(&s, &scheme, &mut type_name);
+        let encoded = encode_test(&s, &scheme, &mut type_name);
         let mut out = Solver::new(HashMap::new(), Vec::new());
         let decoded = decode(
             &encoded,
@@ -558,7 +804,7 @@ mod tests {
         assert_eq!(out.vars[1].into, vec![V(0)]);
         assert_eq!(out.vars[1].lower.len(), 1);
         // U6 permits different node numbering for the same graph.
-        let again = encode(&out, &decoded, &mut type_name);
+        let again = encode_test(&out, &decoded, &mut type_name);
         let mut original: serde_json::Value = serde_json::from_str(&encoded).unwrap();
         let mut rebuilt: serde_json::Value = serde_json::from_str(&again).unwrap();
         original.as_object_mut().unwrap().remove("graph");
@@ -591,7 +837,7 @@ mod tests {
             ty,
             key_slots: vec![(key, 1)],
         };
-        let encoded = encode(&original, &scheme, &mut |t| match t {
+        let encoded = encode_test(&original, &scheme, &mut |t| match t {
             TypeRef::Builtin(b) => b.name().into(),
             _ => unreachable!(),
         });

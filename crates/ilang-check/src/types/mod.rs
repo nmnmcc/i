@@ -33,7 +33,7 @@ mod value_types;
 
 pub use lits::{LitValue, TestValues};
 pub use records::ShownGraph;
-pub use scheme_wire::{AliasArtifact, SchemeArtifact};
+pub use scheme_wire::{AliasArtifact, SchemeArtifact, SchemeEnvironment};
 pub use shown::{ShownFn, ShownType};
 
 use crate::hir::{BindingRef, CtorRef, DefId, ModuleId, Program, TypeRef};

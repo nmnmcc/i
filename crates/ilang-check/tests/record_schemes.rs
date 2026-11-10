@@ -2,7 +2,7 @@ mod common;
 
 use ilang_check::{
     hir::{BuiltinType, DefId, TypeRef},
-    types::SchemeArtifact,
+    types::{SchemeArtifact, SchemeEnvironment},
 };
 
 #[test]
@@ -49,4 +49,49 @@ fn exported_label_scheme_round_trips_with_cross_module_caller() {
     before.as_object_mut().unwrap().remove("graph");
     after.as_object_mut().unwrap().remove("graph");
     assert_eq!(before, after);
+}
+
+#[test]
+fn exports_from_one_nondirect_binding_retain_shared_type_identity() {
+    let (graph, program, diags) = common::check_files(&[(
+        "src/defs.i",
+        "(a, b)\nmake = (f) { (f, f) }\n(a, b) = make((x) { x })\n",
+    )]);
+    assert!(diags.is_empty(), "{:?}", graph.sources.render_all(&diags));
+    let program = program.unwrap();
+    let (typed, diags) = ilang_check::types::check(&program, &graph.sources);
+    assert!(diags.is_empty(), "{:?}", graph.sources.render_all(&diags));
+    let module = common::module(&program, "app/defs");
+    let artifact = |name: &str| {
+        let index = program
+            .module(module)
+            .defs
+            .iter()
+            .position(|d| d.name == name)
+            .unwrap();
+        &typed.scheme_artifacts[&DefId {
+            module,
+            index: index as u32,
+        }]
+    };
+    let mut name = |t: TypeRef| match t {
+        TypeRef::Builtin(b) => b.name().to_string(),
+        TypeRef::Custom(id) => format!("custom:{}", id.0),
+    };
+    let a = artifact("a").text_with(&mut name);
+    let b = artifact("b").text_with(&mut name);
+    let ids = |text: &str| -> std::collections::BTreeSet<u64> {
+        let json: serde_json::Value = serde_json::from_str(text).unwrap();
+        json["variables"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|v| v["external"].as_u64())
+            .collect()
+    };
+    assert!(!ids(&a).is_empty());
+    assert_eq!(ids(&a), ids(&b));
+    let mut env = SchemeEnvironment::default();
+    env.read(&a, &mut |_| None).unwrap();
+    env.read(&b, &mut |_| None).unwrap();
 }

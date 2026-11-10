@@ -371,7 +371,23 @@ impl<'a> Checker<'a> {
         self.entry_points();
         // The shown type schemes (§4.7).
         let mut typed = std::mem::take(&mut self.out);
-        let mut artifact_solver = None;
+        let artifact_schemes = p
+            .modules
+            .iter()
+            .enumerate()
+            .flat_map(|(mi, module)| {
+                module.defs.iter().enumerate().filter_map(move |(di, def)| {
+                    (def.exported || matches!(def.kind, DefKind::External { .. })).then_some(
+                        DefId {
+                            module: ModuleId(mi as u32),
+                            index: di as u32,
+                        },
+                    )
+                })
+            })
+            .filter_map(|id| self.defs.get(&id).cloned())
+            .collect::<Vec<_>>();
+        let mut artifact_catalog = None;
         let mut test_shaped = HashSet::new();
         for (mi, m) in p.modules.iter().enumerate() {
             self.set_module(ModuleId(mi as u32));
@@ -403,13 +419,17 @@ impl<'a> Checker<'a> {
                         .insert(id, shown.text_limited(&self.s.type_names, 12));
                     typed.schemes.insert(id, shown.text(&self.s.type_names));
                     if d.exported || opts.written {
-                        let solver = artifact_solver.get_or_insert_with(|| {
-                            std::sync::Arc::new(std::sync::Mutex::new(self.s.scheme_snapshot()))
+                        let catalog = artifact_catalog.get_or_insert_with(|| {
+                            std::sync::Arc::new(super::scheme_wire::SchemeCatalog {
+                                solver: std::sync::Mutex::new(self.s.scheme_snapshot()),
+                                schemes: artifact_schemes.clone(),
+                                externals: std::sync::OnceLock::new(),
+                            })
                         });
                         typed.scheme_artifacts.insert(
                             id,
                             super::SchemeArtifact {
-                                solver: solver.clone(),
+                                catalog: catalog.clone(),
                                 scheme: scheme.clone(),
                             },
                         );
