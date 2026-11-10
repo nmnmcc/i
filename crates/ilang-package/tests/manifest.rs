@@ -85,7 +85,7 @@ fn name_rules() {
     assert_eq!(codes(r#"name = "App""#), [code::MANIFEST_NAME]);
     assert_eq!(codes(r#"name = "my-app""#), [code::MANIFEST_NAME]);
     assert_eq!(codes(r#"name = "__x""#), [code::MANIFEST_NAME]);
-    assert_eq!(codes(r#"name = "case""#), [code::MANIFEST_NAME]);
+    assert_eq!(codes(r#"name = "a-b""#), [code::MANIFEST_NAME]);
     assert!(codes(r#"name = "_my_app2""#).is_empty());
     assert!(parse_manifest("").0.is_none());
 }
@@ -104,7 +104,10 @@ fn dependency_names() {
     assert_eq!(deps(r#"i = { path = "x" }"#), [code::DEPENDENCY_NAME]);
     assert_eq!(deps(r#"app = { path = "x" }"#), [code::DEPENDENCY_NAME]);
     assert_eq!(deps(r#"Json = { path = "x" }"#), [code::DEPENDENCY_NAME]);
-    assert_eq!(deps(r#"if = { path = "x" }"#), [code::DEPENDENCY_NAME]);
+    assert_eq!(
+        deps(r#"bad-name = { path = "x" }"#),
+        [code::DEPENDENCY_NAME]
+    );
     assert!(deps(r#"json = { path = "x" }"#).is_empty());
     // Distinct across both tables.
     assert_eq!(
@@ -254,5 +257,20 @@ fn versions() {
         "+1.2.3",
     ] {
         assert_eq!(parse_version(bad), None, "{bad}");
+    }
+}
+
+#[test]
+fn former_keywords_are_package_and_dependency_names() {
+    // Spec §1.4 and A3: these words are ordinary names everywhere.
+    for word in ["import", "export", "case", "if"] {
+        assert!(ilang_package::is_name(word));
+        assert!(codes(&format!("name = \"{word}\"\n")).is_empty());
+        assert!(
+            codes(&format!(
+                "name = \"app\"\n[dependencies]\n{word} = {{ path = \"x\" }}\n"
+            ))
+            .is_empty()
+        );
     }
 }

@@ -105,7 +105,7 @@ fn check(src: &str) -> Result<(), String> {
     if !diags.is_empty() {
         return Err(format!("the output has errors: {diags:?}\n{out}"));
     }
-    if common::shape(&module) != common::shape(&again) {
+    if ilang_syntax::shape::canon(&module) != ilang_syntax::shape::canon(&again) {
         return Err(format!("the output has another tree:\n{out}"));
     }
     if kept_comments(src) != comments(&out) {
@@ -150,8 +150,11 @@ fn format_properties() {
     sources.extend(spec_blocks());
     let mut checked = 0;
     let mut failed = Vec::new();
+    let mut skipped = Vec::new();
     for (name, src) in &sources {
-        if !parse_module(src).1.is_empty() {
+        let (_, diags) = parse_module(src);
+        if !diags.is_empty() {
+            skipped.push(format!("parse {name}"));
             continue;
         }
         checked += 1;
@@ -159,6 +162,18 @@ fn format_properties() {
             eprintln!("=== {name} ===\n{msg}");
             failed.push(name.clone());
         }
+    }
+    skipped.sort();
+    let skipped = skipped.join("\n") + "\n";
+    let skip_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/format_skip.txt");
+    if std::env::var_os("UPDATE").is_some() {
+        fs::write(&skip_path, &skipped).unwrap();
+    } else {
+        assert_eq!(
+            fs::read_to_string(skip_path).unwrap_or_default(),
+            skipped,
+            "skipped sources changed"
+        );
     }
     eprintln!("checked {checked} of {} sources", sources.len());
     assert!(checked > 250, "only {checked} sources were checked");
@@ -186,6 +201,7 @@ fn format_golden() {
             panic!("{}: {msg}", path.display());
         }
         let actual = format(&src).unwrap();
+        assert_ne!(src, actual, "{} must exercise formatting", path.display());
         let out = path.with_extension("out");
         if update {
             fs::write(&out, &actual).unwrap();

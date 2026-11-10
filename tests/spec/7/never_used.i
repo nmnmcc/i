@@ -2,14 +2,17 @@
 // expect: warning W0501
 
 name = (b: Bool) {
-  case b {
-    True -> "yes"
-    _ -> "no"
-    False -> "never"
-  }
+	b |> {
+		True  -> "yes"
+		_     -> "no"
+		False -> "never"
+	}
 }
 
 @test
 names = () {
-  case name(False) { "no" -> Nil  _ -> panic("no") }
+	name(False) |> {
+		"no" -> Nil
+		_    -> panic("no")
+	}
 }

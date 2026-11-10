@@ -185,22 +185,9 @@ fn file_uri(path: &Path) -> String {
         .to_string()
 }
 
-const MAIN: &str = "import (util = app/util)
+const MAIN: &str = " (util = app/util)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser { User(name: String, age: Int) }\n\ngreet = (u: User) { \"héllo 𝕏 \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n";
 
-/// Adds two numbers.
-add = (x, y) { x + y }
-
-User { User(name: String, age: Int) }
-
-greet = (u: User) { \"héllo 𝕏 \" <> u.name }
-
-main = () { util.double(add(1, 2)) }
-";
-
-const UTIL: &str = "export (double)
-
-double = (n: Int) -> Int { n * 2 }
-";
+const UTIL: &str = " (double)\n\ndouble = (n: Int) -> Int { n * 2 }\n";
 
 #[test]
 fn an_editor_session() {
@@ -268,11 +255,11 @@ fn an_editor_session() {
         .iter()
         .map(|i| i["label"].as_str().unwrap())
         .collect();
-    for name in [
-        "x", "y", "add", "greet", "util", "User", "Int", "panic", "case",
-    ] {
+    for name in ["x", "y", "add", "greet", "util", "User", "Int", "panic"] {
         assert!(labels.contains(&name), "{name} in {labels:?}");
     }
+
+    assert!(!labels.contains(&"case"));
 
     // A change with an error: the problem is published, with its code.
     let broken = MAIN.replace("x + y", "x + z");
@@ -355,7 +342,7 @@ fn unsaved_changes_in_another_file() {
     c.open(&main, MAIN);
     assert_eq!(c.diagnostics(&main), vec![]);
     // `double` is no longer exported, in the buffer only.
-    c.open(&util, &UTIL.replace("export (double)", "export ()"));
+    c.open(&util, &UTIL.replace(" (double)", " "));
     let diags = c.diagnostics(&main);
     assert_eq!(
         diags.first().and_then(|d| d.code.clone()),
@@ -662,14 +649,14 @@ fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(hover("k ="), "k: (f: (a) -> b ? e ! n, x: a) -> b ? e ! n");
-    assert_eq!(hover("y ="), "y: b");
-    assert_eq!(hover("f, x"), "f: (a) -> b ? e ! n");
-    assert_eq!(hover("g) {"), "g: (b) -> c ? e2 ! n2");
-    assert_eq!(hover("f, g"), "f: (a) -> b ? e ! n");
-    assert_eq!(hover("x) { g"), "x: a");
-    assert_eq!(hover("b) {"), "b: b");
-    assert_eq!(hover("a, b"), "a: a");
+    assert_eq!(hover("k ="), "k: (f: (A) -> B ? E ! N, x: A) -> B ? E ! N");
+    assert_eq!(hover("y ="), "y: B");
+    assert_eq!(hover("f, x"), "f: (A) -> B ? E ! N");
+    assert_eq!(hover("g) {"), "g: (B) -> C ? E2 ! N2");
+    assert_eq!(hover("f, g"), "f: (A) -> B ? E ! N");
+    assert_eq!(hover("x) { g"), "x: A");
+    assert_eq!(hover("b) {"), "b: B");
+    assert_eq!(hover("a, b"), "a: A");
     c.shutdown();
 }
 
@@ -698,21 +685,21 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(hover("one"), "one: (x: a) -> Int");
-    assert_eq!(hover("x) {\n  y = x"), "x: a");
-    assert_eq!(hover("y = x"), "y: a");
+    assert_eq!(hover("one"), "one: (x: A) -> Int");
+    assert_eq!(hover("x) {\n  y = x"), "x: A");
+    assert_eq!(hover("y = x"), "y: A");
     assert_eq!(
         hover("drop2"),
-        "drop2: (x: a, g: (Int) -> b ? e ! n, h: c) -> b ? e ! n"
+        "drop2: (x: A, g: (Int) -> B ? E ! N, h: C) -> B ? E ! N"
     );
-    assert_eq!(hover("x, g, h"), "x: a");
-    assert_eq!(hover("h) {"), "h: c");
-    assert_eq!(hover("y = (x, h)"), "y: (a, c)");
+    assert_eq!(hover("x, g, h"), "x: A");
+    assert_eq!(hover("h) {"), "h: C");
+    assert_eq!(hover("y = (x, h)"), "y: (A, C)");
     assert_eq!(
         hover("effonly"),
-        "effonly: (f: (a) -> b ? e ! n, x: a) -> Nil ? e ! n"
+        "effonly: (f: (A) -> B ? E ! N, x: A) -> Nil ? E ! N"
     );
-    assert_eq!(hover("f, x) {\n  r"), "f: (a) -> b ? e ! n");
-    assert_eq!(hover("r = "), "r: b");
+    assert_eq!(hover("f, x) {\n  r"), "f: (A) -> B ? E ! N");
+    assert_eq!(hover("r = "), "r: B");
     c.shutdown();
 }

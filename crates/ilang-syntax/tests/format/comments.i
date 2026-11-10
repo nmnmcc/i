@@ -1,6 +1,6 @@
 // A comment at the top of the file.
 
-import (i/core) // the core
+ (i/core) // the core
 
 /// The documentation of a type.
 /// It has two lines.
@@ -31,7 +31,7 @@ area = (shape) { // after the brace
     2 // two
     // after the last part
   ]
-  y = case shape {
+  y =  shape |> {
     // before a clause
     Circle(r) -> r *. r // area of a circle
     Square(s) -> s *. s // area of a square
@@ -43,7 +43,7 @@ area = (shape) { // after the brace
 }
 
 empty = (x) {
-  case x {
+   x |> {
     // nothing here
   }
 }

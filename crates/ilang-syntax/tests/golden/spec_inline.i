@@ -5,14 +5,14 @@ f = (n) { f(n - 1) }
 x = [x]
 group = { a + b } * c
 names = list.map(users, (u) { u.name })
-opt = case opt { Some(u) -> u.name  None -> "" }
-inter = (x: a & Int) -> a { x }
-user = case u { User(n = name, ..) -> n  User(age, name) -> name }
-test = case v { True | _: Int -> 1 }
-whole = case s { whole = "lit" <> rest -> rest }
+opt =  opt |> { Some(u) -> u.name  None -> "" }
+inter(A) = (x: A & Int) -> A { x }
+user =  u |> { User(n = name, ..) -> n  User(age, name) -> name }
+test =  v |> { True | _: Int -> 1 }
+whole =  s |> { whole = "lit" <> rest -> rest }
 bits = <<82, 2:u2>>
 piped = a |> f(b)
 labelled: (x: Int) -> Int = (y) { y }
 diff = (x: { Int | String | Nil } - String) { x }
-yield = (n: { Yield(a) | n } - Yield(a)) { n }
+yield(A, N) = (n: { Yield(A) | N } - Yield(A)) { n }
 update = m.c(..v, f: 1)

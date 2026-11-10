@@ -31,19 +31,19 @@ shared = {
   x + y
 }
 
-clauses = case b {
+clauses = b |> {
   True -> 1
   False -> 0
 }
 
-case_lines = case x {
-  1 | 2 if y -> 3
+case_lines = x |> {
+  1 | 2 ? y -> 3
   _ -> 4
 }
 
 typed = (x) -> Int ? String { x }
 
-negative = case n {
+negative = n |> {
   0 -> 1
   -1 -> 2
   _ -> 3

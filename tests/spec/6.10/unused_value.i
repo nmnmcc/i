@@ -5,6 +5,7 @@
 // first does nothing, so the compiler warns about it.
 @test
 two_statements = () {
-  assert 1 + 1 == 2
-  Nil
+	assert
+	1 + 1 == 2
+	Nil
 }

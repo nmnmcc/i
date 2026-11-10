@@ -1,7 +1,7 @@
 //// The module documentation.
 //// It has two lines.
 
-import (i/core, decode = json/decode, opt = (Option, Some) = std/option,)
-export (main, User(..),)
+ (i/core, decode = json/decode, opt = (Option, Some) = std/option,)
+ (main, User(..),)
 
 main = () { core.print(decode.run("1")) }

@@ -1,0 +1,10 @@
+// spec: 4.7
+// expect: compile-error E0226
+(main)
+pair(A, A) = (x: A) { (x, x) }
+
+@main
+main = () {
+  assert(True)
+  Nil
+}

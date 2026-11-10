@@ -8,42 +8,51 @@
 // output: double 5
 // output: echo after
 // output: 4 Error("negative") 10
-import (i/control, i/core, i/fail, i/resource)
+(
+	i/control
+	i/core
+	i/fail
+	i/resource
+)
 
 // An async host service: the program waits at each call, and goes on when
 // the host answers through `ilang_resume:…`. Several calls are made one
 // after the other, also through library code and inside a boundary of the
 // program, and a final function waits too.
 @host("test:async/v1", "async")
-Later { Later(double: (n: Int) -> Int ? String, echo: (text: String) -> String) }
+Later {
+	Later(double: (n: Int) -> Int ? String, echo: (text: String) -> String)
+}
 
 @host("test:io/v1")
-Io { Io(print: (text: String) -> Nil) }
+Io {
+	Io(print: (text: String) -> Nil)
+}
 
 twice = (n: Int, later ! Later) { later.double(later.double(n)) }
 
 @main
 main = (later ! Later, io ! Io) {
-  a = twice(1)
-  b = later.echo(core.inspect(a))
-  c = fail.catch(() { later.double(-1) })
-  d = resource.ensure(() { 5 }, () {
-    later.echo("final")
-    Nil
-  })
-  e = control.boundary((bd) {
-    x = later.double(d)
-    later.echo("after")
-    x
-  })
-  io.print(b <> " " <> core.inspect(c) <> " " <> core.inspect(e))
+	a = twice(1)
+	b = later.echo(core.inspect(a))
+	c = fail.catch(() { later.double(-1) })
+	d = resource.ensure(() { 5 }, () {
+		later.echo("final")
+		Nil
+	})
+	e = control.boundary((bd) {
+		x = later.double(d)
+		later.echo("after")
+		x
+	})
+	io.print(b <> " " <> core.inspect(c) <> " " <> core.inspect(e))
 }
 
 // A test that may call an async function is async too.
 @test
 async_test = (later ! Later) {
-  case later.double(21) {
-    42 -> Nil
-    n -> panic(core.inspect(n))
-  }
+	later.double(21) |> {
+		42 -> Nil
+		n  -> panic(core.inspect(n))
+	}
 }

@@ -1,3 +1,4 @@
+// old-syntax-check: E0115
 a = 1
-import (i/fail)
+(i/fail)
 b = 2

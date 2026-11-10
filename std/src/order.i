@@ -3,7 +3,7 @@
 //// Compare functions in `std` have the type `(a, a) -> Order`, for example
 //// `int.compare` and `string.compare`. `list.sort` takes such a function.
 
-export (
+(
 	Order(..)
 	negate
 	reverse
@@ -32,7 +32,7 @@ Order {
 /// order.negate(Less)  // Greater
 /// ```
 negate = (order: Order) -> Order {
-	case order {
+	order |> {
 		Less    -> Greater
 		Equal   -> Equal
 		Greater -> Less
@@ -44,13 +44,13 @@ negate = (order: Order) -> Order {
 /// ```i
 /// list.sort([1, 3, 2], order.reverse(int.compare))  // [3, 2, 1]
 /// ```
-reverse = (orderer: (a, a) -> Order ? e ! n) -> (a, a) -> Order ? e ! n {
-	(a, b) { orderer(b, a) }
-}
+reverse(A, E, N) = (
+	orderer: (A, A) -> Order ? E ! N
+) -> (A, A) -> Order ? E ! N { (a, b) { orderer(b, a) } }
 
 /// `-1` for `Less`, `0` for `Equal`, and `1` for `Greater`.
 to_int = (order: Order) -> Int {
-	case order {
+	order |> {
 		Less    -> -1
 		Equal   -> 0
 		Greater -> 1
@@ -61,9 +61,9 @@ to_int = (order: Order) -> Int {
 compare = (a: Order, with: Order) -> Order {
 	x = to_int(a)
 	y = to_int(with)
-	case x == y {
+	{ x == y } |> {
 		True -> Equal
-		False -> case x < y {
+		False -> { x < y } |> {
 			True  -> Less
 			False -> Greater
 		}
@@ -72,7 +72,7 @@ compare = (a: Order, with: Order) -> Order {
 
 /// The greater of two orders, with `Less < Equal < Greater`.
 max = (a: Order, b: Order) -> Order {
-	case compare(a, b) {
+	compare(a, b) |> {
 		Less -> b
 		_    -> a
 	}
@@ -80,7 +80,7 @@ max = (a: Order, b: Order) -> Order {
 
 /// The smaller of two orders, with `Less < Equal < Greater`.
 min = (a: Order, b: Order) -> Order {
-	case compare(a, b) {
+	compare(a, b) |> {
 		Greater -> b
 		_       -> a
 	}
@@ -94,15 +94,15 @@ min = (a: Order, b: Order) -> Order {
 /// order.break_tie(in: int.compare(1, 1), with: Less)  // Less
 /// ```
 break_tie = (in: Order, with: Order) -> Order {
-	case in {
+	in |> {
 		Equal -> with
 		_     -> in
 	}
 }
 
 /// Like `break_tie`, but `with` is only called when it is needed.
-lazy_break_tie = (in: Order, with: () -> Order ? e ! n) -> Order ? e ! n {
-	case in {
+lazy_break_tie(E, N) = (in: Order, with: () -> Order ? E ! N) -> Order ? E ! N {
+	in |> {
 		Equal -> with()
 		_     -> in
 	}

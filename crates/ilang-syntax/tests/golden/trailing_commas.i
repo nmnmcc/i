@@ -7,9 +7,9 @@ add: Int
 )
 now: () -> Int
 
-T(a, b,) { C(a, b) }
+T(A, B,) { C(A, B) }
 
-U(a,) = List(a)
+U(A,) = List(A)
 
 V { C(x: Int, y: Int,) }
 
@@ -18,6 +18,6 @@ W = Result(
   String,
 )
 
-f = (x: Result(a, e,)) { x }
+f(A, E) = (x: Result(A, E,)) { x }
 
 x: Result(Int, Int,) = y

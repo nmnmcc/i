@@ -1,4 +1,10 @@
-export (T, S(..))
+(
+	T
+	S(..)
+)
 
 T = Int
-S { S(get: () -> Int) }
+
+S {
+	S(get: () -> Int)
+}

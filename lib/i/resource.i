@@ -1,6 +1,6 @@
 //// Final functions (§9.5).
 
-export (
+(
 	ensure
 	acquire
 )
@@ -8,14 +8,14 @@ export (
 /// Runs `with` after `body`, whether `body` ends normally, ends with an
 /// error, or is unwound.
 @external("ilang:resource", "ensure")
-ensure: (body: () -> a ? e ! n, with: () -> Nil ! n) -> a ? e ! n
+ensure(A, E, N): (body: () -> A ? E ! N, with: () -> Nil ! N) -> A ? E ! N
 
 /// After `open` is done, runs `release` when `use` ends or is unwound.
-acquire = (
-	open: () -> r ? e ! n
-	release: (r) -> Nil ! n
-	use: (r) -> a ? e ! n
-) -> a ? e ! n {
+acquire(R, E, N, A) = (
+	open: () -> R ? E ! N
+	release: (R) -> Nil ! N
+	use: (R) -> A ? E ! N
+) -> A ? E ! N {
 	resource = open()
 	ensure(() { use(resource) }, () { release(resource) })
 }

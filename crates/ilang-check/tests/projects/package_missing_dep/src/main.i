@@ -1,3 +1,5 @@
-import (gone/x)
+(
+	gone/x
+)
 
 y = 1

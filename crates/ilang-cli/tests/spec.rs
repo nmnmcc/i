@@ -38,6 +38,9 @@ use ilang_host::{HostOptions, Outcome, Program, TestResult};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+#[path = "common/spec_header.rs"]
+mod spec_header;
+
 #[derive(Debug, Clone, PartialEq)]
 enum Expect {
     Pass,
@@ -48,6 +51,8 @@ enum Expect {
 
 struct Case {
     name: String,
+    header_path: PathBuf,
+    comment: &'static str,
     /// The package directory to build.
     project: PathBuf,
     expect: Expect,
@@ -132,6 +137,8 @@ fn cases(root: &Path) -> Vec<Result<Case, String>> {
                 out.push(header(&text, "#").map_err(|e| format!("{name}: {e}")).map(
                     |(expect, output)| Case {
                         name,
+                        header_path: path.join("i.toml"),
+                        comment: "#",
                         project: path.clone(),
                         expect,
                         output,
@@ -150,6 +157,8 @@ fn cases(root: &Path) -> Vec<Result<Case, String>> {
                             .unwrap();
                         Case {
                             name,
+                            header_path: path.clone(),
+                            comment: "//",
                             project: dir.path().to_path_buf(),
                             expect,
                             output,
@@ -236,13 +245,12 @@ fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
     })
 }
 
-fn check(case: &Case, o: &Outcome2) -> Result<(), String> {
+fn check(case: &Case, o: &Outcome2, expect: &Expect) -> Result<(), String> {
     if let (Some(want), Outcome2::Ran { output, .. }) = (&case.output, o)
         && want != output
     {
         return Err(format!("expected the output {want:?}, got {output:?}"));
     }
-    let expect = &case.expect;
     match (expect, o) {
         (Expect::CompileError(code), Outcome2::CompileError { codes, text }) => {
             if codes.iter().any(|c| c == code) {
@@ -370,11 +378,38 @@ fn main() {
 
 fn run_case(case: &Case) -> Result<(), String> {
     let o0 = run(&case.project, Level::O0).map_err(|e| format!("--opt 0: {e}"))?;
-    check(case, &o0).map_err(|e| format!("--opt 0: {e}"))?;
     let o2 = run(&case.project, Level::O2).map_err(|e| format!("--opt 2: {e}"))?;
-    check(case, &o2).map_err(|e| format!("--opt 2: {e}"))?;
     if o0 != o2 {
         return Err(format!("--opt 0 and --opt 2 differ:\n{o0:#?}\n{o2:#?}"));
+    }
+    let mut expect = case.expect.clone();
+    let mut update = None;
+    if std::env::var("UPDATE").as_deref() == Ok("1")
+        && let Expect::Stop(_, old_at) = &expect
+        && let Outcome2::Ran {
+            main: Some(Err(message)),
+            ..
+        } = &o0
+    {
+        let mut lines = message.split('\n');
+        let first = lines.next().unwrap_or("");
+        // An absent at list deliberately does not check the call frames.
+        let at: Vec<String> = if old_at.is_empty() {
+            Vec::new()
+        } else {
+            lines.map(str::to_string).collect()
+        };
+        let text = std::fs::read_to_string(&case.header_path).map_err(|e| e.to_string())?;
+        let updated = spec_header::rewrite(&text, case.comment, first, &at)?;
+        if updated != text {
+            update = Some(updated);
+        }
+        expect = Expect::Stop(first.to_string(), at);
+    }
+    check(case, &o0, &expect).map_err(|e| format!("--opt 0: {e}"))?;
+    check(case, &o2, &expect).map_err(|e| format!("--opt 2: {e}"))?;
+    if let Some(updated) = update {
+        std::fs::write(&case.header_path, updated).map_err(|e| e.to_string())?;
     }
     Ok(())
 }

@@ -1,6 +1,10 @@
-import (textlib/inner)
+(
+	textlib/inner
+)
 
-export (shout)
+(
+	shout
+)
 
 shout = (s: String) { inner.bang(s) }
 

@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Regressions for source extraction and exact negative-example checks."""
+import contextlib
+import importlib.machinery
+import importlib.util
+import io
+import json
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+
+loader = importlib.machinery.SourceFileLoader("old_syntax_check", str(Path(__file__).with_name("old-syntax-check")))
+spec = importlib.util.spec_from_loader(loader.name, loader)
+check = importlib.util.module_from_spec(spec)
+loader.exec_module(check)
+
+
+class Extraction(unittest.TestCase):
+    def test_rust_decodes_source_and_skips_comments_and_chars(self):
+        text = r'''// "wrong = old"
+/* outer /* "nested" */ */
+let c = '"';
+let a = "x = \"a\"\n"; let b = r##"f = { x -> x }"##;'''
+        self.assertEqual([s for _, _, s in check.rust_strings(text)], ['x = "a"\n', 'f = { x -> x }'])
+
+    def test_js_decodes_source_strings_and_templates(self):
+        text = '// "wrong = old"\nconst a = "f = () { Nil }\\n"; const b = `x = ${value}`;'
+        self.assertEqual([s for _, _, s in check.js_strings(text)], ['f = () { Nil }\n', 'x = ${value}'])
+
+    def test_source_templates_are_candidates(self):
+        for text in ['f = () { Nil }', '  a{i} = {{ a{p} }}\n', '(i/core)\nx = 1', '@main\nf = () { Nil }']:
+            self.assertTrue(check.candidate(text), text)
+        self.assertFalse(check.candidate('A message about import and case.'))
+
+    def test_non_source_js_surrogates_do_not_crash_the_inventory(self):
+        # The ABI tests deliberately pass an unpaired surrogate as a host value.
+        value = list(check.js_strings('const value = "\\ud800";'))[0][2]
+        self.assertFalse(check.candidate(value))
+        self.assertTrue(check.identity('host.test.mjs', value).startswith('host.test.mjs:'))
+
+    def test_driver_reads_multiple_sources(self):
+        self.assertEqual(check.parse(['x = "@1..2"', 'x = "@3..4"']), [[], []])
+        self.assertTrue(check.parse(['x ='])[0][0].startswith('E0101:'))
+
+
+class Expectations(unittest.TestCase):
+    def run_case(self, entry, actual, marker=""):
+        source = 'x ='
+        item = dict(path='fixture.rs', line=1, source=source, start=len(marker), end=len(marker) + len(source), host=marker + source, kind='embedded')
+        key = check.identity(item['path'], source)
+        data = type('Data', (), {'read_text': lambda self: json.dumps({key: entry})})()
+        with patch.object(check, 'DATA', data), patch.object(check, 'snippets', return_value=iter([item])), patch.object(check, 'parse', return_value=[actual]), patch.object(check.subprocess, 'run'), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            check.main()
+
+    def test_negative_requires_an_adjacent_expected_diagnostic(self):
+        entry = {'diagnostics': ['E0101: expected an expression']}
+        with self.assertRaises(SystemExit):
+            self.run_case(entry, entry['diagnostics'])
+        self.run_case(entry, entry['diagnostics'], '/* old-syntax-check: E0101 */ ')
+
+    def test_future_track_fails_when_the_source_starts_to_parse(self):
+        entry = {'track': 'T3', 'diagnostics': ['E0114: kept for records']}
+        self.run_case(entry, entry['diagnostics'])
+        with self.assertRaises(SystemExit):
+            self.run_case(entry, [])
+
+    def test_future_track_checks_the_whole_message(self):
+        entry = {'track': 'T3', 'diagnostics': ['E0114: kept for records']}
+        with self.assertRaises(SystemExit):
+            self.run_case(entry, ['E0114: a different error'])
+
+
+if __name__ == '__main__':
+    unittest.main()

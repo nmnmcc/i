@@ -113,13 +113,10 @@ fn run_prints_the_stop_message() {
 fn test_runs_each_test() {
     let dir = package(&[
         ("i.toml", "name = \"app\"\n"),
-        (
-            "src/lib.i",
-            "export (twice)\n\ntwice = (n: Int) { n * 2 }\n",
-        ),
+        ("src/lib.i", " (twice)\n\ntwice = (n: Int) { n * 2 }\n"),
         (
             "test/lib_test.i",
-            "import (app/lib)\n\n@test\ngood = () { case lib.twice(2) { 4 -> Nil  _ -> panic(\"no\") } }\n\n@test\nbad = () { panic(\"bad\") }\n",
+            " (app/lib)\n\n@test\ngood = () {  lib.twice(2) |> { 4 -> Nil  _ -> panic(\"no\") } }\n\n@test\nbad = () { panic(\"bad\") }\n",
         ),
     ]);
     let out = i(&["test"], dir.path());
@@ -151,9 +148,9 @@ fn host_exports() {
         ),
         (
             "src/math.i",
-            r#"import (i/core)
+            r#" (i/core)
 
-export (add, describe, flip, half, bits, unit, alias)
+ (add, describe, flip, half, bits, unit, alias)
 
 add = (a: Int, b: Int) { a + b }
 describe = (name: String, n: Int) { name <> "=" <> core.inspect(n) }
@@ -246,14 +243,14 @@ fn host_exports_give_errors() {
         ),
         (
             "src/math.i",
-            r#"import (i/fail)
+            r#" (i/fail)
 
-export (divide, check, positive, bits)
+ (divide, check, positive, bits)
 
 // The errors are `String | Int`, given to the host in the canonical
 // order: `Int` is member 1 and `String` member 2 (B.2).
 divide = (a: Int, b: Int) {
-  case b {
+   b |> {
     0 -> fail.raise("division by zero")
     1 -> fail.raise(a)
     _ -> a / b
@@ -262,7 +259,7 @@ divide = (a: Int, b: Int) {
 
 // `Nil` and `Bool` errors have their own tags.
 check = (n: Int) -> Float ? Bool | Nil {
-  case n {
+   n |> {
     0 -> fail.raise(Nil)
     1 -> fail.raise(True)
     _ -> 1.5
@@ -277,7 +274,7 @@ positive = (n: Int) {
 
 // A `BitArray` error.
 bits = (b: Bool) -> Nil ? BitArray {
-  case b {
+   b |> {
     True -> fail.raise(<<1, 2>>)
     False -> Nil
   }
@@ -382,9 +379,9 @@ fn host_exports_with_services_and_async() {
         ),
         (
             "src/api.i",
-            r#"import (i/core)
+            r#" (i/core)
 
-export (Kv, Later, lookup, quadruple, both, pure)
+ (Kv, Later, lookup, quadruple, both, pure)
 
 @host("test:kv/v1")
 Kv { Kv(get: (key: String) -> String ? String) }
@@ -568,11 +565,11 @@ fn run_gives_the_standard_services() {
         ("i.toml", "name = \"app\"\n"),
         (
             "src/main.i",
-            "import ((Io) = i/io)\n\n@main\nmain = (io ! Io) {\n  io.print(\"one\")\n  io.print(\"two\")\n}\n",
+            " ((Io) = i/io)\n\n@main\nmain = (io ! Io) {\n  io.print(\"one\")\n  io.print(\"two\")\n}\n",
         ),
         (
             "test/main_test.i",
-            "import (i/io)\n\n@test\nprints = (out ! io.Io) { out.print(\"in a test\") }\n",
+            " (i/io)\n\n@test\nprints = (out ! io.Io) { out.print(\"in a test\") }\n",
         ),
     ]);
     let out = i(&["run"], dir.path());
@@ -600,7 +597,7 @@ fn an_error_stops_a_test() {
         ("i.toml", "name = \"app\"\n"),
         (
             "test/app_test.i",
-            "import (i/fail)\n\nf = (n) { fail.raise(n) }\n\n@test\nraises = () {\n  f(\"oops\")\n  Nil\n}\n",
+            " (i/fail)\n\nf = (n) { fail.raise(n) }\n\n@test\nraises = () {\n  f(\"oops\")\n  Nil\n}\n",
         ),
     ]);
     for opt in [Level::O0, Level::O2] {
@@ -667,7 +664,7 @@ fn located_packages() {
     std::fs::write(work.join("i.toml"), "name = \"lib\"\n").unwrap();
     std::fs::write(
         work.join("src/lib.i"),
-        "export (boom)\n\nboom = (m) {\n  panic(m)\n}\n",
+        " (boom)\n\nboom = (m) {\n  panic(m)\n}\n",
     )
     .unwrap();
     git(&work, &["add", "-A"]);
@@ -683,7 +680,7 @@ fn located_packages() {
         ),
         (
             "src/main.i",
-            "import (lib/lib)\n\n@main\nmain = () {\n  lib.boom(\"x\")\n  Nil\n}\n",
+            " (lib/lib)\n\n@main\nmain = () {\n  lib.boom(\"x\")\n  Nil\n}\n",
         ),
     ]);
     let run = |cache: &str, args: &[&str]| {

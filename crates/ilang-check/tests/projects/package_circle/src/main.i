@@ -1,3 +1,5 @@
-import (a/lib)
+(
+	a/lib
+)
 
 x = lib.y

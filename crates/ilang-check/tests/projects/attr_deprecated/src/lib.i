@@ -1,9 +1,15 @@
-export (old, Old(..), fresh)
+(
+	old
+	Old(..)
+	fresh
+)
 
 @deprecated("use fresh")
 old = 1
 
 @deprecated("use New")
-Old { OldC }
+Old {
+	OldC
+}
 
 fresh = old

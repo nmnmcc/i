@@ -9,7 +9,7 @@ use std::path::Path;
 use wasmtime::{Caller, Config, Engine, Extern, Linker, Module, Store};
 
 /// The import of the standard service (spec §9.7).
-const IO: &str = "import ((Io) = i/io)\n";
+const IO: &str = " ((Io) = i/io)\n";
 
 fn package(main: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
@@ -210,7 +210,7 @@ fn stops_write_the_message_and_exit_with_1() {
         ("", "@main\nmain = () { assert(1 + 1 == 3) }\n"),
         // An error at the entry (§9.3).
         (
-            "import (i/fail)\n",
+            " (i/fail)\n",
             "Bad { Bad(Int) }\n@main\nmain = () { fail.raise(Bad(7)) }\n",
         ),
         // A stop while the top-level values are worked out (§2.5).
@@ -242,14 +242,14 @@ fn long_output_survives_short_writes() {
     let dir = package(&format!(
         "{IO}
 double = (s: String, n: Int) {{
-  case n {{
+  n |> {{
     0 -> s
     _ -> double(s <> s, n - 1)
   }}
 }}
 
 lines = (io ! Io, n: Int) {{
-  case n {{
+  n |> {{
     0 -> Nil
     _ -> {{
       io.print(\"ünïcödé ✓\")
@@ -394,9 +394,7 @@ fn the_standard_service_is_the_one_of_i_io() {
 /// declaration in the program, not in the library.
 #[test]
 fn an_import_that_does_not_agree_with_the_library_is_told_in_the_program() {
-    let source = "import ((Io) = i/io)\n\
-                  @external(\"i:io/v1\", \"print\") p: (text: String) -> Nil\n\
-                  @main\nmain = (io ! Io) {\n\tio.print(\"a\")\n\tp(\"b\")\n}\n";
+    let source = " ((Io) = i/io)\n@external(\"i:io/v1\", \"print\") p: (text: String) -> Nil\n@main\nmain = (io ! Io) {\n\tio.print(\"a\")\n\tp(\"b\")\n}\n";
     for target in [Target::Wasi, Target::Ilang] {
         let dir = package(source);
         let e = match build(dir.path(), options(Level::O0, target)) {

@@ -1,0 +1,217 @@
+#!/usr/bin/env -S python3 -I
+"""Independent counterexamples for a1-front-end.md §3.17."""
+from pathlib import Path
+import contextlib
+import io
+import runpy
+import subprocess
+import tempfile
+from unittest import mock
+
+TOOL = Path(__file__).resolve().with_name('wat-diff')
+
+
+def wat(funcs='', site='\\00\\00\\00\\00\\01\\00\\00\\00\\01\\00\\00\\00', count=3, outside='', start=''):
+    return f'''(module
+(data $site_data "{site}")
+{outside}
+{funcs}
+;; ilang_start
+(func $start (result i32) {start} (i32.const 0))
+(func $ilang_start
+(call $sites_install (array.new_data $sites $site_data (i32.const 0) (i32.const {count}))
+(array.new_fixed $values 0)))
+)
+'''
+
+
+def check(a, b, allowed=None, ok=True, renumber=False):
+    with tempfile.TemporaryDirectory() as folder:
+        root = Path(folder)
+        for side, src in [('a', a), ('b', b)]:
+            (root / side).mkdir(); (root / side / 'test.wat').write_text(src)
+        cmd = ['python3', '-I', str(TOOL), str(root / 'a'), str(root / 'b')]
+        if allowed is not None:
+            (root / 'allowed').write_text(allowed); cmd += ['--allowed', str(root / 'allowed')]
+        if renumber: cmd += ['--renumber']
+        p = subprocess.run(cmd, capture_output=True, text=True)
+        assert (p.returncode == 0) == ok, f'{cmd}\n{p.stdout}\n{p.stderr}'
+
+
+def main():
+    # Independent review F5: reordering definitions changes export index 1.
+    numeric = '(module\n(type $sites (array (mut i32)))\n(type $values (array (mut i32)))\n(data $site_data "")\n(func $sites_install (param (ref $sites)) (param (ref $values)))\n;; app/main.a\n(func $f0 (result i32) (i32.const 11))\n;; app/main.b\n(func $f1 (result i32) (i32.const 22))\n(func $ilang_start\n(call $sites_install (array.new_data $sites $site_data (i32.const 0) (i32.const 0))\n(array.new_fixed $values 0)))\n(export "answer" (func 1))\n)\n'
+    swapped = numeric.replace(';; app/main.a\n(func $f0 (result i32) (i32.const 11))\n;; app/main.b\n(func $f1 (result i32) (i32.const 22))', ';; app/main.b\n(func $f1 (result i32) (i32.const 22))\n;; app/main.a\n(func $f0 (result i32) (i32.const 11))')
+    assert numeric != swapped
+    check(numeric, swapped, '', ok=False)
+    check(numeric, numeric, '', ok=False)
+    # Strict mode masks only the site bytes, and checks their count.
+    check(wat(), wat(site='\\00\\00\\00\\00\\09\\00\\00\\00\\05\\00\\00\\00'))
+    check(wat(), wat(count=0, site=''), ok=False)
+    check(wat(), wat(start='(drop (i32.const 1))'), ok=False)
+    # The coordinator requires unchanged errors to be compared as they are.
+    check('ERROR 1 problems', 'ERROR 1 problems')
+    check('ERROR 1 problems', 'ERROR 2 problems', ok=False)
+    check('ERROR 1 problems', wat(), ok=False)
+    check(wat(), 'ERROR 1 problems', ok=False)
+    # S4 ruling: new cases have no old export. Their unformatted A1
+    # exports are the reference, including exact ERROR text. E1 only
+    # compares shared files, with no site masking.
+    audit = runpy.run_path(str(TOOL))
+
+    def blind_check(before, after, reference=None, byte_equal=False, ok=True, allowed=None):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for side, files in [('a', before), ('b', after), ('reference', reference or {})]:
+                (root / side).mkdir()
+                for name, text in files.items(): (root / side / name).write_text(text)
+            args = [str(TOOL), str(root / 'a'), str(root / 'b')]
+            if reference is not None: args += ['--a1-unformatted', str(root / 'reference')]
+            if byte_equal: args += ['--byte-equal']
+            if allowed is not None:
+                (root / 'allowed').write_text(allowed); args += ['--allowed', str(root / 'allowed')]
+            with mock.patch.dict(audit['main'].__globals__, {'blind_dumps': lambda: {'blind.wat'}}), mock.patch('sys.argv', args), contextlib.redirect_stdout(io.StringIO()):
+                try:
+                    audit['main']()
+                    success = True
+                except audit['Failure']:
+                    success = False
+            assert success == ok, (before, after, reference, byte_equal)
+
+    base = {'old.wat': wat()}
+    new = {**base, 'blind.wat': 'ERROR 1 problems'}
+    blind_check(base, new, byte_equal=True)
+    blind_check(base, {'old.wat': wat(site=''), 'blind.wat': wat()}, byte_equal=True, ok=False)
+    blind_check(base, {**base, 'other.wat': wat()}, byte_equal=True, ok=False)
+    blind_check(base, {'blind.wat': wat()}, byte_equal=True, ok=False)
+    blind_check(base, new, ok=False)
+    blind_check(base, new, reference=base, ok=False)
+    blind_check(base, base, reference=new, ok=False)
+    blind_check(base, new, reference=new)
+    blind_check(base, {**base, 'blind.wat': 'ERROR 2 problems'}, reference=new, ok=False)
+    blind_check(base, {**base, 'blind.wat': 'ERROR 1 problems\r\n'}, reference={**base, 'blind.wat': 'ERROR 1 problems\n'}, ok=False)
+    blind_check(base, {**base, 'blind.wat': wat()}, reference=new, ok=False)
+    blind_check(base, new, reference={**base, 'blind.wat': wat()}, ok=False)
+    blind_check(base, {**base, 'blind.wat': wat()}, reference={**base, 'blind.wat': wat(site='\\00' * 12)})
+    blind_check(base, {**base, 'blind.wat': wat(start='(drop (i32.const 1))')}, reference={**base, 'blind.wat': wat()}, ok=False)
+    # The identical owner rules apply to both reference kinds.
+    skip = 'one-clause p.skip src/p.i:1 r1 fitted clause\n'
+    blind_check(base, {**base, 'blind.wat': wat(';; p.skip\n(func $f0 (i32.const 2))')}, reference={**base, 'blind.wat': wat(';; p.skip\n(func $f0 (i32.const 1))')}, allowed=skip)
+    allowed = 'one-clause p.skip src/p.i:1 r1 one fitted clause\n'
+    a = ''';; p.skip
+(func $f0 (call $j0))
+;; p.skip join 0
+(func $j0 (i32.const 1))
+;; p.keep
+(func $f1 (call $j1))
+;; p.keep join 1
+(func $j1 (i32.const 2))'''
+    b = ''';; p.skip
+(func $f0 (call $j0))
+;; p.skip join 0
+(func $j0 (call $j1))
+;; p.skip join 1
+(func $j1 (i32.const 1))
+;; p.keep
+(func $f1 (call $j2))
+;; p.keep join 2
+(func $j2 (i32.const 2))'''
+    check(wat(a), wat(b), allowed)
+    check(wat(a), wat(b.replace('(i32.const 2)', '(i32.const 3)')), allowed, ok=False)
+    check(wat(a), wat(b + '\n;; p.extra\n(func $f2)'), allowed, ok=False)
+    # A skipped owner's extra closure shifts later function ids, a Ctor
+    # function's id, its $c global, and the elem declaration.
+    a = ''';; p.skip
+(func $f0)
+(func $f1 (i32.const 7))
+(func $f2 (i32.add (local.get $x) (local.get $y)))
+;; p.keep
+(func $f3 (global.get $c1) (call $f2))'''
+    b = ''';; p.skip
+(func $f0 (ref.func $f1))
+;; p:fn1
+(func $f1)
+(func $f2 (i32.const 7))
+(func $f3 (i32.add (local.get $x) (local.get $y)))
+;; p.keep
+(func $f4 (global.get $c2) (call $f3))'''
+    oa = '(global $c1 (ref $clo0) (ref.func $f1))\n(elem declare func $f0 $f1 $f2 $f3)'
+    ob = '(global $c2 (ref $clo0) (ref.func $f2))\n(elem declare func $f0 $f1 $f2 $f3 $f4)'
+    check(wat(a, outside=oa), wat(b, outside=ob), allowed)
+    check(wat(a, outside=oa), wat(a, outside=oa), '')
+    # Every segment/re-entry/closure of a skipped owner is skipped together.
+    sa = ''';; p.skip
+(func $f0 (ref.func $r0))
+;; p.skip after point 0
+(func $s0 (i32.const 0))
+(func $r0 (call $s0))'''
+    sb = sa.replace('(i32.const 0)', '(i32.const 3)')
+    check(wat(sa), wat(sb), allowed)
+    # A closure with no enclosing use must not silently disappear.
+    check(wat(sa), wat(sb + '\n;; p:fn1\n(func $f1)'), allowed, ok=False)
+    # Start entries must give an explicit reason; they cover top-level values.
+    check(wat(start='(i32.const 1)'), wat(start='(i32.const 2)'),
+          'hand ilang_start src/p.i:1 r2 top-level value changed\n')
+    # Pattern text is the only data change allowed, with its exact byte length.
+    old, new = 'pattern x: a did not match ', 'pattern x: A did not match '
+    pa = f'(data $s0 "{old}")'
+    pb = '(data $s0 "' + ''.join(f'\\{b:02x}' for b in new.encode()) + '")'
+    fa = f';; p.keep\n(func $f0 (array.new_data $bytes $s0 (i32.const 0) (i32.const {len(old)})))'
+    fb = fa.replace(str(len(old)), str(len(new)))
+    pair = 'pattern-text p.keep src/p.i:1 r3 {"old":"x: a","new":"x: A"}\n'
+    check(wat(fa, outside=pa), wat(fb, outside=pb), pair)
+    check(wat(fa, outside=pa), wat(fb, outside=pb), '', ok=False)
+    check(wat(fa, outside=pa), wat(fb + '\n;; p.other\n(func $f1)', outside=pb), pair, ok=False)
+    check(wat(), wat(), 'split i/core.f lib/i/core.i:1 r4 whole forbidden\n', ok=False)
+    # Whole-dump entries still require both sides to be real WAT exports.
+    check(wat(';; p.keep\n(func $f0)'), wat(';; p.other\n(func $f0)'),
+          'split p.keep src/p.i:1 r5 whole split top-level tuple\n')
+    # Neither a missing file nor an arbitrary added file is a blind case.
+    with tempfile.TemporaryDirectory() as folder:
+        root = Path(folder); (root / 'a').mkdir(); (root / 'b').mkdir()
+        (root / 'a' / 'test.wat').write_text(wat())
+        (root / 'b' / 'other.wat').write_text(wat())
+        p = subprocess.run(['python3', '-I', str(TOOL), str(root / 'a'), str(root / 'b')], capture_output=True)
+        assert p.returncode != 0
+    # Renumbering is opt-in and bounded by may-fail report entries. Site
+    # operands are decoded through the module strings and the packed table.
+    sa = r'\00\00\00\00\01\00\00\00\02\00\00\00'
+    sb = r'\00\00\00\00\09\00\00\00\09\00\00\00' + sa
+    a = wat(';; p.skip\n(func $f0)\n;; p.keep\n(func $f1 (call $shadow_site (i32.const 0)))', site=sa, outside='(data $s0 "p")')
+    b = wat(';; p.skip\n(func $f0 (call $shadow_site (i32.const 0)))\n;; p.keep\n(func $f1 (call $shadow_site (i32.const 1)))', site=sb, count=6, outside='(data $s0 "p")')
+    modules = '(array.new_fixed $values 1 (array.new_data $bytes $s0 (i32.const 0) (i32.const 1)))))'
+    a = a.replace('(array.new_fixed $values 0)))', modules)
+    b = b.replace('(array.new_fixed $values 0)))', modules)
+    allowed = 'one-clause p.skip src/p.i:1 r6 may-fail fitted pattern\n'
+    check(a, b, allowed, renumber=True)
+    check(a, b, allowed, ok=False)
+    check(a, b.replace('(call $shadow_site (i32.const 1))', '(call $shadow_site (local.get $n))'), allowed, ok=False, renumber=True)
+    check(a, b, 'one-clause p.skip src/p.i:1 r6 not marked may-fail\n', ok=False, renumber=True)
+    # A data $s0 and a segment $s0 use different WAT namespaces.
+    a = wat(';; p.keep\n(func $f0 (ref.func $r0))\n;; p.keep after point 0\n(func $s0 (array.new_data $bytes $s0 (i32.const 0) (i32.const 1)))\n(func $r0 (call $s0))', outside='(data $s0 "p")')
+    check(a, a, '')
+    # Wrappers have no owner and must survive global renumbering, including
+    # their segments, re-entry functions, constants, and repeated entry names.
+    a = ''';; import test:math/v1 add
+(func $f0 (ref.func $r0))
+;; import test:math/v1 add after point 0
+(func $s0 (i32.const 7))
+(func $r0 (call $s0))
+;; async entry
+(func $f1 (call $f0))
+;; async entry
+(func $f2 (call $f0))'''
+    b = a.replace('$f2', '$f9').replace('$f1', '$f8').replace('$f0', '$f7')
+    b = b.replace('$r0', '$r4').replace('$s0', '$s4').replace('point 0', 'point 4')
+    oa = '(global $c0 (ref $clo0) (ref.func $f0))\n(elem declare func $f0 $f1 $f2 $r0)'
+    ob = '(global $c7 (ref $clo0) (ref.func $f7))\n(elem declare func $f7 $f8 $f9 $r4)'
+    check(wat(a, outside=oa), wat(b, outside=ob), '')
+    check(wat(a, outside=oa), wat(b.replace('i32.const 7', 'i32.const 8'), outside=ob), allowed, ok=False)
+    check(wat(a, outside=oa), wat(b.replace('(call $f7)', '(call $f8)'), outside=ob), allowed, ok=False)
+    check(wat(a), wat(), '', ok=False)
+    # Unknown code comments still fail closed.
+    check(wat(';; unknown wrapper\n(func $f0)'), wat(), '', ok=False)
+    print('wat-diff counterexamples passed')
+
+
+if __name__ == '__main__': main()

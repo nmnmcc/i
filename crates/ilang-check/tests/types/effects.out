@@ -5,8 +5,8 @@ half : () -> Int ! Log
 given : (c: Clock) -> Int
 fetch : (url: String) -> String ? Int ! Http
 two : () -> (String, String) ? Int | Nil ! Http
-first : (r: Result(a, b)) -> a ! Assert
-pair : (t: (a, b)) -> a
-head : (List(a)) -> a ! Assert
-unwrap : (Result(Int, a)) -> Int
-51:21: error[E0501]: `Assert` is not a subtype of `Never`
+first : (r: Result(A, B)) -> A ! Assert
+pair : (t: (A, B)) -> A
+head : (List(A)) -> A ! Assert
+unwrap : (Result(Int, A)) -> Int
+66:21: error[E0501]: `Assert` is not a subtype of `Never`

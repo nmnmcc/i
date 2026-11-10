@@ -1,6 +1,6 @@
 //// Functions for tuples of two parts, `(a, b)`.
 
-export (
+(
 	new
 	first
 	second
@@ -10,32 +10,38 @@ export (
 )
 
 /// Makes a pair.
-new = (first: a, second: b) -> (a, b) { (first, second) }
+new(A, B) = (first: A, second: B) -> (A, B) { (first, second) }
 
 /// The first part of a pair.
-first = (pair: (a, b)) -> a { pair.0 }
+first(A, B) = (pair: (A, B)) -> A { pair.0 }
 
 /// The second part of a pair.
-second = (pair: (a, b)) -> b { pair.1 }
+second(A, B) = (pair: (A, B)) -> B { pair.1 }
 
 /// The pair with its parts the other way round.
 ///
 /// ```i
 /// pair.swap((1, "a"))  // ("a", 1)
 /// ```
-swap = (pair: (a, b)) -> (b, a) {
+swap(A, B) = (pair: (A, B)) -> (B, A) {
 	(x, y) = pair
 	(y, x)
 }
 
 /// Changes the first part of a pair with a function.
-map_first = (of: (a, b), with: (a) -> c ? e ! n) -> (c, b) ? e ! n {
+map_first(A, B, C, E, N) = (
+	of: (A, B)
+	with: (A) -> C ? E ! N
+) -> (C, B) ? E ! N {
 	(x, y) = of
 	(with(x), y)
 }
 
 /// Changes the second part of a pair with a function.
-map_second = (of: (a, b), with: (b) -> c ? e ! n) -> (a, c) ? e ! n {
+map_second(A, B, C, E, N) = (
+	of: (A, B)
+	with: (B) -> C ? E ! N
+) -> (A, C) ? E ! N {
 	(x, y) = of
 	(x, with(y))
 }

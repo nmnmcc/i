@@ -1,3 +1,6 @@
-import (check/lib, app/main)
+(
+	check/lib
+	app/main
+)
 
 y = lib.z

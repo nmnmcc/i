@@ -1,4 +1,4 @@
-import (
+(
 	i/core
 	float = std/float
 	int = std/int
@@ -1107,7 +1107,7 @@ to_string_shortest_test = () {
 round_trip_test = () {
 	// to_string then parse gives back the same bits, for many floats.
 	go = (seed, count) {
-		case count {
+		count |> {
 			0 -> Nil
 			_ -> {
 				next = {

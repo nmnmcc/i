@@ -1,6 +1,11 @@
-import (base = (Green) = app/app/base)
+(
+	base = (Green) = app/app/base
+)
 
-export (answer, colors)
+(
+	answer
+	colors
+)
 
 // A module comes after the modules it imports (§2.5).
 answer = base.start + 2

@@ -10,12 +10,49 @@ use crate::lexer::{DocComment, lex};
 use crate::span::Span;
 use crate::token::{Token, TokenKind as T};
 use crate::{Code, Diagnostic};
+use std::collections::HashMap;
 
 type PResult<X> = Result<X, Diagnostic>;
 
-/// Parses a module. The module is complete as far as the source allows; the
-/// diagnostics say what was wrong, sorted by position.
+/// What a `{` that begins an expression begins (§6.1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Brace {
+    Block,
+    Clauses,
+    /// `{ name: … }`, kept for records (E0114); read as clauses.
+    Record,
+}
+
+/// Counts of one parse, for tests: the `{` that were decided, and the
+/// decisions made. Each `{` is decided once.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ParseStats {
+    pub decisions: usize,
+    pub braces: usize,
+}
+
+/// Parses a module in the syntax of §2.2. The module is complete as
+/// far as the source allows; the diagnostics say what was wrong, sorted by
+/// position.
 pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
+    let (module, diags, _) = run(source, true);
+    (module, diags)
+}
+
+#[doc(hidden)]
+pub fn parse_stats(source: &str) -> ParseStats {
+    run(source, true).2
+}
+
+/// Parses without reusing brace decisions, for the cache equivalence test.
+#[doc(hidden)]
+pub fn parse_module_uncached(source: &str) -> (Module, Vec<Diagnostic>) {
+    let (module, diags, _) = run(source, false);
+    (module, diags)
+}
+
+fn run(source: &str, cache: bool) -> (Module, Vec<Diagnostic>, ParseStats) {
     let lexed = lex(source);
     let mut parser = Parser {
         toks: &lexed.tokens,
@@ -24,17 +61,37 @@ pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
         doc_pos: 0,
         pos: 0,
         diags: Vec::new(),
-        no_brace: false,
         guard: false,
+        decided: HashMap::new(),
+        decisions: 0,
+        tuple_type: false,
+        cache,
     };
     let module = parser.module();
+    let stats = ParseStats {
+        decisions: parser.decisions,
+        braces: parser.decided.len(),
+    };
     let mut diags = lexed.diagnostics.clone();
     diags.append(&mut parser.diags);
     diags.sort_by_key(|d| d.span.start);
     // Recovery may go on at the token that failed, and fail there again.
     diags.dedup();
-    (module, diags)
+    if !diags.is_empty()
+        && let Some(hint) = crate::old_syntax_hint(source)
+    {
+        for d in &mut diags {
+            d.message.push_str("; ");
+            d.message.push_str(hint);
+        }
+    }
+    (module, diags, stats)
 }
+
+const RECORD_RESERVED: &str =
+    "`{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`";
+
+const TUPLE_NOTE: &str = "; a tuple type in a clause pattern is put in `{ }`";
 
 struct Parser<'a> {
     toks: &'a [Token],
@@ -43,12 +100,18 @@ struct Parser<'a> {
     doc_pos: usize,
     pos: usize,
     diags: Vec<Diagnostic>,
-    /// Set in the expression after `case`: a `{` after a complete expression
-    /// ends it (§1.7). Cleared inside brackets.
-    no_brace: bool,
     /// Set in a guard: a `->` ends the clause head, so it never makes a `( )`
     /// a function (§6.1). Cleared inside brackets.
     guard: bool,
+    /// The decision for each `{` that begins an expression, by the index of
+    /// its token. A decision depends only on the tokens, so it
+    /// holds after a speculative parse goes back.
+    decided: HashMap<usize, Brace>,
+    decisions: usize,
+    /// Set when a pattern has `x: ( … )`, for the note on tuple types in a
+    /// clause (§7.1).
+    tuple_type: bool,
+    cache: bool,
 }
 
 fn binop(kind: &T) -> Option<BinOp> {
@@ -90,6 +153,40 @@ fn is_name(e: &Expr) -> bool {
         }
         _ => false,
     }
+}
+
+/// Whether the leftmost operand of `e`, through operators, calls, `.f`,
+/// and `.k`, is a clause block.
+fn starts_with_clauses(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Clauses(_) => true,
+        ExprKind::Binary { lhs: e, .. }
+        | ExprKind::Call { callee: e, .. }
+        | ExprKind::Field { target: e, .. }
+        | ExprKind::TupleIndex { target: e, .. } => starts_with_clauses(e),
+        _ => false,
+    }
+}
+
+/// The parameters of a type definition head when it is a list of plain
+/// `UpName`s with no
+/// module and no arguments (§4.3).
+fn head_params(types: &[TypeExpr]) -> Option<Vec<Ident>> {
+    let upper = types
+        .iter()
+        .all(|t| matches!(&t.kind, TypeKind::Named { module: None, args, .. } if args.is_empty()));
+    if !upper {
+        return None;
+    }
+    Some(
+        types
+            .iter()
+            .map(|t| match &t.kind {
+                TypeKind::Named { name, .. } => name.clone(),
+                _ => unreachable!(),
+            })
+            .collect(),
+    )
 }
 
 impl Parser<'_> {
@@ -201,13 +298,12 @@ impl Parser<'_> {
         Ok(Some(module))
     }
 
-    /// Runs `f` inside brackets, where the `case` and guard restrictions do
-    /// not hold.
+    /// Runs `f` inside brackets, where the guard restriction does not hold.
     fn nested<X>(&mut self, f: impl FnOnce(&mut Self) -> PResult<X>) -> PResult<X> {
-        let saved = (self.no_brace, self.guard);
-        (self.no_brace, self.guard) = (false, false);
+        let saved = self.guard;
+        self.guard = false;
         let result = f(self);
-        (self.no_brace, self.guard) = saved;
+        self.guard = saved;
         result
     }
 
@@ -249,9 +345,8 @@ impl Parser<'_> {
     fn recover(&mut self, start: usize, end: usize) {
         let failed = self.pos;
         let top = end + 1 == self.toks.len();
-        let resumes = |t: &Token| {
-            t.brk && !(top && matches!(t.kind, T::LBrace | T::Bang | T::DotDot | T::Case))
-        };
+        let resumes =
+            |t: &Token| t.brk && !(top && matches!(t.kind, T::LBrace | T::Bang | T::DotDot));
         let mut i = start;
         while i < end && !(i > start && i >= failed && resumes(&self.toks[i])) {
             i = match self.close[i] {
@@ -294,23 +389,56 @@ impl Parser<'_> {
             ..Module::default()
         };
         let eof = self.toks.len() - 1;
-        if self.at(&T::Import) {
+        let (mut imports, mut exports) = (false, false);
+        loop {
             let start = self.pos;
-            match self.import() {
-                Ok(items) => module.imports = items,
-                Err(d) => {
-                    self.diags.push(d);
-                    self.recover(start, eof);
+            let from = self.start();
+            let is_import = if self.at_header_group() {
+                let close = self.close[self.pos].unwrap() as usize;
+                let is_import = self.slash_inside(self.pos, close);
+                let msg = if close == self.pos + 1 {
+                    Some("a file with nothing to import or export leaves the group out")
+                } else if is_import && exports {
+                    Some("the imports come before the exports")
+                } else if is_import && imports || !is_import && exports {
+                    Some("a file has at most one imports group and one exports group")
+                } else {
+                    None
+                };
+                if let Some(msg) = msg {
+                    let span = Span::new(from, self.toks[close].span.end);
+                    self.diags
+                        .push(Diagnostic::new(Code::HeaderGroup, span, msg));
+                    self.pos = (close + 1).min(eof);
+                    continue;
                 }
-            }
-        }
-        if self.at(&T::Export) {
-            let start = self.pos;
-            match self.export() {
-                Ok(items) => module.exports = items,
-                Err(d) => {
-                    self.diags.push(d);
-                    self.recover(start, eof);
+                is_import
+            } else {
+                break;
+            };
+            if is_import {
+                imports = true;
+                match self.import() {
+                    Ok(items) => {
+                        module.imports = items;
+                        module.imports_span = Some(self.span_from(from));
+                    }
+                    Err(d) => {
+                        self.diags.push(d);
+                        self.recover(start, eof);
+                    }
+                }
+            } else {
+                exports = true;
+                match self.export() {
+                    Ok(items) => {
+                        module.exports = items;
+                        module.exports_span = Some(self.span_from(from));
+                    }
+                    Err(d) => {
+                        self.diags.push(d);
+                        self.recover(start, eof);
+                    }
                 }
             }
         }
@@ -327,8 +455,30 @@ impl Parser<'_> {
         module
     }
 
+    /// A `(` whose `)` is not followed by `=`: the imports or the exports
+    /// at the start of a file, and an error after it (§2.2).
+    fn at_header_group(&self) -> bool {
+        self.at(&T::LParen)
+            && self.close[self.pos].is_some_and(|c| self.toks[c as usize + 1].kind != T::Eq)
+    }
+
+    /// Whether a `/` is directly inside the brackets at `open` and `close`.
+    fn slash_inside(&self, open: usize, close: usize) -> bool {
+        let mut i = open + 1;
+        while i < close {
+            if self.toks[i].kind == T::Slash {
+                return true;
+            }
+            i = match self.close[i] {
+                Some(c) => c as usize + 1,
+                None => i + 1,
+            };
+        }
+        false
+    }
+
+    /// The imports group.
     fn import(&mut self) -> PResult<Vec<ImportItem>> {
-        self.bump();
         self.expect(&T::LParen)?;
         self.seq(T::RParen, true, |p| {
             let start = p.start();
@@ -365,8 +515,8 @@ impl Parser<'_> {
         })
     }
 
+    /// The exports group.
     fn export(&mut self) -> PResult<Vec<ExportItem>> {
-        self.bump();
         self.expect(&T::LParen)?;
         self.seq(T::RParen, true, |p| {
             let start = p.start();
@@ -395,10 +545,6 @@ impl Parser<'_> {
     }
 
     fn item(&mut self) -> PResult<Item> {
-        if matches!(self.kind(), T::Import | T::Export) {
-            let msg = "`import` and `export` come first in a file, `import` before `export`, at most once each";
-            return Err(Diagnostic::new(Code::ImportPlacement, self.tok().span, msg));
-        }
         let mut doc = self.take_docs();
         let start = self.start();
         let mut attributes = Vec::new();
@@ -407,15 +553,52 @@ impl Parser<'_> {
             // §1.2: a `///` after an attribute is still before the item.
             doc.extend(self.take_docs());
         }
-        let kind = if attributes.iter().any(|a| a.name.name == "external") {
-            let name = self.name()?;
-            self.expect(&T::Colon)?;
-            ItemKind::Declaration {
-                name,
-                ty: self.ty()?,
-            }
-        } else if matches!(self.kind(), T::UpName(_)) {
+        if self.at_header_group() {
+            let close = self.close[self.pos].unwrap() as usize;
+            let span = Span::new(self.start(), self.toks[close].span.end);
+            let msg = if attributes.is_empty() {
+                "a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file"
+            } else {
+                "a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have no attribute before them"
+            };
+            self.pos = (close + 1).min(self.toks.len() - 1);
+            return Err(Diagnostic::new(Code::HeaderGroup, span, msg));
+        }
+        let kind = if matches!(self.kind(), T::UpName(_)) {
             ItemKind::TypeDef(self.type_def()?)
+        } else if self.at_type_params() {
+            let bstart = self.start();
+            let (name, type_params, ty) = self.declared_head()?;
+            match ty {
+                Some(ty) if !self.at(&T::Eq) => ItemKind::Declaration {
+                    name,
+                    type_params,
+                    ty,
+                },
+                ty => {
+                    let pattern = Self::declared_pattern(name, ty);
+                    self.expect(&T::Eq)?;
+                    let value = self.expr()?;
+                    ItemKind::Binding(Binding {
+                        pattern,
+                        value,
+                        span: self.span_from(bstart),
+                        type_params,
+                    })
+                }
+            }
+        } else if self.at_macro_item() {
+            let module = if *self.nth(1) == T::Dot {
+                let module = self.name()?;
+                self.bump();
+                Some(module)
+            } else {
+                None
+            };
+            let name = self.name()?;
+            self.bump();
+            let args = self.args()?;
+            ItemKind::MacroItem { module, name, args }
         } else {
             let bstart = self.start();
             let Some(pattern) = self.binding_head()? else {
@@ -428,7 +611,11 @@ impl Parser<'_> {
                     return Ok(Item {
                         doc,
                         attributes,
-                        kind: ItemKind::Declaration { name, ty },
+                        kind: ItemKind::Declaration {
+                            name,
+                            type_params: Vec::new(),
+                            ty,
+                        },
                         span: self.span_from(start),
                     });
                 }
@@ -439,6 +626,7 @@ impl Parser<'_> {
                 pattern,
                 value,
                 span: self.span_from(bstart),
+                type_params: Vec::new(),
             })
         };
         Ok(Item {
@@ -449,23 +637,129 @@ impl Parser<'_> {
         })
     }
 
+    /// `name ( UpName {, UpName} )` with the `(` on the line of the name,
+    /// followed by `=` or `:`: a binding or a declaration with type
+    /// parameters (§2.5, §6.1 test 1).
+    fn at_type_params(&self) -> bool {
+        if !matches!(self.kind(), T::Name(_)) {
+            return false;
+        }
+        let open = self.pos + 1;
+        if open >= self.toks.len() || self.toks[open].kind != T::LParen || self.toks[open].brk {
+            return false;
+        }
+        let Some(close) = self.close[open] else {
+            return false;
+        };
+        let close = close as usize;
+        let mut j = open + 1;
+        loop {
+            if !matches!(self.toks[j].kind, T::UpName(_)) {
+                return false;
+            }
+            j += 1;
+            if j == close {
+                break;
+            }
+            if self.toks[j].kind == T::Comma {
+                j += 1;
+                if j == close {
+                    break;
+                }
+            } else if !self.toks[j].brk {
+                return false;
+            }
+        }
+        matches!(self.toks[close + 1].kind, T::Eq | T::Colon)
+    }
+
+    /// `name(A, …)` and then `: Type` if there is one.
+    #[allow(clippy::type_complexity)]
+    fn declared_head(&mut self) -> PResult<(Ident, Vec<Ident>, Option<TypeExpr>)> {
+        let name = self.name()?;
+        self.bump();
+        let type_params = self.seq(T::RParen, false, Self::up_name)?;
+        let ty = if self.eat(&T::Colon) {
+            Some(self.ty()?)
+        } else {
+            None
+        };
+        Ok((name, type_params, ty))
+    }
+
+    /// The pattern of a binding with type parameters: the name, with its type.
+    fn declared_pattern(name: Ident, ty: Option<TypeExpr>) -> Pattern {
+        match ty {
+            None => Pattern {
+                kind: PatternKind::Var(name.name),
+                span: name.span,
+            },
+            Some(ty) => Pattern {
+                span: name.span.to(ty.span),
+                kind: PatternKind::Typed {
+                    binder: Binder {
+                        name: name.name,
+                        discard: false,
+                        span: name.span,
+                    },
+                    ty,
+                },
+            },
+        }
+    }
+
+    /// `[name .] name (` … `)` with no `=` or `:` after the `)`: a
+    /// `MacroItem` (§2.2).
+    fn at_macro_item(&self) -> bool {
+        if !matches!(self.kind(), T::Name(_)) {
+            return false;
+        }
+        let mut i = self.pos + 1;
+        if self.toks[i].kind == T::Dot && matches!(self.nth(2), T::Name(_)) {
+            i += 2;
+        }
+        if i >= self.toks.len() || self.toks[i].kind != T::LParen || self.toks[i].brk {
+            return false;
+        }
+        self.close[i].is_some_and(|c| !matches!(self.toks[c as usize + 1].kind, T::Eq | T::Colon))
+    }
+
     fn attribute(&mut self) -> PResult<Attribute> {
         let start = self.bump().start;
+        let module = if matches!(self.kind(), T::Name(_))
+            && *self.nth(1) == T::Dot
+            && matches!(self.nth(2), T::Name(_))
+        {
+            let module = self.name()?;
+            self.bump();
+            Some(module)
+        } else {
+            None
+        };
         let name = self.name()?;
         let mut args = Vec::new();
+        let mut call = None;
         if self.at_joined(&T::LParen) {
-            self.bump();
-            args = self.seq(T::RParen, false, |p| match p.kind() {
-                T::Str(s) => {
-                    let s = s.clone();
-                    Ok((s, p.bump()))
-                }
-                _ => p.error("a string"),
-            })?;
+            let open = self.bump().start;
+            let list = self.args()?;
+            let span = self.span_from(open);
+            let strings: Option<Vec<(String, Span)>> = list
+                .iter()
+                .map(|a| match (&a.label, &a.value.kind) {
+                    (None, ExprKind::String(s)) => Some((s.clone(), a.value.span)),
+                    _ => None,
+                })
+                .collect();
+            match strings {
+                Some(strings) if !strings.is_empty() => args = strings,
+                _ => call = Some((list, span)),
+            }
         }
         Ok(Attribute {
+            module,
             name,
             args,
+            call,
             span: self.span_from(start),
         })
     }
@@ -474,13 +768,23 @@ impl Parser<'_> {
     fn type_def(&mut self) -> PResult<TypeDef> {
         let name = self.up_name()?;
         let mut params = Vec::new();
+        let mut head = Vec::new();
         if self.at_joined(&T::LParen) {
             self.bump();
-            params = self.seq(T::RParen, false, Self::name)?;
+            let types = self.seq(T::RParen, false, Self::ty)?;
+            match head_params(&types) {
+                Some(names) => params = names,
+                None => head = types,
+            }
         }
         if self.eat(&T::Eq) {
             let body = TypeBody::Alias(self.ty()?);
-            return Ok(TypeDef { name, params, body });
+            return Ok(TypeDef {
+                name,
+                params,
+                head,
+                body,
+            });
         }
         if !self.at_joined(&T::LBrace) {
             return self.error("`{` or `=`");
@@ -520,7 +824,12 @@ impl Parser<'_> {
             Ok(constructors)
         })?;
         let body = TypeBody::Custom(constructors);
-        Ok(TypeDef { name, params, body })
+        Ok(TypeDef {
+            name,
+            params,
+            head,
+            body,
+        })
     }
 
     // ---- Statements (§6.10) ----
@@ -578,6 +887,19 @@ impl Parser<'_> {
             let span = self.span_from(start);
             return Ok(Stmt::Env { ty, value, span });
         }
+        if self.at_type_params() {
+            let (name, type_params, ty) = self.declared_head()?;
+            let pattern = Self::declared_pattern(name, ty);
+            self.expect(&T::Eq)?;
+            let value = self.expr()?;
+            let span = self.span_from(start);
+            return Ok(Stmt::Bind(Binding {
+                pattern,
+                value,
+                span,
+                type_params,
+            }));
+        }
         if let Some(pattern) = self.binding_head()? {
             let value = self.expr()?;
             let span = self.span_from(start);
@@ -585,6 +907,7 @@ impl Parser<'_> {
                 pattern,
                 value,
                 span,
+                type_params: Vec::new(),
             }));
         }
         Ok(Stmt::Expr(self.expr()?))
@@ -644,9 +967,32 @@ impl Parser<'_> {
             self.bump();
             let rhs = self.binary(op.level())?;
             if op == BinOp::Pipe
+                && let ExprKind::Clauses(_) = rhs.kind
+            {
+                let ExprKind::Clauses(clauses) = rhs.kind else {
+                    unreachable!()
+                };
+                lhs = Expr {
+                    kind: ExprKind::Case {
+                        subject: Box::new(lhs),
+                        clauses,
+                    },
+                    span: self.span_from(start),
+                };
+                continue;
+            }
+            if op == BinOp::Pipe
                 && !(is_name(&rhs) || matches!(rhs.kind, ExprKind::Call { .. } | ExprKind::Fn(_)))
             {
-                let msg = "the right side of `|>` must be a name, a call, or a function";
+                let msg = if matches!(
+                    rhs.kind,
+                    ExprKind::Binary { .. } | ExprKind::Field { .. } | ExprKind::TupleIndex { .. }
+                ) && starts_with_clauses(&rhs)
+                {
+                    "a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+                } else {
+                    "the right side of `|>` must be a name, a call, a function, or a clause block"
+                };
                 self.diags
                     .push(Diagnostic::new(Code::PipeTarget, rhs.span, msg));
             }
@@ -706,32 +1052,38 @@ impl Parser<'_> {
         }
     }
 
+    /// The arguments of a call, after its `(`, and the `)`.
+    fn args(&mut self) -> PResult<Vec<Arg>> {
+        let args = self.seq(T::RParen, true, |p| {
+            let label = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Colon {
+                let label = p.name()?;
+                p.bump();
+                Some(label)
+            } else {
+                None
+            };
+            Ok(Arg {
+                label,
+                value: p.expr()?,
+            })
+        })?;
+        // §6.6: arguments by position come before arguments by label.
+        let mut labeled = false;
+        for arg in &args {
+            labeled |= arg.label.is_some();
+            if labeled && arg.label.is_none() {
+                let msg = "an argument by position may not come after an argument by label";
+                self.diags
+                    .push(Diagnostic::new(Code::ArgOrder, arg.value.span, msg));
+            }
+        }
+        Ok(args)
+    }
+
     fn call(&mut self, callee: Expr) -> PResult<ExprKind> {
         self.bump();
         if !self.at(&T::DotDot) {
-            let args = self.seq(T::RParen, true, |p| {
-                let label = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Colon {
-                    let label = p.name()?;
-                    p.bump();
-                    Some(label)
-                } else {
-                    None
-                };
-                Ok(Arg {
-                    label,
-                    value: p.expr()?,
-                })
-            })?;
-            // §6.6: arguments by position come before arguments by label.
-            let mut labeled = false;
-            for arg in &args {
-                labeled |= arg.label.is_some();
-                if labeled && arg.label.is_none() {
-                    let msg = "an argument by position may not come after an argument by label";
-                    self.diags
-                        .push(Diagnostic::new(Code::ArgOrder, arg.value.span, msg));
-                }
-            }
+            let args = self.args()?;
             let callee = Box::new(callee);
             return Ok(ExprKind::Call { callee, args });
         }
@@ -800,8 +1152,16 @@ impl Parser<'_> {
                     p.segment(value, start)
                 })?)
             }
-            T::LBrace => ExprKind::Block(self.block()?),
-            T::Case => self.case()?,
+            T::LBrace => match self.decide() {
+                Brace::Block => ExprKind::Block(self.block()?),
+                Brace::Clauses => ExprKind::Clauses(self.clauses()?),
+                Brace::Record => {
+                    let at = self.tok().span;
+                    self.diags
+                        .push(Diagnostic::new(Code::RecordReserved, at, RECORD_RESERVED));
+                    ExprKind::Clauses(self.clauses()?)
+                }
+            },
             _ => return self.error("an expression"),
         };
         Ok(Expr {
@@ -839,8 +1199,7 @@ impl Parser<'_> {
         let start = self.start();
         let is_fn = self.close[self.pos].is_some_and(|c| {
             let next = &self.toks[c as usize + 1];
-            next.kind == T::Arrow && !self.guard
-                || next.kind == T::LBrace && !next.brk && !self.no_brace
+            next.kind == T::Arrow && !self.guard || next.kind == T::LBrace && !next.brk
         });
         self.bump();
         let kind = if is_fn {
@@ -917,40 +1276,165 @@ impl Parser<'_> {
         })
     }
 
-    /// §6.12.
-    fn case(&mut self) -> PResult<ExprKind> {
-        self.bump();
-        let saved = std::mem::replace(&mut self.no_brace, true);
-        let subject = self.expr();
-        self.no_brace = saved;
-        let subject = Box::new(subject?);
-        if !self.at_joined(&T::LBrace) {
-            return self.error("`{` after the expression of `case`");
-        }
-        let clauses = self.braced(|p| {
-            let start = p.start();
-            let mut patterns = vec![p.pattern()?];
-            while p.eat(&T::Pipe) {
-                patterns.push(p.pattern()?);
+    /// The clauses of a clause block, from its `{` (§6.12).
+    fn clauses(&mut self) -> PResult<Vec<Clause>> {
+        self.braced(Self::clause)
+    }
+
+    /// `Pattern { "|" Pattern } [ "?" Expr ] "->" Expr`.
+    fn clause(&mut self) -> PResult<Clause> {
+        let start = self.start();
+        self.tuple_type = false;
+        let patterns = self.clause_patterns();
+        let note = self.tuple_type;
+        let noted = |mut d: Diagnostic| {
+            if note {
+                d.message.push_str(TUPLE_NOTE);
             }
-            let guard = if p.eat(&T::If) {
-                p.guard = true;
-                let guard = p.expr();
-                p.guard = false;
-                Some(guard?)
-            } else {
-                None
+            d
+        };
+        let patterns = patterns.map_err(noted)?;
+        let (guard, body) = self.clause_tail().map_err(noted)?;
+        Ok(Clause {
+            patterns,
+            guard,
+            body,
+            span: self.span_from(start),
+        })
+    }
+
+    fn clause_patterns(&mut self) -> PResult<Vec<Pattern>> {
+        let mut patterns = vec![self.pattern()?];
+        while self.eat(&T::Pipe) {
+            patterns.push(self.pattern()?);
+        }
+        Ok(patterns)
+    }
+
+    fn clause_tail(&mut self) -> PResult<(Option<Expr>, Expr)> {
+        let guard = if self.eat(&T::Question) {
+            self.guard = true;
+            let guard = self.expr();
+            self.guard = false;
+            Some(guard?)
+        } else {
+            None
+        };
+        self.expect(&T::Arrow)?;
+        let body = self.expr()?;
+        Ok((guard, body))
+    }
+
+    // ---- Deciding a `{` (§6.1) ----
+
+    /// Whether the `{` at the current token begins a block or a clause
+    /// block. Each `{` is decided once; the answer is kept by its index.
+    fn decide(&mut self) -> Brace {
+        let at = self.pos;
+        if self.cache
+            && let Some(&b) = self.decided.get(&at)
+        {
+            return b;
+        }
+        self.decisions += 1;
+        let ndiags = self.diags.len();
+        let b = self.nested(|p| Ok(p.probe(at))).unwrap_or(Brace::Block);
+        self.pos = at;
+        self.diags.truncate(ndiags);
+        self.decided.insert(at, b);
+        b
+    }
+
+    /// The tests of §6.1 on the first statement of the `{` at `at`. Moves
+    /// `pos`, which `decide` puts back.
+    fn probe(&mut self, at: usize) -> Brace {
+        let Some(end) = self.close[at] else {
+            return Brace::Block;
+        };
+        let end = end as usize;
+        let s = at + 1;
+        self.pos = s;
+        // 0: `{}`.
+        if s == end {
+            return Brace::Clauses;
+        }
+        // 1: `name(A, …) =` or `:`.
+        if self.at_type_params() {
+            return Brace::Block;
+        }
+        // 2: the longest pattern, and what follows it.
+        self.pos = s;
+        let mut chain = 0;
+        while matches!(self.kind(), T::Name(_)) && *self.nth(1) == T::Eq {
+            self.pos += 2;
+            chain += 1;
+        }
+        let last = self.pos;
+        let p_end = match self.pattern_in(false) {
+            Ok(_) => Some(self.pos),
+            Err(_) if chain > 0 => Some(last - 1),
+            Err(_) => None,
+        };
+        let last_is_tuple = p_end.is_some_and(|e| {
+            e > last
+                && self.toks[last].kind == T::LParen
+                && self.close[last].is_some_and(|c| c as usize + 1 == e)
+        });
+        if let Some(e) = p_end {
+            self.pos = e;
+            let follows = self.kind().clone();
+            if matches!(follows, T::Pipe | T::Question | T::Arrow) {
+                if chain > 0 && last_is_tuple && follows == T::Arrow {
+                    self.bump();
+                    if self.arrow_tail().is_ok() && self.at_joined(&T::LBrace) {
+                        return Brace::Block;
+                    }
+                }
+                return Brace::Clauses;
+            }
+            // 3: a binding.
+            if chain > 0 || follows == T::Eq {
+                return Brace::Block;
+            }
+        }
+        self.pos = s;
+        // 3: an environment statement.
+        if self.at(&T::Bang) {
+            return Brace::Block;
+        }
+        // 4: `{ name: … }`, kept for records.
+        if matches!(self.kind(), T::Name(_)) && *self.nth(1) == T::Colon {
+            return Brace::Record;
+        }
+        // 5: a clause whose pattern is wrong.
+        if self.arrow_before_break(s, end) {
+            self.pos = s;
+            match self.expr() {
+                Err(_) => return Brace::Clauses,
+                Ok(_) if self.at(&T::Arrow) => return Brace::Clauses,
+                Ok(_) => {}
+            }
+        }
+        // 6.
+        Brace::Block
+    }
+
+    /// A `->` outside brackets from `s` to the next break or to `end`.
+    fn arrow_before_break(&self, s: usize, end: usize) -> bool {
+        let mut i = s;
+        while i < end {
+            if i > s && self.toks[i].brk {
+                return false;
+            }
+            if self.toks[i].kind == T::Arrow {
+                return true;
+            }
+            i = match self.close[i] {
+                Some(c) => c as usize + 1,
+                None => i + 1,
             };
-            p.expect(&T::Arrow)?;
-            let body = p.expr()?;
-            Ok(Clause {
-                patterns,
-                guard,
-                body,
-                span: p.span_from(start),
-            })
-        })?;
-        Ok(ExprKind::Case { subject, clauses })
+        }
+        false
     }
 
     // ---- Patterns (§7.1) ----
@@ -996,6 +1480,7 @@ impl Parser<'_> {
             T::Name(_) | T::Discard(_) => {
                 let binder = self.binder()?;
                 if !segment && self.eat(&T::Colon) {
+                    self.tuple_type |= self.at(&T::LParen);
                     PatternKind::Typed {
                         binder,
                         ty: self.ty()?,
@@ -1267,10 +1752,37 @@ impl Parser<'_> {
             }
             T::Name(_) if self.at_qualified() => return self.named_type(),
             T::UpName(_) => return self.named_type(),
-            T::Name(n) => {
-                self.bump();
-                TypeKind::Var(n)
+            // gave an error here for `a.x`.
+            T::Name(_)
+                if (*self.nth(1) == T::Dot && matches!(self.nth(2), T::Name(_))
+                    || *self.nth(1) == T::LParen && !self.toks[self.pos + 1].brk) =>
+            {
+                let module = if *self.nth(1) == T::Dot {
+                    let module = self.name()?;
+                    self.bump();
+                    Some(module)
+                } else {
+                    None
+                };
+                let name = self.name()?;
+                if self.at_joined(&T::LParen) {
+                    self.bump();
+                    let args = self.seq(T::RParen, true, |p| {
+                        Ok(match p.kind().clone() {
+                            T::Int(v) => TypeArg::Int(v, p.bump()),
+                            T::Str(s) => TypeArg::String(s, p.bump()),
+                            _ => TypeArg::Type(p.ty()?),
+                        })
+                    })?;
+                    TypeKind::Call { module, name, args }
+                } else {
+                    TypeKind::ValueOf { module, name }
+                }
             }
+            T::Name(_) => TypeKind::ValueOf {
+                module: None,
+                name: self.name()?,
+            },
             T::Discard(d) if d == "_" => {
                 self.bump();
                 TypeKind::Hole

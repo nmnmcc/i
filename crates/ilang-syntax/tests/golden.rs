@@ -10,7 +10,8 @@ use std::fs;
 use std::path::Path;
 
 fn render(src: &str) -> String {
-    let (module, diags) = parse_module(src);
+    let parse = parse_module;
+    let (module, diags) = parse(src);
     let mut out = print_module(&module);
     let explicit = print_module_explicit(&module);
     let differ: Vec<&str> = explicit
@@ -25,7 +26,8 @@ fn render(src: &str) -> String {
         out.push('\n');
     }
     if diags.is_empty() {
-        let (again, diags2) = parse_module(&print_module(&module));
+        assert_eq!(ilang_syntax::print::unprintable(&module), None);
+        let (again, diags2) = parse(&print_module(&module));
         assert!(
             diags2.is_empty(),
             "the print does not parse: {diags2:?}\n{out}"
@@ -52,8 +54,29 @@ fn render(src: &str) -> String {
 
 #[test]
 fn golden() {
+    check_goldens();
+}
+
+fn check_goldens() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden");
     let update = std::env::var_os("UPDATE").is_some();
+    let retired = dir.with_file_name("golden_old");
+    if update && retired.exists() {
+        for entry in fs::read_dir(&retired).unwrap() {
+            let path = entry.unwrap().path();
+            assert_eq!(path.extension().and_then(|e| e.to_str()), Some("out"));
+            fs::remove_file(path).unwrap();
+        }
+        fs::remove_dir(retired).unwrap();
+    }
+    // Removing a parser input also removes its derived output on regeneration.
+    for entry in fs::read_dir(&dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|e| e == "out") && !path.with_extension("i").exists() {
+            assert!(update, "orphan golden output: {}", path.display());
+            fs::remove_file(path).unwrap();
+        }
+    }
     let mut paths: Vec<_> = fs::read_dir(&dir)
         .unwrap()
         .map(|e| e.unwrap().path())

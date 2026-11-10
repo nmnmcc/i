@@ -7,13 +7,85 @@ pub mod format;
 pub mod lexer;
 pub mod parser;
 pub mod print;
+#[doc(hidden)]
+pub mod shape;
 pub mod span;
 pub mod token;
 
 use span::Span;
 
 pub use lexer::{Lexed, lex};
-pub use parser::parse_module;
+pub use parser::{ParseStats, parse_module, parse_stats};
+
+/// Token marks used to explain errors in packages published before A3.
+/// This never changes how a name is parsed or resolved.
+pub fn old_syntax_marks(source: &str) -> bool {
+    let lexed = lex(source);
+    let mut depth = 0usize;
+    for (i, token) in lexed.tokens.iter().enumerate() {
+        use token::TokenKind as T;
+        if let T::Name(name) = &token.kind {
+            if depth == 0
+                && (i == 0 || token.nl)
+                && matches!(name.as_str(), "import" | "export")
+                && lexed
+                    .tokens
+                    .get(i + 1)
+                    .is_some_and(|t| t.kind == T::LParen && !t.nl)
+            {
+                return true;
+            }
+            if name == "case" {
+                let mut j = i + 1;
+                while let Some(t) = lexed.tokens.get(j) {
+                    if t.nl || t.brk || t.kind == T::Eof {
+                        break;
+                    }
+                    if t.kind == T::LBrace {
+                        j += 1;
+                        while let Some(t) = lexed.tokens.get(j) {
+                            if t.kind == T::RBrace || t.brk {
+                                break;
+                            }
+                            if t.kind == T::Arrow {
+                                return true;
+                            }
+                            j = lexed.close[j].map_or(j + 1, |c| c as usize + 1);
+                        }
+                        break;
+                    }
+                    j = lexed.close[j].map_or(j + 1, |c| c as usize + 1);
+                }
+            }
+        }
+        match token.kind {
+            T::LParen | T::LBracket | T::LBrace | T::LtLt => depth += 1,
+            T::RParen | T::RBracket | T::RBrace | T::GtGt => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    false
+}
+
+/// A migration hint for an error path, never a grammar restriction.
+pub fn old_syntax_hint(source: &str) -> Option<&'static str> {
+    let lexed = lex(source);
+    let has = |name: &str| {
+        lexed
+            .tokens
+            .iter()
+            .any(|t| matches!(&t.kind, token::TokenKind::Name(n) if n == name))
+    };
+    if old_syntax_marks(source) || has("import") || has("export") || has("case") {
+        Some(
+            "if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+        )
+    } else if has("if") {
+        Some("if this is an old clause guard, replace `if condition` with `? condition`")
+    } else {
+        None
+    }
+}
 
 /// The kind of a syntax error. Each kind has a stable code.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -40,6 +112,8 @@ pub enum Code {
     ArgOrder,
     PipeTarget,
     TypeGroupBreak,
+    RecordReserved,
+    HeaderGroup,
 }
 
 impl Code {
@@ -67,6 +141,8 @@ impl Code {
             Code::ArgOrder => "E0110",
             Code::PipeTarget => "E0111",
             Code::TypeGroupBreak => "E0112",
+            Code::RecordReserved => "E0114",
+            Code::HeaderGroup => "E0115",
         }
     }
 }
@@ -89,3 +165,5 @@ impl Diagnostic {
         }
     }
 }
+
+mod walk;

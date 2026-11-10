@@ -1,7 +1,7 @@
 //// The standard service (§9.7). A program that prints imports `Io` from
 //// this module and takes it from the environment of its entry point.
 
-export (
+(
 	Io(..)
 )
 

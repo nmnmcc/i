@@ -335,7 +335,7 @@ fn check(project: &Path, offline: bool, types: bool) -> ExitCode {
             }
         }
     }
-    for line in graph.sources.render_all(&diags) {
+    for line in ilang_cli::diagnostic_lines(&graph, &diags) {
         eprintln!("{line}");
     }
     let errors = diags.iter().filter(|d| d.is_error()).count();

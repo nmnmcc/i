@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // The token set follows the structure of the Gleam lexer's tokens
 // (https://github.com/gleam-lang/gleam, Apache-2.0, see licenses/gleam-LICENCE),
-// changed for the symbols and keywords of i (§1.4, §1.5).
+// changed for the symbols of i (§1.4, §1.5).
 
 //! Tokens (§1.3 to §1.6) and the token sets of the line rule (§1.7).
 
@@ -17,11 +17,6 @@ pub enum TokenKind {
     Int(BigUint),
     Float(f64),
     Str(String),
-    // Keywords (§1.4)
-    Import,
-    Export,
-    Case,
-    If,
     // Symbols (§1.5)
     Eq,
     Colon,
@@ -97,20 +92,10 @@ impl TokenKind {
         ) || matches!(
             self,
             LParen | LBracket | LBrace | LtLt | Minus | MinusDot | DotDot | Bang | At
-        ) || matches!(self, Import | Export | Case)
+        )
     }
 
-    pub fn keyword(word: &str) -> Option<TokenKind> {
-        Some(match word {
-            "import" => TokenKind::Import,
-            "export" => TokenKind::Export,
-            "case" => TokenKind::Case,
-            "if" => TokenKind::If,
-            _ => return None,
-        })
-    }
-
-    /// The source text of a symbol or keyword.
+    /// The source text of a symbol.
     pub fn text(&self) -> &'static str {
         use TokenKind::*;
         match self {
@@ -120,10 +105,6 @@ impl TokenKind {
             Int(_) => "an int",
             Float(_) => "a float",
             Str(_) => "a string",
-            Import => "import",
-            Export => "export",
-            Case => "case",
-            If => "if",
             Eq => "=",
             Colon => ":",
             Comma => ",",

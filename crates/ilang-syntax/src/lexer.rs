@@ -286,7 +286,7 @@ impl Lexer<'_> {
         Some(kind)
     }
 
-    /// §1.3: names, discards, UpNames, and keywords.
+    /// §1.3: names, discards, and UpNames.
     fn word(&mut self) -> T {
         let start = self.pos;
         while is_word(self.at(0)) {
@@ -305,8 +305,6 @@ impl Lexer<'_> {
         } else if b[0] == b'_' {
             let ok = b[1].is_ascii_lowercase() && lower_tail(b);
             (T::Name(w.into()), ok)
-        } else if let Some(kw) = T::keyword(w) {
-            (kw, true)
         } else {
             (T::Name(w.into()), lower_tail(b))
         };

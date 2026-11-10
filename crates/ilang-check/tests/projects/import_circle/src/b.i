@@ -1,3 +1,5 @@
-import (app/c)
+(
+	app/c
+)
 
 y = 1

@@ -1,15 +1,18 @@
-export (map, fold)
+(
+	map
+	fold
+)
 
-map = (xs: List(a), f: (a) -> b) -> List(b) {
-  case xs {
-    [] -> []
-    [x, ..rest] -> [f(x), ..map(rest, f)]
-  }
+map(A, B) = (xs: List(A), f: (A) -> B) -> List(B) {
+	xs |> {
+		[]          -> []
+		[x, ..rest] -> [f(x), ..map(rest, f)]
+	}
 }
 
-fold = (xs: List(a), init: b, f: (b, a) -> b) -> b {
-  case xs {
-    [] -> init
-    [x, ..rest] -> fold(rest, f(init, x), f)
-  }
+fold(A, B) = (xs: List(A), init: B, f: (B, A) -> B) -> B {
+	xs |> {
+		[]          -> init
+		[x, ..rest] -> fold(rest, f(init, x), f)
+	}
 }

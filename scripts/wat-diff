@@ -1,0 +1,460 @@
+#!/usr/bin/env -S python3 -I
+"""Compare A1 WAT exports under the rules of a1-front-end.md §3.17.
+
+Usage: scripts/wat-diff A B [--allowed FILE] [--renumber]
+Allowed lines: category owner source:line report-id [may-fail] [whole] reason.
+A pattern-text reason is JSON: {"old": "old pattern", "new": "new pattern"}.
+An allowed file is evidence from the migration report, not a wildcard list.
+"""
+import argparse
+from collections import defaultdict
+import hashlib
+import json
+from pathlib import Path
+import re
+import struct
+import subprocess
+import sys
+
+
+class Failure(Exception):
+    pass
+
+
+def require(ok, message):
+    if not ok:
+        raise Failure(message)
+
+
+STRING = r'"(?:[^"\\]|\\.)*"'
+SITE = re.compile(r'(?m)^(\(data \$site_data )(' + STRING + r')(\))$')
+INSTALL = re.compile(r'(\(call \$sites_install \(array.new_data \$sites \$site_data \(i32.const 0\) \(i32.const )(\d+)(\)\))')
+IDENT = re.compile(r'\$[^\s()";]+')
+TOKEN = re.compile(STRING + r'|;;[^\n]*|\$[^\s()";]+')
+FUNC = re.compile(r'(?m)^\(func (\$[^\s()]+)')
+CATEGORIES = {'one-clause', 'choices-split', 'g-binding', 'split', 'pattern-text', 'hand'}
+
+
+def wat_bytes(quoted):
+    raw = quoted[1:-1]
+    out = bytearray()
+    i = 0
+    while i < len(raw):
+        if raw[i] != '\\':
+            out.extend(raw[i].encode()); i += 1
+        elif re.fullmatch('[0-9a-fA-F]{2}', raw[i + 1:i + 3]):
+            out.append(int(raw[i + 1:i + 3], 16)); i += 3
+        else:
+            escapes = {'n': b'\n', 'r': b'\r', 't': b'\t', '"': b'"', '\\': b'\\', "'": b"'"}
+            require(i + 1 < len(raw) and raw[i + 1] in escapes, 'unknown WAT string escape')
+            out.extend(escapes[raw[i + 1]]); i += 2
+    return bytes(out)
+
+
+def wat_string(value):
+    return '"' + ''.join(f'\\{b:02x}' for b in value) + '"'
+
+
+def site_count(text):
+    data, count = list(SITE.finditer(text)), list(INSTALL.finditer(text))
+    require(len(data) == len(count) == 1, 'expected one site table and one sites_install call')
+    words = int(count[0][2])
+    require(words % 3 == 0, 'site table has an incomplete entry')
+    require(len(wat_bytes(data[0][2])) == words * 4, 'site data length disagrees with site count')
+    return words // 3
+
+
+def mask_sites(text):
+    site_count(text)
+    return SITE.sub(lambda m: m[1] + '"<sites>"' + m[3], text)
+
+
+def end_form(text, start):
+    """Balanced WAT form, with strings, line comments, and block comments."""
+    i, depth, block = start, 0, 0
+    while i < len(text):
+        if text.startswith('(;', i): block += 1; i += 2; continue
+        if block:
+            if text.startswith(';)', i): block -= 1; i += 2
+            else: i += 1
+            continue
+        if text.startswith(';;', i):
+            i = text.find('\n', i)
+            require(i >= 0, 'unterminated WAT form')
+            continue
+        if text[i] == '"':
+            m = re.match(STRING, text[i:]); require(m is not None, 'unclosed WAT string')
+            i += m.end(); continue
+        if text[i] == '(': depth += 1
+        if text[i] == ')':
+            depth -= 1
+            if depth == 0: return i + 1
+        i += 1
+    raise Failure('unclosed WAT form')
+
+
+def entries(path):
+    out = []
+    if path is None: return out
+    for line_no, line in enumerate(path.read_text().splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith('#'): continue
+        fields = line.split(None, 4)
+        require(len(fields) == 5, f'{path}:{line_no}: incomplete allowed entry')
+        category, owner, source, report, reason = fields
+        require(category in CATEGORIES, f'unknown category {category}')
+        require(re.search(r':\d+$', source) and report, 'entry needs a source position and report id')
+        flags = set()
+        while reason.split(None, 1)[0] in {'may-fail', 'whole'}:
+            flag, *tail = reason.split(None, 1)
+            require(tail, 'entry needs a reason')
+            flags.add(flag); reason = tail[0]
+        require('whole' not in flags or category in {'split', 'hand'}, 'only split and hand can skip a dump')
+        require(not ('whole' in flags and (source.startswith('lib/') or owner.startswith('i/'))), 'a library whole-dump entry is forbidden')
+        pair = None
+        if category == 'pattern-text':
+            pair = json.loads(reason)
+            require(set(pair) == {'old', 'new'} and all(isinstance(v, str) for v in pair.values()), 'pattern-text needs old and new strings')
+            require(pair['old'] != pair['new'], 'pattern-text must change the text')
+        out.append(dict(category=category, owner=owner, source=source, report=report,
+                        flags=flags, reason=reason, pair=pair))
+    return out
+
+
+def replace_pattern(text, pair, required=False):
+    old = ('pattern ' + pair['old'] + ' did not match ').encode()
+    new = ('pattern ' + pair['new'] + ' did not match ').encode()
+    data = list(re.finditer(r'(?m)^\(data (\$s\d+) (' + STRING + r')\)$', text))
+    hits = [m for m in data if wat_bytes(m[2]) == old]
+    # A pattern that cannot fail has no data string (§3.17).
+    if not hits:
+        require(not required, "may-fail pattern text was not found")
+        return text
+    require(len(hits) == 1, 'pattern text appears more than once')
+    require(not any(wat_bytes(m[2]) == new for m in data), 'pattern text would merge two data strings')
+    m = hits[0]
+    text = text[:m.start(2)] + wat_string(new) + text[m.end(2):]
+    use = re.compile(r'(\(array.new_data \$bytes ' + re.escape(m[1]) + r' \(i32.const 0\) \(i32.const )(\d+)(\)\))')
+    def change(match):
+        require(int(match[2]) == len(old), 'wrong pattern string byte length')
+        return match[1] + str(len(new)) + match[3]
+    return use.sub(change, text)
+
+
+def symbolic_function_refs(text):
+    """Only the compiler's folded, symbolic function-reference dialect is safe.
+
+    Function order is normalized below. Numeric references and unsupported
+    element/start forms must not survive with an index-dependent meaning.
+    """
+    tokens = []
+    literal = re.compile(STRING)
+    atom = re.compile(r'[^\s()]+')
+    i = 0
+    while i < len(text):
+        if text.startswith(';;', i):
+            end = text.find('\n', i); i = len(text) if end < 0 else end; continue
+        if text.startswith('(;', i):
+            depth = 1; i += 2
+            while depth and i < len(text):
+                if text.startswith('(;', i): depth += 1; i += 2
+                elif text.startswith(';)', i): depth -= 1; i += 2
+                else: i += 1
+            require(depth == 0, 'unclosed WAT comment')
+            continue
+        if text[i].isspace(): i += 1; continue
+        if text[i] == '"':
+            m = literal.match(text, i); require(m is not None, 'unclosed WAT string')
+            tokens.append('<string>'); i = m.end(); continue
+        if text[i] in '()': tokens.append(text[i]); i += 1; continue
+        m = atom.match(text, i); tokens.append(m[0]); i = m.end()
+    for i, token in enumerate(tokens):
+        following = tokens[i + 1] if i + 1 < len(tokens) else ''
+        if token in {'call', 'return_call', 'ref.func'}:
+            require(i > 0 and tokens[i - 1] == '(' and following.startswith('$'),
+                    'allowed comparison requires folded symbolic function references')
+        if token == 'func':
+            require(not re.fullmatch(r'[+-]?(?:0x[0-9a-fA-F_]+|[0-9][0-9_]*)', following),
+                    'numeric function references are not supported in allowed comparison')
+        if token == 'start':
+            raise Failure('start forms are not supported in allowed comparison')
+        if token == 'elem':
+            require(tokens[i + 1:i + 3] == ['declare', 'func'],
+                    'only symbolic declare elements are supported in allowed comparison')
+            j = i + 3
+            while j < len(tokens) and tokens[j] != ')':
+                require(tokens[j].startswith('$'), 'numeric element references are not supported')
+                j += 1
+
+
+class Wat:
+    def __init__(self, text):
+        symbolic_function_refs(text)
+        self.text = text
+        self.funcs = []
+        self.names = {}
+        self.owners = {}
+        self.comments = {}
+        wrapper_families = set()
+        spans = []
+        for m in FUNC.finditer(text):
+            start, end = m.start(), end_form(text, m.start())
+            name = m[1]
+            require(name not in self.names, f'duplicate function {name}')
+            comment = ''
+            line = text.rfind('\n', 0, max(start - 1, 0)) + 1
+            previous = text[line:start].strip()
+            if previous.startswith(';; '):
+                comment = previous[3:]
+                start = line
+            body = text[m.start():end]
+            self.funcs.append((name, body))
+            self.comments[name] = comment
+            remove_end = end
+            while remove_end < len(text) and text[remove_end] == "\n": remove_end += 1
+            spans.append((start, remove_end))
+            if name == '$start': self.owners[name] = 'ilang_start'
+            elif re.fullmatch(r'\$[sj]\d+', name):
+                owner = re.fullmatch(r'(.+) (?:after point|join) \d+', comment)
+                require(owner is not None, f'cannot place {name}: {comment}')
+                self.owners[name] = owner[1]
+            elif re.fullmatch(r'\$f\d+', name):
+                if re.fullmatch(r'.+:fn\d+', comment): continue
+                if comment:
+                    if comment == 'async entry' or re.fullmatch(r'import \S+ \S+', comment):
+                        wrapper_families.add(comment)
+                    else:
+                        require('.' in comment, f'unknown code function comment: {comment}')
+                    self.owners[name] = comment
+                else:
+                    digest = hashlib.sha256(body.replace(name, '$self', 1).encode()).hexdigest()
+                    canonical = '$value#' + digest
+                    require(canonical not in self.names.values(), 'duplicate constructor/runtime body digest')
+                    self.names[name] = canonical
+        # A closure's segments carry its name; resolve that name to the
+        # closure's enclosing top-level owner after finding its first use.
+        closure_names = {self.comments[n]: n for n, _ in self.funcs
+                         if re.fullmatch(r'.+:fn\d+', self.comments[n])}
+        segment_closures = {n: closure_names[o] for n, o in self.owners.items() if o in closure_names}
+        # Re-entry functions have the owner of the segment of the same point.
+        for name, _ in self.funcs:
+            if re.fullmatch(r'\$r\d+', name):
+                segment = '$s' + name[2:]
+                require(segment in self.owners, f'no segment for {name}')
+                self.owners[name] = self.owners[segment]
+        # The first ref.func/call use identifies a closure's enclosing owner.
+        closure_parents = {}
+        closures = {n for n, _ in self.funcs if re.fullmatch(r'.+:fn\d+', self.comments[n])}
+        for parent, body in self.funcs:
+            for ref in re.finditer(r'\((?:ref.func|call|return_call) (\$f\d+)(?=[\s)])', body):
+                if ref[1] in closures: closure_parents.setdefault(ref[1], parent)
+        def owner(name, seen):
+            if name in self.owners:
+                current = self.owners[name]
+                if current in closure_names:
+                    require(name not in seen, f'cyclic closure owner {name}')
+                    current = owner(closure_names[current], seen | {name})
+                    self.owners[name] = current
+                return current
+            require(name not in seen and name in closure_parents, f'cannot place closure {name}')
+            result = owner(closure_parents[name], seen | {name})
+            self.owners[name] = result
+            return result
+        for name in closures: owner(name, set())
+        for segment, closure in segment_closures.items():
+            self.owners[segment] = self.owners[closure]
+        for name, _ in self.funcs:
+            if re.fullmatch(r'\$r\d+', name): self.owners[name] = self.owners['$s' + name[2:]]
+        counters = defaultdict(int)
+        for name, _ in self.funcs:
+            if name not in self.owners:
+                self.names.setdefault(name, name)
+                continue
+            own = self.owners[name]
+            if own in wrapper_families:
+                # Import and async-entry wrappers have no source owner.
+                # Count within their comment family, never across the program.
+                kind = 'fn' if name in closures else name[1]
+                k = (own, kind); counters[k] += 1
+                canonical = f'$wrapper:{own.encode().hex()}/{kind}#{counters[k]}'
+            elif name == '$start': canonical = '$start'
+            elif name in closures:
+                k = (own, 'fn'); counters[k] += 1; canonical = f'${own}/fn#{counters[k]}'
+            elif re.fullmatch(r'\$[srj]\d+', name):
+                kind = name[1]; k = (own, kind); counters[k] += 1; canonical = f'${own}/{kind}#{counters[k]}'
+            else: canonical = '$' + own
+            self.names[name] = canonical
+        self.owners = {n: o for n, o in self.owners.items() if o not in wrapper_families}
+        self.outside = text
+        for start, end in reversed(spans): self.outside = self.outside[:start] + self.outside[end:]
+        for m in re.finditer(r'(?m)^\(global (\$c\d+) .*$', self.outside):
+            ref = re.search(r'\(ref.func (\$f\d+)\)', m[0])
+            require(ref is not None and ref[1] in self.names, 'unplaced constant global')
+            self.names[m[1]] = '$c:' + self.names[ref[1]][1:]
+
+    def rename(self, text):
+        # Quoted strings and comments are not identifiers. Change only
+        # point/join/closure numbers in comments whose syntax is known.
+        operands = re.compile(STRING + r'|;;[^\n]*|(\((?:func|call|return_call|ref.func|global|global.get) )(\$[^\s()]+)')
+        def token(m):
+            word = m[0]
+            if word.startswith('"'): return word
+            if word.startswith(';;'):
+                word = re.sub(r':fn\d+', ':fn', word)
+                return re.sub(r' (after point|join) \d+$', r' \1', word)
+            return m[1] + self.names.get(m[2], m[2])
+        return operands.sub(token, text)
+
+    def normalized(self, skipped):
+        groups = defaultdict(list)
+        for name, body in self.funcs:
+            own = self.owners.get(name)
+            if own not in skipped:
+                groups[own].append((self.names[name], self.rename(";; " + self.comments[name]), self.rename(body)))
+        outside = self.outside
+        constants = []
+        def constant(m):
+            ref = re.search(r'\(ref.func (\$f\d+)\)', m[0])
+            if self.owners.get(ref[1]) not in skipped: constants.append(self.rename(m[0]))
+            return ''
+        outside = re.sub(r'(?m)^\(global \$c\d+ .*\n?', constant, outside)
+        def elem(m):
+            names = IDENT.findall(m[0])
+            kept = {self.names.get(n, n) for n in names if self.owners.get(n) not in skipped}
+            return '(elem declare func ' + ' '.join(sorted(kept)) + ')'
+        outside = re.sub(r'\(elem declare func[^)]*\)', elem, outside)
+        outside = self.rename(outside)
+        return outside, sorted(constants), dict(groups)
+
+
+def renumber(text):
+    """Decode known constant site operands; fail on an unknown call form."""
+    site_count(text)
+    data = SITE.search(text)
+    sites = list(struct.iter_unpack('<III', wat_bytes(data[2])))
+    strings = {m[1]: wat_bytes(m[2]).decode('utf-8') for m in re.finditer(r'(?m)^\(data (\$s\d+) (' + STRING + r')\)$', text)}
+    install = INSTALL.search(text)
+    end = end_form(text, install.start())
+    # The module names are the second argument of sites_install.
+    modules = [strings[m[1]] for m in re.finditer(r'\(array.new_data \$bytes (\$s\d+)', text[install.end():end])]
+    def decoded(n):
+        n = int(n)
+        if n == -1: return '<none>'
+        tail = n < -1
+        index = -2 - n if tail else n
+        require(index < len(sites), f'unknown site code {n}')
+        mod, line, col = sites[index]
+        require(mod < len(modules), 'unknown site module')
+        return json.dumps(('tail ' if tail else '') + f'{modules[mod]}:{line}:{col}')
+    patterns = [
+        r'(\(call \$(?:shadow_site|shadow_leave_tail) \(i32.const )(-?\d+)(\)\))',
+        r'(\(call \$async_begin \(i32.const \d+\) \(i32.const )(-?\d+)(\)\))',
+        r'(\(call \$stop_error \(local.get \$e\) \(i32.const )(-?\d+)(\))',
+    ]
+    for pattern in patterns:
+        text = re.sub(pattern, lambda m: m[1] + decoded(m[2]) + m[3], text)
+    for name in ['shadow_site', 'shadow_leave_tail', 'async_begin', 'stop_error']:
+        for m in re.finditer(r'\(call \$' + name + r'(?=[\s)])', text):
+            form = text[m.start():end_form(text, m.start())]
+            require('"' in form or '(global.get $async_site)' in form, f'unknown site form: {form}')
+    text = INSTALL.sub(lambda m: m[1] + '<count>' + m[3], text)
+    text = SITE.sub(lambda m: m[1] + '"<sites>"' + m[3], text)
+    # In renumber mode only, data identifiers become content, and the data
+    # lines are sorted, as §3.17 requires.
+    data_names = {k: '$string:' + v.encode().hex() for k, v in strings.items()}
+    text = re.sub(r'(\((?:data|array.new_data \$bytes) )(\$s\d+)(?=[\s)])', lambda m: m[1] + data_names[m[2]], text)
+    lines = text.splitlines(keepends=True)
+    datas = sorted(line for line in lines if line.startswith('(data $string:'))
+    return ''.join(line for line in lines if not line.startswith('(data $string:')) + ''.join(datas)
+
+
+def blind_dumps():
+    root = Path(__file__).resolve().parent.parent
+    proc = subprocess.run(['git', 'diff', '--name-only', '--diff-filter=A', 'b28fca5', '--', 'tests/spec'], cwd=root, capture_output=True, text=True, check=True)
+    names = set()
+    for line in proc.stdout.splitlines():
+        if line.endswith('.i'):
+            rel = line.removeprefix('tests/spec/').replace('/', '_')
+            for target in ['ilang', 'wasi']:
+                for tests in ['true', 'false']: names.add(f'{rel}.{target}.{tests}.wat')
+    return names
+
+
+def compare(a, b, allowed, use_renumber, allowed_mode=False):
+    if a.startswith('ERROR') or b.startswith('ERROR'):
+        require(a == b, 'ERROR exports differ')
+        return
+    wa, wb = (Wat(a), Wat(b)) if allowed_mode else (None, None)
+    for entry in allowed:
+        if "whole" in entry["flags"]:
+            module = entry["owner"].rsplit(".", 1)[0]
+            if any(o.startswith(module + ".") for o in set(wa.owners.values()) | set(wb.owners.values())):
+                print(f'warning: whole dump skipped: {entry["source"]}: {entry["reason"]}')
+                return
+    ca, cb = site_count(a), site_count(b)
+    budget = sum('may-fail' in e['flags'] and e['owner'] in (set(wa.owners.values()) | set(wb.owners.values())) for e in allowed)
+    require(ca == cb or (use_renumber and abs(ca - cb) <= budget), f'site counts differ: {ca} != {cb}')
+    if not allowed_mode and not use_renumber:
+        require(mask_sites(a) == mask_sites(b), 'WAT differs outside site_data')
+        return
+    wa, wb = Wat(a), Wat(b)
+    owners_a, owners_b = set(wa.owners.values()), set(wb.owners.values())
+    require(owners_a == owners_b, f'owner sets differ: {owners_a ^ owners_b}')
+    active = [e for e in allowed if e['owner'] in owners_a]
+    for e in active:
+        if e['pair']: a = replace_pattern(a, e['pair'], 'may-fail' in e['flags'])
+    if use_renumber: a, b = renumber(a), renumber(b)
+    if use_renumber: wa, wb = Wat(a), Wat(b)
+    else: wa, wb = Wat(mask_sites(a)), Wat(mask_sites(b))
+    skipped = {e['owner'] for e in active if e['category'] != 'pattern-text'}
+    if 'ilang_start' in skipped:
+        print('warning: ilang_start entry skips every top-level value: ' + '; '.join(e['reason'] for e in active if e['owner'] == 'ilang_start'))
+    left, right = wa.normalized(skipped), wb.normalized(skipped)
+    require(left == right, 'WAT differs outside listed owners and pattern text')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('A', type=Path); parser.add_argument('B', type=Path)
+    parser.add_argument('--allowed', type=Path); parser.add_argument('--renumber', action='store_true')
+    parser.add_argument('--byte-equal', action='store_true', help='E1: compare shared files byte for byte and list added blind exports')
+    parser.add_argument('--a1-unformatted', type=Path, help='E2/E3: unformatted A1 exports from the same build, used only for added blind cases')
+    args = parser.parse_args()
+    require(not args.byte_equal or (args.allowed is None and not args.renumber and args.a1_unformatted is None), '--byte-equal cannot mask or replace a reference')
+    allowed = entries(args.allowed)
+    require(not args.renumber or any('may-fail' in e['flags'] for e in allowed), '--renumber needs a may-fail report entry')
+    require(args.A.is_dir() and args.B.is_dir(), 'both dump directories must exist')
+    aa = {p.relative_to(args.A) for p in args.A.rglob('*') if p.is_file()}
+    bb = {p.relative_to(args.B) for p in args.B.rglob('*') if p.is_file()}
+    require(aa and bb, 'empty WAT dump')
+    reference = args.a1_unformatted
+    require(reference is None or reference.is_dir(), 'the unformatted A1 dump directory must exist')
+    rr = {p.relative_to(reference) for p in reference.rglob('*') if p.is_file()} if reference else set()
+    added = blind_dumps() if (bb | rr) - aa else set()
+    require(not aa - bb and all(str(p) in added for p in bb - aa), f'files on one side only: {aa ^ bb}')
+    if reference:
+        require(all(str(p) in added for p in rr - aa), 'the unformatted reference has an unknown added export')
+        require(bb - aa == rr - aa, f'blind export sets differ: {(bb - aa) ^ (rr - aa)}')
+    require(args.byte_equal or not bb - aa or reference is not None, 'added blind exports need --a1-unformatted')
+    for p in sorted(aa | bb):
+        try:
+            b = (args.B / p).read_bytes().decode('utf-8')
+            if p not in aa:
+                print(f'blind export: {p}')
+                if args.byte_equal: continue
+                a = (reference / p).read_bytes().decode('utf-8')
+            else:
+                a = (args.A / p).read_bytes().decode('utf-8')
+            if args.byte_equal:
+                require((args.A / p).read_bytes() == (args.B / p).read_bytes(), 'exports differ byte for byte')
+            else:
+                compare(a, b, allowed, args.renumber, args.allowed is not None)
+        except Failure as e:
+            raise Failure(f'{p}: {e}') from e
+    print(f'WAT equal: {len(aa)} shared exports, {len(bb - aa)} blind exports')
+
+
+if __name__ == '__main__':
+    try: main()
+    except (Failure, ValueError, OSError, subprocess.CalledProcessError) as error:
+        print(f'wat-diff: {error}', file=sys.stderr)
+        sys.exit(1)

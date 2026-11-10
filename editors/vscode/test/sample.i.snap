@@ -1,32 +1,33 @@
+"//"  comment.line.double-slash.i punctuation.definition.comment.i
+" old-syntax-check: E0003,E0106"  comment.line.double-slash.i
 "////"  comment.line.documentation.module.i punctuation.definition.comment.i
 " The module documentation."  comment.line.documentation.module.i
-"import"  meta.import.i keyword.control.import.i
-"("  meta.import.i punctuation.brackets.round.i
-"i/fail"  meta.import.i entity.name.namespace.i
-"decode"  meta.import.i entity.name.namespace.alias.i
-"="  meta.import.i keyword.operator.assignment.i
-"json/decode"  meta.import.i entity.name.namespace.i
-"opt"  meta.import.i entity.name.namespace.alias.i
-"="  meta.import.i keyword.operator.assignment.i
-"("  meta.import.i punctuation.brackets.round.i
-"Option"  meta.import.i entity.name.type.i
-","  meta.import.i punctuation.separator.comma.i
-"Some"  meta.import.i entity.name.type.i
-")"  meta.import.i punctuation.brackets.round.i
-"="  meta.import.i keyword.operator.assignment.i
-"std/option"  meta.import.i entity.name.namespace.i
-")"  meta.import.i punctuation.brackets.round.i
-"export"  keyword.control.import.i
-"("  punctuation.brackets.round.i
-"main"  variable.other.i
-","  punctuation.separator.comma.i
-"User"  entity.name.type.i
-"("  punctuation.brackets.round.i
-".."  keyword.operator.spread.i
-")"  punctuation.brackets.round.i
-","  punctuation.separator.comma.i
-"Shape"  entity.name.type.i
-")"  punctuation.brackets.round.i
+"("  meta.header.i punctuation.definition.header.begin.i
+"i/fail"  meta.header.i entity.name.namespace.i
+"decode"  meta.header.i entity.name.namespace.alias.i
+"="  meta.header.i keyword.operator.assignment.i
+"json/decode"  meta.header.i entity.name.namespace.i
+"opt"  meta.header.i entity.name.namespace.alias.i
+"="  meta.header.i keyword.operator.assignment.i
+"("  meta.header.i punctuation.brackets.round.i
+"Option"  meta.header.i entity.name.type.i
+","  meta.header.i punctuation.separator.comma.i
+"Some"  meta.header.i entity.name.type.i
+")"  meta.header.i punctuation.brackets.round.i
+"="  meta.header.i keyword.operator.assignment.i
+"std/option"  meta.header.i entity.name.namespace.i
+")"  meta.header.i punctuation.definition.header.end.i
+"("  meta.header.i punctuation.definition.header.begin.i
+"main"  meta.header.i entity.name.namespace.alias.i
+","  meta.header.i punctuation.separator.comma.i
+"User"  meta.header.i entity.name.type.i
+"("  meta.header.i punctuation.brackets.round.i
+"."  meta.header.i punctuation.accessor.i
+"."  meta.header.i punctuation.accessor.i
+")"  meta.header.i punctuation.brackets.round.i
+","  meta.header.i punctuation.separator.comma.i
+"Shape"  meta.header.i entity.name.type.i
+")"  meta.header.i punctuation.definition.header.end.i
 "///"  comment.line.documentation.i punctuation.definition.comment.i
 " A user."  comment.line.documentation.i
 "User"  entity.name.type.i
@@ -44,16 +45,16 @@
 "}"  punctuation.brackets.curly.i
 "Shape"  entity.name.type.i
 "("  punctuation.brackets.round.i
-"a"  variable.other.i
+"A"  entity.name.type.i
 ")"  punctuation.brackets.round.i
 "="  keyword.operator.assignment.i
 "("  punctuation.brackets.round.i
-"a"  variable.other.i
+"A"  entity.name.type.i
 ","  punctuation.separator.comma.i
-"a"  variable.other.i
+"A"  entity.name.type.i
 ")"  punctuation.brackets.round.i
 "->"  keyword.operator.arrow.i
-"a"  variable.other.i
+"A"  entity.name.type.i
 "|"  keyword.operator.choice.i
 "Nil"  constant.language.i
 "@"  storage.type.annotation.i punctuation.definition.annotation.i
@@ -210,7 +211,6 @@
 "2.0"  constant.numeric.float.i
 "-."  keyword.operator.arithmetic.float.i
 "0.5"  constant.numeric.float.i
-"case"  keyword.control.conditional.i
 "z"  variable.other.i
 "<."  keyword.operator.comparison.float.i
 "1.0"  constant.numeric.float.i
@@ -226,6 +226,7 @@
 "z"  variable.other.i
 ">."  keyword.operator.comparison.float.i
 "4.0"  constant.numeric.float.i
+"|>"  keyword.operator.match.i
 "{"  punctuation.brackets.curly.i
 "True"  constant.language.i
 "->"  keyword.operator.arrow.i
@@ -304,8 +305,8 @@
 "\""  string.quoted.double.i punctuation.definition.string.end.i
 "n"  variable.other.i
 "="  keyword.operator.assignment.i
-"case"  keyword.control.conditional.i
 "first"  variable.other.i
+"|>"  keyword.operator.match.i
 "{"  punctuation.brackets.curly.i
 "0"  constant.numeric.integer.decimal.i
 "|"  keyword.operator.choice.i
@@ -313,7 +314,7 @@
 "->"  keyword.operator.arrow.i
 "1"  constant.numeric.integer.decimal.i
 "n"  variable.other.i
-"if"  keyword.control.conditional.i
+"?"  keyword.operator.guard.i
 "n"  variable.other.i
 ">"  keyword.operator.comparison.i
 "10"  constant.numeric.integer.decimal.i
@@ -373,3 +374,33 @@
 "3"  constant.numeric.integer.decimal.i
 ")"  punctuation.brackets.round.i
 "}"  punctuation.brackets.curly.i
+"identity"  entity.name.function.definition.i
+"("  punctuation.brackets.round.i
+"A"  entity.name.type.parameter.i
+")"  punctuation.brackets.round.i
+"="  keyword.operator.assignment.i
+"("  punctuation.brackets.round.i
+"x"  variable.parameter.i
+":"  punctuation.separator.annotation.i
+"A"  entity.name.type.i
+")"  punctuation.brackets.round.i
+"{"  punctuation.brackets.curly.i
+"x"  variable.other.i
+"}"  punctuation.brackets.curly.i
+"import"  entity.name.function.definition.i
+"="  keyword.operator.assignment.i
+"("  punctuation.brackets.round.i
+"x"  variable.other.i
+")"  punctuation.brackets.round.i
+"{"  punctuation.brackets.curly.i
+"x"  variable.other.i
+"}"  punctuation.brackets.curly.i
+"export"  variable.other.i
+"="  keyword.operator.assignment.i
+"import"  variable.other.i
+"case"  variable.other.i
+"="  keyword.operator.assignment.i
+"export"  variable.other.i
+"if"  variable.other.i
+"="  keyword.operator.assignment.i
+"case"  variable.other.i
