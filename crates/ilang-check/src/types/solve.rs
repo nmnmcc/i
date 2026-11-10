@@ -819,12 +819,13 @@ impl Solver {
                 }
                 Ty::Var(nv)
             }
-            Ty::Con(h, args) if env => {
+            Ty::Con(h, values, args) if env => {
                 // §4.5 rule 4: service arguments stay equal across levels,
                 // independently of their ordinary value variance. Inside
                 // an argument, ordinary type rules apply again.
                 Ty::Con(
                     *h,
+                    values.clone(),
                     args.iter()
                         .map(|a| self.extrude(a, Pol::Both, level, false, cache))
                         .collect(),
@@ -936,7 +937,7 @@ impl Solver {
             && (ms.iter().filter(|m| m.is_varlike()).take(2).count() > 1
                 || ms
                     .iter()
-                    .any(|m| matches!(m, Ty::Con(_, args) if !args.is_empty())))
+                    .any(|m| matches!(m, Ty::Con(_, _, args) if !args.is_empty())))
         {
             // Check forms hidden behind a row variable too (§9.2). The
             // collector adds no requirement to the returned union; it
