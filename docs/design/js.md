@@ -1,11 +1,7 @@
 # Design: JS bindings, target providers, and checked WASI adapters
 
 Status: revision 8, after the confirmation review of e821f9a, 2026-11-10.
-This note applies J1–J8, K1–K5 and L1–L4. It is a design contract conditional
-on the explicit source amendments in §9, not an implementation claim. This
-revision merges redesign at 681ad65 before changing this note. Only js.md is
-owned here; source amendments are a handoff. The current WASI printer remains
-until its amendment lands. Removing externals, merging host forms, portable
+This note applies J1–J8, K1–K5 and L1–L4. Track JA has installed the owned source amendments listed in §9; that table records the items left out. This is not an implementation claim. Revision 8 merged redesign at 681ad65; JA starts at 7b3cea3. The current compiler printer remains until the provider implementation and parity tests land. Removing externals, merging host forms, portable
 arbitrary foreign values and callbacks remain outside this revision.
 
 Sources, in order: the user's rulings; `docs/spec.md`; accepted `syntax.md`,
@@ -944,8 +940,8 @@ it grants no certification to f's environment parameters. A direct capture
 of the original certified value remains a capture, including inside keep_env.
 These rules use lexical identity, not runtime environment/value analysis.
 
-For the source form `certified_name |> { clauses }` (allowing parentheses
-or a one-expression group around the subject), omit a clause's guard and body only
+For the source form `certified_name |> { clauses }` (allowing a one-expression
+`{ }` group around the subject), omit a clause's guard and body only
 if its pattern selects resolved constructor C and
 `C != map[current_target]`, allowing field subpatterns and `name = pattern`.
 For a choice, this inequality must hold for **every** alternative, recursively;
@@ -1275,10 +1271,7 @@ Wasm call. Teardown does not run i finals; explicit process exit is termination,
 not a way to detach work. WASI resource cleanup must finish before this call.
 
 **W3 — Ordinary printing, with existing behavior preserved.** The proposed
-Io factory captures Wasi and makes a closure that UTF-8 encodes text and LF,
-allocates/stores a buffer, and repeats fd_write on its remaining slice.
-Positive short writes advance the offset; zero progress or a reported write
-error gives up; release the buffer on every returning path. Give Nil, never
+Io factory captures Wasi and makes a closure that writes the UTF-8 text, then separately attempts LF even if the text write gave up. For each write it allocates/stores a buffer and repeats fd_write on the remaining slice. Positive short writes advance the offset; zero progress or a reported write error gives up that write; release the buffer on every returning path. Give Nil, never
 an IO error, as legacy Io requires. Stdio's error-reporting API stays distinct.
 This moves encoding, looping and output policy into i, while W2 keeps unsafe
 layout construction inside the kernel. The review's raw-iovec prototype is
@@ -1470,43 +1463,45 @@ choice is left for that track to invent.
 
 ## 9. Replacement source text and conflicts
 
-This section is the precise amendment handoff, not an edit to another lane.
-**Until the coordinator lands it, preserve the current spec on every conflict.**
-The review and old proposal cannot override the spec. No ruling requires
+This section records the precise amendment handoff and its JA installation. Installed locations refer to this lane; the coordinator still lands these commits. Items marked “left out, conflict” remain unchanged at the named source. The review and old proposal cannot override the spec. No ruling requires
 widening the §10.3 ABI value/error lists.
 
-| Source section | Replacement/addition |
-|---|---|
-| Spec §2.6 | Insert T9's full schema, validation, graph, ordering and lifetime rules as the normative provider-plan subsection; retain T6's shorthand and T7's wasm.synchronous contract. Add T3's command table (L4). These keys were previously unused; do not claim compatibility with old readers that ignore them. |
-| Spec §2.2/§2.5; syntax §2.5 | Add js to built-in attributes. Replace the external-only declaration restriction with: “A declaration requires external or js, or expansion by a macro. A js declaration has the closed opaque type and foreign link semantics of §10.1. It is initialized once during start only if retained by the target link pass; ordinary bindings retain this section's initialization rules.” Add F1's ordering and F2's roots/conservative analysis verbatim as the foreign-declaration subsection. |
-| Spec §4.3/§4.7 | Keep sets, nominal identity and principal inference. Add js to the mandatory-full-annotation exceptions. Explicitly say target linking does not change inferred types. No general cast or request-map rule. |
-| Spec §9.2 | No semantic change. Add the captured-provider versus call-site replacement example described in T1. |
-| Spec §9.7/§10.2 | Keep general host imports and substitution. Replace entry's host/Assert-only restriction with: “An entry may also require a service supplied by its explicit target provider plan. The plan constructs ordinary service values; missing required standard capabilities are build errors, including when all operation errors are caught. Providers do not alter inferred source types.” Use T1–T5 for Target, capability tables and explicit host plans. Retain legacy Io's line/no-error behavior. |
-| Spec §10.1 | Retain externals. Add F1–F3 as “JavaScript value declarations”: full nominal annotation, supported targets, source scope/order, retained getter imports, compile-time unavailable errors, loader failures and no re-entry. |
-| Spec §10.3 | Keep the lists unchanged. Cross-reference R2's existing outer Request/Result declaration forms. “IO wrappers over Int and constructed Thrown/Mismatch are not boundary types; their libraries pass Int or opaque Outcome and decode in i.” |
-| Spec §11.7 | Keep host-value, memory and stack stops. A bridge call that does not expose exceptions uses F4's panic; malformed raw outcome/host reply uses the existing host-value stop. Do not convert these into Mismatch. |
-| Spec B.1/B.3 | Keep ABI allocation ownership. “Checked Wasi buffers are separate table-owned allocations and are not addresses supplied to ilang_free by i code.” Use W1/W2 as the checked root contract; ABI exports remain host machinery. |
-| Spec B.4–B.6 | Keep v3 ids, cancel, statuses and import-time re-entry restrictions. Add F3's JS target marker/ilang.js v1 metadata and retained getter imports, without changing the host artifact contract. Mandatory changes to runtime imports/statuses/host-called exports still require a version bump. |
-| Spec B.7 | Replace only the special Io implementation bullet after adoption: “The target's Io provider writes UTF-8 text plus LF through the checked Wasi adapter; positive short writes are retried, zero progress/errors give up, and print gives Nil.” Keep it absent from external required-import metadata because internally provided. Keep custom imports, runtime-reserved import names, stops, `_start`, blocking calls and no tests. Add the no-result proc_exit adapter rule W2. |
-| Runtime D5 and §10 | Replace entry provisioning/classification and ABI async-flag text with §9.1 below. |
-| Runtime §§5.1/5.4 | Keep their existing ownership rules; use corrected A2 and the Ready-survives-Owner test in §10. |
-| Runtime §§7/7.4 | Keep the landed native N9/runtime resource text, group operations, await_owned/await_resource and program/control-root accounting. Split process fields by T2, preserving other signatures/errors. |
-| Runtime §8.2 | Generated js/nodejs defaults follow T1–T3, with no automatic unsupported stubs. Explicit Host factories remain configurable. Generated builds share A4's factories. Keep WASI custom imports; list printer as this target project's separate adapter stage, and do not promise later adapters before they land. |
-| Meta §4.3 | Add js to the built-in names and @js to the caller-origin list, exactly as M1. |
-| Meta §8 | Add: “A macro program contains no executable JS binding or initializer. Reject required js declarations before instantiation; quoted syntax remains data.” Apply M1's full-needs rule. |
-| Native N1/N3/N4/N9 | Keep runner ABI, registrations, packaging order and N9. Document host as the preferred ilang alias, and the nullary Native tag; do not add a Native root. |
+| Source section | Replacement/addition | JA installation |
+|---|---|---|
+| Spec §2.6 | Insert T9's full schema, validation, graph, ordering and lifetime rules as the normative provider-plan subsection; retain T6's shorthand and T7's wasm.synchronous contract. Add T3's command table (L4). These keys were previously unused; do not claim compatibility with old readers that ignore them. | Installed: `docs/spec.md:292`, `docs/spec.md:483`. |
+| Spec §2.2/§2.5; syntax §2.5 | Add js to built-in attributes. Replace the external-only declaration restriction with: “A declaration requires external or js, or expansion by a macro. A js declaration has the closed opaque type and foreign link semantics of §10.1. It is initialized once during start only if retained by the target link pass; ordinary bindings retain this section's initialization rules.” Add F1's ordering and F2's roots/conservative analysis verbatim as the foreign-declaration subsection. | Spec installed: `docs/spec.md:178`, `docs/spec.md:247`, `docs/spec.md:1404`. Syntax companion left out, conflict: unowned syntax.md still reserves non-external declarations (details below). |
+| Spec §4.3/§4.7 | Keep sets, nominal identity and principal inference. Add js to the mandatory-full-annotation exceptions. Explicitly say target linking does not change inferred types. No general cast or request-map rule. | Installed: `docs/spec.md:606`, `docs/spec.md:656`. |
+| Spec §9.2 | No semantic change. Add the captured-provider versus call-site replacement example described in T1. | Installed: `docs/spec.md:1097`; example gives (1, 2). |
+| Spec §9.7/§10.2 | Keep general host imports and substitution. Replace entry's host/Assert-only restriction with: “An entry may also require a service supplied by its explicit target provider plan. The plan constructs ordinary service values; missing required standard capabilities are build errors, including when all operation errors are caught. Providers do not alter inferred source types.” Use T1–T5 for Target, capability tables and explicit host plans. Retain legacy Io's line/no-error behavior. | Installed: `docs/spec.md:1231`, `docs/spec.md:1505`. |
+| Spec §10.1 | Retain externals. Add F1–F3 as “JavaScript value declarations”: full nominal annotation, supported targets, source scope/order, retained getter imports, compile-time unavailable errors, loader failures and no re-entry. | Installed: `docs/spec.md:1374`, `docs/spec.md:1404`, `docs/spec.md:1775`. Parenthesized-subject allowance left out, conflict with spec §6.4; braces retained. |
+| Spec §10.3 | Keep the lists unchanged. Cross-reference R2's existing outer Request/Result declaration forms. “IO wrappers over Int and constructed Thrown/Mismatch are not boundary types; their libraries pass Int or opaque Outcome and decode in i.” | Installed: `docs/spec.md:1521`; boundary lists unchanged; R2 declaration forms explicitly cross-referenced. |
+| Spec §11.7 | Keep host-value, memory and stack stops. A bridge call that does not expose exceptions uses F4's panic; malformed raw outcome/host reply uses the existing host-value stop. Do not convert these into Mismatch. | Installed: `docs/spec.md:1582`. |
+| Spec B.1/B.3 | Keep ABI allocation ownership. “Checked Wasi buffers are separate table-owned allocations and are not addresses supplied to ilang_free by i code.” Use W1/W2 as the checked root contract; ABI exports remain host machinery. | Installed: `docs/spec.md:1678`, `docs/spec.md:1711`, `docs/spec.md:1816`. |
+| Spec B.4–B.6 | Keep v3 ids, cancel, statuses and import-time re-entry restrictions. Add F3's JS target marker/ilang.js v1 metadata and retained getter imports, without changing the host artifact contract. Mandatory changes to runtime imports/statuses/host-called exports still require a version bump. | Installed: `docs/spec.md:1717`, `docs/spec.md:1775`; B.5 unchanged. |
+| Spec B.7 | Replace only the special Io implementation bullet after adoption: “The target's Io provider writes UTF-8 text plus LF through the checked Wasi adapter; positive short writes are retried, zero progress/errors give up, and print gives Nil.” Keep it absent from external required-import metadata because internally provided. Keep custom imports, runtime-reserved import names, stops, `_start`, blocking calls and no tests. Add the no-result proc_exit adapter rule W2. | Installed: `docs/spec.md:1807`, `docs/spec.md:1870`; separate LF attempt preserves the existing failure behavior. |
+| Runtime D5 and §10 | Replace entry provisioning/classification and ABI async-flag text with §9.1 below. | Installed exact §9.1 replacements: `docs/design/runtime.md:126`, `docs/design/runtime.md:1768`, `docs/design/runtime.md:1843`. |
+| Runtime §§5.1/5.4 | Keep their existing ownership rules; use corrected A2 and the Ready-survives-Owner test in §10. | Bootstrap installed: `docs/design/runtime.md:378`; ownership unchanged; Ready test at `docs/design/runtime.md:2098`. |
+| Runtime §§7/7.4 | Keep the landed native N9/runtime resource text, group operations, await_owned/await_resource and program/control-root accounting. Split process fields by T2, preserving other signatures/errors. | Split installed: `docs/design/runtime.md:1225`; raw signatures, codecs, errors and resource rules preserved. |
+| Runtime §8.2 | Generated js/nodejs defaults follow T1–T3, with no automatic unsupported stubs. Explicit Host factories remain configurable. Generated builds share A4's factories. Keep WASI custom imports; list printer as this target project's separate adapter stage, and do not promise later adapters before they land. | Installed: `docs/design/runtime.md:1488`, `docs/design/runtime.md:1849`. |
+| Meta §4.3 | Add js to the built-in names and @js to the caller-origin list, exactly as M1. | Installed in the two owned rows: `docs/design/meta.md:371`, `docs/design/meta.md:379`. |
+| Meta §8 | Add: “A macro program contains no executable JS binding or initializer. Reject required js declarations before instantiation; quoted syntax remains data.” Apply M1's full-needs rule. | Left out, conflict with JA ownership: only Meta §4.3 may be edited. Meta §8:580 still bans only executable external needs, not JS needs. See companion edits below. |
+| Native N1/N3/N4/N9 | Keep runner ABI, registrations, packaging order and N9. Document host as the preferred ilang alias, and the nullary Native tag; do not add a Native root. | Preserved without editing native.md: N1/N3/N4/N9 remain controlling. Alias and nullary tag installed at `docs/spec.md:487` and `docs/spec.md:1246`. |
 
-Concrete conflicts recorded: current spec §2.5 forbids js declarations;
-§10.2 does not admit ordinary Target/provider services; §9.7/B.7 mandate the
-special WASI Io implementation; B.6 lacks JS target imports. These block
-claiming the proposal is already spec-conforming, not completing this note.
-Runtime §8.2's automatic unsupported browser defaults conflict with J1;
-its no-preview-adapter scope must explicitly coexist with this separate
-printer project. The merged native N9 resource representation is controlling
-under J2. No conflict remains with native N9 or custom-import preservation
-under J4. The coordinator has accepted §9.1's B.7 exception. Replacing resource
-factories or adding a Native root would create new conflicts, so neither is
-part of this revision.
+The older spec restrictions on declarations, entry services, the special WASI printer and target metadata have been replaced at the locations above. Runtime's automatic browser stubs are replaced under J1. Native N9, custom WASI imports, request ownership and the multicore gate are unchanged.
+
+**Companion items left out.** JA owns neither syntax.md nor Meta outside §4.3. Syntax §2.2 (`docs/design/syntax.md:138`) and §2.5 (`:200`) say “A declaration with no `@external` is kept for macros”; the installed spec admits `@js`. Meta §7.1 (`docs/design/meta.md:496`) says typed macros are “the only use of a declaration other than `@external`”; that also needs `@js`. Meta §8 (`:580`) rejects executable external needs, whereas M1 above requires executable JS declarations, getters/providers and initializers to be rejected too, including initializer needs. Recommended coordinator action: assign those small companion edits to their owners, preserving quoted syntax as data. No macro sandbox behavior is claimed installed by JA.
+
+F2 originally said “allowing parentheses or a one-expression group around the subject”. Spec §6.4 says “`(x)` is a tuple of one part” and uses `{ }` for grouping. The parenthesis allowance was left out, and that sentence in F2 was corrected. This changes no type or tuple rule.
+
+**Adjoining sentences corrected with installation.** Spec opening/§2.1 now name target modules and distinguish checking test source from compiling test entries; §1.4 no longer reserves `@js` for macros; §2.2/§2.5 allow its declaration and initialization; §2.6's key introduction includes plans; §4.3/§4.7 require its annotation and preserve inference; §9.7 distinguishes chosen factories from imported services and keeps Io's Nil result; §10.2 replaces the host/Assert-only and direct-async rules; B.1/B.3 separate checked buffers, B.6 lists required host registrations and JS markers, and B.7 applies its reserved-import rule to required graph imports. Runtime §10's old host-supply/browser/WASI sentences, entry-dependency instructions and related test expectations now follow D5 and J1. These are consequences of the named amendments, not additional feature choices.
+
+**Installation checks and attacks.** The CLI spec suite passed all 168 cases at O0/O2; the syntax spec test passed parsing and print round trips. The old-syntax checker passed with its 19 future-track expectations unchanged. No new snippet needed a future-parser entry, and no check was weakened. The first CLI suite attempt stopped before tests because Binaryen was absent; initializing this lane's pinned submodule fixed it. No remaining suite failure was found.
+
+The new capture example was run and its assertion of (1, 2) passed. A probe comparing `(t)` with t was rejected as disjoint with E0520, confirming the grouping conflict. Current source-only checking of a State entry still gives E0522 (`crates/ilang-check/src/types/infer.rs:405–429`), and the @js probe gives E0301/E0308/E0315 (`crates/ilang-check/src/resolve.rs:500–551` handles the attribute list); these are verified implementation gaps, not failures of installed target behavior. No provider/foreign implementation was added.
+
+Reading the current `$wasi_line` showed it always tries LF after the text write (`crates/ilang-wasm/src/runtime/mod.rs:298–304`); W3's sentence and spec B.7 now preserve that behavior. The short-write loop is at `:282–297`. The ordinary printer and checked table remain future work, so their memory/error behavior is checked against W1/W2 by inspection, not claimed executed.
+
+After these corrections, two further inspection passes found no serious new issue. Pass 1 traced `Cell(A) -> Cell(List(A))` (recursive-dependency error), the T10 Config-before-Await graph, the T11 seed override ("override", never silently replaced), and the existing substituted-Target/keep_env fixtures (retain unknown foreign references). Pass 2 traced body-twice and body-after-exit adapters (the specified provider stops), `free(token); load(token, 0, 0)` (closed), oversized fd_write results (host-value stop), and Ready surviving Owner close (original answer once). Those future results follow the installed rules; they were not run. A byte comparison confirmed that spec §10.3's boundary lists, B.2's wire table, B.5's protocol and runtime §§5.4/8.1 ownership/resource rules are unchanged. R2/IO type and operation definitions still need their own installation; JA cross-references those accepted contracts rather than inventing them.
 
 ### 9.1 Exact runtime replacement (accepted WASI exception)
 
@@ -1637,9 +1632,7 @@ Multicore's pure Event algebra, shared spawn/run counter, non-migrating live
 continuations and MC-D gate remain unchanged. These provider changes do not
 approve or implement multicore.
 
-The earlier K1/B.7 question is closed by the ledger. Source changes above
-still require integration before implementation can claim conformance; the
-normative spec remains controlling until then. No new spec/native/multicore
+The earlier K1/B.7 question is closed by the ledger. The table above records installed source changes and the companion edits still left out; implementation conformance still requires those handoffs and the compiler/runtime work. No new spec/native/multicore
 conflict is resolved by silently weakening their rules.
 
 ## 10. Required tests and adversarial revision
