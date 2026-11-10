@@ -334,7 +334,7 @@ calendar_text = () {
 	Nil
 }
 
-// C1 and spec §2.4 require constructor, field-selection and constructor-update
+// C1 and spec §2.4 require constructor and constructor-update
 // privacy. Run these negative checks with the exact lane compiler, restoring
 // this owned file after each case. They are not deliberately failing @tests.
 // direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec("\n".join(x[4:] for x in Path("std/test/calendar_test.i").read_text().splitlines() if x.startswith("//| ")))'
@@ -348,6 +348,8 @@ calendar_text = () {
 //|     'private TimeOfDay constructor': 'bad = () { calendar.TimeOfDay(24, 0, 0, 0) }',
 //|     'private Offset constructor': 'bad = () { calendar.Offset(1440) }',
 //| }
+//| baseline = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)
+//| assert baseline.returncode == 0, baseline.stderr
 //| try:
 //|     for name, source in cases.items():
 //|         path.write_text(original + '\n' + source + '\n')

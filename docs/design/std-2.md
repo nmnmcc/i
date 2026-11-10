@@ -1,6 +1,7 @@
 # Design: time, calendar, command arguments, and logging
 
-Status: proposed API and implementation contract. No implementation is changed.
+Status: accepted API and implementation contract. The pure implementation and
+its verification are recorded in §12. Generic sink clients retain the §7 gate.
 Source baseline: `b9173ce013405fd3a055ffa34edf3b8829672104`. Repository line
 references below mean that commit, unless another revision is named. The spec
 in this checkout already has the syntax migration; all examples use that syntax.
@@ -1006,3 +1007,179 @@ and Gregorian UTC/fixed-offset scope are already given by the task; they need
 no reconfirmation. Real IO remains unverified until the accepted runtime and
 provider APIs land. Recheck the five IO signatures against that landed surface;
 local stand-in type checks are not a substitute.
+
+## 12. Pure implementation record
+
+The implementation adds only the eight source/test files in §9 and updates this
+note. The lane began clean; there was no interrupted implementation to keep or
+discard. It merged redesign at `7b3cea3` before implementation. The four modules
+contain all 55 pure functions; the five future IO functions remain phase two.
+There is no Rust, manifest, language-spec, host-adapter, golden or derived-file
+change. The module headers contain their public inventories, rules and laws.
+
+### 12.1 Interpretation evidence
+
+These checks establish the requirements independently of generated expectations:
+
+| Choice or expected value | Controlling sentence and check |
+|---|---|
+| Exact signed units and distinct epoch positions | T1: “The private integer is nanoseconds”; T3: “between(a,b) is b minus a”. The tests spell out the unit multipliers, orientation, inverse laws and 10^100-hour case; hidden-constructor and nominal-mixing checker cases remain rejected. |
+| Truncating duration division, floor calendar division | T2: “otherwise it divides toward zero, including for a negative divisor”; C3: “Never use truncating division for eras, days or weekday on negative input.” Signed duration cases and negative epoch/day boundaries check these separately. |
+| Review calendar table | C1's Gregorian rule, C3's 1970 origin and C4's Monday-based weekday formula require the nine review table rows, including +10000. Tests use those fixed rows and a separate January-based year-counting oracle at 38,424 month endpoints, plus century and huge-day boundaries. This oracle does not use the production March-era inverse. |
+| Epoch -1 ns and extreme offsets | C4: “at adds offset_minutes×60×10^9 to the epoch count, splits by floor division”. The fixed expected date/time fields cover -1 ns and epoch at both -1439 and +1439 minutes, alongside the inverse laws. |
+| Strict calendar text, one parse error | C5: “Any bad syntax or invalid component gives Error(BadText); constructor functions retain their precise errors.” The parser validates components and catches its local validation errors; the tests independently spell out canonical text and malformed boundaries. |
+| CLI namespace and diagnostic policy | A1: “Every long/short name is unique in its own option namespace”; positional names are unique among positionals. Long, short and positional namespaces are separate. The coordinator's ruling is now the first paragraph of §5.3. Short-alias missing/conversion cases assert canonical names and distinct option/value indexes. |
+| CLI token ownership and error precedence | A3: “This arity rule is independent of the read callback”; A6: “First definition validation ... then token scanning errors ... then extra positionals ... then missing/value conversion errors in descriptor order.” Tests include every pure §5.5/review-table case, stopping later callbacks, heterogeneous composition and help bytes from A8. |
+| Internal CLI bucket consumption | §5.4: “Each leaf consumes exactly one bucket; pure consumes none.” The executable test harness compiles the implementation as a temporary test module and checks empty supplied buckets, the exact unused suffix and full public parse consumption. |
+| Call-time logging and lazy suppression | L2: “write obtains the current service ... original Entry”; L3: “False calls neither message nor send.” Closed clients record entry order, replacement of an already-created producer, eager argument evaluation, lazy suppression and unchanged custom errors with exactly one delivery attempt. |
+| Sink row and generic gate | L5: “E is covariant; N is invariant through the unused `(N)->Nil` marker”; §7: “The implementation can use inferred function bodies and explicitly typed closed client calls in the meantime.” No marker, error or service parameter was removed. Both negative cases and all five waiting positive probes are executable in log_test.i. Successful generic clients must then pass runtime assertions at both optimization levels. |
+| Log text bytes | L6: “Other U+0000..001F and U+007F..009F, plus U+2028/U+2029, become `\u{h}` with minimal lowercase hex digits.” Fixed expectations cover quote/backslash, LF/CR/tab, NUL, ESC, C1 boundaries, separators, Unicode, duplicate/empty fields and signed timestamps. |
+| Future tests stay deferred | §9: “Keep IO-fake cases in the matching second phase.” T4/T5, cli.read and L7 require the unavailable IO services. Their absence does not change any pure signature. |
+
+### 12.2 Inferred public interfaces
+
+Measured with the lane-built `target/release/i check --project std --types`.
+All 16 time, 18 calendar, 13 cli and 8 log functions agree with §3.2, §4.2,
+§5.2 and §6.2 respectively, including parameter labels. No export is added or
+omitted in the pure phase. Constructors and their visibility match those same
+sections and spec §2.4.
+
+The printer renames type variables: silent's A is the note's N; filter,
+minimum and enabled use A/B for E/N; lazy uses E for the message's F and E2 for
+the sink's E. These are alpha-renamings of the same universally quantified
+types. The order of a union does not matter (spec §4.4). write/lazy omit result
+annotations under the explicit §7 workaround, but their inferred public types
+retain all required errors and services. There is no semantic API difference.
+
+```text
+std/time.nanoseconds : (count: Int) -> Duration
+std/time.milliseconds : (count: Int) -> Duration
+std/time.seconds : (count: Int) -> Duration
+std/time.minutes : (count: Int) -> Duration
+std/time.hours : (count: Int) -> Duration
+std/time.to_nanoseconds : (duration: Duration) -> Int
+std/time.add : (first: Duration, second: Duration) -> Duration
+std/time.subtract : (first: Duration, second: Duration) -> Duration
+std/time.scale : (duration: Duration, by: Int) -> Duration
+std/time.divide : (duration: Duration, by: Int) -> Result(Duration, TimeError)
+std/time.compare : (first: Duration, second: Duration) -> Order
+std/time.from_unix_nanoseconds : (count: Int) -> Instant
+std/time.unix_nanoseconds : (instant: Instant) -> Int
+std/time.shift : (instant: Instant, by: Duration) -> Instant
+std/time.between : (start: Instant, end: Instant) -> Duration
+std/time.compare_instants : (first: Instant, second: Instant) -> Order
+
+std/calendar.is_leap_year : (year: Int) -> Bool
+std/calendar.days_in_month : (year: Int, month: Int) -> Result(Int, CalendarError)
+std/calendar.date : (year: Int, month: Int, day: Int) -> Result(Date, CalendarError)
+std/calendar.time_of_day : (hour: Int, minute: Int, second: Int, nanosecond: Int) -> Result(TimeOfDay, CalendarError)
+std/calendar.offset : (minutes: Int) -> Result(Offset, CalendarError)
+std/calendar.utc : () -> Offset
+std/calendar.date_parts : (date: Date) -> (Int, Int, Int)
+std/calendar.time_parts : (time: TimeOfDay) -> (Int, Int, Int, Int)
+std/calendar.offset_minutes : (offset: Offset) -> Int
+std/calendar.day_number : (date: Date) -> Int
+std/calendar.from_day_number : (day: Int) -> Date
+std/calendar.weekday : (date: Date) -> Weekday
+std/calendar.add_days : (date: Date, days: Int) -> Date
+std/calendar.days_between : (start: Date, end: Date) -> Int
+std/calendar.at : (instant: time.Instant, offset: Offset) -> Civil
+std/calendar.to_instant : (civil: Civil, offset: Offset) -> time.Instant
+std/calendar.parse : (text: String) -> Result((Civil, Offset), CalendarError)
+std/calendar.format : (civil: Civil, offset: Offset) -> String
+
+std/cli.pure : (value: A) -> Parser(A)
+std/cli.flag : (names: Names, help: String) -> Parser(Bool)
+std/cli.option : (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(A)
+std/cli.argument : (name: String, help: String, read: (String) -> Result(A, String)) -> Parser(A)
+std/cli.optional : (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(Option(A))
+std/cli.many : (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(List(A))
+std/cli.rest : (name: String, help: String, read: (String) -> Result(A, String)) -> Parser(List(A))
+std/cli.map : (parser: Parser(A), with: (A) -> B) -> Parser(B)
+std/cli.map2 : (first: Parser(A), second: Parser(B), with: (A, B) -> C) -> Parser(C)
+std/cli.text : (text: String) -> Result(String, String)
+std/cli.integer : (text: String) -> Result(Int, String)
+std/cli.parse : (parser: Parser(A), args: List(String)) -> Result(A, CliError)
+std/cli.help : (parser: Parser(A), program: String) -> Result(String, DefinitionError)
+
+std/log.make : (accept: (Level) -> Bool, send: (Entry) -> Nil ? E ! N) -> Sink(E, N)
+std/log.silent : () -> Sink(Never, A)
+std/log.filter : (sink: Sink(A, B), accept: (Level) -> Bool) -> Sink(A, B)
+std/log.minimum : (sink: Sink(A, B), level: Level) -> Sink(A, B)
+std/log.enabled : (level: Level) -> Bool ! Sink(A, B)
+std/log.write : (entry: Entry) -> Nil ? E ! N | Sink(E, N)
+std/log.lazy : (level: Level, message: () -> String ? E ! N) -> Nil ? E | E2 ! N | Sink(E2, N)
+std/log.format : (entry: Entry) -> String
+```
+
+### 12.3 Compiler gate and verification
+
+Five positive checker cases remain waiting for K4, each with E0505: the full
+annotated logging body, the review's smaller annotated service body, an ordinary
+generic write client, an ordinary generic lazy client, and the review's minimal
+invariant-service client. The three client cases carry runtime tests that the
+harness runs at optimization 0 and 2 once checking succeeds. They are excluded
+from the ordinary passing suite under §7's gate, not advertised as supported.
+Closed logging clients run in the regular suite. The unsafe Consumer row case
+still gives E0501; incompatible installed Sink error arguments give E0515.
+
+The smallest rejection needs no logging library:
+
+```i
+S(N) { S(() -> Nil ! N) }
+use(N) = (s ! S(N)) -> Nil ! N | S(N) {
+  S(f) = s
+  f()
+}
+```
+
+It is a finite type under spec §4.7/§4.8. The checker failure is the known
+conformance defect, not permission to change Sink or weaken service equality.
+No conflict between the controlling design contracts was found.
+
+All commands below run from this lane through
+`direnv exec /home/agent/Programming/i`. Cargo and dev-verify use the shared
+`/home/agent/Programming/i/.rd/cache/heavy` wrapper.
+
+| Command/check | Final result |
+|---|---|
+| `cargo build --release --locked -p ilang-cli` | Passed; exact lane compiler built with the pinned Binaryen submodule. |
+| `./scripts/dev-verify i` | Passed: formatting of lib/std/bench/examples; std 1446 passed at both optimization levels; hello 2 and bench 12 passed at each level; WASI smoke passed. |
+| `target/release/i test --project std --opt 0` and `--opt 2`, as invoked by dev-verify | Both passed, 1446 tests each. These are the runtime acceptance checks. |
+| `target/release/i fmt --check std` | Passed. |
+| `./scripts/old-syntax-check` | Passed: 1181 snippets, exact expected diagnostics, 19 unchanged future-track entries. |
+| `target/release/i check --project std --types` | Passed; all 55 measured interfaces are listed above. |
+| Executable checker harnesses in time_test.i and calendar_test.i | Required nominal separation E0501 and hidden-constructor/update E0204 cases rejected. Each harness first requires a passing baseline and restores its file in finally. |
+| Executable internal CLI decoder harness in cli_test.i | One internal test passed at each optimization level; test file restored. |
+| Executable logging harness in log_test.i | Negative cases rejected with E0501/E0515; the five positive cases remain E0505 gates, as described above. |
+
+Development checks that failed or were superseded:
+
+- Early time checks stopped on concurrently unfinished calendar/CLI syntax.
+  The module writers corrected those syntax errors before the combined gates.
+  Calendar also corrected local pattern/module shadowing during checking.
+- The first calendar runtime run had three passing and two failing test groups.
+  Its loops incorrectly treated list.range as exclusive and included month 13.
+  list.i says the range has “both ends”; correcting those bounds preserves the
+  intended month/year coverage. Both final calendar optimization runs passed.
+- The first log run had four passing groups and one format failure because
+  int.to_base16 emits uppercase. L6 explicitly requires lowercase; the
+  implementation now lowercases those digits, leaving the expectation intact.
+- The first CLI internal harness put @test in src/, giving E0305. It now
+  compiles the production source as a temporary test module, preserving the
+  required private bucket checks without changing the production API.
+- One earlier full opt-2 run overlapped that temporary CLI test copy and ran
+  1437 tests. That is a substitute measurement, not the acceptance result.
+  The final dev-verify run used the restored suite and passed all 1446 twice.
+- Cached-compiler module runs were substitutes during the exact compiler build.
+  They do not replace the final lane-built results. Formatter-sensitive edit
+  attempts that failed to match made no file change and were retried against
+  the formatted text. No check or expected behavior was weakened.
+
+The Binaryen submodule was initialized at its pinned revision and the lane's
+target/release/i was built; these build artifacts remain available. Temporary
+test mutations were restored byte for byte. No user checkout or other lane was
+edited. No environment setting was changed. There are no derived files to
+regenerate. Full generic logging waits for K4; IO adapters and their fake/host
+tests wait for the separate IO phase. Neither requires an API change here.
+The final redesign merge check was already up to date at `7b3cea3`.
