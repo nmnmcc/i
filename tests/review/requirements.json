@@ -722,19 +722,19 @@
       "fixed_by": "K4 F3: finite field and generic-handler inference"
     },
     {
-      "pattern": "^review-k4s/soundness$",
-      "known_failure": true,
+      "pattern": "^review\\-k4s/soundness$",
+      "known_failure": false,
       "outcome": "reject",
       "finding": "K4s P1: annotated local function must not erase an unprovided service from main",
       "source": "docs/spec.md §4.5 rule 4 and §9.2; review-k4s/review-summary.json records expected E0522, with E0505 on its historical baseline",
       "origin": "review-k4s/soundness/src/main.i",
       "diagnostic_codes": [
-        "E0501",
         "E0522"
       ],
       "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
       "phase": "entry",
-      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute."
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1: shared coalescing normalization and entry validation"
     },
     {
       "pattern": "^review-rec/",
