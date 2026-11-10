@@ -123,29 +123,68 @@ resume updates one request cell before resuming that one loop. Reason: C §6.4
 and `emit/host.rs:23–48`. A slot index alone is not a language handle: cells
 have identity and a fresh GC identity token for their generation, so an old alias cannot cancel a reused slot.
 
-**D5. Provision entry services from the inferred environment.** Let N be the
-entry function's ordinary inferred environment. On the ilang target the entry
-is async exactly when N contains an async/request host service or Scheduler or
-Runner from i/task. Otherwise it remains synchronous. No reachability guess,
-attribute on the entry, or change to its principal type is needed. Task services
-in N request the default FIFO task run, with root path [] and seed
-random.from_seed(0). Async host services without task needs use a direct root
-Await handler and request context; they do not set up a scheduler. Pure entries
-set up neither a task run nor a host hand-off. Await/Owner/Root alone, for
-example for completed fakes, do not turn an entry async; a low-level wait/poll
-that tries to hand off there stops with request: no active entry.
+**D5. Provision and classify entries by the complete provider plan.**
 
-This is one narrow entry-point rule for the resolved standard services,
-authorized by the coordinator and ledger G2(S7). It is a deliberate provision
-for i/task and request services; an arbitrary user scheduler is not implicitly
-bootstrapped. IO service values are given only as the inferred needs require,
-like Assert and Io today. Channel and scheduling operations remain ordinary i.
-The host-import and request primitives themselves have no IO namespace rule.
-A pure task run can have async metadata yet finish with status 0 on its first
-call: scheduler switches alone never cause a host yield. Progress polling below
-requires an actual task waiting for host work; idle waiting also counts
-unawaited requests. There is no automatic entropy draw. Contextual top(seed)
-keeps the current Runner's route/prefix; it changes only the seed.
+Let N be an entry's ordinary inferred environment. Resolve the target's
+chosen provider for every service in N, and transitively for every service
+in each chosen factory's inferred environment, generated constructor payloads
+and the structured adapter's outer requirements. Use the complete validated
+provider-plan schema of spec §2.6, including its outer/body scopes and seed
+edges. A role belongs to the service row and survives a factory override.
+At most one distinct adapter may reach an entry; otherwise report both
+originating rows and their adapter names. No composition is defined.
+A request host declaration
+is a request-mode provider; an async host declaration is normalized to its
+request-and-await provider. Scheduler and Runner are provider roles with
+typed structured-run entry adapters, usable by any service; no rule tests
+a module or type spelling. Reject unresolved supplies and provider cycles.
+
+On targets using the v3 asynchronous entry protocol, the entry is async
+exactly when that closure contains a request-mode service provider, a
+Scheduler provider or a Runner provider. This is computed from the full
+chosen graph, without source-body reachability or field-use analysis, and
+does not change the principal source type. Await/Owner/Root providers alone
+do not qualify. A service node's declared request/async mode counts even if
+a factory supplies a completed fake for that service. A pure bundle provider
+without such a dependency may remain synchronous. An ordinary user bundle
+follows exactly the same rule as a shipped bundle.
+
+First open the primitive entry context; enable async admission exactly for
+an async entry. Opening is fixed, cannot be replaced, and has no service
+dependencies. It constructs no replaceable service value. The initial root
+key argument, when needed, is registered there as part of narrow bootstrap.
+Construct every chosen service, including context services, in the one
+topological order of the complete plan graph in spec §2.6. An adapter-enter
+node follows its outer prerequisites; seeds become available inside its
+guarded continuation. A seed-dependent factory executes there. Other ready
+factories precede adapter-enter according to that order. No Root/Owner/Await
+prefix and no temporary fallback service may bypass a dependency.
+
+Invoke the unchanged source entry with the chosen body services. Finish the
+adapter and its ordinary structured cleanup, then retire the primitive
+context on every exit. Provider factories have no uncaught typed errors;
+construction cannot add to the source entry's ABI error row. A stop skips
+i finals; context retirement still occurs. Enforce the adapter's single-call,
+active-extent guard from spec §2.6; a suspension does not end that extent.
+The shipped task adapter retains FIFO, fresh run identity/path [], seed
+random.from_seed(0), and no entropy draw. With no role there is no structured
+adapter: ordinary chosen Await/Owner/Root factories suffice. Synchronous
+fake-only contexts cannot hand off: a low-level wait requiring hand-off or
+poll stops with request: no active entry.
+
+A host export can therefore become async when its provider closure changes,
+even if its source type is unchanged or its body never waits. The artifact's
+async metadata and wrapper follow the closure. If it is listed in the root
+package's wasm.synchronous contract, such a build is an error showing the
+qualifying dependency path. Do not silently block or emit synchronous
+metadata. Otherwise the caller must use the async entry protocol. Status 0
+on the first call is still possible; pure scheduler switches alone do not
+yield to the host. Existing progress-polling and contextual Runner seed
+rules stay unchanged.
+
+On WASI preview 1, spec B.7 continues to require blocking imports,
+synchronous entry metadata and no async hand-off. This is the explicit
+target-ABI exception accepted by the coordinator; custom imports remain.
 
 **D6. Scopes use module functions, not polymorphic methods.** Write
 `task.go(s, body)`, `task.join(t)`, `task.share(s, x)`, and `task.send(c, x)`.
@@ -336,14 +375,14 @@ through answers of unlisted requests, which are stored for later use. All-listed
 cancelled tickets count as settled. No root continuation is stored on a cell.
 
 Cancellation ownership and run affiliation are separate. Root identifies a
-request run and its enclosing entry context. The runtime creates the initial
-Root only for an entry whose inferred needs require request/task support.
+request run and its enclosing entry context. The primitive entry context registers the initial root key only when the
+checked provider graph needs the entry-root-key argument. An ordinary chosen
+factory constructs the Root service value from that key. Opening admission
+has no service dependencies and does not construct a chosen Root, Owner or
+Await. This is narrow entry provisioning, not a public unscoped root allocator.
 open_root needs an existing live Root to retain that entry context; it does
 not require the new root to share the old root's request count. A dispatcher
-can thus open an independent root without inventing a second entry. The
-initial bootstrap is part of the narrow entry provision, not a public unscoped
-root allocator. Entry request contexts and each task.run open a fresh Root and
-bind it for their whole lifetime. open_owner uses that Root, not the currently
+can thus open an independent root without inventing a second entry. Each task.run opens a fresh Root and binds it for its whole lifetime. Entry contexts obtain their chosen service values through the checked provider graph (D5). open_owner uses that Root, not the currently
 bound Owner, to register its group. request.within opens/binds a fresh Owner and
 ensures close_owner on exit; it leaves Root unchanged. Thus custom groups of a
 run have the same root, and a nested task.run has a different root. Both Root
@@ -1027,7 +1066,7 @@ public raw test APIs. No language rule forbids constructing or replacing service
 | clock / Clock / `i:clock/v1` | `ClockError { ClockError(operation: String, code: String) }` |
 | fs / Fs (type only) / `i:fs/v1` | File, constructor private; `FsError { FsError(operation: String, path: String, code: String) }` |
 | net / Net (type only) / `i:net/v1` | Listener and Stream, constructors private; `NetError { NetError(operation: String, endpoint: String, code: String) }` |
-| process / Process (type only) / `i:process/v1` | Child, constructor private; `ProcessError { ProcessError(operation: String, code: String) }` |
+| process / Process (type only) / `i:process/v1`; Entropy, Arguments, Environment, WorkingDirectory (§7.4) | Child, constructor private; `ProcessError { ProcessError(operation: String, code: String) }` |
 | stdio / Stdio / `i:stdio/v1` | `StdioError { StdioError(operation: String, code: String) }` |
 
 The common stable wire error codes are `invalid`, `not_found`, `denied`,
@@ -1185,16 +1224,18 @@ their pending Request values cannot.
 
 ### 7.4 Processes and entropy
 
-| Raw Process field | Type |
-|---|---|
-| `args` | `() -> Request(Result(BitArray,String))` |
-| `env` | `(name: String) -> Request(Result(String,String))` |
-| `cwd` | `() -> Request(Result(String,String))` |
-| `entropy` | `(bytes: Int) -> Request(Result(BitArray,String))` |
-| `spawn` | `(program: String, args: BitArray) -> Request(Result(Int,String))` |
-| `wait` | `(child: Int) -> Request(Result(Int,String))` |
-| `terminate` | `(child: Int) -> Request(Result(Nil,String))` |
-| `close` | `(child: Int) -> Request(Nil)` |
+The fields stay in i/process, but each wrapper requires only its capability's service, plus Await and Owner when it waits. Entropy, Arguments, Environment and WorkingDirectory have public constructors for ordinary fakes; Process retains private raw fields and the private Child wrapper. Keep ProcessError for every wrapper. Arguments and Environment do not require WorkingDirectory; preview 1 has no general cwd query.
+
+| Service / namespace | Raw field | Type |
+|---|---|---|
+| Arguments / `i:arguments/v1` | `args` | `() -> Request(Result(BitArray,String))` |
+| Environment / `i:environment/v1` | `env` | `(name: String) -> Request(Result(String,String))` |
+| WorkingDirectory / `i:working-directory/v1` | `cwd` | `() -> Request(Result(String,String))` |
+| Entropy / `i:entropy/v1` | `entropy` | `(bytes: Int) -> Request(Result(BitArray,String))` |
+| Process / `i:process/v1` | `spawn` | `(program: String, args: BitArray) -> Request(Result(Int,String))` |
+| Process / `i:process/v1` | `wait` | `(child: Int) -> Request(Result(Int,String))` |
+| Process / `i:process/v1` | `terminate` | `(child: Int) -> Request(Result(Nil,String))` |
+| Process / `i:process/v1` | `close` | `(child: Int) -> Request(Nil)` |
 
 Public args gives List(String); spawn takes `(program: String, args: List(String))`
 and returns Child; wait/terminate/close take Child. Match Child(number)
@@ -1446,20 +1487,23 @@ generations and ABI H13's late-callback prohibition still apply independently.
 
 ### 8.2 Target behavior, operation by operation family
 
-| Module | `i run` and native Rust host | JS SDK standard service factory: Node | JS factory: browser | WASI preview-1 target in this track |
-|---|---|---|---|---|
-| random | Pure i | Same pure i | Same pure i | Same pure i |
-| task | i FIFO loop over v3 | Same loop; promises, AbortSignal, macrotask polling | Same loop on calling thread; never block it | Same i loop; raw host calls complete synchronously; no status hand-off |
-| clock | Reactor timers and OS clocks | Monotonic/system clocks and abortable timers | Performance/system clocks and abortable timers | Ordinary blocking service imports; preview-1 command supplies no i:clock adapter |
-| fs | OS files, with the cancellation rule above | Node context-owned Int table, closed/busy leases, explicit close | Every raw operation gives unsupported, except close gives Nil | Blocking Int imports; buffer-aware embedder/linked adapter needed, no default fs adapter |
-| net | Reactor TCP | Node context-owned Int table; provisional cleanup and close wakeups | All operations give unsupported, close gives Nil; browser fetch is not raw TCP | Ordinary blocking imports; no default listen/connect adapter |
-| process | OS args/env/cwd/entropy/child processes | Node process data, entropy, spawn/wait/terminate/close | args gives an encoded empty list; env gives denied; cwd/spawn/wait/terminate give unsupported; entropy uses platform secure entropy; close gives Nil | Ordinary blocking imports; no default process/entropy adapter or spawn implementation |
-| stdio | Per-source input broker/subscribers and byte output | Node standard byte streams with cancelable subscribers | Default byte read/write/flush operations give unsupported; an embedder can give explicit byte sources/sinks | Ordinary blocking imports; no new i:stdio adapter; legacy i/io continues to use fd_write |
+The generated targets select ordinary providers by spec §2.6 and §9.7. The initial synchronous JS stage supplies Io, Target and its root; the following IO defaults are added only when their implementations and tests ship. A missing standard capability without an explicit provider is a compile error even if the program catches unsupported. Host SDK embedders may explicitly choose stubs; generated targets do not install them automatically.
 
-The JS factory is an explicit SDK option, not a language name-resolution rule.
-It installs all fields including unsupported stubs, so a module can instantiate
-and catch a typed unsupported error. Embedders can override any whole service with ordinary imports and explicit
-binding grants. The standard factories share one ResourceContext across workers
+| Capability | i run/test and native | Generated nodejs | Generated js | WASI preview 1 |
+|---|---|---|---|---|
+| random | Pure i | Same | Same | Same |
+| task | i FIFO loop over v3 | Same loop; promises, AbortSignal, macrotask polling | Same loop on calling thread; never block it | Same i loop; raw calls block; no async hand-off |
+| Io | Standard output | Console provider | Console provider | Ordinary provider over the checked Wasi printer adapter |
+| Clock | Reactor timers and OS clocks | Monotonic/system clocks and abortable timers | Performance/system clocks and abortable timers | No default until a separately approved adapter ships |
+| Entropy | OS secure entropy | Secure entropy | Platform secure entropy | No default until a separately approved adapter ships |
+| Arguments, Environment | Process data | Node process data | No defaults | No defaults until separately approved adapters ship |
+| WorkingDirectory | OS cwd | Node cwd | No default | No default; preview 1 has no general cwd query |
+| Fs | OS files with §8.1 cancellation | Granted context-owned Int table and leases | No default | No default until a separately approved adapter ships |
+| Net | Reactor TCP | Granted context-owned Int table and cleanup | No default; fetch is not raw TCP | No default listen/connect adapter |
+| Process | Spawn/wait/terminate/close | Granted Node child-process factory | No default | No default spawn implementation |
+| Stdio | Input broker/subscribers and byte output | Node standard streams | No default; explicit byte sources/sinks remain possible | No default until a separately approved adapter ships |
+
+The Host SDK factory remains an explicit embedder option. Embedders can replace whole services with ordinary imports and explicit binding grants, including intentionally selected unsupported stubs. Generated Node builds share these granted factories; an arbitrary Js value cannot construct a resource service with access to its private raw numbers. No module name gets a language rule. The standard factories share one ResourceContext across workers
 and make a fresh one per invocation, even when the factory is reused for tests.
 JS resource numbers/counters use BigInt, never Number. Stop/dispose removes
 listeners, destroys sockets and owns child cleanup, including promises settling
@@ -1470,15 +1514,14 @@ path already exist (`bindings/javascript/ilang.mjs:34–58`, `:894–902`). New 
 factories and tests are IO work, not claims about today's SDK.
 
 WASI keeps the current §B.7 blocking-import contract. It is not the `i run` host:
-no standalone promise for the new IO imports is made here. Each request-mode
+no standalone promise for the new IO imports is made here. Registered standard capabilities require an explicit plan when no default exists; they do not fall through to imports. Required custom imports remain open as spec §B.7 permits. Each request-mode
 blocking import returns an already-Ready request, so neither ABI cancel nor
 resume/continue is used, and poll is a no-op. Ordinary channel tasks still run
 cooperatively, but a blocking TCP read/accept supplied by a custom WASI embedder
 blocks the worker and cannot meet the concurrent-server acceptance criterion.
 `i build --target wasi` must clearly report required non-WASI service imports;
 it must not claim that plain wasmtime run supplies them. Preserve general custom
-blocking imports, as §B.7 already permits. Implementing a preview-1 adapter set
-is a separate target project, not an unreviewed second IO host in this track.
+blocking imports, as §B.7 already permits. The checked printer in js.md is a separate target adapter stage. Other preview-1 adapters still need separate approval and implementation; this IO track does not promise them.
 Resource wrappers are ordinary Int-bearing values, not opaque ABI references.
 A WASI adapter passes Int and keeps the same context-owned kind-checked table,
 leases and teardown. An OS fd is private implementation data, never the language
@@ -1663,20 +1706,17 @@ It is host policy, not a reserved library namespace or a new type rule.
 > immediately. Only this outer Request and optional Result have this rule;
 > Request is not an ABI value type.
 >
-> A host service required at an entry point is given by the host. i code can
-> replace it with an ordinary value, including completed fake requests. Each
-> field is imported under the namespace and its label (Appendix B). A service
+> A host service selected through a host-registration cell is given by the host. An ordinary chosen provider or environment statement can supply it instead, including completed fake requests. Registered capabilities with no default or explicit provider are compile errors; unregistered custom host services keep open host registration. Each required host field is imported under the namespace and its label (Appendix B). A service
 > behaves the same whichever worker calls it; requests and host references
 > stay on their worker (§11.9).
 >
 > The standard service of i/io remains
 > `@host("i:io/v1") Io { Io(print: (text: String) -> Nil) }`. print writes the
 > text plus LF and gives up a failed write. i run and i test provide it;
-> the WASI target implements it as §B.7 says. i/stdio is a separate byte-IO
+> the WASI target selects its ordinary checked-adapter provider as §B.7 says. i/stdio is a separate byte-IO
 > service, i:stdio/v1. The clock, files, TCP, process and stdio APIs are given
 > in §9.7.1–§9.7.5. i run and i test implement all of them. Other hosts
-> provide the imports or cannot instantiate the program; supported hosts may
-> supply typed unsupported errors for unavailable capabilities.
+> follow the explicit target plan of spec §2.6. Missing required standard capabilities are compile errors even when all operation errors are caught. Only an explicit Host embedder may choose unsupported stubs; generated targets omit absent defaults. §7.4 splits process capabilities without changing their wrapper errors.
 
 **New §9.7.1–§9.7.5.** Copy the service/type/error definitions, stable error-code
 paragraphs, raw field tables, public wrapper type transformations, wire codecs,
@@ -1736,32 +1776,30 @@ Exclude the discussion of compiler frame/table layout.
 > named in the compiled package's wasm.exports; they must be exported by
 > their module and take/return only the types of §10.3, including their errors.
 >
-> Entry environment parameters and needs may contain host services, Assert,
-> request.Await, request.Root, request.Owner, task.Scheduler, and task.Runner.
-> No other unsupplied service is allowed. The runtime binds only the defaults
-> requested by the ordinary inferred environment. Inferred Scheduler or Runner
-> needs request the default structured FIFO run, fresh identity/path [], seed
-> random.from_seed(0), and its internal request context. Async/request host
-> needs without task needs get a direct request context/Await handler, without
-> a task scheduler. Await/Root/Owner-only needs may use completed fakes in a
-> synchronous entry. These resolved standard-service entry defaults are the
-> one narrow library provision; another library gets no implicit bootstrap.
+> Any ordinary named service may appear in an entry's inferred environment
+> when the chosen target provider plan supplies it. Source inference and
+> boundary/entry signature checks run first. The provider phase then checks
+> supplies for the full inferred environment and selected factory dependencies;
+> the checker no longer restricts entry services to a built-in list. A missing
+> required service is an entry compile error, even when operation errors are
+> caught. Select user providers per target by spec §2.6; the dependencies of
+> an unchosen provider are not supplied on that target. Do not delete any
+> inferred requirement through target-branch pruning.
 >
-> Entry wrapping does not change a function's principal type. The default
-> values can be replaced by ordinary environment statements. task.top(seed)
-> changes a Runner's seed while retaining its route and prefix. An unsupplied
-> user State service remains an entry error. Main/test errors stop after
-> cleanup; host-export errors reach the host after cleanup. Stops run no finals.
+> Source-only i check stops after ordinary source validation; it promises no
+> provider or target availability. i check --target validates the selected
+> target plan without emission or execution. i run and i test execute in
+> process using native providers; i build uses its selected target, default
+> native. All use the command/entry selection table of spec §2.6.
 >
-> On the ilang target, let N be the entry's inferred environment: the entry is
-> async exactly when N contains an async or request-mode host service, or
-> task.Scheduler or task.Runner. Otherwise it is a synchronous export, including
-> a pure comparator usable by a synchronous host callback. No body-reachability
-> analysis or universal async wrapping is used. Even an async entry may finish
-> with status 0 on its first call. Scheduler progress polling yields to the host only for actual host waiters,
-> including nested waiters; idle waits also count unawaited work. Pure task
-> switches alone do not yield there.
-> On WASI, all entry calls and host imports remain synchronous (§B.7).
+> Apply D5's transitive-provider rule, wrapper order, synchronous-export
+> contract and WASI exception exactly. This is the sole classification rule;
+> directly examining N for host/task service names is insufficient. Ordinary
+> environment statements still replace values at call sites, and selected
+> factories are ordinary functions with ordinary types. A provider can capture
+> its dependencies; later substitutions do not mutate that captured value.
+> The original source type stays unchanged. Main/test errors stop after
+> cleanup; host-export errors reach the host after cleanup; stops run no i finals.
 
 **§10.3.** Keep the existing boundary value/error lists, and append:
 
@@ -1802,21 +1840,26 @@ ResourceContext teardown are loader/host contracts (native §3.1), not new
 runtime imports or metadata fields that a v3 host silently trusts. In §B.5 replace only “a module made by
 this compiler has no outstanding request at that point” with “structured entry
 cleanup normally leaves no outstanding request; a deliberately unowned raw
-request is dropped by the host at status 0”. Request-mode and async declarations
-produce the same v3 async signature; metadata lists the unwrapped signature and
-derives each entry's async flag from its inferred environment as §10.2 says. A completed cell is not an outstanding id.
+request is dropped by the host at status 0”. Metadata derives each entry's async flag and status/result exports from
+D5's complete chosen provider closure, subject to B.7's blocking WASI ABI.
+This calculation precedes linking and optimization. A requested synchronous
+export that classifies async is a build error. Request-mode and async host
+declarations retain v3's existing wire; completed cells are not outstanding ids.
 
 **§B.7.** Keep the existing target rules, and append:
 
-> The new standard service namespaces i:clock/v1, i:fs/v1, i:net/v1,
-> i:process/v1 and i:stdio/v1 remain ordinary blocking imports on this target.
-> This version supplies no preview-1 adapters for them. A required adapter is
-> not supplied by plain wasmtime run; builds report these required imports.
-> An async adapter awaits its already-completed blocking result. A request
-> adapter returns a completed request value. The task loop's root poll is a
-> no-op; no request uses a resume export or ABI cancel. i/random is pure and
-> i/task can interleave computations at its explicit scheduling points, but
-> a blocking host operation blocks that worker. Legacy i/io is unchanged.
+> The standard Clock, Fs, Net, Entropy, Arguments, Environment,
+> WorkingDirectory, Process and Stdio capabilities have no implicit WASI
+> defaults. Without a shipped adapter they require an explicit provider plan;
+> catching unsupported does not permit a missing standard supply. An explicit
+> host plan can select ordinary blocking imports. Required custom imports
+> remain open and builds report them; plain wasmtime run need not supply them.
+> The ordinary Io provider uses the separately approved checked Wasi adapter
+> of spec B.7; no other preview-1 adapter is promised here. An async adapter
+> awaits its already-completed blocking result; a request adapter returns a
+> completed request. Poll is a no-op; no request uses a resume export or ABI
+> cancel. i/random is pure, i/task can interleave at its explicit scheduling
+> points, and a blocking host operation blocks the worker.
 
 ### 10.1 Coordinated edits to the accepted multicore note
 
@@ -1899,9 +1942,7 @@ none is quietly charged to C. S7 already requires the key/keep_env/portable work
 Request-mode host fields and Owner/Await expansion add checker changes to R2;
 those are a real prerequisite, not something i/task alone can express today.
 Generated host-field references add ordinary dependency edges to i/request;
-entry wrappers add i/task dependencies only when N requests task services;
-request-only wrappers depend on i/request. Add these edges before ordering/
-reachability, using inferred service needs rather than scanning function bodies.
+entry wrappers retain every chosen provider and adapter dependency from D5's complete graph. Add these edges before ordering/reachability; use the provider closure, not only N or scanned function bodies.
 Assign the corresponding edge construction in the checker/driver to R2 (after
 T2's ordering changes), so dead-code elimination or module ordering cannot drop
 the runtime definitions merely because user source did not import i/task.
@@ -1957,7 +1998,7 @@ Ordered R2 checklist:
 4. [ ] Prove the monomorphic keyed prototype by type-checking two channel element
    types and heterogeneous child results. Reject any need for a cast or forall field.
 5. [ ] Implement the i loop, per-task boundaries, rooted Owner groups, Runner/top,
-   task.keep and inferred-needs entry provisioning. Preserve synchronous exports
+   task.keep and D5 provider-plan entry provisioning. Preserve exports whose chosen closure is synchronous
    and suppress host progress polls when no task waits for IO. Include nested
    progress-interest forwarding and guaranteed registration cleanup. Check O0/O2 WAT for retained frames.
 6. [ ] Add scope chains/local witnesses, joins, body cancellation, shielded finals,
@@ -1992,7 +2033,7 @@ because lib/i is included, and adds matching target/JS cases):
    legacy i/io compatibility and context turnover; finish registration/spec lists
    and B.7 with blocking Int adapters, not fd/externref shortcuts.
 6. [ ] Run permission/error/resource/security and concurrency reviews; include
-   unsupported browser/preview-1 behavior and user-supplied host fakes.
+   missing-default diagnostics on generated browser/preview-1 targets and explicitly selected Host stubs/fakes.
 7. [ ] Run end-to-end echo, then combined verification in the integration lane.
 
 ## 12. Tests, counterexamples, and verification limits
@@ -2051,9 +2092,10 @@ The acceptance server in §9 is a complete module.
 | `(raw ! net.Net) { raw.read(1, 1) }` outside i/net | Constructor/field visibility error under §2.4/§7, despite the exported type name |
 | Force a small allocator limit | Memory stop before insertion, never reuse; native N9.2 |
 | Process args codec for ["a","é"] | Bytes `<<2,0,0,0,1,0,0,0,97,2,0,0,0,195,169>>`; §7.4 UTF-8 framing |
-| Missing env variable; browser raw TCP | ProcessError(...,"not_found"); NetError(...,"unsupported"); §7 and target matrix |
-| WASI pure tasks/random; WASI requiring private Fs | Pure calculations work; report blocking Int imports requiring a buffer-aware adapter; §8.2/B.7, no fd identity reuse |
-| @main needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
+| Missing env variable with supplied Environment; generated browser raw TCP without provider | ProcessError(...,"not_found"); compile error naming Net even inside fail.catch; §7, §8.2 and spec §2.6 |
+| WASI pure tasks/random; WASI requiring private Fs without/with explicit host plan | Pure calculations work; missing Fs compile error / report blocking Int imports requiring a buffer-aware adapter; §8.2/B.7, no fd identity reuse |
+| @main needs user State without/with a target provider | Target-plan compile error / construct ordinary State; source-only check accepts both, async classification follows the complete D5 graph without changing the type |
+| Ready answer returned from within, then take | Original answer, then Taken; closing Owner cancels outstanding work only, not detached Ready answers (§5.1/§5.4) |
 | Existing async user service, not an IO namespace, used in two children | Overlap via Await, same request table as IO; D3, no namespace rule |
 
 Preserve all S7 single-worker tests T1–T12/T20/T21/T24–T27 as assigned there,
@@ -2479,7 +2521,7 @@ Python models passed:
   index. Model word vectors for seed 0 are root 0x9474f0eb06d79fd8,
   S(1) 0x5223018439128278, P(1) 0xdbcefe01be55b171; these are model vectors,
   not i executions or statistical evidence.
-- Inferred entry-service classification, pure/fake-only synchronous cases,
+- Complete provider-closure classification (D5), pure/fake-only synchronous cases,
   task/host-only async cases, and no host poll for pure or raw-only runnable
   work. Nested waiter interests forward, update and unregister without
   cancelling borrowed requests.
