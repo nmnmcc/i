@@ -92,10 +92,6 @@ pub(crate) struct FnTy {
 }
 
 impl Ty {
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "Literal inference is enabled in T1 stage 7")
-    )]
     pub fn lit(b: crate::hir::BuiltinType, values: lits::ValueSet) -> Ty {
         debug_assert!(matches!(
             b,
@@ -104,18 +100,33 @@ impl Ty {
         Ty::Con(Head::Named(TypeRef::Builtin(b)), values, Vec::new())
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "Set-sensitive rules are added in T1 stages 4 and 5"
-        )
-    )]
     pub fn values(&self) -> &lits::ValueSet {
         match self {
             Ty::Con(_, values, _) => values,
             _ => &lits::ValueSet::ALL,
         }
+    }
+
+    /// Only these argumentless heads have a scalar value-set algebra.
+    pub fn scalar(&self) -> Option<crate::hir::BuiltinType> {
+        match self {
+            Ty::Con(Head::Named(TypeRef::Builtin(b)), _, args)
+                if args.is_empty()
+                    && matches!(
+                        b,
+                        crate::hir::BuiltinType::Int | crate::hir::BuiltinType::String
+                    ) =>
+            {
+                Some(*b)
+            }
+            _ => None,
+        }
+    }
+
+    /// Replace a scalar's set, keeping empty distinct from All (§4.2).
+    pub fn with_values(&self, values: Option<lits::ValueSet>) -> Ty {
+        let b = self.scalar().expect("only Int and String have value sets");
+        values.map_or(Ty::Never, |values| Ty::lit(b, values))
     }
     pub fn head(&self) -> Option<Head> {
         match self {

@@ -170,9 +170,48 @@ Stage gate:
   literal semantics, which remain disabled.
 - No golden or derived file changed.
 
+## Stage 4: solver rules
+
+The solver now implements literal-types §5.1 rules 1–10. Same-head
+constraints use set inclusion; route sends only the uncovered scalar
+values to the eligible variable alternative; diff_left and diff_in
+subtract values; unions batch scalar heads; intersections test for empty
+sets before merging arguments. Lower bounds fuse by union and nonempty
+upper bounds by intersection. Disjoint upper bounds remain separate
+because reach ignores Never. Nonempty scalar creation uses Ty::lit;
+with_values maps an empty operation result to Never before calling it.
+This reconciles §4's nonempty ValueSet constructor with its sentence
+“It returns Ty::Never for an empty set.”
+
+Environment comparisons require equal sets. Bound propagation cannot skip
+an environment comparison just because an ordinary subtype comparison
+previously accepted the same stored scalar bound: the old propagation
+may have used a different comparison mode. The regression checks this
+directly. This follows §5.1 rule 1: “In env mode ... require S == T.”
+
+Value-only failures remain Mismatch until stage 6b adds Values/sub_case.
+Source inference still produces only All sets, as §12 requires before
+stage 7. Display, known types and coverage have not yet acquired their
+set-sensitive rules and must be completed before enabling literals.
+
+Stage gate:
+
+- 15 checker library tests passed, including 8 solver rule tests. These
+  cover accepted/rejected subtyping, all three diff_left splits, raw
+  same-head unions, ambiguity, delayed variable links, 1000-bound fusion,
+  disjoint upper bounds, and literal service-argument equality.
+- Existing codegen, type and query tests passed without regeneration.
+- 139/139 spec cases passed at both O0 and O2.
+- All 522 WAT outputs remained byte-equal to the provided `1df2fe0`
+  export, with none added or removed.
+- The first full dev-verify stopped at Clippy's items_after_test_module:
+  the new solver tests preceded remaining helpers. Moving the test module
+  to the end fixes the layout; the full gate must be rerun.
+- old-syntax-check passed: 1012 snippets, 20 explicit future entries.
+
 ## Remaining stages
 
-The solver/display/coverage rules, deferred
+The display/known/coverage rules (stage 5), deferred
 Assert fix, literal inference, written types/narrowing, fitted choices,
 performance scripts, and final soundness review are not enabled by stage 1.
 Future entries must be removed when their syntax actually parses, never
