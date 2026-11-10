@@ -90,6 +90,8 @@ i/syntax.raw_text_value : (TextResult) -> String
 i/syntax.raw_text_error : (TextResult) -> String
 i/syntax.raw_text_error_at : (TextResult) -> Syntax
 i/syntax.reverse : (items: List(Syntax), result: List(Syntax)) -> List(Syntax)
+i/syntax.prepend_reversed : (items: List(Syntax), result: List(Syntax)) -> List(Syntax)
+i/syntax._append : (first: List(Syntax), second: List(Syntax)) -> List(Syntax)
 i/syntax.children : (syntax: Syntax, index: Int, end: Int, result: List(Syntax)) -> List(Syntax)
 i/syntax.node : (syntax: Syntax) -> Node
 i/syntax.build_list : (items: List(Syntax), result: SyntaxList) -> SyntaxList
