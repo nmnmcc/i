@@ -734,3 +734,41 @@ gate before soundness work starts. The quiet timing criterion stays open;
 the running sampler has seen 15–94% background CPU and has not timed an
 invalid window. This schedules the environmental measurement last rather
 than leaving the authorized soundness review idle while other lanes build.
+
+### Soundness review and final syntax retirement audit
+
+The rule-led review in tests/t1/soundness-review.md is independent of the
+goldens. Ten new rejection/runtime/stop probes use strict helpers and
+actual matching host providers, so false acceptance would be observable
+as unreachable or a wrong handler. The focused spec command passes all
+ten at O0/O2. Its first run failed three malformed fixtures (a tuple
+clause after a numeric body on the same line was parsed as a call,
+E0106); separating clauses fixes them. The other seven passed initially.
+No new compiler hole was found and no implementation rule was changed.
+
+The review preserves the coordinator's exact None-accumulator amendment
+and E0506 rejection. K2 is fixed in the owned place preparation, with
+both the exact source check and tests/spec/7/guarded_list_heads.i running.
+The user's later-track question about rule 13 obtaining tuple shape from
+inference remains open, with no implementation here. The accepted note's
+constructor-family-changing callback limitation remains explicitly outside
+the scalar widening claim. K1's invariant traversal is unchanged.
+
+The explicit final JSON inventory audit finds no future/track entry
+containing T1. The scan passes 1193 snippets, exact diagnostics and 17
+other-track futures. The retirement was implemented with written literal
+syntax in stage 8 and has remained green through the final review.
+
+Soundness full gate: exit 0, 210 spec cases at both O0/O2, 1422 std
+tests per level, 33 browser tests; all workspace Rust checks pass. Log:
+rf-full.log. No implementation change was needed for the ten new probes.
+The golden-rule generator now records its exact comparison revision; the
+final audit will compare the post-merge source checkpoint so unrelated
+upstream golden additions are not attributed to T1.
+
+The quiet-window sampler was intentionally terminated before the final
+upstream merge. It had no measurement child, no final timing reports, and
+had only sampled busy windows (up to 98%). This interrupts a waiting
+measurement gate, not an executing language/Rust test. It will be restarted
+against the merged sources and final binary. No process outside this
+lane's sampler was signalled; no environment setting was changed.
