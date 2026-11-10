@@ -53,6 +53,13 @@ impl fmt::Debug for Graph {
 }
 
 impl Pool {
+    pub fn graph(&self, ty: &Ty) -> Graph {
+        Graph {
+            pool: self.clone(),
+            id: self.import(ty),
+        }
+    }
+
     pub fn node(&self, id: Id) -> Node {
         self.0.read().expect("type pool").node(id).clone()
     }

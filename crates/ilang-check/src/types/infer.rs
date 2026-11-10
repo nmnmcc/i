@@ -371,6 +371,7 @@ impl<'a> Checker<'a> {
         self.entry_points();
         // The shown type schemes (§4.7).
         let mut typed = std::mem::take(&mut self.out);
+        let mut artifact_solver = None;
         for (mi, m) in p.modules.iter().enumerate() {
             self.set_module(ModuleId(mi as u32));
             for (di, d) in m.defs.iter().enumerate() {
@@ -395,6 +396,16 @@ impl<'a> Checker<'a> {
                         .insert(id, shown.text_limited(&self.s.type_names, 12));
                     typed.schemes.insert(id, shown.text(&self.s.type_names));
                     if d.exported || opts.written {
+                        let solver = artifact_solver.get_or_insert_with(|| {
+                            std::sync::Arc::new(std::sync::Mutex::new(self.s.scheme_snapshot()))
+                        });
+                        typed.scheme_artifacts.insert(
+                            id,
+                            super::SchemeArtifact {
+                                solver: solver.clone(),
+                                scheme: scheme.clone(),
+                            },
+                        );
                         typed.scheme_types.insert(id, shown);
                     }
                 } else {

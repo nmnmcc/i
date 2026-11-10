@@ -21,6 +21,7 @@ fn library_resolves_cleanly() {
             "i/resource",
             "i/assertion",
             "i/core",
+            "i/record",
             "i/io",
             "i/task",
             "i/clock",

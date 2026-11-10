@@ -26,12 +26,14 @@ mod known;
 mod lits;
 mod pattern;
 mod records;
+mod scheme_wire;
 mod shown;
 mod solve;
 mod value_types;
 
 pub use lits::{LitValue, TestValues};
 pub use records::ShownGraph;
+pub use scheme_wire::SchemeArtifact;
 pub use shown::{ShownFn, ShownType};
 
 use crate::hir::{BindingRef, CtorRef, DefId, ModuleId, Program, TypeRef};
@@ -415,6 +417,8 @@ pub struct Typed {
     /// a module gives them. `schemes[d]` is
     /// `scheme_types[d].text(&type_names(program, d.module))`.
     pub scheme_types: HashMap<DefId, ShownType>,
+    /// Full graph schemes, including their retained bounds and obligations.
+    pub scheme_artifacts: HashMap<DefId, SchemeArtifact>,
     /// §7.5: each use of a name that is known to be made by a constructor,
     /// by the span of the `Name` expression.
     pub known_ctors: HashMap<(ModuleId, Span), CtorRef>,

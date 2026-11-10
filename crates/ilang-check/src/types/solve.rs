@@ -190,7 +190,7 @@ pub(crate) struct Solver {
     /// The pairs of bounds whose parts `add_bound` has put together.
     compared: HashSet<(Ty, Ty, bool, Mode)>,
     pub variance: StdHashMap<TypeId, Vec<Variance>>,
-    has_handlers: bool,
+    pub(super) has_handlers: bool,
     pub row_params: StdHashMap<TypeId, Vec<Mode>>,
     pub failures: Vec<Failure>,
     /// The names of the custom types, by `TypeId`, to show types.
@@ -228,6 +228,16 @@ pub(crate) fn join_literals(ms: Vec<Ty>) -> Vec<Ty> {
 }
 
 impl Solver {
+    /// An interface needs the graph and retained constraints, not transient
+    /// proof caches or diagnostic observations from the inference run.
+    pub(super) fn scheme_snapshot(&self) -> Solver {
+        let mut snapshot = Solver::new(self.variance.clone(), self.type_names.clone());
+        snapshot.records = self.records.clone();
+        snapshot.vars = self.vars.clone();
+        snapshot.row_params = self.row_params.clone();
+        snapshot.has_handlers = self.has_handlers;
+        snapshot
+    }
     pub fn record(&mut self, mut fields: Vec<(super::records::Label, Ty)>) -> Ty {
         fields.sort_by(|(a, _), (b, _)| a.cmp(b));
         let mut merged: Vec<(super::records::Label, Ty)> = Vec::with_capacity(fields.len());
