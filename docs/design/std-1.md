@@ -1,8 +1,12 @@
 # Design: four pure standard modules
 
-Status: proposed API contract for Std-1. This note changes no implementation.
+Status: API choices accepted by the coordinator, with the review corrections
+below. Path and sequence may proceed independently. Stream implementation waits
+for the compiler prerequisite in §3.4. This note changes no implementation.
 Source baseline: `1e0d910e7308d5b69280eba4deef59d6ec156146`.
-All source positions below refer to that baseline. Examples use the accepted
+All repository source positions below refer to that baseline. The independent
+review is `/home/agent/Programming/i/.rd/cache/gpt/report-review-std1.md`;
+its two findings were checked again for this revision. Examples use the accepted
 syntax. Signature inventories describe bindings with bodies, not external
 declarations or new syntax. `Option`, `Some`, and `None` are explicitly imported
 from `std/option`; `ContinueOrStop` is qualified through `std/list`.
@@ -43,6 +47,7 @@ Facts checked by reading code:
 | `std/test/string_test.i:2060–2095`, `:2240–2247`; `std/test/option_test.i:255–280`; `std/test/result_test.i:319–342`, `:372–382` | Empty pieces, Unicode, known fields, deferred callbacks, long walks, and union errors have concrete precedents. |
 | `crates/ilang-check/src/types/infer.rs:232–247`, `:292–325` | Recursive group names get monomorphic holders before generalization. A Haskell helper recursively called at `Node(A)` cannot simply be ported. |
 | `crates/ilang-check/src/types/infer.rs:2237–2266`, `:2321–2329` | Custom variance is found by a fixed point; function result, errors and environment are traversed. A plain thunk wrapper would infer positive N variance. That is insufficient to preserve the stricter environment relation; §3 adds an ordinary negative occurrence to make N invariant. |
+| `crates/ilang-check/src/types/display.rs:670–679`, `:1028–1052`; `crates/ilang-check/src/types/infer.rs:2104–2120` | Normalization can collapse equal Both sides; the ordinary constructor occurrence walk does not visit invariant arguments in both directions. Generalization consumes the simplification, so the factory failure in §3.4 affects accepted clients, not only display. This requires a general compiler conformance fix. |
 | `crates/ilang-check/src/order.rs:135–168`, `:188–207` | Direct recursive functions are possible; eager self-dependent values are rejected. Build infinite streams through functions, not an eager cyclic list. |
 | `std/src/bit_array.i:33–45`, `:70–77`; `crates/ilang-wasm/src/runtime/core.rs:110–125` | UTF-8 conversion can fail; whole byte fragments can be joined; conversion validates UTF-8. URI bytes need not be UTF-8. |
 
@@ -89,8 +94,7 @@ Decisions, reasons, and sources:
    [finger-tree paper's correction](https://www.staff.city.ac.uk/~ross/papers/FingerTree.html)
    identifies laziness as material to its analysis. The
    [Data.Sequence API](https://hackage-content.haskell.org/package/containers-0.8/docs/Data-Sequence.html)
-   is the operation reference. Coordinator question 1 in §10 records this cost
-   choice.
+   is the operation reference. The coordinator accepted this cost choice.
 6. **Use `Option` for sequence misses and `Result` for malformed inputs.** No
    ordinary bounds/parse failure needs `Assert`. Reasons: spec §9.6 and existing
    option/result conventions in the source table.
@@ -179,14 +183,16 @@ the constructor would not prevent this coercion.
 Consequently combinators use one shared N, and never write `Stream(A, E, N | M)`:
 an invariant argument would make that multi-variable union illegal under spec
 §4.4 (`infer.rs:600–655`). Choose the full common environment at construction.
-Pure factories are polymorphic in N even though they use no services, so they
-can supply empty tails in any such environment; a wholly pure client chooses
+The API keeps pure factories polymorphic in N even though they use no services,
+so they can supply empty tails in any such environment once §3.4 is fixed;
+a wholly pure client chooses
 Never. An already typed stream cannot acquire a wider row by subtyping.
 `map_environment` explicitly rebuilds its tails with a rank-one runner for each
 step. The runner may install/remove services or have a written larger environment
 of concrete service types. It is not polymorphic over the computation result:
-its fixed Step(A,E,N) appears on both sides. This preserves principal inference
-without a row-merging rule or a higher-rank handler.
+its fixed Step(A,E,N) appears on both sides. This uses the existing principal
+inference rules without a row-merging rule or a higher-rank handler. The current compiler does not yet preserve generic
+invariant N in the empty factory; §3.4 is a prerequisite, not an API change.
 
 All written unions of distinct error variables above are in positive output
 places. Incompatible arguments of the same service still cannot occur in a
@@ -320,6 +326,52 @@ inner state, so a million empty inners do not grow the call stack. Filter skips
 use the same approach. Folds use tail calls; collection allocates O(k) output
 and reverses once. Repeated pulls repeat costs; long chains of combinators can
 still have depth proportional to the chain. No fusion guarantee.
+
+### 3.4 Compiler prerequisite: retain generic invariant environments
+
+The API above is unchanged, but stream implementation must wait for a separate
+compiler track to fix generalization of invariant type arguments. This is a
+compiler fault against spec §4.7 (`docs/spec.md:405–409`), which requires principal
+types and meaning-preserving simplification. The private negative N field is
+needed for sound service compatibility; neither removing it nor specializing
+the public factory to Never is an acceptable workaround.
+
+Use the independent review's factory probe as the compiler regression gate,
+written here in the accepted syntax with Stream/Step as defined in §3.1:
+
+```i
+new(A, N) = () -> Stream(A, Never, N) {
+  Stream(
+    () -> Step(A, Never, N) ! N { Done },
+    (_: N) { Nil }
+  )
+}
+Bias { Bias(value: Int) }
+needs_bias = () -> Stream(Int, Never, Bias) { new() }
+```
+
+Expected: the factory retains a generalized environment N, needs_bias is
+accepted, and constructing its result needs no Bias service. Covariant A may
+simplify to Never without losing the allowed element instances; invariant N
+must not. The positive `make((b ! Bias) { Next(b.value, new()) })` test in §3.3
+must also pass. As the negative gate, the `bad_coerce` Sink(Int) to Sink(Never)
+client in §9 must still be rejected. Keep the existing equal-service-argument
+rule (spec §4.5 rule 4 and §9.2); no stream-specific exception is permitted.
+
+Checked independently with the cached `i-1e0d910` compiler, using a lane-local
+copy of the review's baseline-syntax probe: new becomes
+`() -> Stream(Never, Never, Never)` and needs_bias fails with E0501 because Bias
+is not a subtype of Never. The review's concrete unsafe Sink coercion probe also
+still fails with E0501. These runs reproduce the blocker; they do not verify a
+fix or the migrated parser. Temporary probe copies were removed.
+
+Source inspection confirms why the prerequisite is material:
+`display.rs:670–679` collapses equal positive/negative Both forms;
+`:1028–1052` treats invariant constructor arguments like a single polarity
+unless walking an environment. `infer.rs:2108–2120` uses the simplified type for
+generalization. The separate compiler track must correct this general behavior
+and pass both gates before the stream writer starts; it must not teach the
+compiler about Stream, Bias or any std path.
 
 ## 4. `std/sequence`
 
@@ -675,8 +727,12 @@ then call build. The constructor is known from its single-variant nominal type
   Use strict RFC §5.2 resolution, including §5.2.4 dot removal on the *encoded*
   path. Keep empty versus missing query distinctions. Never use `path.clean`,
   percent-decode dot/slash escapes, collapse repeated slashes, or retain a base
-  fragment in place of a missing reference fragment. The result is a valid Uri;
-  successful base validation makes the remaining algorithm total.
+  fragment in place of a missing reference fragment. Then validate the computed
+  Parts with the same validator as build. Return its Ok Uri or its Error value,
+  using the offsets defined in U8. A base with a scheme does not guarantee Ok:
+  dot removal can expose a leading `//` in a path whose authority is absent.
+  Do not repair that candidate by escaping, reparsing or inventing an authority.
+  Every successful result must still satisfy U4 and the raw round-trip law.
 - **U6 Codec.** Encoders preserve only ASCII letters, digits, `-._~`; all other
   octets become upper-case `%HH`. Text encoding first takes UTF-8 bytes.
   encode_bytes rejects non-byte-aligned input with UnalignedBits, without padding.
@@ -695,9 +751,12 @@ then call build. The constructor is known from its single-variant nominal type
   It may change flag spelling; raw Uri query round trips use U3 instead.
 - **U8 Errors.** All public parse/build/resolve/codec failures are Result values.
   No parser API raises or asks for a service. UriError offsets count UTF-8 bytes:
-  in parse, into the whole input; in build, into the field named by part; in
-  resolve's missing-scheme error, 0. EOF is the field/input length. Codec offsets
-  are byte positions in that decoder's input; parse_query adjusts a key/value
+  in parse, into the whole input; in build, into the field named by part. Resolve
+  first reports its missing-scheme error at WholePart offset 0. Otherwise its
+  validation errors use build's field-relative offsets in the computed Parts,
+  not positions in either original input or the recomposed text. A leading `//`
+  without authority gives `UriError(PathPart, 0, BadPath)`. EOF is the field/input
+  length. Codec offsets are byte positions in that decoder's input; parse_query adjusts a key/value
   error back to the whole query. InvalidUtf8 and UnalignedBits have no offset.
 
 Error selection is deterministic. Parse first scans the whole input left to
@@ -723,13 +782,21 @@ part is missing: BadScheme for scheme, BadAuthority for userinfo/authority
 structure, BadHost for reg-name/bracket syntax, BadPort for port, BadPath for
 path. A byte after a closing host bracket must be a port colon or authority end;
 otherwise it is BadHost at that byte. Empty scheme reports BadScheme at 0. This avoids inventing an IP
-parser's internal diagnostic ordering. No error includes credentials in a message.
+parser's internal diagnostic ordering. Resolve checks the base scheme before
+transforming; after transformation it uses build's validation order and returns
+the same error that build would give for those Parts. No error includes
+credentials in a message.
 
 ### 6.3 Laws and tests
 
 The laws are raw fidelity `parse(to_string(u)) == Ok(u)`, and preservation of
-valid candidate parts through successful build followed by parts. No semantic
-URI equivalence is attached to `==`.
+valid candidate parts through successful build followed by parts. The raw
+round-trip law applies to every Uri made by parse, build or successful resolve.
+For a base with a scheme, let p be the Parts computed by strict RFC resolution:
+`resolve(base, reference) == build(p)`, including when build gives an Error.
+Thus `resolve(base, reference) == Ok(u)` implies both `has_scheme(u) == True`
+and `parse(to_string(u)) == Ok(u)`. There is no unconditional successful-resolution
+law for scheme-bearing bases. No semantic URI equivalence is attached to `==`.
 `decode_component(encode_component(s)) == Ok(s)` for all Strings. For whole bytes,
 `encode_bytes(b) == Ok(encoded)` implies `decode_bytes(encoded) == Ok(b)`. `parse_query(build_query(pairs)) == Ok(pairs)`. The reverse form law is
 false because spelling is lost. Use to_string after unwrapping successful parse
@@ -771,6 +838,22 @@ Resolution fixtures use base `"http://a/b/c/d;p?q"`:
 | `"%2e%2e/g"` | `"http://a/b/c/%2e%2e/g"` | U5 |
 | `"http:g"` | `"http:g"` | U5 strict, own scheme |
 
+Resolution must also check candidates outside the authority-bearing fixtures:
+
+| Base | Reference | Expected result | Rule |
+|---|---|---|---|
+| `"x:a"` | `"/.//h"` | Error(UriError(PathPart, 0, BadPath)); candidate path is `"//h"` with no authority | U4/U5/U8 |
+| `"x:a"` | `"/a/..//h"` | Error(UriError(PathPart, 0, BadPath)) | U5/U8 |
+| `"x:a"` | `"/.//a:b"` | Error(UriError(PathPart, 0, BadPath)); do not reparse it as a host/port | U4/U5/U8 |
+| `"x:a"` | `"x:/.//h"` | Error(UriError(PathPart, 0, BadPath)), also when the reference has a scheme | U5/U8 |
+| `"x://host/a"` | `"/.//h"` | Ok Uri printing `"x://host//h"`, retaining authority host | U4/U5 |
+| `"a"` | `"/.//h"` | Error(UriError(WholePart, 0, RelativeBase)), before candidate validation | U5/U8 |
+
+For every successful case, including all RFC fixtures and generated inputs,
+check `parse(to_string(u)) == Ok(u)` on the resolved u. For the first four rows,
+check that resolving returns the stated Error and never constructs an invalid
+Uri or silently changes components.
+
 Also run every RFC §5.4 normal and abnormal resolution example as a data table.
 Test IPv6 full/compressed/mixed IPv4, duplicate compression markers, too many or
 few groups, missing brackets, IPvFuture, forbidden zones, encoded delimiters,
@@ -795,61 +878,33 @@ variant. Do not use a String to hold arbitrary decoded octets. Parse/build,
 to_string, codecs, forms and resolution target O(b) work/space in total input and
 output bytes, plus pair/list spines. Raw parts projection and has_scheme use O(1)
 field work. Linear resolution needs a segment stack/output fragments for dot
-removal; repeatedly copying a growing output string is quadratic. No host parser
+removal; repeatedly copying a growing output string is quadratic. Validate the
+finished resolution Parts before calling the hidden Uri constructor; that extra
+linear pass does not change the bound. No host parser
 or new string intrinsic is required. These bounds remain implementation gates.
 
-## 7. Replacement spec text, section by section
+## 7. Spec disposition, section by section
 
-Do not renumber sections and do not define std APIs as language intrinsics. Put
-the module contracts in their own module documentation. The following general
-clarifications are the entire proposed spec patch; they introduce no new rule.
+No replacement spec text is proposed. The coordinator declined the redundant
+general clarifications after review. Keep existing section numbers and put these
+module contracts in ordinary module documentation.
 
-### §2.1 Packages and modules: append after the module import rules
-
-> A package may provide collections, parsers, and other reusable modules in its
-> source files. These are ordinary modules, not library modules in the fixed
-> sense used here. Their paths, types, constructors, and functions have no
-> special meaning to the language. Importing such a module follows the same
-> dependency and scope rules as importing any other module of a package.
-
-### §4.1–§4.8 Types and §6 Expressions: no replacement
-
-Keep the accepted syntax and literal/record changes. This note adds no type,
-variance, recursive generalization, evaluation, field or pattern rule. Stream
-and sequence are normal nominal types; their private validity invariants are
-enforced by their bodies. No application of a library function is a direct value
-merely because that function is pure.
-
-### §9.1 Computations: append after its first paragraph
-
-> Calling the same computation again does its body again. Making or storing a
-> computation does not call it, and the language does not remember the result of
-> a previous call. Like any function, it gets the environment of its call (§9.2).
-
-This applies equally to delayed parsing, retry bodies, configuration computations
-and streams; it is not a lazy-value feature.
-
-### §9.2–§9.6 Effects and resources: no replacement
-
-Keep call-time environments, ordinary error propagation and scoped finalizers.
-No stream cursor, close protocol or automatic resource scope is added.
-
-### §11.4 Equality: append after its bullets
-
-> Exporting a custom type without its constructors (§2.4) does not change these
-> equality rules. A module may provide a function that compares its values in
-> another way, but that function does not change `==` or `core.hash`.
-
-### §12, §13, Appendix B and all other sections: no replacement
-
-No built-in name, core operation, host service, host representation, package
-requirement or ABI entry is added. If the coordinator prefers to avoid redundant
-clarifications, keep the whole spec unchanged; the API is still expressible.
+| Spec sections | Disposition and existing authority |
+|---|---|
+| §2.1 and §2.4 | Unchanged. Package/import rules and constructor visibility already make these ordinary package modules (`docs/spec.md:124–142`, `:203–206`). |
+| §4.1–§4.8 and §6 | Unchanged, apart from the separately accepted syntax/type migrations. The stream prerequisite fixes the compiler against existing §4.7; it adds no inference or direct-value rule (`docs/spec.md:405–414`, `:590`). |
+| §9.1–§9.6 | Unchanged. Stored computations are ordinary functions, with call-time environments, error propagation and scoped finalizers (`docs/spec.md:743`, `:779–784`, `:788–813`, `:828–860`). |
+| §11.4 and §13 | Unchanged. Equality/hash already follow language rules independently of constructor visibility or a module's comparison function (`docs/spec.md:970–975`, `:1078`). |
+| §12, Appendix B and all other sections | Unchanged. No built-in name, core operation, host service, package requirement or ABI entry is added. |
 
 ## 8. Files, writer boundaries, and implementation gates
 
 Only this note is committed by this design task. Implementation is four
-independent module writers after the new-syntax compiler is available. Each owns
+independent module writers after the new-syntax compiler is available. Path and
+sequence may be implemented first and need not wait for the stream prerequisite.
+URI may also proceed independently with the corrected U5/U8 contract. Stream
+implementation starts only after the separate compiler track passes §3.4's
+positive factory and negative service-compatibility gates. Each writer owns
 one new `std/src/<name>.i` and one new `std/test/<name>_test.i`, from line 1 through
 EOF. Module source regions, in order: imports; exact exports; public types;
 factories/parsers; operations/builders; private helpers. Tests use `@test`,
@@ -858,27 +913,23 @@ import a test module (spec §2.1). No writer edits string.i, list.i, dict.i, the
 prelude, the compiler, or another writer's files. URI does not depend on path;
 sequence does not depend on stream. Stream alone may import list for fold control.
 
-The coordinator owns applying §7's small proposed edits at
-`docs/spec.md:138–142`, `:743`, `:970–975`, after the accepted migrations. Every
-other spec region remains unchanged. No `std/i.toml` change is needed: source
+No spec edit is assigned to Std-1. The coordinator assigns the compiler
+conformance prerequisite to a separate compiler track; std writers do not patch
+it or weaken the stream interface. No `std/i.toml` change is needed: source
 discovery already walks source/test directories and accepts .i files
 (`crates/ilang-package/src/modules.rs:22–31`, `:84–94`; spec §2.1). Any discovered compiler
 defect is reported with a minimal ordinary-language witness, not patched in std.
 
-### Stream writer
+### Path writer: ready independently
 
-- [ ] Add the exact opaque wrapper, Step and signatures; implement make/pull first.
-- [ ] Add list/unfold factories and demand-preserving transformations. Keep outer,
-  inner and callback error variables distinct until their output unions. Make
-  service N invariant and share one N across composition; implement the explicit
-  environment runner without a higher-rank signature.
-- [ ] Implement skipping/empty-inner searches with tail-recursive state loops.
-- [ ] Add S1–S8 tests, long filtering/collection, late services, distinct error
-  types, nominal field inference, and new() used independently at two types.
-- [ ] Check inferred exported interfaces; verify no construction needs services.
-  Put compile-fail client probes in temporary packages, not failing std tests.
+- [ ] Implement one-pass segment scanning and reversed-stack cleaning; build all
+  outputs with fragment joins.
+- [ ] Implement raw split/base/extension separately from clean and cleaned dir.
+- [ ] Implement explicit-base relative, including unmatched parent errors.
+- [ ] Add P1–P5 table/law tests, Unicode/backslash/NUL cases and long inputs.
+  Expected IO validation stays outside this module.
 
-### Sequence writer
+### Sequence writer: ready independently
 
 - [ ] Establish uniform rank/measure helpers and a private invariant checker.
 - [ ] Implement symmetric end operations, bottom-up from_list and single-pass walks.
@@ -891,26 +942,36 @@ defect is reported with a minimal ordinary-language witness, not patched in std.
   need private constructors, using temporary development probes and removing
   probes before shipping. External std tests cover public observations.
 
-### Path writer
-
-- [ ] Implement one-pass segment scanning and reversed-stack cleaning; build all
-  outputs with fragment joins.
-- [ ] Implement raw split/base/extension separately from clean and cleaned dir.
-- [ ] Implement explicit-base relative, including unmatched parent errors.
-- [ ] Add P1–P5 table/law tests, Unicode/backslash/NUL cases and long inputs.
-  Expected IO validation stays outside this module.
-
 ### URI writer
 
 - [ ] Implement raw representation and a single shared validator for parse/build.
   Parse must not be a permissive splitter; build must check cross-field grammar.
 - [ ] Complete IP-literal grammar and deterministic U8 error translation.
-- [ ] Implement raw printing and strict resolution over encoded paths, then
-  byte/text codecs and ordered form pairs.
+- [ ] Implement raw printing and strict resolution over encoded paths. Validate
+  every computed Parts before returning a Uri, using build's error order and
+  field-relative offsets. Then add byte/text codecs and ordered form pairs.
 - [ ] Add U1–U8 tests, the full resolution tables, generated raw round trips and
-  invalid grammar/UTF-8 cases. Form tests must not stand in for generic URI tests.
+  invalid grammar/UTF-8 cases. Include authority-free resolution failures and
+  raw round trips for every successful resolution. Form tests must not stand in
+  for generic URI tests.
 - [ ] Check long authority/port/query/path inputs without repeated string copies.
   HTTP policy, IDNA, URI templates and scheme-specific validation remain separate.
+
+### Stream writer: after the compiler prerequisite
+
+- [ ] Confirm that the separate compiler track passes §3.4's factory probe and
+  still rejects unsafe service coercion on the nominated implementation compiler.
+  Do not replace the generic factory, remove N invariance, or add a library rule.
+- [ ] Add the exact opaque wrapper, Step and signatures; implement make/pull first.
+- [ ] Add list/unfold factories and demand-preserving transformations. Keep outer,
+  inner and callback error variables distinct until their output unions. Make
+  service N invariant and share one N across composition; implement the explicit
+  environment runner without a higher-rank signature.
+- [ ] Implement skipping/empty-inner searches with tail-recursive state loops.
+- [ ] Add S1–S8 tests, long filtering/collection, late services, distinct error
+  types, nominal field inference, and new() used independently at two types.
+- [ ] Check inferred exported interfaces; verify no construction needs services.
+  Put compile-fail client probes in temporary packages, not failing std tests.
 
 For each writer, use the coordinator's prebuilt migrated compiler:
 `i check --project std --types`, then `i test --project std`, then the changed
@@ -998,11 +1059,13 @@ compatibility must forbid this. Repair: the unused negative N field makes
 Stream/Step invariant in N. Checked the next obstruction too: writing N|M in
 that invariant argument is rejected by `check_places` (`infer.rs:600–655`). Thus
 use a shared N and the explicit map_environment runner, not an illegal union or
-a claimed compiler fix. New/list factories remain polymorphic in N so empty
-tails can be built. A compile-fail coercion probe is a required implementation
+a claimed compiler fix. The API keeps new/list factories polymorphic in N so
+empty tails can be built once §3.4's compiler prerequisite is fixed. A compile-fail coercion probe is a required implementation
 gate; concrete common-service clients and runner-provided services are positive
 gates. This may also merit a separate language review of covariant custom types
-that hide environment parameters; Std-1 does not depend on that review.
+that hide environment parameters. The separate factory-generalization fault
+found in independent review is the explicit prerequisite in §3.4; the initial
+reading pass did not establish factory buildability.
 
 **Behavior: overpull through take.**
 
@@ -1055,7 +1118,7 @@ branches = (q: sequence.Sequence(Int)) {
 On a full fringe every branch may repeat an O(log n) carry. A plain thunk does
 not share its computed result; claiming amortized O(1) for this history is
 unjustified. Repair: strict eager tree, O(log n) persistent worst-case end edits,
-no imported Haskell laziness claim. Question 1 in §10 asks the coordinator to ratify this cost.
+no imported Haskell laziness claim. The coordinator accepted this cost.
 
 **Soundness of validation and fidelity: delimiter injection.**
 
@@ -1134,7 +1197,35 @@ required for cleanup. The abandon witness has no library finalization guarantee.
 a documented stack risk. No further serious design issue found in this second
 clean reading pass.
 
-## 10. Risks, coordinator questions, and verification limits
+### Independent review follow-up
+
+The original clean reading passes did not establish full buildability or cover
+authority-free resolution. The independent review found two real omissions.
+Both were checked against sources and probes before this revision:
+
+1. **Generic invariant factory:** independently reran the review's baseline-syntax
+   factory and unsafe coercion probes with the cached compiler. The factory loses
+   N and its Bias client fails; the unsafe service coercion remains rejected.
+   Re-read display.rs and generalize as cited in §3.4. Repair: retain the API and
+   service rules, and gate the stream writer on a general compiler conformance fix.
+2. **Resolution can leave Uri's value set:** with base `"x:a"`, references
+   `"/.//h"` and `"/.//a:b"` transform to absent-authority paths `"//h"` and
+   `"//a:b"`. Re-read RFC §3.3/§5.2 and executed a separate dot-removal model.
+   Repair: U5 validates the computed Parts; U8 reports PathPart/BadPath at offset
+   0 of the candidate path. No invalid Uri is constructed, so the round-trip law
+   stays true for every Uri the module can make.
+
+Two further reading passes checked the revised boundary. The first checked the
+positive Bias factory gate alongside the negative Sink coercion gate, and both
+resolution counterexamples against the shared validator. The second checked
+`"/a/..//h"`, an own-scheme reference `"x:/.//h"`, the valid authority-bearing
+control `"x://host/a"` with `"/.//h"`, and missing-base-scheme error precedence.
+It also checked that path/sequence have no dependency on the factory gate and
+that no spec addition or weaker service rule remains. No further serious issue
+was found in these two passes. The compiler prerequisite is still open; these
+checks do not claim its fix or an execution of std/uri.
+
+## 10. Risks, coordinator decisions, and verification limits
 
 Main implementation risks are the finger tree's private rank/count invariants,
 strict linear string construction, complete IP-literal validation, correct
@@ -1144,29 +1235,26 @@ may suspend because it is an ordinary call; the stream library itself never
 creates one-use continuations. It cannot make an arbitrary user-supplied thunk
 replay-safe or guarantee resource validity after its external scope ends.
 
-Questions for the coordinator (recommended answers are the contract used here):
+Coordinator decisions for this revision:
 
-1. **Strict sequence end cost:** accept O(log n) persistent worst-case edits,
-   retaining O(1) end access and logarithmic indexing/concat? **Recommend yes.**
-   If persistent amortized O(1) end edits are mandatory, fund a separate pure
-   scheduled representation/proof before implementation; do not add mutable
-   memo cells or polymorphic recursion just for this module.
-2. **URI boundary:** is strict ASCII RFC 3986, without IRI/IDNA/WHATWG repair,
-   sufficient for first HTTP consumers? **Recommend yes.** Keep policy and Unicode
-   host processing outside the generic parser; encode Unicode component text
-   explicitly. Put scheme-specific validation in those consumers.
-3. **Stream environment ergonomics:** accept invariant N, shared environments
-   and a rank-one map_environment adapter? **Recommend yes.** It closes the
-   wrapper variance hole using existing features. Review generic wrapper variance
-   separately; do not grant std a service-subtyping exception.
-4. **Spec clarification placement:** apply §7's general paragraphs or leave the
-   language spec alone? **Recommend apply them** at existing section numbers.
-   They state consequences already required by ordinary language rules.
+- Accept logarithmic persistent sequence end edits and constant-time end views.
+- Keep strict ASCII RFC 3986 syntax initially, with scheme policy, IRI/IDNA and
+  browser repair outside this module.
+- Keep shared invariant stream environments and the rank-one environment adapter.
+  Fix the compiler's generic factory inference in a separate track.
+- Add no general spec clarifications: the current spec already defines these
+  consequences. There is no outstanding request to edit it for Std-1.
+- Validate resolution candidates and return defined build-style errors when they
+  cannot be a Uri. Path and sequence may proceed before the stream compiler fix.
+
+No API question from the original recommendation list remains open. Stream's
+implementation prerequisite is a tracked compiler dependency, not a language
+change or a reason to relax service compatibility.
 
 Checked here: source baseline and branch, cited std/compiler regions, accepted
 syntax and scoped type notes, plan/ledger decisions, reference API documents,
-and three manual counterexample passes (last two clean). No new modules exist
-yet, so their compile/run behavior, exported inferred signatures, Wasm stack use,
+the initial manual counterexample passes, and the independent-review corrections
+with two further clean reading passes. No new modules exist yet, so their compile/run behavior, exported inferred signatures, Wasm stack use,
 node-count bounds and performance remain unverified. Executed separate Python
 models of P1/P5 and U6/U7: clean idempotence on 130 paths; 8,734 successful
 relative/join laws; 144 ordered form-pair round trips including empty keys, plus,
@@ -1174,7 +1262,12 @@ Unicode and NUL; and round-trip encoding all 256 byte values. These check the
 stated laws independently, not an i implementation. A mechanical inventory
 check found 23 stream, 23 sequence, 8 path and 12 URI function signatures with
 all type variables declared, plus three private sequence helper signatures;
-it also found no old keyword syntax in i blocks. Do not report the design
+it also found no old keyword syntax in i blocks. For this revision, independently
+reran the review's factory and unsafe coercion probes on `i-1e0d910`; both fail
+as documented in §3.4. An independent RFC model confirmed four invalid transformed
+paths (`"/.//h"`, `"/a/..//h"`, `"/.//a:b"`, `"x:/.//h"` against `"x:a"`)
+and two standard dot-removal examples. These are baseline compiler failures and
+model results, not passing std implementations. Do not report the design
 witnesses or proposed test tables as passing implementation tests. The cached
 baseline compiler predates the accepted syntax migration; full new-syntax
 verification belongs to the four implementation writers and integration.
