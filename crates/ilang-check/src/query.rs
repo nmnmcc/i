@@ -167,7 +167,12 @@ impl<'a> Query<'a> {
     }
 
     fn ast(&self, m: ModuleId) -> ast::Module {
-        ilang_syntax::parse_module(self.text(m)).0
+        let source = self.graph.sources.get(self.program.module(m).source);
+        if source.display.ends_with(".is") {
+            ilang_syntax::lisp::parse_source(&source.text).0
+        } else {
+            ilang_syntax::parse_module(self.text(m)).0
+        }
     }
 
     // ---- type_at ----

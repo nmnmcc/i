@@ -144,7 +144,12 @@ fn analyze(job: &Job) -> (Analysis, bool) {
         }
         for m in &p.modules {
             let rest = m.path.split_once('/').map_or(m.path.as_str(), |x| x.1);
-            let file = format!("{rest}.i");
+            let extension = if graph.sources.get(m.source).display.ends_with(".is") {
+                "is"
+            } else {
+                "i"
+            };
+            let file = format!("{rest}.{extension}");
             let path = match m.kind {
                 ModuleKind::Src => dir.join("src").join(file),
                 ModuleKind::Test => dir.join("test").join(file),
@@ -209,7 +214,7 @@ fn add_new_documents(
     };
     let mut new: Vec<(&PathBuf, &String)> = docs
         .iter()
-        .filter(|(p, _)| p.extension().is_some_and(|e| e == "i"))
+        .filter(|(p, _)| p.extension().is_some_and(|e| e == "i" || e == "is"))
         .filter(|(p, _)| !paths.values().any(|q| q == *p))
         .collect();
     new.sort_by(|a, b| a.0.cmp(b.0));
@@ -231,7 +236,11 @@ fn add_new_documents(
             if package.modules.iter().any(|m| m.path == module) {
                 continue;
             }
-            let display = format!("{sub}/{}.i", parts.join("/"));
+            let extension = path
+                .extension()
+                .expect("filtered source extension")
+                .to_string_lossy();
+            let display = format!("{sub}/{}.{extension}", parts.join("/"));
             let source = graph.sources.add(display, text.clone());
             graph.packages[root].modules.push(ModuleSource {
                 path: module,

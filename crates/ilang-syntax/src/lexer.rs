@@ -41,6 +41,16 @@ pub struct Lexed {
 }
 
 pub fn lex(source: &str) -> Lexed {
+    lex_surface(source, false)
+}
+
+/// Lex a Lisp-surface file. Line endings are trivia, and quote tokens are
+/// available only in this surface.
+pub fn lex_lisp(source: &str) -> Lexed {
+    lex_surface(source, true)
+}
+
+fn lex_surface(source: &str, lisp: bool) -> Lexed {
     let mut lexer = Lexer {
         src: source.as_bytes(),
         source,
@@ -49,6 +59,7 @@ pub fn lex(source: &str) -> Lexed {
         docs: Vec::new(),
         comments: Vec::new(),
         diags: Vec::new(),
+        lisp,
     };
     if source.starts_with('\u{feff}') {
         lexer.pos = 3;
@@ -130,6 +141,7 @@ struct Lexer<'a> {
     docs: Vec<DocComment>,
     comments: Vec<Comment>,
     diags: Vec<Diagnostic>,
+    lisp: bool,
 }
 
 fn is_word(b: u8) -> bool {
@@ -211,7 +223,7 @@ impl Lexer<'_> {
                 self.push(T::Eof, start, true);
                 return;
             };
-            let after_dot = self.tokens.last().is_some_and(|t| t.kind == T::Dot);
+            let after_dot = !self.lisp && self.tokens.last().is_some_and(|t| t.kind == T::Dot);
             let kind = match c {
                 b'a'..=b'z' | b'A'..=b'Z' | b'_' => self.word(),
                 b'0'..=b'9' if after_dot => self.tuple_index(),
@@ -248,12 +260,15 @@ impl Lexer<'_> {
             (b'-', b'.', _) => (T::MinusDot, 2),
             (b'-', _, _) => (T::Minus, 1),
             (b'?', _, _) => (T::Question, 1),
+            (b'^', _, _) => (T::Caret, 1),
             (b'!', b'=', _) => (T::NotEq, 2),
             (b'!', _, _) => (T::Bang, 1),
             (b'|', b'>', _) => (T::PipeGt, 2),
             (b'|', b'|', _) => (T::PipePipe, 2),
             (b'|', _, _) => (T::Pipe, 1),
             (b'@', _, _) => (T::At, 1),
+            (b'`', _, _) if self.lisp => (T::Quote, 1),
+            (b'~', _, _) if self.lisp => (T::Tilde, 1),
             (b'(', _, _) => (T::LParen, 1),
             (b')', _, _) => (T::RParen, 1),
             (b'[', _, _) => (T::LBracket, 1),
