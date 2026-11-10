@@ -18,6 +18,7 @@
 //!   the syntax of §3.
 //! - `shown.rs`: a shown type as a tree ([`ShownType`]), and its text.
 
+mod alias;
 mod coverage;
 mod display;
 mod infer;
@@ -26,6 +27,7 @@ mod lits;
 mod pattern;
 mod shown;
 mod solve;
+mod value_types;
 
 pub use lits::{LitValue, TestValues};
 pub use shown::{ShownFn, ShownType};
@@ -243,7 +245,9 @@ pub(crate) fn boundary_type(
                 }
                 a
             }
-            TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => return None,
+            TypeKind::Of { .. } | TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {
+                return None;
+            }
         })
     }
     let mut s = solve::Solver::new(HashMap::new(), Vec::new());
@@ -346,6 +350,8 @@ pub struct Typed {
     pub(crate) coalescing_errors: Vec<Diagnostic>,
     /// Missing schemes are allowed only in a diagnosed partial result.
     pub(crate) diagnosed: bool,
+    /// Full completed value-dependent alias bodies, with written formal names.
+    pub alias_types: HashMap<crate::hir::TypeId, ShownType>,
     /// The type scheme of each top-level name, simplified and shown in the
     /// syntax of §3 (§4.7).
     pub schemes: HashMap<DefId, String>,
@@ -586,7 +592,17 @@ pub fn check(program: &Program, sources: &Sources) -> (Typed, Vec<Diagnostic>) {
 
 /// `check`, keeping the types of the local names in `Typed::locals`.
 pub fn check_keeping_locals(program: &Program, sources: &Sources) -> (Typed, Vec<Diagnostic>) {
+    check_keeping_locals_with_errors(program, sources, false)
+}
+
+/// Query recovery is explicit; an empty inference diagnostic list is not readiness.
+pub fn check_keeping_locals_with_errors(
+    program: &Program,
+    sources: &Sources,
+    prior_errors: bool,
+) -> (Typed, Vec<Diagnostic>) {
     let mut c = infer::Checker::new(program, sources);
     c.keep_locals = true;
+    c.recovery = prior_errors;
     c.run()
 }

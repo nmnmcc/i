@@ -1414,12 +1414,16 @@ fn roles(t: &Ty, role: Role, out: &mut Vec<(V, Role)>) {
 
 /// The tree of a shown type: `Both` is its side that is shown, `Top` is
 /// `_`, and each variable has the name that `name` gives it.
-fn tree(t: &Ty, name: &mut dyn FnMut(V) -> String) -> ShownType {
-    let all = |xs: &[Ty], name: &mut dyn FnMut(V) -> String| -> Vec<ShownType> {
-        xs.iter().map(|x| tree(x, name)).collect()
+pub(crate) fn tree(t: &Ty, name: &mut dyn FnMut(V) -> String) -> ShownType {
+    tree_with(t, &mut |v| ShownType::Var(name(v)))
+}
+
+pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownType {
+    let all = |xs: &[Ty], name: &mut dyn FnMut(V) -> ShownType| -> Vec<ShownType> {
+        xs.iter().map(|x| tree_with(x, name)).collect()
     };
     match t {
-        Ty::Var(v) => ShownType::Var(name(*v)),
+        Ty::Var(v) => name(*v),
         Ty::Never => ShownType::Never,
         Ty::Top => ShownType::Hole,
         Ty::Con(Head::Named(r), values, _) if !values.is_all() => {
@@ -1457,11 +1461,11 @@ fn tree(t: &Ty, name: &mut dyn FnMut(V) -> String) -> ShownType {
             let params = f
                 .params
                 .iter()
-                .map(|(l, p)| (l.clone(), tree(p, name)))
+                .map(|(l, p)| (l.clone(), tree_with(p, name)))
                 .collect();
-            let ret = tree(&f.ret, name);
-            let err = (f.err != Ty::Never).then(|| tree(&f.err, name));
-            let env = (f.env != Ty::Never).then(|| tree(&f.env, name));
+            let ret = tree_with(&f.ret, name);
+            let err = (f.err != Ty::Never).then(|| tree_with(&f.err, name));
+            let env = (f.env != Ty::Never).then(|| tree_with(&f.env, name));
             ShownType::Fn(Box::new(ShownFn {
                 params,
                 ret,
@@ -1471,12 +1475,12 @@ fn tree(t: &Ty, name: &mut dyn FnMut(V) -> String) -> ShownType {
         }
         Ty::Union(ms) => ShownType::Union(flat_shown(all(ms, name))),
         Ty::Inter(ms) => ShownType::Inter(all(ms, name)),
-        Ty::Diff(a, h) => ShownType::Diff(Box::new(tree(a, name)), flat_shown(all(h, name))),
+        Ty::Diff(a, h) => ShownType::Diff(Box::new(tree_with(a, name)), flat_shown(all(h, name))),
         Ty::Both(a, b) => {
             if **a == Ty::Never {
-                tree(b, name)
+                tree_with(b, name)
             } else {
-                tree(a, name)
+                tree_with(a, name)
             }
         }
     }
