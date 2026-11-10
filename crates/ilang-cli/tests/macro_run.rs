@@ -356,13 +356,25 @@ fn compiler_wrapper_returns_a_successful_macro_value() {
         at: at.clone(),
     }));
     let error = ilang_macro::run::invoke_with_items_budget(
-        &built, &format!("{path}.{name}"), &[input()], prepared.templates.into(),
-        context, None, budget.clone(),
-    ).unwrap_err();
-    assert_eq!(budget.exceeded(), Some(ilang_host::macro_budget::Limit::Work));
-    assert_eq!(error.downcast_ref::<ilang_host::macro_budget::Exceeded>(),
-        Some(&ilang_host::macro_budget::Exceeded(ilang_host::macro_budget::Limit::Work)));
-
+        &built,
+        &format!("{path}.{name}"),
+        &[input()],
+        prepared.templates.into(),
+        context,
+        None,
+        budget.clone(),
+    )
+    .unwrap_err();
+    assert_eq!(
+        budget.exceeded(),
+        Some(ilang_host::macro_budget::Limit::Work)
+    );
+    assert_eq!(
+        error.downcast_ref::<ilang_host::macro_budget::Exceeded>(),
+        Some(&ilang_host::macro_budget::Exceeded(
+            ilang_host::macro_budget::Limit::Work
+        ))
+    );
 }
 
 #[test]
@@ -656,4 +668,74 @@ fn separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged() {
     assert_eq!(b[1].scope(), argument.scope());
     assert_eq!(a[0].scope().marks.len(), 1);
     assert_eq!(b[0].scope().marks.len(), 1);
+}
+
+#[test]
+fn macro_registry_respects_imports_exports_and_scoped_shadowing() {
+    use ilang_check::hygiene::Binding;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, exported)\n(@ macro (= exported (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n(@ macro (= private (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros, (exported) = app/macros)\nmain = () { Nil }\n",
+    )
+    .unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let caller = parsed.iter().find(|p| p.path == "app/main").unwrap().source;
+    let macros = parsed
+        .iter()
+        .find(|p| p.path == "app/macros")
+        .unwrap()
+        .source;
+    let registry = ilang_macro::registry::Registry::new(&graph, &parsed).unwrap();
+    let scope = Scope {
+        module: caller.0,
+        marks: BTreeSet::new(),
+    };
+    let atom = |name: &str| Syntax::from_datum(&parse(name).unwrap()[0], &scope);
+    let alias = atom("m");
+    let exported = atom("exported");
+    let private = atom("private");
+    assert_eq!(
+        registry
+            .resolve(caller, Some(&alias), &exported, &[])
+            .unwrap()
+            .source,
+        macros
+    );
+    assert_eq!(
+        registry
+            .resolve(caller, None, &exported, &[])
+            .unwrap()
+            .source,
+        macros
+    );
+    assert!(
+        registry
+            .resolve(caller, Some(&alias), &private, &[])
+            .is_none()
+    );
+    let locals = [Binding {
+        text: "m".into(),
+        scope: scope.clone(),
+        identity: None,
+        target: (),
+    }];
+    assert!(
+        registry
+            .resolve(caller, Some(&alias), &exported, &locals)
+            .is_none()
+    );
+    let locals = [Binding {
+        text: "exported".into(),
+        scope: scope.clone(),
+        identity: None,
+        target: (),
+    }];
+    assert!(registry.resolve(caller, None, &exported, &locals).is_none());
 }
