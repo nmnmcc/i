@@ -13,6 +13,8 @@ use std::collections::HashMap;
 pub struct Origin {
     pub syntax: Syntax,
     pub call_site: Syntax,
+    /// Original definition head that contains this occurrence, if any.
+    pub definition_head: Option<u64>,
 }
 
 #[derive(Clone, Debug)]
@@ -60,8 +62,14 @@ impl ScopedSource {
     fn position(&self) -> u32 {
         u32::try_from(self.text.len()).expect("expanded source exceeds span space")
     }
-    fn datum(&mut self, syntax: &Syntax, call_site: &Syntax) -> Datum {
+    fn datum(
+        &mut self,
+        syntax: &Syntax,
+        call_site: &Syntax,
+        definition_head: Option<u64>,
+    ) -> Datum {
         let start = self.position();
+        let child_head = syntax.definition_head().or(definition_head);
         let kind = match syntax.node() {
             Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
                 let (open, close) = match syntax.node() {
@@ -77,7 +85,7 @@ impl ScopedSource {
                     if i != 0 || matches!(syntax.node(), Node::Bits(_)) {
                         self.text.push(' ');
                     }
-                    children.push(self.datum(child, call_site));
+                    children.push(self.datum(child, call_site, child_head));
                 }
                 if !xs.is_empty() && matches!(syntax.node(), Node::Bits(_)) {
                     self.text.push(' ');
@@ -99,7 +107,7 @@ impl ScopedSource {
                     _ => unreachable!(),
                 };
                 self.text.push_str(prefix);
-                let child = Box::new(self.datum(child, call_site));
+                let child = Box::new(self.datum(child, call_site, child_head));
                 match syntax.node() {
                     Node::Quote(_) => DatumKind::Quote(child),
                     Node::Unquote(_) => DatumKind::Unquote(child),
@@ -117,6 +125,7 @@ impl ScopedSource {
         let origin = Origin {
             syntax: syntax.clone(),
             call_site: call_site.clone(),
+            definition_head,
         };
         assert!(
             self.spans.insert(span, origin.clone()).is_none(),
@@ -134,7 +143,7 @@ impl ScopedSource {
     }
     fn append(&mut self, syntax: &Syntax, call_site: &Syntax) -> Datum {
         self.text.push('\n');
-        self.datum(syntax, call_site)
+        self.datum(syntax, call_site, None)
     }
     fn error(&self, error: crate::Diagnostic) -> ScopedError {
         let origin = self

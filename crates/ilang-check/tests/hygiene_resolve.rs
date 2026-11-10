@@ -267,28 +267,77 @@ fn answer_names_cannot_be_used_as_binders() {
 
 #[test]
 fn definition_parameter_keeps_identity_across_mark_sets() {
-    use ilang_syntax::lisp::syntax::ScopeIdentity;
+    use ilang_syntax::lisp::definitions::source_definition;
     let (mut graph, mut parsed, caller, template) = setup();
-    let definition = syntax("(= (Box A) A)", template, &[11]);
-    let Node::Round(parts) = definition.node() else {
+    let original = "Id(A) = A";
+    let (module, errors) = ilang_syntax::parse_module(original);
+    assert!(errors.is_empty());
+    let answer = source_definition(
+        &module.items[0],
+        original,
+        &Scope {
+            module: template,
+            marks: BTreeSet::new(),
+        },
+        5,
+    )
+    .flip_mark(11);
+    let Node::Round(parts) = answer.node() else {
         panic!("definition")
     };
     let Node::Round(head) = parts[1].node() else {
         panic!("head")
     };
-    let id = ScopeIdentity::DefinitionParameter {
-        answer: 5,
-        parameter: 0,
-        name: "A".into(),
-    };
-    let binder = head[1].as_answer().with_scope_identity(id.clone());
-    let usage = parts[2].as_answer().with_scope_identity(id).flip_mark(99);
-    let head = parts[1].replace_children(vec![head[0].clone(), binder]);
-    let definition = definition.replace_children(vec![parts[0].clone(), head, usage]);
+    let head = parts[1].replace_children(vec![syntax("Box", template, &[11]), head[1].clone()]);
+    let definition = answer.replace_children(vec![parts[0].clone(), head, parts[2].flip_mark(99)]);
     append_items(&mut graph, &mut parsed, caller, &[definition]);
     let checked = ilang_check::check_parsed(&graph, &parsed);
     assert!(
         !checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn definition_parameter_moved_to_another_head_is_rejected() {
+    use ilang_syntax::lisp::definitions::source_definition;
+    let (mut graph, mut parsed, caller, template) = setup();
+    let original = "Id(A) = A";
+    let (module, errors) = ilang_syntax::parse_module(original);
+    assert!(errors.is_empty());
+    let answer = source_definition(
+        &module.items[0],
+        original,
+        &Scope {
+            module: template,
+            marks: BTreeSet::new(),
+        },
+        5,
+    )
+    .flip_mark(11);
+    let Node::Round(parts) = answer.node() else {
+        panic!("definition")
+    };
+    let Node::Round(answer_head) = parts[1].node() else {
+        panic!("head")
+    };
+    let unrelated = syntax("(= (Box A) A)", template, &[11]);
+    let Node::Round(other) = unrelated.node() else {
+        panic!("definition")
+    };
+    let Node::Round(other_head) = other[1].node() else {
+        panic!("head")
+    };
+    let head = other[1].replace_children(vec![other_head[0].clone(), answer_head[1].clone()]);
+    let stolen = unrelated.replace_children(vec![other[0].clone(), head, parts[2].clone()]);
+    append_items(&mut graph, &mut parsed, caller, &[stolen]);
+    let checked = ilang_check::check_parsed(&graph, &parsed);
+    assert!(
+        checked
+            .diags
+            .iter()
+            .any(|d| d.code == ilang_check::code::MACRO_BINDER),
         "{:?}",
         graph.sources.render_all(&checked.diags)
     );
@@ -540,6 +589,121 @@ fn marked_top_level_cannot_compete_with_its_scope_module_name() {
             .diags
             .iter()
             .any(|d| d.code == ilang_check::code::DEFINED_TWICE),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn answer_head_owner_survives_marks_and_freshens_but_make_cannot_copy_it() {
+    use ilang_syntax::lisp::definitions::{freshen_parameters, source_definition};
+    let original = "Id(A) = A";
+    let (module, errors) = ilang_syntax::parse_module(original);
+    assert!(errors.is_empty());
+    let scope = Scope {
+        module: 17,
+        marks: BTreeSet::new(),
+    };
+    let answer = source_definition(&module.items[0], original, &scope, 5);
+    let Node::Round(parts) = answer.node() else {
+        panic!("definition")
+    };
+    assert_eq!(parts[1].definition_head(), Some(5));
+    assert_eq!(parts[1].flip_mark(7).definition_head(), Some(5));
+    let Node::Round(head) = parts[1].node() else {
+        panic!("head")
+    };
+    let made = Syntax::make(Node::Round(head.clone()), &parts[1]).unwrap();
+    assert_eq!(made.definition_head(), None);
+    let fresh = freshen_parameters(&answer, 5, 9);
+    let Node::Round(parts) = fresh.node() else {
+        panic!("definition")
+    };
+    assert_eq!(parts[1].definition_head(), Some(9));
+}
+
+#[test]
+fn an_exported_written_type_cannot_leak_a_foreign_private_type() {
+    let (mut graph, _, _) = common::check_files(&[
+        ("src/main.i", "(f)\nf: Int = 1\n"),
+        ("src/template.i", "Secret { Secret }\n"),
+    ]);
+    let (mut parsed, errors) = ilang_check::parse(&graph);
+    assert!(errors.is_empty());
+    let caller = parsed
+        .iter()
+        .find(|p| p.path == "app/main")
+        .unwrap()
+        .source
+        .0;
+    let template = parsed
+        .iter()
+        .find(|p| p.path == "app/template")
+        .unwrap()
+        .source
+        .0;
+    let module = parsed.iter_mut().find(|p| p.source.0 == caller).unwrap();
+    let mut scoped = ScopedSource::new(graph.sources.get(module.source).text.clone());
+    let ty = scoped
+        .ty(&syntax("Secret", template, &[3]), &syntax("f", caller, &[]))
+        .unwrap();
+    let ItemKind::Binding(binding) = &mut module.ast.items[0].kind else {
+        panic!("binding")
+    };
+    let ilang_syntax::ast::PatternKind::Typed { ty: written, .. } = &mut binding.pattern.kind
+    else {
+        panic!("typed binding")
+    };
+    *written = ty;
+    graph
+        .sources
+        .set_text(module.source, scoped.text().to_owned());
+    module.scoped = Some(scoped);
+    let checked = ilang_check::check_parsed(&graph, &parsed);
+    assert!(
+        checked
+            .diags
+            .iter()
+            .any(|d| d.code == ilang_check::code::EXPORT_HIDDEN_TYPE),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn fixed_type_identity_never_falls_back_to_a_same_named_alias() {
+    use ilang_syntax::lisp::syntax::ScopeIdentity;
+    let (mut graph, _, _) = common::check_files(&[("src/main.i", "A = Int\nf: A = 1\n")]);
+    let (mut parsed, errors) = ilang_check::parse(&graph);
+    assert!(errors.is_empty());
+    let caller = parsed
+        .iter()
+        .find(|p| p.path == "app/main")
+        .unwrap()
+        .source
+        .0;
+    let fixed = syntax("A", caller, &[]).with_scope_identity(ScopeIdentity::TypeVariable {
+        variable: 42,
+        name: "A".into(),
+    });
+    let module = parsed.iter_mut().find(|p| p.source.0 == caller).unwrap();
+    let mut scoped = ScopedSource::new(graph.sources.get(module.source).text.clone());
+    let ty = scoped.ty(&fixed, &syntax("f", caller, &[])).unwrap();
+    let ItemKind::Binding(binding) = &mut module.ast.items[1].kind else {
+        panic!("binding")
+    };
+    let ilang_syntax::ast::PatternKind::Typed { ty: written, .. } = &mut binding.pattern.kind
+    else {
+        panic!("typed binding")
+    };
+    *written = ty;
+    graph
+        .sources
+        .set_text(module.source, scoped.text().to_owned());
+    module.scoped = Some(scoped);
+    let checked = ilang_check::check_parsed(&graph, &parsed);
+    assert!(
+        checked.diags.iter().any(|d| d.is_error()),
         "{:?}",
         graph.sources.render_all(&checked.diags)
     );

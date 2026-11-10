@@ -2641,10 +2641,9 @@ impl<'a> Resolver<'a> {
             Provenance::Answer | Provenance::Made { from_answer: true }
         );
         let allowed_parameter = type_parameter
-            && matches!(
-                syntax.scope_identity(),
-                Some(ScopeIdentity::DefinitionParameter { .. })
-            );
+            && matches!(syntax.scope_identity(),
+                Some(ScopeIdentity::DefinitionParameter { answer, .. })
+                    if origin.definition_head == Some(*answer));
         let bad_answer = answer && !allowed_parameter;
         let forbidden_identity = matches!(
             syntax.scope_identity(),
