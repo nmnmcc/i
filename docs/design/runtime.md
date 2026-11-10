@@ -4,7 +4,9 @@ Status: proposed joint design for R1, R2, and IO, revised after the coordinator
 review of aa20548. Code references remain at `1e0d910` unless another commit is
 named. The coordinator has accepted contextual top and blocking WASI, rejected
 universal async entries, and required the join/Owner corrections recorded below.
-This note changes no implementation. Examples use the accepted syntax, including
+Adopted native.md N7–N12 replace the resource representation and future
+multicore backend here; other accepted runtime rules remain. This note changes
+no implementation. Examples use the accepted syntax, including
 capital type parameters, imports in parentheses, and clause blocks.
 
 ## 1. Problem, sources, and evidence
@@ -174,11 +176,19 @@ shielded joiner of a dropped/cancelled child stops with
 Shielded finals invalidate the older argument that every joiner can be
 cancelled. Race uses a private scope-success signal and structured cancellation, not a public task kill.
 
-**D9. IO services start requests; ordinary wrappers await and translate errors.**
-Opaque files, listeners, streams and children are host references. The portable
-combinators cannot return these references; servers use local scopes. Stdio has
-its own `i:stdio/v1` service. Keep the normative `i/io` printer for compatibility;
-it does not take over or rename stdio. Reason: spec §9.7, §10.3, S7 P4, plan IO.
+**D9. IO resources are private nominal wrappers over Int.** File, Listener,
+Stream and Child each have one private constructor containing an Int. Only that
+Int crosses the raw boundary. Ordinary i wrappers unwrap arguments, await,
+wrap successful resource numbers and translate String errors. These values
+are portable by S7's general rules; Request/Ticket remain local. No compiler
+codec or portability exception names an IO type. One host resource context
+owns a kind-checked table shared by all workers, separate from request Roots.
+It closes leftovers at entry end, stop, host failure or disposal, including
+provisional replies. Native N9 and §8.1 define leases, non-reuse and teardown.
+Raw service constructors/fields are private; type names alone are exported
+for public environments (§2.4). Namespace spelling grants no host binding
+(native.md §3.1). Stdio keeps i:stdio/v1; legacy i/io keeps its contract.
+Reason: adopted native N9, spec §4.3/§9.7/§10.3, ledger adoption decision.
 
 **D10. The test scheduler is explicit and has no real time.** `task.test` chooses
 specified runnable paths, then FIFO when the script ends. Pending real host
@@ -705,6 +715,9 @@ unwind delimiters are inside that boundary. This is a construction argument,
 not a checked implementation; the first R2 implementation gate is to type-check
 this two-result-type/channel prototype before building the full scheduler.
 
+All mutable scheduler state stays behind one Scheduler boundary: R2 exposes no
+worker queue or stealing/commit protocol in public handles. Native N7/N8 later
+replace publication and shared-state storage; continuations remain local.
 The i loop threads immutable State through tail recursion. It keeps a FIFO
 ready queue, tables of scopes/channels/tasks/shares, and ticket waiters. It
 removes a continuation from State before resuming it once. Resuming can yield
@@ -854,25 +867,61 @@ which legal runnable step is chosen; it cannot commit an unready event.
 
 ## 7. IO public APIs
 
-All five modules export the ordinary wrappers below, their service type with
-its constructor, opaque resource types, and error types with constructors.
-Each wrapper needs its module service, request.Await, and request.Owner, unless its row says
-otherwise. All host failures expected from normal OS operations become the
-listed typed errors; malformed host values and implementation failures remain
-host faults under ABI v3. No IO primitive implicitly imports a std package.
+All five modules export ordinary wrappers and error types with constructors.
+Fs, Net and Process export only their type names, with private constructors,
+fields and live field functions. Their names occur in public wrapper environments,
+so §2.4 requires exporting them. Public resource names also hide constructors.
+Clock and Stdio retain exported service constructors: they carry no resource
+numbers. Each wrapper needs its module service, request.Await and request.Owner
+unless stated otherwise. The exported service type names may be used in inferred or written
+environments; their constructors and fields remain inaccessible outside the module. Normal OS failures become typed errors;
+malformed host values remain ABI faults. No IO primitive imports std.
 
-Host services below use request mode. The tables give full source fields:
-write them inside `@host("namespace", "request") Type { Type(...) }`. The request attribute adds request.Owner to each callable field's environment;
-these tables give their written boundary declarations. Thus all fields return
-Request, never lists, tuples, records or user error constructors
-on the ABI. The host sees their unwrapped result/error ABI types from §5.2.
+Tables give written fields inside `@host("namespace", "request") Type { Type(...) }`.
+The attribute adds request.Owner to callable fields (§5.2). Unwrapped wire
+results/errors obey §10.3; resources cross only as Int. Definitions include:
 
-| Module/service/namespace | Public opaque types and errors |
+```i
+File { File(Int) }
+Listener { Listener(Int) }
+Stream { Stream(Int) }
+Child { Child(Int) }
+```
+
+Each definition belongs to its respective module. Before resource IO, enforce
+§2.4's existing “may not make or take apart” rule for nominal field projection,
+not just constructor names. The current field checker enumerates all constructors
+and labels without testing visibility (base 051f064,
+crates/ilang-check/src/types/infer.rs:1538–1634); exported_type already requires
+exposed environment types to be exported (:566–595). This is a general compiler
+privacy fix, not an IO-specific field exception. Structural record fields keep
+their accepted rules. A user may request an opaque Fs environment value but
+cannot select its raw fields. Test that at O0/O2 before Fs lands. Export the type without
+`(..)`, so its constructor stays private (§2.4). A wrapper matches e.g.
+`Stream(number)` to unwrap an argument and calls Stream on a successful number.
+No File/Listener/Stream/Child itself is admissible at a host export (§10.3).
+Equality, hash and text follow ordinary custom values over Int (§11). Numbers
+are host data, not secret capabilities, fds or i/task path ids; S7 §18 rules
+11/25 concern task handles. Native §3.1's binding grants and §8.1's context/kind
+checks provide isolation.
+
+Resource modules export no raw-number injection helper, raw service value,
+or function accepting a caller-created raw service. Such a helper could wrap a
+forged live number returned by a fake accept, then pass that Stream to the real
+read/close wrappers, bypassing declaration grants. Resource wrapper constructors
+are used only on validated replies of the module's private service. Resource
+integration tests override the raw host binding explicitly, which grants raw
+authority to that fixture. Ordinary i code may inject public wrapper functions
+at its own call sites, or replace any accessible user service under §9.7.
+Clock/Stdio retain ordinary constructor fakes; opaque resource services are not
+public raw test APIs. No language rule forbids constructing or replacing services.
+
+| Module/service/namespace | Public resource types and errors |
 |---|---|
 | clock / Clock / `i:clock/v1` | `ClockError { ClockError(operation: String, code: String) }` |
-| fs / Fs / `i:fs/v1` | `File {}`; `FsError { FsError(operation: String, path: String, code: String) }` |
-| net / Net / `i:net/v1` | `Listener {}`; `Stream {}`; `NetError { NetError(operation: String, endpoint: String, code: String) }` |
-| process / Process / `i:process/v1` | `Child {}`; `ProcessError { ProcessError(operation: String, code: String) }` |
+| fs / Fs (type only) / `i:fs/v1` | File, constructor private; `FsError { FsError(operation: String, path: String, code: String) }` |
+| net / Net (type only) / `i:net/v1` | Listener and Stream, constructors private; `NetError { NetError(operation: String, endpoint: String, code: String) }` |
+| process / Process (type only) / `i:process/v1` | Child, constructor private; `ProcessError { ProcessError(operation: String, code: String) }` |
 | stdio / Stdio / `i:stdio/v1` | `StdioError { StdioError(operation: String, code: String) }` |
 
 The common stable wire error codes are `invalid`, `not_found`, `denied`,
@@ -912,20 +961,21 @@ OpenMode { ReadOnly WriteTruncate Append ReadWrite }
 
 | Raw Fs field | Type |
 |---|---|
-| `open` | `(path: String, mode: String) -> Request(Result(File,String))` |
-| `read` | `(file: File, max_bytes: Int) -> Request(Result(BitArray,String))` |
-| `write` | `(file: File, bytes: BitArray) -> Request(Result(Nil,String))` |
-| `flush` | `(file: File) -> Request(Result(Nil,String))` |
-| `close` | `(file: File) -> Request(Nil)` |
+| `open` | `(path: String, mode: String) -> Request(Result(Int,String))` |
+| `read` | `(file: Int, max_bytes: Int) -> Request(Result(BitArray,String))` |
+| `write` | `(file: Int, bytes: BitArray) -> Request(Result(Nil,String))` |
+| `flush` | `(file: Int) -> Request(Result(Nil,String))` |
+| `close` | `(file: Int) -> Request(Nil)` |
 | `remove` | `(path: String) -> Request(Result(Nil,String))` |
 | `rename` | `(from: String, to: String) -> Request(Result(Nil,String))` |
 | `read_file` | `(path: String) -> Request(Result(BitArray,String))` |
 | `write_file` | `(path: String, bytes: BitArray) -> Request(Result(Nil,String))` |
 
-Public open takes OpenMode and encodes `read`, `truncate`, `append`, or
+Public open returns File by wrapping the successful Int, takes OpenMode and encodes `read`, `truncate`, `append`, or
 `read_write`; write modes create the file if absent, read_write does not
 truncate. Public read/write/flush/remove/rename/read_file/write_file otherwise
-use exactly these parameter and success types, with `? FsError`. Public close
+use File in place of resource Int parameters, with `? FsError`; other success
+types stay the same. Unwrap File(number) before each raw call. Public close
 has no errors and is idempotent. A read requires max_bytes > 0, returns up to
 that many bytes, and returns `<<>>` only at EOF. All bytes parameters must have
 a whole number of bytes; otherwise give invalid before an OS operation. write
@@ -934,24 +984,83 @@ flush reports data-flush failures. close releases resources even when flush
 would fail; it does not promise durability. read_file opens, reads to EOF and
 closes; write_file truncates, writes and closes, and is not atomic replacement.
 rename errors use the from path; no path normalization or sandboxing is hidden
-in the i wrapper. Expected access denial is code denied.
+in the i wrapper. Expected access denial is code denied. One read/write/flush
+holds the cursor lease; a competing operation gives busy. Missing, closed,
+foreign-context or wrong-kind numbers give closed; close gives Nil. Close wakes
+pending operations with closed unless their answer already committed.
+
+The resource-bearing parts of the File wrappers are explicit ordinary i:
+
+```i
+mode_string = {
+  ReadOnly -> "read"
+  WriteTruncate -> "truncate"
+  Append -> "append"
+  ReadWrite -> "read_write"
+}
+
+open = (path, mode, raw ! Fs) {
+  File(fail.map_error(
+    () { await_resource(raw.open(path, mode_string(mode)), (n) {
+      request.await(raw.close(n))
+    }) }
+    (code) { FsError("open", path, code) }
+  ))
+}
+
+read = (File(number), max_bytes, raw ! Fs) {
+  request.await(raw.read(number, max_bytes)) |> {
+    Ok(bytes) -> bytes
+    Error(code) -> fail.raise(FsError("read", "", code))
+  }
+}
+
+close = (File(number), raw ! Fs) { request.await(raw.close(number)) }
+```
 
 ### 7.3 TCP networking
 
 | Raw Net field | Type |
 |---|---|
-| `listen` | `(address: String, port: Int) -> Request(Result(Listener,String))` |
-| `local_port` | `(listener: Listener) -> Request(Result(Int,String))` |
-| `accept` | `(listener: Listener) -> Request(Result(Stream,String))` |
-| `connect` | `(address: String, port: Int) -> Request(Result(Stream,String))` |
-| `read` | `(stream: Stream, max_bytes: Int) -> Request(Result(BitArray,String))` |
-| `write` | `(stream: Stream, bytes: BitArray) -> Request(Result(Nil,String))` |
-| `shutdown_write` | `(stream: Stream) -> Request(Result(Nil,String))` |
-| `close_stream` | `(stream: Stream) -> Request(Nil)` |
-| `close_listener` | `(listener: Listener) -> Request(Nil)` |
+| `listen` | `(address: String, port: Int) -> Request(Result(Int,String))` |
+| `local_port` | `(listener: Int) -> Request(Result(Int,String))` |
+| `accept` | `(listener: Int) -> Request(Result(Int,String))` |
+| `connect` | `(address: String, port: Int) -> Request(Result(Int,String))` |
+| `read` | `(stream: Int, max_bytes: Int) -> Request(Result(BitArray,String))` |
+| `write` | `(stream: Int, bytes: BitArray) -> Request(Result(Nil,String))` |
+| `shutdown_write` | `(stream: Int) -> Request(Result(Nil,String))` |
+| `close_stream` | `(stream: Int) -> Request(Nil)` |
+| `close_listener` | `(listener: Int) -> Request(Nil)` |
 
-The same names are public wrappers with the same parameters and success types,
-`? NetError`, and no errors for the two close functions. Address is a numeric
+Public listen returns Listener; accept/connect return Stream. Public resource
+parameters use Listener or Stream as appropriate. Other result types stay the
+same, with NetError, except the error-free close functions. Explicit wrappers
+inside i/net include (await_resource is defined in §8.1):
+
+```i
+accept = (Listener(number), raw ! Net) {
+  Stream(fail.map_error(
+    () { await_resource(raw.accept(number), (n) {
+      request.await(raw.close_stream(n))
+    }) }
+    (code) { NetError("accept", "", code) }
+  ))
+}
+
+read = (Stream(number), max_bytes, raw ! Net) {
+  request.await(raw.read(number, max_bytes)) |> {
+    Ok(bytes) -> bytes
+    Error(code) -> fail.raise(NetError("read", "", code))
+  }
+}
+
+close_stream = (Stream(number), raw ! Net) {
+  request.await(raw.close_stream(number))
+}
+```
+
+Raw accept returns Int; neither Stream nor NetError crosses the ABI.
+Address is a numeric
 IPv4/IPv6 address in v1, not a URL or a DNS name. Ports are 0..65535 for listen
 (0 asks the OS to choose) and 1..65535 for connect. local_port returns the bound
 port. Empty address, bad addresses/ports, nonpositive read bounds and partial-byte
@@ -963,7 +1072,9 @@ whole stream/listener, is idempotent, and settles other pending operations on
 that object with closed unless their answer already committed. A concurrent
 read and write are allowed. A second concurrent read, write, or accept on the
 same direction/object gives busy, not an unspecified interleaving. There is no
-TLS, UDP, HTTP, DNS, or cross-worker reference transfer in v1.
+TLS, UDP, HTTP or DNS in v1. Missing, closed, foreign-context or wrong-kind
+numbers give closed; close gives Nil. Stream values can cross workers, while
+their pending Request values cannot.
 
 ### 7.4 Processes and entropy
 
@@ -973,13 +1084,15 @@ TLS, UDP, HTTP, DNS, or cross-worker reference transfer in v1.
 | `env` | `(name: String) -> Request(Result(String,String))` |
 | `cwd` | `() -> Request(Result(String,String))` |
 | `entropy` | `(bytes: Int) -> Request(Result(BitArray,String))` |
-| `spawn` | `(program: String, args: BitArray) -> Request(Result(Child,String))` |
-| `wait` | `(child: Child) -> Request(Result(Int,String))` |
-| `terminate` | `(child: Child) -> Request(Result(Nil,String))` |
-| `close` | `(child: Child) -> Request(Nil)` |
+| `spawn` | `(program: String, args: BitArray) -> Request(Result(Int,String))` |
+| `wait` | `(child: Int) -> Request(Result(Int,String))` |
+| `terminate` | `(child: Int) -> Request(Result(Nil,String))` |
+| `close` | `(child: Int) -> Request(Nil)` |
 
-Public args gives List(String); spawn takes `(program: String, args: List(String))`;
-other wrappers keep raw parameters/success values, with `? ProcessError` except
+Public args gives List(String); spawn takes `(program: String, args: List(String))`
+and returns Child; wait/terminate/close take Child. Match Child(number)
+to unwrap arguments and wrap the successful spawn Int with Child. Other wrappers
+keep raw parameters/success values, with `? ProcessError` except
 close, which has no errors. Program args exclude the interpreter/program name;
 spawn's args exclude argv[0]. Each child inherits cwd, environment, and standard
 streams. There is no shell expansion, pipeline, or implicit command parsing.
@@ -1003,7 +1116,34 @@ wait; close terminates if still running and reaps, and is idempotent/error-free.
 An expected OS error from terminate raises ProcessError; close waits for reaping, even if it must wait for natural exit after a
 failed termination request. A raw OS process may be slow to terminate, so close/final
 completion has no bounded duration. Pipes and changed cwd/env are later API
-extensions, not unspecified behavior of this version.
+extensions, not unspecified behavior of this version. Missing, closed,
+foreign-context or wrong-kind numbers give closed; close gives Nil. Close wakes
+a pending wait/terminate with closed unless its answer already committed.
+
+Inside i/process, encode_args is the ordinary codec above (it raises
+ProcessError("spawn", "invalid") for bad input before starting work). The
+resource-bearing wrapper parts are:
+
+```i
+spawn = (program, args, raw ! Process) {
+  bytes = encode_args(args)
+  Child(fail.map_error(
+    () { await_resource(raw.spawn(program, bytes), (n) {
+      request.await(raw.close(n))
+    }) }
+    (code) { ProcessError("spawn", code) }
+  ))
+}
+
+wait = (Child(number), raw ! Process) {
+  request.await(raw.wait(number)) |> {
+    Ok(status) -> status
+    Error(code) -> fail.raise(ProcessError("wait", code))
+  }
+}
+
+close = (Child(number), raw ! Process) { request.await(raw.close(number)) }
+```
 
 ### 7.5 Standard streams
 
@@ -1036,14 +1176,51 @@ service modules behind it, with explicit testing imports able to override the
 standard defaults before instantiation. Add production tokio net/io/fs/process
 support as needed, without changing the one-thread-per-run executor contract.
 Service ownership of request futures remains in requests.rs, not tokio::spawn.
+Before Fs, enforce general nominal field privacy (§7), then implement native.md
+§3.1's general binding grants, including external
+aliases, trusted compiler provenance and JS manifest verification. The standard
+factory grants raw bindings to their resolved declarations. Ordinary i service
+substitutions need no host binding; resource fixtures that override raw host
+functions receive that authority explicitly.
+Use a general context-aware host-registration adapter: create a fresh invocation
+context before each entry, and pass it to each host start. A legacy registration
+may ignore it. Futures capture the immutable context at start, not a mutable
+current-context slot. This permits reuse of HostOptions/service factories across
+tests without retargeting old work into the next test's table. Rust and JS need
+the same per-invocation hook; this is IO plumbing, not an existing ABI feature.
+
+One ResourceContext belongs to each live entry invocation and all its workers.
+Nested task.run, Root and Owner do not create new resource tables: resources may
+outlive request groups. A later export invocation, test or instance gets a fresh
+context. Resource wrappers cannot be host-exported under §10.3; no boundary
+promises to retain them between invocations. The context owns provisional and
+delivered resources, a live/ending/ended state and an independent teardown
+controller. A positive arbitrary-precision Int indexes each entry, which also
+records its resource kind. One host-wide allocator never reissues a number,
+including provisional/failed creations, across contexts, tests or instances.
+Unknown, zero/negative, foreign-context and wrong-kind numbers give closed;
+close gives Nil. Checked allocation failure stops for memory exhaustion, never
+wraps or truncates to u64/fd. A host restart begins another identity domain;
+retaining raw numbers across host restarts is unsupported.
 
 Split `services.rs` into registration plus `services/{clock,fs,net,process,stdio}.rs`.
 Clock captures deadlines in start closures. Net uses reactor readiness; never
-hold a synchronous mutex across an await. Resource cells contain a typed OS
-object, closed flag, operation leases and a close wakeup. A close takes and
-releases the resource and wakes pending operations. If close races completion,
-whichever commits first determines the result. Request cancellation drops its
-future and registration immediately. OS side effects already committed may
+hold a synchronous mutex across an await. Table entries contain typed OS
+objects, operation leases and close wakeups.
+Lookup, lease acquisition, completion commit and removal serialize under a short
+host lock; no OS wait or i/Wasm callback runs under it. A completion committed
+first keeps its answer. Close committed first removes the entry, invalidates
+all aliases and settles pending operations with closed. An operation retains a
+lease/private OS reference, never a bare pointer into a removed entry, and tests
+its lease before publishing success. Release happens once after references are
+safe. Close returns Nil when cleanup completes (Child also awaits reaping);
+it never waits for a lock held by a pending read/wait. Cancelling close cannot
+restore the entry or cancel its host-owned cleanup. A close already in progress
+has a context/kind-checked cleanup receipt;
+concurrent closes join that receipt (in particular Child reaping), then give Nil.
+Teardown includes these jobs even after their live table entries were removed;
+completed receipts are freed, not retained as permanent tombstones.
+Request cancellation drops its future and registration immediately. OS side effects already committed may
 remain; no error or cancellation promises rollback.
 
 Filesystem blocking work must own a duplicate OS handle and its private input/
@@ -1072,6 +1249,12 @@ Stdout/stderr writes own copied buffers and an operation lease; if detached, the
 lease remains busy until that write ends, so the next write cannot interleave
 with its remaining prefix. Cancellation may leave a written prefix.
 
+Before starting an OS spawn, register its host-owned supervisor/creation job
+with the ResourceContext. Ending the context cancels that job even if the child
+has not been created yet. A late-created child is terminated/reaped by that
+supervisor, not dropped into a dead reactor. Native's controller waits for every
+registered spawn job to acknowledge no remaining possible child before exit;
+waiting only for children already present in the table misses this race.
 Child ownership is independent of its wait future. A cancelled wait removes its
 wait lease; Child.close requests termination and reaping independently. Cleanup
 must not need a mutex locked by that cancelled future. Spawn failures are typed
@@ -1085,20 +1268,22 @@ termination cannot be delivered and natural exit must be awaited. Merely droppin
 a default tokio Child does not implement this contract. Abandoning host work
 never promises that the OS has already completed reaping when the instance
 returns status 0. Verify this supervisor in the process phase before claiming
-that cancelled spawn leaves no orphan. Host shutdown does not wait for detached
-blocking work, as C requires.
+that cancelled spawn leaves no orphan. Host shutdown does not wait for unrelated detached blocking work, as C requires;
+the native executable specifically waits for registered spawn/reaping jobs before
+process exit, so it cannot kill its cleanup owner.
 
-For open/listen/accept/connect/spawn the host reply owns a new resource until
-it is decoded into a request cell. Dropping host work or an undelivered reply
-releases that provisional resource. After decoding, the i wrapper owns the
-unclaimed Ready result. Its error-free final inspects request.state: for
-Ready(Ok(resource)), close it using the appropriate service, then cancel the
-ticket; for Waiting, cancel; for Taken/Cancelled/Error, just cancel. request.await
-calls take with no scheduler step between its wait returning and the transfer. A cancelled
-scheduler await jumps to the final before taking, so that final closes an already
-decoded resource. On success take removes the cell's answer and marks Taken;
-the final does not close the resource just handed to the caller. The caller
-then uses resource.acquire/ensure to own its lifetime.
+For open/listen/accept/connect/spawn, insert a new number as provisional before
+publishing the reply. The host reply holds a drop guard: abandonment removes and
+closes that entry (Child requests supervised termination/reaping). Successful
+validation/publication of the decoded Int into Ready disarms the guard. The
+context still owns the resource;
+the i wrapper now owns the unclaimed Ready result. Its error-free final closes
+Ready(Ok(number)) and cancels the ticket; Waiting is cancelled; other states
+only cancel. There is no scheduler step from await returning through take and
+nominal wrapping. Cancellation before take therefore closes the Ready resource;
+successful take transfers explicit close responsibility to the caller, without
+removing the context's teardown ownership. A forgotten decoded Ready answer
+stays in the table until explicit close or teardown; no i GC timing is involved.
 
 The core of that guard is ordinary i (Request is a built-in type; status constructors are
 qualified here; no new syntax or polymorphic service field is needed):
@@ -1121,37 +1306,56 @@ await_resource(A, E, N) = (
 }
 ```
 
-This guard is ordinary i, parameterized by the module's close function and its
-kept service environment. It may suspend while closing. It adds no ABI ack or
-resource-specific compiler rule. Raw service users must install the same guard
-if they start resource-creating requests manually: request.cancel alone drops
-host work, not arbitrary i-owned resources. On a stop, i finals do not run, but
-destroying the instance drops its host resources. On GC of a forgotten File or
-Stream, host ownership may also release it; GC timing is not the specified way
-to close a resource. Expected close failures are swallowed only by the explicit
-error-free close contract; flush/terminate expose errors separately.
+This guard is ordinary i, parameterized by the raw close function and its
+service environment, then followed by error translation and nominal wrapping.
+It may suspend during close in a shielded final. No ABI ack or resource-specific
+compiler rule is added. Raw callers inside the module must use the same guard:
+request.cancel cannot infer that an arbitrary Int answer denotes a resource.
+Expected close errors are swallowed only by close's error-free contract;
+flush/terminate expose errors separately.
 
-Resource objects are host references, which remain local as S7 requires. On Rust
-this can use the existing Arc-backed HostReference (`crates/ilang-host/src/lib.rs:372–382`).
-The request table's generation token solves stale i aliases, not a malicious
-host's late callback after id reuse: ABI H13 already forbids that callback.
+**Teardown is a host action, not an i final or GC finalizer.** At normal entry
+end, stop, trap, host failure, abandoned async call or explicit dispose:
+(1) mark the context ending and refuse new starts/deliveries; (2) detach/cancel
+request work and wake idle workers; (3) remove every table entry, including
+provisional and forgotten Ready/Taken answers, revoke leases and schedule each
+OS cleanup once; (4) mark ended. These steps require no Store borrow or i code. User imports, including
+synchronous services/externals, reject new host actions once the stop gate closes;
+controller cleanup remains allowed. An operation admitted before stop may finish
+its already-started OS effect, without delivering a new i callback.
+An operation either commits before ending or discards its result. A late creator
+closes its new OS object instead of inserting into an ending table. Finite
+critical sections never wait for a worker that may spin in Wasm.
+In a live host, native N12 interrupts and joins stopped workers before returning
+the run result. Child supervisors and safe detached blocking work may outlive
+that result, owning only host data, never a Store or context. A native process
+must finish child termination/reaping before its final process exit: exit would
+kill an in-process supervisor. This may await natural child exit if termination
+fails; no bounded OS-cleanup time is promised. Unrelated detached file/stdin work
+is not joined, as C requires. Stdin unsubscribes per context; the source broker
+survives sequential tests. Integer resources have no GC finalizers. Request-slot
+generations and ABI H13's late-callback prohibition still apply independently.
 
 ### 8.2 Target behavior, operation by operation family
 
-| Module | `i run` Rust host | JS SDK standard service factory: Node | JS factory: browser | WASI preview-1 target in this track |
+| Module | `i run` and native Rust host | JS SDK standard service factory: Node | JS factory: browser | WASI preview-1 target in this track |
 |---|---|---|---|---|
 | random | Pure i | Same pure i | Same pure i | Same pure i |
 | task | i FIFO loop over v3 | Same loop; promises, AbortSignal, macrotask polling | Same loop on calling thread; never block it | Same i loop; raw host calls complete synchronously; no status hand-off |
 | clock | Reactor timers and OS clocks | Monotonic/system clocks and abortable timers | Performance/system clocks and abortable timers | Ordinary blocking service imports; preview-1 command supplies no i:clock adapter |
-| fs | OS files, with the cancellation rule above | Node file operations, closed/busy state, explicit close | Every raw operation gives unsupported, except close gives Nil | Ordinary blocking imports; opaque File needs an export-aware embedder, not plain preload |
-| net | Reactor TCP | Node TCP, cancellation destroys provisional sockets and removes listeners | All operations give unsupported, close gives Nil; browser fetch is not raw TCP | Ordinary blocking imports; no default listen/connect adapter |
+| fs | OS files, with the cancellation rule above | Node context-owned Int table, closed/busy leases, explicit close | Every raw operation gives unsupported, except close gives Nil | Blocking Int imports; buffer-aware embedder/linked adapter needed, no default fs adapter |
+| net | Reactor TCP | Node context-owned Int table; provisional cleanup and close wakeups | All operations give unsupported, close gives Nil; browser fetch is not raw TCP | Ordinary blocking imports; no default listen/connect adapter |
 | process | OS args/env/cwd/entropy/child processes | Node process data, entropy, spawn/wait/terminate/close | args gives an encoded empty list; env gives denied; cwd/spawn/wait/terminate give unsupported; entropy uses platform secure entropy; close gives Nil | Ordinary blocking imports; no default process/entropy adapter or spawn implementation |
 | stdio | Per-source input broker/subscribers and byte output | Node standard byte streams with cancelable subscribers | Default byte read/write/flush operations give unsupported; an embedder can give explicit byte sources/sinks | Ordinary blocking imports; no new i:stdio adapter; legacy i/io continues to use fd_write |
 
 The JS factory is an explicit SDK option, not a language name-resolution rule.
 It installs all fields including unsupported stubs, so a module can instantiate
-and catch a typed unsupported error. Embedders can override any whole service
-with ordinary imports. Browser APIs never silently treat URLs as files or a
+and catch a typed unsupported error. Embedders can override any whole service with ordinary imports and explicit
+binding grants. The standard factories share one ResourceContext across workers
+and make a fresh one per invocation, even when the factory is reused for tests.
+JS resource numbers/counters use BigInt, never Number. Stop/dispose removes
+listeners, destroys sockets and owns child cleanup, including promises settling
+after cancellation. Browser APIs never silently treat URLs as files or a
 WebSocket as Stream. Node and browser async starters read requestSignal()
 synchronously and register cancellation there; the helper and status-2 macrotask
 path already exist (`bindings/javascript/ilang.mjs:34–58`, `:894–902`). New service
@@ -1167,16 +1371,19 @@ blocks the worker and cannot meet the concurrent-server acceptance criterion.
 it must not claim that plain wasmtime run supplies them. Preserve general custom
 blocking imports, as §B.7 already permits. Implementing a preview-1 adapter set
 is a separate target project, not an unreviewed second IO host in this track.
-The current hostref representation requires an externref and reference_id
-(`crates/ilang-wasm/src/runtime/mod.rs:240`, `:249–268`), so “just return an fd”
-would not implement File under the existing ABI. That unsupported shortcut is
-specifically rejected.
+Resource wrappers are ordinary Int-bearing values, not opaque ABI references.
+A WASI adapter passes Int and keeps the same context-owned kind-checked table,
+leases and teardown. An OS fd is private implementation data, never the language
+number: fds are reused. Int buffers still require an export-aware embedder or
+static linking (§B.7); switching from externref does not make plain --preload
+sufficient. No resource wrapper becomes a host-export type.
 
 ## 9. End-to-end acceptance: concurrent TCP echo
 
-This complete example needs only i modules. It deliberately uses local_scope:
-accepted sockets are host references. Several connections overlap on one worker;
-this example does not promise multicore speedup for socket-owning handlers.
+This complete example needs only i modules. It uses a portable scope: Listener
+and Stream are nominal Int values. Connections overlap on one worker; in MC
+the next acceptor may be claimed by another worker. A started handler and each
+of its Request values still stay on their original worker.
 
 ```i
 (i/task, i/net, i/fail, i/resource)
@@ -1209,7 +1416,7 @@ main = () {
     () { net.listen("127.0.0.1", 8080) }
     (listener) { net.close_listener(listener) }
     (listener) {
-      task.local_scope((scope) {
+      task.scope((scope) {
         task.go(scope, () { serve_next(scope, listener) })
         Nil
       })
@@ -1223,7 +1430,7 @@ starting the next accepting task. Thus there is one pending accept while older
 tasks serve their own sockets; an unstarted child never owns an accepted socket.
 The handler's catch isolates expected read/write errors to that connection;
 listener errors still fail main and cancel all handlers. A production bounded
-server can use a local channel of permits, but a limit is not needed to show
+server can use a portable channel of permits, but a limit is not needed to show
 concurrency. The example's co-recursive types must infer from ordinary module
 functions; there are no constructors imported implicitly from net/task.
 
@@ -1238,6 +1445,8 @@ A/C handlers, and all started host requests end. This distinguishes overlap
 from an implementation that accepts one client and reads it to EOF first.
 No sleep-based assertion decides readiness. Run the fixture 200 times at O0/O2
 and once through the JS Node factory; Rust is the standalone acceptance host.
+In MC repeat at 1/2/4 workers and force remote claims of the next acceptor.
+Listener/Stream remain equal after transport; their wrappers do not pin tasks.
 
 ## 10. Replacement spec text, section by section
 
@@ -1310,7 +1519,15 @@ Add after them:
 > final functions. A host failure or a destroyed instance cannot run i final
 > functions; the host instead releases its own work and resources (Appendix B).
 
-**§9.7 full replacement.**
+**§2.4/§6.7 privacy clarification.** Retain §2.4's export requirement and add
+to §6.7: “Taking a nominal value apart by field selection requires the same
+constructor visibility as a constructor pattern (§2.4). Exporting T without
+constructors exports neither field access nor update. Structural record fields
+follow their own rules.” This enforces the existing abstraction boundary.
+
+**§9.7 full replacement.** Copy native.md §10's general binding-permission
+paragraph after this replacement; it applies to every namespace and §10.1 alias.
+It is host policy, not a reserved library namespace or a new type rule.
 
 > A type definition with `@host("namespace")`,
 > `@host("namespace", "async")`, or `@host("namespace", "request")` declares a
@@ -1356,10 +1573,9 @@ Add after them:
 **New §9.7.1–§9.7.5.** Copy the service/type/error definitions, stable error-code
 paragraphs, raw field tables, public wrapper type transformations, wire codecs,
 and behavior in §7.1–§7.5 of this note, in that order. Prepend §7's shared
-introductory API/error paragraphs and service/type table to §9.7.1. Include §8.1's
-resource-transfer/cancellation paragraphs from “For open/listen/accept/connect/spawn”
-through “specified way to close a resource”. They define the ownership visible
-to programs; Rust implementation choices elsewhere in §8.1 do not enter the spec.
+introductory API/error paragraphs and service/type table to §9.7.1. Include the resource value, privacy, binding, lease, transfer and teardown
+behavior from §7 and §8.1 through its end. Omit wrapper implementation examples
+and Rust API choices; these behavioral rules define ownership visible to programs.
 
 **§9.8.** Use S7's Keys text unchanged. R2 supplies its implementations.
 
@@ -1374,8 +1590,9 @@ implementation argument of §6.3. Prepend:
 > child results/errors and shares. Portable paths check core.portable even
 > with one worker: sends at the call, send events at construction, children
 > at completion, scope body errors at failure, shares at creation. Failure
-> stops with panic("task: value is not portable"). go itself does not check;
-> unstarted tasks with non-portable captures stay on their home worker.
+> stops with panic("task: value is not portable"). go never rejects for
+> non-portability; on multiple workers it silently classifies the complete task
+> record at go and publishes portable records. Other records stay local.
 > Local scopes/channels hold the maker's boundary only as a non-portability
 > witness. A Task/join event from a local scope holds that scope too. Every
 > handle checks run identity. Channels belong to the first scope in their
@@ -1440,6 +1657,8 @@ resource guards. Exclude the discussion of compiler frame/table layout.
 > The outer Request/Result types in a request-mode host field describe how
 > host work is obtained (§9.7); they do not add ABI parameter/result types.
 > Requests, tickets, tasks, scopes, channels and events cannot cross the ABI.
+> Custom IO wrappers with Int fields are not ABI types; raw resource services
+> pass only Int. No library-specific exception is added.
 
 **§11.1, §11.4, §11.7–§11.9, §13.** Apply S7's existing replacements, including
 portable, keys, cycles, and identity. Add requests/tickets to §11.1's value list.
@@ -1467,7 +1686,9 @@ Add this row to §12's built-in name table, beside the S7 Key/Keyed row:
 Await, Root, Owner, Scheduler, Runner and IO types require imports, using qualified
 names when wanted; the entry rule refers to their resolved definitions, not spellings.
 
-**§B.4–B.6.** Keep ABI v3 and all H rules. In §B.5 replace only “a module made by
+**§B.4–B.6.** Keep ABI v3 and all H rules. Trusted binding plans and
+ResourceContext teardown are loader/host contracts (native §3.1), not new
+runtime imports or metadata fields that a v3 host silently trusts. In §B.5 replace only “a module made by
 this compiler has no outstanding request at that point” with “structured entry
 cleanup normally leaves no outstanding request; a deliberately unowned raw
 request is dropped by the host at status 0”. Request-mode and async declarations
@@ -1488,8 +1709,9 @@ derives each entry's async flag from its inferred environment as §10.2 says. A 
 
 ### 10.1 Coordinated edits to the accepted multicore note
 
-Only runtime.md is edited in this lane. When integrating these coordinator-
-approved rules, apply the following exact replacements in multicore.md too.
+Native adoption applies these coordinator-approved join corrections in
+multicore.md now. The quotations below record their source, not pending edits.
+Native N7/N8 also replace D8 and the parallel CML plan.
 
 In §18 rule 8, old sentence:
 
@@ -1540,22 +1762,22 @@ all Owner groups registered to its Root, not one default cancellation group or
 the whole instance. A nested run establishes another Root. The §5 counter-based
 PRF implementation sketch is replaced by the published SplitMix split-tree
 choice in §4 of this note, following the coordinator's preference; the tagged
-P/S stream promise of §18 rule 11 remains. R1 must reconcile that sketch when
-landing its algorithm text rather than leave two algorithm prescriptions.
+P/S stream promise of §18 rule 11 remains. This adoption reconciles the sketch now; R1 copies the one published algorithm
+when landing its spec text, rather than leaving two prescriptions.
 
 ## 11. Files, ownership, merge order, and ordered implementation checklists
 
-Only this note is changed in the design lane. The following is an implementation
-assignment, not permission for a worker to edit outside its lane. Line references
+This adoption changes only native.md, runtime.md and multicore.md. The following
+is an implementation assignment, not permission for a worker to edit outside its lane. Line references
 anchor current regions; implementations re-find them after earlier tracks land.
 
 | Track | Files and regions to change |
 |---|---|
 | R1 | Replace `lib/i/random.i:1`; register no Rust primitive. Add R1 spec text and `tests/spec/9.10/` |
 | R2 prerequisites from S7 | New `lib/i/key.i`; `lib/i/control.i:3–28` keep_env; `lib/i/core.i:3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs:1285–1291` and `hir.rs:210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
-| R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs:664–679`, `:1470–1555`, mode in `hir.rs:182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs:969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs:23–165`, `:172–246`, `:335–358`; add continue export. No edits to `ilang-host/src/requests.rs` are needed for many outstanding requests |
+| R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs:664–679`, `:1470–1555`, mode in `hir.rs:182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs:969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs:23–165`, `:172–246`, `:335–358`; add continue export. The existing host table already supports many outstanding requests; IO adds teardown-owner access independent of a Store borrow |
 | R2 scheduler and entry | Replace `lib/i/task.i:1`; `infer.rs:376–429` resolved allowed-entry-service set and diagnostics; `lower.rs:828–938` entry wrappers/metadata; `emit/mod.rs:805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
-| IO service phases | Replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml:15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser service factories and their tests under `bindings/javascript/` and `tests/browser/` |
+| IO service phases | Before Fs, generic nominal field visibility in current `crates/ilang-check/src/types/infer.rs:1538–1634` and its tests (spec §2.4); replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml:15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser factories/tests under `bindings/javascript/` and `tests/browser/`; context-aware host registrations, shared ResourceContext/Int allocator and trusted binding grants before Fs (native §3.1/§10) |
 | Shared registration | `crates/ilang-package/src/library.rs:7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
 | Spec/test ownership | R1 §9.10; R2 §9.2, §9.4–9.5, §9.8–9.9, §9.11, §10.2 and request additions in §4/§10.3/§11/§B.5; IO §9.7, §B.7, §0/§2.1/§12 lists. Use the exact section splits in §10; one owner reconciles each shared paragraph |
 
@@ -1636,16 +1858,22 @@ Ordered R2 checklist:
 Ordered IO checklist (each phase writes its i module and Rust service, compiles
 because lib/i is included, and adds matching target/JS cases):
 
-1. [ ] Clock: deadlines fixed at start, both clocks, zero/negative/huge durations,
+1. [ ] Clock: before Fs, add the shared ResourceContext, host-wide non-reusing Int
+   allocator and trusted binding grants (native §3.1) on Rust/JS; enforce §2.4 field privacy; test sequential
+   invocations, late creators, disposal and forced exhaustion. Clock deadlines fixed at start, both clocks, zero/negative/huge durations,
    abortable timers and no timer keeping an ended Node run alive.
 2. [ ] Fs: codecs/errors, whole-byte validation, all-byte writes, explicit flush,
-   close, cancelled blocking-file state, safe detached operations.
+   private File(Int) codecs, raw Int wrappers, no number-injection exports, closed/busy leases,
+   cancelled blocking-file state, safe detached work and context teardown.
 3. [ ] Net: numeric endpoints, ephemeral bind, read/write/half-close, busy leases,
-   cancellation/provisional socket ownership and concurrent connection fixture.
+   private Listener/Stream(Int) codecs, provisional ownership, close-vs-wait
+   across workers and a portable-scope concurrent connection fixture.
 4. [ ] Process: bounded entropy, UTF-8/framing, no shell expansion, inherited
-   streams, wait caching, terminate and cleanup/reaping on every ownership edge.
+   streams, private Child(Int) codec, wait caching, terminate and reaping on every
+   ownership edge, including native exit after child cleanup.
 5. [ ] Stdio: cancellable subscriber input, exact byte output, flush/error stream,
-   legacy i/io compatibility; register all services and finish spec lists/B.7.
+   legacy i/io compatibility and context turnover; finish registration/spec lists
+   and B.7 with blocking Int adapters, not fd/externref shortcuts.
 6. [ ] Run permission/error/resource/security and concurrency reviews; include
    unsupported browser/preview-1 behavior and user-supplied host fakes.
 7. [ ] Run end-to-end echo, then combined verification in the integration lane.
@@ -1674,7 +1902,7 @@ The acceptance server in §9 is a complete module.
 | Two same-import requests answered in reverse order | Each original typed handle returns its own value; §5.3 per-cell decoding |
 | Wait on A, host answers B first | B remains Ready, wait on A continues; §5.1 requested-set semantics |
 | Cancel after decode but before an IO await resumes | One close of the provisional socket/file, zero user-body uses; §8.1 Ready/Taken guard |
-| Local socket result vs portable scope child returning that socket | Local join works; portable result stops task: value is not portable; D7 |
+| Local/portable scope child returns File/Listener/Stream/Child | Both join; portable is True under D9; a Request/Ticket result still stops under D7 |
 | Portable send_event of a continuation in a choose with always(1) | Stops at event construction, even though it would lose; S7 rule 2 |
 | `sync(choose([send_event(c,1), receive_event(c)]))` with no other task | Deadlock; §6.4 same registration cannot rendezvous with itself |
 | Two ready alternatives with side-effecting map callbacks | First alternative commits; exactly its callback runs in the syncing task; §6.4 |
@@ -1700,9 +1928,14 @@ The acceptance server in §9 is a complete module.
 | Stream write of N bytes followed by peer EOF | Peer receives the exact N-byte prefix before EOF; §7.3 write-all/half-close |
 | Two concurrent stream reads; read concurrent with write | busy for second read; opposite directions work; §7.3 leases |
 | Close File/Stream/Child twice | Nil both times, underlying release once; §7/§8 idempotence |
+| Close while another worker awaits read/accept/wait | closed if close commits first; prior committed answer stays; §8.1 leases |
+| Stop with outstanding accept and forgotten Ready spawn, then run another test | No i finals; empty new table, fresh numbers and host-owned child cleanup; §8.1/native N12 |
+| Redeclare raw namespace or external alias | No automatic binding; local fake still works; native §3.1 |
+| `(raw ! net.Net) { raw.read(1, 1) }` outside i/net | Constructor/field visibility error under §2.4/§7, despite the exported type name |
+| Force a small allocator limit | Memory stop before insertion, never reuse; native N9.2 |
 | Process args codec for ["a","é"] | Bytes `<<2,0,0,0,1,0,0,0,97,2,0,0,0,195,169>>`; §7.4 UTF-8 framing |
 | Missing env variable; browser raw TCP | ProcessError(...,"not_found"); NetError(...,"unsupported"); §7 and target matrix |
-| WASI pure tasks/random; WASI module requiring Fs | Pure calculations work; report ordinary blocking imports requiring an embedder; §B.7, no fake fd-as-externref |
+| WASI pure tasks/random; WASI requiring private Fs | Pure calculations work; report blocking Int imports requiring a buffer-aware adapter; §8.2/B.7, no fd identity reuse |
 | @main needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
 | Existing async user service, not an IO namespace, used in two children | Overlap via Await, same request table as IO; D3, no namespace rule |
 
@@ -1734,13 +1967,14 @@ This is an inference/buildability attack, not a rejected syntax spelling alone.
 **Decoded-resource cancellation.** Program shape (Net is a raw request service):
 
 ```i
-leak = (listener, n ! net.Net) {
-  r = n.accept(listener)
+// Inside i/net; its raw Net service is private.
+leak = (Listener(number), n ! Net) {
+  r = n.accept(number)
   request.await(r)
 }
 ```
 
-Let the host decode Ready(Ok(stream)), then cancel this task before it resumes.
+Let the host decode Ready(Ok(number)), then cancel this task before it resumes.
 A plain cancel would discard the only i owner without installing close. Fixed
 by taken/ready distinction and the ordinary error-free resource guard in §8.1.
 The program above is deliberately low-level and must install that guard; the
@@ -1870,8 +2104,9 @@ the same scope cancel: shielded unwind lets it complete. Try receiving a raw
 Ready answer after its Owner exits: settled cells belong to their handles and
 have left the group; the answer is not incorrectly cancelled by group cleanup.
 
-Try implementing WASI File with an i32: it cannot satisfy externref/reference_id,
-so this note does not require that adapter. Try browser TCP via fetch: unsupported
+The historical File was an externref. Adopted N9 now requires File(Int) and
+an explicit raw Int codec; a bare reusable fd still violates non-reuse/context
+ownership. This track still supplies no preview-1 adapter. Try browser TCP via fetch: unsupported
 is a typed result, not a false TCP implementation. Try a Node timer or Rust
 blocking stdin after entry cancellation: abortable timers and a detached broker
 must not keep the run waiting for abandoned work. Those are explicit host gates,
@@ -1905,8 +2140,8 @@ before take (the wrapper closes Ready), and while serving (ensure closes the
 stream and the scope cancels the next acceptor). A queued next acceptor owns
 only the listener capability whose outer acquire outlives all children. This
 removes the original unstarted-resource gap without weakening S7's cancel rule.
-A stop is still allowed to skip i finals and relies on instance destruction
-for host cleanup.
+A stop skips i finals and relies on explicit ResourceContext teardown, including
+forgotten/provisional integer resources (§8.1), for host cleanup.
 
 This was the second initial clean assessment at aa20548, superseded by the
 independent review and the new attacks below. These are source/type/ownership arguments; the mandatory
@@ -2144,7 +2379,8 @@ The proposed i scheduler, request/Root primitives, revised source programs,
 O0/O2 WAT, JS callback fixture, OS cleanup and real echo fixture remain unrun in
 this design lane. The statistical gate remains unverified. Reading the existing
 entry/host code establishes the baseline and needed edit regions, not that the
-new implementation exists. No implementation or other note is changed here. No cargo or host integration
+new implementation exists. That earlier runtime revision changed no implementation. This native adoption
+also reconciles native.md and multicore.md; new checks are recorded in native §11. No cargo or host integration
 tests were run for this documentation-only revision.
 
 
