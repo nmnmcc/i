@@ -352,7 +352,7 @@ impl Checker<'_> {
 
     /// A member that is a custom type with no constructors (§4.3).
     fn no_constructors(&self, m: &Ty) -> bool {
-        matches!(m, Ty::Con(Head::Named(TypeRef::Custom(id)), _)
+        matches!(m, Ty::Con(Head::Named(TypeRef::Custom(id)), _, _)
             if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty()))
     }
 
@@ -605,7 +605,7 @@ impl Checker<'_> {
                         err: self.s.fresh(),
                         env: self.s.fresh(),
                     })),
-                    h => Ty::Con(h, args),
+                    h => Ty::Con(h, super::lits::ValueSet::ALL, args),
                 });
             }
         }
@@ -739,7 +739,7 @@ impl Checker<'_> {
                         members
                             .iter()
                             .filter_map(|m| match m {
-                                Ty::Con(h, args) => Some(Pat::Head(*h, args.len())),
+                                Ty::Con(h, _, args) => Some(Pat::Head(*h, args.len())),
                                 Ty::Fn(f) => Some(Pat::Head(Head::Fn, f.params.len())),
                                 _ => None,
                             })
@@ -750,7 +750,10 @@ impl Checker<'_> {
                     let heads = alts
                         .iter()
                         .filter_map(|a| match a {
-                            Pat::Head(h, _) => Some(*h),
+                            Pat::Head(h, _) => Some(super::TestMember {
+                                head: *h,
+                                values: super::TestValues::All,
+                            }),
                             _ => None,
                         })
                         .collect();
@@ -798,7 +801,7 @@ impl Checker<'_> {
                 let targs = self.shared(places, at, h, n);
                 let fields = self.ctor_fields(*ctor, &targs);
                 let kargs = match known::member(&places[at].known, Some(h)) {
-                    Some(Ty::Con(_, xs)) => Some(xs),
+                    Some(Ty::Con(_, _, xs)) => Some(xs),
                     _ => None,
                 };
                 let mut parts = vec![Pat::Wild(None); fields.len()];
@@ -849,7 +852,7 @@ impl Checker<'_> {
                 let h = Head::Tuple(n);
                 let parts = self.shared(places, at, h, ps.len());
                 let kparts = match known::member(&places[at].known, Some(h)) {
-                    Some(Ty::Con(_, xs)) => xs,
+                    Some(Ty::Con(_, _, xs)) => xs,
                     _ => vec![Ty::Top; ps.len()],
                 };
                 let mut pats = Vec::new();
@@ -872,7 +875,7 @@ impl Checker<'_> {
                 let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![e.clone()]);
                 let klist = known::member(&places[at].known, Some(h)).unwrap_or(Ty::Top);
                 let kitem = match &klist {
-                    Ty::Con(_, xs) if xs.len() == 1 => xs[0].clone(),
+                    Ty::Con(_, _, xs) if xs.len() == 1 => xs[0].clone(),
                     _ => Ty::Top,
                 };
                 let mut pats = Vec::new();

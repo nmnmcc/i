@@ -206,7 +206,7 @@ fn values(s: &Solver, t: &Ty, mode: Mode, seen: &mut Vec<(V, Mode)>) -> Vals {
             seen.pop();
             out
         }
-        Ty::Con(h, args) => Vals {
+        Ty::Con(h, _, args) => Vals {
             heads: vec![(*h, args.clone(), mode)],
             other: false,
         },
@@ -671,14 +671,7 @@ pub(crate) fn field_order<'p>(
 /// The literal of a pattern, when it is one.
 pub(crate) fn literal(q: &Pattern) -> Option<Lit> {
     Some(match &q.kind {
-        PatternKind::Int { negative, value } => {
-            let zero = value.bits() == 0;
-            Lit::Int(if *negative && !zero {
-                format!("-{value}")
-            } else {
-                value.to_string()
-            })
-        }
+        PatternKind::Int { negative, value } => Lit::Int(super::lits::int_text(*negative, value)),
         PatternKind::Float { negative, value } => {
             let v = if *negative { -*value } else { *value };
             Lit::Float(if v == 0.0 { 0 } else { v.to_bits() })

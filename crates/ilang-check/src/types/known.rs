@@ -240,7 +240,11 @@ impl Checker<'_> {
         match k {
             Ty::Var(_) | Ty::Top | Ty::Both(..) => self.s.fresh(),
             Ty::Never => Ty::Never,
-            Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(|x| self.known_bound(x)).collect()),
+            Ty::Con(h, values, xs) => Ty::Con(
+                *h,
+                values.clone(),
+                xs.iter().map(|x| self.known_bound(x)).collect(),
+            ),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
                 params: f
                     .params
@@ -265,7 +269,7 @@ impl Checker<'_> {
             Ty::Var(v) => {
                 self.kgen.insert(*v);
             }
-            Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+            Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
                 xs.iter().for_each(|x| self.note_general(x))
             }
             Ty::Fn(f) => {
@@ -331,7 +335,7 @@ impl Checker<'_> {
         match p {
             Ty::Var(v) => sigma.entry(*v).or_default().push(k.clone()),
             Ty::Con(..) | Ty::Fn(_) => match (p, member(k, p.head())) {
-                (Ty::Con(_, ps), Some(Ty::Con(_, ks))) if ps.len() == ks.len() => {
+                (Ty::Con(_, _, ps), Some(Ty::Con(_, _, ks))) if ps.len() == ks.len() => {
                     for (x, y) in ps.iter().zip(&ks) {
                         self.match_k(x, y, sigma, depth + 1);
                     }
@@ -388,7 +392,7 @@ impl Checker<'_> {
                 None if partial => Ty::Top,
                 None => return None,
             },
-            Ty::Con(h, xs) => Ty::Con(*h, all(xs)?),
+            Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), all(xs)?),
             Ty::Union(xs) => Ty::Union(all(xs)?),
             Ty::Inter(xs) => Ty::Inter(all(xs)?),
             Ty::Diff(a, h) => Ty::Diff(Box::new(go(a)?), all(h)?),
@@ -476,7 +480,7 @@ impl Checker<'_> {
             }
             PatternKind::Constructor { ctor, args, spread } => {
                 let args_k = match member(b, Some(Head::Named(TypeRef::Custom(ctor.ty)))) {
-                    Some(Ty::Con(_, xs)) => Some(xs),
+                    Some(Ty::Con(_, _, xs)) => Some(xs),
                     _ => None,
                 };
                 let n = match &self.p.ty(ctor.ty).body {
@@ -506,7 +510,7 @@ impl Checker<'_> {
             }
             PatternKind::Tuple(ps) => {
                 let parts = match member(b, Some(Head::Tuple(ps.len() as u32))) {
-                    Some(Ty::Con(_, xs)) => xs,
+                    Some(Ty::Con(_, _, xs)) => xs,
                     _ => vec![Ty::Top; ps.len()],
                 };
                 for (x, k) in ps.iter().zip(&parts) {
@@ -516,7 +520,7 @@ impl Checker<'_> {
             PatternKind::List { items, rest } => {
                 let list = member(b, Some(Head::Named(TypeRef::Builtin(BuiltinType::List))));
                 let e = match &list {
-                    Some(Ty::Con(_, xs)) if xs.len() == 1 => xs[0].clone(),
+                    Some(Ty::Con(_, _, xs)) if xs.len() == 1 => xs[0].clone(),
                     _ => Ty::Top,
                 };
                 for x in items {
@@ -634,7 +638,9 @@ fn ty_vars(t: &Ty, out: &mut Vec<V>) {
                 out.push(*v);
             }
         }
-        Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| ty_vars(x, out)),
+        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+            xs.iter().for_each(|x| ty_vars(x, out))
+        }
         Ty::Fn(f) => {
             f.params.iter().for_each(|p| ty_vars(&p.1, out));
             [&f.ret, &f.err, &f.env]

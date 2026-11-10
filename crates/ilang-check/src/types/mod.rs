@@ -22,13 +22,16 @@ mod coverage;
 mod display;
 mod infer;
 mod known;
-// Stage 2 tests the pure algebra before stage 3 adds it to solver types.
-#[cfg(test)]
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "T1 literal rules are enabled in later stages")
+)]
 mod lits;
 mod pattern;
 mod shown;
 mod solve;
 
+pub use lits::{LitValue, TestValues};
 pub use shown::{ShownFn, ShownType};
 
 use crate::hir::{BindingRef, CtorRef, DefId, ModuleId, Program, TypeRef};
@@ -49,13 +52,20 @@ pub enum Head {
     Fn,
 }
 
+/// A runtime type test, including the values of an Int or String member.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TestMember {
+    pub head: Head,
+    pub values: TestValues,
+}
+
 /// A type in inference. `Top` is only made when a type is shown: it is a
 /// type variable that has no effect, in an input place.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Ty {
     Var(V),
     /// A named type or a tuple, with its arguments or parts.
-    Con(Head, Vec<Ty>),
+    Con(Head, lits::ValueSet, Vec<Ty>),
     Fn(Box<FnTy>),
     Union(Vec<Ty>),
     Inter(Vec<Ty>),
@@ -68,6 +78,10 @@ pub(crate) enum Ty {
     Both(Box<Ty>, Box<Ty>),
 }
 
+// The baseline Ty is 40 bytes on 64-bit targets. The set adds at most 8.
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<Ty>() <= 48);
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct FnTy {
     /// Labels have no effect on subtyping (§4.6).
@@ -78,20 +92,45 @@ pub(crate) struct FnTy {
 }
 
 impl Ty {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "Literal inference is enabled in T1 stage 7")
+    )]
+    pub fn lit(b: crate::hir::BuiltinType, values: lits::ValueSet) -> Ty {
+        debug_assert!(matches!(
+            b,
+            crate::hir::BuiltinType::Int | crate::hir::BuiltinType::String
+        ));
+        Ty::Con(Head::Named(TypeRef::Builtin(b)), values, Vec::new())
+    }
+
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "Set-sensitive rules are added in T1 stages 4 and 5"
+        )
+    )]
+    pub fn values(&self) -> &lits::ValueSet {
+        match self {
+            Ty::Con(_, values, _) => values,
+            _ => &lits::ValueSet::ALL,
+        }
+    }
     pub fn head(&self) -> Option<Head> {
         match self {
-            Ty::Con(h, _) => Some(*h),
+            Ty::Con(h, _, _) => Some(*h),
             Ty::Fn(_) => Some(Head::Fn),
             _ => None,
         }
     }
 
     pub fn named(t: TypeRef, args: Vec<Ty>) -> Ty {
-        Ty::Con(Head::Named(t), args)
+        Ty::Con(Head::Named(t), lits::ValueSet::ALL, args)
     }
 
     pub fn tuple(parts: Vec<Ty>) -> Ty {
-        Ty::Con(Head::Tuple(parts.len() as u32), parts)
+        Ty::Con(Head::Tuple(parts.len() as u32), lits::ValueSet::ALL, parts)
     }
 
     /// A type variable, or a difference of one: a member that a value of
@@ -102,6 +141,52 @@ impl Ty {
             Ty::Diff(a, _) => a.is_varlike(),
             _ => false,
         }
+    }
+}
+
+#[cfg(test)]
+mod literal_representation_tests {
+    use super::{
+        Head, Ty,
+        lits::ValueSet,
+        solve::{Pol, Solver},
+    };
+    use crate::hir::{BuiltinType, TypeRef};
+    use std::sync::Arc;
+
+    #[test]
+    fn scalar_sets_survive_child_mapping() {
+        // literal-types §4: "No helper rebuilds a Con with a default set."
+        let set = ValueSet::except([Arc::from("a")]);
+        let literal = Ty::lit(BuiltinType::String, set.clone());
+        let mut solver = Solver::new(Default::default(), Vec::new());
+        assert_eq!(literal.values(), &set);
+        let mapped = solver.map_children(&literal, Pol::Pos, &mut |_, _, _| {
+            panic!("a literal has no children")
+        });
+        assert_eq!(mapped, literal);
+        let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![literal.clone()]);
+        assert_eq!(
+            solver.map_children(&list, Pol::Pos, &mut |_, t, _| t.clone()),
+            list
+        );
+        assert_eq!(Ty::tuple(vec![literal]).values(), &ValueSet::ALL);
+        assert_eq!(solver.fresh().values(), &ValueSet::ALL);
+        assert_eq!(
+            mapped.head(),
+            Some(Head::Named(TypeRef::Builtin(BuiltinType::String)))
+        );
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic]
+    fn only_int_and_string_carry_sets() {
+        // literal-types decision 3: Float has no literal types.
+        Ty::lit(
+            BuiltinType::Float,
+            ValueSet::only([Arc::from("1")]).unwrap(),
+        );
     }
 }
 
@@ -175,7 +260,7 @@ pub struct Typed {
     /// Each type test `x: T` or `_: T` in a `case` clause pattern, by the
     /// span of the `Typed` pattern: the type constructors of the members of
     /// `T`, which are tested at run time (§7.1).
-    pub type_tests: HashMap<(ModuleId, Span), Vec<Head>>,
+    pub type_tests: HashMap<(ModuleId, Span), Vec<TestMember>>,
     /// The type constructor of the service of each environment parameter,
     /// by the span of its name, and of each environment statement, by the
     /// span of the statement (§9.2). Aliases are expanded.

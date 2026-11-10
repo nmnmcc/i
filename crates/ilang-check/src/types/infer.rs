@@ -405,7 +405,7 @@ impl<'a> Checker<'a> {
         let mut services = Vec::new();
         for m in known::members(&f.env) {
             let ok = match &m {
-                Ty::Con(Head::Named(TypeRef::Custom(id)), _) => {
+                Ty::Con(Head::Named(TypeRef::Custom(id)), _, _) => {
                     if self.p.ty(*id).host.is_some() {
                         services.push(*id);
                     }
@@ -458,7 +458,7 @@ impl<'a> Checker<'a> {
         }
         let error_members = known::members(&f.err);
         let errors_ok = error_members.iter().all(|m| {
-            matches!(m, Ty::Con(Head::Named(r), xs) if xs.is_empty() && (*r == self.b.nil || *r == self.b.bool_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
+            matches!(m, Ty::Con(Head::Named(r), _, xs) if xs.is_empty() && (*r == self.b.nil || *r == self.b.bool_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
         });
         // B.2: the signature that the code generator encodes.
         let params: Option<Vec<HostType>> = f.params.iter().map(|p| self.host_part(&p.1)).collect();
@@ -500,14 +500,14 @@ impl<'a> Checker<'a> {
     /// take (§10.3, B.2).
     fn host_part(&self, t: &Ty) -> Option<HostType> {
         Some(match t {
-            Ty::Con(Head::Named(TypeRef::Builtin(b)), _) => match b {
+            Ty::Con(Head::Named(TypeRef::Builtin(b)), _, _) => match b {
                 BuiltinType::Int => HostType::Int,
                 BuiltinType::Float => HostType::Float,
                 BuiltinType::String => HostType::String,
                 BuiltinType::BitArray => HostType::BitArray,
                 _ => return None,
             },
-            Ty::Con(Head::Named(r @ TypeRef::Custom(id)), _) => {
+            Ty::Con(Head::Named(r @ TypeRef::Custom(id)), _, _) => {
                 if *r == self.b.nil {
                     HostType::Nil
                 } else if *r == self.b.bool_ {
@@ -527,8 +527,8 @@ impl<'a> Checker<'a> {
     /// (§10.1).
     fn host_type(&self, t: &Ty) -> bool {
         match t {
-            Ty::Con(Head::Named(TypeRef::Builtin(b)), _) => host_builtin(*b),
-            Ty::Con(Head::Named(r @ TypeRef::Custom(id)), _) => {
+            Ty::Con(Head::Named(TypeRef::Builtin(b)), _, _) => host_builtin(*b),
+            Ty::Con(Head::Named(r @ TypeRef::Custom(id)), _, _) => {
                 *r == self.b.nil
                     || *r == self.b.bool_
                     || matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty())
@@ -1118,7 +1118,7 @@ impl<'a> Checker<'a> {
             ExprKind::Tuple(items) => {
                 // A part has the matching part of the expected type (§4.8).
                 let parts = match known::members(expected).as_slice() {
-                    [Ty::Con(Head::Tuple(n), xs)] if *n as usize == items.len() => xs.clone(),
+                    [Ty::Con(Head::Tuple(n), _, xs)] if *n as usize == items.len() => xs.clone(),
                     _ => vec![Ty::Top; items.len()],
                 };
                 let (ts, ks) = items
@@ -1131,7 +1131,7 @@ impl<'a> Checker<'a> {
             ExprKind::List { items, rest } => {
                 let head = Some(Head::Named(TypeRef::Builtin(BuiltinType::List)));
                 let (item_exp, list_exp) = match known::members(expected).as_slice() {
-                    [m @ Ty::Con(_, xs)] if m.head() == head && xs.len() == 1 => {
+                    [m @ Ty::Con(_, _, xs)] if m.head() == head && xs.len() == 1 => {
                         (xs[0].clone(), m.clone())
                     }
                     _ => (Ty::Top, Ty::Top),
@@ -1148,7 +1148,7 @@ impl<'a> Checker<'a> {
                     let (rt, rk) = self.infer_k(r, &list_exp);
                     self.sub(&rt, &list, r.span);
                     ks.push(match known::member(&rk, head) {
-                        Some(Ty::Con(_, xs)) if xs.len() == 1 => xs[0].clone(),
+                        Some(Ty::Con(_, _, xs)) if xs.len() == 1 => xs[0].clone(),
                         _ => Ty::Top,
                     });
                 }
@@ -1516,7 +1516,7 @@ impl<'a> Checker<'a> {
                 let mut out = Vec::new();
                 for m in known::members(kv) {
                     match &m {
-                        Ty::Con(Head::Named(TypeRef::Custom(id)), _) => {
+                        Ty::Con(Head::Named(TypeRef::Custom(id)), _, _) => {
                             if let TypeBody::Custom(cs) = &self.p.ty(*id).body {
                                 out.extend(
                                     (0..cs.len() as u32).map(|index| CtorRef { ty: *id, index }),
@@ -1546,7 +1546,7 @@ impl<'a> Checker<'a> {
         }
         if let Some(c) = known_ctor {
             let args = match known::member(&kv, Some(Head::Named(TypeRef::Custom(c.ty)))) {
-                Some(Ty::Con(_, xs)) => Some(xs),
+                Some(Ty::Con(_, _, xs)) => Some(xs),
                 _ => None,
             };
             ctors.push((c, args));
@@ -1564,10 +1564,12 @@ impl<'a> Checker<'a> {
             }
             for m in known::members(&kv) {
                 let custom = match &m {
-                    Ty::Con(Head::Named(TypeRef::Custom(id)), xs) => match &self.p.ty(*id).body {
-                        TypeBody::Custom(cs) => Some((*id, xs.clone(), cs.len())),
-                        TypeBody::Alias(_) => None,
-                    },
+                    Ty::Con(Head::Named(TypeRef::Custom(id)), _, xs) => {
+                        match &self.p.ty(*id).body {
+                            TypeBody::Custom(cs) => Some((*id, xs.clone(), cs.len())),
+                            TypeBody::Alias(_) => None,
+                        }
+                    }
                     _ => None,
                 };
                 let Some((id, xs, count)) = custom else {
@@ -1653,7 +1655,7 @@ impl<'a> Checker<'a> {
             let h = Some(Head::Named(TypeRef::Custom(c.ty)));
             let targs = match (&narrowed, forms.iter().find(|f| f.head() == h)) {
                 (Some(a), _) => a.clone(),
-                (None, Some(Ty::Con(_, xs))) => xs.clone(),
+                (None, Some(Ty::Con(_, _, xs))) => xs.clone(),
                 (None, _) => {
                     let a = self.fresh_args(c.ty);
                     forms.push(Ty::named(TypeRef::Custom(c.ty), a.clone()));
@@ -1695,15 +1697,15 @@ impl<'a> Checker<'a> {
         let mut kparts = Vec::new();
         for m in known::members(&kv) {
             match &m {
-                Ty::Con(Head::Tuple(n), xs) if k < *n => {
+                Ty::Con(Head::Tuple(n), _, xs) if k < *n => {
                     let form = self.known_bound(&m);
-                    if let Ty::Con(_, ys) = &form {
+                    if let Ty::Con(_, _, ys) = &form {
                         parts.push(ys[k as usize].clone());
                     }
                     forms.push(form);
                     kparts.push(xs[k as usize].clone());
                 }
-                Ty::Con(Head::Tuple(n), _) => {
+                Ty::Con(Head::Tuple(n), _, _) => {
                     self.error(
                         code::NO_FIELD,
                         index_span,
@@ -1817,7 +1819,7 @@ impl<'a> Checker<'a> {
         // §4.8: the known type of the call of `C` with the given fields and
         // the other fields of `v`.
         let base_args = match known::member(&bk, Some(Head::Named(TypeRef::Custom(ctor.ty)))) {
-            Some(Ty::Con(_, xs)) => Some(xs),
+            Some(Ty::Con(_, _, xs)) => Some(xs),
             _ => None,
         };
         let ks: Vec<Ty> = given
@@ -2165,7 +2167,11 @@ impl<'a> Checker<'a> {
                 }
                 Ty::Diff(Box::new(a), h)
             }
-            Ty::Con(h, args) => Ty::Con(*h, args.iter().map(|a| go(self, a)).collect()),
+            Ty::Con(h, values, args) => Ty::Con(
+                *h,
+                values.clone(),
+                args.iter().map(|a| go(self, a)).collect(),
+            ),
             Ty::Union(ms) => Ty::Union(ms.iter().map(|a| go(self, a)).collect()),
             Ty::Inter(ms) => Ty::Inter(ms.iter().map(|a| go(self, a)).collect()),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
@@ -2186,7 +2192,7 @@ impl<'a> Checker<'a> {
 /// The custom types that a type uses.
 fn uses_types(t: &Ty, out: &mut Vec<TypeId>) {
     match t {
-        Ty::Con(h, xs) => {
+        Ty::Con(h, _, xs) => {
             if let super::Head::Named(TypeRef::Custom(id)) = h
                 && !out.contains(id)
             {
@@ -2216,7 +2222,7 @@ fn uses_types(t: &Ty, out: &mut Vec<TypeId>) {
 fn has_both(t: &Ty) -> bool {
     match t {
         Ty::Both(..) => true,
-        Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().any(has_both),
+        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().any(has_both),
         Ty::Fn(f) => {
             f.params.iter().any(|p| has_both(&p.1))
                 || [&f.ret, &f.err, &f.env].into_iter().any(has_both)

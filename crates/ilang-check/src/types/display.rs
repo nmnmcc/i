@@ -54,7 +54,7 @@ pub(crate) fn scheme_in(s: &Solver, t: &Ty, context: &[Ty], opts: Opts) -> Resul
     parts.push(t.clone());
     let traced = trace(s, &Ty::tuple(parts), opts)?;
     let (whole, origin) = traced.prepare();
-    let Ty::Con(_, parts) = whole else {
+    let Ty::Con(_, _, parts) = whole else {
         return Err(());
     };
     let t = parts.last().ok_or(())?;
@@ -228,7 +228,7 @@ fn same_unmarked(a: &Ty, b: &Ty) -> bool {
     };
     match (a, b) {
         _ if is_top(a) && is_top(b) => true,
-        (Ty::Con(h, xs), Ty::Con(g, ys)) => h == g && all(xs, ys),
+        (Ty::Con(h, _, xs), Ty::Con(g, _, ys)) => h == g && all(xs, ys),
         (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => all(xs, ys),
         (Ty::Fn(f), Ty::Fn(g)) => {
             f.params.len() == g.params.len()
@@ -411,7 +411,9 @@ fn cycles(s: &Solver, t: &Ty, keep: Option<u32>) -> HashMap<V, V> {
 fn ty_vars(t: &Ty, out: &mut Vec<V>) {
     match t {
         Ty::Var(v) => out.push(*v),
-        Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| ty_vars(x, out)),
+        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+            xs.iter().for_each(|x| ty_vars(x, out))
+        }
         Ty::Fn(f) => {
             f.params.iter().for_each(|p| ty_vars(&p.1, out));
             [&f.ret, &f.err, &f.env]
@@ -556,7 +558,7 @@ impl Coalescer<'_> {
                     Ty::Inter(parts)
                 }
             }
-            Ty::Con(h, args) => {
+            Ty::Con(h, values, args) => {
                 let vs = self.s.variances(*h, args.len());
                 let args = args
                     .iter()
@@ -574,7 +576,7 @@ impl Coalescer<'_> {
                         ),
                     })
                     .collect();
-                Ty::Con(*h, args)
+                Ty::Con(*h, values.clone(), args)
             }
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
                 params: f
@@ -614,7 +616,7 @@ pub(crate) fn both(t: &Ty) -> Ty {
                 both(b)
             }
         }
-        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(both).collect()),
+        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(both).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(both).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(both).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
@@ -654,7 +656,11 @@ impl Norm<'_> {
             Ty::Diff(a, h) => {
                 self.diff(self.norm(*a), h.into_iter().map(|m| self.norm(m)).collect())
             }
-            Ty::Con(h, args) => Ty::Con(h, args.into_iter().map(|a| self.norm(a)).collect()),
+            Ty::Con(h, values, args) => Ty::Con(
+                h,
+                values.clone(),
+                args.into_iter().map(|a| self.norm(a)).collect(),
+            ),
             Ty::Fn(f) => {
                 let f = *f;
                 Ty::Fn(Box::new(FnTy {
@@ -753,7 +759,7 @@ impl Norm<'_> {
     /// `t` has every value of its type constructor.
     fn full(&self, t: &Ty) -> bool {
         match t {
-            Ty::Con(h, args) => {
+            Ty::Con(h, _, args) => {
                 let vs = self.s.variances(*h, args.len());
                 args.iter().zip(vs).all(|(a, v)| match v {
                     Variance::Co => is_top(a),
@@ -898,10 +904,11 @@ impl Norm<'_> {
             (Variance::Inv, _) => x,
         };
         match (a, b) {
-            (Ty::Con(h, xs), Ty::Con(_, ys)) if xs.len() == ys.len() => {
+            (Ty::Con(h, values, xs), Ty::Con(_, _, ys)) if xs.len() == ys.len() => {
                 let vs = self.s.variances(h, xs.len());
                 Ty::Con(
                     h,
+                    values,
                     xs.into_iter()
                         .zip(ys)
                         .zip(vs)
@@ -1027,7 +1034,7 @@ impl Norm<'_> {
                     Ty::Var(v) => record(occ, order, *v, pos, Vec::new()),
                     a => self.walk(a, pos, occ, order, env),
                 },
-                Ty::Con(h, args) => {
+                Ty::Con(h, _, args) => {
                     let vs = self.s.variances(*h, args.len());
                     for (a, v) in args.iter().zip(vs) {
                         match v {
@@ -1084,7 +1091,7 @@ fn mentions(t: &Ty, v: V) -> bool {
 fn visit(t: &Ty, f: &mut dyn FnMut(&Ty)) {
     f(t);
     match t {
-        Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| visit(x, f)),
+        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| visit(x, f)),
         Ty::Fn(g) => {
             g.params.iter().for_each(|p| visit(&p.1, f));
             [&g.ret, &g.err, &g.env]
@@ -1108,7 +1115,7 @@ fn replace(t: &Ty, v: V, by: &Ty) -> Ty {
     let r = |x: &Ty| replace(x, v, by);
     match t {
         Ty::Var(x) if *x == v => by.clone(),
-        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(r).collect()),
+        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(r).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(r).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(r).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
@@ -1229,7 +1236,7 @@ fn tops(t: &Ty, next: &mut u32, origin: &mut HashMap<V, V>) -> Ty {
             origin.insert(V(*next), V(m.0 - MARK));
             Ty::Var(V(*next))
         }
-        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(go).collect()),
+        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
@@ -1262,7 +1269,7 @@ fn roles(t: &Ty, role: Role, out: &mut Vec<(V, Role)>) {
             roles(a, role, out);
             h.iter().for_each(|x| roles(x, Role::Value, out));
         }
-        Ty::Con(_, xs) => xs.iter().for_each(|x| roles(x, Role::Value, out)),
+        Ty::Con(_, _, xs) => xs.iter().for_each(|x| roles(x, Role::Value, out)),
         Ty::Fn(f) => {
             f.params.iter().for_each(|p| roles(&p.1, Role::Value, out));
             roles(&f.ret, Role::Value, out);
@@ -1287,8 +1294,8 @@ fn tree(t: &Ty, name: &mut dyn FnMut(V) -> String) -> ShownType {
         Ty::Var(v) => ShownType::Var(name(*v)),
         Ty::Never => ShownType::Never,
         Ty::Top => ShownType::Hole,
-        Ty::Con(Head::Named(r), args) => ShownType::Named(*r, all(args, name)),
-        Ty::Con(_, parts) => ShownType::Tuple(all(parts, name)),
+        Ty::Con(Head::Named(r), _, args) => ShownType::Named(*r, all(args, name)),
+        Ty::Con(_, _, parts) => ShownType::Tuple(all(parts, name)),
         Ty::Fn(f) => {
             let params = f
                 .params
@@ -1337,7 +1344,7 @@ fn outer_vars(t: &Ty, out: &mut HashSet<V>) {
         Ty::Var(v) => {
             out.insert(*v);
         }
-        Ty::Con(_, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
             xs.iter().for_each(|x| outer_vars(x, out))
         }
         Ty::Fn(f) => {
@@ -1359,7 +1366,7 @@ fn hide(t: &Ty, outside: &HashSet<V>, in_h: bool) -> Ty {
     let go = |x: &Ty| hide(x, outside, in_h);
     match t {
         Ty::Var(v) if in_h && (v.0 >= MARK || !outside.contains(v)) => Ty::Top,
-        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(go).collect()),
+        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
@@ -1416,7 +1423,7 @@ fn not_general(s: &Solver, t: &Ty, level: u32) -> Ty {
     let go = |x: &Ty| not_general(s, x, level);
     match t {
         Ty::Var(v) if s.vars.get(v.0 as usize).is_none_or(|x| x.level <= level) => Ty::Top,
-        Ty::Con(h, xs) => Ty::Con(*h, xs.iter().map(go).collect()),
+        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {

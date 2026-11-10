@@ -93,9 +93,86 @@ Stage gate:
   at both O0 and O2 passed, with no golden regeneration.
 - `cargo clippy -p ilang-check --all-targets --locked -- -D warnings`: passed.
 
+## Stage 3: Con field and runtime test table
+
+The joint algebra shape is `Con(Head, ValueSet, Vec<Ty>)`. New named and
+tuple heads have All values. Every child mapper and rebuilder carries the
+existing set. No expression, annotation, or pattern constructs a restricted
+set yet. Scalar creation and the value accessor have targeted temporary
+dead-code expectations, to be removed as stages 4–7 consume them; no
+verification command or test expectation is relaxed.
+
+The existing coverage integer conversion now calls the same canonical
+decimal helper as the literal tests. Its output is unchanged, including
+negative zero. The measured baseline Ty size is 40 bytes on this 64-bit
+target; the enum and Head at `1865366` have the same fields as `1df2fe0`.
+The compile-time limit is 48 bytes, literal-types §4's baseline plus 8.
+
+`type_tests` now contains TestMember with TestValues. All existing tests
+produce All. Lowering includes the future Only equality tests and the
+Except head-and-negated-equality conjunction. Its source is literal-types
+§5.6: “Not(Or(...)) alone is wrong ... The And(head_cond) is required.”
+
+The eight wildcard Con matches and head comparisons were audited against
+literal-types decision 2 and §12 step 3. Locations below refer to the
+pre-field baseline so they stay useful after formatting:
+
+| Location | Set rule / reason sets do not matter here |
+|---|---|
+| solve 298 | Concrete-member partition only; clones retain sets |
+| solve 397 | Concrete bound collection only; stage 4 adds fusion |
+| solve 442 | Bound reachability; equality/hash already include sets |
+| solve 552 | diff_left set rule in stage 4 |
+| solve 779 | inter_in set rule in stage 4 |
+| solve 893 | diff_in set rule in stage 4 |
+| display 871 | Norm difference set rule in stage 5 |
+| known 333 | Matching shape/children; union subtraction changes in stage 7 |
+| solve 320 | Difference overlap set rule in stage 4 |
+| solve 393/453/473 | compare deduplicates argument/arity comparisons only; literal heads have no arguments |
+| solve 519/521 | Route split set rule in stage 4 |
+| solve 710/711 | Union merge set rule in stage 4 |
+| solve 756 | Recognizes headed alternatives; does not remove or rebuild a member |
+| solve 782 | Intersection merge set rule in stage 4 |
+| display 711/712 | Norm union merge set rule in stage 5 |
+| display 740/756 | Norm Top/subset rule in stage 5 |
+| display 787/791/820 | Classifies headed and variable alternatives; retains full nodes |
+| display 836/837/838 | Norm intersection merge set rule in stage 5 |
+| known 27/29 | Set-sensitive members in stage 5 |
+| known 42/48 | Selects the member for a head; returns the full member |
+| known 66/69 | Set-sensitive disjointness in stage 5 |
+| known 352/357 | Union known matching by value in stage 7 |
+| coverage 231 | Set-sensitive difference in stage 5 |
+| coverage 284/390/488 | Constructor domain/specialization in stages 5/7 |
+| pattern 474 | Known difference in stage 6b |
+| pattern 729 | Tests whether a member has a concrete head; sets do not affect validity |
+| pattern 906 | Constructor head recorded for narrowing; literal candidates in stage 8 |
+| infer 935 | Rejects variable members in a written difference; sets have no variables |
+| infer 1134 | Expected list element shape; List always has All values |
+| infer 1654 | Selects nominal constructor field forms; scalar heads have no fields |
+| infer 1900/1959 | Service lookup; literal heads cannot be services |
+| mod 288 | Lists nominal type identities; scalar literals introduce no nominal identity |
+
+Rebuilders audited: solve map_children, display Coalescer::go/both/norm/
+replace/tops/hide/not_general, known known_bound/ksubst_in, and infer
+instantiation. The mergers retain the first set until their stage 4/5
+algebra is installed. same_unmarked and shown tree are stage 5 work.
+K1's invariant occurrence guard and A2's Namer are preserved.
+
+Stage gate:
+
+- Workspace `cargo check --workspace --tests --locked`: passed.
+- Checker/CLI library, codegen, type and query tests: passed (7 new literal
+  algebra/representation tests in the checker library).
+- `cargo test -p ilang-cli --test spec --locked`: 139/139 cases at O0/O2.
+- `WAT_DUMP=... cargo test -p ilang-cli --test wat_dump --locked`: 522
+  outputs, all byte-equal to the provided `1df2fe0` directory; none added
+  or removed. This is an implementation comparison, not evidence for new
+  literal semantics, which remain disabled.
+- No golden or derived file changed.
+
 ## Remaining stages
 
-The Con field, solver/display/coverage rules, deferred
+The solver/display/coverage rules, deferred
 Assert fix, literal inference, written types/narrowing, fitted choices,
 performance scripts, and final soundness review are not enabled by stage 1.
 Future entries must be removed when their syntax actually parses, never

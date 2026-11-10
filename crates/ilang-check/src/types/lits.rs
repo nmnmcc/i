@@ -173,11 +173,11 @@ impl ValueSet {
     }
 }
 
-pub(crate) fn int_text(negative: bool, value: &BigUint) -> Arc<str> {
+pub(crate) fn int_text(negative: bool, value: &BigUint) -> String {
     if negative && value.bits() != 0 {
-        format!("-{value}").into()
+        format!("-{value}")
     } else {
-        value.to_string().into()
+        value.to_string()
     }
 }
 
@@ -634,6 +634,10 @@ mod tests {
             h.finish()
         };
         assert_eq!(hash(&a), hash(&b));
+        let mut collision = Set::from_items([Arc::from("different")]);
+        collision.hash = a.0.as_ref().unwrap().0.items.hash;
+        collision.len = a.0.as_ref().unwrap().0.items.len;
+        assert_ne!(a, ValueSet::from_set(false, collision).unwrap());
         assert_eq!(a.items().map(AsRef::as_ref).collect::<Vec<_>>(), ["a", "b"]);
         assert!(a.is_finite());
         assert!(!ValueSet::except([Arc::from("a")]).is_finite());
@@ -648,9 +652,9 @@ mod tests {
     fn canonical_literal_values() {
         // literal-types decision 12: decimal numbers and decoded scalars.
         let hex = BigUint::parse_bytes(b"10", 16).unwrap();
-        assert_eq!(int_text(false, &hex).as_ref(), "16");
-        assert_eq!(int_text(true, &BigUint::from(0u8)).as_ref(), "0");
-        assert_eq!(int_text(true, &hex).as_ref(), "-16");
+        assert_eq!(int_text(false, &hex), "16");
+        assert_eq!(int_text(true, &BigUint::from(0u8)), "0");
+        assert_eq!(int_text(true, &hex), "-16");
         let (m, diags) =
             ilang_syntax::parse_module("a = \"\\u{e9}\"\nb = \"é\"\nc = \"e\\u{301}\"\n");
         assert!(diags.is_empty(), "{diags:?}");
@@ -723,6 +727,10 @@ mod tests {
         for n in 1..=1024 {
             let small: BTreeSet<_> = model.iter().take(n).cloned().collect();
             check_tree(&Set::from_sorted(small.iter().cloned().collect()), &small);
+        }
+        for n in [1025, 4095, 4096] {
+            let subset: BTreeSet<_> = model.iter().take(n).cloned().collect();
+            check_tree(&Set::from_sorted(subset.iter().cloned().collect()), &subset);
         }
         for i in 0..4096 {
             let key = format!("{:04}", (i * 53) % 4096);

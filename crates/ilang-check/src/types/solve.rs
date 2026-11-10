@@ -203,7 +203,7 @@ impl Solver {
     pub fn level_of(&self, t: &Ty) -> u32 {
         match t {
             Ty::Var(v) => self.var(*v).level,
-            Ty::Con(_, args) => args.iter().map(|a| self.level_of(a)).max().unwrap_or(0),
+            Ty::Con(_, _, args) => args.iter().map(|a| self.level_of(a)).max().unwrap_or(0),
             Ty::Fn(f) => f
                 .params
                 .iter()
@@ -323,7 +323,7 @@ impl Solver {
                     self.constrain_in(l, a, env);
                 }
             }
-            (Ty::Con(h1, a1), Ty::Con(h2, a2)) if h1 == h2 && a1.len() == a2.len() => {
+            (Ty::Con(h1, _, a1), Ty::Con(h2, _, a2)) if h1 == h2 && a1.len() == a2.len() => {
                 if env {
                     // §4.5 rule 4: service arguments are equal.
                     for (x, y) in a1.iter().zip(a2) {
@@ -470,7 +470,7 @@ impl Solver {
                     self.join(&f.env, &g.env, level, true);
                 }
             }
-            (Ty::Con(h, xs), Ty::Con(_, ys)) if xs.len() == ys.len() => {
+            (Ty::Con(h, _, xs), Ty::Con(_, _, ys)) if xs.len() == ys.len() => {
                 let vs = self.variances(*h, xs.len());
                 for ((x, y), var) in xs.iter().zip(ys).zip(&vs) {
                     if env {
@@ -647,14 +647,14 @@ impl Solver {
     ) -> Ty {
         match t {
             Ty::Var(_) | Ty::Never | Ty::Top => t.clone(),
-            Ty::Con(h, args) => {
+            Ty::Con(h, values, args) => {
                 let vs = self.variances(*h, args.len());
                 let args = args
                     .iter()
                     .zip(vs)
                     .map(|(a, v)| f(self, a, pol.by(v)))
                     .collect();
-                Ty::Con(*h, args)
+                Ty::Con(*h, values.clone(), args)
             }
             Ty::Fn(fun) => Ty::Fn(Box::new(FnTy {
                 params: fun
@@ -800,12 +800,12 @@ impl Solver {
     /// arguments must be equal (§9.2).
     fn merge(&mut self, a: Ty, b: Ty, union: bool, env: bool) -> Ty {
         match (a, b) {
-            (Ty::Con(h, xs), Ty::Con(_, ys)) if xs.len() == ys.len() => {
+            (Ty::Con(h, values, xs), Ty::Con(_, _, ys)) if xs.len() == ys.len() => {
                 if env {
                     for (x, y) in xs.iter().zip(&ys) {
                         self.equal(x, y, FailKind::EnvForms);
                     }
-                    return Ty::Con(h, xs);
+                    return Ty::Con(h, values, xs);
                 }
                 let vs = self.variances(h, xs.len());
                 let args = xs
@@ -814,7 +814,7 @@ impl Solver {
                     .zip(vs)
                     .map(|((x, y), v)| self.merge_arg(x, y, v, union))
                     .collect();
-                Ty::Con(h, args)
+                Ty::Con(h, values, args)
             }
             (Ty::Fn(f), Ty::Fn(g)) if f.params.len() == g.params.len() => {
                 let f = *f;
@@ -1207,7 +1207,7 @@ fn edge_vars(s: &Solver, (v, p): (V, bool)) -> Vec<(V, bool, bool)> {
 fn bound_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, bool)>) {
     match t {
         Ty::Var(v) => out.push((*v, pos, con)),
-        Ty::Con(h, args) => {
+        Ty::Con(h, _, args) => {
             let vs = s.variances(*h, args.len());
             for (a, v) in args.iter().zip(vs) {
                 match v {
@@ -1247,7 +1247,7 @@ fn bound_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, 
 /// both sides.
 fn env_vars(s: &Solver, t: &Ty, pos: bool, out: &mut Vec<(V, bool, bool)>) {
     match t {
-        Ty::Con(_, args) => {
+        Ty::Con(_, _, args) => {
             for a in args {
                 bound_vars(s, a, true, true, out);
                 bound_vars(s, a, false, true, out);
@@ -1266,7 +1266,7 @@ fn env_vars(s: &Solver, t: &Ty, pos: bool, out: &mut Vec<(V, bool, bool)>) {
 /// environments must be checked when the bounds are put together.
 fn needs_join(t: &Ty) -> bool {
     match t {
-        Ty::Con(_, args) => !args.is_empty(),
+        Ty::Con(_, _, args) => !args.is_empty(),
         Ty::Never | Ty::Top => false,
         _ => true,
     }

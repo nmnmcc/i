@@ -39,7 +39,7 @@
 use crate::ir::Stmt;
 use crate::ir::{self, *};
 use ilang_check::hir::{self, *};
-use ilang_check::types::{Access, Head, HostType, Typed};
+use ilang_check::types::{Access, Head, HostType, LitValue, TestMember, TestValues, Typed};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast::{BinOp, UnOp};
 use ilang_syntax::span::{LineIndex, Span};
@@ -2128,7 +2128,7 @@ impl<'a> Lowerer<'a> {
                 if let Some(heads) = self.typed.type_tests.get(&(fx.module, p.span)) {
                     let cond = heads
                         .iter()
-                        .map(|h| self.head_cond(v.clone(), *h))
+                        .map(|m| self.test_cond(v.clone(), m))
                         .reduce(|a, b| Cond::Or(Box::new(a), Box::new(b)))
                         .unwrap_or(Cond::Tag(v.clone(), u32::MAX));
                     guard(out, cond, fail);
@@ -2206,6 +2206,29 @@ impl<'a> Lowerer<'a> {
     }
 
     /// The test of a type test `x: T` for one member of `T` (§7.1).
+    fn test_cond(&self, v: Atom, member: &TestMember) -> Cond {
+        let values = match &member.values {
+            TestValues::All => return self.head_cond(v, member.head),
+            TestValues::Only(values) | TestValues::Except(values) => values,
+        };
+        let equal = values
+            .iter()
+            .map(|value| match value {
+                LitValue::Int(n) => Cond::IsInt(v.clone(), n.clone()),
+                LitValue::Str(s) => Cond::IsString(v.clone(), s.clone()),
+            })
+            .reduce(|a, b| Cond::Or(Box::new(a), Box::new(b)))
+            .unwrap_or(Cond::Tag(v.clone(), u32::MAX));
+        match &member.values {
+            TestValues::Only(_) => equal,
+            TestValues::Except(_) => Cond::And(
+                Box::new(self.head_cond(v, member.head)),
+                Box::new(Cond::Not(Box::new(equal))),
+            ),
+            TestValues::All => unreachable!(),
+        }
+    }
+
     fn head_cond(&self, v: Atom, h: Head) -> Cond {
         match h {
             Head::Tuple(n) => Cond::Tuple(v, n),
