@@ -163,3 +163,85 @@ WebKit. Regenerate them, and the feature probe in `ilang.mjs`, with
 `bash scripts/build-abi-fixture.sh`. The hand-written ones test the host
 contract; `compiled.wasm` is built by the compiler, and runs sync and async host
 services, external functions, and host exports of a real program.
+
+## Resource contexts and binding permissions
+
+A `ResourceHost` is one live host identity domain. Reuse it in `resourceHost`
+across instances and tests; the SDK otherwise uses a shared default host. Every
+SDK entry/export invocation receives a fresh `ResourceContext`. Nested request
+roots and workers share that context. Numbers are positive BigInts and never
+reused in that host. Resources are looked up by context and kind; named leases
+serialize competing operations and reject success after close. A close receipt
+joins independent cleanup, including when the close waiter is abandoned.
+`cleanupJob()` registers creation/supervision before OS work starts, so teardown
+also joins jobs that have not produced a resource yet. `dispose()` closes the
+invocation gate and aborts outstanding requests without running i functions.
+Direct `instance.exports` access is the raw ABI; use SDK calls for invocation
+ownership. Initialization has its own context, closed by the first SDK call or
+disposal.
+
+`contextImports` callbacks receive their immutable invocation context first.
+They are restricted registrations: without approved declarations, loading fails
+with `ungranted host import <namespace> <name>: a trusted binding plan or explicit
+declaration grant is required`. Refusing a declaration gives
+`ungranted host import <namespace> <name> declared by <module> <declaration>`.
+Legacy `imports` registrations deliberately authorize all declarations of the
+specified import name, preserving custom embeddings. A resource factory must
+use `contextImports` and explicit declaration approval.
+
+`i build` writes a separate `.bindings.json` compiler plan next to an ilang
+artifact. It lists every required declaration before coalescing, its package
+content identity, module digest, host type/field or external name, and wire
+signature. Its artifact digest covers the final optimized Wasm bytes. This is
+outside ABI v3. Authenticate the compiler plan and trusted package content
+through your build/deployment path. A manifest's own names and digests do not
+establish trust. Pass the artifact bytes and plan to `authorizeBindings` with
+an explicit approval predicate; instantiate its returned `module` with that
+opaque token in `bindings`. A token cannot authorize a separately compiled
+module, even one supplied by an untrusted manifest.
+
+The CLI grants its loader-selected library content identity. Its existing
+printer is an ordinary public binding. Existing test/custom bindings retain
+explicit embedding authority: console print, storage read, clock later, math
+hypot; the spec host's test io print, math add/hypot, kv get/check, async
+double/echo/nan and bad nan/bits. No IO resource service is implemented here.
+
+Additional existing fixture grants are `custom.echo_string`, `custom.echo_int`,
+`custom.echo_bits`, `custom.echo_ref`, `custom.echo_bool`, `custom.echo_float`,
+`custom.echo_nil`, `custom:fallible/v1.fallible`, and the compiled fixture's
+`app:clock/v1.tick`. They use the same explicit legacy registration authority.
+
+Approval covers the complete authenticated binding plan: the artifact digest
+and the entire ordered declaration list, including refused and duplicate entries.
+JS authorization tokens retain an immutable snapshot, just as Rust grants do.
+Replacing any part of it, even by deleting a refused alias while keeping identical
+Wasm bytes, requires fresh explicit approval. Wire-import coverage alone cannot
+prove the list complete. Legacy broad registration authority is unchanged.
+
+Every SDK-managed entry into guest code checks the invocation gate, including
+continuations, result exports, allocation and each free. Ending during a host
+callback prevents return into guest code. Ending during request cancellation at
+status zero prevents the later result export. An interrupted invocation leaves
+the instance unusable. Synchronous opaque values are returned unchanged, without
+reading `then` or `finally`; operation kind and ABI metadata determine whether
+invocation handling is asynchronous. Direct raw Wasm export access remains the
+embedding's ABI duty.
+
+Teardown closes admission, removes every live entry and publishes close receipts
+before running any callback. Reentrant teardown joins the same completion.
+Callbacks cannot acquire resources, commit leases, deliver provisional values or
+reenter an SDK invocation during this transition.
+
+Cleanup failures are host diagnostics. Close and teardown still complete every
+cancellation, lease wake and cleanup starter, and keep their error-free contract.
+Thrown cancellation/cleanup errors, rejected cleanup Promises and exceptions in
+listeners registered on the supplied AbortSignals (including `onabort`) are
+isolated and collected. Drain records with `ResourceHost.takeCleanupErrors()` or
+`guest.takeCleanupErrors()`. Each record retains `phase` (`cancel`, `wake` or
+`cleanup`) and the original thrown `error`. The queue belongs to the host identity
+domain and includes late cleanup; draining it does not enter Wasm or replace the
+invocation's original result or failure. There are no implicit console reports
+or unhandled rejections for these failures. Cancellation callbacks revoke work
+synchronously; register independent asynchronous cleanup with `cleanupJob()`.
+If a cancellation callback nevertheless returns a Promise, its rejection is
+observed and recorded when it settles, without delaying synchronous revocation.

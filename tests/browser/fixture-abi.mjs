@@ -197,3 +197,26 @@ export async function checkOpaque(guest, reference, other) {
   results.push(await guest.callAsync("app/opaque.async_ab") === false);
   return results.every(Boolean);
 }
+
+/** Counters in bg-lifecycle.wat prove that no guest call occurs after end. */
+export const bgLifecycleAbi = {
+  version: 3,
+  entry: { name: "entry", async: true },
+  tests: [],
+  exports: {
+    runnable: { params: [], result: "nil", errors: [], async: true },
+    immediate: { params: [], result: "nil", errors: [], async: true },
+    leftover: { params: [], result: "nil", errors: [], async: true },
+    sync: { params: [], result: "nil", errors: [], async: false },
+    bits: { params: ["bit_array"], result: "bit_array", errors: [], async: false },
+    buffers: { params: ["string", "string"], result: "nil", errors: [], async: false },
+  },
+  services: {
+    "bg:control/v1": {
+      capture: { params: [], result: "nil", errors: [], async: false },
+      end: { params: [], result: "nil", errors: [], async: false },
+    },
+    "bg:work/v1": { wait: { params: [], result: "nil", errors: [], async: true } },
+  },
+  externals: {},
+};
