@@ -1632,5 +1632,13 @@
   },
   "crates/ilang-check/src/resolve.rs:d46aee08cc49f6d1": {
     "not_source": "A name compared on the diagnostic path, not an i source"
+  },
+  "docs/spec.md:f1ecfb339fbfa144": {
+    "track": "T1",
+    "reason": "Accepted T1 step 1 spec text; remove when step 8 adds literal type parsing",
+    "diagnostics": [
+      "E0101: expected a type, found a string",
+      "E0101: expected a type, found a string"
+    ]
   }
 }
