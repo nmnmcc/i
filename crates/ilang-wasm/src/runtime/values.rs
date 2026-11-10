@@ -404,14 +404,35 @@ const CORE: &str = r#"
     (then (return_call $result_ok (call $field (local.get $value) (i32.const 1)))))
   (call $result_error (ref.null eq)))
 
-;; Explicit work stack, including list tails. Only patched captures can form
-;; cycles; their last slot is the stamp, never a language capture (§11.9).
+;; Visit each distinct aggregate once, including shared acyclic data. As in
+;; BEAM's shared-copy walk, temporarily mark headers and restore them before
+;; returning. This walk calls no i code or host and cannot suspend/re-enter.
+;; A stop makes the instance unusable; ordinary true/false exits restore all
+;; headers. Patched closures still exclude their reserved non-capture slot.
 (func $core_portable (param $v eqref) (result eqref)
   (local $stack (ref $values)) (local $grown (ref $values))
   (local $sp i32) (local $tag i32) (local $n i32)
   (local $xs (ref null $values)) (local $o (ref $obj))
-  (local $token eqref)
-  (local.set $token (call $key_new))
+  (local $seen (ref $values)) (local $count i32) (local $bad i32)
+  ;; BEAM's shared-copy walk also handles constants before allocating work.
+  (local.set $tag (call $value_tag (local.get $v)))
+  (if (i32.or (i32.and (i32.ge_u (local.get $tag) (i32.const 10))
+                       (i32.le_u (local.get $tag) (i32.const 12)))
+               (i32.ge_u (local.get $tag) (i32.const 17)))
+    (then (return (global.get $value_false))))
+  (if (i32.eqz (i32.or
+        (i32.or (i32.eq (local.get $tag) (i32.const 4)) (i32.eq (local.get $tag) (i32.const 5)))
+        (i32.or (i32.eq (local.get $tag) (i32.const 6))
+          (i32.or (i32.eq (local.get $tag) (i32.const 7))
+            (i32.or (i32.eq (local.get $tag) (i32.const 14)) (i32.eq (local.get $tag) (i32.const 16)))))))
+    (then (return (global.get $value_true))))
+  (if (i32.eq (local.get $tag) (i32.const 6))
+    (then (if (call $list_is_empty (local.get $v)) (then (return (global.get $value_true)))))
+    (else
+      (local.set $xs (struct.get $obj 5 (ref.cast (ref $obj) (local.get $v))))
+      (if (ref.is_null (local.get $xs)) (then (return (global.get $value_true))))
+      (if (i32.eqz (array.len (local.get $xs))) (then (return (global.get $value_true))))))
+  (local.set $seen (array.new_default $values (i32.const 16)))
   (local.set $stack (array.new_default $values (i32.const 16)))
   (array.set $values (local.get $stack) (i32.const 0) (local.get $v))
   (local.set $sp (i32.const 1))
@@ -420,10 +441,11 @@ const CORE: &str = r#"
     (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
     (local.set $v (array.get $values (local.get $stack) (local.get $sp)))
     (local.set $tag (call $value_tag (local.get $v)))
+    (br_if $walk (i32.lt_s (local.get $tag) (i32.const 0)))
     (if (i32.or (i32.and (i32.ge_u (local.get $tag) (i32.const 10))
                        (i32.le_u (local.get $tag) (i32.const 12)))
                (i32.ge_u (local.get $tag) (i32.const 17)))
-      (then (return (global.get $value_false))))
+      (then (local.set $bad (i32.const 1)) (br $done)))
     (local.set $xs (ref.null $values))
     (local.set $n (i32.const 0))
     (if (i32.eq (local.get $tag) (i32.const 6))
@@ -442,10 +464,17 @@ const CORE: &str = r#"
         (if (i32.and (i32.eq (local.get $tag) (i32.const 7))
                     (i32.and (struct.get $obj 1 (local.get $o)) (i32.const 1)))
           (then
-            (local.set $n (i32.sub (local.get $n) (i32.const 1)))
-            (br_if $walk (ref.eq (local.get $token)
-              (array.get $values (local.get $xs) (local.get $n))))
-            (array.set $values (local.get $xs) (local.get $n) (local.get $token))))))
+            (local.set $n (i32.sub (local.get $n) (i32.const 1)))))))
+    (br_if $walk (i32.eqz (local.get $n)))
+    (if (i32.eq (local.get $count) (array.len (local.get $seen))) (then
+      (local.set $grown (array.new_default $values (i32.shl (local.get $count) (i32.const 1))))
+      (array.copy $values $values (local.get $grown) (i32.const 0)
+        (local.get $seen) (i32.const 0) (local.get $count))
+      (local.set $seen (local.get $grown))))
+    (array.set $values (local.get $seen) (local.get $count) (local.get $v))
+    (local.set $count (i32.add (local.get $count) (i32.const 1)))
+    (struct.set $val 0 (ref.cast (ref $val) (local.get $v))
+      (i32.or (local.get $tag) (i32.const -2147483648)))
     (if (i32.gt_u (i32.add (local.get $sp) (local.get $n)) (array.len (local.get $stack)))
       (then
         (if (i32.ge_u (array.len (local.get $stack)) (i32.const 268435456)) (then unreachable))
@@ -464,7 +493,14 @@ const CORE: &str = r#"
           (local.get $xs) (i32.const 0) (local.get $n))))
     (local.set $sp (i32.add (local.get $sp) (local.get $n)))
     (br $walk)))
-  (global.get $value_true))
+  (block $restored (loop $restore
+    (br_if $restored (i32.eqz (local.get $count)))
+    (local.set $count (i32.sub (local.get $count) (i32.const 1)))
+    (local.set $v (array.get $values (local.get $seen) (local.get $count)))
+    (struct.set $val 0 (ref.cast (ref $val) (local.get $v))
+      (i32.and (call $value_tag (local.get $v)) (i32.const 2147483647)))
+    (br $restore)))
+  (call $bool_new (i32.eqz (local.get $bad))))
 "#;
 
 const HOST_NEW: &str = r#"(func $host_ref_new (param $r externref) (result eqref)

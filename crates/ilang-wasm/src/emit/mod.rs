@@ -118,7 +118,7 @@ pub fn wat(p: &Program) -> String {
         let _ = writeln!(
             m,
             "(type $fn{n} (func (param (ref null $obj) (ref null $env){params}) (result eqref)))\n\
-             (type $clo{n} (sub final $obj (struct (field i32) (field i32) (field i64) (field f64) \
+             (type $clo{n} (sub final $obj (struct (field (mut i32)) (field i32) (field i64) (field f64) \
              (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs)) \
              (field (ref null $call)) (field (ref $fn{n})))))"
         );

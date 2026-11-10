@@ -1082,3 +1082,49 @@ function except seven source-initializer changes. A stray slash in the first
 scratch-audit shell command returned 126 before running the diagnostic; the
 correct command then completed successfully. No file or environment change
 resulted from that shell typo.
+
+## Independent review corrections
+
+The lane began this follow-up clean at 0573e88. No interrupted edits were
+present. Merge 27781967 brings in the QA corpus. The syntax inventory conflict
+was resolved by key-wise three-way merge, preserving both tracks' entries.
+The independent report and its observations are requirements evidence to
+investigate, not replacement expected outputs.
+
+References read before the corrections (under .rd/ref; none executed/copied):
+
+- trio/src/trio/_core/_run.py: CancelStatus.recalculate,
+  parent_cancellation_is_visible_to_us, CancelScope.shield and its setter.
+  Shielding blocks ancestor cancellation while retaining cancellation from
+  scopes created inside it. i requires this protection automatically in finals.
+- eio/lib_eio/core/cancel.ml: protect, with_cc, cancel_child; switch.ml:
+  await_idle and on_release_full. Release hooks run in protected child contexts,
+  and a fresh scope can still manage its own failures. i keeps one least-path
+  failure rather than Eio's aggregation.
+- ghc/libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:
+  bracket and finally; ghc/rts/RaiseAsync.c: throwToMsg's NotBlocked case and
+  blockedThrowTo. GHC masks the release action, with interruptible-operation
+  exceptions. i's final protection must survive scheduler suspension as R4 says.
+- go/src/runtime/chan.go: hchan.sendq/recvq and waitq.enqueue/dequeue;
+  select.go: selectgo passes 2/3 and waitq.dequeueSudoG. Each source owns its
+  waiters; one choice owns its withdrawal links. i uses source-order choices,
+  not Go's randomized polling, and preserves FIFO partners.
+- cml-sml/libraries/cml/src/core-cml/channel.sml: channel, cleanAndRemove,
+  cleanAndEnqueue, sendEvt; event.sml: mkFlg, syncOnBEvts. Channel-local queues
+  share a transaction identity so one commit withdraws the other alternatives.
+- go/src/runtime/runtime2.go: g and sudog; proc.go: newproc1/goid allocation;
+  tokio/tokio/src/runtime/task/list.rs: LocalOwnedTasks.bind and its owned list.
+  Stable integer identities are distinct from paths. Their mutable records
+  cannot simply be copied into i: runtime §6.3 says the loop threads immutable
+  State, and forbids storing its state in forged host references or untyped casts.
+- otp/erts/emulator/beam/copy.c: copy_shared_calculate and
+  copy_shared_perform_x. A shared object's mark/forwarding entry prevents
+  traversing its expanded paths. The single-worker spawn has no publication
+  consumer for portable_record, so it must not classify that record at all.
+
+Source interpretation: spec §9.5 says “A final function may not give errors”
+and “When the program stops (§11.7), final functions are not run.” Stop variants
+therefore check immediate stop without finals; typed failures from a final are
+negative typing tests. Normal-return and typed-error finals must complete under
+ancestor cancellation, and fresh cleanup scopes must retain their own failure
+and cancellation rules (runtime §12.9/R4a). No stop semantics are changed.

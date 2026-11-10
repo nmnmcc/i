@@ -20710,6 +20710,424 @@
       "files": [
         "src/main.i"
       ]
+    },
+    {
+      "id": "review-r2/borrow_owned",
+      "project": "tests/review/cases/review-r2/borrow_owned",
+      "origin": "/tmp/review-r2/borrow_owned",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "borrow_owned",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/cancel_choose",
+      "project": "tests/review/cases/review-r2/cancel_choose",
+      "origin": "/tmp/review-r2/cancel_choose",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "cancel_choose",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/cancel_error_final",
+      "project": "tests/review/cases/review-r2/cancel_error_final",
+      "origin": "/tmp/review-r2/cancel_error_final",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "cancel_error_final",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/cancel_normal_final",
+      "project": "tests/review/cases/review-r2/cancel_normal_final",
+      "origin": "/tmp/review-r2/cancel_normal_final",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "cancel_normal_final",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/cancel_send",
+      "project": "tests/review/cases/review-r2/cancel_send",
+      "origin": "/tmp/review-r2/cancel_send",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "cancel_send",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/choice_commit",
+      "project": "tests/review/cases/review-r2/choice_commit",
+      "origin": "/tmp/review-r2/choice_commit",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "choice_commit",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/dag_16",
+      "project": "tests/review/cases/review-r2/dag_16",
+      "origin": "/tmp/review-r2/dag_16",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "dag_16",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/dag_20",
+      "project": "tests/review/cases/review-r2/dag_20",
+      "origin": "/tmp/review-r2/dag_20",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "dag_20",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/dag_24",
+      "project": "tests/review/cases/review-r2/dag_24",
+      "origin": "/tmp/review-r2/dag_24",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "dag_24",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/dag_28",
+      "project": "tests/review/cases/review-r2/dag_28",
+      "origin": "/tmp/review-r2/dag_28",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "dag_28",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/dag_28_local",
+      "project": "tests/review/cases/review-r2/dag_28_local",
+      "origin": "/tmp/review-r2/dag_28_local",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "dag_28_local",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/deadlock",
+      "project": "tests/review/cases/review-r2/deadlock",
+      "origin": "/tmp/review-r2/deadlock",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "deadlock",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/deep_1000",
+      "project": "tests/review/cases/review-r2/deep_1000",
+      "origin": "/tmp/review-r2/deep_1000",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "deep_1000",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/deep_200",
+      "project": "tests/review/cases/review-r2/deep_200",
+      "origin": "/tmp/review-r2/deep_200",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "deep_200",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/deep_50",
+      "project": "tests/review/cases/review-r2/deep_50",
+      "origin": "/tmp/review-r2/deep_50",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "deep_50",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/determinism",
+      "project": "tests/review/cases/review-r2/determinism",
+      "origin": "/tmp/review-r2/determinism",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "determinism",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/escaped_task",
+      "project": "tests/review/cases/review-r2/escaped_task",
+      "origin": "/tmp/review-r2/escaped_task",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "escaped_task",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/join_failure",
+      "project": "tests/review/cases/review-r2/join_failure",
+      "origin": "/tmp/review-r2/join_failure",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "join_failure",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/lifetime",
+      "project": "tests/review/cases/review-r2/lifetime",
+      "origin": "/tmp/review-r2/lifetime",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "lifetime",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/local_capture",
+      "project": "tests/review/cases/review-r2/local_capture",
+      "origin": "/tmp/review-r2/local_capture",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "local_capture",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/missing_service",
+      "project": "tests/review/cases/review-r2/missing_service",
+      "origin": "/tmp/review-r2/missing_service",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "missing_service",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/never_yields",
+      "project": "tests/review/cases/review-r2/never_yields",
+      "origin": "/tmp/review-r2/never_yields",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "never_yields",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/nonportable_result",
+      "project": "tests/review/cases/review-r2/nonportable_result",
+      "origin": "/tmp/review-r2/nonportable_result",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "nonportable_result",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/pure_fake",
+      "project": "tests/review/cases/review-r2/pure_fake",
+      "origin": "/tmp/review-r2/pure_fake",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "pure_fake",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/race_tie",
+      "project": "tests/review/cases/review-r2/race_tie",
+      "origin": "/tmp/review-r2/race_tie",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "race_tie",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/request_groups",
+      "project": "tests/review/cases/review-r2/request_groups",
+      "origin": "/tmp/review-r2/request_groups",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "request_groups",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/request_reuse",
+      "project": "tests/review/cases/review-r2/request_reuse",
+      "origin": "/tmp/review-r2/request_reuse",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "request_reuse",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/request_stop",
+      "project": "tests/review/cases/review-r2/request_stop",
+      "origin": "/tmp/review-r2/request_stop",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "request_stop",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/senders_1000",
+      "project": "tests/review/cases/review-r2/senders_1000",
+      "origin": "/tmp/review-r2/senders_1000",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "senders_1000",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/senders_128",
+      "project": "tests/review/cases/review-r2/senders_128",
+      "origin": "/tmp/review-r2/senders_128",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "senders_128",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/senders_16",
+      "project": "tests/review/cases/review-r2/senders_16",
+      "origin": "/tmp/review-r2/senders_16",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "senders_16",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/senders_256",
+      "project": "tests/review/cases/review-r2/senders_256",
+      "origin": "/tmp/review-r2/senders_256",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "senders_256",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/senders_32",
+      "project": "tests/review/cases/review-r2/senders_32",
+      "origin": "/tmp/review-r2/senders_32",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "senders_32",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/senders_64",
+      "project": "tests/review/cases/review-r2/senders_64",
+      "origin": "/tmp/review-r2/senders_64",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "senders_64",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/shield_nested",
+      "project": "tests/review/cases/review-r2/shield_nested",
+      "origin": "/tmp/review-r2/shield_nested",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "shield_nested",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/tasks_1000",
+      "project": "tests/review/cases/review-r2/tasks_1000",
+      "origin": "/tmp/review-r2/tasks_1000",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "tasks_1000",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/tasks_5000",
+      "project": "tests/review/cases/review-r2/tasks_5000",
+      "origin": "/tmp/review-r2/tasks_5000",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "tasks_5000",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/wait_any_unlisted",
+      "project": "tests/review/cases/review-r2/wait_any_unlisted",
+      "origin": "/tmp/review-r2/wait_any_unlisted",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "wait_any_unlisted",
+      "files": [
+        "src/main.i"
+      ]
     }
   ]
 }

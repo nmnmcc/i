@@ -93,6 +93,32 @@
       "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
       "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
       "censored": true
+    },
+    {
+      "pattern": "^review-r2/(?:cancel_(?:choose|error_final|normal_final|send)|choice_commit|dag_[0-9]+(?:_local)?|deep_(?:50|200)|determinism|join_failure|lifetime|local_capture|pure_fake|race_tie|senders_[0-9]+|shield_nested|tasks_[0-9]+)$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "R2 structured lifetime, protected cleanup, FIFO rendezvous and single commitment; functional assertions are preserved in each independent program. Exact final output is additionally checked by r2_runtime and spec/9.9.",
+      "source": "docs/spec.md §§9.5,9.9; runtime.md §§6.2,6.4–6.5: final functions finish, FIFO partners, one commit and deterministic pure schedules."
+    },
+    {
+      "pattern": "^review-r2/missing_service$",
+      "known_failure": false,
+      "outcome": "reject",
+      "phase": "entry",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "A child retains an unsupplied ordinary service; execution must be rejected.",
+      "source": "docs/spec.md §9.2: the environment that a function needs is the union of the environments that its calls need; coordinator R2 default-plan specialization."
+    },
+    {
+      "pattern": "^review-r2/(?:deep_1000|never_yields)$",
+      "known_failure": true,
+      "censored": true,
+      "outcome": "accept",
+      "finding": "Preserved independent bounded observation; never_yields is intentionally divergent, and deep_1000 had exceeded 45 seconds. No timeout is called a deadlock or passing termination check. Deep nesting is a separate scale observation, not the channel-contention gate.",
+      "source": "runtime.md §6.4: cooperative M:1 does not preempt non-yielding work; docs/testing.md: observation budgets are resource caps, not performance promises."
     }
   ],
   "transitions": [

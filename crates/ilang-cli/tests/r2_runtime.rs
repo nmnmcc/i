@@ -332,7 +332,7 @@ fn seeded_script_replays_200_times_at_each_optimization_level() {
 fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
     // runtime.md R2 explicitly orders already-observed failures, independently
     // of their observation order. Seed the private typed storage directly in
-    // a source copy; the two IO primitives are unused by this pure unit probe.
+    // a source copy; the IO and continuation queries are unused by this pure unit probe.
     let source = include_str!("../../../lib/i/task.i");
     let source = source.replace(
         "@external(\"ilang:request\", \"observe_change\")\nobserve_change: (root: Key(Nil)) -> Request(Nil)",
@@ -341,6 +341,13 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
         "@external(\"ilang:request\", \"has_work\")\nhas_work: (ticket: Ticket) -> Bool",
         "has_work = (_ticket: Ticket) -> Bool { False }",
     );
+    let begin = source
+        .find("@external(\"ilang:control\", \"finalizing\")")
+        .unwrap();
+    let end = source[begin..].find("\nFrame {").unwrap() + begin;
+    let source = source[..begin].to_string()
+        + "finalizing(A,R,E,N,B,F,M) = (_k: Continuation(A,R,E,N), _b: Boundary(B,F,M)) -> Bool { False }\n"
+        + &source[end..];
     assert!(!source.contains("@external(\"ilang:request\""));
     let source = source
         + r#"
@@ -400,6 +407,95 @@ fn user_examples_have_documented_outputs() {
                 assert!(matches!(outcome, Outcome::Ok(_)), "{name}: {outcome:?}");
             }
             assert_eq!(*log.lock().unwrap(), expected, "{name}");
+        }
+    }
+}
+
+#[test]
+fn error_unwind_cleanup_finishes_under_ancestor_cancellation() {
+    let source = include_str!("../../../tests/spec/9.9/error_final_cancel.i");
+    for opt in [Level::O0, Level::O2] {
+        let log = services::Log::default();
+        let result = program(source, opt)
+            .run_entry(HostOptions::new(services::testing(log.clone())))
+            .unwrap();
+        assert!(matches!(result, Outcome::Ok(_)), "{result:?}");
+        assert_eq!(
+            *log.lock().unwrap(),
+            ["final-start", "final-end", "Error(\"parent\")"]
+        );
+    }
+}
+
+#[test]
+fn preserved_review_cleanup_programs_finish_their_finals() {
+    for (source, expected_error) in [
+        (
+            include_str!("../../../tests/review/cases/review-r2/cancel_error_final/src/main.i"),
+            "Error(\"parent\")",
+        ),
+        (
+            include_str!("../../../tests/review/cases/review-r2/cancel_normal_final/src/main.i"),
+            "Error(\"boom\")",
+        ),
+    ] {
+        for opt in [Level::O0, Level::O2] {
+            let log = services::Log::default();
+            let printed = log.clone();
+            let result = program(source, opt)
+                .run_entry(HostOptions::new(services::standard(move |text| {
+                    printed.lock().unwrap().push(text.into())
+                })))
+                .unwrap();
+            assert!(matches!(result, Outcome::Ok(_)), "{result:?}");
+            assert_eq!(
+                *log.lock().unwrap(),
+                ["final-start", "final-end", expected_error]
+            );
+        }
+    }
+}
+
+#[test]
+fn preserved_review_request_programs_run_with_their_embedder_services() {
+    // The public review-corpus CLI cannot supply test:async/v1. Keep its
+    // missing-provider observation separate from these real-host executions.
+    for (name, source) in [
+        (
+            "borrow_owned",
+            include_str!("../../../tests/review/cases/review-r2/borrow_owned/src/main.i"),
+        ),
+        (
+            "request_groups",
+            include_str!("../../../tests/review/cases/review-r2/request_groups/src/main.i"),
+        ),
+        (
+            "request_reuse",
+            include_str!("../../../tests/review/cases/review-r2/request_reuse/src/main.i"),
+        ),
+        (
+            "wait_any_unlisted",
+            include_str!("../../../tests/review/cases/review-r2/wait_any_unlisted/src/main.i"),
+        ),
+        (
+            "request_stop",
+            include_str!("../../../tests/review/cases/review-r2/request_stop/src/main.i"),
+        ),
+    ] {
+        for opt in [Level::O0, Level::O2] {
+            let result = program(source, opt)
+                .run_entry(HostOptions::new(
+                    services::testing(services::Log::default()),
+                ))
+                .unwrap();
+            if name == "request_stop" {
+                assert!(
+                    matches!(result, Outcome::Stop(ref stop) if stop.message.as_ref().unwrap().starts_with("panic: stop-before-answer")),
+                    "{result:?}"
+                );
+            } else {
+                assert!(matches!(result, Outcome::Ok(_)), "{name}: {result:?}");
+            }
         }
     }
 }

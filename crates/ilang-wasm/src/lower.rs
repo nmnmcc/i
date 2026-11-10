@@ -1700,6 +1700,13 @@ impl<'a> Lowerer<'a> {
                 "resume" => Ok((Op::Resume, arity)),
                 "cancel" => Ok((Op::Cancel, arity)),
                 "keep_env" => Ok((Op::KeepEnv, arity)),
+                "finalizing" => Ok((
+                    Op::Runtime {
+                        name: "control_finalizing",
+                        arity,
+                    },
+                    arity,
+                )),
                 _ => Err(format!("`control.{function}` is not known")),
             },
             _ => Err(format!(

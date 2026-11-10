@@ -39,7 +39,7 @@ pub(super) const EFFECTS: &str = r#"
 (func $host_boundary (param $body eqref) (param $env (ref null $env)) (result eqref)
   (local $b (ref $boundary))
   (local.set $b (struct.new $boundary (i32.const 11) (i32.const 0) (i64.const 0) (f64.const 0)
-    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1)))
+    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1) (ref.null eq) (i32.const 0)))
   (global.set $host_root (local.get $b))
   (return_call $boundary_run (local.get $b) (local.get $env) (local.get $body) (ref.null $flist)
     (ref.null eq) (ref.null eq) (ref.null $frame)))
@@ -117,7 +117,7 @@ pub(super) const TYPES: &str = r#"(type $waiting (struct (field i32)))
 (type $request_root (struct (field eqref) (field (mut i32))))
 (type $request_owner (struct (field eqref) (field (ref $request_root)) (field (mut i32))))
 (type $request (sub final $obj (struct
-  (field i32) (field i32) (field i64) (field f64)
+  (field (mut i32)) (field i32) (field i64) (field f64)
   (field (ref null $bytes)) (field (ref null $values))
   (field (ref null $limbs)) (field (ref null $call))
   ;; state, answer, slot, generation, owner, observer kind, observer target
