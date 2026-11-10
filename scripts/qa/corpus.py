@@ -357,6 +357,13 @@ def run_corpus(args):
                               for v in entry_checks)
             elif wanted == 'accept':
                 met = check['exit'] == 0 and all(value['exit'] == 0 for value in result.values())
+            elif wanted == 'diverge':
+                met = check['exit'] == 0 and all(
+                    result[phase]['exit'] == 0 for phase in ('test0', 'test2')
+                ) and all(
+                    result[phase]['exit'] == 'timeout' and not result[phase]['stdout']
+                    for phase in ('run0', 'run2')
+                )
             else:
                 met = False
             if requirement.get('diagnostic_codes'):

@@ -1,0 +1,57 @@
+{
+  "compiler": "9c03f16491a5a40031c14aa77884b2c3d61eba9f",
+  "binary_sha256": "cef48a582319ee42f93efcb5d4d11a78e8801051f743254ca07ea8152d5976d3",
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 10,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 0,
+      "stdout": "app/main.cycle : (n: Int) -> Nil ! request.Root | request.Await | Assert | Later\napp/main.main : () -> Nil ! request.Root | request.Await | Assert | Later\n",
+      "stderr": ""
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 1,
+      "stdout": "FAIL app/qa_corpus_runtime_test.qa_startup\n  missing host function test:async/v1 echo\n0 passed, 1 failed\n",
+      "stderr": ""
+    },
+    "run0": {
+      "command": [
+        "run",
+        "--opt",
+        "0"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "missing host function test:async/v1 echo\n"
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 1,
+      "stdout": "FAIL app/qa_corpus_runtime_test.qa_startup\n  missing host function test:async/v1 echo\n0 passed, 1 failed\n",
+      "stderr": ""
+    },
+    "run2": {
+      "command": [
+        "run",
+        "--opt",
+        "2"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "missing host function test:async/v1 echo\n"
+    }
+  }
+}
