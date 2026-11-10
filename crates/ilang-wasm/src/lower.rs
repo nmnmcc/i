@@ -1002,23 +1002,24 @@ impl<'a> Lowerer<'a> {
         Callee::Direct(wrapper)
     }
 
-    /// Whether an entry point is async: it may call a function of an async
-    /// host service (§10.2). Every such call gets the service from the
-    /// environment, and only the host gives it at an entry point, so this
-    /// is when an async host service is in the environment of its type. The
-    /// host services of the environment go to `needed`.
+    /// R2 supplies the inferred needs. JP will supply the complete chosen
+    /// provider closure without changing this classification rule.
+    fn services_require_async(&self, services: &[TypeId]) -> bool {
+        self.options.target == ir::Target::Ilang
+            && services.iter().any(|id| {
+                let ty = self.program.ty(*id);
+                ty.host.as_ref().is_some_and(|h| h.is_async || h.is_request)
+                    || (self.program.module(ty.module).path == "i/task"
+                        && matches!(ty.name.as_str(), "Scheduler" | "Runner"))
+            })
+    }
+
     fn entry_async(&self, d: DefId, needed: &mut BTreeSet<TypeId>) -> bool {
         let Some(services) = self.typed.entry_services.get(&d) else {
             return false;
         };
         needed.extend(services.iter().copied());
-        services.iter().any(|t| {
-            self.program
-                .ty(*t)
-                .host
-                .as_ref()
-                .is_some_and(|h| self.host_is_async(h))
-        })
+        self.services_require_async(services)
     }
 
     /// Whether a host service is async in the module: on the WASI target

@@ -348,3 +348,48 @@ provider-plan conformance is not claimed. The task module is still empty.
 All task-interface rows, structured-lifetime/event laws, scripted determinism,
 200-run Rust/JS stress, scheduler/channel costs and complete WAT-difference audit
 remain to be implemented or measured after the entry-contract scope is resolved.
+
+## Coordinator resolution: R2 entry specialization
+
+The coordinator keeps the original R2 entry scope. Until JP, the provider graph
+is exactly the inferred service set with shipped defaults. The compiler's
+services_require_async function takes that set; JP can pass its chosen closure
+instead. Provider and adapter tables now report E0522, "not implemented yet",
+rather than being ignored. providers_pending is marked future-track JP and
+expects that temporary rejection. The amended normative text is retained.
+
+JP inherits these sentences, currently not implemented by R2:
+
+- Spec §2.6.1: "A target provider plan maps resolved service type identities to
+  ordinary i factory functions or host registrations."
+- Spec §2.6.1: "For each entry, supply every service left in its inferred
+  environment and all dependencies of the chosen factories."
+- Spec §2.6.1: "Missing required services and dependency cycles are compile
+  errors naming the target, service and requiring entry."
+- Spec §2.6.1's schema, outer/body graphs, adapter guards, seed and entry-root-key
+  arguments, dependency ordering and wasm.synchronous contract.
+- Spec §10.2 and runtime D5: classification from the complete chosen provider
+  graph, including factory and structured-adapter requirements.
+- Spec §2.6's source-only/target checking and target/command provider selection.
+
+The Bundle counterexample above is a future JP semantic example. It parses
+already, so adding a failing parser exception to old-syntax-check would be
+incorrect. Its executable R2 test instead carries the future-track JP marker
+and checks the explicit temporary manifest diagnostic. No check is weakened.
+
+Merged BG resource contexts and binding grants at cb17adb. Existing host request
+starts already receive their invocation context; group cancellation uses the
+ABI cancel path that revokes each request's host lifetime/lease. The guest keeps
+its per-entry Root/Owner registry inside that host invocation. Entry retirement
+closes all remaining roots; host invocation teardown remains the final owner.
+
+R2 entry-specialization checkpoint: the full heavy-wrapped gate with port 4183
+passed, exit 0 (target/r2-entry-ruling-verify.log): 196 spec cases at O0/O2,
+Rust checks, i tests, WASI smoke, 76 Node tests and 51 browser tests. The new
+manifest unit test checks both root and dependency manifests. Its TOML literals
+are recorded as non-i host data in the existing syntax-check inventory; the
+provider_pending i program itself is parsed normally. The generated BG binding
+plan follows in a separate Regenerate derived files commit.
+The entry-specialization syntax gate also passed: 1,226 extracted blocks, exact
+expected diagnostics and 19 future parser entries. The JP semantic marker does
+not add a parser exception, because that example already parses.

@@ -863,7 +863,7 @@
   "crates/ilang-cli/tests/check.rs:453fcde653a95c85": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `1`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `1`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "crates/ilang-cli/tests/check.rs:b2331ec9454567b3": {
@@ -882,7 +882,7 @@
   "crates/ilang-cli/tests/package_commands.rs:015b3139e860bcaf": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "crates/ilang-lsp/src/change.rs:4cdfb1ce888445e2": {
@@ -984,10 +984,10 @@
   "crates/ilang-syntax/tests/golden/err_guard_word.i:d9ca0efb02727105": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `->`, found `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `v`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `->`, found `if`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `v`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "crates/ilang-syntax/tests/golden/err_header_empty.i:bc7cf48d1732417b": {
@@ -1026,8 +1026,8 @@
   "crates/ilang-syntax/tests/golden/err_pipe_group.i:b21ad312873fd189": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`",
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`",
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`"
     ]
   },
   "crates/ilang-syntax/tests/golden/err_pipe_target.i:f211c96492c6d0ca": {
@@ -1100,10 +1100,10 @@
       "E0006: `2` is not a digit of base 2",
       "E0007: this float literal is not a finite binary64 number",
       "E0003: unknown escape",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
+      "E0004: `\\u{\u2026}` needs 1 to 6 hex digits that make a Unicode scalar value",
+      "E0004: `\\u{\u2026}` needs 1 to 6 hex digits that make a Unicode scalar value",
+      "E0004: `\\u{\u2026}` needs 1 to 6 hex digits that make a Unicode scalar value",
+      "E0004: `\\u{\u2026}` needs 1 to 6 hex digits that make a Unicode scalar value",
       "E0006: `12px` is not a number",
       "E0008: `fooBar` is not a name, a discard, or an UpName",
       "E0008: `Foo_bar` is not a name, a discard, or an UpName",
@@ -1181,19 +1181,19 @@
   "crates/ilang-syntax/tests/parse.rs:04e24b46baf5040e": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`"
     ]
   },
   "crates/ilang-syntax/tests/parse.rs:3ce334bfd693e428": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`"
     ]
   },
   "crates/ilang-syntax/tests/parse.rs:b6a4ae21a4ba6902": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`"
     ]
   },
   "docs/design/literal-types.md:67290c6bbdeb16e7": {
@@ -1373,8 +1373,8 @@
   "editors/vscode/test/sample.i:9622caf46ec9f392": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0003: unknown escape; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0106: a discard binds nothing, so it may not be used as a value; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0003: unknown escape; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0106: a discard binds nothing, so it may not be used as a value; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/spec/1.7/a1_same_line_negative.i:cd6051bd45bfd1c6": {
@@ -1546,26 +1546,26 @@
   },
   "crates/ilang-syntax/tests/parse.rs:79d44e974dbc8474": {
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `n`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `n`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ],
     "reason": "Deliberately malformed token-probe or parser-recovery input"
   },
   "crates/ilang-syntax/tests/parse.rs:96422ef1f554e5e2": {
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `{`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `{`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ],
     "reason": "Deliberately malformed token-probe or parser-recovery input"
   },
   "crates/ilang-syntax/tests/parse.rs:180492297ecd3956": {
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `case`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `n`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `case`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `n`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ],
     "reason": "Deliberately malformed token-probe or parser-recovery input"
   },
   "crates/ilang-syntax/tests/parse.rs:c1f607c4a9dd9c9d": {
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `n`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `n`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ],
     "reason": "Deliberately malformed token-probe or parser-recovery input"
   },
@@ -1632,5 +1632,11 @@
   },
   "crates/ilang-check/src/resolve.rs:d46aee08cc49f6d1": {
     "not_source": "A name compared on the diagnostic path, not an i source"
+  },
+  "crates/ilang-package/tests/manifest.rs:ef830fe8a6451ed0": {
+    "not_source": "TOML manifest for the future JP provider plan; R2 explicitly rejects it"
+  },
+  "crates/ilang-package/tests/manifest.rs:f09186ea668f8c28": {
+    "not_source": "TOML manifest for the future JP provider plan; R2 explicitly rejects it"
   }
 }
