@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex, OnceLock, Weak};
 use anyhow::{Context, Result, bail};
 use ilang_syntax::lisp::syntax::{Node, Position, Syntax};
 
+use crate::macro_budget::MacroBudget;
 use crate::{HostImports, HostReference, Value};
 
 #[derive(Clone)]
@@ -268,6 +269,90 @@ fn invoke(name: &str, args: &[Value]) -> Result<Value> {
 
 /// Install only the compiler's syntax operations into an otherwise empty host.
 pub fn install(imports: &mut HostImports) -> Result<()> {
+    install_inner(imports, None)
+}
+
+/// Install compiler services and share their logical charges with the Wasm
+/// instrumentation. A fresh budget is supplied for each invocation.
+pub fn install_metered(imports: &mut HostImports, budget: MacroBudget) -> Result<()> {
+    imports.set_macro_budget(budget.clone());
+    install_inner(imports, Some(budget))
+}
+
+fn charge_tree(budget: &MacroBudget, root: &Syntax, output: bool) -> Result<()> {
+    enum Visit<'a> {
+        Node(&'a Syntax),
+        Leave,
+    }
+    let mut pending = vec![Visit::Node(root)];
+    while let Some(visit) = pending.pop() {
+        let Visit::Node(s) = visit else {
+            budget.leave_frame();
+            continue;
+        };
+        budget.enter_frame(1)?;
+        budget.charge(1, 1)?;
+        pending.push(Visit::Leave);
+        let bytes = match s.node() {
+            Node::Name(x) | Node::Discard(x) | Node::Up(x) | Node::Symbol(x) | Node::Text(x) => {
+                x.len() as u64
+            }
+            Node::Int(x) => x.bits().div_ceil(8),
+            Node::Float(_) => 8,
+            Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                // Charge before the traversal stack may grow.
+                budget.charge(xs.len() as u64, 4 + xs.len() as u64)?;
+                pending.extend(xs.iter().rev().map(Visit::Node));
+                0
+            }
+            Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => {
+                budget.charge(1, 1)?;
+                pending.push(Visit::Node(x));
+                0
+            }
+        };
+        // Escaping one input byte can produce several ASCII characters (for
+        // example a control character); bound both construction and output.
+        let work = if output {
+            bytes.saturating_mul(12)
+        } else {
+            bytes
+        };
+        budget.charge(work, if output { 4 + work.div_ceil(8) } else { 0 })?;
+    }
+    Ok(())
+}
+
+fn charge_call(budget: &MacroBudget, name: &str, args: &[Value]) -> Result<()> {
+    // Every compiler service call takes one unit and a bounded result wrapper.
+    budget.charge(1, 8)?;
+    match (name, args) {
+        ("make_text", [_, Value::String(s), _]) => {
+            let n = s.len() as u64;
+            budget.charge(n, 4 + n.div_ceil(8))?;
+        }
+        ("make_int", [Value::Int(n), _]) => {
+            let bytes = n.bits().div_ceil(8);
+            budget.charge(bytes, 4 + bytes.div_ceil(8))?;
+        }
+        ("make_list", [_, list, _]) => {
+            let mut link = get::<List>(list)?.0.as_deref();
+            while let Some(current) = link {
+                budget.charge(1, 1)?;
+                link = current.previous.as_deref();
+            }
+        }
+        ("show" | "show_as", [value, ..]) => charge_tree(budget, get(value)?, true)?,
+        ("same_code", [left, right]) => {
+            charge_tree(budget, get(left)?, false)?;
+            charge_tree(budget, get(right)?, false)?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn install_inner(imports: &mut HostImports, budget: Option<MacroBudget>) -> Result<()> {
     const NAMES: &[&str] = &[
         "kind",
         "text",
@@ -294,7 +379,13 @@ pub fn install(imports: &mut HostImports) -> Result<()> {
         "text_error_at",
     ];
     for &name in NAMES {
-        imports.external("i:compiler/syntax/v1", name, move |args| invoke(name, args))?;
+        let budget = budget.clone();
+        imports.external("i:compiler/syntax/v1", name, move |args| {
+            if let Some(budget) = &budget {
+                charge_call(budget, name, args)?;
+            }
+            invoke(name, args)
+        })?;
     }
     Ok(())
 }
@@ -302,8 +393,46 @@ pub fn install(imports: &mut HostImports) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::macro_budget::{Limit, Limits};
     use ilang_syntax::lisp::{parse, syntax::Scope};
     use std::collections::BTreeSet;
+
+    #[test]
+    fn compiler_syntax_traversal_charges_work_memory_and_depth() {
+        let parsed = parse("(((alpha beta)))").unwrap();
+        let value = opaque(Syntax::from_datum(
+            &parsed[0],
+            &Scope {
+                module: 0,
+                marks: BTreeSet::new(),
+            },
+        ));
+        let budget = MacroBudget::new(Limits {
+            work: 1000,
+            allocation: 1000,
+            frames: 100,
+        });
+        charge_call(&budget, "show", std::slice::from_ref(&value)).unwrap();
+        let used = budget.usage();
+        assert!(used.work > 10 && used.allocation > 10);
+        assert_eq!(used.frames, 0);
+
+        let shallow = MacroBudget::new(Limits {
+            work: 1000,
+            allocation: 1000,
+            frames: 2,
+        });
+        assert!(charge_call(&shallow, "show", std::slice::from_ref(&value)).is_err());
+        assert_eq!(shallow.exceeded(), Some(Limit::Frames));
+
+        let small = MacroBudget::new(Limits {
+            work: 1000,
+            allocation: 8,
+            frames: 100,
+        });
+        assert!(charge_call(&small, "show", std::slice::from_ref(&value)).is_err());
+        assert_eq!(small.exceeded(), Some(Limit::Allocation));
+    }
 
     #[test]
     fn opaque_values_keep_scopes_and_reject_invalid_atoms() {
