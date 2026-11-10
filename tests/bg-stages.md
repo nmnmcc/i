@@ -81,3 +81,29 @@ The lane was clean at b9173ce. There was no interrupted uncommitted work.
 - Test logs were initially written to temporary files outside the lane; they
   have been moved into this lane's ignored target/bg directory. No temporary
   logs remain at their original paths. No other checkout was edited.
+
+## Stage 3 results
+
+- `cargo test -p ilang-cli --lib --locked`: compiler provenance regression passed
+  at O0 and O2. Two used external declarations produce one wire import and two
+  independently authorized plan entries (native 3.1's alias sentence).
+- Binding plans cover the final optimized artifact digest, package content,
+  module/source digest, declared host type/field or external name, kind and wire
+  signature. They never enter ilang.abi. `i run`/`i test` retain the compiler plan
+  in process and approve only the loader-selected library content identity.
+  `i build` exports a separate .bindings.json for explicit embedding approval.
+- JS authorization compiles exact bytes after checking SHA-256. Its opaque token
+  can authorize only that module object. JSON assertions alone are not authority.
+- Interpretation: native 3.1 says "arbitrary custom imports remain the embedder's
+  explicit authority." Existing legacy registration APIs deliberately grant all
+  declarations of their named custom import. New context registrations are
+  restricted by default. Standard resource factories must use the latter.
+  Both host READMEs list every existing built-in/spec/custom fixture binding.
+- Shared compiler/CLI files: lower.rs captures declarations before coalescing;
+  ilang-wasm/src/lib.rs exposes the separate plan; ilang-cli/src/lib.rs and
+  main.rs preserve the compiler trust path and emit the sidecar. These implement
+  native 10's explicit "IO trust plumbing" handoff. No checker, i library,
+  request-table implementation, opaque lowering or equality changes were made.
+- The stage-2 SHA-256 dependency updated Cargo.lock through `cargo check`, without
+  cargo update. This generated lock change is held for the required final derived
+  commit; it remains in the working tree during verification.
