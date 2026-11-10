@@ -648,3 +648,89 @@ Final fitted-choices full gate: exit 0, 198 spec cases at O0/O2,
 and every workspace Rust target pass. Log: choices-full.log under the
 continuation target directory. No golden changes beyond the held stage
 7/8 outputs; no check was interrupted.
+
+### Corpus and performance
+
+The switch-on corpus audit after fitted choices has 295 cases: 265 kept,
+29 new, one lost checker fixture (types/spec.i, `assert(1 == 2)`, required
+E0520 by §8). No correct existing package is lost. The four original
+runtime equality fixtures have the separately recorded required E0520
+changes; their parameter-based replacements still run at both levels.
+
+Performance sources: §9 says “k-way join”, “bound fusion”, “Cheap Eq and
+Hash”, “Narrowing fast path”, then interning only if those are not enough.
+The new scripts validate warm-ups/check exits, use one warm-up and 11
+sequential samples per binary, retain hashes/load/affinity/all samples,
+and enforce every numeric budget. The note's 1865366 revision has old
+syntax: the supplied new-syntax 1df2fe0 binary is the explicitly labelled
+substitute, checking exactly the same current sources. It accepts std.
+The baseline generalized-calls problem has ticket T1-P1 in
+`tests/t1/performance.md`; it is not conflated with the monomorphic gate.
+
+The four ignored stresses pass at peak two bounds per head per side,
+including all concrete heads, recorded at insertions and copied-bound
+installation. The calls check proves the local binding is indirect and
+all 5000 literals reach its one parameter. The first debug run measured
+39/74 ms for 2500/5000 calls (a debug measurement, not the release gate).
+
+Development checks: the first counter compile hit a Rust borrow error;
+it now computes a local peak before updating the counter. A busy-machine
+exploratory std run was +19.6%, not the quiet gate. Callgrind returned 0
+and warned about its brk segment limit, then produced an instruction
+profile (1.580 billion instructions); this is profiling evidence, not a
+timing substitute. The read-only Norm occurrence walk was deep-cloning
+its whole input at every recursive node. It now borrows that slice;
+K1's invariant/environment traversal is unchanged, and all type goldens
+and independent interpretation checks remain green.
+
+The first scripted run passed std but failed keys' 2× ceiling (2.64×)
+and pick's doubling limit (2.80×). No threshold was changed. Bulk finite
+joins now build one tree, using a sorted singleton batch or a heap merge
+of sorted streams; persistent incremental fusion remains in add_bound.
+The independent infinite-domain model checks every triple combination.
+Narrowing inspects the already-recorded earlier row and hashes taken
+literal candidates. A top-level scalar-row prefix index avoids repeated
+matrix scans for scalar literals and a closing catch-all. Other queries
+retain the full matrix, and no solver constraint is added by the index.
+
+The matrix oracle initially found a difference for a finite subject with
+an earlier literal and a later prefix. That optimization was restricted:
+prefixes, complements and structural tests retain the ordinary matrix's
+conservative decision. A subsequent compile found a missed function
+signature argument during that correction; it was fixed. The final
+oracle agrees on usefulness and exact missing witnesses across finite,
+cofinite, mixed, unknown and empty columns, choices and a closing wildcard.
+Runtime/rejection tests separately require that guarded literals never
+cover later rows. No golden was regenerated for these optimizations.
+
+The first performance full checkpoint passed all gates (200 spec cases,
+1422 std tests at each level, 33 browser tests). A final narrowing
+optimization then skips a whole-head matrix query only when the actual
+top rows are a finite scalar prefix: finitely many Int/String literals
+cannot cover an infinite whole scalar head under Any columns. The matrix
+oracle explicitly checks that fact. The final stage gate is repeated
+after this addition; the earlier checkpoint is not claimed for it.
+
+The timing harness now measures background CPU ticks minus benchmark
+child CPU time. `--require-quiet` makes at most 5% background machine
+capacity an explicit measurement gate, an operational interpretation of
+§9's “quiet window”, separate from the unchanged timing ratios. A manual
+failed-warm-up check found an argparse percent-sign help-string error;
+the help now spells “percent”. A retry also found that `/bin/false` does
+not exist in the Nix environment; the verified run discovers the actual
+executable in the dev-shell PATH. It returns nonzero and records the
+failed warm-up rather than timing it as a success. No system path or
+configuration was changed.
+
+Final performance implementation full gate: exit 0, 200 spec cases at
+O0/O2, 1422 std tests per level, 33 browser tests; fmt, Clippy -D warnings
+and every Rust target pass. Log: perf-final-full.log. old-syntax-check:
+1183 snippets, 17 other-track futures, exit 0. The implementation is a
+committed checkpoint, not a claim that the numeric gate has passed.
+The order of the remaining work is soundness review/full gate, merge of
+latest redesign, final full gate, quiet timing gate on that merged binary,
+and final derived generation. Timing preparation is green under the full
+gate before soundness work starts. The quiet timing criterion stays open;
+the running sampler has seen 15–94% background CPU and has not timed an
+invalid window. This schedules the environmental measurement last rather
+than leaving the authorized soundness review idle while other lanes build.

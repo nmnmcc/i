@@ -9,6 +9,7 @@ use super::{FnTy, Head, Ty};
 use crate::code;
 use crate::hir::*;
 use ilang_syntax::span::Span;
+use rustc_hash::FxHashSet as HashSet;
 use std::collections::HashMap;
 
 const LITERAL_CANDIDATES: bool = true;
@@ -623,7 +624,21 @@ impl Checker<'_> {
             }
         }
         let mut taken = Vec::new();
+        // Under Any columns, a finite literal prefix cannot cover a
+        // whole infinite scalar head. Keep the matrix for every other row.
+        let literal_prefix = place.parent.is_none()
+            && (0..ci)
+                .filter(|i| clauses[*i].guard.is_none())
+                .all(|i| rows[i].iter().all(coverage::scalar_literal_row));
         for (h, n) in candidates {
+            if literal_prefix
+                && matches!(
+                    h,
+                    Head::Named(TypeRef::Builtin(BuiltinType::Int | BuiltinType::String))
+                )
+            {
+                continue;
+            }
             let q = coverage::replace(&rows[ci][choice], id, &Pat::Head(h, n));
             if self.useful(&earlier, &[q], &[Col::Any]).is_none() {
                 let args: Vec<Ty> = (0..n).map(|_| self.s.fresh()).collect();
@@ -639,13 +654,18 @@ impl Checker<'_> {
             }
         }
         if LITERAL_CANDIDATES {
+            let mut scalar_taken: HashSet<Ty> = HashSet::default();
             for (earlier_clause, unguarded, candidate, pat) in &place.scalar_seen {
-                if *earlier_clause >= ci || !unguarded || taken.contains(candidate) {
+                if *earlier_clause >= ci || !unguarded || scalar_taken.contains(candidate) {
                     continue;
                 }
-                let fast = place.parent.is_none() && (0..ci).any(|i| clauses[i].guard.is_none() && rows[i].iter().any(|row| matches!((row,pat),(Pat::Ctor(Ctor::Lit(a),_),Pat::Ctor(Ctor::Lit(b),_)) if a == b)));
+                // The visit record already identifies the earlier clause.
+                // Inspect its actual row, not every earlier row and not a
+                // fitted row (which would erase a failing type test).
+                let fast = place.parent.is_none() && rows[*earlier_clause].iter().any(|row| matches!((row,pat),(Pat::Ctor(Ctor::Lit(a),_),Pat::Ctor(Ctor::Lit(b),_)) if a == b));
                 let q = coverage::replace(&rows[ci][choice], id, pat);
                 if fast || self.useful(&earlier, &[q], &[Col::Any]).is_none() {
+                    scalar_taken.insert(candidate.clone());
                     taken.push(candidate.clone());
                 }
             }
@@ -664,11 +684,15 @@ impl Checker<'_> {
         self.set_module(c.module);
         let col = [Col::of(c.subject.clone())];
         let mut rows: Vec<Vec<Pat>> = Vec::new();
+        let mut scalar_rows = Some(coverage::ScalarRows::default());
         for (pat, guarded, span) in &c.clauses {
-            if self
-                .useful(&rows, std::slice::from_ref(pat), &col)
-                .is_none()
-            {
+            let useful = match &scalar_rows {
+                Some(index) => self.scalar_row_useful(index, pat, &c.subject, &rows),
+                None => self
+                    .useful(&rows, std::slice::from_ref(pat), &col)
+                    .is_some(),
+            };
+            if !useful {
                 let mut message = "this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)".to_string();
                 if let Ok(t) =
                     super::display::shown(&self.s, &c.subject, super::display::Opts::default())
@@ -688,10 +712,18 @@ impl Checker<'_> {
                 self.warning(code::NEVER_USED, *span, message);
             }
             if !guarded {
+                if let Some(index) = &mut scalar_rows
+                    && !index.add(pat)
+                {
+                    scalar_rows = None;
+                }
                 rows.push(vec![pat.clone()]);
             }
         }
-        let missing = self.useful(&rows, &[Pat::Wild(None)], &col);
+        let missing = match &scalar_rows {
+            Some(index) => self.scalar_row_missing(index, &c.subject),
+            None => self.useful(&rows, &[Pat::Wild(None)], &col),
+        };
         if let Some(w) = missing {
             let text = self.show_pat(&w[0]);
             let mut message = format!(

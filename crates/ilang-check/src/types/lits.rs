@@ -156,6 +156,35 @@ impl ValueSet {
             assert!(!sets.is_empty(), "join_all needs a nonempty list");
             return Self::ALL;
         }
+        if sets.len() == 1 {
+            return sets[0].clone();
+        }
+        if sets.len() > 2 && sets.iter().all(Self::is_finite) {
+            // A bulk union builds one tree, rather than copying the
+            // growing tree's search path once per incoming singleton.
+            let items = if sets.iter().all(|s| s.0.as_ref().unwrap().0.items.len == 1) {
+                Set::from_items(sets.iter().flat_map(Self::items).cloned())
+            } else {
+                let mut streams: Vec<_> = sets.iter().map(Self::items).collect();
+                let mut heap = std::collections::BinaryHeap::new();
+                for (i, stream) in streams.iter_mut().enumerate() {
+                    if let Some(v) = stream.next() {
+                        heap.push(std::cmp::Reverse((v, i)));
+                    }
+                }
+                let mut keys = Vec::new();
+                while let Some(std::cmp::Reverse((v, i))) = heap.pop() {
+                    if keys.last() != Some(v) {
+                        keys.push(v.clone());
+                    }
+                    if let Some(v) = streams[i].next() {
+                        heap.push(std::cmp::Reverse((v, i)));
+                    }
+                }
+                Set::from_sorted(keys)
+            };
+            return Self::from_set(false, items).unwrap();
+        }
         let largest = sets
             .iter()
             .enumerate()
@@ -612,6 +641,35 @@ mod tests {
             }
             if let Some(a) = a {
                 assert_eq!(model(&a.complement()), 31 ^ model(&Some(a.clone())));
+            }
+        }
+    }
+
+    #[test]
+    fn bulk_join_matches_the_infinite_domain_model() {
+        // §9's batch join must preserve §4's set algebra, including
+        // duplicate streams, cofinite inputs and the outside value ★.
+        let sets: Vec<_> = (0..16)
+            .flat_map(|mask| {
+                [
+                    ValueSet::only(keys(mask)),
+                    Some(ValueSet::except(keys(mask))),
+                ]
+            })
+            .flatten()
+            .collect();
+        for a in &sets {
+            for b in &sets {
+                for c in &sets {
+                    assert_eq!(
+                        model(&Some(ValueSet::join_all(&[
+                            a.clone(),
+                            b.clone(),
+                            c.clone()
+                        ]))),
+                        model(&Some(a.clone())) | model(&Some(b.clone())) | model(&Some(c.clone()))
+                    );
+                }
             }
         }
     }

@@ -64,6 +64,95 @@ pub(crate) enum Pat {
     Except(Head, ValueSet),
 }
 
+/// A row that names only finitely many top-level scalar values.
+pub(crate) fn scalar_literal_row(p: &Pat) -> bool {
+    match p {
+        Pat::Ctor(Ctor::Lit(Lit::Int(_) | Lit::Str(_)), args) => args.is_empty(),
+        Pat::Or(ps) => ps.iter().all(scalar_literal_row),
+        _ => false,
+    }
+}
+
+/// Index for a prefix containing only top-level Int/String literals.
+/// All other rows retain the ordinary matrix algorithm. A literal prefix
+/// removes exactly these finite sets from the subject, without constraints.
+#[derive(Default)]
+pub(crate) struct ScalarRows {
+    ints: rustc_hash::FxHashSet<String>,
+    strings: rustc_hash::FxHashSet<String>,
+    closed: bool,
+}
+
+impl ScalarRows {
+    fn choices(p: &Pat, out: &mut Vec<Lit>) -> bool {
+        match p {
+            Pat::Ctor(Ctor::Lit(lit @ (Lit::Int(_) | Lit::Str(_))), args) if args.is_empty() => {
+                out.push(lit.clone());
+                true
+            }
+            Pat::Or(alts) => alts.iter().all(|p| Self::choices(p, out)),
+            _ => false,
+        }
+    }
+
+    fn contains(&self, lit: &Lit) -> bool {
+        match lit {
+            Lit::Int(v) => self.ints.contains(v),
+            Lit::Str(v) => self.strings.contains(v),
+            _ => false,
+        }
+    }
+
+    pub fn add(&mut self, p: &Pat) -> bool {
+        fn wild(p: &Pat) -> bool {
+            match p {
+                Pat::Wild(_) => true,
+                Pat::Or(ps) => ps.iter().any(wild),
+                _ => false,
+            }
+        }
+        if self.closed || wild(p) {
+            self.closed = true;
+            return true;
+        }
+        let mut lits = Vec::new();
+        if !Self::choices(p, &mut lits) {
+            return false;
+        }
+        for lit in lits {
+            match lit {
+                Lit::Int(v) => {
+                    self.ints.insert(v);
+                }
+                Lit::Str(v) => {
+                    self.strings.insert(v);
+                }
+                _ => unreachable!(),
+            }
+        }
+        true
+    }
+
+    fn rest(&self, subject: &Ty) -> Ty {
+        let mut excluded = Vec::new();
+        for (b, items) in [
+            (BuiltinType::Int, &self.ints),
+            (BuiltinType::String, &self.strings),
+        ] {
+            if let Some(set) =
+                ValueSet::only(items.iter().map(|v| std::sync::Arc::from(v.as_str())))
+            {
+                excluded.push(Ty::lit(b, set));
+            }
+        }
+        if excluded.is_empty() {
+            subject.clone()
+        } else {
+            Ty::Diff(Box::new(subject.clone()), excluded)
+        }
+    }
+}
+
 /// The values a column of the matrix may have.
 #[derive(Clone, Debug)]
 pub(crate) enum Col {
@@ -351,6 +440,45 @@ pub(crate) fn replace(p: &Pat, id: u32, by: &Pat) -> Pat {
 }
 
 impl Checker<'_> {
+    /// Usefulness after a scalar prefix, with the same full-row semantics.
+    pub(crate) fn scalar_row_useful(
+        &mut self,
+        rows: &ScalarRows,
+        q: &Pat,
+        subject: &Ty,
+        matrix: &[Vec<Pat>],
+    ) -> bool {
+        if rows.closed {
+            return false;
+        }
+        let mut lits = Vec::new();
+        if ScalarRows::choices(q, &mut lits) {
+            let col = Col::of(subject.clone());
+            lits.into_iter()
+                .any(|lit| !rows.contains(&lit) && self.sub_cols(&col, &Ctor::Lit(lit)).is_some())
+        } else if matches!(q, Pat::Wild(_)) {
+            self.useful(&[], std::slice::from_ref(q), &[Col::of(rows.rest(subject))])
+                .is_some()
+        } else {
+            // Prefixes, complements and structural tests retain the full
+            // matrix, including its conservative overlap decisions.
+            self.useful(matrix, std::slice::from_ref(q), &[Col::of(subject.clone())])
+                .is_some()
+        }
+    }
+
+    pub(crate) fn scalar_row_missing(
+        &mut self,
+        rows: &ScalarRows,
+        subject: &Ty,
+    ) -> Option<Vec<Pat>> {
+        if rows.closed {
+            None
+        } else {
+            self.useful(&[], &[Pat::Wild(None)], &[Col::of(rows.rest(subject))])
+        }
+    }
+
     /// A witness of usefulness: a vector of patterns, one for each column,
     /// that matches values that no row matches. `None` when `q` is not
     /// useful.
@@ -1101,6 +1229,110 @@ mod literal_coverage_tests {
         );
         let q = Pat::Except(h, except);
         assert!(ch.useful(&[vec![row[0].clone()]], &[q], &col).is_none());
+    }
+
+    #[test]
+    fn scalar_index_agrees_with_the_full_matrix() {
+        // §9: an optimization may avoid the matrix, but must make the
+        // same usefulness/coverage decisions as the full-row algorithm.
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::create_dir(root.path().join("src")).unwrap();
+        std::fs::write(root.path().join("src/main.i"), "x = 1\n").unwrap();
+        let (graph, ds) = ilang_package::load(root.path());
+        assert!(ds.is_empty());
+        let checked = crate::check(&graph);
+        let p = checked.program.unwrap();
+        let mut ch = Checker::new(&p, &graph.sources);
+        let int = Head::Named(TypeRef::Builtin(BuiltinType::Int));
+        let string = Head::Named(TypeRef::Builtin(BuiltinType::String));
+        let lit = |l| Pat::Ctor(Ctor::Lit(l), Vec::new());
+        let prefix = [
+            lit(Lit::Int("0".into())),
+            lit(Lit::Int("1".into())),
+            lit(Lit::Str("a".into())),
+            lit(Lit::Str("ab".into())),
+        ];
+        let mut queries = prefix.to_vec();
+        queries.extend([
+            lit(Lit::Str("".into())),
+            lit(Lit::Prefix("a".into())),
+            Pat::Head(int, 0),
+            Pat::Head(string, 0),
+            Pat::Except(string, ValueSet::except([std::sync::Arc::from("a")])),
+            Pat::Wild(None),
+            Pat::Or(vec![prefix[0].clone(), prefix[2].clone()]),
+            Pat::Or(vec![prefix[0].clone(), Pat::Wild(None)]),
+            Pat::Ctor(Ctor::Tuple(1), vec![Pat::Wild(None)]),
+            lit(Lit::Float(0)),
+        ]);
+        let inputs = [
+            Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new()),
+            Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new()),
+            Ty::Union(vec![
+                Ty::Con(int, ValueSet::ALL, Vec::new()),
+                Ty::Con(string, ValueSet::ALL, Vec::new()),
+            ]),
+            Ty::lit(
+                BuiltinType::Int,
+                ValueSet::only([std::sync::Arc::from("0"), std::sync::Arc::from("2")]).unwrap(),
+            ),
+            Ty::lit(
+                BuiltinType::String,
+                ValueSet::only([std::sync::Arc::from("a"), std::sync::Arc::from("x")]).unwrap(),
+            ),
+            Ty::lit(
+                BuiltinType::Int,
+                ValueSet::except([std::sync::Arc::from("0")]),
+            ),
+            Ty::lit(
+                BuiltinType::String,
+                ValueSet::except([std::sync::Arc::from("ab")]),
+            ),
+            Ty::Top,
+            Ty::Never,
+            ch.s.fresh_input(),
+        ];
+        for mask in 0..32 {
+            let mut index = ScalarRows::default();
+            let mut rows = Vec::new();
+            for (i, p) in prefix
+                .iter()
+                .chain(std::iter::once(&Pat::Wild(None)))
+                .enumerate()
+            {
+                if mask & (1 << i) != 0 {
+                    assert!(index.add(p));
+                    rows.push(vec![p.clone()]);
+                }
+            }
+            if mask < 16 {
+                // Narrowing uses Any columns. A finite scalar prefix
+                // leaves values of each whole infinite scalar head.
+                assert!(rows.iter().all(|r| scalar_literal_row(&r[0])));
+                for h in [int, string] {
+                    assert!(ch.useful(&rows, &[Pat::Head(h, 0)], &[Col::Any]).is_some());
+                }
+            }
+            for subject in &inputs {
+                let col = [Col::of(subject.clone())];
+                for q in &queries {
+                    let ordinary = ch.useful(&rows, std::slice::from_ref(q), &col).is_some();
+                    assert_eq!(
+                        ch.scalar_row_useful(&index, q, subject, &rows),
+                        ordinary,
+                        "{mask}: {subject:?}, {q:?}"
+                    );
+                }
+                let ordinary = ch.useful(&rows, &[Pat::Wild(None)], &col);
+                let fast = ch.scalar_row_missing(&index, subject);
+                assert_eq!(
+                    format!("{fast:?}"),
+                    format!("{ordinary:?}"),
+                    "{mask}: {subject:?}"
+                );
+            }
+        }
     }
 
     #[test]

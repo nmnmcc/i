@@ -88,6 +88,9 @@ impl Pol {
 
 pub(crate) struct Solver {
     pub vars: Vec<VarState>,
+    /// Peak concrete bounds of one head, on either side of one variable.
+    #[cfg(test)]
+    peak_bound_count: usize,
     /// The level of new variables: one more than the level of the binding
     /// whose value is being typed, for a binding that is generalized.
     pub level: u32,
@@ -136,6 +139,8 @@ impl Solver {
     pub fn new(variance: StdHashMap<TypeId, Vec<Variance>>, type_names: Vec<String>) -> Solver {
         Solver {
             vars: Vec::new(),
+            #[cfg(test)]
+            peak_bound_count: 0,
             level: 0,
             cache: HashSet::default(),
             compared: HashSet::default(),
@@ -186,6 +191,8 @@ impl Solver {
             }
         }
         self.var_mut(v).upper = upper;
+        #[cfg(test)]
+        self.observe_bounds(v, false);
     }
 
     /// Sets the lower bounds of a new variable.
@@ -196,6 +203,8 @@ impl Solver {
             }
         }
         self.var_mut(v).lower = lower;
+        #[cfg(test)]
+        self.observe_bounds(v, true);
     }
 
     fn var(&self, v: V) -> &VarState {
@@ -507,6 +516,10 @@ impl Solver {
         }
         if !bounds.contains(&t) {
             bounds.push(t.clone());
+            #[cfg(test)]
+            if t.head().is_some() {
+                self.observe_bounds(v, lower);
+            }
             if let Ty::Var(w) = &t {
                 if lower {
                     self.var_mut(*w).into.push(v);
@@ -516,6 +529,23 @@ impl Solver {
             }
         }
         true
+    }
+
+    #[cfg(test)]
+    fn observe_bounds(&mut self, v: V, lower: bool) {
+        let bounds = if lower {
+            &self.var(v).lower
+        } else {
+            &self.var(v).upper
+        };
+        let mut counts = HashMap::default();
+        let mut peak = 0;
+        for h in bounds.iter().filter_map(Ty::head) {
+            let n = counts.entry(h).or_insert(0);
+            *n += 1;
+            peak = peak.max(*n);
+        }
+        self.peak_bound_count = self.peak_bound_count.max(peak);
     }
 
     /// The variables reached from `starts` through bounds that are
@@ -1709,5 +1739,116 @@ mod literal_tests {
         s.constrain_env(&strings(&["a"]), &v);
         assert_eq!(s.failures.len(), 1);
         assert_eq!(s.failures[0].kind, FailKind::EnvForms);
+    }
+}
+
+#[cfg(test)]
+mod literal_stress_tests {
+    use crate::hir::{ExprKind, PatternKind, Stmt};
+    use crate::types::infer::Checker;
+    use crate::types::{Head, Ty};
+
+    fn stress(part: &str, n: usize) {
+        // literal-types §9: check real programs and observe peak counts,
+        // not just the final (possibly simplified) type of a definition.
+        let dir = tempfile::tempdir().unwrap();
+        let script =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/t1/gen-stress.py");
+        assert!(
+            std::process::Command::new("python3")
+                .arg(script)
+                .arg(dir.path())
+                .arg(n.to_string())
+                .arg(part)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let (graph, ds) = ilang_package::load(dir.path());
+        assert!(ds.is_empty(), "{ds:?}");
+        let (p, ds) = crate::resolve_program(&graph);
+        assert!(ds.is_empty(), "{ds:?}");
+        let p = p.unwrap();
+        let mut checker = Checker::new(&p, &graph.sources);
+        checker.keep_locals = true;
+        let start = std::time::Instant::now();
+        let (typed, ds) = checker.run();
+        let elapsed = start.elapsed();
+        assert!(ds.is_empty(), "{ds:?}");
+        let locals = typed.locals.unwrap();
+        let solver = locals.s.lock().unwrap();
+        assert!(
+            solver.peak_bound_count <= 2,
+            "{part}({n}): peak {}",
+            solver.peak_bound_count
+        );
+        if part == "calls" {
+            // §6.10: the local function must be indirect and monomorphic.
+            let module = p
+                .modules
+                .iter()
+                .find(|m| Some(m.package) == graph.root)
+                .unwrap();
+            let ExprKind::Fn(f) = &module.bindings[0].binding.value.kind else {
+                panic!("calls function")
+            };
+            let Stmt::Bind(b) = &f.body.stmts[0] else {
+                panic!("local binding")
+            };
+            assert!(!b.direct);
+            let PatternKind::Var(v) = &b.pattern.kind else {
+                panic!("f binder")
+            };
+            let Ty::Fn(f) = &locals.types[&v.var] else {
+                panic!("shared function shape")
+            };
+            let Ty::Var(v) = &f.params[0].1 else {
+                panic!("one shared parameter")
+            };
+            let bound = solver.vars[v.0 as usize]
+                .lower
+                .iter()
+                .find(|t| {
+                    t.head()
+                        == Some(Head::Named(crate::hir::TypeRef::Builtin(
+                            crate::hir::BuiltinType::String,
+                        )))
+                })
+                .unwrap();
+            assert_eq!(
+                bound.values().items().count(),
+                n,
+                "all calls reach the same parameter"
+            );
+        }
+        eprintln!(
+            "{part} n={n}: {elapsed:?}, peak bounds/head/side={}",
+            solver.peak_bound_count
+        );
+    }
+
+    #[test]
+    #[ignore = "literal-types §9 performance gate"]
+    fn t1_stress_match_2000() {
+        stress("pick", 2000);
+    }
+
+    #[test]
+    #[ignore = "literal-types §9 performance gate"]
+    fn t1_stress_calls_5000() {
+        stress("calls", 2500);
+        stress("calls", 5000);
+    }
+
+    #[test]
+    #[ignore = "literal-types §9 performance gate"]
+    fn t1_stress_alias_1000() {
+        stress("alias", 1000);
+    }
+
+    #[test]
+    #[ignore = "literal-types §9 performance gate"]
+    fn t1_stress_nested_50_by_50() {
+        stress("nested", 50);
     }
 }

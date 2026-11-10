@@ -1031,10 +1031,12 @@ impl Norm<'_> {
     fn walk(&self, t: &Ty, pos: bool, occ: &mut HashMap<V, Occ>, order: &mut Vec<V>, env: bool) {
         // Only a union in an output place and an intersection in an input
         // place say that a variable comes with the other members.
-        let (group, together): (Vec<Ty>, bool) = match t {
-            Ty::Union(ms) => (ms.clone(), pos),
-            Ty::Inter(ms) => (ms.clone(), !pos),
-            _ => (vec![t.clone()], true),
+        // This walk only reads the group. Cloning the enclosing tree at
+        // each recursive step costs quadratic work on nested types.
+        let (group, together): (&[Ty], bool) = match t {
+            Ty::Union(ms) => (ms, pos),
+            Ty::Inter(ms) => (ms, !pos),
+            _ => (std::slice::from_ref(t), true),
         };
         for (i, m) in group.iter().enumerate() {
             match m {

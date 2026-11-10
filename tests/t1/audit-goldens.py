@@ -14,6 +14,7 @@ RULES = {
     'L': 'literal-types decision 4: "No widening, no template literal types, no literal arithmetic." Literal leaves retain their value; existing principal inference propagates them through tuples, lists, calls, returns and errors.',
     'P': 'literal-types decision 6: "A literal pattern gets its literal type only in a match." Rule 11 unions those values; fitted/shared places keep their whole head.',
     'K': 'literal-types decision 7: "Rule 13 does not use value sets." Its covariant bounds keep whole scalars and noncovariant parts become fresh holes; known results stay separate.',
+    'H': 'literal-types decision 9/section 5.8: where the host gives a scalar value it must have all its values; inferred export parameters with restricted sets give E0521.',
     'E': 'literal-types decision 8: "E0520 compares value sets." Section 5.4 specifies constant/finite-set messages, False for == and True for !=; only top members are compared.',
     'C': 'literal-types section 5.5: "For a finite column, the missing literal." Listed values specialize first; infinite Int/String columns use the specified concrete witness. Finite scalar clauses can therefore be exhaustive.',
     'W': 'literal-types section 5.3: "When the subject ... has a type with one value, add ... the value matched is always"; usefulness also excludes rows after a covering row.',
@@ -27,6 +28,8 @@ def rule(line, path):
         return 'A'
     if 'E0235' in line:
         return 'F'
+    if 'E0521' in line:
+        return 'L,H'
     if 'E0520' in line:
         return 'E'
     if 'E0516' in line:
