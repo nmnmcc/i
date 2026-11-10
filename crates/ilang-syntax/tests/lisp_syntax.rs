@@ -410,3 +410,27 @@ fn macro_arguments_match_labels_and_attribute_items() {
         .is_err()
     );
 }
+
+#[test]
+fn compiler_answer_names_keep_their_own_identity() {
+    use ilang_syntax::lisp::syntax::{Node, ScopeIdentity, Syntax, validate_expansion};
+    let parameter = root("Key").with_scope_identity(ScopeIdentity::DefinitionParameter {
+        answer: 12,
+        parameter: 0,
+        name: "Key".into(),
+    });
+    let copied = parameter.flip_mark(7).flip_mark(7);
+    assert_eq!(copied.scope_identity(), parameter.scope_identity());
+    let same = Syntax::make(Node::Up("Key".into()), &parameter).unwrap();
+    assert_eq!(same.scope_identity(), parameter.scope_identity());
+    validate_expansion(&same, &[]).unwrap();
+    let changed = Syntax::make(Node::Up("Other".into()), &parameter).unwrap();
+    assert!(validate_expansion(&changed, &[]).is_err());
+    let other_answer = root("Key").with_scope_identity(ScopeIdentity::DefinitionParameter {
+        answer: 13,
+        parameter: 0,
+        name: "Key".into(),
+    });
+    assert!(parameter.same_code(&other_answer));
+    assert_ne!(parameter.scope_identity(), other_answer.scope_identity());
+}
