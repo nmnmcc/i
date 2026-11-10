@@ -381,3 +381,94 @@ requires references; corrected. The first full gate found collapsible_if;
 corrected. A superseded full run was interrupted after adding the deep
 field regression, to prevent duplicate browser use of port 4181. The final
 source ran the whole gate successfully. No persistent environment changed.
+
+### Stage 7 source conflict
+
+Literal inference was implemented experimentally with the required known
+matching, hidden-input, whole-literal-bound, coverage witness and host
+parameter rules. The required empty optional accumulator exposes a conflict
+between §10's runnable example and decision 7 plus rule 13. The reduced
+program, both texts, derivation, measured rejection, and successful annotated
+substitute are recorded in `tests/t1-blockers/README.md`. The user requires
+stopping when a controlling source must change. No amendment is assumed.
+
+Stage-7 work is preserved under target/t1/continued/stage7-work and removed
+from the branch's active sources. Stage 6b is the last verified feature
+checkpoint. No stage 8 work began and no check was weakened. Generated
+stage-7 output changes were regenerated back to the stage-6b state; the new
+stage-6a output alone is retained for the final derived-files commit.
+
+Failed experimental checks, all before restoring the source checkpoint:
+
+- Initial coverage compile: Arc<str> items were converted with the wrong
+  String iterator adapters; corrected before subsequent tests.
+- Initial focused query tests: three failures from changed exact literal
+  types, then a further drop/drop2 expectation; corrected in saved patch.
+- Initial interpretation checks: two malformed fixture setups (missing
+  header separator/std constructor import and a nonexistent export
+  attribute). Corrected to a dependency manifest and wasm.exports. All
+  eight interpretation checks subsequently passed in the workspace run.
+- First spec run: 167/173 passed. Four existing runtime equality programs
+  now hit mandatory E0520 and were routed behind parameters in the patch;
+  two new files lacked std dependencies. The second run passed 172/173;
+  its remaining fixture placed tests under src. Moving them under test
+  exposed the actual E0506 source conflict in the workspace run.
+- First full gate passed Clippy/library tests and stopped at a front-end
+  assertion expecting Int instead of 1 | 2; corrected in the patch.
+- Workspace no-fail-fast run: query and LSP expectations, one package
+  interface expectation, and the E0506 acceptance case failed. Other
+  targets passed. Text-only expectations were corrected in the patch;
+  the acceptance case remains unresolved. No final stage-7 full gate was
+  claimed. The stage-7 release build completed successfully.
+- First reduced reproduction used one too many parent directories for
+  std; corrected. Final reproduced E0506 is the only error. The amended
+  reproduction ran at O0 and O2 with exit 0, explicitly a substitute.
+
+Every operation and artifact stayed in this lane. There was no dependency,
+lockfile, configuration or persistent environment change. The superseded
+stage-6b gate is the only interrupted check. The initial interrupted worker
+work was kept, completed and committed as cb83db1.
+
+The only derived file committed on this continuation is the generated
+`crates/ilang-check/tests/types/may_fail_group.out`. Its individual lines
+are required by these sentences (not by regenerating an expectation):
+
+| Output line | Requiring source sentence/rule |
+|---|---|
+| `pair : (String, () -> Int ! Assert)` | §5.3's self-holder example “gets Assert”; §12 says “before step 7 nothing makes a set other than ALL”, so its literals remain String/Int here. |
+| `identity_pair : ((x: String) -> String, () -> Int ! Assert)` | §5.3: a value reaching the holder “only through the holder's upper bounds” must also be deferred; ordinary fitting constrains the identity's argument/result to String. |
+| `total_pair : ((Int, Int), () -> Int)` | §5.3: “A binding that can not fail adds nothing to its e, which stays Never”; the total tuple example is named explicitly. |
+| `f : (s: String) -> Int` | §5.3: “Every binding ... one fresh variable e for that binding”; the example with an inner Assert statement explicitly requires “no Assert in f's type”. Its written arrow fixes Int. |
+| `s : String` | §12's before-step-7 ALL rule, applied to its literal expression. |
+| `top : Int` | §12's same ALL rule, applied to the literal result of the immediate function call. |
+| `written : () -> Int` | §4.8 rule 4: the body fits the written return/environment; the written arrow retains Int even when the binding is rejected. |
+| E0501 at `28:3` | §5.3: “a failure of a deferred Assert <: e is one error E0501 at the binding's pattern”, with its specified exact text. Top-level environment is Never by §2.5. |
+| E0501 at `34:2` | The same §5.3 sentence; the written function without Assert gives the Never upper bound by rule 4. |
+
+No existing golden remains changed. The discarded experimental stage-7
+outputs are retained only in the ignored audit patch and are not accepted
+as expectations on this branch.
+
+Final verification of the committed checkpoint after merging redesign
+1ce1a7e (stream/URI) into lane/a:
+
+- `ILANG_BROWSER_PORT=4181 ./scripts/dev-verify`: exit 0, including Rust
+  fmt/Clippy/workspace tests, 169/169 spec cases at both O0/O2, 1422 std
+  tests per level, hello/bench, WASI smoke, JavaScript SDK and 33 browser
+  tests. Log: target/t1/continued/source-conflict-final-full.log.
+- `scripts/old-syntax-check`: exit 0, 1096 snippets, exact diagnostics and
+  20 future entries. Log: source-conflict-verified-old-syntax.log in the
+  same directory. T1 future entries remain because its parser is not on.
+- UPDATE=1 checker type generation: exit 0, five tests. No existing output
+  remains changed; only the new deferred-Assert output is committed.
+- The saved experimental binary checking the committed reduced program:
+  exit 1, exactly E0506 at src/main.i:8:22. This confirms the source conflict;
+  it is not a successful T1 stage gate. The annotated substitute ran at
+  both optimization levels with exit 0, as recorded above.
+
+Redesign was checked again at the end and remains 1ce1a7e. The source
+conflict blocks stage 7 acceptance. Written types/narrowing, fitted choices,
+full switched-on corpus audit, performance scripts/budget, final soundness
+review and T1 future-entry removal are not done. No quiet-window performance
+claim or finished-T1 claim is made. The coordinator must amend the §10
+acceptance example or authorize different known-type rules before resumption.
