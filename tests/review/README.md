@@ -6,6 +6,9 @@ Use `scripts/review-corpus run` for full shown-type, diagnostic, O0/O2 test and
 main-output comparisons. `expected.json` is an observed baseline, not evidence
 that the compiler follows the language. `requirements.json` separately records
 known defects and the required result; an unexpected pass requires promotion.
+Accepted temporary packages include one ordinary Nil test to exercise startup,
+including source libraries with no original entry. Censored observations keep
+their raw partial outputs; completed phases still compare exactly.
 
 `tools/` preserves original review generators, finite models and evidence.
 Historical tools contain absolute paths and mutation commands: they are source

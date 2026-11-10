@@ -107,14 +107,37 @@ def compare(paths):
     if groups[0].keys() != groups[1].keys():
         raise SystemExit('workload sets differ')
     for name in groups[0]:
-        row = {'workload': name}
+        censored = [any(s['timeout'] for s in group[name]) for group in groups]
+        exits = [sorted({s['exit'] for s in group[name]}) for group in groups]
+        valid = not any(censored) and exits[0] == exits[1]
+        row = {'workload': name, 'censored': censored, 'exit_codes': exits, 'completion_comparison': valid}
         for metric in ['wall_seconds', 'cpu_seconds', 'peak_rss_bytes']:
             medians = []
             for group in groups:
                 values = [s[metric] for s in group[name]]
                 medians.append(statistics.median(values))
-            row[metric] = {'baseline': medians[0], 'candidate': medians[1], 'ratio': medians[1] / medians[0] if medians[0] else None}
+            row[metric] = {'baseline': medians[0], 'candidate': medians[1], 'ratio': medians[1] / medians[0] if valid and medians[0] else None}
         print(json.dumps(row))
+
+
+def summarize(path):
+    run = json.loads(path.read_text())
+    groups = {}
+    for sample in run['samples']:
+        groups.setdefault(sample['workload'], []).append(sample)
+    summary = {'compiler': run['compiler'], 'binaries': run['binaries'], 'samples': len(run['samples']),
+               'workloads': len(groups), 'censored': [], 'metrics': {},
+               'note': 'Censored values describe observations before the watchdog; they are not completed checker costs. GNU time CPU counters have 0.01-second resolution.'}
+    if len(run['binaries']) != 1:
+        raise SystemExit('summarize a single-binary bundle; use --compare for an interleaved pair')
+    for name, samples in groups.items():
+        if any(s['timeout'] for s in samples):
+            summary['censored'].append(name)
+        summary['metrics'][name] = {metric: {'min': min(s[metric] for s in samples),
+                                           'median': statistics.median(s[metric] for s in samples),
+                                           'max': max(s[metric] for s in samples)}
+                                    for metric in ['wall_seconds', 'cpu_seconds', 'peak_rss_bytes']}
+    return summary
 
 
 def main():
@@ -126,9 +149,17 @@ def main():
     parser.add_argument('--timeout', type=float, default=30)
     parser.add_argument('--filter', default='')
     parser.add_argument('--compare', nargs='+', type=Path)
+    parser.add_argument('--summarize', type=Path)
     args = parser.parse_args()
     if args.compare:
         compare(args.compare)
+        return
+    if args.summarize:
+        summary = summarize(args.summarize)
+        if args.output:
+            dump(args.output, summary)
+        else:
+            print(json.dumps(summary, indent=2))
         return
     if not args.output or args.runs < 2:
         parser.error('recording requires --output and at least two repetitions')

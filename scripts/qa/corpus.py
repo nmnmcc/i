@@ -297,6 +297,17 @@ def run_corpus(args):
         # its raw partial output, but compare only its censored outcome.
         return {k: ({'exit': 'timeout', 'command': v['command']} if v['exit'] == 'timeout' else v)
                 for k, v in outcome.items()}
+    def completed_phases_match(before, after):
+        checker_censored = before['check']['exit'] == 'timeout' or after['check']['exit'] == 'timeout'
+        for phase in before.keys() | after.keys():
+            left, right = before.get(phase), after.get(phase)
+            if left is None or right is None:
+                if checker_censored:
+                    continue
+                return False
+            if left['exit'] != 'timeout' and right['exit'] != 'timeout' and left != right:
+                return False
+        return True
     def observe_case(case):
         bound = args.timeout
         saved = ROOT / case['project'] / 'expected.json'
@@ -314,7 +325,8 @@ def run_corpus(args):
         else:
             old = json.loads(expected_path.read_text())['outcome']
             censored = any(r.get('censored') for r in applicable) and any(v['exit'] == 'timeout' for v in [*old.values(), *result.values()])
-            if comparable(old) != comparable(result) and not censored:
+            same = completed_phases_match(old, result) if censored else comparable(old) == comparable(result)
+            if not same:
                 failures.append(case['id'] + ': full output changed')
                 dump(ROOT / case['project'] / 'actual.json', result)
             elif censored:

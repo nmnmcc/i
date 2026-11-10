@@ -95,6 +95,7 @@ Measure checker workloads separately from the runtime `scripts/bench`:
 scripts/checker-bench --runs 5 --output baseline.json
 scripts/checker-bench --binary /path/to/baseline --candidate /path/to/candidate --runs 5 --output interleaved.json
 scripts/checker-bench --compare baseline.json candidate.json
+scripts/checker-bench --summarize baseline.json --output summary.json
 ```
 
 Use the coordinator's `.rd/cache/quiet` wrapper (it acquires all heavy slots)
@@ -113,6 +114,9 @@ Prior art read before implementation (paths under `.rd/ref`):
 
 - `tsrs/bench/release.mjs`: `release`, `command`, `waitQuiet` — pinned inputs,
   preflight, repeated/interleaved measurements, raw data and visible noise.
+- `tsrs/bench/runner.mjs`: `measureOne`, `metrics`, `hyperfineResults` — retain
+  units, reject incomplete measurements, and distinguish collected counters
+  from unavailable ones. The i comparison omits ratios for censored runs.
 - `tsrs/tasks/determinism/src/runner/regressions.rs`: `selection`, `run` — reject
   empty selection, check the saved baseline, then vary schedules.
 - `tsrs/notes/fuzz-derived-variance.md`: Generator, Findings, Verdict — retain
@@ -124,8 +128,11 @@ Prior art read before implementation (paths under `.rd/ref`):
   assignability/history, widening and reference behavior do not define i.
 - `gleam/compiler-core/src/type_/tests.rs`: `assert_infer`,
   `assert_module_error` — readable source beside inferred types/full errors.
-- `go/test/README.md`, `go/test/alias.go`: black-box regressions and errorcheck
-  annotations — use the existing runner and name the diagnostic requirement.
+- `go/test/README.md`, `go/test/alias.go`, and
+  `go/src/cmd/internal/testdir/testdir_test.go`: `errorCheck` — black-box
+  regressions and error annotations, with normalized paths and explicit
+  missing/unexpected diagnostics. i retains full diagnostics rather than regex
+  matches, while reusing its existing CLI and test runner.
 - `ghc/testsuite/driver/testlib.py`: `expect_broken`, unexpected-pass reporting;
   `tests/typecheck/should_fail/all.T` — named expected failures remain visible.
   i keeps the required result separately, rather than blessing an observed trap.
