@@ -2,6 +2,6 @@ inc : (x: A & Int) -> A
 same : () -> Bool
 other : () -> Bool
 wide : (v: Int) -> Bool
-4:13: warning[W0502]: this value is not used, and working it out does nothing
-6:14: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
-8:19: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
+5:2: warning[W0502]: this value is not used, and working it out does nothing
+11:14: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
+14:19: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)

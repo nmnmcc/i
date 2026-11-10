@@ -1,4 +1,4 @@
-src/main.i:2:4: error[E0213]: `v` is imported, but it is also a top-level name of this module
-src/main.i:2:7: error[E0213]: the type `T` is imported, but this module also defines it
-src/main.i:2:10: error[E0213]: the type `U` is imported, but this module also defines it
-src/main.i:3:5: error[E0213]: `fail` is imported, but it is also a top-level name of this module
+src/main.i:2:3: error[E0213]: `v` is imported, but it is also a top-level name of this module
+src/main.i:2:6: error[E0213]: the type `T` is imported, but this module also defines it
+src/main.i:2:9: error[E0213]: the type `U` is imported, but this module also defines it
+src/main.i:3:4: error[E0213]: `fail` is imported, but it is also a top-level name of this module

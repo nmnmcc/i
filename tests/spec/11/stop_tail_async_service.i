@@ -1,7 +1,7 @@
 // spec: 11.7, B.2, B.5
 // expect: stop "host: value is not correct"
-// at: spec/stop_tail_async_service:22:3
-// at: spec/stop_tail_async_service:33:3
+// at: spec/stop_tail_async_service:26:2
+// at: spec/stop_tail_async_service:37:2
 // output: echo one
 // output: echo two
 // output: two

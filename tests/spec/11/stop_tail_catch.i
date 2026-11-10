@@ -1,7 +1,7 @@
 // spec: 11.7, 9.3
 // expect: stop "panic: boom"
-// at: spec/stop_tail_catch:8:33
-// at: spec/stop_tail_catch:12:3
+// at: spec/stop_tail_catch:10:33
+// at: spec/stop_tail_catch:14:2
 (
 	i/fail
 )

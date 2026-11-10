@@ -1,6 +1,6 @@
 // spec: 6.2
 // expect: stop "panic: first"
-// at: spec/evaluation_order:12:11
+// at: spec/evaluation_order:12:10
 
 // The arguments of a call are worked out from left to right as they are
 // written, also with labels.

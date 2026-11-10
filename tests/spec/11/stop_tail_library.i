@@ -1,7 +1,7 @@
 // spec: 11.7
 // expect: stop "float: result is not finite"
-// at: spec/stop_tail_library:10:3
-// at: spec/stop_tail_library:15:3
+// at: spec/stop_tail_library:11:21
+// at: spec/stop_tail_library:15:2
 (
 	i/core
 )

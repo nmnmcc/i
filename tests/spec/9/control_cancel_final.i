@@ -1,9 +1,9 @@
 // spec: 9.4, 9.5, 11.7
 // expect: stop "panic: final"
-// at: spec/control_cancel_final:16:12
-// at: spec/control_cancel_final:14:5
-// at: spec/control_cancel_final:15:37
-// at: spec/control_cancel_final:13:3
+// at: spec/control_cancel_final:22:11
+// at: spec/control_cancel_final:17:3
+// at: spec/control_cancel_final:19:5
+// at: spec/control_cancel_final:16:2
 (
 	i/control
 	i/resource

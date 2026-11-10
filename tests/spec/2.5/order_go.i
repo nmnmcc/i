@@ -1,7 +1,7 @@
 // spec: 2.5
 // expect: stop "panic: y"
-// at: spec/order_go:14:19
-// at: spec/order_go:11:5
+// at: spec/order_go:18:19
+// at: spec/order_go:14:5
 (
 	i/core
 )

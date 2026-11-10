@@ -1,4 +1,4 @@
-src/main.i:3:4: error[E0212]: `v` is put in by more than one import
-src/main.i:3:7: error[E0212]: `T` is put in by more than one import
-src/main.i:3:7: error[E0212]: the type `T` is put in by more than one import
-src/main.i:3:18: error[E0212]: `x` is put in by more than one import
+src/main.i:3:3: error[E0212]: `v` is put in by more than one import
+src/main.i:3:6: error[E0212]: `T` is put in by more than one import
+src/main.i:3:6: error[E0212]: the type `T` is put in by more than one import
+src/main.i:3:17: error[E0212]: `x` is put in by more than one import

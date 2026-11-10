@@ -1,7 +1,7 @@
 // spec: 11.7, 9.5
 // expect: stop "panic: body"
-// at: spec/stop_tail_ensure:9:28
-// at: spec/stop_tail_ensure:14:3
+// at: spec/stop_tail_ensure:10:41
+// at: spec/stop_tail_ensure:14:2
 (
 	i/resource
 )

@@ -8,4 +8,4 @@ use_update : () -> T
 item : (b: Box(A)) -> A | Int
 use_item : () -> Int
 wrong : (v: A) -> Int
-51:16: error[E0512]: the constructor `B`, which made this value (§7.5), has no field with the label `f` (§4.8 rule 13)
+70:14: error[E0512]: the constructor `B`, which made this value (§7.5), has no field with the label `f` (§4.8 rule 13)

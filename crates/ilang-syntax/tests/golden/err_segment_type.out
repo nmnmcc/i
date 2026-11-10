@@ -1,5 +1,5 @@
 f = (b) {
-  case b {}
+  b |> {}
 }
 --- errors ---
-E0101 @1:25 expected a name, found `Int`
+E0101 @1:24 expected a name, found `Int`

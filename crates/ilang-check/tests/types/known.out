@@ -10,7 +10,7 @@ not_known : (s: Shape) -> Shape
 wrong_ctor : (s: Shape) -> Shape
 no_field : (s: Shape) -> Float
 choice_field : (s: Shape) -> Never
-54:26: error[E0517]: `Circle(..v, …)` needs `v` to be known to be made by `Circle` (§6.7): its type has other constructors, so `v` must be a name matched with `Circle(…)` (§7.5)
-57:19: error[E0517]: `Circle(..v, …)` needs `v` to be known to be made by `Circle` (§6.7): its type has other constructors, so `v` must be a name matched with `Circle(…)` (§7.5)
-63:21: error[E0512]: the constructor `Square`, which made this value (§7.5), has no field with the label `radius` (§4.8 rule 13)
-69:50: error[E0512]: not every constructor of `Shape` has a field with the label `radius` (§4.8 rule 13)
+63:26: error[E0517]: `Circle(..v, …)` needs `v` to be known to be made by `Circle` (§6.7): its type has other constructors, so `v` must be a name matched with `Circle(…)` (§7.5)
+67:17: error[E0517]: `Circle(..v, …)` needs `v` to be known to be made by `Circle` (§6.7): its type has other constructors, so `v` must be a name matched with `Circle(…)` (§7.5)
+74:19: error[E0512]: the constructor `Square`, which made this value (§7.5), has no field with the label `radius` (§4.8 rule 13)
+81:47: error[E0512]: not every constructor of `Shape` has a field with the label `radius` (§4.8 rule 13)

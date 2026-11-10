@@ -5,4 +5,4 @@ part : List(String)
 thunk : List(Int)
 tuple_pattern : List(String)
 unknown : (p: A) -> Never
-19:26: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
+40:4: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`

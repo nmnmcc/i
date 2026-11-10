@@ -1,7 +1,7 @@
 // spec: 13, 11.3
 // expect: stop "float: result is not finite"
-// at: spec/stop_float_from_bits:10:3
-// at: spec/stop_float_from_bits:15:3
+// at: spec/stop_float_from_bits:11:14
+// at: spec/stop_float_from_bits:15:2
 
 (
 	i/core

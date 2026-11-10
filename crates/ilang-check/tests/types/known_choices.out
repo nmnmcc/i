@@ -7,10 +7,10 @@ in_tuple : (p: (T, Int)) -> Never
 subject : (v: T) -> Never
 both : (r: Result(T, T)) -> T
 both_subject : (v: U) -> Int
-7:58: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
-8:64: error[E0517]: `A(..v, …)` needs `v` to be known to be made by `A` (§6.7): its type has other constructors, so `v` must be a name matched with `A(…)` (§7.5)
-9:64: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
-10:61: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
-11:69: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
-12:74: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
-14:52: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
+12:29: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
+19:31: error[E0517]: `A(..v, …)` needs `v` to be known to be made by `A` (§6.7): its type has other constructors, so `v` must be a name matched with `A(…)` (§7.5)
+26:29: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
+33:32: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
+40:33: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
+47:39: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)
+55:25: error[E0512]: not every constructor of `T` has a field with the label `f` (§4.8 rule 13)

@@ -1,7 +1,7 @@
 // spec: 8.3, 11.7
 // expect: stop "bit array: length is negative"
-// at: spec/stop_negative:11:7
-// at: spec/stop_negative:17:3
+// at: spec/stop_negative:11:6
+// at: spec/stop_negative:17:2
 
 make = (n: Int) {
 	b = <<1:u1>>

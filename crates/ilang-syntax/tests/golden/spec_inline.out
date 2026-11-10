@@ -13,23 +13,23 @@ group = { a + b } * c
 
 names = list.map(users, (u) { u.name })
 
-opt = case opt {
+opt = opt |> {
   Some(u) -> u.name
   None -> ""
 }
 
-inter = (x: a & Int) -> a { x }
+inter(A) = (x: A & Int) -> A { x }
 
-user = case u {
+user = u |> {
   User(n = name, ..) -> n
   User(age, name) -> name
 }
 
-test = case v {
+test = v |> {
   True | _: Int -> 1
 }
 
-whole = case s {
+whole = s |> {
   whole = "lit" <> rest -> rest
 }
 
@@ -41,6 +41,6 @@ labelled: (x: Int) -> Int = (y) { y }
 
 diff = (x: { Int | String | Nil } - String) { x }
 
-yield = (n: { Yield(a) | n } - Yield(a)) { n }
+yield(A, N) = (n: { Yield(A) | N } - Yield(A)) { n }
 
 update = m.c(..v, f: 1)

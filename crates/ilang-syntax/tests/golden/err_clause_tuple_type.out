@@ -1,3 +1,4 @@
-f = case p {}
+f = p |> {}
 --- errors ---
-E0101 @2:33 expected `->`, found `}`
+E0114 @2:10 `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`
+E0101 @2:31 expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`

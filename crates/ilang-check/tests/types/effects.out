@@ -9,4 +9,4 @@ first : (r: Result(A, B)) -> A ! Assert
 pair : (t: (A, B)) -> A
 head : (List(A)) -> A ! Assert
 unwrap : (Result(Int, A)) -> Int
-51:21: error[E0501]: `Assert` is not a subtype of `Never`
+66:21: error[E0501]: `Assert` is not a subtype of `Never`

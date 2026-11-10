@@ -11,4 +11,4 @@ checked : () -> Result(Int, AssertionFailure)
 checked_library : () -> Result(String, AssertionFailure)
 inc : (x: A & Int) -> A
 mixed : List(Int | String)
-74:13: warning[W0502]: this value is not used, and working it out does nothing
+101:2: warning[W0502]: this value is not used, and working it out does nothing

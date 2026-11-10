@@ -6,6 +6,6 @@ nested_choice : (r: Result(Result(A, A), A)) -> A
 shared : (r: Result(Int | String, A)) -> A | Int
 shared_list : (xs: List(Int | String)) -> Int
 shared_tuple : (p: (Int | String, Bool)) -> Int
-39:8: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Ok(_: Int)`
-46:8: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[_: Int, ..]`
-53:8: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(_: Int, _)`
+45:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Ok(_: Int)`
+53:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[_: Int, ..]`
+61:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(_: Int, _)`

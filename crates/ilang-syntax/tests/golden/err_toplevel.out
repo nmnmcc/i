@@ -1,6 +1,3 @@
-f(x)
-
-Some(x) = y
-
-@external("m", "f")
-g = 1
+Some(X) = Y
+--- errors ---
+E0101 @1:1 expected an item: a type definition, or a binding `pattern = value`, found `1`

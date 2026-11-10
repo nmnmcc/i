@@ -14,5 +14,5 @@ use_string : () -> Int | String
 state_int : () -> Int ! State(Int)
 state_str : () -> Int ! State(String)
 both : () -> Int ! State(Int) | State(String)
-13:38: warning[W0502]: this value is not used, and working it out does nothing
-47:8: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)
+22:3: warning[W0502]: this value is not used, and working it out does nothing
+72:8: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)
