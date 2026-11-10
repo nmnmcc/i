@@ -7,7 +7,9 @@ Status: proposal for review (stream C, step C-D). Base commit `dcb19df`. All fil
 - An async host import gets one more Wasm parameter, placed first: an `i32` **request id** that the module picks.
 - The resume export becomes `ilang_resume:ns:label(id, results...) -> status`.
 - Status 1 now means "waiting for one or more outstanding requests". A host may answer outstanding requests in any order, one at a time.
-- Compiled modules still keep at most one request outstanding in this stream. Many outstanding requests from one module come with `i/task` in stream R2, and R2 needs no ABI change, because the hosts already accept many requests in any order.
+- Status 2 is new: "I can go on without an answer". The host first gives the answers that are already done, and otherwise calls the new export `ilang_continue`. This lets the `i/task` scheduler of R2 pick up finished IO while some task can still run.
+- A new runtime import `ilang:host/v1.cancel(id)` drops one outstanding request.
+- Compiled modules still keep at most one request outstanding in this stream, never return status 2 and never import `cancel`. A hand-written fixture tests all three. Many outstanding requests from one module come with `i/task` in stream R2. R2 needs no other ABI change for the needs known today (section 6.4); a new runtime import, status or export later means version 4.
 - The ABI version becomes 3 everywhere. Hosts refuse every other version with a clear message.
 - The Rust host stops starting one OS thread for every Wasm call. `i run` and `i test` run each program on one long-lived thread with a big stack, and that thread also runs a tokio `current_thread` runtime. This runtime is the reactor that `i/clock`, `i/net` and `i/fs` need later.
 - Wasmtime fibers (its async support) are not used. Stack depth, trap texts and stop messages stay byte-identical.
@@ -42,9 +44,18 @@ Reason: this is the smallest change that lets R2 keep many requests outstanding.
 
 ### D3. How a request ends
 
-A request ends in one of three ways: its resume is called; the async entry point ends (status 0) while it is still outstanding; or the instance traps or the host fails. In the last two cases the host drops the work and never answers it.
+A request ends in one of four ways: its resume is called; the module calls the runtime import `cancel(id)` (D12); the async entry point ends (status 0) while it is still outstanding; or the instance traps or the host fails. In the last three cases the host drops the work and never answers it.
 
-Reason: dropping at status 0 lets R2 end a task without a cancel import. A `cancel(id)` runtime import is a planned R2 addition, not part of v3: no module needs it before R2, and an import that no compiler emits would be untested.
+Reason: dropping at status 0 lets a program end without waiting for work it no longer needs.
+
+### D12. v3 already has what the R2 scheduler needs: `cancel` and status 2
+
+Spec §B.6 says the host must give every import in `ilang:host/v1`, or making the instance fails. So a runtime import added later breaks every older host, and that is exactly what the version number reports. The same holds for a new status value or a new export that the host must call. So v3 carries the two things an M:1 scheduler needs, and later additions of this kind bump the version:
+
+- `cancel(id: i32)`, a runtime import: the module drops one outstanding request. The host drops its work and never answers it. A scheduler needs this to end one task (for example a timeout around a read) while the entry point goes on.
+- Status 2, "runnable", with a new export `ilang_continue() -> status`. Without it, a host calls the module back only after status 1, and status 1 is right only when no task can run. A task that loops with `task.yield()` would then starve every task that waits for IO (a sleeping task never wakes; a server never sees the next `accept`). With status 2 the scheduler returns at its scheduling points; the host lets the reactor run once, gives every answer that is done, and calls `ilang_continue` when there is none. This is the role of Go's netpoller check in its scheduler. How often R2 returns status 2 is R2's choice.
+
+Compiled modules of stream C use neither. The hand-written fixture tests both on both hosts (sections 8 and 10), so neither is untested code.
 
 ### D4. No Wasmtime fibers (needs approval)
 
@@ -67,11 +78,13 @@ Reason: the cost today is one thread per Wasm call. One long-lived thread remove
 
 `block_on` gains the bounds `F: Future + Send, F::Output: Send`. This is a breaking change for an embedder that passes a future that is not `Send`. All in-repo callers pass `Instance` futures. `invoke_in` already takes `impl AsContextMut<Data = State> + Send` (lib.rs:1163), and `ServiceFuture` is `Send` (lib.rs:479), so these futures are `Send`. The tests check this at compile time (T15). Embedders with a future that is not `Send` keep using `call_async` on their own executor, which takes the fallback path. The public docs of `block_on` and `call_async` say both things in one sentence each.
 
+A second breaking change: sync services and externals now run inside a tokio runtime context. Under v2 each Wasm call ran on a fresh thread with no runtime, so a sync service could build its own runtime and `block_on` it, or use a blocking client such as `reqwest::blocking`. Now such a service panics with tokio's "Cannot start a runtime from within a runtime". Tokio has no public way to leave a runtime context, so the host cannot hide this. The docs of `ServiceFunction` and the changelog say: a service that needs its own runtime or a blocking client is written as an async service, or starts its own thread and joins it. T16 checks the second way.
+
 ### D6. The work of a request starts lazily: one rule for every path
 
 The start closure of an async service runs during the import. The future it returns is first polled when the host next waits, after the Wasm call has returned. This is the same on the `ilang` thread and on the fallback path.
 
-The rule for service authors, written in `services.rs` and allowed by spec §B.4: **fix anything that depends on time, such as a deadline, in the start closure, and copy the inputs there; do not do it inside the future.** For example `let deadline = Instant::now() + d; Box::pin(async move { sleep_until(deadline).await; ... })`. Services do not `tokio::spawn`; the host owns every future, so dropping a request drops its work with nothing left running.
+The rule for service authors, written in `services.rs` and stated in spec §B.4 (section 4): **fix anything that depends on time, such as a deadline, in the start closure, and copy the inputs there; do not do it inside the future.** For example `let deadline = Instant::now() + d; Box::pin(async move { sleep_until(deadline).await; ... })`. Services do not `tokio::spawn`; the host owns every future, so dropping a request drops its work with nothing left running.
 
 Reason: an "eager" start that spawns the work on the `current_thread` runtime does not help. A task spawned on that runtime is not polled until the thread goes back to the runtime, which is after the Wasm call returns, so a timer made inside the task would still count from the wait. Polling once inside the import would need a waker and a runtime context inside a host function. Lazy start with the rule above is simpler and is the same on every path.
 
@@ -79,11 +92,13 @@ Reason: an "eager" start that spawns the work on the `current_thread` runtime do
 
 The module does not guard sync entry points, tests or host exports while an async entry point waits. `$async_begin` and `$async_result` keep their existing checks. The Rust host refuses through `usable()` and the `&mut Instance` borrow; the JS host through `bridge.waiting`.
 
-Reason: a guard in every sync export would change the WAT of every module and edit `emit/mod.rs`, which is outside stream C. With host-side checks, a module with no async import changes only in its version string, so the WAT checks of the other lanes stay valid.
+Reason: a guard in every sync export would change the code that `emit/mod.rs` writes for each export, which is outside stream C.
+
+What does change in every module: `emit/mod.rs` (mod.rs:181-182) adds `host::EFFECTS` to every module, WASI included, with no check of the target or the imports. `$host_pending`, `$async_begin`, `$async_result` and `$async_run` live in that block. So every module, sync and WASI ones too, gets the same new text there: the three globals of section 6.1 instead of `$host_pending`, the `$req_*` functions, and the new bodies of `$async_begin`, `$async_result` and `$async_run`. Writing this only when a module has async imports is not possible without editing `emit/mod.rs` and every caller, because `$async_begin` is always there and refers to it. The change is one fixed block of text, the same in every module, so the WAT audit of the other lanes treats it as one known diff (section 6.6).
 
 ### D8. A one-entry request table in the module, with a fixed interface
 
-`emit/host.rs` gets three small functions, `$req_start`, `$req_answer` and `$req_outstanding`, that are the whole request table of the module. In stream C the table has one entry. R2 replaces the bodies with a real table and keeps the callers. Answers still go through the per-import globals `$hr{i}_*`, which is correct only while one request is outstanding (section 6.4).
+`emit/host.rs` gets four small functions, `$req_start`, `$req_answer`, `$req_outstanding` and `$req_clear`, that are the whole request table of the module. In stream C the table has one entry. R2 replaces the bodies with a real table and keeps the callers. Answers still go through the per-import globals `$hr{i}_*`, which is correct only while one request is outstanding (section 6.4).
 
 Reason: it keeps the change in C small, and it gives R2 one place to take over.
 
@@ -96,27 +111,29 @@ The version is 3 in the compiler, the Rust host, the JS SDK, the fixtures and th
 
 ### D10. Hosts keep a request table keyed by id
 
-- Rust: `requests.rs` keeps the request data in a map from id, and the work futures in a `FuturesUnordered` (from `futures-util`, already in `Cargo.lock`), so each wake polls only the futures that were woken.
+- Rust: `requests.rs` keeps the request data in a map from id, and the work futures in a `FuturesUnordered` (from `futures-util`, already in `Cargo.lock`), so each wake polls only the futures that were woken. Each work future is wrapped in `futures_util::future::Abortable`, and the map keeps its `AbortHandle`, so `cancel(id)` can stop one future.
 - JS: a `Map` from id to entry, a FIFO of settled answers and one wake resolver. A settle is kept only while `requests.get(id) === entry`, so a late settle of a dropped request is ignored. Answers are given in the order they settle.
 
 ### D11. Tests are deterministic
 
-The out-of-order tests use a "gate" service whose answer order comes from a seeded permutation, not from timers. The timer test uses tokio paused time. The JS tests resolve gates one at a time with a macrotask yield in between, so the order does not depend on how many promise steps the SDK puts around the work.
+The out-of-order tests use a "gate" service: at each step a seeded random choice among the requests that are outstanding at that moment is answered next, not a timer. The timer test uses tokio paused time. The JS tests resolve gates one at a time with a macrotask yield in between, so the order does not depend on how many promise steps the SDK puts around the work.
 
 ## 3. Exact rules (ABI v3)
 
 - **R1. Request id.** An async import (target `ilang` only) has the Wasm parameters `(i32 id, B.2 parameters...)` and no results. The id is 0 or more, and differs from the id of every outstanding request of the instance. "Outstanding" means started and not yet answered or dropped. An id may be used again after its request has been answered or dropped. In stream C the compiler takes ids from a counter that starts at 0 and wraps at 2^31; with one outstanding request, a late or stale id is never outstanding.
-- **R2. When a request may start.** An async import may only be called during a call of an async entry point or of `ilang_resume:…`. The host makes the import trap, and does not use the instance again, when it is called at another time (during `ilang_start`, a sync entry point, a test that is not async, a host export, `ilang_result:…`, or inside another import), or with an id that is below 0 or already outstanding. In the Rust host this is the `accepting` flag of the request table; in JS, `bridge.accepting`. Compiled modules cannot do this: `$host_root_boundary` already traps outside an async entry point.
+- **R2. When a request may start.** An async import, and `cancel`, may only be called during a call of an async entry point, of `ilang_resume:…` or of `ilang_continue`, and not inside another import. The host makes the import trap, and does not use the instance again, when it is called at another time (during `ilang_start`, a sync entry point, a test that is not async, a host export that is not async, `ilang_result:…`, or during an import, which includes a call such as `ilang_alloc` that the host makes into the module while an import runs), or with an id that is below 0 or already outstanding. In the Rust host this is the `accepting` flag of the request table; in JS, `bridge.accepting`. The async calls set it to true only around the Wasm call of the export. Every import wrapper (sync service, external, runtime import, async import) saves the flag, sets it to false while the host function runs, and puts the saved value back when it returns. So `Bridge::write` (lib.rs:1499), which calls `ilang_alloc` while a sync import lowers its reply, runs with the flag false. Compiled modules cannot break this rule: `$host_root_boundary` already traps outside an async entry point, and `ilang_alloc` makes no imports.
 - **R3. Copy at start.** The module frees the parameter buffers when the import returns (§B.3), so the host copies `Int`, `String` and `BitArray` parameters during the import. Both hosts already lift (copy) the parameters during the call.
-- **R4. Status.** After an async entry point or a resume returns, 0 means ended and 1 means waiting with one or more outstanding requests. Another value is a fault of the module: the instance is not used again. Status 1 with no outstanding request is also a fault of the module, because the program can never go on: "the module waits, but no host function is running".
+- **R4. Status.** After an async entry point, a resume or `ilang_continue` returns, 0 means ended, 1 means waiting with one or more outstanding requests, and 2 means runnable (R14). Another value is a fault of the module: the instance is not used again. Status 1 with no outstanding request is also a fault of the module, because the program can never go on: "the module waits, but no host function is running".
 - **R5. Answer.** The host answers by calling `ilang_resume:ns:label(id, results...)` for an outstanding id that the import `ns.label` started. Only one resume runs at a time, and never inside another Wasm call of the instance. The host may answer any outstanding request whose work is done; ilang-host and the JS SDK answer in completion order. Result buffers are made with `ilang_alloc` just before the resume that carries them. A finished answer that has not been delivered stays a host value, so a later trap leaks nothing in linear memory.
 - **R6. Wrong resume.** A resume with an id that is not outstanding, or that another import started, traps with a bare `unreachable` and no stop message: it is a host bug, not a program stop. Both hosts check first and fail with their own text: "the host answered request {id}, which is not outstanding".
-- **R7. Leftovers at status 0.** When the status is 0 while requests are still outstanding, the host drops them and never answers them. Rust drops the future, which cancels it; JS forgets the entry and ignores a late settle. Compiled modules of stream C never leave requests open. The rule is there so that R2 can end a task without a cancel import.
+- **R7. Leftovers at status 0.** When the status is 0 while requests are still outstanding, the host drops them and never answers them. Rust drops the future, which cancels it; JS forgets the entry and ignores a late settle. The module clears its own table on the same path: `$async_run` calls `$req_clear` before it gives status 0, so `$async_result` and the next `$async_begin`, which trap while a request is outstanding, see an empty table. Compiled modules of stream C never leave requests open, so `$req_clear` does nothing for them; it is there so that the rule holds unchanged when R2 replaces the table.
 - **R8. Trap.** When any call traps (a stop or another trap) while requests are outstanding, the host drops every outstanding request and every finished answer that was not delivered, before it reports the outcome. The instance is not used again, and a late answer never wakes it. The outcome shapes stay the same: `Outcome::Stop` for a stop, `Err(Stop)` for a stop during `ilang_start`, and a failure for a host failure.
 - **R9. Host failure.** When a work future gives `Err(...)` (a failure, not an `? E` error, which is an answer), the host drops all other outstanding requests, does not use the instance again, and returns the error. This is v2's behaviour extended to many requests.
-- **R10. One async entry point at a time.** While an async entry point waits, the host calls only `ilang_resume:…`, `ilang_alloc` and `ilang_free`. `$async_begin` and `$async_result` trap if a request is outstanding; other exports do not check (D7). Hosts refuse such calls before they reach Wasm.
-- **R11. Dropping a waiting call (Rust).** If the future of `call_async` or `run_async` is dropped while it waits, the instance is not used again ("an async call was dropped while it waited"), and its requests are dropped with it. Implementation: `wait()` sets `unusable` to that text before its first await and clears it only when it returns normally.
-- **R12. WASI.** `host_is_async` (lower.rs:937) is false on the WASI target, so there are no ids, no resume exports and no change to imports. WASI metadata still says version 3.
+- **R10. One async entry point at a time.** While an async entry point waits or is runnable, the host calls only `ilang_resume:…`, `ilang_continue`, `ilang_alloc` and `ilang_free`. `$async_begin` and `$async_result` trap if a request is outstanding; other exports do not check (D7). Hosts refuse such calls before they reach Wasm.
+- **R11. Dropping a waiting call (Rust).** If the future of `call_async` or `run_async` is dropped while it waits, the instance is not used again ("an async call was dropped while it waited"), and its requests are dropped with it. The work futures live in `State.requests` inside the `Store`, not in the call future, so dropping the call future alone would keep them alive until the `Instance` is dropped. Implementation: `wait()` holds a drop guard that owns the `&mut Instance` borrow, and the loop reaches the instance through the guard. Unless the guard is disarmed by a normal return, its `Drop` sets `unusable` to that text and calls `requests.drop_all()`. So the work is dropped at the moment the call future is dropped.
+- **R12. WASI.** `host_is_async` (lower.rs:937) is false on the WASI target, so there are no ids, no resume exports and no change to imports. WASI metadata still says version 3. The shared `host::EFFECTS` block changes in WASI modules as in every module (D7), but nothing in a WASI module calls it with a request.
+- **R13. Cancel.** The runtime import `ilang:host/v1.cancel(id: i32)` (no results) drops the outstanding request `id`: the host drops its work, drops a finished answer that was not delivered, and never answers it. The id may be used again at once. It follows R2: called at another time, or with an id that is not outstanding, it traps and the host does not use the instance again ("the module cancelled request {id}, which is not outstanding"). A host gives `cancel` to every v3 module that imports it.
+- **R14. Status 2, runnable.** Status 2 means the module can go on without an answer. The host then lets its IO run once without waiting (Rust: `tokio::task::yield_now().await`, so the `current_thread` runtime polls its timer and IO drivers; JS: one macrotask yield), and looks for a request whose work is done, without waiting for one. If there is one, it answers it as in R5, and the resume gives the next status. If there is none, it calls the export `ilang_continue` (no parameters, result `i32` status). Status 2 with no outstanding request is allowed. A module that returns status 2 must export `ilang_continue`; if it does not, it is a fault of the module ("the module is runnable, but has no ilang_continue"). Compiled modules of stream C never return 2 and do not export `ilang_continue`.
 
 ## 4. Spec text, section by section
 
@@ -132,28 +149,34 @@ Add at the end of the last paragraph:
 
 Replace the bullet "Async functions of host services" with:
 
-> - **Async functions of host services**: the import has an `i32` **request id** first, then the parameters of §B.2, and no results. The host copies the parameters, keeps the request, and returns at once. The work may start at any time before the host next waits. The answer comes later through `ilang_resume` (§B.5). Until then the request is **outstanding**.
->   - The module chooses the id: a number of 0 or more that no other outstanding request of the instance has. After a request is answered or dropped (§B.5), its id may be used again.
->   - The module calls an async function only during a call of an async entry point or of `ilang_resume:…`. If it calls one at another time, or with an id that is below 0 or already outstanding, the import traps and the host does not use the instance again.
+> - **Async functions of host services**: the import has an `i32` **request id** first, then the parameters of §B.2, and no results. The host copies the parameters, keeps the request, and returns at once. The answer comes later through `ilang_resume` (§B.5). Until then the request is **outstanding**.
+>   - The work may first run only when the host next waits, after the import has returned. So anything that depends on the time of the call, such as the deadline of a sleep, is fixed during the import, and the parameters are copied then.
+>   - The module chooses the id: a number of 0 or more that no other outstanding request of the instance has. After a request is answered, cancelled or dropped (§B.5), its id may be used again.
+>   - The module calls an async function only during a call of an async entry point, of `ilang_resume:…` or of `ilang_continue`, and not while an import runs (also not from a call such as `ilang_alloc` that the host makes during an import). If it calls one at another time, or with an id that is below 0 or already outstanding, the import traps and the host does not use the instance again.
+
+In the list of runtime imports, add:
+
+> - `cancel(id: i32)` drops the outstanding request `id` (above): the host stops its work if it can and never answers it, and the id may be used again. It may be called at the same times as an async function. With an id that is not outstanding, it traps and the host does not use the instance again.
 
 ### §B.5 Exports
 
 Replace the bullets from "Async entry points" to the end of the section with:
 
-> - **Async entry points** (§10.2) have the parameters above and one result, an `i32` **status**. 0 means the entry point has ended. 1 means it is **waiting**: it has one or more outstanding requests (§B.4), and it goes on only when the host answers one. Another status is a fault of the module.
+> - **Async entry points** (§10.2) have the parameters above and one result, an `i32` **status**. 0 means the entry point has ended. 1 means it is **waiting**: it has one or more outstanding requests (§B.4), and it goes on only when the host answers one. 2 means it is **runnable**: it can go on without an answer. Another status is a fault of the module.
+> - When the status is 2, the host lets its own work run once without waiting, then answers a request whose work is done, if there is one. If there is none, it calls the export `ilang_continue`, with no parameters, whose result is a status again. A module that gives status 2 has this export.
 > - The host answers a request by calling the export `ilang_resume:namespace:label` of the function that started it. The first parameter is the request id, and the others are the results of the function as in §B.2. The result is a status again. The host may answer outstanding requests in any order, but one at a time. It makes the result buffers with `ilang_alloc` just before the call that gives them.
 > - A call of `ilang_resume:…` with an id that is not outstanding, or that another function started, traps.
 > - When the status is 1 and no request is outstanding, the program can never go on. This is a fault of the module, and the host does not use the instance again.
 > - When the status is 0, the host calls the export `ilang_result:name` of the entry point, with no parameters, to get its results as in §B.2. Requests that are still outstanding are dropped: the host stops their work if it can and never answers them. This lets a program end work that it no longer needs; a module made by this compiler has no outstanding request at that point.
 > - When the work of an async function fails in the host (not an error of its `? E`, which is an answer), the host drops every outstanding request and does not use the instance again.
-> - While an async entry point is waiting, the host may only call `ilang_resume:…`, `ilang_alloc`, and `ilang_free`. So an instance runs one async entry point at a time. The module does not check every export for this; a host that calls another export breaks the instance.
+> - While an async entry point is waiting or runnable, the host may only call `ilang_resume:…`, `ilang_continue`, `ilang_alloc`, and `ilang_free`. So an instance runs one async entry point at a time. The module does not check every export for this; a host that calls another export breaks the instance.
 > - When the program stops, the export traps after the `panic` import (§B.4). After a trap, the host may not use that instance of the module again. Every outstanding request is dropped, and an answer that comes later is ignored. The host makes a new instance and calls `ilang_start` on it.
 
 ### §B.6 Metadata
 
 In the JSON example, `"version": 2` becomes `"version": 3`. Add this bullet first:
 
-> - `version` is 3. A host refuses a module with another version. Version 3 differs from version 2 only in the request id of §B.4 and §B.5, so a module of an older version must be built again.
+> - `version` is 3. A host refuses a module with another version, so a module of an older version must be built again. Version 3 differs from version 2 in these ways: an async function has a request id; status 1 means one or more outstanding requests, not exactly one, and the host may answer them in any order; status 2 and `ilang_continue` are new; the runtime import `cancel` is new; outstanding requests are dropped when the entry point ends, on a trap, and when the work fails in the host; and an async function may only be called during an async entry point, a resume or `ilang_continue` (§B.4). A runtime import, status or export that a host must handle is added only with a new version.
 
 ### §B.7 The WASI target
 
@@ -218,26 +241,35 @@ pub(crate) fn on_ilang_thread() -> bool { ON_ILANG_THREAD.get() }
 - `State.pending: Vec<Pending>` (lib.rs:607) becomes `State.requests: Requests`.
 - `invoke_in` (lib.rs:1162): if `run::on_ilang_thread()`, call `function.call(&mut *context, params, results)` directly. Otherwise use today's scoped thread and enter `Handle::try_current()` inside it. The error path calls `requests.drop_all()` instead of `pending.clear()` (lib.rs:1185).
 - `define_import` (lib.rs:1324): for an async service, the `FuncType` is `[I32] ++ signature.param_types()` with no results. Read the id from `parameters[0]` and lift the B.2 parameters from offset 1. Call `requests.start(id, request)`. On `Err`, set `state.failure` with the text of the error and return the trap error, so the existing failure path marks the instance unusable.
-- `call_async` (lib.rs:965) and `run_async` (lib.rs:1019) set `requests.accepting = true` only around the call of the async export. `call`, `run` and `ilang_start` leave it false (R2). At the start of `call_async`, an outstanding request cannot exist because `usable()` refuses; assert it as an internal error.
+- Every import wrapper made by `define_import` and the runtime imports saves `requests.accepting`, sets it to false while the host function runs, and puts it back on return, also on the error path (R2).
+- A new runtime import `ilang:host/v1.cancel(i32)` calls `requests.cancel(id)`; on `Err` it fails like an async import with a bad id.
+- `call_async` (lib.rs:965) and `run_async` (lib.rs:1019) set `requests.accepting = true` only around the Wasm call of the async export, after the parameters are lowered. `call`, `run` and `ilang_start` leave it false (R2). At the start of `call_async`, an outstanding request cannot exist because `usable()` refuses; assert it as an internal error.
 - `wait(name, status)` (lib.rs:1038):
 
 ```text
-self.unusable = Some("an async call was dropped while it waited")   // R11
+let mut this = WaitGuard::new(self)       // R11: Drop sets unusable and calls requests.drop_all()
 loop {
-  match status { 0 => { requests.drop_all(); self.unusable = None; return Ok(None) }   // R7
-                 1 => {}
-                 other => fault("status {other} of {name}") }
-  let Some((id, request, reply)) = requests.next().await
-      else fault("the module waits, but no host function is running")                // R4
+  let (id, request, reply) = match status {
+    0 => { requests.drop_all(); this.disarm(); return Ok(None) }                    // R7
+    1 => match requests.next().await {
+           Some(done) => done,
+           None => fault("the module waits, but no host function is running") }    // R4
+    2 => { tokio::task::yield_now().await                                           // R14
+           match requests.next().now_or_never().flatten() {
+             Some(done) => done,
+             None => { status = call_with_accepting("ilang_continue", []); continue } } }
+    other => fault("status {other} of {name}") }
   match reply { Err(failure) => { requests.drop_all(); unusable = failure; return Err } // R9
                 Ok(answer) => {} }
   let resume = export("ilang_resume:{ns}:{label}")
-  let mut values = lower_reply(answer)       // allocates now (R5)
+  let mut values = lower_reply(answer)       // allocates now, with accepting false (R5)
   values.insert(0, Val::I32(id))             // the id goes in at the call site
-  requests.accepting = true; status = invoke_in(resume, values); requests.accepting = false
+  status = call_with_accepting(resume, values)   // accepting = true only around invoke_in
   settle(...)                                // a trap goes through invoke_in, which drops all (R8)
 }
 ```
+
+On a fault or an error return, `wait()` sets `unusable` to its own text, drops the requests and disarms the guard, so the guard's text is used only when the call future is dropped. A missing `ilang_continue` is a fault (R14).
 
 - `Program::run_entry` (lib.rs:742), `Program::run_test` (lib.rs:767) and the new public `Program::run_test_with(&self, name, options)` wrap their bodies in `run::block_on(async { ... })`. `run_test` calls `run_test_with`.
 - Docs of `call_async` and `block_on`: "Called from a thread that `block_on` did not start, each Wasm call starts its own thread with a stack of `THREAD_STACK` bytes." and "`block_on` needs a `Send` future; with a future that is not `Send`, await `call_async` on your own executor."
@@ -259,15 +291,18 @@ impl Requests {
     /// The next finished request, or None when nothing is outstanding.
     /// The id is removed from `outstanding` before it is returned.
     pub async fn next(&mut self) -> Option<(u32, Request, Result<Result<Value, Value>>)>;
+    /// R13: aborts the work of `id` and forgets it.
+    pub fn cancel(&mut self, id: i32) -> Result<()>;
     pub fn drop_all(&mut self);
 }
 ```
 
-The error texts of `start`: "the module started request {id} outside an async call", "the module started request {id}, which is below 0", "the module started request {id} twice". `next` returns `None` at once when `outstanding` is empty. R2 takes over this file when it adds `cancel(id)`.
+The error texts of `start`: "the module started request {id} outside an async call", "the module started request {id}, which is below 0", "the module started request {id} twice". `cancel` uses the R13 text and the same "outside an async call" text. `next` returns `None` at once when `outstanding` is empty. It skips a future that ends as `Aborted`, and a future whose id is no longer in `outstanding` or now belongs to a newer request (each entry keeps a sequence number, and the future carries it). An aborted future is dropped at the latest when `next` next polls it, which is before the next answer; `drop_all` drops all futures at once. R2 does not need to change this file.
 
 ### 5.5 services.rs
 
 - Add the D6 rule to the docs of `AsyncServiceFunction` in one sentence: "The start closure runs during the import, and the future is first polled when the host waits; so work out deadlines and copy inputs in the start closure, and do not spawn tasks."
+- Add to the docs of `ServiceFunction`: "A sync service runs inside the tokio runtime of `block_on`. It must not start or block on a runtime of its own (for example `Runtime::block_on` or `reqwest::blocking`); write it as an async service, or do that work on a thread of its own and join it." (D5)
 - `standard()` does not change in C. The IO stream adds `i/clock`, `i/net` and `i/fs` later.
 - `testing()` does not change, so the output order of `spec.rs` holds. The test services of section 8 live in `tests.rs`.
 
@@ -291,7 +326,7 @@ On the `ilang` thread, a few KB of `block_on`, tokio and `wait()` frames sit bel
 
 ```wat
 ;; The request table (B.4, B.5). In stream C it has one entry. R2 replaces
-;; these three functions with a table of requests (see the comment below).
+;; these four functions with a table of requests (see the comment below).
 (func $req_start (param $import i32) (result i32)
   (local $id i32)
   (if (i32.ne (global.get $host_import) (i32.const -1)) (then unreachable))
@@ -310,6 +345,11 @@ On the `ilang` thread, a few KB of `block_on`, tokio and `wait()` frames sit bel
 
 (func $req_outstanding (result i32)
   (i32.ne (global.get $host_import) (i32.const -1)))
+
+;; The entry point has ended: the host drops what is left (B.5), so forget it.
+(func $req_clear
+  (global.set $host_import (i32.const -1))
+  (global.set $host_request (i32.const -1)))
 ```
 
 The traps are bare `unreachable`, with no new panic text, so stop messages stay byte-identical.
@@ -328,17 +368,18 @@ The traps are bare `unreachable`, with no new panic text, so stop messages stay 
 
 - `$host_resume_k` (host.rs:47): delete the line that sets `$host_pending`; `$req_answer` clears the entry now. Its signature and its `return_call $control_resume(k, null, $root_env)` stay exactly the same. `$host_boundary` is not touched. So the seam with `control.rs` (only `$host_boundary` and `$host_resume_k`, host.rs:4) holds, and B can land before or after C.
 - `$async_begin` (host.rs:56) and `$async_result` (host.rs:64): trap on `(call $req_outstanding)` instead of `$host_pending`.
+- `$async_run` (host.rs:70; status 0 at :81 and :90): `(call $req_clear)` on each path that gives status 0 (the value path and the error path), so the module's table matches the host's after R7. For a compiled module of stream C it does nothing.
 - Header comment of `EFFECTS` (host.rs:10): describe the request id and the table.
 
 ### 6.4 The R2 hand-off (written as a comment in emit/host.rs)
 
 > R2 takes over the request table. These parts are correct only while one request is outstanding, and R2 must replace them together:
-> - `$req_start`, `$req_answer`, `$req_outstanding` become a table from id to { import, continuation, answer }, with a free list. The id may be the slot index.
+> - `$req_start`, `$req_answer`, `$req_outstanding`, `$req_clear` become a table from id to { import, continuation, answer }, with a free list. The id may be the slot index. `$req_clear` frees every entry; `$async_run` already calls it before status 0 (R7), so `$async_result` and `$async_begin` keep their check of `$req_outstanding` unchanged.
 > - The answer globals `$hr{i}_*`: each resume must decode its answer into the entry of its request before control leaves the export, or a second answer of the same import overwrites the first.
 > - The one continuation `$host_k`: `$host_wait` stores `k` in the entry of the current request, and `$host_resume_k` takes `k` from the entry of the id.
-> - The scheduler of `i/task` returns `$host_waiting` to the root only when no task can run.
-> - `cancel(id)` in `ilang:host/v1`, if R2 needs to end one request without ending the entry point.
-> None of this changes the ABI: hosts already accept many outstanding requests in any order.
+> - The scheduler of `i/task` returns `$host_waiting` (status 1) to the root only when no task can run. At its scheduling points, while some task can still run, it returns status 2 so that the host can give finished answers, and goes on in the export `ilang_continue`, which R2 adds to the module (R14).
+> - To end one request without ending the entry point, R2 imports `cancel(id)` from `ilang:host/v1` and frees the entry (R13).
+> None of this changes the ABI: v3 hosts already accept many outstanding requests in any order, status 2 and `cancel`. A need that v3 does not cover (a new runtime import, status or export) means ABI version 4.
 
 ### 6.5 Outside C's files (escalations)
 
@@ -353,9 +394,9 @@ These need the coordinator's approval:
 
 - `(import "app:clock/v1" "later" (func $imp0 (param i32 f64)))`.
 - Each `ilang_resume:…` has a leading `(param $id i32)`.
-- Modules with async imports: the three new globals and `$req_*` functions replace `$host_pending`.
-- WASI modules: no `$host_request` (WASI never has async imports), only the version string changes.
-- Modules with no async import: only the version string in the custom section changes. `wat_expect.changed` lists the version change for every module and the full change only for modules with async imports.
+- Every module, sync, async and WASI alike (D7): in the `host::EFFECTS` block, the three new globals and the four `$req_*` functions replace `$host_pending`, and `$async_begin`, `$async_result`, `$async_run` and `$host_resume_k` get their new bodies. This text is the same in every module. The version string in the custom section changes too.
+- Modules with async imports, in addition: the import signatures and the `ilang_resume:…` exports above, and the calls of `$req_start` in `host_start`.
+- `wat_expect.changed` lists the shared `EFFECTS` diff and the version change once, as they apply to every module, and lists separately the modules with async imports and their extra changes. The plan's WAT audit of the other lanes first takes out this one known `EFFECTS` diff (applied as a patch to their baseline) and then expects no other change.
 
 ## 7. JS bindings (bindings/javascript)
 
@@ -376,6 +417,9 @@ work.then(
   - Shift the first entry and `requests.delete(id)`. A failure that is not a `GuestError` sets `unusable`, clears both, and rethrows.
   - Validate `ilang_resume:${ns}:${label}` with params `[0x7f, ...resultTypes(signature)]` and result `[0x7f]`.
   - `values = lowerReply(...)`, then `status = bridge.enter(() => { bridge.accepting = true; try { return exports[resume](id, ...values); } finally { bridge.accepting = false; } })`.
+  - Status 2 (R14): one macrotask yield (`setImmediate` in Node, a `MessageChannel` message in browsers, through one helper), then take the first settled entry if there is one; otherwise validate `ilang_continue` (no params, result `[0x7f]`; missing is a `GuestFault`) and call it the same way as a resume.
+- `guardedFunction` (ilang.mjs:106), which wraps every import, saves `bridge.accepting`, sets it to false while the host function runs, and restores it in a `finally` (R2). So a call of `ilang_alloc` that the SDK makes during an import cannot start a request.
+- A runtime import `cancel` next to `reference_id` (ilang.mjs:643): it checks `accepting` and that `requests.has(id)`, else `breakIn` with the R13 text; then it deletes the entry and removes its settled answer from the FIFO, if any. A late settle is then ignored by the `requests.get(id) === entry` check.
 - `callAsync` and `runPoint` set `accepting` only around the async export call. `trapped()` (ilang.mjs:440) clears `requests` and `settled`.
 - JS cannot stop a promise. The work of a dropped request keeps running, and its side effects happen; only its answer is ignored. The README says so.
 - `ilang.d.ts:14`: `version: 3`. README: "version 3"; rewrite the waiting paragraph: the module picks a request id for each async host function it starts; the SDK answers them in the order they finish; while it waits, other calls are refused.
@@ -390,12 +434,17 @@ Shared by the Rust and JS tests.
 - `later` becomes `(param i32 f64)`. Existing exports pass an id from a counter global and keep their behaviour. `ilang_resume:app:clock/v1:later` takes `$id` first and checks it against the stored id.
 - New hand-written exports (the compiler never keeps many requests outstanding in C):
   - `app/async.many(n: Float) -> Float`. It starts n `later` requests with sparse ids `k*37+5` and argument `x_k = k+1`. Linear memory keeps, for each id, a started flag and the expected value. Each resume checks that the id is started and not answered (else it panics with "fixture: bad id") and that the value is `2*x_k` (else "fixture: wrong answer"). It folds `h = (h*31 + k+1) mod (2^31-1)` in answer order. After each of the first n answers it starts one more request that **reuses the freed id** (with a new argument), while the others are still outstanding, until 2n requests have been answered. It returns status 1 until then. `ilang_result` gives `h`. The test computes the expected `h` from the order it chose.
+  - `app/async.fan(n: Float) -> Float`: starts n `later` requests with ids `k*37+5` and `x_k = k+1`, with no further requests; checks and folds `h` as `async.many` does, and ends after n answers. Used by the timer test, where each answer must not start a new request.
+  - `app/async.cancel(n: Float) -> Float`: starts n requests (n >= 2). On each answer it calls `cancel` for the outstanding request with the lowest id, if one is left, and folds `h` over the answered ones only. It panics with "fixture: cancelled request answered" if a resume arrives for a cancelled id. Ends when nothing is outstanding.
+  - `app/async.yielding(m: Float) -> Float`: starts one request, then returns status 2. `ilang_continue` counts and returns status 2 until the answer has come, or status 0 with the count when it has. After m calls of `ilang_continue` with no answer it panics with "fixture: starved". It also exports `ilang_continue`.
   - `app/async.stuck`: returns status 1 with nothing started (R4).
   - `app/async.dup`: starts two requests with the same id (R2).
   - `app/async.negative`: starts a request with id -1 (R2).
   - `app/async.leftover`: starts 3 and returns 0 after the first answer (R7).
   - `app/async.stop_mid`: starts 3, then panics and traps on the first answer (R8).
   - `app/sync.starts`: a sync export that calls `later` (R2).
+  - `app/async.nested`: sets a flag that makes the fixture's `ilang_alloc` call `later`, then calls a sync service that returns a `String`, so the host calls `ilang_alloc` during the import (R2).
+  - `app/async.cancel_bad`: calls `cancel` with an id that is not outstanding (R13).
   - `app/deep(n)` and `app/async.deep(n)`: recursion that is not a tail call, n deep, in a sync call and after a resume.
 - The metadata lists the new exports as host exports with `async` true or false.
 
@@ -408,17 +457,18 @@ Shared by the Rust and JS tests.
 
 ### 8.3 scripts/build-abi-fixture.sh
 
-No change to the steps. Add one check after the `wasm-tools` loop: read the version from `"version": N` in `crates/ilang-wasm/src/lower.rs` and from `{\"version\":N,` in `host-abi.wat`, and fail with "host-abi.wat says ABI version X, but the compiler writes Y" when they differ. Keep the format of the `featureProbe` sed line. Run the script after the emit change.
+No change to the steps. Add one check after the `wasm-tools` loop: read the version from `"version": N` in `crates/ilang-wasm/src/lower.rs`, and compare it with `ABI_VERSION` in `crates/ilang-host/src/lib.rs`, `{\"version\":N,` in `host-abi.wat` and `custom-imports.wat`, `version: N` in `fixture-abi.mjs`, `const version = N` in `bindings/javascript/ilang.mjs` and `version: N` in `bindings/javascript/ilang.d.ts`. Fail with "{file} says ABI version X, but the compiler writes Y" for each one that differs. Keep the format of the `featureProbe` sed line. Run the script after the emit change.
 
 ## 9. Files to change
 
 | File | Region | Change |
 |---|---|---|
 | `docs/spec.md` | §B.3–B.7 | section 4 (phase 1, alone) |
-| `crates/ilang-wasm/src/emit/host.rs` | :1–80, :99–130, :261–282 | section 6.1–6.4 |
+| `crates/ilang-wasm/src/emit/host.rs` | :1–90, :99–130, :261–282 | section 6.1–6.4 |
 | `crates/ilang-wasm/src/lower.rs` | ~:2680 | version 3 |
 | `crates/ilang-wasm/src/emit/mod.rs` | ~:141 | escalation 1 |
 | `crates/ilang-wasm` tests | WAT expectations | section 6.6 |
+| `crates/ilang-wasm/tests/codegen.rs` | :103 | `"version": 3` in the expected metadata JSON |
 | `crates/ilang-host/Cargo.toml`, `Cargo.lock` | dependencies | section 5.1 |
 | `crates/ilang-host/src/run.rs` | new | section 5.2 |
 | `crates/ilang-host/src/requests.rs` | new | section 5.4 |
@@ -431,42 +481,47 @@ No change to the steps. Add one check after the `wasm-tools` loop: read the vers
 | `tests/browser/host.spec.mjs`, `fixture-abi.mjs`, `fixtures/*` | | sections 8, 10 |
 | `scripts/build-abi-fixture.sh` | after the parse loop | section 8.3 |
 
-Every version literal moves in one commit: `lower.rs`, `ABI_VERSION`, `ilang.mjs`, `ilang.d.ts`, both READMEs, `fixture-abi.mjs`, `host-abi.wat`, `custom-imports.wat`, `compiled.wasm`, the JSON in `tests.rs` and `host.test.mjs`. `tests/wasi.rs` needs no edit; it reads the version through `Abi::from_wasm`.
+Every version literal moves in one commit: `lower.rs`, `ABI_VERSION`, `ilang.mjs`, `ilang.d.ts`, both READMEs, `fixture-abi.mjs`, `host-abi.wat`, `custom-imports.wat`, `compiled.wasm`, the metadata JSON in `crates/ilang-wasm/tests/codegen.rs:103`, the JSON in `tests.rs` and `host.test.mjs`. Before the commit, `grep -rn '"version": *2\|version: *2\|version = 2\|ABI_VERSION' crates bindings tests scripts` must show no v2 literal of the ABI. `tests/wasi.rs` needs no edit; it reads the version through `Abi::from_wasm`.
 
 ## 10. Tests
 
 ### 10.1 Test services (Rust, in tests.rs)
 
-- **Gate.** Each start takes `rank = perm[k]` from a seeded permutation (xorshift). Its future is ready when the shared `next_rank == rank`; then it adds 1 to `next_rank` and wakes every stored waker. When it is not ready it stores its waker first, so it never hangs. Each future has a drop guard that counts drops. The answer order is exactly `perm`, with no timers.
+- **Gate.** The order is chosen at answer time, among the requests that are outstanding then, never from a fixed permutation of all starts. A fixed permutation can hang: `async.many` keeps only n requests outstanding, so a rank can belong to a request that has not started yet (seed 0 gives n = 1; with the permutation [1, 0] the first request waits for a rank that only the second, unstarted request has). The shared controller keeps a list of live gates. The start closure adds the gate to this list (D6: it runs during the import, so the list is complete before the host waits, whatever order the futures are polled in). When a gate is polled and no gate is released, the controller releases `live[rng() % live.len()]` with a seeded xorshift, records it in the release log, and wakes it if it has a stored waker. A gate that is not released stores its waker and returns `Pending`. The released gate, when polled, removes itself from `live`, clears the release and wakes every stored waker, so the next poll releases the next gate. Since only one gate is released at a time, the answer order is exactly the release log, with no timers, and a choice always exists while a request is outstanding, so it cannot hang.
+- **Drop guard.** Each test future has a guard that counts drops and records whether the future had completed. Tests check two numbers: all drops, and drops of futures that had not completed. `FuturesUnordered` drops a future when it completes, so all drops = starts once everything is dropped.
 - **Countdown.** Ready after a seeded number of polls; it calls `wake_by_ref` each time it returns `Pending`. The tests check only that the module's hash equals the hash of the order that the host recorded, because the order depends on how `FuturesUnordered` polls.
-- **Timer.** `tokio::time::sleep_until(deadline)` with the deadline fixed in the start closure (D6), run with paused time.
+- **Timer.** `tokio::time::sleep_until(deadline)` with the deadline fixed in the start closure (D6), run with paused time. The delay comes from the argument: `(n + 1 - x)` ms for `x = k+1`, so it is 1 to n ms and never 0 or negative; it is computed in `f64` and checked to be at least 1 before it becomes a `Duration`.
+- **Ready.** A future that is ready on its first poll. Used with `async.yielding`.
 
 ### 10.2 Rust (crates/ilang-host/src/tests.rs)
 
-- **T1 `many_requests_complete_out_of_order`**: for seed in 0..200, n = 1 + seed % 16, gate service. Call `app/async.many(n)` through `block_on`. Check `h` against the expected value, that every future was dropped once (2n drops), and that the instance stays usable (a second call reuses ids).
-- **T2 `timers_answer_through_the_reactor`**: 200 repeats with paused time (`tokio::time::pause` in the runtime of the test), n = 8, deadlines `(n-k)` ms. Check the value and that the order is `n-1 … 0`. Paused time makes it fast and stable under parallel test threads.
-- **T3 `a_stop_drops_outstanding_requests`** (`stop_mid`): `Outcome::Stop` with the message; 2 drops before the outcome is returned; the next call is refused.
+- **T1 `many_requests_complete_out_of_order`**: for seed in 0..200, n = 1 + seed % 16, gate service. Call `app/async.many(n)` through `block_on`. Check `h` against the value computed from the release log, that 2n futures were dropped and none before it completed, and that the instance stays usable (a second call reuses ids).
+- **T2 `timers_answer_through_the_reactor`**: 200 repeats with paused time (`tokio::time::pause` in the runtime of the test), n = 8, timer service, `app/async.fan(n)` (which starts no more requests). Check the value and that the recorded order is `n-1 … 0`. Paused time makes it fast and stable under parallel test threads.
+- **T3 `a_stop_drops_outstanding_requests`** (`stop_mid`): `Outcome::Stop` with the message; before the outcome is returned, 3 drops in all, 2 of them not completed; the next call is refused.
 - **T4 `a_host_failure_drops_the_others`**: one gate future gives `Err`; `Err` is returned, all others are dropped, the instance is unusable.
 - **T5 `status_one_with_nothing_outstanding_is_a_fault`** (`stuck`).
 - **T6 `duplicate_or_negative_id_traps`** (`dup`, `negative`).
-- **T7 `a_sync_call_may_not_start_requests`** (`sync.starts`, and `ilang_start` of a small WAT that starts one).
-- **T8 `leftovers_are_dropped_at_status_zero`** (`leftover`): `Ok`, 2 drops, usable afterwards.
+- **T7 `a_sync_call_may_not_start_requests`** (`sync.starts`; `ilang_start` of a small WAT that starts one; and `async.nested`, where the request comes from `ilang_alloc` during a sync import of an async call). Each traps and makes the instance unusable.
+- **T8 `leftovers_are_dropped_at_status_zero`** (`leftover`): `Ok`, 3 drops in all, 2 not completed, usable afterwards, and the next `app/async.many` call works (the module table was cleared).
 - **T9 `a_wrong_resume_traps`**: raw resume calls with an unknown id, a stale id and the wrong label; each is a trap with no stop message.
-- **T10 `dropping_a_waiting_call_makes_the_instance_unusable`**: poll `call_async` once with a closed gate, drop it, check that the next call is refused and the futures were dropped.
+- **T10 `dropping_a_waiting_call_makes_the_instance_unusable`**: poll `call_async("app/async.many", 3)` once with a gate controller that releases nothing (a test switch), so 3 requests are outstanding. Drop the call future while the `Instance` is still alive; check that 3 futures were dropped, none completed, right after the drop, and that the next call is refused with the R11 text.
 - **T11 `deep_recursion_after_a_resume_stops_like_a_sync_call`**: the trap texts of `app/deep(N)` and `app/async.deep(N)` are equal, and a moderate depth succeeds in both. Lands in the first (v2) commit with a v2 version of the fixture export.
 - **T12 `block_on_works_inside_a_tokio_runtime`**: no park and no panic; and `call_async` awaited on a user's own runtime thread still works through the fallback.
 - **T13 `old_and_new_versions_are_refused`**: versions 1 and 2 give the rebuild message; version 4 gives the update-the-host message.
 - **T14 `run_entry_uses_one_thread`**: a sync service records `std::thread::current().id()` on every call during a multi-resume async entry; all ids are equal.
 - **T15 `futures_are_send`**: compile-time checks, for example `fn send<T: Send>(_: &T) {}` on the futures of `Instance::run_async` and `call_async`, and the same check on `ServiceFuture`, `Outcome`, `TestResult` and `Value`. No new crate is needed.
+- **T16 `a_sync_service_may_block_on_its_own_thread`**: a sync service that builds its own tokio runtime on a thread it starts and joins works under `Program::run_entry`. The same service without the thread panics with tokio's message, which the test expects, so the breaking change of D5 stays visible.
+- **T17 `cancel_drops_one_request`** (`async.cancel`, gate service, 200 seeds): `h` matches the release log of the answered requests; drops: n in all, the cancelled ones not completed, each dropped before the next answer; no cancelled id is answered. Also `async.cancel_bad` traps with the R13 text.
+- **T18 `status_two_gives_ready_answers`** (`async.yielding`, ready service): ends with status 0 and a count below m. With a timer service in real time (1 ms) and m = 10^7, it also ends well before m, because the yield lets the timer driver run. Paused time is not used here: it only moves forward when the runtime is idle, and a module that keeps returning status 2 never lets it be idle.
 
 ### 10.3 JS (bindings/javascript/test, node --test)
 
-- `host.test.mjs`: a gate made of stored resolvers. The test resolves them in `perm` order, **one at a time, with a macrotask yield (`setImmediate`) after each**, so every settle reaches the FIFO before the next resolve, whatever the depth of the promise chains in the SDK. The same 200-seed loop as T1; T3–T9; versions 1, 2 and 4 refused; the base metadata at version 3.
+- `host.test.mjs`: a gate made of stored resolvers; the start of each request adds its resolver to a `live` list. The test starts the call, yields one macrotask, and then, while `live` is not empty, resolves `live[rng() % live.length]` (removing it), **one at a time, with a macrotask yield (`setImmediate`) after each**. So every settle reaches the FIFO and its resume runs (and may start a new request) before the next choice, whatever the depth of the promise chains in the SDK. The release log gives the expected `h`. A choice is made only among requests that exist, so the test cannot hang. The same 200-seed loop as T1; T3–T10 where they apply, T17 and T18; versions 1, 2 and 4 refused; the base metadata at version 3.
 - `compiled.test.mjs`: resume calls get an explicit id: `(0, 0, 0, 0)` and `(0, 0, 1, 0, 0)` (the first request of a fresh instance has id 0), still expecting `RuntimeError` where they do today; a stale id must trap.
 
 ### 10.4 Browser (tests/browser/host.spec.mjs)
 
-One test, "many requests complete out of order", runs the 200 seeds inside a single `page.evaluate`, in chromium, firefox and webkit. The macrotask yield is a `MessageChannel` message, not `setTimeout`, so there is no 4 ms clamping. The two existing async tests stay.
+One test, "many requests complete out of order", runs the 200 seeds inside a single `page.evaluate`, in chromium, firefox and webkit, with the same `live` list driver as `host.test.mjs`. The macrotask yield is a `MessageChannel` message, not `setTimeout`, so there is no 4 ms clamping. The two existing async tests stay.
 
 ### 10.5 Unchanged tests that must still pass
 
@@ -487,8 +542,10 @@ One test, "many requests complete out of order", runs the 200 seeds inside a sin
 - **Fibers left out.** This departs from the plan and needs approval (D4). If the user still wants fibers, an all-async store spike must come first.
 - **Stack below the first Wasm frame.** A few KB of tokio and wait frames now sit below Wasm on the `ilang` thread. The 16 MiB native margin covers them; T11 and the phase 2 gate confirm it.
 - **`block_on` needs `Send`.** A breaking change for an embedder that passes a future that is not `Send`. T15 checks the in-repo futures; the docs say what to do instead.
+- **Sync services run inside a tokio runtime.** A breaking change for an embedder whose sync service starts its own runtime or uses a blocking client: it now panics (D5). The docs of `ServiceFunction` and the changelog say what to do; T16 keeps it visible.
+- **Status 2 and `cancel` are tested only by the fixture.** No compiled module uses them before R2. The fixture tests run on both hosts and in three browsers, so the host side is covered; the module side is R2's work.
 - **The fallback path.** Embedders that await `call_async` on their own threads still pay one 48 MiB thread per Wasm call. Only `block_on` and `Program::run_*` get the fast path.
-- **Lazy start.** A timer made inside the future counts from the first poll. The rule in `services.rs` and §B.4 says so, but nothing enforces it.
+- **Lazy start.** A timer made inside the future counts from the first poll. The rule in `services.rs` and the sentence added to §B.4 say so, but nothing enforces it.
 - **A long Wasm computation blocks the reactor.** Wasm runs on the reactor thread, so timers and later network IO wait while pure computation runs. This is inherent in M:1 and would be the same with one fiber.
 - **One outstanding request in the module.** `$req_start` traps on a second request, and answers use the `$hr` globals of each import. Only the hand-written fixture keeps many requests outstanding. R2 must replace the table, the answer globals and `$host_k` together (section 6.4).
 - **Host-only enforcement of R10.** A careless third-party host that calls a sync export while waiting can corrupt the module's state. The spec says this breaks the instance.
@@ -502,4 +559,4 @@ One test, "many requests complete out of order", runs the 200 seeds inside a sin
 1. Does the user approve leaving out Wasmtime fibers (D4), and may the plan line be changed as in "Approval needed"?
 2. Does the coordinator approve the two escalations of section 6.5 (`emit/mod.rs` ~:141; `ilang-cli/src/lib.rs:162`)?
 3. Should `block_on` keep a second form that runs on the current thread with no `Send` bound, for embedders? This design says no and points them to `call_async`.
-4. Should v3 already reserve the name `cancel` in `ilang:host/v1`, so that R2 can add it without a version bump? This design does not reserve it; adding an optional runtime import that old modules do not use would not need a new version anyway.
+4. Does the user agree to put `cancel` and status 2 with `ilang_continue` into v3 now (D12), so that R2 needs no version 4? The other choice is to leave them out and bump to version 4 in R2; then a v3 host fails on an R2 module with the D9 "update the host" message, which is correct but means two bumps in a row.
