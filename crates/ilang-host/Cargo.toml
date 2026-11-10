@@ -8,11 +8,14 @@ description = "Wasmtime embedding and versioned host ABI for the i programming l
 
 [dependencies]
 anyhow.workspace = true
+futures-util = { version = "0.3.34", default-features = false, features = ["alloc"] }
 num-bigint.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tokio = { version = "1.53.3", default-features = false, features = ["rt", "time"] }
 wasmparser.workspace = true
 wasmtime = { version = "=50.0.0", default-features = false, features = ["anyhow", "cranelift", "gc", "gc-copying", "gc-drc", "gc-null", "runtime", "std", "backtrace", "parallel-compilation"] }
 
 [dev-dependencies]
+tokio = { version = "1.53.3", default-features = false, features = ["rt", "time", "test-util", "net"] }
 wat = "=1.262.0"

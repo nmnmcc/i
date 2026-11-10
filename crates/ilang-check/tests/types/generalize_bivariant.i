@@ -1,0 +1,16 @@
+// §4.5 rule 6: a has no input or output occurrence after following fields.
+// It is used only in the recursive type argument.
+Phantom(a) {
+	Phantom(next: () -> Phantom(a))
+}
+
+new = () -> Phantom(a) { Phantom(new) }
+
+// §4.7: removing this argument variable does not change accepted programs.
+int_phantom = () -> Phantom(Int) { new() }
+
+string_phantom = () -> Phantom(String) { new() }
+
+change = (p: Phantom(Int)) -> Phantom(String) { p }
+
+change_back = (p: Phantom(String)) -> Phantom(Int) { p }

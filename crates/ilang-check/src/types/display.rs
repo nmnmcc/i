@@ -993,8 +993,9 @@ impl Norm<'_> {
                 .is_some_and(|s| s.name.is_some())
     }
 
-    /// `env`: the type is an environment, whose members have arguments that
-    /// are compared as equal (§4.5 rule 4): they count on both sides.
+    /// Invariant arguments count on both sides (§4.5 rules 6 and 7), even
+    /// when normalization has collapsed their equal `Both` forms. In an
+    /// environment, every argument is invariant (§4.5 rule 4).
     fn walk(&self, t: &Ty, pos: bool, occ: &mut HashMap<V, Occ>, order: &mut Vec<V>, env: bool) {
         // Only a union in an output place and an intersection in an input
         // place say that a variable comes with the other members.
@@ -1029,7 +1030,7 @@ impl Norm<'_> {
                     let vs = self.s.variances(*h, args.len());
                     for (a, v) in args.iter().zip(vs) {
                         match v {
-                            _ if env => {
+                            _ if env || v == Variance::Inv => {
                                 self.walk(a, true, occ, order, false);
                                 self.walk(a, false, occ, order, false);
                             }

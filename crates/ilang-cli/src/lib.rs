@@ -157,38 +157,12 @@ pub fn run_test(program: &ilang_host::Program, name: &str) -> ilang_host::TestRe
     run_test_with(program, name, standard_options())
 }
 
-/// Runs one test in a new instance (§10.2) with these host services. An
-/// async test is waited for (B.5).
+/// Runs one test in a new instance (§10.2) with these host services, on one
+/// `ilang` thread. An async test is waited for (B.5).
 pub fn run_test_with(
     program: &ilang_host::Program,
     name: &str,
     options: ilang_host::HostOptions,
 ) -> ilang_host::TestResult {
-    let mut instance = match program.instantiate(options) {
-        Ok(i) => i,
-        Err(e) => {
-            return match e.downcast::<ilang_host::Stop>() {
-                Ok(stop) => ilang_host::TestResult::Stopped(stop),
-                Err(e) => ilang_host::TestResult::Failed(e),
-            };
-        }
-    };
-    let is_async = program
-        .abi()
-        .tests
-        .iter()
-        .any(|t| t.name == name && t.is_async);
-    let outcome = if is_async {
-        ilang_host::block_on(instance.run_async(name))
-    } else {
-        instance.run(name)
-    };
-    match outcome {
-        Ok(ilang_host::Outcome::Ok(_)) => ilang_host::TestResult::Passed,
-        Ok(ilang_host::Outcome::Stop(stop)) => ilang_host::TestResult::Stopped(stop),
-        Ok(ilang_host::Outcome::Err(e)) => {
-            ilang_host::TestResult::Failed(anyhow::anyhow!("the test gave the error {:?}", e.0))
-        }
-        Err(e) => ilang_host::TestResult::Failed(e),
-    }
+    program.run_test_with(name, options)
 }

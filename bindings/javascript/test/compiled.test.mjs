@@ -41,14 +41,24 @@ test("async host services of a compiled module wait for the host", async () => {
   assert.equal(value.unusable, null);
 });
 
-test("the module traps when the host answers a function it does not wait for", async () => {
+test("the module traps when the host answers a request it does not wait for", async () => {
+  for (const [resume, args] of [
+    // The module waits for request 0 of `later`, not of `tick` (B.5).
+    ["tick", [0, 0, 0, 0]],
+    // Nor for another id of `later`.
+    ["later", [5, 0, 1, 0, 0]],
+  ]) {
+    const value = await guest([], { later: () => new Promise(() => {}) });
+    void value.callAsync("app/app.wait_sum", [1, 2]);
+    assert.throws(() => value.exports[`ilang_resume:app:clock/v1:${resume}`](...args), WebAssembly.RuntimeError);
+    // Keep the work pending: no SDK resume may use this instance after a trap.
+  }
   const value = await guest();
-  const waiting = value.callAsync("app/app.wait_sum", [1, 2]);
-  // The module waits for `later`, not for `tick` (B.5).
-  assert.throws(() => value.exports["ilang_resume:app:clock/v1:tick"](0, 0, 0), WebAssembly.RuntimeError);
-  assert.equal(await waiting, 3);
+  await value.callAsync("app/app.wait_sum", [1, 2]);
+  // Requests 0 and 1 were answered: their ids are stale now.
+  assert.throws(() => value.exports["ilang_resume:app:clock/v1:later"](1, 0, 1, 0, 0), WebAssembly.RuntimeError);
   const idle = await guest();
-  assert.throws(() => idle.exports["ilang_resume:app:clock/v1:later"](0, 1, 0, 0), WebAssembly.RuntimeError);
+  assert.throws(() => idle.exports["ilang_resume:app:clock/v1:later"](0, 0, 1, 0, 0), WebAssembly.RuntimeError);
 });
 
 test("an answer of the host that is not correct stops the program in the module", async () => {
