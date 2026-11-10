@@ -248,3 +248,27 @@ Additional existing fixture grants are `custom.echo_string`, `custom.echo_int`,
 `custom.echo_bits`, `custom.echo_ref`, `custom.echo_bool`, `custom.echo_float`,
 `custom.echo_nil`, `custom:fallible/v1.fallible`, and the compiled fixture's
 `app:clock/v1.tick`. They use the same explicit legacy registration authority.
+
+Approval covers the complete authenticated binding plan: the artifact digest
+and the entire ordered declaration list, including refused and duplicate entries.
+Rust grants retain a snapshot of that plan, just as JS authorization tokens do.
+Replacing any part of it, even by deleting a refused alias while keeping identical
+Wasm bytes, requires fresh explicit approval. Wire-import coverage alone cannot
+prove the list complete. Legacy broad registration authority is unchanged.
+
+Every SDK-managed entry into guest code checks the invocation gate, including
+continuations, result exports, allocation and each free. Ending during a host
+callback prevents return into guest code. Ending during request cancellation at
+status zero prevents the later result export. An interrupted invocation leaves
+the instance unusable. Raw access to a Wasm instance remains the embedding's ABI
+duty.
+
+Cleanup failures are host diagnostics. Close and teardown still complete every
+cancellation, lease wake and cleanup starter, and keep their error-free contract.
+Rust isolates unwinding panics in cleanup starters, request-future destructors
+and wake callbacks; its normal panic hook still runs. Drain diagnostic records
+with `ResourceHost::take_cleanup_errors()` or the instance's forwarding method.
+Each record has `phase` (`cancel`, `wake` or `cleanup`) and a panic `message`.
+The queue belongs to the host identity domain and includes late cleanup; draining
+it does not enter Wasm or replace the invocation's original result or failure.
+No process-wide panic hook is installed or changed.

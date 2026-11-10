@@ -2281,9 +2281,19 @@ fn bg_grants_check_every_declaration_before_coalescing() {
     program
         .instantiate(HostOptions::new(imports.clone()))
         .unwrap();
-    // Duplicate entries do not acquire another declaration's authority.
+    // Even a duplicate changes the complete authenticated plan. Reapproval
+    // preserves the obligations of every original declaration.
     let mut twice = plan.clone();
     twice.declarations.push(original.clone());
+    assert!(
+        self::program()
+            .with_binding_plan(twice.clone())
+            .unwrap()
+            .instantiate(HostOptions::new(imports.clone()))
+            .is_err()
+    );
+    imports.grant(&twice, &original);
+    imports.grant(&twice, &alias);
     self::program()
         .with_binding_plan(twice)
         .unwrap()
@@ -2684,4 +2694,349 @@ fn opaque_imports(seed: Value) -> HostImports {
             .unwrap();
     }
     imports
+}
+
+#[test]
+fn bg_review_complete_plan_cannot_drop_a_denied_coalesced_declaration() {
+    let plan: bindings::BindingPlan = serde_json::from_str(include_str!(
+        "../../../tests/browser/fixtures/compiled.bindings.json"
+    ))
+    .unwrap();
+    let mut imports = imports(&Log::default());
+    imports
+        .async_service("app:clock/v1", "tick", |_| async {
+            Ok(Ok(Value::Int(1.into())))
+        })
+        .unwrap();
+    imports.merge(opaque_imports(Value::NullExternref)).unwrap();
+    let key = ("app:opaque/v1".into(), "get".into());
+    imports.functions.remove(&key);
+    imports.unrestricted.remove(&key);
+    imports
+        .context_external(&key.0, &key.1, |_, _| Ok(Value::NullExternref))
+        .unwrap();
+    assert_eq!(
+        plan.declarations
+            .iter()
+            .filter(|d| d.namespace == key.0 && d.name == key.1)
+            .count(),
+        2
+    );
+    let allowed = plan
+        .declarations
+        .iter()
+        .find(|d| d.declaration == "get_a")
+        .unwrap();
+    imports.grant(&plan, allowed);
+    let options = HostOptions::new(imports);
+    assert!(
+        Program::from_bytes(COMPILED)
+            .unwrap()
+            .with_binding_plan(plan.clone())
+            .unwrap()
+            .instantiate(options.clone())
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("get_b")
+    );
+    let mut omitted = plan.clone();
+    omitted.declarations.retain(|d| d.declaration != "get_b");
+    assert!(
+        Program::from_bytes(COMPILED)
+            .unwrap()
+            .with_binding_plan(omitted)
+            .unwrap()
+            .instantiate(options.clone())
+            .is_err(),
+        "a replacement plan must not reuse approval of the complete original plan"
+    );
+    let mut reordered = plan;
+    reordered.declarations.reverse();
+    assert!(
+        Program::from_bytes(COMPILED)
+            .unwrap()
+            .with_binding_plan(reordered)
+            .unwrap()
+            .instantiate(options)
+            .is_err()
+    );
+}
+
+#[test]
+fn bg_review_ended_context_blocks_runnable_continuations() {
+    use std::task::{Context, Waker};
+    let p = program();
+    let plan = bg_plan(&p);
+    let mut imports = imports(&Log::default());
+    let key = ("app:clock/v1".into(), "later".into());
+    imports.functions.remove(&key);
+    imports.unrestricted.remove(&key);
+    let saved = Arc::new(Mutex::new(None));
+    let capture = saved.clone();
+    imports
+        .context_async_service(&key.0, &key.1, move |context, _| {
+            *capture.lock().unwrap() = Some(context);
+            async { Ok(Ok(Value::Float(2.0))) }
+        })
+        .unwrap();
+    imports.grant_package(&plan, "fixture-content");
+    let mut guest = p
+        .with_binding_plan(plan)
+        .unwrap()
+        .instantiate(HostOptions::new(imports))
+        .unwrap();
+    let args = [Value::Float(100.0)];
+    let mut call = Box::pin(guest.call_async("app/async.yielding", &args));
+    let mut cx = Context::from_waker(Waker::noop());
+    assert!(call.as_mut().poll(&mut cx).is_pending());
+    assert!(call.as_mut().poll(&mut cx).is_pending());
+    saved.lock().unwrap().as_ref().unwrap().teardown();
+    assert!(
+        matches!(call.as_mut().poll(&mut cx), std::task::Poll::Ready(Err(error)) if error.to_string().contains("ended"))
+    );
+}
+
+#[test]
+fn bg_review_opaque_shape_is_not_an_async_protocol_on_rust() {
+    struct Opaque {
+        _then: fn(),
+        _finally: fn(),
+    }
+    let value = HostReference::new(Opaque {
+        _then: || panic!("opaque then must not run"),
+        _finally: || panic!("opaque finally must not run"),
+    });
+    let (mut guest, _) = fixture();
+    let Value::Externref(returned) = ok(guest
+        .call("opaque_roundtrip", &[Value::Externref(value.clone())])
+        .unwrap())
+    else {
+        panic!("expected opaque reference")
+    };
+    assert!(value.ptr_eq(&returned));
+}
+
+fn bg_lifecycle_program() -> Program {
+    let bytes = include_bytes!("../../../tests/browser/fixtures/bg-lifecycle.wasm");
+    let point = Signature::new([], AbiType::Nil).asynchronous();
+    Program::from_bytes(bytes)
+        .unwrap()
+        .with_abi(Abi {
+            entry: Some(EntryPoint {
+                name: "entry".into(),
+                is_async: true,
+            }),
+            exports: [
+                ("runnable".into(), point.clone()),
+                ("immediate".into(), point.clone()),
+                ("leftover".into(), point),
+                ("sync".into(), Signature::new([], AbiType::Nil)),
+                (
+                    "buffers".into(),
+                    Signature::new([AbiType::String, AbiType::String], AbiType::Nil),
+                ),
+            ]
+            .into(),
+            services: [
+                (
+                    "bg:control/v1".into(),
+                    [
+                        ("capture".into(), Signature::new([], AbiType::Nil)),
+                        ("end".into(), Signature::new([], AbiType::Nil)),
+                    ]
+                    .into(),
+                ),
+                (
+                    "bg:work/v1".into(),
+                    [(
+                        "wait".into(),
+                        Signature::new([], AbiType::Nil).asynchronous(),
+                    )]
+                    .into(),
+                ),
+            ]
+            .into(),
+            ..Abi::default()
+        })
+        .unwrap()
+}
+fn bg_lifecycle_counter(guest: &mut Instance, offset: usize) -> u32 {
+    let memory = guest
+        .instance
+        .get_memory(&mut guest.store, "memory")
+        .unwrap();
+    u32::from_le_bytes(
+        memory.data(&guest.store)[offset..offset + 4]
+            .try_into()
+            .unwrap(),
+    )
+}
+fn bg_lifecycle_imports(
+    p: &Program,
+    capture: impl Fn(ResourceContext) + Send + Sync + 'static,
+) -> HostImports {
+    let plan = bg_plan(p);
+    let mut imports = HostImports::default();
+    imports
+        .context_service("bg:control/v1", "capture", move |context, _| {
+            capture(context);
+            Ok(Ok(Value::Nil))
+        })
+        .unwrap();
+    imports
+        .context_service("bg:control/v1", "end", |context, _| {
+            context.teardown();
+            Ok(Ok(Value::Nil))
+        })
+        .unwrap();
+    imports
+        .context_async_service("bg:work/v1", "wait", |_, _| std::future::pending())
+        .unwrap();
+    imports.grant_package(&plan, "fixture-content");
+    imports
+}
+#[test]
+fn bg_review_no_request_runnable_and_result_paths_do_not_enter_ended_wasm() {
+    for entry in [false, true] {
+        let p = bg_lifecycle_program();
+        let plan = bg_plan(&p);
+        let saved = Arc::new(Mutex::new(None));
+        let capture = saved.clone();
+        let imports =
+            bg_lifecycle_imports(&p, move |context| *capture.lock().unwrap() = Some(context));
+        let mut guest = p
+            .with_binding_plan(plan)
+            .unwrap()
+            .instantiate(HostOptions::new(imports))
+            .unwrap();
+        let mut call: Pin<Box<dyn Future<Output = Result<Outcome>> + Send + '_>> = if entry {
+            Box::pin(guest.run_async("entry"))
+        } else {
+            Box::pin(guest.call_async("runnable", &[]))
+        };
+        assert!(
+            call.as_mut()
+                .poll(&mut std::task::Context::from_waker(std::task::Waker::noop()))
+                .is_pending()
+        );
+        saved.lock().unwrap().as_ref().unwrap().teardown();
+        assert!(matches!(block_on(call), Err(error) if error.to_string().contains("ended")));
+        assert_eq!(bg_lifecycle_counter(&mut guest, 0), 0);
+        assert_eq!(bg_lifecycle_counter(&mut guest, 4), 0);
+    }
+}
+#[test]
+fn bg_review_drop_at_status_zero_blocks_later_result_export() {
+    struct EndOnDrop(ResourceContext);
+    impl Drop for EndOnDrop {
+        fn drop(&mut self) {
+            self.0.teardown();
+        }
+    }
+    let p = bg_lifecycle_program();
+    let plan = bg_plan(&p);
+    let mut imports = bg_lifecycle_imports(&p, |_| {});
+    imports
+        .functions
+        .remove(&("bg:work/v1".into(), "wait".into()));
+    imports
+        .context_async_service("bg:work/v1", "wait", |context, _| {
+            let guard = EndOnDrop(context);
+            async move {
+                let _guard = guard;
+                std::future::pending().await
+            }
+        })
+        .unwrap();
+    let mut guest = p
+        .with_binding_plan(plan)
+        .unwrap()
+        .instantiate(HostOptions::new(imports))
+        .unwrap();
+    assert!(
+        matches!(block_on(guest.call_async("leftover", &[])), Err(error) if error.to_string().contains("ended"))
+    );
+    assert_eq!(bg_lifecycle_counter(&mut guest, 4), 0);
+}
+#[test]
+fn bg_review_gate_covers_sync_callbacks_allocations_and_each_free() {
+    for mode in [0, 16, 20] {
+        let p = bg_lifecycle_program();
+        let plan = bg_plan(&p);
+        let imports = bg_lifecycle_imports(&p, move |context| {
+            if mode == 0 {
+                context.teardown();
+            }
+        });
+        let mut guest = p
+            .with_binding_plan(plan)
+            .unwrap()
+            .instantiate(HostOptions::new(imports))
+            .unwrap();
+        let memory = guest
+            .instance
+            .get_memory(&mut guest.store, "memory")
+            .unwrap();
+        if mode != 0 {
+            memory.data_mut(&mut guest.store)[mode] = 1;
+        }
+        let result = if mode == 0 {
+            guest.call("sync", &[])
+        } else {
+            guest.call(
+                "buffers",
+                &[
+                    Value::String("first".into()),
+                    Value::String("second".into()),
+                ],
+            )
+        };
+        assert!(!matches!(result, Ok(Outcome::Ok(_))));
+        if mode == 20 {
+            assert_eq!(bg_lifecycle_counter(&mut guest, 24), 1);
+        } else {
+            assert_eq!(bg_lifecycle_counter(&mut guest, 12), 0);
+        }
+    }
+}
+
+#[test]
+fn bg_review_cleanup_failure_is_reported_without_replacing_a_success() {
+    struct PanicOnDrop;
+    impl Drop for PanicOnDrop {
+        fn drop(&mut self) {
+            panic!("request destructor failed");
+        }
+    }
+    let p = bg_lifecycle_program();
+    let plan = bg_plan(&p);
+    let mut imports = bg_lifecycle_imports(&p, |_| {});
+    imports
+        .functions
+        .remove(&("bg:work/v1".into(), "wait".into()));
+    imports
+        .context_async_service("bg:work/v1", "wait", |_, _| {
+            let guard = PanicOnDrop;
+            async move {
+                let _guard = guard;
+                std::future::pending().await
+            }
+        })
+        .unwrap();
+    let mut guest = p
+        .with_binding_plan(plan)
+        .unwrap()
+        .instantiate(HostOptions::new(imports))
+        .unwrap();
+    assert!(matches!(
+        block_on(guest.call_async("leftover", &[])).unwrap(),
+        Outcome::Ok(Value::Nil)
+    ));
+    assert_eq!(bg_lifecycle_counter(&mut guest, 4), 1);
+    let errors = guest.take_cleanup_errors();
+    assert_eq!(errors.len(), 1);
+    assert_eq!(errors[0].phase, "cancel");
+    assert_eq!(errors[0].message, "request destructor failed");
+    assert!(guest.unusable().is_none());
 }

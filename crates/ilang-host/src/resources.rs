@@ -35,28 +35,59 @@ impl fmt::Display for ResourceError {
 }
 impl std::error::Error for ResourceError {}
 
+/// An isolated cleanup failure. It is reported to the embedding, never to i.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CleanupFailure {
+    pub phase: &'static str,
+    pub message: String,
+}
+type CleanupErrors = Arc<Mutex<Vec<CleanupFailure>>>;
+fn isolate_cleanup(errors: &CleanupErrors, phase: &'static str, action: impl FnOnce()) {
+    if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(action)) {
+        let message = panic
+            .downcast_ref::<String>()
+            .cloned()
+            .or_else(|| panic.downcast_ref::<&str>().map(|s| (*s).to_owned()))
+            .unwrap_or_else(|| "non-string panic".into());
+        errors
+            .lock()
+            .unwrap()
+            .push(CleanupFailure { phase, message });
+    }
+}
+
 /// Reuse this host across programs, instances and tests. Clones share identities.
 #[derive(Clone)]
-pub struct ResourceHost(Arc<Mutex<Allocator>>);
+pub struct ResourceHost(Arc<Mutex<Allocator>>, CleanupErrors);
 struct Allocator {
     next: BigInt,
     limit: Option<BigInt>,
 }
 impl Default for ResourceHost {
     fn default() -> Self {
-        Self(Arc::new(Mutex::new(Allocator {
-            next: 1.into(),
-            limit: None,
-        })))
+        Self(
+            Arc::new(Mutex::new(Allocator {
+                next: 1.into(),
+                limit: None,
+            })),
+            Default::default(),
+        )
     }
 }
 impl ResourceHost {
+    /// Drain this host's cleanup diagnostics; cleanup itself remains error-free.
+    pub fn take_cleanup_errors(&self) -> Vec<CleanupFailure> {
+        std::mem::take(&mut *self.1.lock().unwrap())
+    }
     /// A small ceiling for deterministic exhaustion tests; never a wrap point.
     pub fn with_limit(limit: BigInt) -> Self {
-        Self(Arc::new(Mutex::new(Allocator {
-            next: 1.into(),
-            limit: Some(limit),
-        })))
+        Self(
+            Arc::new(Mutex::new(Allocator {
+                next: 1.into(),
+                limit: Some(limit),
+            })),
+            Default::default(),
+        )
     }
     pub fn context(&self) -> ResourceContext {
         ResourceContext {
@@ -80,15 +111,21 @@ impl ResourceHost {
 }
 
 #[derive(Default)]
-struct Signal(Mutex<Option<Vec<Waker>>>);
+struct Signal {
+    state: Mutex<Option<Vec<Waker>>>,
+    errors: CleanupErrors,
+}
 impl Signal {
-    fn pending() -> Arc<Self> {
-        Arc::new(Self(Mutex::new(Some(Vec::new()))))
+    fn pending(errors: CleanupErrors) -> Arc<Self> {
+        Arc::new(Self {
+            state: Mutex::new(Some(Vec::new())),
+            errors,
+        })
     }
     fn complete(&self) {
-        let wakes = self.0.lock().unwrap().take().unwrap_or_default();
+        let wakes = self.state.lock().unwrap().take().unwrap_or_default();
         for wake in wakes {
-            wake.wake();
+            isolate_cleanup(&self.errors, "wake", || wake.wake());
         }
     }
 }
@@ -98,7 +135,7 @@ pub struct CloseReceipt(Arc<Signal>);
 impl Future for CloseReceipt {
     type Output = ();
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        let mut signal = self.0.0.lock().unwrap();
+        let mut signal = self.0.state.lock().unwrap();
         let Some(wakers) = signal.as_mut() else {
             return Poll::Ready(());
         };
@@ -110,7 +147,7 @@ impl Future for CloseReceipt {
 }
 impl CloseReceipt {
     pub fn is_complete(&self) -> bool {
-        self.0.0.lock().unwrap().is_none()
+        self.0.state.lock().unwrap().is_none()
     }
 }
 
@@ -192,7 +229,7 @@ impl ResourceContext {
         if table.ended {
             return Err(ResourceError::Closed);
         }
-        let receipt = CloseReceipt(Signal::pending());
+        let receipt = CloseReceipt(Signal::pending(self.host.1.clone()));
         table.jobs.insert(id.clone(), receipt.clone());
         Ok(CleanupDone {
             receipt,
@@ -212,7 +249,8 @@ impl ResourceContext {
         let value = Arc::new(value);
         let cleanup: Cleanup = Box::new({
             let value = value.clone();
-            move |done| cleanup(value, done)
+            let errors = self.host.1.clone();
+            move |done| isolate_cleanup(&errors, "cleanup", || cleanup(value, done))
         });
         let id = match self.host.allocate() {
             Ok(id) => id,
@@ -256,6 +294,9 @@ impl ResourceContext {
         lane: &str,
     ) -> Result<Lease<T>, ResourceError> {
         let mut table = self.table.lock().unwrap();
+        if table.ended {
+            return Err(ResourceError::Closed);
+        }
         let entry = table
             .entries
             .get_mut(id)
@@ -269,7 +310,7 @@ impl ResourceContext {
         if entry.leases.contains_key(lane) {
             return Err(ResourceError::Busy);
         }
-        let revoked = Signal::pending();
+        let revoked = Signal::pending(self.host.1.clone());
         entry.leases.insert(lane.into(), revoked.clone());
         Ok(Lease {
             table: Arc::downgrade(&self.table),
@@ -290,7 +331,7 @@ impl ResourceContext {
         }
         let entry = table.entries.remove(id).unwrap();
         // Revocation is visible under the same lock as removal. Wake outside it.
-        let receipt = CloseReceipt(Signal::pending());
+        let receipt = CloseReceipt(Signal::pending(self.host.1.clone()));
         table
             .closing
             .insert(id.clone(), (entry.kind, receipt.clone()));
@@ -379,6 +420,9 @@ impl<T> Lease<T> {
     pub fn commit<A>(self, answer: A) -> Result<A, ResourceError> {
         let table = self.table.upgrade().ok_or(ResourceError::Closed)?;
         let mut table = table.lock().unwrap();
+        if table.ended {
+            return Err(ResourceError::Closed);
+        }
         let entry = table
             .entries
             .get_mut(&self.id)
@@ -432,6 +476,9 @@ impl ProvisionalResource {
     }
     pub fn deliver(mut self) -> Result<BigInt, ResourceError> {
         let table = self.context.table.lock().unwrap();
+        if table.ended {
+            return Err(ResourceError::Closed);
+        }
         if !table
             .entries
             .get(&self.id)
@@ -665,6 +712,7 @@ struct PendingWork<T> {
 }
 struct FutureCell<T> {
     pending: Mutex<PendingWork<T>>,
+    errors: CleanupErrors,
 }
 impl<T> CancelWork for FutureCell<T> {
     fn cancel(&self) {
@@ -675,9 +723,9 @@ impl<T> CancelWork for FutureCell<T> {
         };
         // Destructors and poll callbacks never run under a host lock. Work
         // already inside poll sees cancellation when that finite poll returns.
-        drop(future);
+        isolate_cleanup(&self.errors, "cancel", || drop(future));
         if let Some(wake) = wake {
-            wake.wake();
+            isolate_cleanup(&self.errors, "wake", || wake.wake());
         }
     }
 }
@@ -706,6 +754,8 @@ impl<T> Future for ResourceFuture<T> {
         {
             let mut pending = self.cell.pending.lock().unwrap();
             if pending.cancelled {
+                drop(pending);
+                isolate_cleanup(&self.cell.errors, "cancel", || drop(future));
                 return Poll::Ready(None);
             }
             if result.is_pending() {
@@ -714,7 +764,7 @@ impl<T> Future for ResourceFuture<T> {
             }
             pending.wake = None;
         }
-        drop(future);
+        isolate_cleanup(&self.cell.errors, "cancel", || drop(future));
         if let Some(table) = self.table.upgrade() {
             table.lock().unwrap().work.remove(&self.key);
         }
@@ -740,6 +790,7 @@ impl ResourceContext {
                 wake: None,
                 cancelled: false,
             }),
+            errors: self.host.1.clone(),
         });
         let key = Arc::as_ptr(&cell) as usize;
         let mut table = self.table.lock().unwrap();
@@ -793,4 +844,128 @@ fn a_host_future_can_reenter_its_controller_without_a_lock_cycle() {
         })
         .unwrap();
     assert_eq!(crate::block_on(work), None);
+}
+
+#[cfg(test)]
+mod bg_review_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct OnDrop(Option<Box<dyn FnOnce() + Send>>);
+    impl Drop for OnDrop {
+        fn drop(&mut self) {
+            self.0.take().unwrap()();
+        }
+    }
+    #[test]
+    fn bg_review_reentrant_cancellation_cannot_publish_after_teardown() {
+        let host = ResourceHost::default();
+        let context = host.context();
+        let id = context.insert("file", (), |_, _| {}).unwrap();
+        let lease = context.acquire::<()>(&id, "file", "read").unwrap();
+        let provisional = ProvisionalResource::new(context.clone(), id.clone(), "file");
+        let controller = context.clone();
+        let checked = Arc::new(AtomicUsize::new(0));
+        let done = checked.clone();
+        let guard = OnDrop(Some(Box::new(move || {
+            assert!(!controller.is_live());
+            assert!(matches!(
+                controller.acquire::<()>(&id, "file", "write"),
+                Err(ResourceError::Closed)
+            ));
+            assert_eq!(lease.commit(42), Err(ResourceError::Closed));
+            assert_eq!(provisional.deliver(), Err(ResourceError::Closed));
+            let receipts = controller.teardown();
+            assert_eq!(receipts.len(), 1);
+            assert!(!receipts[0].is_complete());
+            done.fetch_add(1, Ordering::SeqCst);
+        })));
+        let _work = context
+            .own_future(async move {
+                let _guard = guard;
+                std::future::pending::<()>().await;
+            })
+            .unwrap();
+        let receipts = context.teardown();
+        assert_eq!(checked.load(Ordering::SeqCst), 1);
+        assert!(receipts.iter().all(CloseReceipt::is_complete));
+        assert!(host.take_cleanup_errors().is_empty());
+    }
+
+    #[test]
+    fn bg_review_cleanup_panics_do_not_skip_cancellation_wakes_or_cleanup() {
+        let host = ResourceHost::default();
+        let context = host.context();
+        let cancelled = Arc::new(AtomicUsize::new(0));
+        let mut work = Vec::new();
+        for panic in [true, false] {
+            let count = cancelled.clone();
+            let guard = OnDrop(Some(Box::new(move || {
+                count.fetch_add(1, Ordering::SeqCst);
+                if panic {
+                    panic!("cancel failed");
+                }
+            })));
+            work.push(
+                context
+                    .own_future(async move {
+                        let _guard = guard;
+                        std::future::pending::<()>().await;
+                    })
+                    .unwrap(),
+            );
+        }
+        let cleaned = Arc::new(AtomicUsize::new(0));
+        let wakes = Arc::new(AtomicUsize::new(0));
+        struct Wake {
+            panic: bool,
+            count: Arc<AtomicUsize>,
+        }
+        impl std::task::Wake for Wake {
+            fn wake(self: Arc<Self>) {
+                if self.panic {
+                    panic!("wake failed");
+                }
+                self.count.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        let mut leases = Vec::new();
+        for panic in [true, false] {
+            let count = cleaned.clone();
+            let id = context
+                .insert("file", (), move |_, _| {
+                    count.fetch_add(1, Ordering::SeqCst);
+                    if panic {
+                        panic!("cleanup failed");
+                    }
+                })
+                .unwrap();
+            let lease = context.acquire::<()>(&id, "file", "read").unwrap();
+            let waker = Waker::from(Arc::new(Wake {
+                panic,
+                count: wakes.clone(),
+            }));
+            assert!(
+                Pin::new(&mut lease.closed())
+                    .poll(&mut Context::from_waker(&waker))
+                    .is_pending()
+            );
+            leases.push(lease);
+        }
+        let receipts = context.teardown();
+        assert_eq!(cancelled.load(Ordering::SeqCst), 2);
+        assert_eq!(cleaned.load(Ordering::SeqCst), 2);
+        assert_eq!(wakes.load(Ordering::SeqCst), 1);
+        assert!(receipts.iter().all(CloseReceipt::is_complete));
+        let errors = host.take_cleanup_errors();
+        for phase in ["cancel", "wake", "cleanup"] {
+            assert_eq!(errors.iter().filter(|e| e.phase == phase).count(), 1);
+        }
+        assert!(host.take_cleanup_errors().is_empty());
+        assert_eq!(
+            context.insert("late", (), |_, _| panic!("late cleanup failed")),
+            Err(ResourceError::Closed)
+        );
+        assert_eq!(host.take_cleanup_errors()[0].message, "late cleanup failed");
+    }
 }

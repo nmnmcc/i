@@ -1045,6 +1045,11 @@ impl Instance {
         Invocation(context)
     }
 
+    /// Drain this host's cleanup diagnostics without entering Wasm.
+    pub fn take_cleanup_errors(&self) -> Vec<resources::CleanupFailure> {
+        self.resource_host.take_cleanup_errors()
+    }
+
     /// Stop admission and release host work/resources without invoking i code.
     pub fn dispose(&mut self) {
         self.store.data().resources.teardown();
@@ -1348,6 +1353,9 @@ impl Instance {
         let mut resume_continue: Option<Func> = None;
         let mut resumes: HashMap<String, HashMap<String, Func>> = HashMap::new();
         loop {
+            if let Err(error) = live_context(&self.store) {
+                return Err(self.fault(error.to_string()));
+            }
             let (id, request, reply) = match status[0].i32() {
                 Some(0) => return Ok(None),
                 Some(1) => match self.store.data_mut().requests.next().await {
@@ -1371,6 +1379,9 @@ impl Instance {
                     // Let the timers and IO of the runtime run once, then
                     // give an answer that is done, or go on without one.
                     tokio::task::yield_now().await;
+                    if let Err(error) = live_context(&self.store) {
+                        return Err(self.fault(error.to_string()));
+                    }
                     match self.store.data_mut().requests.ready() {
                         Some(done) => done,
                         None => {
@@ -1549,6 +1560,14 @@ fn gc_settings() -> Result<(wasmtime::Collector, u64)> {
 /// stack, and room for the host functions it calls.
 pub const THREAD_STACK: usize = WASM_STACK + (16 << 20);
 
+fn live_context(context: &impl AsContext<Data = State>) -> Result<()> {
+    ensure!(
+        context.as_context().data().resources.is_live(),
+        "the resource context has ended"
+    );
+    Ok(())
+}
+
 /// Call a Wasm function inside the root scope of its arguments, on a thread
 /// with a stack of [`THREAD_STACK`] bytes: directly on the `ilang` thread of
 /// [`block_on`] when no other Wasm call runs on it, and otherwise on a new
@@ -1559,6 +1578,9 @@ fn invoke_in(
     params: &[Val],
     results: &mut [Val],
 ) -> Invoked {
+    if let Err(error) = live_context(context) {
+        return Invoked::Failed(error);
+    }
     let called = if run::fast_path() {
         run::in_wasm(|| function.call(&mut *context, params, results))
     } else {
@@ -1570,6 +1592,7 @@ fn invoke_in(
                 .stack_size(THREAD_STACK)
                 .spawn_scoped(scope, || {
                     let _entered = handle.as_ref().map(|handle| handle.enter());
+                    live_context(context).map_err(wasmtime::Error::from_anyhow)?;
                     function.call(&mut *context, params, results)
                 })
                 .expect("a thread for Wasm code");
@@ -1580,7 +1603,10 @@ fn invoke_in(
         })
     };
     let Err(error) = called else {
-        return Invoked::Done;
+        return match live_context(context) {
+            Ok(()) => Invoked::Done,
+            Err(error) => Invoked::Failed(error),
+        };
     };
     trapped_in(context, anyhow::Error::from(error))
 }
@@ -1904,6 +1930,9 @@ fn define_import(
                 Ok(reply) => reply,
                 Err(error) => return Err(host_failure(caller, error)),
             };
+            if let Err(error) = live_context(caller) {
+                return Err(host_failure(caller, error));
+            }
             let mut values = Vec::new();
             match lower_reply(
                 &mut *caller,
@@ -2049,8 +2078,10 @@ impl Bridge {
             .alloc
             .context("the module does not export ilang_alloc")?
             .typed::<i32, i32>(context.as_context())?;
+        live_context(context)?;
         let ptr = run::in_wasm(|| alloc.call(context.as_context_mut(), len as i32))
             .map_err(|_| anyhow::Error::new(GuestTrap))? as u32;
+        live_context(context)?;
         allocations.push(Allocation { ptr, len });
         memory
             .write(context.as_context_mut(), ptr as usize, bytes)
@@ -2078,12 +2109,14 @@ impl Bridge {
             {
                 continue;
             }
+            live_context(context)?;
             run::in_wasm(|| {
                 free.call(
                     context.as_context_mut(),
                     (allocation.ptr as i32, allocation.len as i32),
                 )
             })?;
+            live_context(context)?;
         }
         Ok(())
     }

@@ -95,17 +95,27 @@ impl BindingPlan {
     }
 }
 
+/// Approval retains the entire authenticated plan, including declarations that
+/// were refused. Replacing any part of that plan requires fresh approval.
 #[derive(Clone, Default)]
-pub(crate) struct Grants(Vec<(String, BindingDeclaration)>);
+pub(crate) struct Grants(Vec<(std::sync::Arc<BindingPlan>, Vec<BindingDeclaration>)>);
 impl Grants {
     pub fn grant(&mut self, plan: &BindingPlan, declaration: &BindingDeclaration) {
-        self.0
-            .push((plan.artifact_digest.clone(), declaration.clone()));
+        if let Some((_, declarations)) = self
+            .0
+            .iter_mut()
+            .find(|(approved, _)| approved.as_ref() == plan)
+        {
+            declarations.push(declaration.clone());
+        } else {
+            self.0
+                .push((std::sync::Arc::new(plan.clone()), vec![declaration.clone()]));
+        }
     }
     pub fn allows(&self, plan: &BindingPlan, declaration: &BindingDeclaration) -> bool {
-        self.0
-            .iter()
-            .any(|(digest, granted)| digest == &plan.artifact_digest && granted == declaration)
+        self.0.iter().any(|(approved, declarations)| {
+            approved.as_ref() == plan && declarations.contains(declaration)
+        })
     }
     pub fn merge(&mut self, other: Self) {
         self.0.extend(other.0);

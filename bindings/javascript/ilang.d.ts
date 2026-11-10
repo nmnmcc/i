@@ -56,6 +56,8 @@ export interface Guest {
   readonly unusable: string | null;
   /** Stop admission and cancel work/resources independently of language finals. */
   dispose(): void;
+  /** Drain the host-wide cleanup diagnostic queue without entering Wasm. */
+  takeCleanupErrors(): CleanupFailure[];
   /** Gives the value; throws GuestError for an error of `? E` and Stop when the program stops. */
   call(name: string, args?: unknown[]): unknown;
   callAsync(name: string, args?: unknown[]): Promise<unknown>;
@@ -106,9 +108,11 @@ export interface BindingAuthorization { readonly module: WebAssembly.Module }
 export function authorizeBindings(source: Exclude<ModuleSource, WebAssembly.Module>, plan: BindingPlan,
   approve: (declaration: Readonly<BindingDeclaration>) => boolean | Promise<boolean>, options?: { abi?: Abi }): Promise<BindingAuthorization>;
 export class ResourceError extends Error { readonly code: "closed" | "busy" | "memory exhausted" }
+export interface CleanupFailure { readonly phase: "cancel" | "wake" | "cleanup"; readonly error: unknown }
 export class ResourceHost {
   constructor(options?: { limit?: bigint });
   context(): ResourceContext;
+  takeCleanupErrors(): CleanupFailure[];
 }
 export interface ResourceLease<T> {
   readonly value: T;
@@ -124,6 +128,7 @@ export interface ProvisionalResource {
 export class ResourceContext {
   private constructor();
   readonly live: boolean;
+  abortController(phase?: "cancel" | "wake"): AbortController;
   ownRequest(cancel: () => void): () => void;
   cleanupJob(): { readonly receipt: Promise<void>; complete(): void };
   insert<T>(kind: string, value: T, cleanup: (value: T) => void | Promise<void>): bigint;

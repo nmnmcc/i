@@ -393,6 +393,7 @@ class GuestFault extends ModuleFault {
 
 class Bridge {
   resources;
+  ending = false;
   instance;
   /** Set while an async export waits (B.5). */
   waiting = false;
@@ -441,7 +442,7 @@ class Bridge {
     if (!bytes.length) return 0;
     const allocator = this.exports().ilang_alloc;
     expect(typeof allocator === "function", "The module does not export ilang_alloc");
-    const pointer = unsigned(allocator(bytes.length), "Allocation address");
+    const pointer = unsigned(this.guestCall(() => allocator(bytes.length)), "Allocation address");
     const buffer = this.memory().buffer;
     expect(pointer + bytes.length <= buffer.byteLength, "ilang_alloc gave a buffer outside memory");
     new Uint8Array(buffer, pointer, bytes.length).set(bytes);
@@ -457,7 +458,7 @@ class Bridge {
     for (const [pointer, length] of buffers.toReversed()) {
       if (pointer === 0 || released.has(pointer)) continue;
       released.add(pointer);
-      free(pointer, length);
+      this.guestCall(() => free(pointer, length));
     }
   }
 
@@ -465,6 +466,7 @@ class Bridge {
     expect(!this.unusable, `The instance cannot be used after it stopped (${this.unusable}); make a new instance`);
     expect(this.depth === 0, "The instance is running Wasm; a host function may not call it (§B.3)");
     expect(!this.waiting, "An async call is waiting; only its host functions may answer now");
+    expect(!this.ending, "An invocation is tearing down; cleanup may not enter Wasm");
   }
 
   /**
@@ -513,22 +515,41 @@ class Bridge {
 
   /** The program stops with `host: value is not correct`. */
   hostValueStop() {
-    this.resources?.teardown();
+    this.endResources();
     this.dropRequests();
     this.unusable = HOST_VALUE_REASON;
     return new Stop(HOST_VALUE_REASON);
   }
 
-  /** Run Wasm; a trap or exception makes the instance unusable. */
-  enter(operation) {
+  endResources(resources = this.resources) {
+    const saved = this.ending;
+    this.ending = true;
+    try { return resources?.teardown(); }
+    finally { this.ending = saved; }
+  }
+
+  liveContext() {
+    if (!this.resources.live) {
+      this.unusable ??= "The resource context has ended";
+      throw new ModuleFault(this.unusable);
+    }
+  }
+
+  /** Gate each actual guest call, including calls nested in argument lowering. */
+  guestCall(operation) {
+    this.liveContext();
     this.depth++;
     try {
-      return operation();
-    } catch (error) {
-      throw this.trapped(error);
-    } finally {
-      this.depth--;
-    }
+      const result = operation();
+      this.liveContext();
+      return result;
+    } finally { this.depth--; }
+  }
+
+  /** Translate a trap once at the enclosing SDK boundary. */
+  enter(operation) {
+    try { return this.guestCall(operation); }
+    catch (error) { throw this.trapped(error); }
   }
 
   /**
@@ -541,12 +562,12 @@ class Bridge {
     if (failure) this.failure ??= failure;
     else this.stopMessage ??= HOST_VALUE_REASON;
     this.broken = true;
-    this.resources.teardown();
+    this.endResources();
     return signature.async ? [] : resultTypes(signature).map((wasm) => (wasm === 0x6f ? null : 0));
   }
 
   trapped(error) {
-    this.resources?.teardown();
+    this.endResources();
     this.dropRequests();
     if (this.failure) {
       const { error: failure } = this.failure;
@@ -873,7 +894,7 @@ export async function instantiate(source, options = {}) {
         message = `(the stop message is outside memory: ${error.message})`;
       }
       bridge.stopMessage ??= message;
-      bridge.resources.teardown();
+      bridge.endResources();
     }), [0x7f, 0x7f], [], `${namespace} panic`),
   };
   for (const [kind, table] of [["service", abi.services], ["external", abi.externals]]) {
@@ -907,7 +928,7 @@ export async function instantiate(source, options = {}) {
             if (signature.async) {
               // The service runs now, during the import, with the signal of
               // this request (D6 of docs/design/host-concurrency.md).
-              const abort = new AbortController();
+              const abort = resources.abortController();
               const target = new WeakRef(bridge);
               const detach = resources.ownRequest(() => { abort.abort(); target.deref()?.wake?.(); });
               const saved = currentSignal;
@@ -940,7 +961,8 @@ export async function instantiate(source, options = {}) {
               return undefined;
             }
             const answer = kind === "service" ? reply(fn, args) : { value: fn(...args) };
-            expect(!answer.value || typeof answer.value.then !== "function", `${moduleName} ${name} is not async; it must not give a Promise`);
+            bridge.liveContext();
+            expect(signature.result === "externref" || !answer.value || typeof answer.value.then !== "function", `${moduleName} ${name} is not async; it must not give a Promise`);
             const values = bridge.lowerReply(signature, answer);
             return importResult(values ?? bridge.breakIn(signature, null));
           } catch (error) {
@@ -990,7 +1012,9 @@ export async function instantiate(source, options = {}) {
   const wait = async (name, status) => {
     bridge.waiting = true;
     try {
+      bridge.liveContext();
       while (status !== 0) {
+        bridge.liveContext();
         let next;
         if (status === 1) {
           if (!bridge.requests.size) throw bridge.trapped(new ModuleFault("the module waits, but no host function is running"));
@@ -1006,6 +1030,7 @@ export async function instantiate(source, options = {}) {
           // Let timers and IO run once, then give an answer that is done,
           // or go on without one.
           await macrotask();
+          bridge.liveContext();
           next = bridge.settled.shift();
           if (!next) {
             status = bridge.enterAccepting(() => instance.exports.ilang_continue());
@@ -1083,7 +1108,7 @@ export async function instantiate(source, options = {}) {
       const owned = [];
       const raw = bridge.enter(() => {
         const rawArguments = signature.params.flatMap((type, index) => bridge.lower(type, args[index], owned));
-        return instance.exports[name](...rawArguments);
+        return bridge.guestCall(() => instance.exports[name](...rawArguments));
       });
       return finish(signature, raw, owned);
     },
@@ -1098,7 +1123,7 @@ export async function instantiate(source, options = {}) {
         const rawArguments = signature.params.flatMap((type, index) => bridge.lower(type, args[index], owned));
         bridge.accepting = true;
         try {
-          return instance.exports[name](...rawArguments);
+          return bridge.guestCall(() => instance.exports[name](...rawArguments));
         } finally {
           bridge.accepting = false;
         }
@@ -1121,9 +1146,10 @@ export async function instantiate(source, options = {}) {
       return runPoint(point);
     },
     /** Abandon a live invocation and clean up host resources without i callbacks. */
+    takeCleanupErrors() { return resourceHost.takeCleanupErrors(); },
     dispose() {
       bridge.unusable ??= "the instance was disposed";
-      bridge.resources.teardown();
+      bridge.endResources();
       bridge.dropRequests();
       bridge.wake?.();
     },
@@ -1134,16 +1160,18 @@ export async function instantiate(source, options = {}) {
     const operation = guest[name];
     const invoke = (...args) => {
       bridge.usable();
-      bridge.resources.teardown();
+      bridge.endResources();
       const resources = resourceHost.context();
       bridge.resources = resources;
       try {
         const value = operation(...args);
-        if (value && typeof value.then === "function") return value.finally(() => resources.teardown());
-        resources.teardown();
+        const asynchronous = name === "callAsync" || (name === "run" && abi.entry?.async)
+          || (name === "runEntryPoint" && [...(abi.entry ? [abi.entry] : []), ...abi.tests].find((point) => point.name === args[0])?.async);
+        if (asynchronous) return value.finally(() => bridge.endResources(resources));
+        bridge.endResources(resources);
         return value;
       } catch (error) {
-        resources.teardown();
+        bridge.endResources(resources);
         throw error;
       }
     };

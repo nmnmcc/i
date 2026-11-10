@@ -210,3 +210,38 @@ Additional existing fixture grants are `custom.echo_string`, `custom.echo_int`,
 `custom.echo_bits`, `custom.echo_ref`, `custom.echo_bool`, `custom.echo_float`,
 `custom.echo_nil`, `custom:fallible/v1.fallible`, and the compiled fixture's
 `app:clock/v1.tick`. They use the same explicit legacy registration authority.
+
+Approval covers the complete authenticated binding plan: the artifact digest
+and the entire ordered declaration list, including refused and duplicate entries.
+JS authorization tokens retain an immutable snapshot, just as Rust grants do.
+Replacing any part of it, even by deleting a refused alias while keeping identical
+Wasm bytes, requires fresh explicit approval. Wire-import coverage alone cannot
+prove the list complete. Legacy broad registration authority is unchanged.
+
+Every SDK-managed entry into guest code checks the invocation gate, including
+continuations, result exports, allocation and each free. Ending during a host
+callback prevents return into guest code. Ending during request cancellation at
+status zero prevents the later result export. An interrupted invocation leaves
+the instance unusable. Synchronous opaque values are returned unchanged, without
+reading `then` or `finally`; operation kind and ABI metadata determine whether
+invocation handling is asynchronous. Direct raw Wasm export access remains the
+embedding's ABI duty.
+
+Teardown closes admission, removes every live entry and publishes close receipts
+before running any callback. Reentrant teardown joins the same completion.
+Callbacks cannot acquire resources, commit leases, deliver provisional values or
+reenter an SDK invocation during this transition.
+
+Cleanup failures are host diagnostics. Close and teardown still complete every
+cancellation, lease wake and cleanup starter, and keep their error-free contract.
+Thrown cancellation/cleanup errors, rejected cleanup Promises and exceptions in
+listeners registered on the supplied AbortSignals (including `onabort`) are
+isolated and collected. Drain records with `ResourceHost.takeCleanupErrors()` or
+`guest.takeCleanupErrors()`. Each record retains `phase` (`cancel`, `wake` or
+`cleanup`) and the original thrown `error`. The queue belongs to the host identity
+domain and includes late cleanup; draining it does not enter Wasm or replace the
+invocation's original result or failure. There are no implicit console reports
+or unhandled rejections for these failures. Cancellation callbacks revoke work
+synchronously; register independent asynchronous cleanup with `cleanupJob()`.
+If a cancellation callback nevertheless returns a Promise, its rejection is
+observed and recorded when it settles, without delaying synchronous revocation.

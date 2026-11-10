@@ -151,3 +151,55 @@ The lane was clean at b9173ce. There was no interrupted uncommitted work.
 - No semantic conflict between controlling sources was found. There are no
   outside-lane implementation escalations. IO services, R2's request rows and
   multicore worker transport remain assigned to their later tracks.
+
+## Independent BG review repairs
+
+The lane was clean at eb05ac3. Read the independent review and both sets of
+reproductions. Ported them into repository tests; none uses /tmp or an external
+probe. Both hosts were inspected for each class before choosing the repair.
+
+| Finding | Cause and general repair | Regression names | Other host |
+|---|---|---|---|
+| 1 | Rust grants kept only a digest and individual declaration. Retain the entire ordered authenticated plan snapshot; any replacement needs fresh approval. | Rust bg_review_complete_plan_cannot_drop_a_denied_coalesced_declaration; JS "BG review 1: approval retains the complete plan despite source mutation" | JS already retained the snapshot; control passes. Both READMEs state the same rule. |
+| 2 | Continuation and status-zero/result paths bypassed admission checks. Gate every managed guest call, including worker handoff, allocation and each free, and reject interrupted-instance reuse. | Rust bg_review_ended_context_blocks_runnable_continuations, bg_review_no_request_runnable_and_result_paths_do_not_enter_ended_wasm, bg_review_drop_at_status_zero_blocks_later_result_export, bg_review_gate_covers_sync_callbacks_allocations_and_each_free; JS review 2 tests and "BG review audit: sync callbacks, allocators and each free are gated" | Both affected and fixed; memory counters prove no guest call occurred. |
+| 3 | JS inferred async handling from opaque result properties. Use operation/ABI kind; skip Promise-shape checks for synchronous externref replies too. | Rust bg_review_opaque_shape_is_not_an_async_protocol_on_rust; JS "BG review 3: synchronous opaque objects are never inspected for then or finally" | Rust values are statically tagged and were unaffected; its identity control passes. |
+| 4 | JS left entries accessible while cancellation callbacks ran. Remove all entries and publish receipts before any callback; enforce liveness on acquire, commit and delivery. | Rust bg_review_reentrant_cancellation_cannot_publish_after_teardown; JS "BG review 4: cancellation cannot acquire, commit or deliver after teardown" and reentrant teardown test | Rust already removed entries first; strengthened explicit liveness checks and retained a reentry control. |
+| 5 | JS exceptions, and Rust cleanup/destructor/wake panics, could interrupt later cleanup. Isolate each step; collect host diagnostics without changing close or the original invocation result. | Rust bg_review_cleanup_panics_do_not_skip_cancellation_wakes_or_cleanup, bg_review_cleanup_failure_is_reported_without_replacing_a_success; JS review 5 tests and request-abort diagnostic test | Rust had the same class through unwinding panics; both hosts fixed. |
+
+Source checks are separate from execution checks:
+
+- Finding 1 implements native 3.1's "Check every required declaration before
+  instantiation/import coalescing" and the user's explicit complete-plan rule.
+  The same bytes plus a shorter plan do not authenticate the omitted obligations.
+- Finding 2 implements N9.5's "close the start/delivery gate" and no worker/i
+  callback requirement. Appendix B.5 requires the result export after status 0;
+  it does not permit entering it after the host has ended the context.
+- Finding 3 preserves Appendix B.2's opaque host-reference value domain. A
+  synchronous externref can be a thenable, Promise or proxy; its properties are
+  not the SDK's scheduling protocol.
+- Finding 4 follows N9.3's ordered lookup/lease/close transaction. Counter fixtures
+  and closed expectations come from those source rules, not generated goldens.
+- Finding 5 keeps N9.3's "Close is idempotent/error-free" and N9.5's scheduling
+  of every cleanup. Errors are diagnostics in a host-wide drainable queue:
+  take_cleanup_errors (Rust) / takeCleanupErrors (JS), also forwarded by the
+  instance/guest. Records have cancel/wake/cleanup phases; Rust retains panic
+  messages and its normal panic hook, JS retains original thrown values and
+  observes rejected cleanup Promises. No console/panic hook or ABI is installed.
+
+The further audit found and covered argument getters ending a JS invocation
+before its actual export call, raw allocator/free paths on both hosts, later
+result exports after request-drop callbacks, reuse after a failed gate, and
+fresh-invocation reentry during synchronous cleanup. Supplied JS AbortSignals
+keep native brands/listener removal while isolating user listeners, including
+onabort. Rejected cancellation callback Promises are observed as late diagnostics;
+registered cleanup jobs remain the way to join independent asynchronous cleanup.
+
+Checkpoint checks: cargo test -p ilang-host --locked: 76 passed; targeted Clippy
+-D warnings passed; npm test: 75 passed; browser review suite: 9 passed across
+all three engines. The initial JS reproduction run failed four cases with its
+plan-token control passing, then passed after repair. The first Rust reproduction
+run waited for a heavy slot and compiled after repairs were present, so it is
+not a pre-fix measurement. One additional Rust regression build failed because
+its boxed test future omitted Send; corrected the test type without weakening an
+assertion. Existing tests and all new paired controls pass. Full post-merge
+verification follows this checkpoint.
