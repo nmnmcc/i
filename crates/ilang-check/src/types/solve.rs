@@ -102,11 +102,16 @@ pub(crate) struct Solver {
     pub failures: Vec<Failure>,
     /// The names of the custom types, by `TypeId`, to show types.
     pub type_names: Vec<String>,
+    /// A failed coalescence is diagnostic recovery, never an unknown type
+    /// that may silently make a program pass. The checker drains this at
+    /// binding and artifact boundaries, including known-type conversions.
+    pub coalescing_failed: std::cell::Cell<bool>,
 }
 
 impl Solver {
     pub fn new(variance: StdHashMap<TypeId, Vec<Variance>>, type_names: Vec<String>) -> Solver {
         Solver {
+            coalescing_failed: std::cell::Cell::new(false),
             vars: Vec::new(),
             level: 0,
             cache: HashSet::default(),
@@ -995,7 +1000,7 @@ impl Solver {
         if cycle.is_some() {
             // A constraint graph can have redundant constructor paths
             // even when its type is finite. Keep the usual fast path.
-            self.normalize_bounds(&roots);
+            self.normalize_type(&Ty::Union(roots.iter().copied().map(Ty::Var).collect()));
             cycle = self.first_cycle(&roots);
         }
         match cycle {
@@ -1014,7 +1019,8 @@ impl Solver {
     /// Otherwise v <: u implies v <: u | T, also through variable chains.
     /// These rewrites preserve every solution; they introduce no variables
     /// and use only finite reachability searches.
-    fn normalize_bounds(&mut self, roots: &[V]) {
+    fn normalize_bounds(&mut self, roots: &[V]) -> bool {
+        let mut changed = false;
         let mut done = HashSet::default();
         for &v in roots {
             if !done.insert(v) {
@@ -1029,6 +1035,10 @@ impl Solver {
                 _ => false,
             });
             if let Some(t) = exact {
+                if self.var(v).lower == [t.clone()] && self.var(v).upper == [t.clone()] {
+                    continue;
+                }
+                changed = true;
                 let old_lower = std::mem::take(&mut self.var_mut(v).lower);
                 let old_upper = std::mem::take(&mut self.var_mut(v).upper);
                 for b in old_lower {
@@ -1045,11 +1055,52 @@ impl Solver {
                 self.var_mut(v).upper = vec![t.clone()];
             } else {
                 let (vars, _) = self.reach(vec![v], false);
+                let before = self.var(v).upper.len();
                 self.var_mut(v).upper.retain(|b| {
                     !matches!(b, Ty::Union(ms) if ms.iter().any(|m| matches!(m, Ty::Var(u) if vars.contains(u))))
                 });
+                changed |= self.var(v).upper.len() != before;
             }
         }
+        changed
+    }
+
+    /// Normalize the whole component that coalescing can reach, including
+    /// variable aliases stored in the reverse links. Removing one bound
+    /// can expose another redundant bound, so continue to a fixed point.
+    fn normalize_type(&mut self, t: &Ty) -> bool {
+        let mut edges = Vec::new();
+        bound_vars(self, t, true, false, &mut edges);
+        let mut todo: Vec<V> = edges.drain(..).map(|e| e.0).collect();
+        let mut seen = HashSet::default();
+        let mut roots = Vec::new();
+        while let Some(v) = todo.pop() {
+            if !seen.insert(v) {
+                continue;
+            }
+            roots.push(v);
+            let st = self.var(v);
+            todo.extend(st.from.iter().chain(&st.into).copied());
+            for b in st.lower.iter().chain(&st.upper) {
+                bound_vars(self, b, true, false, &mut edges);
+            }
+            todo.extend(edges.drain(..).map(|e| e.0));
+        }
+        let mut changed = false;
+        while self.normalize_bounds(&roots) {
+            changed = true;
+        }
+        changed
+    }
+
+    /// A canonical view for coalescing. Occurs checking and coalescing use
+    /// the same reductions. A view keeps variable ids and levels, but needs
+    /// no constraint caches: normalization neither adds constraints nor
+    /// allocates variables. Only the rare failed coalescence copies state.
+    pub fn normalized(&self, t: &Ty) -> Option<Solver> {
+        let mut view = Solver::new(self.variance.clone(), self.type_names.clone());
+        view.vars = self.vars.clone();
+        view.normalize_type(t).then_some(view)
     }
 
     /// The search of the occurs check, one root at a time.

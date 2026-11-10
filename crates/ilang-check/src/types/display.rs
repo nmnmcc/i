@@ -47,8 +47,8 @@ pub(crate) fn scheme_in(s: &Solver, t: &Ty, context: &[Ty], opts: Opts) -> Resul
     let mut namer = Namer::new(s);
     let scheme = match context {
         [] => None,
-        [b] => scheme_names(s, b),
-        _ => scheme_names(s, &Ty::tuple(context.to_vec())),
+        [b] => Some(scheme_names(s, b)?),
+        _ => Some(scheme_names(s, &Ty::tuple(context.to_vec()))?),
     };
     let mut parts = context.to_vec();
     parts.push(t.clone());
@@ -98,12 +98,12 @@ struct SchemeNames {
     taken: HashSet<String>,
 }
 
-fn scheme_names(s: &Solver, t: &Ty) -> Option<SchemeNames> {
+fn scheme_names(s: &Solver, t: &Ty) -> Result<SchemeNames, ()> {
     let opts = Opts {
         mono: true,
         written: false,
     };
-    let traced = trace(s, t, opts).ok()?;
+    let traced = trace(s, t, opts)?;
     let (shown, origin) = traced.prepare();
     let mut namer = Namer::new(s);
     namer.assign(&shown);
@@ -121,7 +121,7 @@ fn scheme_names(s: &Solver, t: &Ty) -> Option<SchemeNames> {
             names.entry(m).or_insert_with(|| (i, name.clone()));
         }
     }
-    Some(SchemeNames {
+    Ok(SchemeNames {
         names,
         taken: namer.taken,
     })
@@ -174,9 +174,19 @@ fn simplify_steps(
         rep,
         members,
     };
-    let t = c.go(t, true, 0, false);
+    let input = t;
+    let t = c.go(input, true, 0, false);
     if c.occurs {
-        return Err(());
+        // Alias classes can expose a redundant bound that the raw occurs
+        // graph did not reach. Use exactly its fixed-point reductions.
+        let result = match s.normalized(input) {
+            Some(view) => simplify_steps(&view, input, keep, opts, record),
+            None => Err(()),
+        };
+        if result.is_err() {
+            s.coalescing_failed.set(true);
+        }
+        return result;
     }
     let n = Norm {
         s,
