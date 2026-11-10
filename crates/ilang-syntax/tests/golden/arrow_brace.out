@@ -1,6 +1,6 @@
 a = (x) -> { (Int) -> Int } | Nil { x }
 
-b = (x) -> Int ? String { x }
+b = (x) -> Int ^ String { x }
 
 c = (x) -> Int ! Clock { x }
 
@@ -12,8 +12,8 @@ f = (x) -> Int & Nil { x }
 
 g = (x) -> (Int) -> Int { x }
 
-h = (x) -> (Int) -> Int ? E ! N { x }
+h = (x) -> (Int) -> Int ^ E ! N { x }
 
-i = (x) -> { (Int) -> Int ? E } ! N { x }
+i = (x) -> { (Int) -> Int ^ E } ! N { x }
 
 j(A) = (x: A) -> A { x }

@@ -144,6 +144,7 @@ impl Walk for Param {
 impl Walk for ExprKind {
     fn walk(&mut self, v: &mut impl Visitor) {
         match self {
+            Self::Quote(d) => d.walk(v),
             Self::Int(_) | Self::Float(_) => {}
             Self::String(s) => s.walk(v),
             Self::Name { module, name } => {
@@ -199,6 +200,7 @@ impl Walk for ExprKind {
 impl Walk for PatternKind {
     fn walk(&mut self, v: &mut impl Visitor) {
         match self {
+            Self::Quote(d) => d.walk(v),
             Self::Int { .. } | Self::Float { .. } => {}
             Self::Var(s) | Self::Discard(s) | Self::String(s) => s.walk(v),
             Self::Typed { binder, ty } => {
@@ -229,6 +231,22 @@ impl Walk for PatternKind {
                 rest.walk(v);
             }
             Self::BitArray(ss) => ss.walk(v),
+        }
+    }
+}
+impl Walk for crate::lisp::Datum {
+    fn walk(&mut self, v: &mut impl Visitor) {
+        use crate::lisp::DatumKind as D;
+        self.span.walk(v);
+        for doc in &mut self.docs {
+            doc.span.walk(v);
+            doc.text.walk(v);
+        }
+        match &mut self.kind {
+            D::Name(s) | D::Discard(s) | D::UpName(s) | D::String(s) | D::Symbol(s) => s.walk(v),
+            D::Round(xs) | D::Square(xs) | D::Curly(xs) | D::Bits(xs) => xs.walk(v),
+            D::Quote(x) | D::Unquote(x) | D::Splice(x) => x.walk(v),
+            D::Int(_) | D::Float(_) => {}
         }
     }
 }

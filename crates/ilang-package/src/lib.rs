@@ -216,6 +216,7 @@ pub struct Package {
     pub dev_dependencies: Vec<(String, Option<PackageId>)>,
     pub modules: Vec<ModuleSource>,
     pub wasm_exports: Vec<WasmExport>,
+    pub entries: Vec<(String, WasmExport)>,
     /// For a package got by location: its location and version (§2.7).
     pub location: Option<PackageLocation>,
 }
@@ -264,6 +265,8 @@ pub struct PackageGraph {
     pub library: PackageId,
     /// `None` when the compiled package could not be read.
     pub root: Option<PackageId>,
+    /// An explicit [entries] selection; None uses the source convention.
+    pub entry: Option<String>,
 }
 
 /// How packages are loaded.
@@ -341,6 +344,7 @@ pub fn load_with(root: &Path, options: &LoadOptions) -> (PackageGraph, Vec<Diagn
             packages: Vec::new(),
             library: 0,
             root: None,
+            entry: None,
         },
         diags: Vec::new(),
         by_dir: HashMap::new(),
@@ -494,6 +498,7 @@ impl Loader {
             dev_dependencies: Vec::new(),
             modules: Vec::new(),
             wasm_exports: manifest.wasm_exports.clone(),
+            entries: manifest.entries.clone(),
             location: None,
         });
         self.by_dir.insert(dir.clone(), id);
@@ -501,7 +506,7 @@ impl Loader {
         let deps = self.dependencies(id, &manifest, false, &dir, source);
         self.graph.packages[id].dependencies = deps;
         if is_root {
-            let dev = if self.tests {
+            let dev = if self.tests || !manifest.entries.is_empty() {
                 self.dependencies(id, &manifest, true, &dir, source)
             } else {
                 manifest
@@ -513,7 +518,7 @@ impl Loader {
             self.graph.packages[id].dev_dependencies = dev;
         }
         self.stack.pop();
-        let tests = is_root && self.tests;
+        let tests = is_root && (self.tests || !manifest.entries.is_empty());
         let (modules, diags) = modules::collect(self, &manifest.name, &dir, tests, None);
         self.graph.packages[id].modules = modules;
         self.diags.extend(diags);
@@ -572,6 +577,7 @@ impl Loader {
             dev_dependencies: Vec::new(),
             modules: Vec::new(),
             wasm_exports: Vec::new(),
+            entries: Vec::new(),
             location: Some(loc.clone()),
         });
         self.by_key.insert(key.clone(), id);

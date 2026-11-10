@@ -89,7 +89,7 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
         let path = entry.path();
         if path.is_dir() {
             walk(&path, out);
-        } else if path.extension().is_some_and(|e| e == "i") {
+        } else if path.extension().is_some_and(|e| e == "i" || e == "is") {
             out.push(path);
         }
     }
