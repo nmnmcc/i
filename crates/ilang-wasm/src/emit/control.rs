@@ -876,6 +876,13 @@ impl<'p> Emitter<'p> {
         // The slot of the frame as it was at the point: the site of the
         // call, or the tail site of the tail call that called the function
         // (§11.7).
+        if self.metered {
+            let _ = writeln!(
+                self.out,
+                "(call $macro_enter (i32.const {}))",
+                f.budget_frame
+            );
+        }
         self.out
             .push_str("(call $shadow_enter (struct.get $frame 2 (local.get $frame)))\n");
         let args: String = point
