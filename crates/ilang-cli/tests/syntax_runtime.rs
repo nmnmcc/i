@@ -145,3 +145,55 @@ show = () { syntax.show(source()) }
     .unwrap();
     ilang_cli::build(dir.path(), options).unwrap();
 }
+
+#[test]
+fn syntax_values_cross_export_boundary() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        "name = \"app\"\n[wasm]\nexports = [\"app/main.identity\"]\n",
+    )
+    .unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(syntax = i/syntax)\n(identity)\nidentity = (x: syntax.Syntax) { x }\n",
+    )
+    .unwrap();
+    let built = ilang_cli::build(
+        dir.path(),
+        ilang_cli::BuildOptions {
+            tests: false,
+            opt: ilang_cli::Level::O0,
+            offline: true,
+            target: ilang_cli::Target::Ilang,
+        },
+    )
+    .unwrap();
+    let mut instance = built
+        .host_program()
+        .unwrap()
+        .instantiate(built.host_options())
+        .unwrap();
+    let input = Syntax::from_datum(
+        &parse("(a b)").unwrap()[0],
+        &Scope {
+            module: 8,
+            marks: BTreeSet::new(),
+        },
+    );
+    let result = instance
+        .call(
+            "app/main.identity",
+            &[ilang_host::syntax::encode(input.clone())],
+        )
+        .unwrap();
+    let ilang_host::Outcome::Ok(value) = result else {
+        panic!("export stopped: {result:?}")
+    };
+    assert!(
+        ilang_host::syntax::decode(&value)
+            .unwrap()
+            .same_code(&input)
+    );
+}
