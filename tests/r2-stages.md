@@ -1150,3 +1150,12 @@ A subsequent full dev-verify passed the Rust tests up through the spec suite,
 then was interrupted (exit 130) during value_type_performance to free capacity
 for integration's corpus run. It did not reach the i and browser phases and is
 not a completed gate. The integration gate must run on the merged source.
+
+After merging K4, all eight runtime tests and all 78 section 9.9 cases passed
+again, and the regenerated fixtures passed the Node and 57 browser tests.
+The first review-r2 rerun was interrupted for the concurrent integration run.
+For its 32 completed changed observations, K4 canonicalized the order of
+environment-union members without changing the members or execution results;
+the missing-service case also gained the corpus driver's two entry probes,
+both reporting the same E0522. Those observations were updated on that basis.
+The whole review-r2 set must be rerun after the integration load subsides.
