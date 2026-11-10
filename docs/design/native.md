@@ -2,6 +2,8 @@
 
 Status: proposal. It comes from a discussion with the user on 2026-11-10, and the user agreed to its direction. It is not reviewed. Nothing in it is implemented or measured. Design notes were read on `redesign` at `1e0d910` (`multicore.md`, `runtime.md`, `host-concurrency.md`, `lazy-reentry.md`), and code on `main` at `229e3a4`.
 
+Revision 2 (2026-11-10) takes the findings of the independent review that the redesign coordinator ran: N4 is narrower, N9 has a representation that the host boundary allows and a clean-up rule, N12 is new, the sentence on moving continuations is corrected, and part 9 says what the review checked.
+
 This note changes four things that the redesign plan lists as settled. Part 8 lists them. Each needs the user's decision in the plan's own process.
 
 ## 1. Goal
@@ -32,7 +34,7 @@ These are the rules of `multicore.md` (S7). This note keeps all of them: D1 (one
 
 **N3. The native target uses the i binary interface (ABI v3), not WASI.** On the WASI target an async host function is a blocking call, so a program cannot wait for many requests.
 
-**N4. A user's own host service is a compile error on the native target.** A native package has no embedder to give `@host("app:…")`. The error names `--target ilang`. *Proposed default, which the user has not objected to.*
+**N4. On the native target, an import that the program needs and the runner cannot give is a compile error.** A native package has no embedder. The error names the import and `--target ilang`. A program that declares a host service and replaces it with ordinary i code (§9.7) needs no import, and builds. *Reason (review):* the first form of this rule refused every user host service, and so refused programs that run today.
 
 **N5. Workers.** The runner starts N threads. Each thread has one Wasmtime `Store` with one instance of the module, and runs the same scheduler, which is ordinary i code (the M:1 scheduler of R2). N is the number of cores by default. The runner reads another number from its environment or from `i.toml` (open, part 9).
 
@@ -50,11 +52,14 @@ These are the rules of `multicore.md` (S7). This note keeps all of them: D1 (one
 
 **N8. Shared scheduler state is in the runner, behind one lock.** Channel state, wake-ups, the stop cell and the shared queue are in the runner. A message between workers is encoded bytes. This takes the place of the lock-free parallel CML protocol that `multicore.md` part 7 plans for the multicore wave. The scheduler stays i code: the runner gives a small set of general operations (a byte queue, a lock, a wait). Their exact form is open (part 9). *Reason:* one lock is the easiest to get right. It is replaced only when a measurement shows that it is the limit.
 
-**N9. IO resources are integer handles, not host references.** A socket, a listener, a file and a child process are opaque i values that hold an index and a generation into one table of the runner, for the whole process. This changes `runtime.md` D9.
+**N9. IO resources are integer handles, not host references.** A socket, a listener, a file and a child process are values of a private nominal type that holds one `Int`. The raw host service takes and gives that `Int`, and ordinary i code in the library module wraps and unwraps it. This changes `runtime.md` D9.
 
+- *Reason for this form (review):* §10.3 lets only `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray` and custom types with no constructors go to the host. A custom type with an integer field gives E0320, and a type with no constructors is a host reference, which is not portable. A private type around an ABI `Int` needs no special case in the compiler.
 - Such a handle is portable by the S7 rules, with no special case. So one accept loop with `go` for each connection uses all cores, as in Go.
-- The generation stops a use after close.
+- The number is never used again, so the table is a map from numbers to resources, and a use after close finds nothing. (The first form of this note had an index and a generation; one number that is not reused is simpler.)
+- An `Int` can be made by any code, where a host reference cannot. So the raw services are not exported from the library modules; only the wrapped functions are. If this is enough is a question for the IO design (part 9).
 - A handle has no GC lifetime. It is closed explicitly, as `resource.ensure` already does.
+- **The table belongs to one run, and the end of the run closes everything left in it.** Final functions do not run at a stop (§9.5), so this rule, not a final function, frees host resources then. On native, a run is the process. Under `i run`, `i test` and an embedder, the table is dropped with the run, as dropping the instance frees host references today.
 - Two workers that read one socket get a result that depends on the order. D1 of S7 allows this. The docs say it.
 - A host request (`Request`, `Ticket`) stays not portable.
 
@@ -64,11 +69,13 @@ These are the rules of `multicore.md` (S7). This note keeps all of them: D1 (one
 
 **N11. One encoded format, and a transport for each host.** On native, the bytes are in the runner's memory, and the module needs no shared linear memory and no thread-safe `ilang_alloc`. In a browser, the same bytes go through a shared linear memory, as the plan says.
 
+**N12. A stop ends every worker.** D11 of S7 says that a stop anywhere stops the whole run. A worker in a loop with no scheduler call never sees the stop cell. On native, the runner prints the message of the first stop and exits the process. In a host that lives on (an embedder with more than one worker), the host uses Wasmtime's epoch interruption so that the other stores trap. That is the plain use of epochs (a trap at the deadline, with no callback), and it is turned on only when there is more than one worker, because the checks cost time in all code. *Reason (review):* without this, a run with a stop may never return.
+
 ## 4. What is not done, and why
 
 - **Cooperative stealing, or publishing only when a worker is idle.** Both need the owner to reach a poll point (N7).
 - **An interrupt for encoding** (Wasmtime's epoch interruption). It closes that gap, but the task queue must then be safe against an interrupt at any point, and two facts about Wasmtime are not checked (part 9). N7 makes it unnecessary.
-- **Moving a started task by copying its continuation.** After lazy re-entry a paused continuation is heap data (frame records with a function reference and saved values), so this is possible later. Its cost is the size of everything the task can reach. This note asks only that nothing blocks it: every function reference in a frame record has a stable id (D6).
+- **Moving a started task by copying its continuation.** After lazy re-entry a paused continuation is heap data (frame records with a function reference and saved values), so this is possible later. Its cost is the size of everything the task can reach. This note asks only that nothing blocks it. The stable ids of D6 are for the sameness of function values; they are not enough here. A frame record holds a reference to resume code, and moving it needs a stable number for each such code place, which is a different thing and is not designed.
 - **A second back end on linear memory with Wasm threads.** It gives a real shared heap, but i must then have its own collector for many threads, and two back ends and two runtimes.
 - **A fork of Wasmtime with shared-everything threads.** Rough estimate: 1 to 2 person-months for a trial with the null collector, and 1 to 2 person-years until it can be trusted, plus the cost of keeping a fork. Wasmtime 50 has the feature flag and the validation only.
 - **The component model.** Components share nothing and copy only WIT types, so it does not help with cores. The runner may use Wasmtime's WASI implementation in Rust for its own IO; that is a choice of the IO stage.
@@ -111,8 +118,13 @@ None of these changes a program, because the S7 rules hold.
 
 ## 9. Not checked, and open
 
+Checked by the review, with probe programs on Wasmtime 50: a Wasmtime runtime with no compiler loads and runs a `.cwasm` that this compiler made; one `Store` for each worker works, and an idle `Store` can be called from another thread; a shared GC heap is not there. The review also found that `Program::from_bytes` in `ilang-host` calls the compiler, so the runner cannot use it as it is; it must be split first.
+
+Still open:
+
 - The cost of one encode and one decode. Nothing is measured.
-- The size of a runner built with no Cranelift, and that it loads a `.cwasm` made by `i` with the same configuration.
+- The size of a runner built with no Cranelift.
+- If keeping the raw IO services private is enough against made-up handle numbers (N9), or the numbers must also be hard to guess.
 - How the `.cwasm` is put into the runner (bytes after the end of the file, or a section), and what code signing on macOS and Windows needs.
 - Where the runners of other targets come from.
 - The name and the place of the worker count.
