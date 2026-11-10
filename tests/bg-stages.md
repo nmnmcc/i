@@ -221,3 +221,38 @@ assignment, causing E0382 and an unused-mut warning in the targeted build; fixed
 both without changing the regression assertion. The full post-Std-2 gate passed
 (76 Rust host tests, 76 Node tests, 51 browser tests); the next full gate also
 covers this final Rust payload test after merging the newer documentation.
+
+## BG review final acceptance
+
+- Merged redesign 7385747 (pure Std-2) and then 50c44a9 (JA source amendments).
+  The latter changes documentation only. Read the changed controlling Appendix B
+  and runtime ownership/target text; no BG conflict was found. No merge conflict
+  occurred in this repair. The main checkout and other lanes were not edited.
+- After the final merge, heavy/devshell `ILANG_BROWSER_PORT=4184
+  ./scripts/dev-verify` exited 0: formatting, Clippy -D warnings and all workspace
+  tests; 77 Rust host tests; all i tests and WASI smoke checks; 76 Node tests;
+  51 browser tests across Chromium, Firefox and WebKit. The spec harness reported
+  168/168 cases at both --opt 0 and --opt 2. No assertion or gate was weakened.
+- Final scripts/old-syntax-check exited 0: 1186 extracted literals/blocks,
+  exact expected diagnostics, 19 unchanged future-track entries.
+- Final baseline and lane WAT_DUMP cargo test runs both exited 0. Every one of
+  636 outputs is byte-identical, including 226 identical ERROR outputs; no
+  missing, new or different exports. The baseline archive was checked against
+  all 891 tracked blobs of redesign 50c44a9. Its separate Cargo target directory
+  was used throughout; there was no artifact-cache collision or substitute
+  measurement in this repair.
+- scripts/build-abi-fixture.sh generated bg-lifecycle.wasm from its checked-in
+  WAT source. Regeneration with the final release i is a byte-for-byte fixed
+  point. All existing Wasm fixtures, the compiled binding sidecar and the SDK
+  feature probe are unchanged. Only the new binary belongs in the final derived
+  commit; no generated output was hand-edited.
+- New helpers and probes live under crates/ilang-host and bindings/javascript/
+  test, with shared browser support/fixtures under tests/browser. They do not
+  depend on the reviewer's temporary files. All five findings have both-host
+  coverage, including unaffected-host controls; the table above lists them.
+- Failed checks were the expected four pre-fix JS reproduction cases and the
+  two corrected Rust test/helper build errors described above. There were no
+  failed or interrupted final gates. Heavy-slot waiting did not bypass the
+  limit. The inherited Playwright host-validation setting was not changed;
+  all three engines executed the tests. No persistent environment change,
+  outside-scope implementation escalation, or unfinished BG repair remains.
