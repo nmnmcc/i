@@ -1,0 +1,56 @@
+{
+  "artifact_digest": "sha256-59aada2bc430f7ca52b880c0d55298bbe9a588261202f4402736d94a0fa3071b",
+  "declarations": [
+    {
+      "package": "sha256-aaa9ce2aa85b4e90355beac853be79d2213ea6d36bb0d53ebc134ecef28c39f5",
+      "module": "app/r2",
+      "module_digest": "sha256-b34859698689cc40fa80bf8c91493f90eafe718242f7b84ac1de092408af1a2d",
+      "declaration": "Gates.wait",
+      "namespace": "r2:gates/v1",
+      "name": "wait",
+      "kind": "service",
+      "signature": {
+        "params": [
+          "int"
+        ],
+        "result": "int",
+        "errors": [],
+        "async": true
+      }
+    },
+    {
+      "package": "sha256-aaa9ce2aa85b4e90355beac853be79d2213ea6d36bb0d53ebc134ecef28c39f5",
+      "module": "app/r2",
+      "module_digest": "sha256-b34859698689cc40fa80bf8c91493f90eafe718242f7b84ac1de092408af1a2d",
+      "declaration": "Control.release",
+      "namespace": "r2:control/v1",
+      "name": "release",
+      "kind": "service",
+      "signature": {
+        "params": [
+          "int"
+        ],
+        "result": "nil",
+        "errors": [],
+        "async": false
+      }
+    },
+    {
+      "package": "sha256-aaa9ce2aa85b4e90355beac853be79d2213ea6d36bb0d53ebc134ecef28c39f5",
+      "module": "app/r2",
+      "module_digest": "sha256-b34859698689cc40fa80bf8c91493f90eafe718242f7b84ac1de092408af1a2d",
+      "declaration": "Control.check",
+      "namespace": "r2:control/v1",
+      "name": "check",
+      "kind": "service",
+      "signature": {
+        "params": [
+          "int"
+        ],
+        "result": "nil",
+        "errors": [],
+        "async": false
+      }
+    }
+  ]
+}
