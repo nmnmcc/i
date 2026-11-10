@@ -1128,3 +1128,18 @@ therefore check immediate stop without finals; typed failures from a final are
 negative typing tests. Normal-return and typed-error finals must complete under
 ancestor cancellation, and fresh cleanup scopes must retain their own failure
 and cancellation rules (runtime §12.9/R4a). No stop semantics are changed.
+
+The WIP checkpoint initially failed checking because `address_index` used a
+one-element tuple in arithmetic and `finish_scope` queried the new TaskStore
+as a list. The arithmetic now uses a block for grouping and the scope lookup
+uses `store_find`. A 16-field immutable page made inference of `write_slot`
+take tens of seconds. Four-field pages preserve the same table operations and
+reduce the debug compiler's check of the cancellation reproducer to 0.34 s.
+
+On the four-field implementation, all eight `r2_runtime` tests passed. The
+original typed-error cancellation reproducer printed both final markers at O0
+and O2. One non-quiet debug-compiler scale run passed at 128, 256, 1,000 and
+10,000 senders, receivers and three-way choices; the 10,000 cases took 4.14,
+4.60 and 4.22 seconds respectively including startup. Shared capture depths
+28 and 60 took 1.55 and 1.56 seconds. These are single samples under concurrent
+load, not quiet-window measurements; raw output is in target/r2-scale-current.
