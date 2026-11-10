@@ -15,7 +15,7 @@ impl ExpansionSession {
         &mut self,
         arguments: &[Syntax],
         call: &Syntax,
-        execute: impl FnOnce(&[Syntax]) -> Result<Syntax, SyntaxError>,
+        execute: impl FnOnce(&[Syntax], u64) -> Result<Syntax, SyntaxError>,
         expand_result: impl FnOnce(&mut Self, Syntax) -> Result<Syntax, SyntaxError>,
     ) -> Result<Syntax, SyntaxError> {
         if self.depth == 256 {
@@ -28,7 +28,7 @@ impl ExpansionSession {
         self.next_mark = mark.checked_add(1).expect("macro mark space exhausted");
         let marked = flip_mark_all(arguments, mark);
         self.depth += 1;
-        let result = execute(&marked).and_then(|result| {
+        let result = execute(&marked, mark).and_then(|result| {
             validate_expansion(&result, &marked)?;
             expand_result(self, result.flip_mark(mark))
         });

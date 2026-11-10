@@ -243,7 +243,7 @@ fn expansion_runs_mark_arguments_and_freshen_templates() {
         .run(
             std::slice::from_ref(&argument),
             &argument,
-            |args| {
+            |args, _| {
                 Syntax::make(
                     Node::Round(vec![args[0].clone(), template.clone()]),
                     &template,
@@ -261,7 +261,7 @@ fn expansion_runs_mark_arguments_and_freshen_templates() {
         .run(
             &[],
             &argument,
-            |_| Ok(template.clone()),
+            |_, _| Ok(template.clone()),
             |_, result| Ok(result),
         )
         .unwrap();
@@ -280,7 +280,7 @@ fn expansion_depth_is_bounded_and_restored_after_failure() {
         session.run(
             &[],
             value,
-            |_| Ok(value.clone()),
+            |_, _| Ok(value.clone()),
             |session, result| {
                 if n == 0 {
                     Ok(result)
@@ -299,4 +299,22 @@ fn expansion_depth_is_bounded_and_restored_after_failure() {
             .contains("256")
     );
     nested(&mut session, &value, 1).unwrap();
+}
+
+#[test]
+fn expansion_marks_compiler_answers_with_the_same_run_mark() {
+    use ilang_syntax::lisp::expansion::ExpansionSession;
+    let caller = root("call");
+    let answer = root("Definition").as_answer();
+    let mut session = ExpansionSession::default();
+    let result = session
+        .run(
+            &[],
+            &caller,
+            |_, mark| Ok(answer.flip_mark(mark)),
+            |_, result| Ok(result),
+        )
+        .unwrap();
+    assert_eq!(result.scope(), answer.scope());
+    assert_eq!(result.provenance(), answer.provenance());
 }
