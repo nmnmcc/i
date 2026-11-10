@@ -14,8 +14,15 @@
 //! not 0, also when they are empty: the host may make them with
 //! `ilang_alloc(0)` (B.1, B.3).
 
-pub fn wat() -> String {
-    WAT.to_owned()
+pub fn wat(references: bool) -> String {
+    if references {
+        WAT.replace(
+            "(func $abi_ref_in (param $value externref) (result eqref)\n  (call $host_ref_new (local.get $value)))",
+            "(func $abi_ref_in (param $value externref) (param $type i32) (result eqref)\n  (call $host_ref_new (local.get $value) (local.get $type)))",
+        )
+    } else {
+        WAT.to_owned()
+    }
 }
 
 const WAT: &str = r#"
