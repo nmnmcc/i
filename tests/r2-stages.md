@@ -1158,4 +1158,6 @@ For its 32 completed changed observations, K4 canonicalized the order of
 environment-union members without changing the members or execution results;
 the missing-service case also gained the corpus driver's two entry probes,
 both reporting the same E0522. Those observations were updated on that basis.
-The whole review-r2 set must be rerun after the integration load subsides.
+The remaining six showed the same order-only change; after updating those
+observations, the entire 38-case review-r2 run passed, with the intentionally
+divergent case retained as one censored observation.
