@@ -271,6 +271,7 @@ pub struct Type {
 
 #[derive(Clone, Debug)]
 pub enum TypeKind {
+    Lit(crate::types::LitValue),
     /// A named type with the right number of arguments. An alias is kept as
     /// itself; it is not expanded.
     Named {

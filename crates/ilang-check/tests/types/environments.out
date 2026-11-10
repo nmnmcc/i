@@ -1,10 +1,10 @@
 collect : (body: () -> Nil ! Yield(A) | N) -> List(A) ! N
 numbers : () -> List(Int)
-inferred : () -> List(String)
-run_never : (body: () -> Nil ! Yield(Never)) -> Int
-bad_never : () -> Int
-run_int : (body: () -> Nil ! Yield(Int)) -> Int
-good_int : () -> Int
+inferred : () -> List("s")
+run_never : (body: () -> Nil ! Yield(Never)) -> 1
+bad_never : () -> 1
+run_int : (body: () -> Nil ! Yield(Int)) -> 1
+good_int : () -> 1
 emit_int : () -> Nil ! Yield(Int)
 emit_string : () -> Nil ! Yield(String)
 both_yields : () -> Nil ! Yield(Int) | Yield(String)

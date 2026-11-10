@@ -6,7 +6,7 @@ literal : (n: A & Int) -> A ! Assert
 single : (u: User) -> String
 only_ok : (r: Result(Int, Never)) -> Int
 nested : (p: (Result(Int, Never), Bool)) -> Int
-from_value : () -> Int
+from_value : () -> 1
 list : (xs: List(A)) -> A ! Assert
 list_rest : (xs: List(A)) -> List(A)
 prefix : (s: String) -> String
@@ -19,5 +19,5 @@ type_var : (x: A) -> A
 param_tuple : ((A, B)) -> A
 param_user : (User) -> String
 param_ctor : (Result(A, B)) -> A ! Assert
-param_literal : (Int) -> Int ! Assert
-param_list : (List(A)) -> Int ! Assert
+param_literal : (Int) -> 1 ! Assert
+param_list : (List(A)) -> 1 ! Assert

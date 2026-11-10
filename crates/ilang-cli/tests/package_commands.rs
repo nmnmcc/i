@@ -655,7 +655,7 @@ fn publish_compares_the_interface() {
     write(&dir, &[("src/api.i", &added)]);
     commit(&dir, "two");
     let err = w.fails(&["publish", "1.0.2", "--project", &project]);
-    assert!(err.contains("added value api.two: Int"), "{err}");
+    assert!(err.contains("added value api.two: 2"), "{err}");
     assert!(err.contains("a new minor version, at least 1.1.0"), "{err}");
     let out = w.ok(&["publish", "1.1.0", "--dry-run", "--project", &project]);
     assert!(out.contains("something was added since v1.0.1"), "{out}");
@@ -694,7 +694,7 @@ fn publish_compares_the_interface() {
     write(&dir, &[("src/api.i", &hidden)]);
     commit(&dir, "hide");
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
-    assert!(err.contains("removed value api.two: Int"), "{err}");
+    assert!(err.contains("removed value api.two: 2"), "{err}");
     assert!(
         err.contains("removed constructors api.Shape: Circle(r: Float) | Square(side: Float)"),
         "{err}"
@@ -967,7 +967,7 @@ fn publish_sees_a_new_major_version_of_a_dependency() {
     let (ok, out) = try_publish(&w, &dir, &[], "1.0.1");
     assert!(!ok, "{out}");
     assert!(
-        out.contains("changed value api.f: (x: example.com/dep@1:v.V) -> Int"),
+        out.contains("changed value api.f: (x: example.com/dep@1:v.V) -> 1"),
         "{out}"
     );
     assert!(
@@ -1298,4 +1298,34 @@ fn publish_skips_an_old_syntax_interface_and_allows_a_patch() {
     );
     assert!(out.contains("check the interface by hand"), "{out}");
     assert_eq!(git(&dir, &["tag", "--list", "v1.0.1"]), "v1.0.1");
+}
+
+#[test]
+fn publish_keeps_literal_alias_values_beyond_hover_limits() {
+    // literal-types decision 11 and types-joint §10: an alias body is full
+    // interface text; shortening the 14-member hover must not hide a change.
+    let w = World::new();
+    let literals = (0..14)
+        .map(|n| format!("\"m{n:02}\""))
+        .collect::<Vec<_>>()
+        .join(" | ");
+    let api = format!(" (Modes)\n\nModes = {literals}\n");
+    let dir = w.project(
+        "pub",
+        &[
+            ("i.toml", "name = \"pub\"\n"),
+            (".gitignore", "/build/\n"),
+            ("src/api.i", &api),
+        ],
+    );
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "first");
+    let project = dir.display().to_string();
+    w.ok(&["publish", "1.0.0", "--project", &project]);
+    let changed = api.replace("\"m13\"", "\"m99\"");
+    let (ok, out) = try_publish(&w, &dir, &[("src/api.i", &changed)], "1.0.1");
+    assert!(!ok, "{out}");
+    assert!(out.contains("changed type api.Modes"), "{out}");
+    assert!(out.contains("a new major version"), "{out}");
+    assert!(!out.contains("…"), "{out}");
 }

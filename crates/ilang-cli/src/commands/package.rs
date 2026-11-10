@@ -1395,6 +1395,7 @@ impl<'a> TypeShow<'a> {
                 .join(sep)
         };
         match &t.kind {
+            TypeKind::Lit(v) => v.text(),
             TypeKind::Named { ty, args } => {
                 let name = match ty {
                     TypeRef::Builtin(b) => b.name().to_string(),

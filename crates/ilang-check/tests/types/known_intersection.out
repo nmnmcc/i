@@ -3,5 +3,6 @@ same : () -> Bool
 other : () -> Bool
 wide : (v: Int) -> Bool
 5:2: warning[W0502]: this value is not used, and working it out does nothing
-11:14: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
-14:19: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
+9:13: error[E0520]: both sides are constants, `5` and `1`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
+11:14: error[E0520]: both sides are constants, `5` and `"s"`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
+14:19: error[E0520]: the two sides have the known types `Int` and `"s"`, which are disjoint, so the result would always be the same (§6.9)

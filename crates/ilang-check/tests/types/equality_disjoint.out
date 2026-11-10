@@ -12,10 +12,10 @@ sizes : Bool
 same_size : Bool
 function : (f: (Int) -> Int) -> Bool
 holes : (x: A) -> Bool
-6:12: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
-8:23: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-22:13: error[E0520]: the two sides have the known types `Int` and `String`, which are disjoint, so the result would always be the same (§6.9)
+6:12: error[E0520]: both sides are constants, `1` and `"a"`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
+8:23: error[E0520]: the two sides have the known types `String` and `1`, which are disjoint, so the result would always be the same (§6.9)
+22:13: error[E0520]: both sides are constants, `1` and `"a"`, so `!=` is always `True` (§6.9). To compare two constants when the program runs, pass them as parameters.
 27:45: error[E0520]: the two sides have the known types `Int | String` and `Float | Nil`, which are disjoint, so the result would always be the same (§6.9)
-30:9: error[E0520]: the two sides have the known types `(Int, Int)` and `(Int, Int, Int)`, which are disjoint, so the result would always be the same (§6.9)
-35:32: error[E0520]: the two sides have the known types `(Int) -> Int` and `Int`, which are disjoint, so the result would always be the same (§6.9)
-38:15: error[E0520]: the two sides have the known types `(_, Int)` and `String`, which are disjoint, so the result would always be the same (§6.9)
+30:9: error[E0520]: the two sides have the known types `(1, 2)` and `(1, 2, 3)`, which are disjoint, so the result would always be the same (§6.9)
+35:32: error[E0520]: the two sides have the known types `(Int) -> Int` and `1`, which are disjoint, so the result would always be the same (§6.9)
+38:15: error[E0520]: the two sides have the known types `(_, 1)` and `"a"`, which are disjoint, so the result would always be the same (§6.9)
