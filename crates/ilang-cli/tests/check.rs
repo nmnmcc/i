@@ -45,6 +45,48 @@ fn normal_build_never_enables_the_equivalence_feature() {
     assert!(!std::hint::black_box(ilang_check::ONE_CLAUSE_AS_CASE));
 }
 
+#[test]
+fn blind_expected_subject_is_checked_before_audit_codegen() {
+    // S4 ruling 2: even the old-rule audit must report a normal diagnostic
+    // when it cannot give this new match subject its expected type.
+    let source = include_str!("../../../tests/spec/6/a1_fitting_expected_subject.i");
+    let dir = front_end_project(source);
+    let (graph, diags) = ilang_cli::load(dir.path(), true, true);
+    assert!(!diags.iter().any(ilang_package::Diagnostic::is_error));
+    let checked = ilang_check::check(&graph);
+    if ilang_check::ONE_CLAUSE_AS_CASE {
+        let diagnostics = graph.sources.render_all(&checked.diags).join("\n");
+        assert!(diagnostics.contains("error[E0506]"), "{diagnostics}");
+        assert!(
+            diagnostics.contains("`.name` needs a known type"),
+            "{diagnostics}"
+        );
+        assert!(
+            checked.types.is_none(),
+            "an incomplete field access must not reach lowering"
+        );
+    } else {
+        assert!(
+            !checked
+                .diags
+                .iter()
+                .any(ilang_package::Diagnostic::is_error)
+        );
+        for target in [ilang_wasm::Target::Ilang, ilang_wasm::Target::Wasi] {
+            ilang_wasm::compile_wat(
+                &graph,
+                checked.program.as_ref().unwrap(),
+                checked.types.as_ref().unwrap(),
+                ilang_wasm::Options {
+                    tests: true,
+                    target,
+                },
+            )
+            .unwrap();
+        }
+    }
+}
+
 fn front_end_project(source: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();

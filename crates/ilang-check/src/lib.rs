@@ -157,7 +157,8 @@ pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagn
 pub struct Checked {
     /// `None` when a module has a syntax error.
     pub program: Option<hir::Program>,
-    /// `None` when the program could not be resolved.
+    /// `None` when the program could not be resolved, or the equivalence
+    /// audit needs a known type before it can supply lowering data.
     pub types: Option<types::Typed>,
     pub diags: Vec<Diagnostic>,
 }
@@ -170,8 +171,13 @@ pub fn check(graph: &PackageGraph) -> Checked {
     let types = match &program {
         Some(p) if !diags.iter().any(Diagnostic::is_error) => {
             let (typed, more) = types::check(p, &graph.sources);
+            // The old-rule audit can remove an expected type from a new
+            // match subject. Keep E0506, but do not let audit codegen use
+            // the incomplete field/call information after that diagnostic.
+            let audit_needs_type =
+                ONE_CLAUSE_AS_CASE && more.iter().any(|d| d.code == code::NEEDS_KNOWN_TYPE);
             diags.extend(more);
-            Some(typed)
+            (!audit_needs_type).then_some(typed)
         }
         _ => None,
     };

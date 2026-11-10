@@ -1,8 +1,12 @@
 #!/usr/bin/env -S python3 -I
 """Independent counterexamples for a1-front-end.md §3.17."""
 from pathlib import Path
+import contextlib
+import io
+import runpy
 import subprocess
 import tempfile
+from unittest import mock
 
 TOOL = Path(__file__).resolve().with_name('wat-diff')
 
@@ -44,6 +48,49 @@ def main():
     check('ERROR 1 problems', 'ERROR 2 problems', ok=False)
     check('ERROR 1 problems', wat(), ok=False)
     check(wat(), 'ERROR 1 problems', ok=False)
+    # S4 ruling: new cases have no old export. Their unformatted A1
+    # exports are the reference, including exact ERROR text. E1 only
+    # compares shared files, with no site masking.
+    audit = runpy.run_path(str(TOOL))
+
+    def blind_check(before, after, reference=None, byte_equal=False, ok=True, allowed=None):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for side, files in [('a', before), ('b', after), ('reference', reference or {})]:
+                (root / side).mkdir()
+                for name, text in files.items(): (root / side / name).write_text(text)
+            args = [str(TOOL), str(root / 'a'), str(root / 'b')]
+            if reference is not None: args += ['--a1-unformatted', str(root / 'reference')]
+            if byte_equal: args += ['--byte-equal']
+            if allowed is not None:
+                (root / 'allowed').write_text(allowed); args += ['--allowed', str(root / 'allowed')]
+            with mock.patch.dict(audit['main'].__globals__, {'blind_dumps': lambda: {'blind.wat'}}), mock.patch('sys.argv', args), contextlib.redirect_stdout(io.StringIO()):
+                try:
+                    audit['main']()
+                    success = True
+                except audit['Failure']:
+                    success = False
+            assert success == ok, (before, after, reference, byte_equal)
+
+    base = {'old.wat': wat()}
+    new = {**base, 'blind.wat': 'ERROR 1 problems'}
+    blind_check(base, new, byte_equal=True)
+    blind_check(base, {'old.wat': wat(site=''), 'blind.wat': wat()}, byte_equal=True, ok=False)
+    blind_check(base, {**base, 'other.wat': wat()}, byte_equal=True, ok=False)
+    blind_check(base, {'blind.wat': wat()}, byte_equal=True, ok=False)
+    blind_check(base, new, ok=False)
+    blind_check(base, new, reference=base, ok=False)
+    blind_check(base, base, reference=new, ok=False)
+    blind_check(base, new, reference=new)
+    blind_check(base, {**base, 'blind.wat': 'ERROR 2 problems'}, reference=new, ok=False)
+    blind_check(base, {**base, 'blind.wat': 'ERROR 1 problems\r\n'}, reference={**base, 'blind.wat': 'ERROR 1 problems\n'}, ok=False)
+    blind_check(base, {**base, 'blind.wat': wat()}, reference=new, ok=False)
+    blind_check(base, new, reference={**base, 'blind.wat': wat()}, ok=False)
+    blind_check(base, {**base, 'blind.wat': wat()}, reference={**base, 'blind.wat': wat(site='\\00' * 12)})
+    blind_check(base, {**base, 'blind.wat': wat(start='(drop (i32.const 1))')}, reference={**base, 'blind.wat': wat()}, ok=False)
+    # The identical owner rules apply to both reference kinds.
+    skip = 'one-clause p.skip src/p.i:1 r1 fitted clause\n'
+    blind_check(base, {**base, 'blind.wat': wat(';; p.skip\n(func $f0 (i32.const 2))')}, reference={**base, 'blind.wat': wat(';; p.skip\n(func $f0 (i32.const 1))')}, allowed=skip)
     allowed = 'one-clause p.skip src/p.i:1 r1 one fitted clause\n'
     a = ''';; p.skip
 (func $f0 (call $j0))
