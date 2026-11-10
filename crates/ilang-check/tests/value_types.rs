@@ -36,6 +36,24 @@ fn alias(c: &Checked, name: &str) -> String {
     c.types.as_ref().unwrap().alias_types[&TypeId(i as u32)].text(&types::type_names(p, t.module))
 }
 
+fn recovery_order_invariant(files: &[(&str, &str)]) {
+    let (g, _) = checked(files);
+    let (p, ds) = ilang_check::resolve_program(&g);
+    assert!(!ds.iter().any(Diagnostic::is_error), "{:?}", ds);
+    let mut p = p.unwrap();
+    let (normal, ds) = types::check_keeping_locals_with_errors(&p, &g.sources, true);
+    order::reverse_type_ties(&mut p);
+    let (reverse, rs) = types::check_keeping_locals_with_errors(&p, &g.sources, true);
+    let diagnostics = |ds: Vec<Diagnostic>| {
+        let mut ds = ds.into_iter().map(|d| format!("{d:?}")).collect::<Vec<_>>();
+        ds.sort();
+        ds
+    };
+    assert_eq!(diagnostics(ds), diagnostics(rs));
+    assert_eq!(normal.alias_types, reverse.alias_types);
+    assert_eq!(normal.schemes, reverse.schemes);
+}
+
 #[test]
 fn annotation_instances_and_local_sharing() {
     // R1: each completed generalized source occurrence is a fresh instance.
@@ -145,6 +163,7 @@ fn source_module_alias_is_the_foreign_closed_read_boundary() {
     // R7: library completion may fix decode while leaving encode live.
     let lib = "(Codec, size)\nCodec(D,E) { Codec(decode: (String) -> D, encode: (E) -> String) }\nmake(D,E) = (d: (String) -> D, e: (E) -> String) { Codec(decode:d,encode:e) }\nid = (x) { x }\nsize = id(make((s: String) -> Int { 1 }, (n: Int) -> String { \"\" }))\nCodec(LocalSize,_) = size";
     let client = "((Codec) = app/lib)\nCodec(RemoteSize,_) = lib.size";
+    recovery_order_invariant(&[("src/lib.i", lib), ("src/client.i", client)]);
     let (g, c) = checked(&[("src/lib.i", lib), ("src/client.i", client)]);
     assert!(
         c.diags.iter().any(|d| d.code == code::VALUE_TYPE_NOT_FIXED
@@ -153,7 +172,26 @@ fn source_module_alias_is_the_foreign_closed_read_boundary() {
         "{:?}",
         g.sources.render_all(&c.diags)
     );
+    // P5/R7: later written patterns are still original completion demands.
+    let own = [
+        lib,
+        "\nuse = (value: LocalSize) {value}\nCodec(Again,_) = size",
+    ]
+    .concat();
+    recovery_order_invariant(&[("src/main.i", &own)]);
+    let (_, c) = good(&own);
+    assert_eq!(alias(&c, "LocalSize"), "Int");
+    assert_eq!(alias(&c, "Again"), "Int");
+    let whole = [own, "\nwhole = (value: size) {value}".into()].concat();
+    recovery_order_invariant(&[("src/main.i", &whole)]);
+    bad(&whole, code::VALUE_TYPE_NOT_FIXED);
     let lib = lib.replacen("(Codec, size)", "(Codec, size, LocalSize)", 1);
+    recovery_order_invariant(&[("src/lib.i", &lib), ("src/client.i", client)]);
+    let closed_wrapped = lib.replace("size = id", "size: Codec(Int,Int) = id");
+    let (_, c) = checked(&[("src/lib.i", &closed_wrapped), ("src/client.i", client)]);
+    assert!(!c.diags.iter().any(Diagnostic::is_error), "{:?}", c.diags);
+    assert_eq!(alias(&c, "RemoteSize"), "Int");
+    recovery_order_invariant(&[("src/lib.i", &closed_wrapped), ("src/client.i", client)]);
     let (g, c) = checked(&[
         ("src/lib.i", &lib),
         (
@@ -166,6 +204,13 @@ fn source_module_alias_is_the_foreign_closed_read_boundary() {
         "{:?}",
         g.sources.render_all(&c.diags)
     );
+    recovery_order_invariant(&[
+        ("src/lib.i", &lib),
+        (
+            "src/client.i",
+            "((LocalSize) = app/lib)\nRemoteSize = LocalSize",
+        ),
+    ]);
     // An ordinary alias copied from a completed alias has no new Of site.
     let p = c.program.as_ref().unwrap();
     let (_, ds) = types::check(p, &g.sources);
@@ -274,6 +319,7 @@ fn eager_alias_dependencies_and_reverse_ties() {
 fn r7_closed_source_annotations_and_direct_roots() {
     let base = "(Codec,size,LocalSize)\nCodec(D,E) {Codec(decode:(String)->D,encode:(E)->String)}\nmake(D,E) = (d:(String)->D,e:(E)->String) {Codec(d,e)}\nsize = make((s:String)->Int {1},(n:Int)->String {\"\"})\nCodec(LocalSize,_) = size\nlater = () {size.encode(2)}";
     let client = "((Codec) = app/lib)\nCodec(RemoteSize,_) = lib.size";
+    recovery_order_invariant(&[("src/lib.i", base), ("src/client.i", client)]);
     // R7 gates both a direct constructor-shaped root and a weak wrapped root.
     let (g, c) = checked(&[("src/lib.i", base), ("src/client.i", client)]);
     assert!(
@@ -282,6 +328,7 @@ fn r7_closed_source_annotations_and_direct_roots() {
         g.sources.render_all(&c.diags)
     );
     let closed = base.replace("size = make", "size: Codec(Int,Int) = make");
+    recovery_order_invariant(&[("src/lib.i", &closed), ("src/client.i", client)]);
     let (g, c) = checked(&[("src/lib.i", &closed), ("src/client.i", client)]);
     assert!(
         !c.diags.iter().any(Diagnostic::is_error),

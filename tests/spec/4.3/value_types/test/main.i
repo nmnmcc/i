@@ -89,3 +89,27 @@ completed_alias_type_tests = () {
 	assert(test_type(2) == 3)
 	assert(test_type("x") == 0)
 }
+
+Box(A) {
+	Box(A)
+}
+
+@test
+matched_holder_and_original_subject = () {
+	copy = (p: Box(Int)) {
+		Box(a) = id(p)
+		y: a = "s"
+		y == "s"
+	}
+	assert(copy(Box(1)))
+	original = (x) {
+		x |> {
+			_: Int -> {
+				y: x = "s"
+				y == "s"
+			}
+			_ -> True
+		}
+	}
+	assert(original(1))
+}
