@@ -24,6 +24,7 @@ ilang-host.workspace = true
 toml_edit.workspace = true
 tempfile.workspace = true
 ilang-lsp.workspace = true
+ilang-macro.workspace = true
 ilang-syntax.workspace = true
 
 [dev-dependencies]
