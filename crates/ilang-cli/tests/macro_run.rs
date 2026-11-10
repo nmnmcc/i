@@ -6,7 +6,7 @@ use ilang_syntax::lisp::{
     syntax::{Scope, Syntax},
 };
 
-fn build(source: &str) -> ilang_cli::Built {
+fn build(source: &str) -> ilang_macro::run::MacroProgram {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
@@ -15,7 +15,7 @@ fn build(source: &str) -> ilang_cli::Built {
     )
     .unwrap();
     std::fs::write(dir.path().join("src/main.i"), source).unwrap();
-    ilang_cli::build(
+    let built = ilang_cli::build(
         dir.path(),
         ilang_cli::BuildOptions {
             tests: false,
@@ -24,7 +24,8 @@ fn build(source: &str) -> ilang_cli::Built {
             target: ilang_cli::Target::Ilang,
         },
     )
-    .unwrap()
+    .unwrap();
+    ilang_macro::run::MacroProgram::new(built.wasm, built.binding_plan, built.trusted_package)
 }
 
 fn input() -> Syntax {
@@ -43,7 +44,7 @@ fn syntax_crosses_the_compiler_export_without_losing_identity() {
     let original = input();
     for _ in 0..2 {
         let result =
-            ilang_cli::macro_run::invoke(&built, "app/main.identity", &[original.clone()]).unwrap();
+            ilang_macro::run::invoke(&built, "app/main.identity", &[original.clone()]).unwrap();
         assert!(result.identical(&original));
         assert_eq!(result.scope(), original.scope());
     }
@@ -54,7 +55,7 @@ fn untrusted_external_cannot_be_supplied_to_a_macro_instance() {
     let built = build(
         "(syntax = i/syntax)\n(identity)\n@external(\"example:outside\", \"effect\")\neffect: () -> Nil\nidentity = (x: syntax.Syntax) { effect() x }\n",
     );
-    let error = ilang_cli::macro_run::invoke(&built, "app/main.identity", &[input()]).unwrap_err();
+    let error = ilang_macro::run::invoke(&built, "app/main.identity", &[input()]).unwrap_err();
     assert!(format!("{error:#}").contains("instantiate macro program"));
 }
 
@@ -72,11 +73,9 @@ fn compiler_export_is_checked_and_executed_with_syntax_services() {
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let (parsed, diagnostics) = ilang_check::parse(&graph);
     assert!(diagnostics.is_empty());
-    let built =
-        ilang_cli::macro_run::compile(&graph, &parsed, &[("app/main", "identity")]).unwrap();
+    let built = ilang_macro::run::compile(&graph, &parsed, &[("app/main", "identity")]).unwrap();
     let value = input();
-    let result =
-        ilang_cli::macro_run::invoke(&built, "app/main.identity", &[value.clone()]).unwrap();
+    let result = ilang_macro::run::invoke(&built, "app/main.identity", &[value.clone()]).unwrap();
     assert!(result.identical(&value));
 }
 
@@ -99,9 +98,9 @@ fn expression_quote_is_compiled_and_keeps_unquote_identity() {
             &mut templates,
         );
     }
-    let built = ilang_cli::macro_run::compile(&graph, &parsed, &[("app/main", "quoted")]).unwrap();
+    let built = ilang_macro::run::compile(&graph, &parsed, &[("app/main", "quoted")]).unwrap();
     let original = input();
-    let result = ilang_cli::macro_run::invoke_with_templates(
+    let result = ilang_macro::run::invoke_with_templates(
         &built,
         "app/main.quoted",
         &[original.clone()],
@@ -134,9 +133,9 @@ fn quote_splice_preserves_order_and_reuses_original_syntax() {
             &mut templates,
         );
     }
-    let built = ilang_cli::macro_run::compile(&graph, &parsed, &[("app/main", "quoted")]).unwrap();
+    let built = ilang_macro::run::compile(&graph, &parsed, &[("app/main", "quoted")]).unwrap();
     let original = input();
-    let result = ilang_cli::macro_run::invoke_with_templates(
+    let result = ilang_macro::run::invoke_with_templates(
         &built,
         "app/main.quoted",
         &[original.clone()],
@@ -165,15 +164,14 @@ fn prepares_and_executes_a_real_macro_binding() {
         .find(|module| module.path == "app/macros")
         .unwrap()
         .source;
-    let mut parsed =
-        ilang_cli::macro_prepare::import_closure(&graph, &parsed, macro_source).unwrap();
-    let prepared = ilang_cli::macro_prepare::prepare(&graph, &mut parsed).unwrap();
+    let mut parsed = ilang_macro::prepare::import_closure(&graph, &parsed, macro_source).unwrap();
+    let prepared = ilang_macro::prepare::prepare(&graph, &mut parsed).unwrap();
     assert_eq!(prepared.bindings.len(), 1);
     assert_eq!(prepared.bindings[0].name, "wrap");
     assert_eq!(prepared.bindings[0].parameters, ["x"]);
-    let built = ilang_cli::macro_run::compile(&graph, &parsed, &[("app/macros", "wrap")]).unwrap();
+    let built = ilang_macro::run::compile(&graph, &parsed, &[("app/macros", "wrap")]).unwrap();
     let original = input();
-    let result = ilang_cli::macro_run::invoke_with_templates(
+    let result = ilang_macro::run::invoke_with_templates(
         &built,
         "app/macros.wrap",
         &[original],
@@ -204,12 +202,12 @@ fn compiler_program_selects_only_the_macro_import_closure() {
         .find(|m| m.path == "app/macros")
         .unwrap()
         .source;
-    let mut selected = ilang_cli::macro_prepare::import_closure(&graph, &parsed, source).unwrap();
+    let mut selected = ilang_macro::prepare::import_closure(&graph, &parsed, source).unwrap();
     assert!(!selected.iter().any(|m| m.path == "app/unrelated"));
-    let prepared = ilang_cli::macro_prepare::prepare(&graph, &mut selected).unwrap();
-    let built = ilang_cli::macro_run::compile(&graph, &selected, &[("app/macros", "id")]).unwrap();
+    let prepared = ilang_macro::prepare::prepare(&graph, &mut selected).unwrap();
+    let built = ilang_macro::run::compile(&graph, &selected, &[("app/macros", "id")]).unwrap();
     let original = input();
-    let result = ilang_cli::macro_run::invoke_with_templates(
+    let result = ilang_macro::run::invoke_with_templates(
         &built,
         "app/macros.id",
         &[original.clone()],

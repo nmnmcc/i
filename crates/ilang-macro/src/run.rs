@@ -7,7 +7,44 @@
 use anyhow::{Context, Result, bail};
 use ilang_syntax::lisp::syntax::Syntax;
 
-use crate::Built;
+/// Compiled compiler program and the grants bound to its exact Wasm bytes.
+pub struct MacroProgram {
+    wasm: Vec<u8>,
+    binding_plan: ilang_host::bindings::BindingPlan,
+    trusted_package: String,
+}
+
+impl MacroProgram {
+    pub fn new(
+        wasm: Vec<u8>,
+        binding_plan: ilang_host::bindings::BindingPlan,
+        trusted_package: String,
+    ) -> Self {
+        Self {
+            wasm,
+            binding_plan,
+            trusted_package,
+        }
+    }
+    fn host_program(&self) -> Result<ilang_host::Program> {
+        ilang_host::Program::from_bytes(&self.wasm)?.with_binding_plan(self.binding_plan.clone())
+    }
+}
+
+#[derive(Debug)]
+pub enum CompileError {
+    Program(Vec<ilang_package::Diagnostic>),
+    Internal(String),
+}
+impl std::fmt::Display for CompileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Program(diags) => write!(f, "{} compiler program diagnostics", diags.len()),
+            Self::Internal(message) => write!(f, "{message}"),
+        }
+    }
+}
+impl std::error::Error for CompileError {}
 
 /// Compile compiler-generated Syntax wrappers from an already expanded import
 /// closure. This uses the ordinary checker and emitter, but checks the selected
@@ -16,7 +53,7 @@ pub fn compile(
     graph: &ilang_package::PackageGraph,
     parsed: &[ilang_check::Parsed],
     entries: &[(&str, &str)],
-) -> Result<Built, crate::BuildError> {
+) -> Result<MacroProgram, CompileError> {
     let mut graph = graph.clone();
     let first = entries
         .first()
@@ -40,10 +77,10 @@ pub fn compile(
     let checked = ilang_check::check_compiler_exports(&graph, parsed, entries);
     let mut diags = checked.diags;
     let (Some(program), Some(typed)) = (&checked.program, &checked.types) else {
-        return Err(crate::program_error(&graph, &diags));
+        return Err(CompileError::Program(diags));
     };
     if diags.iter().any(ilang_package::Diagnostic::is_error) {
-        return Err(crate::program_error(&graph, &diags));
+        return Err(CompileError::Program(diags));
     }
     let (wasm, declarations) = match ilang_wasm::compile_with_bindings(
         &graph,
@@ -57,17 +94,17 @@ pub fn compile(
         Ok(result) => result,
         Err(ilang_wasm::Error::Diagnostics(more)) => {
             diags.extend(more);
-            return Err(crate::program_error(&graph, &diags));
+            return Err(CompileError::Program(diags));
         }
         Err(ilang_wasm::Error::Internal(message)) => {
-            return Err(crate::BuildError::Internal(message));
+            return Err(CompileError::Internal(message));
         }
     };
     let declarations = declarations
         .into_iter()
         .map(|d| ilang_host::bindings::BindingDeclaration::from_json(&d.to_string()))
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| crate::BuildError::Internal(e.to_string()))?;
+        .map_err(|e| CompileError::Internal(e.to_string()))?;
     let binding_plan = ilang_host::bindings::BindingPlan::new(&wasm, declarations);
     use ilang_package::lock::{FileKind, PackageFile, hash};
     let files = graph.packages[graph.library]
@@ -79,30 +116,23 @@ pub fn compile(
             bytes: graph.sources.get(m.source).text.as_bytes().to_vec(),
         })
         .collect::<Vec<_>>();
-    Ok(Built {
-        name: graph.packages[root].name.clone(),
-        wasm,
-        binding_plan,
-        trusted_package: hash(&files),
-        warnings: graph.sources.render_all(&diags),
-        tests: false,
-    })
+    Ok(MacroProgram::new(wasm, binding_plan, hash(&files)))
 }
 
 /// Invoke a compiler-generated export whose ABI takes and returns Syntax.
 ///
 /// The compiler must check the export's signature and its reachable external
 /// declarations before constructing `built`; the host also validates the ABI
-/// and the opaque values on every call. The `Built` value binds the grant plan
+/// and the opaque values on every call. The `MacroProgram` value binds the grant plan
 /// to the exact compiled artifact.
-pub fn invoke(built: &Built, export: &str, arguments: &[Syntax]) -> Result<Syntax> {
+pub fn invoke(built: &MacroProgram, export: &str, arguments: &[Syntax]) -> Result<Syntax> {
     invoke_with_templates(built, export, arguments, std::sync::Arc::from([]))
 }
 
 /// Invoke with this compiled program's source-located quote templates. The
 /// table belongs to this fresh instance and is never shared with another run.
 pub fn invoke_with_templates(
-    built: &Built,
+    built: &MacroProgram,
     export: &str,
     arguments: &[Syntax],
     templates: std::sync::Arc<[Syntax]>,
