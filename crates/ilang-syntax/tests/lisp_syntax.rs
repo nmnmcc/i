@@ -843,3 +843,50 @@ fn definition_table_keeps_scopes_from_expanded_type_items() {
         })
     ));
 }
+
+#[test]
+fn expanded_definition_identifies_only_parameters_with_the_same_scope() {
+    use ilang_syntax::lisp::definitions::expanded_definition;
+    use ilang_syntax::lisp::syntax::{Node, ScopeIdentity, Syntax};
+    let template = root("((Box A) { (Box A) })");
+    let Node::Round(parts) = template.node() else {
+        panic!("type item")
+    };
+    let Node::Curly(constructors) = parts[1].node() else {
+        panic!("constructors")
+    };
+    let Node::Round(fields) = constructors[0].node() else {
+        panic!("constructor")
+    };
+    let other_scope = fields[1].flip_mark(22);
+    let constructor = Syntax::make(
+        Node::Round(vec![fields[0].clone(), other_scope.clone()]),
+        &constructors[0],
+    )
+    .unwrap();
+    let body = Syntax::make(Node::Curly(vec![constructor]), &parts[1]).unwrap();
+    let item = Syntax::make(Node::Round(vec![parts[0].clone(), body]), &template).unwrap();
+    let answer = expanded_definition(&item, 41).unwrap();
+    let Node::Round(parts) = answer.node() else {
+        panic!("item")
+    };
+    let Node::Round(head) = parts[0].node() else {
+        panic!("head")
+    };
+    let Node::Curly(body) = parts[1].node() else {
+        panic!("body")
+    };
+    let Node::Round(fields) = body[0].node() else {
+        panic!("constructor")
+    };
+    assert!(matches!(
+        head[1].scope_identity(),
+        Some(ScopeIdentity::DefinitionParameter {
+            answer: 41,
+            parameter: 0,
+            ..
+        })
+    ));
+    assert!(fields[1].scope_identity().is_none());
+    assert_eq!(fields[1].scope(), other_scope.scope());
+}
