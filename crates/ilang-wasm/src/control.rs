@@ -1,6 +1,7 @@
 //! Splitting the functions that may suspend (§9.4), after lowering.
 //!
-//! Frames are captured lazily (see `ir.rs`): nothing is saved until
+//! Frames are captured lazily, and re-entered lazily: a resume rebuilds only
+//! the innermost frame (see `ir.rs`): nothing is saved until
 //! `suspend` throws `$capture`. This pass finds the functions that may
 //! suspend with a fixpoint over the whole program, and turns each call in
 //! them that may suspend into a [`Stmt::Suspendable`] with a [`Point`]:
@@ -115,7 +116,7 @@ pub fn split(p: &mut Program) {
                 .filter(|&l| l != *dst && f.locals[l as usize] != LocalType::Env)
                 .chain(needed.iter().copied())
                 .collect();
-            p.points.push(Point {
+            let point = Point {
                 func: FuncId(i as u32),
                 env,
                 dst: *dst,
@@ -123,7 +124,13 @@ pub fn split(p: &mut Program) {
                 envs,
                 segment: cutter.segment(path),
                 locals: Vec::new(),
-            });
+            };
+            // The frame record keeps the environment statements of the call.
+            assert!(
+                point.delta().is_some(),
+                "the environment of a point is in its links"
+            );
+            p.points.push(point);
         }
         for (k, path) in found.joins.iter().enumerate() {
             let j = found.first_join + k as JoinId;
@@ -823,5 +830,47 @@ mod tests {
         assert!(text.contains("(struct.new $box (local.get $l1))"), "{text}");
         let wasm = wat::parse_str(&text).unwrap();
         crate::validate(&wasm).unwrap();
+    }
+    fn point_with(env: Env, envs: Vec<EnvLink>) -> Point {
+        Point {
+            func: FuncId(0),
+            env,
+            dst: 0,
+            params: Vec::new(),
+            envs,
+            segment: Vec::new(),
+            locals: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn delta_follows_the_links_outermost_first() {
+        let inner = EnvLink {
+            dst: 3,
+            from: Env::Local(2),
+            service: 1,
+        };
+        let outer = EnvLink {
+            dst: 2,
+            from: Env::Param,
+            service: 0,
+        };
+        let other = EnvLink {
+            dst: 4,
+            from: Env::Param,
+            service: 1,
+        };
+        assert_eq!(point_with(Env::Param, vec![outer]).delta(), Some(vec![]));
+        assert_eq!(
+            point_with(Env::Local(3), vec![other, inner, outer]).delta(),
+            Some(vec![outer, inner])
+        );
+        assert_eq!(point_with(Env::Local(3), vec![inner]).delta(), None);
+        let circle = EnvLink {
+            dst: 2,
+            from: Env::Local(3),
+            service: 0,
+        };
+        assert_eq!(point_with(Env::Local(3), vec![inner, circle]).delta(), None);
     }
 }
