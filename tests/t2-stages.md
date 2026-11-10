@@ -426,3 +426,128 @@ interface tests. The first syntax-data merge restored two entries deliberately
 removed by T1; a three-way merge now preserves both tracks' deletions and exact
 diagnostics. No syntax check exemption was added. All these checks have passing
 focused reruns; full-gate results are recorded below when complete.
+
+### Final combined verification
+
+This replaces the earlier waiting-for-T1 status. The T1 merge is ac8e1c6;
+the subsequent upstream merge is b02ca81. Redesign moved to
+f6f9cc3a2ea06df397e369b720ce5aed81fedbda during integration, adding only the
+numeric-lowering design. The detached baseline checkout was moved to that
+exact SHA; both baseline build commands and WAT export were rerun. Its
+Binaryen symlink still resolves to the recorded fba5005 commit. The final gate rerun covers all compiler changes, including the alias-copy
+optimization below. The final structured alias-test
+assertion checks exact String/Only members instead of a diagnostic substring.
+
+| Criterion | Command and result |
+| --- | --- |
+| Combined inference, exact reads, ordering, K1 and recovery | `cargo test --workspace --locked` in the full Rust gate passes 25 T1, 31 T2 and 9 joint integration families; 29 checker unit tests, all four completed-interface tests, LSP protocol and the existing invariant/service/contra/bivariant/stream fixtures pass. |
+| Scalar-bound fusion | `cargo test -p ilang-check --lib --locked t1_stress_ -- --ignored --nocapture --test-threads=1`: all four separately gated tests pass. Alias 1000, calls 2500/5000, match 2000 and nested 50x50 retain peak concrete bounds/head/side=2 (`target/t2-t1-stress-counters-optimized.log`). These were initially ignored by the ordinary workspace command, then explicitly executed. |
+| Whole gate | `ILANG_BROWSER_PORT=4182 ./scripts/dev-verify`: fmt, clippy -D warnings, workspace tests, std 1465/hello 2/bench 12 at both O0/O2, WASI smoke, 76 Node tests and 51 browser tests pass (`target/t2-t1-verify-optimized.log`). |
+| Spec and runtime aliases | `cargo test -p ilang-cli --test spec --locked`: 239/239 cases pass at O0/O2, including the new cross-package literal-field program and labelled/pipe argument-order cases (`target/t2-t1-spec-optimized.log`). |
+| Syntax inventory | `./scripts/old-syntax-check`: 1603 snippets parsed, exact diagnostics match, 17 future-track entries (`target/t2-t1-old-syntax-optimized.log`); the final documentation snippets are checked again before reporting. |
+| WAT against exact merged upstream | `WAT_DUMP=... cargo test -p ilang-cli --test wat_dump --locked` at baseline and candidate: 848 baseline files, 898 candidate files, missing 0, changed 0; every baseline byte matches (`target/t2-t1-optimized-wat-comparison.json`). The 50 additions belong to T2/joint cases. |
+
+The readback examples below are excerpts of the programs executed by
+`types_joint.rs` and `tests/spec/4.3/value_type_literals` (the latter at O0/O2):
+
+```i
+v = "GET"
+x: v = "GET"
+```
+
+The annotation reads the exact literal type of v. POST would be rejected.
+
+```i
+Box(A) { Box(A) }
+boxed = True |> { True -> Box(1) False -> Box(2) }
+Box(Number) = boxed
+```
+
+Number is 1 | 2; no alternative is discarded and no literal is widened.
+
+```i
+Config(M, P) { Config(method: M, port: P) }
+config = Config("GET", 8080)
+ConfigType = config
+```
+
+ConfigType is Config("GET", 8080). The dependency exports that completed alias;
+a client constructs the same exact value through it. Constructor privacy is
+unchanged. These are ordinary nominal constructor fields; record builders and
+J8's record/Without tests remain T3's assigned gate. No library name receives
+compiler treatment.
+
+The first post-merge std timing failed the +10% investigation threshold:
+335.53 ms baseline / 373.98 ms candidate, +11.46%, with raw samples retained in
+target/t2-t1-time-std.json. Candidate samples ranged from 323.03 to 436.74 ms;
+this noisy run is still a failed check, not discarded evidence. Investigation
+found a completed template cloned before substitution, followed by a second
+full copying traversal. Instantiation now borrows the template, normalization
+consumes its owned result, and a cached structural flag avoids that traversal
+only when neither the template nor its actual arguments contains an algebra
+operator. With no union/intersection/difference, the previous traversal only
+rebuilt the same constructors, sets, functions and variables. All operators
+still normalize after substitution, so deferred invariant constraints and
+written hole identities retain their rules. Literal ValueSets are moved or
+preserved, never widened. Known conversion checks both template and actual
+arguments for operators as well. All implementation gates are rerun after this
+change; the earlier successful full run is not substituted for them.
+
+### Final timing and handoff after the copy investigation
+
+The final full rerun is target/t2-t1-verify-optimized.log (exit 0). The explicit
+spec, WAT, syntax, stress-counter and release-chain reruns also pass. The normal
+debug chain comparison passes in the workspace suite. Final release medians
+from target/t2-t1-chain-optimized.log, milliseconds:
+
+| Aliases | Ordinary | Value forward | Value reverse |
+| --- | --- | --- | --- |
+| 512 | 8.68 | 9.50 | 9.21 |
+| 1024 | 12.12 | 13.19 | 12.12 |
+| 2048 | 16.64 | 17.87 | 16.93 |
+| 4096 | 27.91 | 27.94 | 31.16 |
+
+All seven sizes including 64/128/256 pass the exact 3x control; completion still
+scales near linearly in both declaration orders.
+
+For std, the shared quiet helper reserved all three heavy-job slots and the
+measurement process pinned itself to CPU 6. This coordinates cooperating
+heavy jobs, not every process on the machine. The unchanged T2 time script ran
+one warm-up plus 11 checks per compiler against the exact f6f9cc3 baseline and
+its std tree. A diagnostic replay used the saved pre-optimization compiler;
+the actual final gate used the rebuilt optimized compiler:
+
+| Measurement | Baseline median | Candidate median | Change | Result |
+| --- | --- | --- | --- | --- |
+| Earlier unreserved run | 335.53 ms | 373.98 ms | +11.46% | Failed investigation threshold; retained |
+| Reserved-window diagnostic replay before optimization | 308.43 ms | 315.53 ms | +2.30% | Below +10%; diagnostic, not final gate |
+| Reserved-window final gate | 328.53 ms | 315.69 ms | -3.91% | Pass |
+
+Raw samples and exit statuses are in target/t2-t1-quiet-comparison.json, with
+individual before/after JSON files. The two candidate medians are effectively
+equal and the baseline varied, so these measurements do not establish a
+speedup caused by the copy optimization. They do establish the final gate's
+measured result and show that the first failed measurement was noisy. No
+threshold, test or source expectation was weakened. The earlier unreserved
+measurement is not replaced by an unsupported claim of an idle machine.
+
+All three documentation examples were also checked as independent projects by
+the merged release compiler (target/t2-t1-examples.json): all exit 0, with
+GET, Box(1|2) and Config(GET,8080) preserved as literal-bearing types. Their
+runtime counterparts passed at O0/O2 in the cross-package spec project.
+
+No new golden or derived repository file needed regeneration. Upstream's T1
+goldens are retained by the merge; authored T2 expectation changes have the
+source explanations above. No user checkout, other lane, shell configuration,
+dependency lockfile or compiler check was changed. Temporary baseline trees,
+compiler copies, logs and measurement programs remain under this lane's
+target/. Scoped port, target-directory and performance variables ended with
+their commands. CPU affinity was scoped to the timing process; shared quiet
+locks were released on completion.
+
+No applicable T1/T2 joint rule remains blocked. T3 extends Closure, alias
+map_vars/has_algebra/normalization, the HIR visitor and shown-type traversal for
+Rec/Without while preserving this exact ValueSet and transaction behavior. It
+still owns J8 and the record/label-specific parts of the joint matrix. M4's
+expansion readiness checks remain with M4. Neither requires an additional
+T1/T2 implementation or another T1 merge before this lane can integrate.
