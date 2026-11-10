@@ -493,7 +493,7 @@ A **typed macro** is a declaration and a binding with the same name in a `.is` f
 
 - The declaration is the **signature**. It is a full function type, with its type variables declared after the name. It may have errors and an environment. It may not have `_`. The rules for written types (spec §4.4) and for types in exported items (spec §2.4) are used for it.
 - The binding is the **implementation**. It follows the rules of §4.1, with these changes: it has one parameter for each parameter of the signature, in the same order, and it is checked against `(Syntax, …) -> Syntax ? SyntaxError ! Types | Definitions | Assert`.
-- This is the only case where two items have one name, and the only use of a declaration other than `@external`.
+- This is the only case where two items have one name, and the only use of a declaration other than `@external` or `@js`.
 - The documentation comment of the macro is on the declaration.
 
 ### 7.2 Checking a call
@@ -578,6 +578,7 @@ A type is given to a macro, and taken from a macro, as the `Syntax` of a written
 - `Syntax` values go between the compiler and the macro program in a form that the compiler defines. It is not seen in i.
 - The entry point gets `Definitions`, `Types` for a typed macro, and an `Assert` whose `fail` stops the run. These are services of the compiler, not host services (spec §9.7). It gets no other service, so a macro cannot read a file, use the network, or read the time.
 - It is a compile error when an `@external` function that is not of the library package `i` is in the full needs (spec §2.5, here also through other modules) of a macro, or of a top-level value of the macro program that is not a direct value. The functions of the library are given by the compiler, as the runtime gives them to a program.
+- A macro program contains no executable `@js` binding, value getter, Js/JsRequests provider or JS initializer. Compute executable needs through the macro entries and all ordinary top-level initializers, including through other modules. If they need one, reject before instantiation, even when no macro entry needs Target. Unused runtime functions containing such declarations may be excluded from the macro program, but may not leave an initializer behind. A quoted declaration is syntax data and does not execute JS; the caller-origin checks of §4.3 still apply when it becomes an expansion. No file-reading/d.ts import tool, callback bridge or JS evaluator is part of the macro sandbox.
 - The macro program is not for a target. It always runs in the compiler, whatever the program is compiled for.
 
 **The same result everywhere.**
