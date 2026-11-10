@@ -25,7 +25,7 @@ shadowing = () {
 	}
 	check(show((x, y)), "(2, 21)")
 	check = "a local name may cover a top-level name"
-	{ (a, b) { a == b }(check, "") } |> {
+	{ check == "" } |> {
 		True  -> panic("no")
 		False -> Nil
 	}
