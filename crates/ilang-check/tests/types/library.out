@@ -8,9 +8,14 @@ i/control.boundary : (body: (b: Boundary(A, B, C)) -> A ? B ! C) -> A ? B ! C
 i/control.suspend : (b: Boundary(A, B, C), f: (k: Continuation(D, A, B, C)) -> A ? B ! C) -> D
 i/control.resume : (k: Continuation(A, B, C, D), value: A) -> B ? C ! D
 i/control.cancel : (k: Continuation(A, B, C, D)) -> Nil ! D
+i/control.keep_env : (f: (x: A) -> B ? E ! N) -> { (x: A) -> B ? E } ! N
 i/resource.ensure : (body: () -> A ? E ! N, with: () -> Nil ! N) -> A ? E ! N
 i/resource.acquire : (open: () -> A ? E ! N, release: (A) -> Nil ! N, use: (A) -> B ? E ! N) -> B ? E ! N
 i/assertion.catch : (body: () -> A ? E ! N) -> Result(A, AssertionFailure) ? E ! N - Assert
+i/key.new : () -> Key(A)
+i/key.wrap : (k: Key(A), value: A) -> Keyed
+i/key.read : (k: Key(A), value: Keyed) -> Result(A, Nil)
+i/key.unwrap : (k: Key(A), x: Keyed) -> Lookup(A)
 i/core.not : (Bool) -> Bool
 i/core.to_float : (Int) -> Float
 i/core.truncate : (Float) -> Int
@@ -40,6 +45,7 @@ i/core.bit_array_to_string : (BitArray) -> Result(String, Nil)
 i/core.bit_array_concat : (List(BitArray)) -> BitArray
 i/core.inspect : (A) -> String
 i/core.hash : (A) -> Int
+i/core.portable : (value: A) -> Bool
 i/random.word_size : () -> Int
 i/random.mask : (x: Int) -> Int
 i/random.xor_shift : (x: Int, n: Int) -> Int
