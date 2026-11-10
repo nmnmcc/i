@@ -1,10 +1,12 @@
 //! Compiler syntax services carried over the ordinary opaque-reference ABI.
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock, Weak};
+mod items;
+pub use items::{ItemContext, ItemRequest, flip_output_and_requests, flip_requests};
+use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result, bail};
 use ilang_syntax::lisp::syntax::{Capture, Node, Position, Substitution, Syntax};
 
+use crate::macro_budget::MacroBudget;
 use crate::{HostImports, HostReference, Value};
 
 #[derive(Clone)]
@@ -32,6 +34,7 @@ pub enum DefinitionReply {
 pub enum DefinitionAbort {
     Deferred { at: Syntax },
     CompileError { message: String, at: Syntax },
+    MacroError { message: String, at: Syntax },
 }
 
 type DefinitionCallback = dyn Fn(&Syntax) -> DefinitionReply + Send + Sync;
@@ -40,6 +43,7 @@ type DefinitionCallback = dyn Fn(&Syntax) -> DefinitionReply + Send + Sync;
 pub struct DefinitionContext {
     callback: Arc<DefinitionCallback>,
     abort: Mutex<Option<DefinitionAbort>>,
+    notes: Mutex<Vec<String>>,
 }
 
 impl DefinitionContext {
@@ -47,7 +51,12 @@ impl DefinitionContext {
         Self {
             callback: Arc::new(callback),
             abort: Mutex::new(None),
+            notes: Mutex::new(Vec::new()),
         }
+    }
+    /// Take this run's buffered diagnostic notes after a successful commit.
+    pub fn take_notes(&self) -> Vec<String> {
+        std::mem::take(&mut *self.notes.lock().expect("diagnostic buffer lock poisoned"))
     }
     pub fn take_abort(&self) -> Option<DefinitionAbort> {
         self.abort
@@ -70,33 +79,7 @@ fn get<T: Send + Sync + 'static>(value: &Value) -> Result<&T> {
 }
 /// Give a syntax value to a macro instance through the opaque-reference ABI.
 pub fn encode(value: Syntax) -> Value {
-    struct Cache {
-        references: HashMap<usize, Weak<dyn std::any::Any + Send + Sync>>,
-        next_cleanup: usize,
-    }
-    static CACHE: OnceLock<Mutex<Cache>> = OnceLock::new();
-    let mut cache = CACHE
-        .get_or_init(|| {
-            Mutex::new(Cache {
-                references: HashMap::new(),
-                next_cleanup: 1024,
-            })
-        })
-        .lock()
-        .expect("syntax reference cache lock poisoned");
-    let key = value.identity_key();
-    if let Some(reference) = cache.references.get(&key).and_then(Weak::upgrade) {
-        return Value::Externref(HostReference(reference));
-    }
-    if cache.references.len() >= cache.next_cleanup {
-        cache
-            .references
-            .retain(|_, reference| reference.strong_count() != 0);
-        cache.next_cleanup = cache.references.len().saturating_mul(2).max(1024);
-    }
-    let reference = HostReference::new(value);
-    cache.references.insert(key, Arc::downgrade(&reference.0));
-    Value::Externref(reference)
+    Value::Externref(HostReference(value.host_identity()))
 }
 /// Read a syntax value returned by a macro instance.
 pub fn decode(value: &Value) -> Result<&Syntax> {
@@ -381,6 +364,127 @@ fn invoke(name: &str, args: &[Value]) -> Result<Value> {
     }
 }
 
+pub fn charge_tree(budget: &MacroBudget, root: &Syntax, output: bool) -> Result<()> {
+    enum Visit<'a> {
+        Node(&'a Syntax),
+        Leave,
+    }
+    let mut pending = vec![Visit::Node(root)];
+    while let Some(visit) = pending.pop() {
+        let Visit::Node(s) = visit else {
+            budget.leave_frame();
+            continue;
+        };
+        budget.enter_frame(1)?;
+        budget.charge(1, 1)?;
+        pending.push(Visit::Leave);
+        let bytes = match s.node() {
+            Node::Name(x) | Node::Discard(x) | Node::Up(x) | Node::Symbol(x) | Node::Text(x) => {
+                x.len() as u64
+            }
+            Node::Int(x) => x.bits().div_ceil(8),
+            Node::Float(_) => 8,
+            Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                // Charge before the traversal stack may grow.
+                budget.charge(xs.len() as u64, 4 + xs.len() as u64)?;
+                pending.extend(xs.iter().rev().map(Visit::Node));
+                0
+            }
+            Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => {
+                budget.charge(1, 1)?;
+                pending.push(Visit::Node(x));
+                0
+            }
+        };
+        // Escaping one input byte can produce several ASCII characters (for
+        // example a control character); bound both construction and output.
+        let work = if output {
+            bytes.saturating_mul(12)
+        } else {
+            bytes
+        };
+        budget.charge(work, if output { 4 + work.div_ceil(8) } else { 0 })?;
+    }
+    Ok(())
+}
+
+fn charge_call(budget: &MacroBudget, name: &str, args: &[Value]) -> Result<()> {
+    // Every compiler service call takes one unit and a bounded result wrapper.
+    budget.charge(1, 8)?;
+    match (name, args) {
+        ("make_text", [_, Value::String(s), _]) => {
+            let n = s.len() as u64;
+            budget.charge(n, 4 + n.div_ceil(8))?;
+        }
+        ("make_int", [Value::Int(n), _]) => {
+            let bytes = n.bits().div_ceil(8);
+            budget.charge(bytes, 4 + bytes.div_ceil(8))?;
+        }
+        ("make_list", [_, list, _]) | ("rebuild", [_, list]) => {
+            let mut link = get::<List>(list)?.0.as_deref();
+            while let Some(current) = link {
+                budget.charge(1, 1)?;
+                link = current.previous.as_deref();
+            }
+        }
+        ("match", [pattern, value]) => {
+            charge_tree(budget, get(pattern)?, false)?;
+            charge_tree(budget, get(value)?, false)?;
+        }
+        ("text", [value]) => {
+            let syntax = get::<Syntax>(value)?;
+            if let Node::Name(s)
+            | Node::Discard(s)
+            | Node::Up(s)
+            | Node::Symbol(s)
+            | Node::Text(s) = syntax.node()
+            {
+                let bytes = s.len() as u64;
+                budget.charge(bytes, 4 + bytes.div_ceil(8))?;
+            }
+        }
+        ("int", [value]) => {
+            if let Node::Int(n) = get::<Syntax>(value)?.node() {
+                let bytes = n.bits().div_ceil(8);
+                budget.charge(bytes, 4 + bytes.div_ceil(8))?;
+            }
+        }
+        ("definition_message", [value]) => {
+            let message = &get::<DefinitionResult>(value)?
+                .0
+                .as_ref()
+                .expect_err("definition result must be an error")
+                .0;
+            let bytes = message.len() as u64;
+            budget.charge(bytes, 4 + bytes.div_ceil(8))?;
+        }
+        ("syntax_error", [value]) => {
+            let message = get::<SyntaxResult>(value)?
+                .0
+                .as_ref()
+                .expect_err("syntax result must be an error");
+            let bytes = message.len() as u64;
+            budget.charge(bytes, 4 + bytes.div_ceil(8))?;
+        }
+        ("text_error", [value]) => {
+            let message = &get::<TextResult>(value)?
+                .0
+                .as_ref()
+                .expect_err("text result must be an error")
+                .0;
+            let bytes = message.len() as u64;
+            budget.charge(bytes, 4 + bytes.div_ceil(8))?;
+        }
+        ("show" | "show_as", [value, ..]) => charge_tree(budget, get(value)?, true)?,
+        ("same_code", [left, right]) => {
+            charge_tree(budget, get(left)?, false)?;
+            charge_tree(budget, get(right)?, false)?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 /// Install only the compiler's syntax operations into an otherwise empty host.
 pub fn install(imports: &mut HostImports) -> Result<()> {
     install_with_templates(imports, Arc::from([]))
@@ -397,6 +501,44 @@ pub fn install_with_context(
     templates: Arc<[Syntax]>,
     definition: Option<Arc<DefinitionContext>>,
 ) -> Result<()> {
+    install_with_items(imports, templates, definition, None)
+}
+
+/// Install compiler syntax operations with a per-run item journal.
+pub fn install_with_items(
+    imports: &mut HostImports,
+    templates: Arc<[Syntax]>,
+    definition: Option<Arc<DefinitionContext>>,
+    items: Option<Arc<ItemContext>>,
+) -> Result<()> {
+    install_inner(imports, templates, definition, items, None)
+}
+
+/// Install the syntax service with the same invocation budget as Wasm.
+pub fn install_with_budget(
+    imports: &mut HostImports,
+    templates: Arc<[Syntax]>,
+    definition: Option<Arc<DefinitionContext>>,
+    items: Option<Arc<ItemContext>>,
+    budget: MacroBudget,
+) -> Result<()> {
+    imports.set_macro_budget(budget.clone());
+    install_inner(imports, templates, definition, items, Some(budget))
+}
+
+/// Install metered syntax services without templates or compiler contexts.
+pub fn install_metered(imports: &mut HostImports, budget: MacroBudget) -> Result<()> {
+    install_with_budget(imports, Arc::from([]), None, None, budget)
+}
+
+fn install_inner(
+    imports: &mut HostImports,
+    templates: Arc<[Syntax]>,
+    definition: Option<Arc<DefinitionContext>>,
+    items: Option<Arc<ItemContext>>,
+    budget: Option<MacroBudget>,
+) -> Result<()> {
+    items::install(imports, items, definition.clone(), budget.clone())?;
     const NAMES: &[&str] = &[
         "kind",
         "text",
@@ -433,17 +575,75 @@ pub fn install_with_context(
         "text_error_at",
     ];
     for &name in NAMES {
-        imports.external("i:compiler/syntax/v1", name, move |args| invoke(name, args))?;
+        let budget = budget.clone();
+        imports.external("i:compiler/syntax/v1", name, move |args| {
+            if let Some(budget) = &budget {
+                charge_call(budget, name, args)?;
+            }
+            invoke(name, args)
+        })?;
     }
+    let note_context = definition.clone();
+    let note_budget = budget.clone();
+    imports.external("i:compiler/syntax/v1", "note", move |args| {
+        let [message] = args else {
+            bail!("diagnostic note expects one message")
+        };
+        if let Some(budget) = &note_budget {
+            let bytes = text(message)?.len() as u64;
+            budget.charge(1 + bytes, 8 + 4 + bytes.div_ceil(8))?;
+        }
+        let context = note_context
+            .as_ref()
+            .expect("compiler instance has no macro run context");
+        context
+            .notes
+            .lock()
+            .expect("diagnostic buffer lock poisoned")
+            .push(text(message)?.to_owned());
+        Ok(Value::Nil)
+    })?;
+    let report_context = definition.clone();
+    let report_budget = budget.clone();
+    imports.external("i:compiler/syntax/v1", "report_error", move |args| {
+        let [message, at] = args else {
+            bail!("macro error reporter expects message and syntax")
+        };
+        if let Some(budget) = &report_budget {
+            let bytes = text(message)?.len() as u64;
+            budget.charge(1 + bytes, 8 + 4 + bytes.div_ceil(8))?;
+        }
+        let context = report_context
+            .as_ref()
+            .expect("compiler instance has no macro run context");
+        *context
+            .abort
+            .lock()
+            .expect("definition context lock poisoned") = Some(DefinitionAbort::MacroError {
+            message: text(message)?.to_owned(),
+            at: get::<Syntax>(at)?.clone(),
+        });
+        bail!("macro reported a syntax error")
+    })?;
+    let definition_budget = budget.clone();
     imports.external("i:compiler/syntax/v1", "definition", move |args| {
         let [value] = args else {
             bail!("definition resolver expects one syntax value")
         };
+        if let Some(budget) = &definition_budget {
+            budget.charge(1, 8)?;
+            charge_tree(budget, get::<Syntax>(value)?, false)?;
+        }
         let context = definition
             .as_ref()
             .expect("compiler instance has no definition resolver");
         match (context.callback)(get::<Syntax>(value)?) {
-            DefinitionReply::Answer(value) => Ok(opaque(DefinitionResult(Ok(value)))),
+            DefinitionReply::Answer(value) => {
+                if let Some(budget) = &definition_budget {
+                    charge_tree(budget, &value, true)?;
+                }
+                Ok(opaque(DefinitionResult(Ok(value))))
+            }
             DefinitionReply::Error { message, at } => {
                 Ok(opaque(DefinitionResult(Err((message, at)))))
             }
@@ -465,10 +665,14 @@ pub fn install_with_context(
             }
         }
     })?;
+    let template_budget = budget;
     imports.external("i:compiler/syntax/v1", "template", move |args| {
         let [index] = args else {
             bail!("syntax template expects one index")
         };
+        if let Some(budget) = &template_budget {
+            budget.charge(1, 8)?;
+        }
         let index = number(index)?;
         let syntax = templates
             .get(index)
@@ -481,8 +685,46 @@ pub fn install_with_context(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::macro_budget::{Limit, Limits};
     use ilang_syntax::lisp::{parse, syntax::Scope};
     use std::collections::BTreeSet;
+
+    #[test]
+    fn compiler_syntax_traversal_charges_work_memory_and_depth() {
+        let parsed = parse("(((alpha beta)))").unwrap();
+        let value = opaque(Syntax::from_datum(
+            &parsed[0],
+            &Scope {
+                module: 0,
+                marks: BTreeSet::new(),
+            },
+        ));
+        let budget = MacroBudget::new(Limits {
+            work: 1000,
+            allocation: 1000,
+            frames: 100,
+        });
+        charge_call(&budget, "show", std::slice::from_ref(&value)).unwrap();
+        let used = budget.usage();
+        assert!(used.work > 10 && used.allocation > 10);
+        assert_eq!(used.frames, 0);
+
+        let shallow = MacroBudget::new(Limits {
+            work: 1000,
+            allocation: 1000,
+            frames: 2,
+        });
+        assert!(charge_call(&shallow, "show", std::slice::from_ref(&value)).is_err());
+        assert_eq!(shallow.exceeded(), Some(Limit::Frames));
+
+        let small = MacroBudget::new(Limits {
+            work: 1000,
+            allocation: 8,
+            frames: 100,
+        });
+        assert!(charge_call(&small, "show", std::slice::from_ref(&value)).is_err());
+        assert_eq!(small.exceeded(), Some(Limit::Allocation));
+    }
 
     #[test]
     fn opaque_values_keep_scopes_and_reject_invalid_atoms() {

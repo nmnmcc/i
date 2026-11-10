@@ -64,6 +64,19 @@ i/random.follow : (h: State, bits: List(Int)) -> State
 i/random.derive_path : (g: Generator, path: List(Int)) -> Generator
 i/random.at_path : (g: Generator, path: List(Int)) -> Generator ? RandomError
 i/syntax.definition : (of: Syntax) -> Syntax ? SyntaxError ! Definitions
+i/syntax.raw_note : (String) -> Nil
+i/syntax._diagnostics : () -> Diagnostics
+i/syntax.raw_metadata_new : () -> ItemMetadata
+i/syntax.raw_metadata_push : (ItemMetadata, String, String) -> ItemMetadata
+i/syntax.raw_items_add : (Syntax, Syntax, ItemMetadata, Syntax) -> ItemResult
+i/syntax.raw_items_expose : (Syntax) -> ItemResult
+i/syntax.raw_items_ok : (ItemResult) -> Bool
+i/syntax.raw_items_message : (ItemResult) -> String
+i/syntax.raw_items_at : (ItemResult) -> Syntax
+i/syntax.build_metadata : (data: List((String, String)), result: ItemMetadata) -> ItemMetadata
+i/syntax.item_result : (result: ItemResult) -> Nil ? SyntaxError
+i/syntax._items : () -> Items
+i/syntax._report_error : (String, Syntax) -> Syntax
 i/syntax.raw_definition : (Syntax) -> DefinitionResult
 i/syntax.raw_definition_ok : (DefinitionResult) -> Bool
 i/syntax.raw_definition_value : (DefinitionResult) -> Syntax
