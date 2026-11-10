@@ -170,3 +170,104 @@ Callgrind profiles and timing samples are retained separately: instruction
 counts are a substitute profile, not elapsed-time measurements. Valgrind
 reported its brk-segment limitation and completed both profiles successfully;
 it required no environment changes.
+
+## Coalescing failure audit
+
+These are the recovery or skipping paths audited against the first review's
+requirement that no coalescing failure be silent:
+
+| Path | Required behavior |
+| --- | --- |
+| `display::simplify_steps` | Use the solver's bound reductions; mark every irreducible failure. |
+| `Checker::generalize` | Report the failure before retaining a raw type for diagnostic recovery. |
+| `Checker::entry_point` | Report before returning; a failed scheme cannot skip entry validation successfully. |
+| `Checker::run` and `Typed::lines` (`--types`) | Missing or failed schemes are diagnosed; only a diagnosed partial result may omit a line. |
+| `Checker::exported_type` | Report before skipping the visibility walk. |
+| `display::scheme_names` and `scheme_in` | Propagate `Err`, including a failure in the enclosing scheme. The tuple extraction is guaranteed by constructing a tuple. |
+| `display::known`, `known_keep`, `known_shown` | `Top` is recovery with the same failure flag, drained at binding/group/program boundaries. |
+| `Checker::check_case` | Its optional scalar-warning detail uses the same flagged coalescer; a failed detail is drained at the group boundary. |
+| `Checker::read_shape` and `check_value_places` | T2's raw-type recovery uses the flagged coalescer; the group/program drain rejects success. |
+| `LocalTypes::show_in` and `named_types` | Both polarities are validated before a query snapshot leaves the checker. Fallbacks assert that the program was diagnosed. |
+| CLI `package::interface_of` | Stop on checker errors; missing text or exported canonical trees are explicit compiler errors, never `_`. |
+| Wasm `lower_with_bindings` | Return retained diagnostics before constructing IR, even for a direct caller of the lowering API. |
+
+T2's `completed` returning an unresolved shape is not a coalescing failure.
+Its staged transaction either supplies all demanded closed equations or
+reports the value-type diagnostic; recording an optional wholly closed shape
+is allowed to skip an unresolved shape. Those paths retain T2's transaction
+and observation rules.
+
+## Base-accepted programs now rejected
+
+Both the review base (94789e6) and the actual merged redesign (c2f41b7)
+accepted every row below. The named comparison runs both base binaries and
+the lane at both optimization levels. Base behavior in this table was the
+same at opt 0 and opt 2.
+
+| Program | Base behavior | Lane diagnostic and reason |
+| --- | --- | --- |
+| z1 | Prints `other` instead of `two` | E0515: an annotation hides a handler's Svc(String) same-form obligation. |
+| z4 | Prints `other` instead of `two` | E0515: the equivalent annotated handler loses the same Svc obligation. |
+| g_inf_SDep | Cast failure | E0515: row comparison inside a type argument changes the required service form. |
+| m3 | Cast failure | E0515: the nested row's service arguments must be equal. |
+| m4 | Cast failure | E0515: the nested row's service arguments must be equal. |
+| r6 | Cast failure | E0515: the row's service arguments must be equal through the helper. |
+| b4 | Cast failure | E0522: the entry retains an unprovided service. |
+| b7 | Cast failure | E0522: the entry retains an unprovided service. |
+| r2 | Cast failure | E0522: the entry retains an unprovided service. |
+| r3 | Cast failure | E0522: the entry retains an unprovided service. |
+| row_alias | Pure unused-code entry returns normally | E0515: a closed alias contains incompatible S forms. Invalid under F2; no runtime failure claimed for its unused code. |
+| alias_kind_env | Pure unused-code entry returns normally | E0515: the function alias makes N an environment row; concrete Svc(Int) and Svc(Nil) cannot inhabit that row. |
+| alias_kind_error | Pure unused-code entry returns normally | E0515: the same contract applies to an error-row parameter. |
+
+The review bases already reject x1/x4/x6/x7/x8/g_ann_SDep with E0505.
+The lane now gives E0515 for their actual same-form violation. They are not
+included in the base-accepted inventory.
+
+## Failed and interrupted development checks
+
+All failures below were resolved before the final gates. Expected negative
+checks inside the runtime harness are successful assertions, not gate failures.
+Logs live under `target/k4d-checks` unless otherwise stated.
+
+| Checks | Failure or interruption | Resolution |
+| --- | --- | --- |
+| Initial T1 merge build | Three constructor patterns omitted the literal value-set field. | Keep the T1 field throughout the K4 operations. |
+| `named-first`, `named2`, `obligations`, `hidden`, `hidden2`, `trace-w` | Finite field/handler E0505, an output-only row incorrectly retained as an input, and early harness parsing/undefined-helper mistakes. | Separate handler obligations, preserve the correct polarity, and repair the complete test programs. |
+| `checker-first` | Replayed mode checks duplicated an existing diagnostic. | Deduplicate identical solver failures. |
+| `checker2` | The old unsafe coercion expectation used E0501. | F2 requires row-form E0515; retain rejection. |
+| `checker3`, `checker5` | Diagnostic/canonical-order golden differences, including interim unrelated scheme changes. | Restore unrelated schemes; generate only the four documented derived changes. |
+| `checker4`, `row-modes` | Boolean call sites remained during the Mode conversion. | Pass the persistent row mode consistently. |
+| `row-schemes` | The test helper's tuple was mistaken for a Checked result. | Invoke the checker on its graph. |
+| `spec-first` | A constructor with one possible form was treated as a nontrivial hidden restriction. | Prove that obligation universally, without a type-name exception. |
+| `clippy-first`, `parameter-iteration` | Collapsible conditions and an owned-iterator lint. | Restructure conditions and make the necessary owned fallback explicit; no lint suppression. |
+| `dev-verify-head` | Formatting failed while the next iterator change was being prepared. | Format the final source; repeat the full gate. |
+| `delivery-build`, `alias-kind-test` | The initial alias test demanded rejection of freely unifiable callback results. | Use concrete, incompatible annotated arguments; retain the alias mode fix. |
+| Initial generator adapter | No entry point because source construction stopped early. | Keep all source-building statements; discard that run. |
+| Initial Python audit script | `enum.py` shadowed Python's standard module. | Rename the local audit script; no global Python change. |
+| Initial snippet checks | Partial constructor, service, or entry-marker fragments were parsed as complete snippets. | Use complete source templates; keep the snippet checker unchanged. |
+| `timing-isolated` | The real redesign rejects the ring with E0505. | Label the pre-follow-up lane as a substitute ring baseline; keep redesign for std. |
+| Initial timing runs | Approximately 7–9%, then 3%, then 1.5% std CPU regressions. | Remove repeated row/occurrence allocation and copying; final measurement is separate. |
+| Initial archived baseline, `baseline-correct`, interrupted isolated build | Cargo target contamination, scratch working-directory mistakes, missing Binaryen source link, and a canceled cold build. | Discard invalid baseline results; rebuild all local crates in the isolated target and verify compiler identity. |
+| Raw generator runtime checks | Two exact source-level recursive helpers time out in both binaries and both optimization levels. | Retain these results as source divergence; also measure the separately labeled bounded corpus. |
+
+No checks or lints were weakened. Temporary trace instrumentation was removed.
+No global configuration, PATH, package lock, shared source checkout, or other
+lane was changed. Scratch sources, dependencies and logs remain only under
+this lane's ignored target directory. Browser dependencies are installed by
+the normal dev-verify command.
+
+The final original-helper runtime test initially used a Rust format string
+whose placeholders were extracted as an i snippet (`delivery-syntax-first`).
+It now substitutes names in a complete i template, preserving exactly the
+same 64 helpers. The snippet parser and its expectations are unchanged.
+The plain generator sorts its set of used helper names, making seeded source
+construction stable across Python hash seeds. The named comparison also
+asserts the principal use/fw schemes for all twenty q spellings, from 4.8's
+union of the callback row N and service parameter S(N).
+
+One queued quiet measurement was canceled before collecting any samples:
+it held slots while the verification command was about to request its nested
+snippet-build slot. Only this lane's waiting quiet wrapper and its flock
+child were terminated, releasing the locks. The completed quiet measurement
+is started after the gates and comparisons finish.

@@ -68,6 +68,9 @@ def main():
             valid = all(r['status'] == 1 and ('E0515' in r['stderr'] or 'E0522' in r['stderr']) and 'trap' not in r['stderr'] for r in [after['check'], *after['runs']])
         else:
             valid = after['check']['status'] == 0 and all(r['status'] == 0 and r['stdout'] == stdout for r in after['runs'])
+        if name.startswith('q'):
+            # §4.8: both field and pattern calls collect N and S(N).
+            valid = valid and all(f'app/main.{binding} : () -> Int ! N | S(N)' in after['check']['stdout'] for binding in ['use', 'fw'])
         if not valid:
             failures.append(name)
         results.append(record)

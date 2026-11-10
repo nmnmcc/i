@@ -224,10 +224,11 @@ run(N) = (body: () -> Nil ! N) { body() }
 forward_0 = () { run(() { use() }) }\n",
     );
     for n in 1..64 {
-        chain.push_str(&format!(
-            "forward_{n} = () {{ run(() {{ forward_{}() }}) }}\n",
-            n - 1
-        ));
+        chain.push_str(
+            &"forward_next = () { run(() { forward_previous() }) }\n"
+                .replace("forward_next", &format!("forward_{n}"))
+                .replace("forward_previous", &format!("forward_{}", n - 1)),
+        );
     }
     chain.push_str("\n@main\nmain = () { forward_63() }\n");
     check_and_run("original-helper-chain", &chain, Some("E0522"), "");

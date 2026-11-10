@@ -35,6 +35,6 @@ def sources(seed, count):
         for _ in range(R.randint(0, 4)):
             ms.insert(R.randrange(len(ms) + 1), st())
         used = [m.split(' = ')[0] for m in ms if re.match('^[lx]\\d = ', m)]
-        fin = e() + ''.join((' + ' + (u + '()' if u[0] == 'l' else u) for u in set(used)))
+        fin = e() + ''.join((' + ' + (u + '()' if u[0] == 'l' else u) for u in sorted(set(used))))
         src = HEAD + '\n'.join(hs) + '\n@main\nmain = () {\n  ' + '\n  '.join(ms + [fin]) + '\n  Nil\n}\n'
         yield src

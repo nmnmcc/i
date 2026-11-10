@@ -8,9 +8,9 @@ from pathlib import Path
 import subprocess
 
 
-def command(binary, args, project):
+def command(binary, args, project, timeout=60):
     try:
-        p = subprocess.run([str(binary), *args, '--project', str(project)], capture_output=True, text=True, timeout=60)
+        p = subprocess.run([str(binary), *args, '--project', str(project)], capture_output=True, text=True, timeout=timeout)
         return {'status': p.returncode, 'stdout': p.stdout, 'stderr': p.stderr}
     except subprocess.TimeoutExpired:
         return {'status': 'timeout', 'stdout': '', 'stderr': ''}
@@ -51,6 +51,7 @@ def main():
     p.add_argument('--count', type=int, default=100)
     p.add_argument('--seed', type=int, default=44)
     p.add_argument('--bound-recursion', action='store_true')
+    p.add_argument('--runtime-timeout', type=float, default=60)
     a = p.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
     results = []
@@ -75,7 +76,7 @@ def main():
                 checked = command(binary, ['check', '--types'], project)
                 row[version] = {'check': checked}
                 if checked['status'] == 0:
-                    row[version]['runs'] = [command(binary, ['run', '--opt', opt], project) for opt in ['0', '2']]
+                    row[version]['runs'] = [command(binary, ['run', '--opt', opt], project, a.runtime_timeout) for opt in ['0', '2']]
             results.append(row)
             (a.out / 'results.json').write_text(json.dumps(results, indent=2) + '\n')
     summary = {}
