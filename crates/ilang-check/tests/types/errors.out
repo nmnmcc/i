@@ -1,17 +1,17 @@
-id : (x: a) -> a
+id : (x: A) -> A
 ids : (x: Int | String) -> Int | String
 n : Int
 s : String
 add : (x: Int) -> Int
 bad_arg : () -> Int
 bad_op : () -> Int
-bad_guard : (x: a) -> a | Int
+bad_guard : (x: A) -> A | Int
 arity : () -> Never
-arity_var : (f: (Int) -> a ? e ! n) -> (a, Never) ? e ! n
-ambiguous : (x: a | b) -> a | b
+arity_var : (f: (Int) -> A ? E ! N) -> (A, Never) ? E ! N
+ambiguous : (x: A | B) -> A | B
 use_ambiguous : () -> Never
-field : (u: a) -> Never
-part : (t: a) -> Never
+field : (u: A) -> Never
+part : (t: A) -> Never
 radius : (s: Shape) -> Never
 now : () -> Int ! Clock
 top_env : Int

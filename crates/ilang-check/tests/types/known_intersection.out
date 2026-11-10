@@ -1,4 +1,4 @@
-inc : (x: a & Int) -> a
+inc : (x: A & Int) -> A
 same : () -> Bool
 other : () -> Bool
 wide : (v: Int) -> Bool

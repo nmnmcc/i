@@ -1,5 +1,5 @@
-s : (b: Boundary(a, b, c), v: d) -> d
-f : (b: Boundary(a, b, c), x: Int) -> Int
+s : (b: Boundary(A, B, C), v: D) -> D
+f : (b: Boundary(A, B, C), x: Int) -> Int
 main : () -> Int
 take_int : (b: Boundary(Int, Never, Never)) -> Nil
 take_string : (b: Boundary(String, Never, Never)) -> Nil

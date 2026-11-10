@@ -1,9 +1,9 @@
 lit_int : () -> Bool
 lit_float : () -> Bool
 lit_bits : () -> Bool
-lit_tuple : (x: a) -> Bool
+lit_tuple : (x: A) -> Bool
 lit_list : () -> Bool
-lit_list_unknown : (x: a) -> Bool
+lit_list_unknown : (x: A) -> Bool
 lit_empty : () -> Bool
 op_int : (a: Int, b: Int) -> Bool
 op_bool : (a: Int, b: Int) -> Bool
@@ -11,13 +11,13 @@ op_string : (a: String, b: String) -> Bool
 op_neg : (a: Float) -> Bool
 op_pipe : () -> Bool
 case_union : (b: Bool) -> Bool
-case_unknown : (b: Bool, x: a) -> Bool
+case_unknown : (b: Bool, x: A) -> Bool
 update : (b: Box(Int)) -> Bool
 update_rest : (u: User) -> Bool
 param_typed : (s: String) -> Bool
-param_untyped : (s: a) -> Bool
+param_untyped : (s: A) -> Bool
 param_env : () -> Bool ! User
-id : (x: a) -> a
+id : (x: A) -> A
 scheme_builtin : () -> Bool
 scheme_member : () -> Bool
 scheme_top : () -> Bool
@@ -31,18 +31,18 @@ group_a : (n: Int) -> Int
 group_b : (m: Int) -> Int
 own_local : () -> (n: Int) -> Int
 call : () -> Bool
-call_unknown : (x: a) -> Bool
+call_unknown : (x: A) -> Bool
 call_ctor : () -> Bool
-unwrap : (x: a | Nil) -> a
+unwrap : (x: A | Nil) -> A
 call_union : (u: User | Nil) -> Bool
 call_union_field : (u: User | Nil) -> String
-first : (p: (a, b)) -> a
-call_hole : (x: a) -> Bool
-either : (x: a, y: a) -> a
+first : (p: (A, B)) -> A
+call_hole : (x: A) -> Bool
+either : (x: A, y: A) -> A
 call_join : () -> Bool
-drop_nil : (x: a) -> a - Nil
+drop_nil : (x: A) -> A - Nil
 call_diff : (u: User | Nil) -> Bool
-inc : (x: a & Int) -> a
+inc : (x: A & Int) -> A
 call_inter : () -> Bool
 field : (u: User) -> Bool
 field_generic : (b: Box(String)) -> Bool
@@ -56,7 +56,7 @@ pattern_list : (xs: List(String)) -> Bool
 pattern_case_part : (b: Box(Int | String)) -> Bool
 pattern_narrowed : (x: Int | String | Nil) -> Int
 not_general : () -> Bool
-untyped_field : (u: a) -> Never
+untyped_field : (u: A) -> Never
 option_name : (opt: Option(User)) -> String
 annotated : (x: Int) -> Int
 annotated_call : Int

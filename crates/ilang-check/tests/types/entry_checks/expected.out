@@ -5,7 +5,7 @@ app/main.never : (s: String) -> Never
 app/main.never_param : (x: Never) -> Int
 app/main.bad_param : (xs: List(Int)) -> Int
 app/main.bad_value : () -> (Int, Int)
-app/main.generic : (x: a) -> a
+app/main.generic : (x: A) -> A
 app/main.bad_errors : () -> Int ? (Int, Int)
 app/main.twice_error : () -> Int ? Handle
 app/main.number : Int

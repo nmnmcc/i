@@ -1,4 +1,4 @@
-collect : (body: () -> Nil ! Yield(a) | n) -> List(a) ! n
+collect : (body: () -> Nil ! Yield(A) | N) -> List(A) ! N
 numbers : () -> List(Int)
 inferred : () -> List(String)
 run_never : (body: () -> Nil ! Yield(Never)) -> Int

@@ -1,6 +1,6 @@
-g : (y: a) -> a | Int
-f : (x: a) -> a | Int
-h : (z: a) -> a | Int
+g : (y: A) -> A | Int
+f : (x: A) -> A | Int
+h : (z: A) -> A | Int
 w : String
 f1 : (x: Int) -> Int
 g1 : (y: Int) -> Int

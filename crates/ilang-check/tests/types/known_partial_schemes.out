@@ -1,8 +1,8 @@
-map : (xs: List(a), f: (a) -> b) -> List(b)
+map : (xs: List(A), f: (A) -> B) -> List(B)
 users : List(User)
 name : List(String)
 part : List(String)
 thunk : List(Int)
 tuple_pattern : List(String)
-unknown : (p: a) -> Never
+unknown : (p: A) -> Never
 19:26: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`

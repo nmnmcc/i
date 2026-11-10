@@ -11,9 +11,9 @@ names : (u: User) -> (String, String, Int)
 unknown : Never
 twice : Never
 missing : Never
-param : (f: a) -> Never
+param : (f: A) -> Never
 bad_pattern : (u: User) -> Never
-id : (x: a) -> a
+id : (x: A) -> A
 through : () -> User
 holes : (f: (x: Int) -> Int) -> Int
 minus : (a: Int, b: Int) -> Int

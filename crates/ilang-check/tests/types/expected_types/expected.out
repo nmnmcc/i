@@ -1,12 +1,12 @@
-app/list.map : (xs: List(a), f: (a) -> b) -> List(b)
-app/list.fold : (xs: List(a), init: b, f: (b, a) -> b) -> b
+app/list.map : (xs: List(A), f: (A) -> B) -> List(B)
+app/list.fold : (xs: List(A), init: B, f: (B, A) -> B) -> B
 app/main.users : List(User)
 app/main.names : List(String)
 app/main.first_name : () -> Bool
 app/main.piped : List(Int)
 app/main.by_label : List(String)
 app/main.total : Int
-app/main.unknown : (people: List(a)) -> List(Never)
+app/main.unknown : (people: List(A)) -> List(Never)
 app/main.annotated : (User) -> String
 app/main.getter : () -> (User) -> String
 app/main.in_block : (User) -> Int
@@ -14,7 +14,7 @@ app/main.in_case : (b: Bool) -> (User) -> String
 app/main.in_tuple : ((User) -> String, Int)
 app/main.in_list : List((User) -> Int)
 app/main.arity : (User) -> String
-app/main.alone : (u: a) -> Never
+app/main.alone : (u: A) -> Never
 src/main.i:15:16: error[E0520]: the two sides have the known types `String` and `Int`, which are disjoint, so the result would always be the same (§6.9)
 src/main.i:24:47: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
 src/main.i:45:38: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`

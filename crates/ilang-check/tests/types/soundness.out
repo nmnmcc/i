@@ -1,4 +1,4 @@
-with_int : (body: () -> a ? e ! n) -> a ? e ! n - Reader(Int)
+with_int : (body: () -> A ? E ! N) -> A ? E ! N - Reader(Int)
 get_s : () -> String ! Reader(String)
 g : () -> String
 k : () -> String
@@ -7,16 +7,16 @@ use_str : (c: Cell(String)) -> String
 pass : (y: Cell(String)) -> String
 through_var : (x: Cell(String)) -> Int
 through_top : (x: Cell(String)) -> Int
-arity : (k: (Int) -> a ? e ! n) -> Never ? e ! n
+arity : (k: (Int) -> A ? E ! N) -> Never ? E ! N
 use_state_int : () -> Int ! State(Int)
 use_state_str : () -> Int ! State(String)
-nested : List(Cell(a))
+nested : List(Cell(A))
 unbox : (b: Box(Int)) -> Int
 two_tests : (v: Box(Int | String)) -> Int
 test_then_ctor : (v: Box(Int | String)) -> Int
 lists : (l: List(Int | String)) -> List(Int)
 test_ok : (v: Box(Int) | String) -> Int
-take : (h: () -> a & Int) -> () -> a & Int
+take : (h: () -> A & Int) -> () -> A & Int
 p : () -> Never
 z : Never
 not_string : String

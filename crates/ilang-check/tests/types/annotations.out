@@ -1,14 +1,14 @@
 exact : (x: Int) -> Int
-general : (x: a) -> a
-holes : (x: List(a)) -> List(a)
-inner : (x: a) -> a
+general : (x: A) -> A
+holes : (x: List(A)) -> List(A)
+inner : (x: A) -> A
 apart : () -> (Int, String)
 typed_value : Int
 fn_type : (Int) -> Int
 union_arg : (x: Int | String) -> Int | String
-inter_arg : (x: a & Int) -> a
+inter_arg : (x: A & Int) -> A
 list_union : List(Int | String)
-result_written : (r: Result(a, e)) -> a ? e
+result_written : (r: Result(A, B)) -> A ? B
 diff_written : (x: Int | String | Nil) -> Int | Nil
 alias_use : (p: (Int, Int)) -> (Int, Int)
 pair_use : (p: (String, String)) -> (String, String)

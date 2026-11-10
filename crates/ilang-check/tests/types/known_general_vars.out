@@ -1,5 +1,5 @@
-map : (xs: List(a), f: (a) -> b) -> List(b)
-id : (x: a) -> a
+map : (xs: List(A), f: (A) -> B) -> List(B)
+id : (x: A) -> A
 users : List(User)
 through_id : List(Never)
 boxed : List(User)

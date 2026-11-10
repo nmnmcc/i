@@ -3,7 +3,7 @@ missing_ctor : (s: Shape) -> Int
 missing_nested : (r: Result(Bool, Nil)) -> Int
 missing_member : (v: Int | String) -> Int
 missing_label : (f: Flags) -> Int
-inferred : (r: Result(Int, a)) -> Int
+inferred : (r: Result(Int, A)) -> Int
 guarded : (b: Bool) -> Int
 ints : (n: Int) -> Int
 floats : (x: Float) -> Int
@@ -12,15 +12,15 @@ prefixes : (s: String) -> String
 all_strings : (s: String) -> String
 bit_arrays : (b: BitArray) -> Int
 all_bits : (b: BitArray) -> Int
-no_empty : (xs: List(a)) -> a
-no_long : (xs: List(a)) -> a | Int
+no_empty : (xs: List(A)) -> A
+no_long : (xs: List(A)) -> A | Int
 lists : (xs: List(Int)) -> Int
 list_items : (xs: List(Bool)) -> Int
 tuples : (p: (Bool, Bool)) -> Int
 only_ok : (r: Result(Int, Never)) -> Int
 empty : Int
 any : (x: Int) -> Int
-unknown : (f: () -> Bool ? e ! n) -> Int ? e ! n
+unknown : (f: () -> Bool ? E ! N) -> Int ? E ! N
 no_error : () -> Int
 14:8: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Point`
 20:8: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Ok(False)`

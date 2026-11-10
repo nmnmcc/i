@@ -1,13 +1,13 @@
-read : (r: Ref(a)) -> a
-either : (r1: Ref(a), r2: Ref(a), c: Bool) -> Ref(a)
-make_int : (x: a & Int) -> Ref(a & Int)
-make_any : (x: a) -> Ref(a)
+read : (r: Ref(A)) -> A
+either : (r1: Ref(A), r2: Ref(A), c: Bool) -> Ref(A)
+make_int : (x: A & Int) -> Ref(A & Int)
+make_any : (x: A) -> Ref(A)
 one_side : (x: Int) -> Int
 errors_only : () -> Int ? Int
 empty_list : () -> List(Never)
-inter_unions : (x: a & Int) -> a & Int
-rest : (v: a) -> Int | a - List(_) - Result(_, _)
-id : (x: a) -> a
+inter_unions : (x: A & Int) -> A & Int
+rest : (v: A) -> Int | A - List(_) - Result(_, _)
+id : (x: A) -> A
 mono : (x: Int | String) -> Int | String
 use_int : () -> Int | String
 use_string : () -> Int | String

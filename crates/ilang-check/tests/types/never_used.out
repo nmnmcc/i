@@ -1,15 +1,15 @@
 after_all : (b: Bool) -> Int
-duplicate : (n: a) -> Int
-after_catch_all : (x: a) -> Int
+duplicate : (n: A) -> Int
+after_catch_all : (x: A) -> Int
 guarded_after : (b: Bool) -> Int
 guard_not_counted : (b: Bool) -> Int
-prefixes : (s: a) -> Int
+prefixes : (s: A) -> Int
 no_values : (v: Int) -> Int
-choices : (r: Result(a, b)) -> Int
+choices : (r: Result(A, B)) -> Int
 nested : (r: Result(Bool, Nil)) -> Int
-lists : (xs: List(a)) -> Int
-bits : (b: a) -> Int
-dead : (x: a) -> Int
+lists : (xs: List(A)) -> Int
+bits : (b: A) -> Int
+dead : (x: A) -> Int
 6:5: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
 12:5: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
 19:5: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)

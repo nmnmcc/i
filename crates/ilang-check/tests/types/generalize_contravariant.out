@@ -1,5 +1,5 @@
-new : () -> Sink(a)
+new : () -> Sink(A)
 int_sink : () -> Sink(Int)
 string_sink : () -> Sink(String)
-make : (s: Sink(a)) -> Back(a)
-wrap : (f: (a) -> Nil) -> Sink(a)
+make : (s: Sink(A)) -> Back(A)
+wrap : (f: (A) -> Nil) -> Sink(A)
