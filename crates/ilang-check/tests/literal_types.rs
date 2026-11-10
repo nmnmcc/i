@@ -105,7 +105,7 @@ fn equality_diagnostics_distinguish_the_operator() {
     for (op, result) in [("==", "False"), ("!=", "True")] {
         let (ds, _) = check(&format!("x = 1 {op} 2\n"));
         assert_eq!(ds.len(), 1, "{ds:?}");
-        assert_eq!(ds[0].0, "E0520");
+        assert_eq!(ds[0].0, "W0503");
         assert!(
             ds[0].1.contains(&format!("`{op}` is always `{result}`")),
             "{ds:?}"
@@ -205,7 +205,7 @@ fn grouped_negatives_supply_the_same_written_group_facts() {
     for value in ["1", "-1", "-{1}", "-{{1}}"] {
         let (ds, _) = check(&format!("pair = ({value}, f)\nf = () {{ pair.0 == 2 }}\n"));
         assert_eq!(ds.len(), 1, "{value}: {ds:?}");
-        assert_eq!(ds[0].0, "E0520");
+        assert_eq!(ds[0].0, "W0503");
         let (ds, _) = check(&format!("pair = ({value}, f)\nf = () {{ pair.0 }}\n"));
         assert!(ds.is_empty(), "{value}: {ds:?}");
     }
@@ -574,23 +574,61 @@ fn fitted_choices_keep_the_deferred_binding_error() {
 }
 
 #[test]
-fn everyday_disjoint_equalities_have_explicit_runtime_repairs() {
-    // Literal-types §8/§6.9: disjoint known scalar values give E0520;
-    // parameters and written whole result types permit runtime comparisons.
+fn everyday_disjoint_equalities_warn_without_widening() {
+    // W520/§6.9: comparisons keep Bool and exact operand types, with a warning.
+    // Explicit broad interfaces still avoid the warning.
     for source in [
         "x = 1\nf = () { x == 2 }\n",
         "status = () { \"ok\" }\nf = () { status() == \"error\" }\n",
         "(list = std/list)\nf = () { list.map([\"a\"], (x) { x == \"b\" }) }\n",
     ] {
-        let (ds, _) = check(source);
+        let (ds, lines) = check(source);
         assert_eq!(
             ds.iter().map(|d| d.0.as_str()).collect::<Vec<_>>(),
-            ["E0520"],
+            ["W0503"],
             "{source}: {ds:?}"
         );
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.ends_with("-> Bool") || l.ends_with("-> List(Bool)")),
+            "{lines:?}"
+        );
+        if source.starts_with("x ") {
+            assert!(lines.iter().any(|l| l.ends_with("x : 1")), "{lines:?}");
+        }
+        if source.starts_with("status ") {
+            assert!(
+                lines.iter().any(|l| l.ends_with("status : () -> \"ok\"")),
+                "{lines:?}"
+            );
+        }
     }
     let (ds, _) = check(
         "(list = std/list)\nx = 1\nequal = (a, b) { a == b }\nstatus = () -> String { \"ok\" }\nf = () { (equal(x, 2), status() == \"error\", list.map([\"a\"], (x: String) { x == \"b\" })) }\n",
     );
     assert!(ds.is_empty(), "{ds:?}");
+}
+
+#[test]
+fn disjoint_guards_do_not_narrow_or_cover() {
+    // W520/§6.9 and §7.4: even an always-true guard does not cover a value.
+    for source in [
+        "f = (x: 1) { x |> { _ ? x == 2 -> 0 } }\n",
+        "f = (x: 1) { x |> { _ ? x != 2 -> 0 } }\n",
+    ] {
+        let (ds, _) = check(source);
+        assert_eq!(ds.iter().filter(|d| d.0 == "W0503").count(), 1, "{ds:?}");
+        assert_eq!(ds.iter().filter(|d| d.0 == "E0516").count(), 1, "{ds:?}");
+    }
+    let (ds, lines) = check("f = (x: 1) { x |> { _ ? x == 2 -> x  _ -> 0 } }\n");
+    assert_eq!(ds.len(), 1, "{ds:?}");
+    assert_eq!(ds[0].0, "W0503");
+    assert!(
+        lines.iter().any(|l| l.ends_with("f : (x: 1) -> 0 | 1")),
+        "{lines:?}"
+    );
+    // The impossible guard does not let an invalid body escape checking.
+    let (ds, _) = check("f = (x: 1) { x |> { _ ? x == 2 -> { y: 2 = x  y }  _ -> 0 } }\n");
+    assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
 }

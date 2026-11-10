@@ -11,5 +11,5 @@ checked : () -> Result(1, AssertionFailure)
 checked_library : () -> Result("x", AssertionFailure)
 inc : (x: A & Int) -> A
 mixed : List(1 | "a")
-94:10: error[E0520]: both sides are constants, `1` and `2`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
+94:10: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False` (§6.9)
 101:2: warning[W0502]: this value is not used, and working it out does nothing

@@ -1,15 +1,14 @@
 // spec: 4.2, 6.9
-// expect: pass
+// expect: warning W0503
 (list = std/list)
 
-// Literal-types §8: pass constants as parameters to compare at runtime.
-equal = (a, b) { a == b }
-status = () -> String { "ok" }
+// W520: exact literal types allow ordinary runtime comparisons.
+status = () { "ok" }
 
 @main
 main = () {
 	x = 1
-	assert(equal(x, 2) == False)
+	assert({x == 2} == False)
 	assert({status() == "error"} == False)
-	assert(list.map(["a"], (x: String) { x == "b" }) == [False])
+	assert(list.map(["a"], (x) { x == "b" }) == [False])
 }

@@ -1408,18 +1408,18 @@ impl<'a> Checker<'a> {
             };
             let message = if single(&lk) && single(&rk) {
                 format!(
-                    "both sides are constants, `{l}` and `{r}`, so `{operator}` is always `{result}` (§6.9). To compare two constants when the program runs, pass them as parameters."
+                    "both sides are constants, `{l}` and `{r}`, which can never be equal, so `{operator}` is always `{result}` (§6.9)"
                 )
             } else if finite(&lk) && finite(&rk) {
                 format!(
-                    "the values `{l}` and `{r}` are never equal, so `{operator}` is always `{result}` (§6.9)"
+                    "the values `{l}` and `{r}` can never be equal, so `{operator}` is always `{result}` (§6.9)"
                 )
             } else {
                 format!(
-                    "the two sides have the known types `{l}` and `{r}`, which are disjoint, so the result would always be the same (§6.9)"
+                    "the two sides have the known types `{l}` and `{r}`, which can never be equal, so `{operator}` is always `{result}` (§6.9)"
                 )
             };
-            self.error(code::EQ_DISJOINT, span, message);
+            self.warning(code::EQ_DISJOINT, span, message);
         }
         if let Some(want) = operand {
             self.sub(&lt, &want, lhs.span);

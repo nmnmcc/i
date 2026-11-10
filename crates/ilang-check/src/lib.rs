@@ -104,11 +104,12 @@ pub mod code {
     pub const NOT_KNOWN_CTOR: &str = "E0517";
     pub const TYPE_PLACE: &str = "E0518";
     pub const BIT_PATTERN: &str = "E0519";
-    pub const EQ_DISJOINT: &str = "E0520";
+    // E0520 became warning W0503: disjoint equality is well defined (§6.9).
     pub const ENTRY_TYPE: &str = "E0521";
     pub const ENTRY_ENV: &str = "E0522";
     pub const NEVER_USED: &str = "W0501";
     pub const VALUE_NOT_USED: &str = "W0502";
+    pub const EQ_DISJOINT: &str = "W0503";
 }
 
 /// A parsed module of the graph.

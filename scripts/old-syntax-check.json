@@ -1189,7 +1189,7 @@
       "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`"
     ]
   },
-  "docs/design/literal-types.md:67290c6bbdeb16e7": {
+  "docs/design/literal-types.md:a8202210d43b26aa": {
     "prefix": "example = () {\n",
     "suffix": "\n}\n",
     "reason": "The note mixes bindings with expression statements; parse the entire example in a function body."

@@ -21,7 +21,7 @@ line", "multi\nline")
 	check("\u{1F600}" <> "!", "😀!")
 	check("tab\there", "tab	here")
 	check(core.inspect("a" <> "b" == "ab"), "True")
-	check(core.inspect((a, b) { a != b }("a", "b")), "True")
+	check(core.inspect("a" != "b"), "True")
 }
 
 @test

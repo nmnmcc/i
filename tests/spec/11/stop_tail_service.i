@@ -17,6 +17,6 @@ apply = (f, x) { [f(x)] }
 
 @main
 main = () {
-	apply((v: Int) { check(v == 0) }, 1)
+	apply((v) { check(v == 0) }, 1)
 	Nil
 }
