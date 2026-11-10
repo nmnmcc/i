@@ -106,3 +106,106 @@ the standalone spec harness provides `i/fail`; corrected. The runtime
 repair fixture initially used unsupported unary `!`; its assertions now
 compare the runtime Bool with False. Its list-map case also needed a package fixture with an explicit std dependency; `i/list` is not a library module. No compiler check or test was
 weakened. The first old-syntax run also rejected eight Rust format templates before substitution; the templates now contain valid type-name placeholders and use string substitution, with no scanner exceptions added. Its next run parsed 1,330 snippets with exact expected diagnostics and the same 17 other-track futures. No check was interrupted; no global environment settings changed.
+
+## Final follow-up verification
+
+The final implementation checkpoint is 3718ea0. Repeated
+`git merge refs/heads/redesign` calls reported “Already up to date”; the
+upstream ref remained 94789e6141d9d2213d3b909b07bcbac9bbcdb02d at final
+verification. The follow-up started clean and preserves the previous T1
+work. The earlier syntax-note escalation is resolved by this user's
+explicit request; no other controlling-source disagreement was found.
+
+The requested whole gate passed. Exact final command, from this lane:
+
+```sh
+ILANG_BROWSER_PORT=4181 /home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i ./scripts/dev-verify
+```
+
+Exit 0: fmt, Clippy with warnings denied, all workspace Rust tests,
+224 spec cases at O0 and O2, 1,465 std tests and 12 bench tests per level,
+hello, WASI smoke tests, JavaScript tests, and 51 browser tests. The raw
+final log is `target/t1/continued/review-full-gate-final.log`. A preliminary
+whole run also completed with exit 0; the final run was repeated after
+the mechanical template cleanup and exhaustive HIR dispatch change, so
+its results cover the committed final sources.
+
+`cargo test -p ilang-check --test literal_types --locked` passed 25 tests.
+The four boundary spec cases and the equality-repair package also passed
+separately at O0/O2. All four exact review sources now check with the
+rebuilt release binary (exit 0), in `review-after-fix.json` under the same
+target report directory. The compatible pre-T1 94789e6 binary accepts all
+three original everyday examples (`review-everyday-before.json`); the new
+checker tests require E0520 for them, and the runtime repairs give False.
+
+The final old-syntax command is
+`direnv exec /home/agent/Programming/i ./scripts/old-syntax-check`: exit 0,
+1,330 snippets, exact expected diagnostics, 17 other-track futures and no
+T1 future entries. The scanner and its exception data were not changed.
+The corpus command `tests/t1/check-all.py` with the compatible pre-T1
+binary, the rebuilt release binary, and `--base-ref 94789e6` checks 321
+cases: 262 kept, 58 added, zero gained, one lost. That loss remains
+`crates/ilang-check/tests/types/spec.i`, `assert(1 == 2)`, required by
+literal-types §8/spec §6.9. The original four runtime-fixture rewrites
+remain separately counted in the earlier T1 report. There is no new loss.
+
+No golden line changed in this follow-up:
+`git diff 7993590 --numstat -- '*.out'` is empty. No regeneration was
+needed. The previous per-line rule audit remains in
+`tests/t1-golden-rules.md`.
+
+## Optional fresh performance repeat: unqualified
+
+The earlier valid T1 performance gate at 7993590 remains historical
+evidence (+8.401% std, all stress budgets and four bound counters passed).
+It is not claimed as a new measurement of this follow-up. The requested
+whole gate above is green; an extra fresh performance repeat did not
+obtain a valid quiet window. Its measurements are not a new performance
+pass and are not evidence of a numerical regression either.
+
+All fresh measured attempts used the unchanged aggregate script,
+compatible pre-T1 94789e6 substitute binary, CPU 6, one warm-up, and 11
+sequential samples per binary. This baseline remains an explicit
+substitute for obsolete 1865366/1df2fe0, with provenance in the earlier
+report. Every measured attempt failed the unchanged background-CPU limit
+of 5%; attempt 1 also missed the +10% std target. Every hard +18% ceiling
+passed. The aggregate stopped at std, so fresh stress/counter runs did
+not occur in these failed repeats.
+
+| Attempt | std change | Peak background CPU | Numeric limits | Quiet limit |
+|---|---:|---:|---|---|
+| 1 | +10.231% | 9.301% | fail | fail |
+| 2 | +8.223% | 18.014% | pass | fail |
+| 3 | +0.494% | 17.379% | pass | fail |
+| 5 | -1.439% | 14.061% | pass | fail |
+| 6 | +7.325% | 9.380% | pass | fail |
+| 7 | +5.174% | 9.879% | pass | fail |
+| 8 | +4.114% | 14.661% | pass | fail |
+| 9 | +7.754% | 8.681% | pass | fail |
+| 10 | +7.298% | 17.307% | pass | fail |
+| 11 | -2.906% | 21.669% | pass | fail |
+| 12 | +8.142% | 17.139% | pass | fail |
+| 13 | +6.404% | 9.051% | pass | fail |
+| 14 | +3.948% | 19.142% | pass | fail |
+| 15 | +8.942% | 14.871% | pass | fail |
+
+Attempt 4 was only a bounded preflight under one quiet reservation. It
+exited 3 after 60 seconds without three consecutive quiet samples; no
+benchmark was run. Raw reports remain in
+`target/t1/continued/review-performance-N/` and matching `.log` files.
+No numeric limit, sample count, or quality threshold was changed. A fresh
+qualified performance repeat remains available to the coordinator using
+`tests/t1/perf-gate.sh`; it is not presented as a completed fresh gate.
+
+Two optional observer waits were deliberately stopped: the unreserved
+ambient observer before it launched a benchmark, and the retry observer
+only after attempt 15 had finished and it had no active child checks.
+A stop guard first refused to stop the retry observer while its child
+was active; that guard took no action. The observer was then paused,
+the child completed, and the idle observer was terminated. No benchmark,
+implementation test, or external process was interrupted or signalled.
+Shared locks were released. Browser port and CPU affinity were local to
+the ended commands; no global environment or git configuration changed.
+The normal npm/build caches from verification are retained, with no
+tracked environment changes. No further implementation work is pending
+for the independent review finding.

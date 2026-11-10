@@ -929,3 +929,24 @@ source quotes, the written-form audit inventory, and development failures
 are recorded in [review-followup.md](t1/review-followup.md). The obsolete
 syntax-design example is now corrected with the governing design quote.
 Final upstream integration and gate results follow here after the run.
+
+
+The final follow-up whole gate passed on 3718ea0 after another merge
+attempt of redesign 94789e6 (already included): 224 spec cases at both
+levels, 1,465 std and 12 bench tests per level, WASI and 51 browser tests,
+plus all Rust/JavaScript checks. The checker literal suite has 25 passing
+tests. Old-syntax-check passes 1,330 snippets with the same 17 other-track
+futures and no T1 futures. The 321-case compatible-baseline corpus has
+262 kept, 58 added, zero gained, and the same one required E0520 loss.
+No follow-up goldens changed; the original per-line audit is preserved.
+
+An optional fresh performance repeat did not qualify: 14 complete std
+measurements all exceeded the unchanged 5% background-CPU limit, and a
+separate 60-second preflight did not find its scheduling window. Attempt
+1 additionally missed the +10% std target; the other measured attempts
+met both std numeric ceilings. These noisy results do not replace the
+earlier valid performance gate at 7993590 and are not claimed as a new
+pass for the follow-up. The exact table, baseline substitution, observer
+wait terminations, and reproducible command are in
+[review-followup.md](t1/review-followup.md). All implementation checks
+completed; no benchmark/test or external process was interrupted.
