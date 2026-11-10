@@ -57,3 +57,25 @@ fn untrusted_external_cannot_be_supplied_to_a_macro_instance() {
     let error = ilang_cli::macro_run::invoke(&built, "app/main.identity", &[input()]).unwrap_err();
     assert!(format!("{error:#}").contains("instantiate macro program"));
 }
+
+#[test]
+fn compiler_export_is_checked_and_executed_with_syntax_services() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(syntax = i/syntax)\nidentity = (x: syntax.Syntax) { syntax.node(x) x }\n",
+    )
+    .unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty());
+    let built =
+        ilang_cli::macro_run::compile(&graph, &parsed, &[("app/main", "identity")]).unwrap();
+    let value = input();
+    let result =
+        ilang_cli::macro_run::invoke(&built, "app/main.identity", &[value.clone()]).unwrap();
+    assert!(result.identical(&value));
+}

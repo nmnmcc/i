@@ -182,6 +182,76 @@ pub fn resolve_parsed(
     (Some(program), diags)
 }
 
+/// Resolve a compiler-owned program from the exact import closure of a macro
+/// module. The supplied entries are compiler-generated wrappers: they expose
+/// host-compatible Syntax values and install the allowed compiler services.
+/// Ordinary program capability checks do not apply to these wrappers; the
+/// complete dependency closure is checked for foreign externals instead.
+pub fn check_compiler_exports(
+    graph: &PackageGraph,
+    parsed: &[Parsed],
+    entries: &[(&str, &str)],
+) -> Checked {
+    let (mut program, mut diags) = resolve::resolve(graph, parsed);
+    order::order(&mut program, &mut diags);
+    for module in &mut program.modules {
+        for binding in &mut module.bindings {
+            binding.main = false;
+            binding.test = false;
+        }
+    }
+    program.host_exports.clear();
+    for &(path, name) in entries {
+        let (module, m) = program
+            .modules
+            .iter()
+            .enumerate()
+            .find(|(_, m)| m.path == path)
+            .expect("compiler export module must be in the selected import closure");
+        let index = m
+            .defs
+            .iter()
+            .position(|d| d.name == name)
+            .expect("compiler export must be a resolved wrapper binding");
+        program.host_exports.push(hir::DefId {
+            module: hir::ModuleId(module as u32),
+            index: index as u32,
+        });
+    }
+    let modules = (0..program.modules.len())
+        .map(|i| hir::ModuleId(i as u32))
+        .collect::<Vec<_>>();
+    for id in
+        macro_sandbox::foreign_externals(&program, graph.library, &modules, &program.host_exports)
+    {
+        let def = program.def(id);
+        diags.push(Diagnostic::error(
+            code::COMPILER_CAPABILITY,
+            Some(program.module(id.module).source),
+            def.span,
+            "a macro program cannot execute an external declaration outside package i (§8)",
+        ));
+    }
+    let mut checked = check_resolved(graph, Some(program), diags);
+    if let (Some(program), Some(typed)) = (&checked.program, &checked.types) {
+        for &entry in &program.host_exports {
+            if typed
+                .entry_services
+                .get(&entry)
+                .is_some_and(|services| !services.is_empty())
+            {
+                checked.diags.push(Diagnostic::error(
+                    code::COMPILER_CAPABILITY,
+                    Some(program.module(entry.module).source),
+                    program.def(entry).span,
+                    "a compiler wrapper must install its allowed services and cannot request a host service (§8)",
+                ));
+            }
+        }
+    }
+    checked
+}
+
 /// The result of `check`.
 pub struct Checked {
     /// `None` when a module has a syntax error.

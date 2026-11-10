@@ -9,6 +9,72 @@ use ilang_syntax::lisp::syntax::Syntax;
 
 use crate::Built;
 
+/// Compile compiler-generated Syntax wrappers from an already expanded import
+/// closure. This uses the ordinary checker and emitter, but checks the selected
+/// wrappers under compiler capabilities rather than ordinary entry authority.
+pub fn compile(
+    graph: &ilang_package::PackageGraph,
+    parsed: &[ilang_check::Parsed],
+    entries: &[(&str, &str)],
+) -> Result<Built, crate::BuildError> {
+    let mut graph = graph.clone();
+    let root = graph.root.expect("compiler program has a root package");
+    // User manifest entries are not roots of the compiler program.
+    graph.packages[root].wasm_exports.clear();
+    graph.packages[root].entries.clear();
+    graph.entry = None;
+    let checked = ilang_check::check_compiler_exports(&graph, parsed, entries);
+    let mut diags = checked.diags;
+    let (Some(program), Some(typed)) = (&checked.program, &checked.types) else {
+        return Err(crate::program_error(&graph, &diags));
+    };
+    if diags.iter().any(ilang_package::Diagnostic::is_error) {
+        return Err(crate::program_error(&graph, &diags));
+    }
+    let (wasm, declarations) = match ilang_wasm::compile_with_bindings(
+        &graph,
+        program,
+        typed,
+        ilang_wasm::Options {
+            tests: false,
+            target: ilang_wasm::Target::Ilang,
+        },
+    ) {
+        Ok(result) => result,
+        Err(ilang_wasm::Error::Diagnostics(more)) => {
+            diags.extend(more);
+            return Err(crate::program_error(&graph, &diags));
+        }
+        Err(ilang_wasm::Error::Internal(message)) => {
+            return Err(crate::BuildError::Internal(message));
+        }
+    };
+    let declarations = declarations
+        .into_iter()
+        .map(|d| ilang_host::bindings::BindingDeclaration::from_json(&d.to_string()))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| crate::BuildError::Internal(e.to_string()))?;
+    let binding_plan = ilang_host::bindings::BindingPlan::new(&wasm, declarations);
+    use ilang_package::lock::{FileKind, PackageFile, hash};
+    let files = graph.packages[graph.library]
+        .modules
+        .iter()
+        .map(|m| PackageFile {
+            path: m.path.clone(),
+            kind: FileKind::Regular,
+            bytes: graph.sources.get(m.source).text.as_bytes().to_vec(),
+        })
+        .collect::<Vec<_>>();
+    Ok(Built {
+        name: graph.packages[root].name.clone(),
+        wasm,
+        binding_plan,
+        trusted_package: hash(&files),
+        warnings: graph.sources.render_all(&diags),
+        tests: false,
+    })
+}
+
 /// Invoke a compiler-generated export whose ABI takes and returns Syntax.
 ///
 /// The compiler must check the export's signature and its reachable external
