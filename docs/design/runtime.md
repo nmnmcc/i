@@ -304,8 +304,14 @@ RequestState(A) { Waiting Ready(A) Cancelled Taken }
 | `close_root` | `(root: Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
 | `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
 | `close_owner` | `(owner: Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
-| `outstanding` | `(owner: Owner) -> List(Ticket)` | Current outstanding requests in this group, in start order |
-| `outstanding_root` | `(root: Root) -> List(Ticket)` | Outstanding requests of every group of this root, in start order |
+| `count` | `(owner: Owner) -> Int` | Number of outstanding requests in this group |
+| `count_root` | `(root: Root) -> Int` | Number of outstanding requests in all groups of this root |
+| `settled_owner` | `(owner: Owner) -> Bool` | True exactly when count(owner) is zero |
+| `settled_root` | `(root: Root) -> Bool` | True exactly when count_root(root) is zero |
+| `cancel_all` | `(owner: Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
+| `cancel_all_root` | `(root: Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
+| `wait_none` | `(owner: Owner) -> Nil ! Await` | Await until this group's count is zero |
+| `wait_none_root` | `(root: Root) -> Nil ! Await` | Await until this root's count is zero |
 | `within(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
 | `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
 | `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
@@ -313,7 +319,8 @@ RequestState(A) { Waiting Ready(A) Cancelled Taken }
 | `take(A)` | `(r: Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
 | `settled` | `(r: Ticket) -> Bool` | True for Ready, Cancelled or Taken |
 | `cancel` | `(r: Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
-| `await(A)` | `(r: Request(A)) -> A ! Await` | Wait, then take the Ready value |
+| `await(A)` | `(r: Request(A)) -> A ! Await` | Borrow the producer, wait, then take the Ready value |
+| `await_owned(A)` | `(r: Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
 | `wait_any` | `(rs: List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
 | `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
 
@@ -344,13 +351,56 @@ and Owner are ordinary portable key-bearing service values, not host requests.
 
 Every raw host start records its Owner group and that group's immutable root.
 close_owner cancels only its own group. close_root closes all groups registered
-at that root; no subgroup or old Owner binding escapes it. outstanding(owner)
-enumerates one cancellation group; outstanding_root(root) enumerates every group
-of the run, including groups made inside request.within and groups retained by
-go. Enumeration of a closed group/root gives []; opening a group under a closed
-Root stops with request: root is gone; a host start under a closed Owner stops
-with request: owner is gone, before making the ABI import. The registries retain
-only live roots/groups and outstanding cells; absence supplies the gone check.
+at that root; no subgroup or old Owner binding escapes it. All group operations
+include every worker, including groups made inside request.within and retained
+by go. Counts and readiness are atomic snapshots; a later start can change them.
+A closed group/root has count zero and is settled. cancel_all cancels the Waiting
+members at its linearization step, not subsequent starts or detached Ready values;
+close additionally refuses future starts. Opening a group under a closed Root
+stops with request: root is gone; a host start under a closed Owner stops with
+request: owner is gone, before making the ABI import. Only live registrations
+and outstanding cells are retained; absence supplies the gone check.
+
+There is no public outstanding/outstanding_root enumeration, including no
+worker-local variant. A Root/Owner operation never returns a Request or Ticket.
+A worker's private typed cell index is implementation storage, not a source API.
+Portable groups hold shared counts, revisions and cancellation state; completion
+and cancellation notifications carry stable ids to the home worker, which alone
+updates its cells and uses their ABI ids. No foreign GC cell or Ticket crosses go.
+For the same order of starts/answers/cancels, every group's answer is identical
+on every worker. Group cancellation is accepted atomically; it forbids later
+success publication for its selected members. Before returning, it applies each
+member's host cancellation action, including lease revocation, through a
+pre-registered host cancellation handle that needs no Store borrow or progress
+by the home worker. Run those actions outside the shared lock; they must obey
+the same nonblocking contract as local cancel. Detached OS effects/cleanup need
+not have finished. The home cell can reflect that transition lazily, but every
+state/settled/take/cancel/wait/delivery operation first reconciles shared terminal
+state, so a later local query observes Cancelled and cannot take a late answer.
+A home worker must not issue ABI cancel for an id the group action already
+retired. This is group control metadata, not a remotely usable Ticket. MC-D must
+prove the start-registration/cancel race and home-table retirement protocol;
+without this, it cannot claim placement-independent group operations.
+
+wait_none/wait_none_root use Await, so a task waits without pausing runnable
+siblings. They return immediately on zero, including for a closed group.
+Otherwise a private local Request(Nil) observation cell subscribes to the group
+and settles on its next zero observation. It has no host id, producer operation
+or Owner membership: a wait is not work that can complete itself. Its Ticket
+never leaves the observer's worker. Check-and-subscribe shares the registration
+lock so completion cannot be lost between checking and sleeping. A concurrent
+start before the zero observation is included; one after it does not undo the
+return. An ordinary ensure unregisters/cancels this local observer on waiter
+exit without cancelling the group's producers. These private cells use the
+same typed state/await machinery as requests; no foreign Ticket is manufactured.
+For progress accounting, an observation cell depends on the actual outstanding
+members of its target group, not on itself; add those members as explicitly
+borrowed work and deduplicate identities (§6.4). In particular it cannot keep
+an otherwise deadlocked empty group alive. Remote members are driven on their
+home workers; group changes reach the local observer through its wake route.
+The private Runner idle operation subscribes to group revisions for any change,
+combined with explicitly borrowed local tickets (§6.4), without enumerating
+foreign tickets. Its observation/check/subscription must be atomic too.
 
 Root is kept at go sites as a normal service. Changing Owner alone cannot move
 a group/request to another run. open_owner under a nested run's Root makes a
@@ -384,8 +434,11 @@ create multiple scheduler histories.
 
 Root and Owner are ordinary services, not primitive types or built-in names.
 They use Key(Nil) and are portable; outstanding request values remain non-portable.
-Root/group registration and enumeration require no ABI import; closing live
-work uses only v3 cancel. Generic
+Root/group registration and observation use internal accounting. Local Ticket
+cancel uses v3 cancel on its home worker; MC group cancellation uses the
+registered host cancellation actions above and retires the home id once. MC
+routes notifications through ordinary request-mode wake services, without new
+runtime imports. Generic
 request groups also serve batch cancellation, request timeouts, and host plugin
 cleanup, independently of tasks. Request operations introduce no new error-row
 or environment polymorphism. Ticket
@@ -400,8 +453,8 @@ Keep synchronous `@host("ns")` as spec §9.7 defines it. For every namespace:
 
 * `@host("ns", "async")` writes its fields with wire type `(P...) -> A ? E`.
   Its actual i field type is `(P...) -> A ? E ! Await | Owner`. Conceptually its body
-  starts Request(Result(A,E)), calls request.await, then fail.from_result.
-  With no errors it starts Request(A) and awaits it. The attribute's type
+  starts Request(Result(A,E)), calls request.await_owned, then fail.from_result.
+  With no errors it starts Request(A) and uses the same owning helper. The attribute's type
   expansion happens before ordinary inference and interface display. A user
   declaration may not add a different field environment to this form.
 * Add `@host("ns", "request")`. Every field is `(P...) -> Request(T)`, with
@@ -428,8 +481,10 @@ Replace the C region as one change, including every caller identified in
 outstanding slot contains import index, ABI id, a fresh GC generation token,
 Owner group key, immutable Root key, and a reference to its request cell.
 Root/group indexes must remove a request on answer or cancel; completed cells
-are not retained by either index. Root enumeration spans every live group,
-while closing a group touches only its own slots. Normal entry-context exit
+are not retained by either index. Root accounting spans every live group,
+while closing a group touches only its own slots. Keep count/revision and local
+cell indexing separate from the start; MC adds shared metadata and home-worker
+notifications without exposing an enumeration API. Normal entry-context exit
 retires every root/group registered in that context, including an independent
 root its caller forgot to close. Clearing requests at status 0 must clear those
 registrations too; a synchronous fake-only context uses the same registry
@@ -438,7 +493,10 @@ Result(A,E)), independently of whether the ABI error list happens to be empty;
 Request(Result(A,Never)) must still decode Ok(A). A cell contains identity, generation, Waiting/Ready/Cancelled/Taken,
 and a decoded eqref answer. The id is a nonnegative i32 slot index; the table
 cannot have more than 2^31 outstanding entries. Exhaustion is a memory stop.
-A cell survives freeing its table slot. Language operations use the cell, and
+A cell survives freeing its table slot. Ready fakes and group-observation cells
+have no host slot or ABI id; cancelling an observer only unregisters its wait.
+Group notifications settle it locally, and it counts only its producer
+dependencies for progress, never itself (§5.1). Language operations use the cell, and
 compare slot generation before cancel; they never act on a new occupant.
 
 `$req_start` allocates a cell and slot before calling the import. The raw stub
@@ -491,6 +549,28 @@ take its A before its final cancels the cell. For resource-creating imports,
 IO wrappers additionally transfer resource ownership as section 8 specifies;
 discarding an unclaimed Ready answer releases its resource. These are two
 separate ownership transfers, not a promise that all raw results are resources.
+
+The ordinary helper for an owned operation that produces no resource is:
+
+```i
+await_owned(A) = (r: Request(A)) -> A ! Await {
+  resource.ensure(
+    () { await(r) }
+    () { cancel(ticket(r)) }
+  )
+}
+```
+
+This definition lives in i/request and uses its local function names. The final
+runs on success, error and task cancellation; after take, cancel is a no-op.
+request.await itself remains a borrowed wait and never takes producer ownership.
+File/Stream/Child wrappers and other non-creating IO wrappers use await_owned,
+including their close operations; resource creators use await_resource (§8.1).
+Cancelling a pending Stream read revokes its read lease before the cancelled
+wrapper finishes unwinding, so a following read cannot see busy from that
+abandoned request. Already consumed bytes or committed effects are not rolled
+back. A cancelled Child wait releases its wait lease without closing the Child;
+a cancelled blocking File operation instead closes that File as §8.1 requires.
 
 ## 6. R2b: the task API and scheduler
 
@@ -811,18 +891,44 @@ The root Runner's poll takes the aggregated tickets; it never scans all instance
 requests to invent a wait. Explicit low-level request.poll still intentionally
 hands off, and stops request: no active entry from a synchronous entry.
 
-When no task is runnable, scan terminal tickets first. Union
-outstanding_root(the_run_root) with Waiting tickets its tasks explicitly await,
-including borrowed tickets from another root. Run affiliation comes from every
-group's registered root, not from the current Owner or just the default group.
-If the union is nonempty, Runner.wait waits for one and then rescans. An
+When no task is runnable, scan terminal tickets first. The logical waitable set
+is the union of outstanding requests in every group of the run's stored program
+Root and Waiting tickets its tasks explicitly await, including borrowed tickets
+from another root on the same worker. Group-observer tickets contribute their
+underlying outstanding members, not the observer cell itself (§5.1). Deduplicate
+identities, including an owned request also explicitly awaited. This is a set of work, not a List(Ticket) that
+can be exported across workers: observe owned groups through their counts and
+revision notifications (§5.1); borrowed Ticket values stay local. If this union
+is nonempty, Runner.wait waits for a member to settle and then rescans. An
 unawaited raw request in any custom group prevents deadlock until it settles.
-Its detached Ready answer is retained only by its handle. If the set is empty,
-stop with `panic("task: deadlock")`, even if an unrelated root has work. Nested
-runs therefore neither count all instance requests nor miss their subgroups.
-Never return status 1 with zero outstanding requests, or busy-poll when no task
-can run. CPU code without suspension can monopolize M:1; a go-only loop may
-postpone children. No bounded wall-time guarantee is made for final functions.
+Its detached Ready answer is retained only by its handle. If the set is empty
+and no task or completion delivery can run, stop with panic("task: deadlock"),
+even if an unrelated root has work. A nested run therefore includes an explicitly
+borrowed outer request, but not unrelated outer work.
+
+A dispatcher may own several ordinary Roots with separate Owners. It chooses
+which root's work it drives; no Root or request has a magic module-based class.
+The scheduler driver keeps a separate control Root/Owner for its wake requests,
+scoped to the run's driver lifetime and closed on every driver exit. It does not
+bind that Owner for user tasks or expose its wake tickets. The stored program
+Root plus explicit borrowed waits above alone justify program progress; the
+control root does not. This same separation serves a batch dispatcher, a timeout
+manager and a plugin notification loop. Both kinds still use the same Root/Owner
+registration, count, cancel and teardown rules. The distinction is which roots
+the ordinary driver selects, not a host import name or a compiler exception.
+
+Quiescence snapshots count runnable/claimed-but-unstarted/running tasks and
+pending completion-to-task or group-notification processing as work. Requests
+stay counted until their answer/cancel transition publishes that work atomically;
+there is no gap where both counts are zero. With no such work, zero members of
+the program waitable set means deadlock, whatever the control count. MC takes
+that snapshot and records the stop under the shared scheduler lock; a wake-only
+control delivery does not count as program work. At the ABI level every actual
+outstanding request, including a wake, still satisfies status 1's requirement.
+Never return status 1 with zero actual outstanding requests or busy-poll with no
+runnable task. A one-worker run needs no wake request. CPU code without suspension
+can monopolize M:1; a go-only loop may postpone children. No bounded wall-time
+guarantee is made for final functions.
 
 ### 6.5 Runner, nested runs, and testing
 
@@ -989,7 +1095,8 @@ holds the cursor lease; a competing operation gives busy. Missing, closed,
 foreign-context or wrong-kind numbers give closed; close gives Nil. Close wakes
 pending operations with closed unless their answer already committed.
 
-The resource-bearing parts of the File wrappers are explicit ordinary i:
+The resource-bearing parts of the File wrappers are explicit ordinary i; all
+non-creating raw operations use request.await_owned (§5.4):
 
 ```i
 mode_string = {
@@ -1002,20 +1109,20 @@ mode_string = {
 open = (path, mode, raw ! Fs) {
   File(fail.map_error(
     () { await_resource(raw.open(path, mode_string(mode)), (n) {
-      request.await(raw.close(n))
+      request.await_owned(raw.close(n))
     }) }
     (code) { FsError("open", path, code) }
   ))
 }
 
 read = (File(number), max_bytes, raw ! Fs) {
-  request.await(raw.read(number, max_bytes)) |> {
+  request.await_owned(raw.read(number, max_bytes)) |> {
     Ok(bytes) -> bytes
     Error(code) -> fail.raise(FsError("read", "", code))
   }
 }
 
-close = (File(number), raw ! Fs) { request.await(raw.close(number)) }
+close = (File(number), raw ! Fs) { request.await_owned(raw.close(number)) }
 ```
 
 ### 7.3 TCP networking
@@ -1041,21 +1148,21 @@ inside i/net include (await_resource is defined in §8.1):
 accept = (Listener(number), raw ! Net) {
   Stream(fail.map_error(
     () { await_resource(raw.accept(number), (n) {
-      request.await(raw.close_stream(n))
+      request.await_owned(raw.close_stream(n))
     }) }
     (code) { NetError("accept", "", code) }
   ))
 }
 
 read = (Stream(number), max_bytes, raw ! Net) {
-  request.await(raw.read(number, max_bytes)) |> {
+  request.await_owned(raw.read(number, max_bytes)) |> {
     Ok(bytes) -> bytes
     Error(code) -> fail.raise(NetError("read", "", code))
   }
 }
 
 close_stream = (Stream(number), raw ! Net) {
-  request.await(raw.close_stream(number))
+  request.await_owned(raw.close_stream(number))
 }
 ```
 
@@ -1129,20 +1236,20 @@ spawn = (program, args, raw ! Process) {
   bytes = encode_args(args)
   Child(fail.map_error(
     () { await_resource(raw.spawn(program, bytes), (n) {
-      request.await(raw.close(n))
+      request.await_owned(raw.close(n))
     }) }
     (code) { ProcessError("spawn", code) }
   ))
 }
 
 wait = (Child(number), raw ! Process) {
-  request.await(raw.wait(number)) |> {
+  request.await_owned(raw.wait(number)) |> {
     Ok(status) -> status
     Error(code) -> fail.raise(ProcessError("wait", code))
   }
 }
 
-close = (Child(number), raw ! Process) { request.await(raw.close(number)) }
+close = (Child(number), raw ! Process) { request.await_owned(raw.close(number)) }
 ```
 
 ### 7.5 Standard streams
@@ -1155,7 +1262,8 @@ close = (Child(number), raw ! Process) { request.await(raw.close(number)) }
 | `flush` | `() -> Request(Result(Nil,String))` |
 | `flush_error` | `() -> Request(Result(Nil,String))` |
 
-Public wrappers unwrap those results, giving `? StdioError ! Stdio | request.Await | request.Owner`.
+Public wrappers use request.await_owned to unwrap those results, giving
+`? StdioError ! Stdio | request.Await | request.Owner`.
 read's bound/EOF and write's whole-byte/all-bytes rules are those above. stdout
 and stderr are distinct directions; one write per direction may be pending,
 with busy for a competing write. A cancelled write may have written a prefix.
@@ -1595,8 +1703,9 @@ implementation argument of §6.3. Prepend:
 > record at go and publishes portable records. Other records stay local.
 > Local scopes/channels hold the maker's boundary only as a non-portability
 > witness. A Task/join event from a local scope holds that scope too. Every
-> handle checks run identity. Channels belong to the first scope in their
-> maker's chain, or the run; channels and shares are freed at scope exit.
+> stateful handle checks run identity; events have fresh keys and sync checks
+> only their stateful leaves, including losing alternatives. Channels belong
+> to the first scope in their maker's chain, or the run; channels and shares are freed at scope exit.
 > Every run has the result of some serial order of task steps. Timing may
 > choose a sender, a race/select winner, which failures precede cancellation,
 > or whether a handle is used before its owner ends. These order-dependent
@@ -1610,9 +1719,11 @@ the old draft and statistical acceptance. Include the seed-modulo-W rule and
 state that distinct streams are not guaranteed to have disjoint outputs.
 
 **New §9.11.** Copy §5.1's public definitions, tables, state transitions,
-cancellation/wait/alias rules, and dynamic-context rule, including Owner groups. Copy §5.4's implicit
-adapter ownership rule, with the consuming take rule and reference to §9.7's
-resource guards. Exclude the discussion of compiler frame/table layout.
+cancellation/wait/alias rules, and dynamic-context rule, including portable
+Root/Owner count/readiness/cancel-all/wait-none operations and local observer
+semantics, with no Ticket enumeration. Copy §5.4's borrowed await and ordinary
+await_owned rules, with consuming take and reference to §9.7's resource guards.
+Exclude the discussion of compiler frame/table layout.
 
 **§10.2 full replacement.**
 
@@ -1817,8 +1928,9 @@ Merge constraints:
 5. R2 and IO then gate E2E-echo. Std-2 adds real time.now after clock lands.
    M2 waits for the completed R2 behavior; compiler sandbox runs use a fixed
    test Runner and no host services. MC keeps Root/Owner keys portable and gives
-   every worker the run's live-root/group registrations; closing a group coordinates
-   its requests across workers. No host request itself becomes portable.
+   every worker shared live-root/group counts, revisions and cancellation state;
+   closing a group coordinates home-worker cleanup without exporting Tickets.
+   Driver control roots remain separate from the program waitable set (§6.4).
 
 Ordered R1 checklist:
 
@@ -1838,7 +1950,10 @@ Ordered R2 checklist:
    value restriction, portable including cycles, and
    keep_env with retained environment frames; run all S7 single-worker tests.
 3. [ ] Implement Request/Ticket cells, Root/group registries and table replacement together with
-   per-cell answer decoding, raw/async host adapters, cancel and continue.
+   per-cell answer decoding, raw/async host adapters, await_owned, cancel and continue.
+   Implement §5.1 group observations without public Ticket enumeration; atomic
+   subscription, local observer dependencies, terminal reconciliation and separate
+   program/control roots are part of this seam now; MC adds the remote host actions.
 4. [ ] Prove the monomorphic keyed prototype by type-checking two channel element
    types and heterogeneous child results. Reject any need for a cast or forall field.
 5. [ ] Implement the i loop, per-task boundaries, rooted Owner groups, Runner/top,
@@ -1850,7 +1965,7 @@ Ordered R2 checklist:
    cancellation-priority joins and shielded dropped/cancelled-join stops.
 7. [ ] Add CML registration/commit/map, combinators and deterministic script policy.
 8. [ ] Integrate every async user host service through Await; require review
-   tests J/E/O, nested subgroup and borrowed-ticket cases, root poll fairness,
+   tests J/E/O, native §11.1 N-R1–N-R6, nested subgroup and borrowed-ticket cases, root poll fairness,
    and synchronous callback/first-turn no-yield tests. Audit the host/control seam.
 9. [ ] Run deadlock/cancel/fairness/alias/IO stress cases 200 times on Rust and JS,
    related spec tests and full required verification; inspect WAT changes.
@@ -1864,13 +1979,15 @@ because lib/i is included, and adds matching target/JS cases):
    abortable timers and no timer keeping an ended Node run alive.
 2. [ ] Fs: codecs/errors, whole-byte validation, all-byte writes, explicit flush,
    private File(Int) codecs, raw Int wrappers, no number-injection exports, closed/busy leases,
-   cancelled blocking-file state, safe detached work and context teardown.
+   await_owned on non-creators, cancelled blocking-file state, safe detached work
+   and context teardown; verify the cancelled File alias gives closed.
 3. [ ] Net: numeric endpoints, ephemeral bind, read/write/half-close, busy leases,
    private Listener/Stream(Int) codecs, provisional ownership, close-vs-wait
-   across workers and a portable-scope concurrent connection fixture.
+   across workers, the race-then-read lease test (native §11.1), and a
+   portable-scope concurrent connection fixture.
 4. [ ] Process: bounded entropy, UTF-8/framing, no shell expansion, inherited
    streams, private Child(Int) codec, wait caching, terminate and reaping on every
-   ownership edge, including native exit after child cleanup.
+   ownership edge, await_owned for wait/terminate/close, including native exit after child cleanup.
 5. [ ] Stdio: cancellable subscriber input, exact byte output, flush/error stream,
    legacy i/io compatibility and context turnover; finish registration/spec lists
    and B.7 with blocking Int adapters, not fd/externref shortcuts.
@@ -1919,7 +2036,7 @@ The acceptance server in §9 is a complete module.
 | Parent fake Clock used after child's third resume and in its final | Fake result survives; keep_env plus retained frame, D16 workaround |
 | Nested wait_flag while an outer sibling sets the flag | Both complete, no global hang; §6.5 Runner wait delegates to outer task |
 | Rebind Runner with top(seed) inside a task, then nested run | New seed, preserved nested prefix/outer wait route; §6.5 contextual top |
-| Nested raw request in request.within, with no task waiters; tasks block on channel | Wait for the request in that run's Root, then deadlock; §6.4 all-group root enumeration |
+| Nested raw request in request.within, with no task waiters; tasks block on channel | Wait for the request in that run's Root, then deadlock; §6.4 all-group root accounting |
 | Infinite yield task plus an outstanding accept | Conditional status-2 polls for the waiting accept task deliver completion and its handler gets a turn; §6.4 |
 | Pure task path/yield/join operations with no host requests | No host poll, status 2, or macrotask yield; task entry can return status 0 immediately; D5/§6.4 |
 | test with script selecting nonexistent path [99] | NotRunnable([99]) of type ScheduleError after cleanup; §6.5 |
@@ -2031,7 +2148,7 @@ deadlock while host work was outstanding, against S7 rule 17. Enumerating the
 whole instance would make a nested run wait for unrelated outer work, against
 rule 5. The first draft tried to fix this with Owner groups and per-run
 enumeration, but missed custom groups as the later review showed. The corrected
-Root affiliation and all-group enumeration are in §5.1/§6.4. The group capability is portable; request cells remain non-portable. This is
+Root affiliation and all-group count/notification rules are in §5.1/§6.4. The group capability is portable; request cells remain non-portable. This is
 also useful to ordinary non-task batch/timeout libraries.
 
 ### 12.3 Attack round 2: adversarial programs after those fixes
@@ -2131,8 +2248,8 @@ Runner, a body needing a custom Clock keeps that need, and a test nested under
 a caller still needs Runner. The revised schemes express exactly these cases.
 A public ordinary function needing Request(Int) needs no privileged module
 import or type declaration. RequestState's unlabeled Ready pattern agrees with
-spec §7.1. Owner's Key(Nil) is portable while a ticket returned by outstanding
-is not. There is no static conversion that can read a Ticket as a Request(Int).
+spec §7.1. Owner's Key(Nil) is portable while Request/Ticket values are not; group
+operations expose no ticket enumeration. There is no static conversion that can read a Ticket as a Request(Int).
 
 For the echo server, cancel before the initial acceptor starts (no accepted
 socket exists), during accept (host drops provisional work), after decode but
@@ -2171,7 +2288,7 @@ was checked separately before changing the rules:
 3. **Custom groups missed by idle accounting: confirmed.** The old within made
    a group absent from the default Owner's table; the old idle union counted
    neither it nor an unawaited request in it. Root is now separate from Owner,
-   and the idle union enumerates all groups of the run. Progress-interest tickets
+   and the idle union accounts for all groups of the run without returning Tickets. Progress-interest tickets
    affect polling only, never substitute for all-group deadlock accounting.
 4. **Request-mode Owner effect omitted from replacement §9.7: confirmed.** The
    old §5.2 added Owner while the replacement paragraph did not. Both now give
@@ -2301,7 +2418,7 @@ selection, in either order. Attack go on a cancelling scope: no child body runs;
 a shielded final receives a dropped handle, whereas a cancellable body unwinds
 before observing it. No missing A/E remains and no synthetic error is introduced.
 
-Attack O with two custom groups, then close only one. outstanding_root still
+Attack O with two custom groups, then close only one. count_root still
 counts the other. Close the whole root and no group escapes its cancellation.
 After a result becomes Ready, closing the group/root does not discard the
 handle's answer. Rebind an outer Owner inside a nested run, then call within:

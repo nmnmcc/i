@@ -1,9 +1,10 @@
 # Design: native packages and multicore workers
 
-Status: adopted, revision 3 (2026-11-10). The ledger's “Native proposal ADOPTED” records
+Status: adopted, revision 4 (2026-11-10). The ledger's “Native proposal ADOPTED” records
 the user's adoption of revision 2, including the four replacements in §8. This revision
 reconciles runtime.md and multicore.md and closes the lifetime, stop and forged-number
-gaps. It changes no implementation. Performance targets are acceptance goals, not
+gaps. Revision 4 applies coordinator rulings N-R1–N-R6 after the independent
+review of 60f37f2; §11.1 records the repairs and regression cases. It changes no implementation. Performance targets are acceptance goals, not
 measurements.
 
 Controlling sources, in order: spec.md (§4.1/§4.7, §9.5/§9.7, §10.3, §11.2/§11.7,
@@ -125,6 +126,18 @@ their exact typed interface and progress proof are an MC-D implementation gate, 
 claim that a mutex alone implements the scheduler. Replace the lock only after
 measurements.
 
+N-R1/N-R3 refine that boundary: Root/Owner are portable group capabilities,
+with shared count/readiness/cancel-all/wait-none semantics and no Ticket
+enumeration (runtime §5.1). Request/Ticket cells and observer cells stay local;
+metadata notifications route changes to their home workers. Group waits use
+Await and count only their underlying producers, never their own observation
+cells. The driver owns separate ordinary program and control Roots, selected
+by its accounting policy, not by any module/import rule. Only the program Root
+and explicit borrowed producer interests enter quiescence; wake requests in the
+control Root still count for ABI status 1. Snapshot runnable/running/claimed work,
+pending program deliveries and that program waitable set under the same lock
+(runtime §6.4; multicore §6). Atomic delivery publication prevents a false zero.
+
 **N9. IO values are private nominal wrappers over Int.** File, Listener, Stream and
 Child each have one private constructor containing an Int, defined in their ordinary
 modules. Raw request services take/return Int; wrappers unwrap/wrap and translate errors
@@ -174,7 +187,10 @@ request cannot undo host cleanup. Child close awaits reaping. A context/kind-che
 cleanup receipt survives removal; concurrent closes join that receipt, including
 reaping, and teardown includes already-closing jobs. Free receipts on completion without
 permanent tombstones. Preserve the blocking-file cancellation, stdin broker,
-partial-write and supervisor rules of runtime §8.1.
+partial-write and supervisor rules of runtime §8.1. Non-creating raw operations
+use the ordinary request.await_owned helper with an ensure/cancel final
+(runtime §5.4); a borrowed request.await does not cancel its producer. Creators
+retain the separate await_resource guard.
 
 **N9.4. Provisional resources have an owner before a reply exists.** The context owns
 them as soon as created. The host reply's drop guard removes and closes an undelivered
@@ -351,13 +367,13 @@ identity, cancellation and lifetime tests through either change.
 | Stage | Build now so it is not redone | What waits |
 |---|---|---|
 | R1 | Immutable published SplitMix and tagged paths exactly as runtime §4; no task/IO dependency | Nothing native-specific blocks R1 |
-| R2 request layer | Local Request/Ticket cells, rooted Owner accounting, one root hand-off, consuming take and cancellation seam; no resource recognition for Int | Native packaging, worker transport |
-| R2 scheduler | Complete task records, detached routing services, retained environment frames, silent pinning, typed keys and single Scheduler boundary; FIFO/CML semantics and R4a joins | Queue encoding/claim ownership, locked transport implementation and worker entry |
+| R2 request layer | Local Request/Ticket and group-observer cells, portable group observations without Ticket enumeration, atomic subscriptions and separate program/control Root accounting; one root hand-off, consuming take, borrowed await and ordinary await_owned; no resource recognition for Int | Native packaging, worker transport |
+| R2 scheduler | Complete task records, detached routing services, retained environment frames, silent pinning, typed keys and single Scheduler boundary; FIFO/CML semantics, pure fresh-key events, stateful-leaf validation, owned-plus-borrowed waitable sets, combined go/run counters and R4a joins | Queue encoding/claim ownership, locked transport implementation and worker entry |
 | IO clock, before Fs | General §2.4 nominal field-privacy fix; host ResourceContext owner/controller, non-reusing Int allocator and trusted binding-plan/grant plumbing on Rust and JS; entry exit/stop/dispose hooks | Worker count, packaging layout, browser multicore |
-| IO fs/net/process | Private nominal resource values and raw Int signatures from first implementation; explicit wrappers, no raw-number injection exports, kind checks, leases, provisional/Ready transfer and host teardown; process supervisor | No intermediate externref services or fd-as-number adapter |
+| IO fs/net/process | Private nominal resource values and raw Int signatures from first implementation; owning await_owned/await_resource wrappers, no raw-number injection exports, kind checks, leases, provisional/Ready transfer and host teardown; process supervisor | No intermediate externref services or fd-as-number adapter |
 | IO stdio | Per-source broker with context subscribers, copied output buffers/leases, compatibility printer, complete target matrix/tests | Preview-1 adapter project |
 | Native packaging after R2/IO | Split compile/load host configuration; compiler-free runner, authenticated payload/plan, exact artifact manifest, N4 validation and default build | Cross-target distribution/signing choices must be fixed before release |
-| MC after MC-D/G5 | N7 queue, N8 typed locked transactions, identity/cycle-safe codec, host transport/wake, claim/cancel reclamation, N12 domains/controller, quiescence and browser stop-safe entry | Started-task migration, lock-free optimization, shared GC |
+| MC after MC-D/G5 | N7 queue, N8 typed locked transactions, identity/cycle-safe codec, host transport/wake, claim/cancel reclamation, N12 domains/controller, program/control quiescence and browser stop-safe entry | Started-task migration, lock-free optimization, shared GC |
 
 R1 and R2 do not wait for native packaging. Resource-bearing IO must not publish
 externref signatures and replace them later. Host lifetime/grant plumbing is IO work
@@ -627,12 +643,240 @@ resetting number 1 into another run, exiting with an empty table but a still-cre
 job, and laundering a live number through a public raw fake. These checks validate only
 the abstractions; no new Rust, JS, i compiler, epoch or OS probe was run.
 
-The documentation audit checked the three allowed paths, 20 i code blocks, 18
+The revision-3 documentation audit checked the three allowed paths, 20 i code blocks, 18
 Markdown tables, balanced fences, table widths and an old-keyword scan. It also
 searched every stealing/CAS/host-reference/resource signature reference and
 checked the native/runtime/multicore section targets. This is a text check,
 not a parser/type-check of the proposed APIs. The sentence ledger's coverage
 and git diff --check are checked again before committing.
+
+### 11.1 Revision-4 review repairs and adversarial cases
+
+Source: the coordinator's N-R1–N-R6 rulings and independent review
+`report-review-native3.md`; its full cases are under `/tmp/review-native3/`.
+These rulings retain packaging, one Store per worker, publication at go, one
+lock, nominal Int resources and all four encapsulation rules. The following
+are design tests to implement, not programs executed against the placeholder
+request/task/IO modules in this lane.
+
+**Choice for N-R1.** Compare three designs by locality, placement-independent
+answers, principal types and the amount R2 must change later: remote/proxy
+Tickets need a new management-handle protocol; pinning Root/Owner pins nearly
+every task; group observations keep Root/Owner portable and never expose another
+worker's cells. Choose the third as ruled. Keep typed local cells from the first
+and local implementation indexes from the second, but expose neither as a public
+enumeration. No worker-local enumeration API remains, so no new static
+non-portability type is needed. Group waits use Await with private local
+observation cells; they cannot stop the entire scheduler while waiting for a
+sibling. Readiness is count zero, counts are atomic snapshots, cancel-all affects
+current Waiting members without closing the group, and wait-none returns on its
+next zero observation (runtime §5.1). These operations observe sets of work,
+not worker placement, and add no inference choice. Their uses include batches,
+timeouts and plugin cleanup, not only tasks.
+
+**N-R1 enumeration replacement.** Hold the host gate until after the count:
+
+```i
+(i/task, i/request)
+@host("review:gate/v1", "request")
+Gate { Gate(wait: () -> Request(Nil)) }
+@main
+main = (gate ! Gate, root ! request.Root) {
+  pending = gate.wait()
+  task.scope((s) {
+    child = task.go(s, () { request.count_root(root) })
+    count = task.join(child)
+    request.cancel(request.ticket(pending))
+    assert(count == 1)
+    assert(request.settled_root(root))
+    request.wait_none_root(root)
+  })
+}
+```
+
+Expected: count is 1 whether child runs on the maker or another worker; after
+cancel the count is 0, readiness true and wait-none returns Nil. No operation
+returns the maker's Ticket. Also run two groups on separate workers: cancel-all
+of one leaves the other's count 1; cancel-all-root makes both zero but permits
+later starts; close-root forbids later starts. Complete between check and
+subscription: the waiter must still finish. A group waiter and a sibling that
+sets the gate must finish on one worker too, since Await suspends only the
+waiter. Cancelling a group waiter removes its observation without cancelling
+the producer. The observer itself never adds a unit to the group it waits for.
+After a remote cancel-all returns, query state on the maker before it processes
+its notification: it must already observe Cancelled. Then start a second read
+on the same Stream: the cancelled request's lease must already be revoked.
+Host cancellation handles apply that action without a Store borrow; local cell
+operations reconcile shared terminal state and never re-cancel a retired ABI id.
+Merely queuing a notification failed this attack, so runtime §5.1 now requires
+these synchronization points before the MC implementation gate.
+
+**N-R2 race then read.** File/Stream/Child non-creators, including close, use
+request.await_owned (runtime §5.4/§7). Resource creators use await_resource;
+request.await remains borrowed. Test with a live Stream and a host fixture
+that keeps the first read pending until the second branch wins:
+
+```i
+(i/net, i/task)
+twice = (stream: net.Stream) {
+  task.race(() { net.read(stream, 1) }, () { <<>> })
+  net.read(stream, 1)
+}
+```
+
+After the race has returned, deliver byte 97 only to the second read. Expected:
+`<<97>>`, with no busy error and no abandoned first read consuming that byte.
+The test scheduler forces the first read to acquire its lease before selecting
+the second branch; no sleeps decide the order. Repeat at 1/2/4 workers. For
+File, cancellation of a blocking read instead makes the alias closed, as the
+existing cursor rule requires. For Child, cancelled wait releases the wait lease
+and a subsequent wait returns its cached/eventual status without busy; it does
+not terminate the child. Cancelling a borrowed request.await waiter leaves its
+producer live. Close cancellation never undoes independent host cleanup.
+
+**N-R3 wake-only deadlock.** Replay the review trace: worker 0 waits with one
+wake request; the last runnable task on A registers sync(never()); there is no
+program IO. Both driver wakes, if present, belong to ordinary control Roots,
+scoped to their driver and closed at its exit. Program Root count = 0; explicit
+borrowed producer count = 0; runnable/running/claimed work and pending program
+delivery = 0 after registration. Record panic("task: deadlock") under the
+shared lock even when control count is 1 or 2. The stop closes/wakes the drivers.
+If a program request is still Waiting, postpone deadlock until it settles;
+if its answer is ready to deliver, count that delivery until the local scheduler
+rescans. Repeated wake-only notifications must not mask the zero snapshot.
+The same ordinary roots and selection policy can separate maintenance work in
+a batch dispatcher, a timeout manager or a plugin loop; no compiler rule names
+a library, namespace or wake operation. All actual host requests still count
+for H4/status 1, independently of this program-progress predicate.
+
+**N-R4 pure events.** Runtime §6.1/§6.4 wins; multicore §4 and §18 rules 5,
+11–12 now distinguish stateful handles from pure event descriptions:
+
+```i
+(i/task, i/control, i/core)
+event = task.always(1)
+@main
+main = () {
+  task.run(() { assert(task.sync(event) == 1) })
+  task.run(() { assert(task.sync(event) == 1) })
+  control.boundary((b) {
+    e = task.map(task.always(Nil), (_) { b })
+    assert(core.not(core.portable(e)))
+  })
+}
+```
+
+Expected: both syncs give 1 without a creating Scheduler or run for event; the
+boundary capture makes e non-portable by the ordinary capture walk. Two fresh
+always(1) constructions compare unequal; copying one preserves equality.
+A receive/join leaf from another run still stops at sync, even when it loses
+to always(1); validate all stateful leaves before registration. A pure event
+has no invented task path, and user callbacks may capture any ordinary value.
+
+**N-R5 borrowed waitable set.** A raw outer-root gated request may be borrowed
+by a nested run on the same worker:
+
+```i
+(i/task, i/request)
+@host("review:gate/v1", "request")
+Gate { Gate(wait: () -> Request(Nil)) }
+@main
+main = (gate ! Gate) {
+  pending = gate.wait()
+  task.run(() { request.await(pending) })
+}
+```
+
+Expected: after the fixture answers, the nested run returns Nil, without a
+deadlock stop. Its logical waitable set is owned program-root work union
+explicitly awaited borrowed Waiting work, deduplicated by identity; group
+observers contribute underlying members, not themselves. Repeat with an
+unrelated outer request and sync(never()) inside: now the nested run deadlocks.
+A captured Request pins a child normally; no cross-worker borrow is introduced.
+
+**N-R6 combined counter.** The review's go/run/go case is:
+
+```i
+(i/task)
+@main
+main = () {
+  task.scope((s) {
+    a = task.go(s, task.path)
+    nested = task.run(task.path)
+    b = task.go(s, task.path)
+    assert((task.join(a), nested, task.join(b)) == ([1], [2], [3]))
+  })
+}
+```
+
+Expected: ([1], [2], [3]) on all worker counts, with the second child's generator
+derived at P(3), not P(2) (runtime §4/§6.1; multicore D10/§5/§18.11).
+
+**Additional decisions and sources.** The group-operation names and private
+observer implementation make N-R1 concrete using existing Await/typed-cell
+rules. No observer receives a host id or registers as its own producer; this
+follows N-R3 and prevents self-counting deadlock. A first draft made wait-none
+a direct root wait; attack with a sibling-controlled gate showed that this could
+pause the sibling on one worker, so the final rule routes it through Await.
+Atomic check/subscription and atomic request-to-delivery accounting follow N-R1's
+placement rule, N-R3's quiescence rule and N8's one-lock transaction discipline;
+they close lost-wakeup and false-zero races, not new public capabilities.
+Synchronous group-cancel acceptance plus host lease revocation and local terminal
+state reconciliation are also forced by N-R1: notification delay must not expose
+Waiting or busy after the same cancellation has already returned on another worker.
+N9.3/N12 already require nonblocking host cancellation/cleanup independent of
+worker progress; MC extends that existing ownership seam to group operations.
+All observers and control Roots are bounded by structured waiter/driver lifetimes.
+No new detached task, library-name privilege, host wire type or inference rule
+is introduced. The helper uses existing resource.ensure (spec §9.5;
+lib/i/resource.i:8–13); current host cancellation drops work outside its slot lock
+(crates/ilang-host/src/requests.rs:161–184). That code supports the intended
+ownership seam but does not yet implement the proposed resource lease behavior.
+
+**Revision-4 checks and two final attack passes.** After the observer and
+cancellation fixes, pass 1 replayed the six review cases and varied group close
+versus start, zero versus subscribe, cancel-all versus late answer, borrowed
+waiter cancellation, and pending/Ready/Taken IO cancellation. It checked that
+private observer dependencies cannot count themselves, group operations reveal
+no foreign cell, and wake-only deliveries cannot defer deadlock. No further
+serious defect was found. Pass 2 checked the same contracts against spec §2.4,
+§9.5/§9.7/§10.3 and ABI H4/H13, runtime's exact replacement text, multicore's
+invariants and §18, top-level events/captured boundaries, and the combined path
+example. No further serious contradiction was found; the intentional spec
+migration below is still required.
+
+Executed an abstract Python model through stdin: 2,880 group action-order/home
+assignments, six observer subscribe/finish/cancel orders and 192 quiescence
+snapshots with varying control counts passed their stated invariants. Two lease
+outcomes checked cancellation/completion before a subsequent read. This model
+assumes the required atomic transitions; it tests the design accounting, not
+the unbuilt notification/lease implementation. The documentation audit checked
+26 i code blocks and 18 tables in the active notes, balanced fences, table
+widths, accepted-syntax keyword scans, cross-reference targets and stale API
+phrases. It is not parsing or type-checking. The existing ensure and cancellation
+seams were read at the file/line citations above; no compiler, IO, OS, JS or
+multicore execution was performed for this revision. The revision-4 ledger
+records every changed paragraph/code/table block against 60f37f2 verbatim,
+including every changed sentence; historical revision-3 records are preserved.
+
+**Work order and spec reconciliation.** R2 must implement these group/observer,
+ownership, event, waitable-set and combined-counter contracts now, including the
+separate control-root seam; IO must use await_owned from its first non-creating
+wrapper. General field privacy, binding grants and ResourceContext plumbing still
+precede Fs. MC-D must prove typed notification routing and the quiescence snapshot
+before MC-I; worker transport, encoding and packaging remain later stages. The
+six semantic defects are resolved; no known API replacement is deferred. This
+is not a promise that an unbuilt MC prototype will need no implementation changes.
+
+The three notes now agree on these six findings. Spec edits remain intentional
+pending work: runtime §10 supplies Request/Root/Owner/Await (§9.11), request-mode
+host services (§9.7), contextual entries (§10.2), task/events (§9.9), and their
+primitive declarations; native §10 supplies packaging and host-policy text and
+the general §2.4/§6.7 field-privacy clarification. The unchanged §10.3 still
+excludes nominal resource wrappers from the wire. Appendix B still counts all
+actual host requests for status 1; it is not the task deadlock predicate.
+No unresolved contradiction among these three active contracts was found in the
+revision-4 passes; historical old/new quotes are not active rules.
 
 ## 12. Risks and coordinator questions
 
@@ -665,8 +909,8 @@ and git diff --check are checked again before committing.
 The entries below preserve each replaced sentence/block verbatim (including code/table
 lines), with its replacement and reason. A block may contain several sentences that
 changed together; nothing inside the old/new quotations is a second active rule. This
-ledger is generated from the lane base to the final three notes, excluding the ledger
-itself. It includes native's adoption/status corrections as well as runtime/multicore
+revision-3 ledger was generated from the lane base to 60f37f2, excluding the
+ledger itself; the appended revision-4 ledger records subsequent changes. It includes native's adoption/status corrections as well as runtime/multicore
 changes.
 
 <!-- change-ledger-start -->
@@ -3643,3 +3887,1608 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > changes.
 
 - Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+
+## 14. Revision-4 sentence change ledger
+
+Base: 60f37f2260bf604e426ecb1869291ad9db2af96c. Each record keeps the complete
+changed sentence block, including code/table lines, with old text, new text and
+reason; additions/deletions use (none). These quotations are history, not active
+rules. This ledger excludes its own generated records.
+
+### R4-001 — docs/design/runtime.md, 60f37f2 line 301
+
+Old sentence(s)/block:
+
+> | Function | Type | Rule |
+> |---|---|---|
+> | `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
+> | `close_root` | `(root: Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+> | `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
+> | `close_owner` | `(owner: Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+> | `outstanding` | `(owner: Owner) -> List(Ticket)` | Current outstanding requests in this group, in start order |
+> | `outstanding_root` | `(root: Root) -> List(Ticket)` | Outstanding requests of every group of this root, in start order |
+> | `within(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+> | `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
+> | `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
+> | `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
+> | `take(A)` | `(r: Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
+> | `settled` | `(r: Ticket) -> Bool` | True for Ready, Cancelled or Taken |
+> | `cancel` | `(r: Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+> | `await(A)` | `(r: Request(A)) -> A ! Await` | Wait, then take the Ready value |
+> | `wait_any` | `(rs: List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
+> | `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
+
+New sentence(s)/block:
+
+> | Function | Type | Rule |
+> |---|---|---|
+> | `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
+> | `close_root` | `(root: Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+> | `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
+> | `close_owner` | `(owner: Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+> | `count` | `(owner: Owner) -> Int` | Number of outstanding requests in this group |
+> | `count_root` | `(root: Root) -> Int` | Number of outstanding requests in all groups of this root |
+> | `settled_owner` | `(owner: Owner) -> Bool` | True exactly when count(owner) is zero |
+> | `settled_root` | `(root: Root) -> Bool` | True exactly when count_root(root) is zero |
+> | `cancel_all` | `(owner: Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
+> | `cancel_all_root` | `(root: Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
+> | `wait_none` | `(owner: Owner) -> Nil ! Await` | Await until this group's count is zero |
+> | `wait_none_root` | `(root: Root) -> Nil ! Await` | Await until this root's count is zero |
+> | `within(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+> | `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
+> | `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
+> | `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
+> | `take(A)` | `(r: Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
+> | `settled` | `(r: Ticket) -> Bool` | True for Ready, Cancelled or Taken |
+> | `cancel` | `(r: Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+> | `await(A)` | `(r: Request(A)) -> A ! Await` | Borrow the producer, wait, then take the Ready value |
+> | `await_owned(A)` | `(r: Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
+> | `wait_any` | `(rs: List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
+> | `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards.
+
+### R4-002 — docs/design/runtime.md, 60f37f2 line 345
+
+Old sentence(s)/block:
+
+> Every raw host start records its Owner group and that group's immutable root.
+> close_owner cancels only its own group. close_root closes all groups registered
+> at that root; no subgroup or old Owner binding escapes it. outstanding(owner)
+> enumerates one cancellation group; outstanding_root(root) enumerates every group
+> of the run, including groups made inside request.within and groups retained by
+> go. Enumeration of a closed group/root gives []; opening a group under a closed
+> Root stops with request: root is gone; a host start under a closed Owner stops
+> with request: owner is gone, before making the ABI import. The registries retain
+> only live roots/groups and outstanding cells; absence supplies the gone check.
+
+New sentence(s)/block:
+
+> Every raw host start records its Owner group and that group's immutable root.
+> close_owner cancels only its own group. close_root closes all groups registered
+> at that root; no subgroup or old Owner binding escapes it. All group operations
+> include every worker, including groups made inside request.within and retained
+> by go. Counts and readiness are atomic snapshots; a later start can change them.
+> A closed group/root has count zero and is settled. cancel_all cancels the Waiting
+> members at its linearization step, not subsequent starts or detached Ready values;
+> close additionally refuses future starts. Opening a group under a closed Root
+> stops with request: root is gone; a host start under a closed Owner stops with
+> request: owner is gone, before making the ABI import. Only live registrations
+> and outstanding cells are retained; absence supplies the gone check.
+>
+> There is no public outstanding/outstanding_root enumeration, including no
+> worker-local variant. A Root/Owner operation never returns a Request or Ticket.
+> A worker's private typed cell index is implementation storage, not a source API.
+> Portable groups hold shared counts, revisions and cancellation state; completion
+> and cancellation notifications carry stable ids to the home worker, which alone
+> updates its cells and uses their ABI ids. No foreign GC cell or Ticket crosses go.
+> For the same order of starts/answers/cancels, every group's answer is identical
+> on every worker. Group cancellation is accepted atomically; it forbids later
+> success publication for its selected members. Before returning, it applies each
+> member's host cancellation action, including lease revocation, through a
+> pre-registered host cancellation handle that needs no Store borrow or progress
+> by the home worker. Run those actions outside the shared lock; they must obey
+> the same nonblocking contract as local cancel. Detached OS effects/cleanup need
+> not have finished. The home cell can reflect that transition lazily, but every
+> state/settled/take/cancel/wait/delivery operation first reconciles shared terminal
+> state, so a later local query observes Cancelled and cannot take a late answer.
+> A home worker must not issue ABI cancel for an id the group action already
+> retired. This is group control metadata, not a remotely usable Ticket. MC-D must
+> prove the start-registration/cancel race and home-table retirement protocol;
+> without this, it cannot claim placement-independent group operations.
+>
+> wait_none/wait_none_root use Await, so a task waits without pausing runnable
+> siblings. They return immediately on zero, including for a closed group.
+> Otherwise a private local Request(Nil) observation cell subscribes to the group
+> and settles on its next zero observation. It has no host id, producer operation
+> or Owner membership: a wait is not work that can complete itself. Its Ticket
+> never leaves the observer's worker. Check-and-subscribe shares the registration
+> lock so completion cannot be lost between checking and sleeping. A concurrent
+> start before the zero observation is included; one after it does not undo the
+> return. An ordinary ensure unregisters/cancels this local observer on waiter
+> exit without cancelling the group's producers. These private cells use the
+> same typed state/await machinery as requests; no foreign Ticket is manufactured.
+> For progress accounting, an observation cell depends on the actual outstanding
+> members of its target group, not on itself; add those members as explicitly
+> borrowed work and deduplicate identities (§6.4). In particular it cannot keep
+> an otherwise deadlocked empty group alive. Remote members are driven on their
+> home workers; group changes reach the local observer through its wake route.
+> The private Runner idle operation subscribes to group revisions for any change,
+> combined with explicitly borrowed local tickets (§6.4), without enumerating
+> foreign tickets. Its observation/check/subscription must be atomic too.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-003 — docs/design/runtime.md, 60f37f2 line 385
+
+Old sentence(s)/block:
+
+> Root and Owner are ordinary services, not primitive types or built-in names.
+> They use Key(Nil) and are portable; outstanding request values remain non-portable.
+> Root/group registration and enumeration require no ABI import; closing live
+> work uses only v3 cancel. Generic
+> request groups also serve batch cancellation, request timeouts, and host plugin
+> cleanup, independently of tasks. Request operations introduce no new error-row
+> or environment polymorphism. Ticket
+> cannot recover A; state only reads through the original Request(A). The existing
+> value restriction prevents a fresh request from being generalized at multiple
+> unrelated answer types. A cell's state transitions are Waiting -> Ready or
+> Cancelled, and Ready -> Taken or Cancelled; there is no write of another A.
+
+New sentence(s)/block:
+
+> Root and Owner are ordinary services, not primitive types or built-in names.
+> They use Key(Nil) and are portable; outstanding request values remain non-portable.
+> Root/group registration and observation use internal accounting. Local Ticket
+> cancel uses v3 cancel on its home worker; MC group cancellation uses the
+> registered host cancellation actions above and retires the home id once. MC
+> routes notifications through ordinary request-mode wake services, without new
+> runtime imports. Generic
+> request groups also serve batch cancellation, request timeouts, and host plugin
+> cleanup, independently of tasks. Request operations introduce no new error-row
+> or environment polymorphism. Ticket
+> cannot recover A; state only reads through the original Request(A). The existing
+> value restriction prevents a fresh request from being generalized at multiple
+> unrelated answer types. A cell's state transitions are Waiting -> Ready or
+> Cancelled, and Ready -> Taken or Cancelled; there is no write of another A.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures.
+
+### R4-004 — docs/design/runtime.md, 60f37f2 line 401
+
+Old sentence(s)/block:
+
+> * `@host("ns", "async")` writes its fields with wire type `(P...) -> A ? E`.
+>   Its actual i field type is `(P...) -> A ? E ! Await | Owner`. Conceptually its body
+>   starts Request(Result(A,E)), calls request.await, then fail.from_result.
+>   With no errors it starts Request(A) and awaits it. The attribute's type
+>   expansion happens before ordinary inference and interface display. A user
+>   declaration may not add a different field environment to this form.
+> * Add `@host("ns", "request")`. Every field is `(P...) -> Request(T)`, with
+>   no written errors or environment; its callable type adds `! Owner`. T is one ABI result type, or Result(A,E) with
+>   A and E ABI-admissible as in §10.3. Its ABI signature is the same as the async
+>   function with result A/errors E; no Request or Result is sent across the wire.
+>   The call starts and returns a handle immediately. A raw field returning
+>   `Request(Result(Nil,Never))` is allowed, though `Request(Nil)` is simpler.
+> * No other occurrence of Request/Result is allowed as a boundary type. A
+>   synchronous function, external, or host export cannot take or return Request.
+>   Opaque references inside its A are valid, because only the decoded answer is
+>   a host reference; Request itself never crosses the boundary.
+
+New sentence(s)/block:
+
+> * `@host("ns", "async")` writes its fields with wire type `(P...) -> A ? E`.
+>   Its actual i field type is `(P...) -> A ? E ! Await | Owner`. Conceptually its body
+>   starts Request(Result(A,E)), calls request.await_owned, then fail.from_result.
+>   With no errors it starts Request(A) and uses the same owning helper. The attribute's type
+>   expansion happens before ordinary inference and interface display. A user
+>   declaration may not add a different field environment to this form.
+> * Add `@host("ns", "request")`. Every field is `(P...) -> Request(T)`, with
+>   no written errors or environment; its callable type adds `! Owner`. T is one ABI result type, or Result(A,E) with
+>   A and E ABI-admissible as in §10.3. Its ABI signature is the same as the async
+>   function with result A/errors E; no Request or Result is sent across the wire.
+>   The call starts and returns a handle immediately. A raw field returning
+>   `Request(Result(Nil,Never))` is allowed, though `Request(Nil)` is simpler.
+> * No other occurrence of Request/Result is allowed as a boundary type. A
+>   synchronous function, external, or host export cannot take or return Request.
+>   Opaque references inside its A are valid, because only the decoded answer is
+>   a host reference; Request itself never crosses the boundary.
+
+Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards.
+
+### R4-005 — docs/design/runtime.md, 60f37f2 line 426
+
+Old sentence(s)/block:
+
+> Replace the C region as one change, including every caller identified in
+> `emit/host.rs:23–52`. The module keeps a growable table and a free list. Each
+> outstanding slot contains import index, ABI id, a fresh GC generation token,
+> Owner group key, immutable Root key, and a reference to its request cell.
+> Root/group indexes must remove a request on answer or cancel; completed cells
+> are not retained by either index. Root enumeration spans every live group,
+> while closing a group touches only its own slots. Normal entry-context exit
+> retires every root/group registered in that context, including an independent
+> root its caller forgot to close. Clearing requests at status 0 must clear those
+> registrations too; a synchronous fake-only context uses the same registry
+> epilogue without a host hand-off. Detached Ready handles retain their answers. Each import also keeps its source answer shape (plain A or
+> Result(A,E)), independently of whether the ABI error list happens to be empty;
+> Request(Result(A,Never)) must still decode Ok(A). A cell contains identity, generation, Waiting/Ready/Cancelled/Taken,
+> and a decoded eqref answer. The id is a nonnegative i32 slot index; the table
+> cannot have more than 2^31 outstanding entries. Exhaustion is a memory stop.
+> A cell survives freeing its table slot. Language operations use the cell, and
+> compare slot generation before cancel; they never act on a new occupant.
+
+New sentence(s)/block:
+
+> Replace the C region as one change, including every caller identified in
+> `emit/host.rs:23–52`. The module keeps a growable table and a free list. Each
+> outstanding slot contains import index, ABI id, a fresh GC generation token,
+> Owner group key, immutable Root key, and a reference to its request cell.
+> Root/group indexes must remove a request on answer or cancel; completed cells
+> are not retained by either index. Root accounting spans every live group,
+> while closing a group touches only its own slots. Keep count/revision and local
+> cell indexing separate from the start; MC adds shared metadata and home-worker
+> notifications without exposing an enumeration API. Normal entry-context exit
+> retires every root/group registered in that context, including an independent
+> root its caller forgot to close. Clearing requests at status 0 must clear those
+> registrations too; a synchronous fake-only context uses the same registry
+> epilogue without a host hand-off. Detached Ready handles retain their answers. Each import also keeps its source answer shape (plain A or
+> Result(A,E)), independently of whether the ABI error list happens to be empty;
+> Request(Result(A,Never)) must still decode Ok(A). A cell contains identity, generation, Waiting/Ready/Cancelled/Taken,
+> and a decoded eqref answer. The id is a nonnegative i32 slot index; the table
+> cannot have more than 2^31 outstanding entries. Exhaustion is a memory stop.
+> A cell survives freeing its table slot. Ready fakes and group-observation cells
+> have no host slot or ABI id; cancelling an observer only unregisters its wait.
+> Group notifications settle it locally, and it counts only its producer
+> dependencies for progress, never itself (§5.1). Language operations use the cell, and
+> compare slot generation before cancel; they never act on a new occupant.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-006 — docs/design/runtime.md, 60f37f2 line 495
+
+Old sentence(s)/block:
+
+> (none)
+
+New sentence(s)/block:
+
+> The ordinary helper for an owned operation that produces no resource is:
+>
+> ```i
+> await_owned(A) = (r: Request(A)) -> A ! Await {
+>   resource.ensure(
+>     () { await(r) }
+>     () { cancel(ticket(r)) }
+>   )
+> }
+> ```
+>
+> This definition lives in i/request and uses its local function names. The final
+> runs on success, error and task cancellation; after take, cancel is a no-op.
+> request.await itself remains a borrowed wait and never takes producer ownership.
+> File/Stream/Child wrappers and other non-creating IO wrappers use await_owned,
+> including their close operations; resource creators use await_resource (§8.1).
+> Cancelling a pending Stream read revokes its read lease before the cancelled
+> wrapper finishes unwinding, so a following read cannot see busy from that
+> abandoned request. Already consumed bytes or committed effects are not rolled
+> back. A cancelled Child wait releases its wait lease without closing the Child;
+> a cancelled blocking File operation instead closes that File as §8.1 requires.
+
+Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots.
+
+### R4-007 — docs/design/runtime.md, 60f37f2 line 814
+
+Old sentence(s)/block:
+
+> When no task is runnable, scan terminal tickets first. Union
+> outstanding_root(the_run_root) with Waiting tickets its tasks explicitly await,
+> including borrowed tickets from another root. Run affiliation comes from every
+> group's registered root, not from the current Owner or just the default group.
+> If the union is nonempty, Runner.wait waits for one and then rescans. An
+> unawaited raw request in any custom group prevents deadlock until it settles.
+> Its detached Ready answer is retained only by its handle. If the set is empty,
+> stop with `panic("task: deadlock")`, even if an unrelated root has work. Nested
+> runs therefore neither count all instance requests nor miss their subgroups.
+> Never return status 1 with zero outstanding requests, or busy-poll when no task
+> can run. CPU code without suspension can monopolize M:1; a go-only loop may
+> postpone children. No bounded wall-time guarantee is made for final functions.
+
+New sentence(s)/block:
+
+> When no task is runnable, scan terminal tickets first. The logical waitable set
+> is the union of outstanding requests in every group of the run's stored program
+> Root and Waiting tickets its tasks explicitly await, including borrowed tickets
+> from another root on the same worker. Group-observer tickets contribute their
+> underlying outstanding members, not the observer cell itself (§5.1). Deduplicate
+> identities, including an owned request also explicitly awaited. This is a set of work, not a List(Ticket) that
+> can be exported across workers: observe owned groups through their counts and
+> revision notifications (§5.1); borrowed Ticket values stay local. If this union
+> is nonempty, Runner.wait waits for a member to settle and then rescans. An
+> unawaited raw request in any custom group prevents deadlock until it settles.
+> Its detached Ready answer is retained only by its handle. If the set is empty
+> and no task or completion delivery can run, stop with panic("task: deadlock"),
+> even if an unrelated root has work. A nested run therefore includes an explicitly
+> borrowed outer request, but not unrelated outer work.
+>
+> A dispatcher may own several ordinary Roots with separate Owners. It chooses
+> which root's work it drives; no Root or request has a magic module-based class.
+> The scheduler driver keeps a separate control Root/Owner for its wake requests,
+> scoped to the run's driver lifetime and closed on every driver exit. It does not
+> bind that Owner for user tasks or expose its wake tickets. The stored program
+> Root plus explicit borrowed waits above alone justify program progress; the
+> control root does not. This same separation serves a batch dispatcher, a timeout
+> manager and a plugin notification loop. Both kinds still use the same Root/Owner
+> registration, count, cancel and teardown rules. The distinction is which roots
+> the ordinary driver selects, not a host import name or a compiler exception.
+>
+> Quiescence snapshots count runnable/claimed-but-unstarted/running tasks and
+> pending completion-to-task or group-notification processing as work. Requests
+> stay counted until their answer/cancel transition publishes that work atomically;
+> there is no gap where both counts are zero. With no such work, zero members of
+> the program waitable set means deadlock, whatever the control count. MC takes
+> that snapshot and records the stop under the shared scheduler lock; a wake-only
+> control delivery does not count as program work. At the ABI level every actual
+> outstanding request, including a wake, still satisfies status 1's requirement.
+> Never return status 1 with zero actual outstanding requests or busy-poll with no
+> runnable task. A one-worker run needs no wake request. CPU code without suspension
+> can monopolize M:1; a go-only loop may postpone children. No bounded wall-time
+> guarantee is made for final functions.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-008 — docs/design/runtime.md, 60f37f2 line 992
+
+Old sentence(s)/block:
+
+> The resource-bearing parts of the File wrappers are explicit ordinary i:
+
+New sentence(s)/block:
+
+> The resource-bearing parts of the File wrappers are explicit ordinary i; all
+> non-creating raw operations use request.await_owned (§5.4):
+
+Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards.
+
+### R4-009 — docs/design/runtime.md, 60f37f2 line 1002
+
+Old sentence(s)/block:
+
+> open = (path, mode, raw ! Fs) {
+>   File(fail.map_error(
+>     () { await_resource(raw.open(path, mode_string(mode)), (n) {
+>       request.await(raw.close(n))
+>     }) }
+>     (code) { FsError("open", path, code) }
+>   ))
+> }
+>
+> read = (File(number), max_bytes, raw ! Fs) {
+>   request.await(raw.read(number, max_bytes)) |> {
+>     Ok(bytes) -> bytes
+>     Error(code) -> fail.raise(FsError("read", "", code))
+>   }
+> }
+>
+> close = (File(number), raw ! Fs) { request.await(raw.close(number)) }
+> ```
+
+New sentence(s)/block:
+
+> open = (path, mode, raw ! Fs) {
+>   File(fail.map_error(
+>     () { await_resource(raw.open(path, mode_string(mode)), (n) {
+>       request.await_owned(raw.close(n))
+>     }) }
+>     (code) { FsError("open", path, code) }
+>   ))
+> }
+>
+> read = (File(number), max_bytes, raw ! Fs) {
+>   request.await_owned(raw.read(number, max_bytes)) |> {
+>     Ok(bytes) -> bytes
+>     Error(code) -> fail.raise(FsError("read", "", code))
+>   }
+> }
+>
+> close = (File(number), raw ! Fs) { request.await_owned(raw.close(number)) }
+> ```
+
+Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards.
+
+### R4-010 — docs/design/runtime.md, 60f37f2 line 1040
+
+Old sentence(s)/block:
+
+> ```i
+> accept = (Listener(number), raw ! Net) {
+>   Stream(fail.map_error(
+>     () { await_resource(raw.accept(number), (n) {
+>       request.await(raw.close_stream(n))
+>     }) }
+>     (code) { NetError("accept", "", code) }
+>   ))
+> }
+>
+> read = (Stream(number), max_bytes, raw ! Net) {
+>   request.await(raw.read(number, max_bytes)) |> {
+>     Ok(bytes) -> bytes
+>     Error(code) -> fail.raise(NetError("read", "", code))
+>   }
+> }
+>
+> close_stream = (Stream(number), raw ! Net) {
+>   request.await(raw.close_stream(number))
+> }
+> ```
+
+New sentence(s)/block:
+
+> ```i
+> accept = (Listener(number), raw ! Net) {
+>   Stream(fail.map_error(
+>     () { await_resource(raw.accept(number), (n) {
+>       request.await_owned(raw.close_stream(n))
+>     }) }
+>     (code) { NetError("accept", "", code) }
+>   ))
+> }
+>
+> read = (Stream(number), max_bytes, raw ! Net) {
+>   request.await_owned(raw.read(number, max_bytes)) |> {
+>     Ok(bytes) -> bytes
+>     Error(code) -> fail.raise(NetError("read", "", code))
+>   }
+> }
+>
+> close_stream = (Stream(number), raw ! Net) {
+>   request.await_owned(raw.close_stream(number))
+> }
+> ```
+
+Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards.
+
+### R4-011 — docs/design/runtime.md, 60f37f2 line 1127
+
+Old sentence(s)/block:
+
+> ```i
+> spawn = (program, args, raw ! Process) {
+>   bytes = encode_args(args)
+>   Child(fail.map_error(
+>     () { await_resource(raw.spawn(program, bytes), (n) {
+>       request.await(raw.close(n))
+>     }) }
+>     (code) { ProcessError("spawn", code) }
+>   ))
+> }
+>
+> wait = (Child(number), raw ! Process) {
+>   request.await(raw.wait(number)) |> {
+>     Ok(status) -> status
+>     Error(code) -> fail.raise(ProcessError("wait", code))
+>   }
+> }
+>
+> close = (Child(number), raw ! Process) { request.await(raw.close(number)) }
+> ```
+
+New sentence(s)/block:
+
+> ```i
+> spawn = (program, args, raw ! Process) {
+>   bytes = encode_args(args)
+>   Child(fail.map_error(
+>     () { await_resource(raw.spawn(program, bytes), (n) {
+>       request.await_owned(raw.close(n))
+>     }) }
+>     (code) { ProcessError("spawn", code) }
+>   ))
+> }
+>
+> wait = (Child(number), raw ! Process) {
+>   request.await_owned(raw.wait(number)) |> {
+>     Ok(status) -> status
+>     Error(code) -> fail.raise(ProcessError("wait", code))
+>   }
+> }
+>
+> close = (Child(number), raw ! Process) { request.await_owned(raw.close(number)) }
+> ```
+
+Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards.
+
+### R4-012 — docs/design/runtime.md, 60f37f2 line 1158
+
+Old sentence(s)/block:
+
+> Public wrappers unwrap those results, giving `? StdioError ! Stdio | request.Await | request.Owner`.
+> read's bound/EOF and write's whole-byte/all-bytes rules are those above. stdout
+> and stderr are distinct directions; one write per direction may be pending,
+> with busy for a competing write. A cancelled write may have written a prefix.
+> Flush functions are explicit. Also export `print(text: String)` and
+> `print_error(text: String)`, which UTF-8 encode text plus one LF, write all bytes,
+> and flush their stream; both can raise StdioError. No implicit text decoding,
+> line buffering or newline translation is added. Legacy i/io still prints a
+> String plus LF with the old no-error contract under `i:io/v1`.
+
+New sentence(s)/block:
+
+> Public wrappers use request.await_owned to unwrap those results, giving
+> `? StdioError ! Stdio | request.Await | request.Owner`.
+> read's bound/EOF and write's whole-byte/all-bytes rules are those above. stdout
+> and stderr are distinct directions; one write per direction may be pending,
+> with busy for a competing write. A cancelled write may have written a prefix.
+> Flush functions are explicit. Also export `print(text: String)` and
+> `print_error(text: String)`, which UTF-8 encode text plus one LF, write all bytes,
+> and flush their stream; both can raise StdioError. No implicit text decoding,
+> line buffering or newline translation is added. Legacy i/io still prints a
+> String plus LF with the old no-error contract under `i:io/v1`.
+
+Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards.
+
+### R4-013 — docs/design/runtime.md, 60f37f2 line 1586
+
+Old sentence(s)/block:
+
+> > i/task is a library implemented using i/control, i/key and i/request. A run
+> > owns its tasks and scheduler state. Its implicit root permits local values.
+> > Scopes constrain the lifetime of spawned work: none outlives its scope.
+> > Values pass between tasks only through go captures/kept services, channels,
+> > child results/errors and shares. Portable paths check core.portable even
+> > with one worker: sends at the call, send events at construction, children
+> > at completion, scope body errors at failure, shares at creation. Failure
+> > stops with panic("task: value is not portable"). go never rejects for
+> > non-portability; on multiple workers it silently classifies the complete task
+> > record at go and publishes portable records. Other records stay local.
+> > Local scopes/channels hold the maker's boundary only as a non-portability
+> > witness. A Task/join event from a local scope holds that scope too. Every
+> > handle checks run identity. Channels belong to the first scope in their
+> > maker's chain, or the run; channels and shares are freed at scope exit.
+> > Every run has the result of some serial order of task steps. Timing may
+> > choose a sender, a race/select winner, which failures precede cancellation,
+> > or whether a handle is used before its owner ends. These order-dependent
+> > results may change between runs or worker counts. Tests must either avoid
+> > that dependence or list the allowed outcomes. No task API observes workers.
+
+New sentence(s)/block:
+
+> > i/task is a library implemented using i/control, i/key and i/request. A run
+> > owns its tasks and scheduler state. Its implicit root permits local values.
+> > Scopes constrain the lifetime of spawned work: none outlives its scope.
+> > Values pass between tasks only through go captures/kept services, channels,
+> > child results/errors and shares. Portable paths check core.portable even
+> > with one worker: sends at the call, send events at construction, children
+> > at completion, scope body errors at failure, shares at creation. Failure
+> > stops with panic("task: value is not portable"). go never rejects for
+> > non-portability; on multiple workers it silently classifies the complete task
+> > record at go and publishes portable records. Other records stay local.
+> > Local scopes/channels hold the maker's boundary only as a non-portability
+> > witness. A Task/join event from a local scope holds that scope too. Every
+> > stateful handle checks run identity; events have fresh keys and sync checks
+> > only their stateful leaves, including losing alternatives. Channels belong
+> > to the first scope in their maker's chain, or the run; channels and shares are freed at scope exit.
+> > Every run has the result of some serial order of task steps. Timing may
+> > choose a sender, a race/select winner, which failures precede cancellation,
+> > or whether a handle is used before its owner ends. These order-dependent
+> > results may change between runs or worker counts. Tests must either avoid
+> > that dependence or list the allowed outcomes. No task API observes workers.
+
+Reason: N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-014 — docs/design/runtime.md, 60f37f2 line 1612
+
+Old sentence(s)/block:
+
+> **New §9.11.** Copy §5.1's public definitions, tables, state transitions,
+> cancellation/wait/alias rules, and dynamic-context rule, including Owner groups. Copy §5.4's implicit
+> adapter ownership rule, with the consuming take rule and reference to §9.7's
+> resource guards. Exclude the discussion of compiler frame/table layout.
+
+New sentence(s)/block:
+
+> **New §9.11.** Copy §5.1's public definitions, tables, state transitions,
+> cancellation/wait/alias rules, and dynamic-context rule, including portable
+> Root/Owner count/readiness/cancel-all/wait-none operations and local observer
+> semantics, with no Ticket enumeration. Copy §5.4's borrowed await and ordinary
+> await_owned rules, with consuming take and reference to §9.7's resource guards.
+> Exclude the discussion of compiler frame/table layout.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots.
+
+### R4-015 — docs/design/runtime.md, 60f37f2 line 1800
+
+Old sentence(s)/block:
+
+> 1. K1 has landed on redesign at 578a17d; require it before R2 and preserve its
+>    display.rs order K1 -> A2 Namer -> T1 -> T3. Do not work around the invariant
+>    generalization fault by weakening key invariance or a public type scheme.
+>    A1+A2 provides new syntax. B's implementation precedes R2 and its keep_env
+>    re-entry changes. C implementation is already the base for this note.
+> 2. R1 is independent of the new request primitives. Land it early on lane b
+>    after B's retained work, for Std-3/property; it must not import Std-3.
+> 3. Keep the ledger's hot-file order: lower.rs named regions C -> T1 -> R2 ->
+>    T3 -> STR -> M2; infer.rs and type tables T1 -> T2 -> T3 -> R2 -> M2 -> M4.
+>    Reconcile those by splitting R2's lower and infer changes into separate
+>    commits; the overall R2 merge follows T3. No worker overwrites T3's new
+>    lower regions. emit/host.rs, host ABI areas and §10.3 follow
+>    C -> T1 (where assigned) -> R2 -> IO -> M2.
+> 4. IO can prepare Rust services after C and draft i wrappers after A1+A2,
+>    but its request-returning i modules merge after R2's request layer. Lane c
+>    keeps clock -> fs -> net -> process -> stdio serial. JS factories are part
+>    of the matching phase. Final registration/list edits happen once, in stdio.
+> 5. R2 and IO then gate E2E-echo. Std-2 adds real time.now after clock lands.
+>    M2 waits for the completed R2 behavior; compiler sandbox runs use a fixed
+>    test Runner and no host services. MC keeps Root/Owner keys portable and gives
+>    every worker the run's live-root/group registrations; closing a group coordinates
+>    its requests across workers. No host request itself becomes portable.
+
+New sentence(s)/block:
+
+> 1. K1 has landed on redesign at 578a17d; require it before R2 and preserve its
+>    display.rs order K1 -> A2 Namer -> T1 -> T3. Do not work around the invariant
+>    generalization fault by weakening key invariance or a public type scheme.
+>    A1+A2 provides new syntax. B's implementation precedes R2 and its keep_env
+>    re-entry changes. C implementation is already the base for this note.
+> 2. R1 is independent of the new request primitives. Land it early on lane b
+>    after B's retained work, for Std-3/property; it must not import Std-3.
+> 3. Keep the ledger's hot-file order: lower.rs named regions C -> T1 -> R2 ->
+>    T3 -> STR -> M2; infer.rs and type tables T1 -> T2 -> T3 -> R2 -> M2 -> M4.
+>    Reconcile those by splitting R2's lower and infer changes into separate
+>    commits; the overall R2 merge follows T3. No worker overwrites T3's new
+>    lower regions. emit/host.rs, host ABI areas and §10.3 follow
+>    C -> T1 (where assigned) -> R2 -> IO -> M2.
+> 4. IO can prepare Rust services after C and draft i wrappers after A1+A2,
+>    but its request-returning i modules merge after R2's request layer. Lane c
+>    keeps clock -> fs -> net -> process -> stdio serial. JS factories are part
+>    of the matching phase. Final registration/list edits happen once, in stdio.
+> 5. R2 and IO then gate E2E-echo. Std-2 adds real time.now after clock lands.
+>    M2 waits for the completed R2 behavior; compiler sandbox runs use a fixed
+>    test Runner and no host services. MC keeps Root/Owner keys portable and gives
+>    every worker shared live-root/group counts, revisions and cancellation state;
+>    closing a group coordinates home-worker cleanup without exporting Tickets.
+>    Driver control roots remain separate from the program waitable set (§6.4).
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-016 — docs/design/runtime.md, 60f37f2 line 1836
+
+Old sentence(s)/block:
+
+> 1. [ ] Commit R2 replacement spec text; merge S7 primitive text, preserving §9.8.
+> 2. [ ] Verify K1's invariant-generalization repair, then implement keys/variance/
+>    value restriction, portable including cycles, and
+>    keep_env with retained environment frames; run all S7 single-worker tests.
+> 3. [ ] Implement Request/Ticket cells, Root/group registries and table replacement together with
+>    per-cell answer decoding, raw/async host adapters, cancel and continue.
+> 4. [ ] Prove the monomorphic keyed prototype by type-checking two channel element
+>    types and heterogeneous child results. Reject any need for a cast or forall field.
+> 5. [ ] Implement the i loop, per-task boundaries, rooted Owner groups, Runner/top,
+>    task.keep and inferred-needs entry provisioning. Preserve synchronous exports
+>    and suppress host progress polls when no task waits for IO. Include nested
+>    progress-interest forwarding and guaranteed registration cleanup. Check O0/O2 WAT for retained frames.
+> 6. [ ] Add scope chains/local witnesses, joins, body cancellation, shielded finals,
+>    run-key checks, channel/share lifetime and error arbitration; add R4a
+>    cancellation-priority joins and shielded dropped/cancelled-join stops.
+> 7. [ ] Add CML registration/commit/map, combinators and deterministic script policy.
+> 8. [ ] Integrate every async user host service through Await; require review
+>    tests J/E/O, nested subgroup and borrowed-ticket cases, root poll fairness,
+>    and synchronous callback/first-turn no-yield tests. Audit the host/control seam.
+> 9. [ ] Run deadlock/cancel/fairness/alias/IO stress cases 200 times on Rust and JS,
+>    related spec tests and full required verification; inspect WAT changes.
+
+New sentence(s)/block:
+
+> 1. [ ] Commit R2 replacement spec text; merge S7 primitive text, preserving §9.8.
+> 2. [ ] Verify K1's invariant-generalization repair, then implement keys/variance/
+>    value restriction, portable including cycles, and
+>    keep_env with retained environment frames; run all S7 single-worker tests.
+> 3. [ ] Implement Request/Ticket cells, Root/group registries and table replacement together with
+>    per-cell answer decoding, raw/async host adapters, await_owned, cancel and continue.
+>    Implement §5.1 group observations without public Ticket enumeration; atomic
+>    subscription, local observer dependencies, terminal reconciliation and separate
+>    program/control roots are part of this seam now; MC adds the remote host actions.
+> 4. [ ] Prove the monomorphic keyed prototype by type-checking two channel element
+>    types and heterogeneous child results. Reject any need for a cast or forall field.
+> 5. [ ] Implement the i loop, per-task boundaries, rooted Owner groups, Runner/top,
+>    task.keep and inferred-needs entry provisioning. Preserve synchronous exports
+>    and suppress host progress polls when no task waits for IO. Include nested
+>    progress-interest forwarding and guaranteed registration cleanup. Check O0/O2 WAT for retained frames.
+> 6. [ ] Add scope chains/local witnesses, joins, body cancellation, shielded finals,
+>    run-key checks, channel/share lifetime and error arbitration; add R4a
+>    cancellation-priority joins and shielded dropped/cancelled-join stops.
+> 7. [ ] Add CML registration/commit/map, combinators and deterministic script policy.
+> 8. [ ] Integrate every async user host service through Await; require review
+>    tests J/E/O, native §11.1 N-R1–N-R6, nested subgroup and borrowed-ticket cases, root poll fairness,
+>    and synchronous callback/first-turn no-yield tests. Audit the host/control seam.
+> 9. [ ] Run deadlock/cancel/fairness/alias/IO stress cases 200 times on Rust and JS,
+>    related spec tests and full required verification; inspect WAT changes.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-017 — docs/design/runtime.md, 60f37f2 line 1861
+
+Old sentence(s)/block:
+
+> 1. [ ] Clock: before Fs, add the shared ResourceContext, host-wide non-reusing Int
+>    allocator and trusted binding grants (native §3.1) on Rust/JS; enforce §2.4 field privacy; test sequential
+>    invocations, late creators, disposal and forced exhaustion. Clock deadlines fixed at start, both clocks, zero/negative/huge durations,
+>    abortable timers and no timer keeping an ended Node run alive.
+> 2. [ ] Fs: codecs/errors, whole-byte validation, all-byte writes, explicit flush,
+>    private File(Int) codecs, raw Int wrappers, no number-injection exports, closed/busy leases,
+>    cancelled blocking-file state, safe detached work and context teardown.
+> 3. [ ] Net: numeric endpoints, ephemeral bind, read/write/half-close, busy leases,
+>    private Listener/Stream(Int) codecs, provisional ownership, close-vs-wait
+>    across workers and a portable-scope concurrent connection fixture.
+> 4. [ ] Process: bounded entropy, UTF-8/framing, no shell expansion, inherited
+>    streams, private Child(Int) codec, wait caching, terminate and reaping on every
+>    ownership edge, including native exit after child cleanup.
+> 5. [ ] Stdio: cancellable subscriber input, exact byte output, flush/error stream,
+>    legacy i/io compatibility and context turnover; finish registration/spec lists
+>    and B.7 with blocking Int adapters, not fd/externref shortcuts.
+> 6. [ ] Run permission/error/resource/security and concurrency reviews; include
+>    unsupported browser/preview-1 behavior and user-supplied host fakes.
+> 7. [ ] Run end-to-end echo, then combined verification in the integration lane.
+
+New sentence(s)/block:
+
+> 1. [ ] Clock: before Fs, add the shared ResourceContext, host-wide non-reusing Int
+>    allocator and trusted binding grants (native §3.1) on Rust/JS; enforce §2.4 field privacy; test sequential
+>    invocations, late creators, disposal and forced exhaustion. Clock deadlines fixed at start, both clocks, zero/negative/huge durations,
+>    abortable timers and no timer keeping an ended Node run alive.
+> 2. [ ] Fs: codecs/errors, whole-byte validation, all-byte writes, explicit flush,
+>    private File(Int) codecs, raw Int wrappers, no number-injection exports, closed/busy leases,
+>    await_owned on non-creators, cancelled blocking-file state, safe detached work
+>    and context teardown; verify the cancelled File alias gives closed.
+> 3. [ ] Net: numeric endpoints, ephemeral bind, read/write/half-close, busy leases,
+>    private Listener/Stream(Int) codecs, provisional ownership, close-vs-wait
+>    across workers, the race-then-read lease test (native §11.1), and a
+>    portable-scope concurrent connection fixture.
+> 4. [ ] Process: bounded entropy, UTF-8/framing, no shell expansion, inherited
+>    streams, private Child(Int) codec, wait caching, terminate and reaping on every
+>    ownership edge, await_owned for wait/terminate/close, including native exit after child cleanup.
+> 5. [ ] Stdio: cancellable subscriber input, exact byte output, flush/error stream,
+>    legacy i/io compatibility and context turnover; finish registration/spec lists
+>    and B.7 with blocking Int adapters, not fd/externref shortcuts.
+> 6. [ ] Run permission/error/resource/security and concurrency reviews; include
+>    unsupported browser/preview-1 behavior and user-supplied host fakes.
+> 7. [ ] Run end-to-end echo, then combined verification in the integration lane.
+
+Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-018 — docs/design/runtime.md, 60f37f2 line 1890
+
+Old sentence(s)/block:
+
+> | Test | Expected result and rule |
+> |---|---|
+> | Re-evaluate word on the same Generator, and split twice without a draw | Equal (word,next) pairs and equal pairs of generators; D1/§4 immutable data |
+> | int(g,0), int(g,-1), at_path(g,[0]) | InvalidBound(0), InvalidBound(-1), InvalidPath([0]); §4 validation, no draw |
+> | int(g,1) | 0 and one word consumed; §4 requires at least one word even for bound 1 |
+> | Stub words for n=10: W-1, then 7 | Reject W-1, give 7 with two draws; §4 rejection rule |
+> | Split initial root vs child path [1] | Their histories contain S(1) vs P(1), not equal generators; §4 domain tags (not an assertion that words must differ) |
+> | `task.random() == task.random()` in one task | True; D1 and S7 rule 11; no draw counter in Scheduler |
+> | Published SplitMix seed 1337, first three words | 0xb5c19e300e8b07b3, 0xd600e0e216c0ac76, 0xc54efc3b3cc5af29; §4.1 pinned source vectors |
+> | Request ready(7); state, take, state, take | Ready(7), 7, Taken, panic request: taken; §5.1 one transfer |
+> | Take Int and String request handles stored together only as tickets | Read each original typed handle correctly; Ticket has no answer operation; D2 |
+> | Cancel an old cell, reuse its slot, cancel the old alias again | New request remains Waiting and receives its own answer; D4 cell identity/generation |
+> | Two same-import requests answered in reverse order | Each original typed handle returns its own value; §5.3 per-cell decoding |
+> | Wait on A, host answers B first | B remains Ready, wait on A continues; §5.1 requested-set semantics |
+> | Cancel after decode but before an IO await resumes | One close of the provisional socket/file, zero user-body uses; §8.1 Ready/Taken guard |
+> | Local/portable scope child returns File/Listener/Stream/Child | Both join; portable is True under D9; a Request/Ticket result still stops under D7 |
+> | Portable send_event of a continuation in a choose with always(1) | Stops at event construction, even though it would lose; S7 rule 2 |
+> | `sync(choose([send_event(c,1), receive_event(c)]))` with no other task | Deadlock; §6.4 same registration cannot rendezvous with itself |
+> | Two ready alternatives with side-effecting map callbacks | First alternative commits; exactly its callback runs in the syncing task; §6.4 |
+> | `task.scope((s) { task.go(s, () { 1 })  2 })` | 2, only after child completion; R3; body result is independent of child's result |
+> | `both(() { 1 }, () { "x" })`; map_concurrently([3,1], id) | (1,"x") and [3,1]; §6.1 typed separate handles/argument order |
+> | Failed child while body joins an unstarted sibling | Error of failed child, body final ran, no deadlock; R2/R4 |
+> | Two failures already observed before cancel, paths [1,1] and [1] | Error at [1]; R2 prefix/path order, not first observed error |
+> | go A(yield; raise A), go B(raise B), body waits | B on production FIFO; §6.4 go does not yield parent, A yields behind B |
+> | `task.scope((s) { s })` then go on returned s | task: go outside its scope; R1 |
+> | Join from outer-scope sibling, or channel from another run | task: join outside its scope; task: handle of another run; R1 |
+> | Channel returned from a finished scope then receive | task: channel is gone; R3; also test an outer waiter present at scope end |
+> | Share returned then get after scope exit | task: shared value is gone; R3 |
+> | Cancelled final yields, awaits fake clock, opens scope and rendezvous | Final completes, then original scope error; never boundary is not active; R4 |
+> | Parent fake Clock used after child's third resume and in its final | Fake result survives; keep_env plus retained frame, D16 workaround |
+> | Nested wait_flag while an outer sibling sets the flag | Both complete, no global hang; §6.5 Runner wait delegates to outer task |
+> | Rebind Runner with top(seed) inside a task, then nested run | New seed, preserved nested prefix/outer wait route; §6.5 contextual top |
+> | Nested raw request in request.within, with no task waiters; tasks block on channel | Wait for the request in that run's Root, then deadlock; §6.4 all-group root enumeration |
+> | Infinite yield task plus an outstanding accept | Conditional status-2 polls for the waiting accept task deliver completion and its handler gets a turn; §6.4 |
+> | Pure task path/yield/join operations with no host requests | No host poll, status 2, or macrotask yield; task entry can return status 0 immediately; D5/§6.4 |
+> | test with script selecting nonexistent path [99] | NotRunnable([99]) of type ScheduleError after cleanup; §6.5 |
+> | test with real pending timer rather than a fake | task: test needs fake IO; D10; fixed seed alone does not fix host time |
+> | Net read(0); fs write with partial byte; process NUL argument | Typed invalid errors with the named operation; §7 validation |
+> | Stream write of N bytes followed by peer EOF | Peer receives the exact N-byte prefix before EOF; §7.3 write-all/half-close |
+> | Two concurrent stream reads; read concurrent with write | busy for second read; opposite directions work; §7.3 leases |
+> | Close File/Stream/Child twice | Nil both times, underlying release once; §7/§8 idempotence |
+> | Close while another worker awaits read/accept/wait | closed if close commits first; prior committed answer stays; §8.1 leases |
+> | Stop with outstanding accept and forgotten Ready spawn, then run another test | No i finals; empty new table, fresh numbers and host-owned child cleanup; §8.1/native N12 |
+> | Redeclare raw namespace or external alias | No automatic binding; local fake still works; native §3.1 |
+> | `(raw ! net.Net) { raw.read(1, 1) }` outside i/net | Constructor/field visibility error under §2.4/§7, despite the exported type name |
+> | Force a small allocator limit | Memory stop before insertion, never reuse; native N9.2 |
+> | Process args codec for ["a","é"] | Bytes `<<2,0,0,0,1,0,0,0,97,2,0,0,0,195,169>>`; §7.4 UTF-8 framing |
+> | Missing env variable; browser raw TCP | ProcessError(...,"not_found"); NetError(...,"unsupported"); §7 and target matrix |
+> | WASI pure tasks/random; WASI requiring private Fs | Pure calculations work; report blocking Int imports requiring a buffer-aware adapter; §8.2/B.7, no fd identity reuse |
+> | @main needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
+> | Existing async user service, not an IO namespace, used in two children | Overlap via Await, same request table as IO; D3, no namespace rule |
+
+New sentence(s)/block:
+
+> | Test | Expected result and rule |
+> |---|---|
+> | Re-evaluate word on the same Generator, and split twice without a draw | Equal (word,next) pairs and equal pairs of generators; D1/§4 immutable data |
+> | int(g,0), int(g,-1), at_path(g,[0]) | InvalidBound(0), InvalidBound(-1), InvalidPath([0]); §4 validation, no draw |
+> | int(g,1) | 0 and one word consumed; §4 requires at least one word even for bound 1 |
+> | Stub words for n=10: W-1, then 7 | Reject W-1, give 7 with two draws; §4 rejection rule |
+> | Split initial root vs child path [1] | Their histories contain S(1) vs P(1), not equal generators; §4 domain tags (not an assertion that words must differ) |
+> | `task.random() == task.random()` in one task | True; D1 and S7 rule 11; no draw counter in Scheduler |
+> | Published SplitMix seed 1337, first three words | 0xb5c19e300e8b07b3, 0xd600e0e216c0ac76, 0xc54efc3b3cc5af29; §4.1 pinned source vectors |
+> | Request ready(7); state, take, state, take | Ready(7), 7, Taken, panic request: taken; §5.1 one transfer |
+> | Take Int and String request handles stored together only as tickets | Read each original typed handle correctly; Ticket has no answer operation; D2 |
+> | Cancel an old cell, reuse its slot, cancel the old alias again | New request remains Waiting and receives its own answer; D4 cell identity/generation |
+> | Two same-import requests answered in reverse order | Each original typed handle returns its own value; §5.3 per-cell decoding |
+> | Wait on A, host answers B first | B remains Ready, wait on A continues; §5.1 requested-set semantics |
+> | Cancel after decode but before an IO await resumes | One close of the provisional socket/file, zero user-body uses; §8.1 Ready/Taken guard |
+> | Local/portable scope child returns File/Listener/Stream/Child | Both join; portable is True under D9; a Request/Ticket result still stops under D7 |
+> | Portable send_event of a continuation in a choose with always(1) | Stops at event construction, even though it would lose; S7 rule 2 |
+> | `sync(choose([send_event(c,1), receive_event(c)]))` with no other task | Deadlock; §6.4 same registration cannot rendezvous with itself |
+> | Two ready alternatives with side-effecting map callbacks | First alternative commits; exactly its callback runs in the syncing task; §6.4 |
+> | `task.scope((s) { task.go(s, () { 1 })  2 })` | 2, only after child completion; R3; body result is independent of child's result |
+> | `both(() { 1 }, () { "x" })`; map_concurrently([3,1], id) | (1,"x") and [3,1]; §6.1 typed separate handles/argument order |
+> | Failed child while body joins an unstarted sibling | Error of failed child, body final ran, no deadlock; R2/R4 |
+> | Two failures already observed before cancel, paths [1,1] and [1] | Error at [1]; R2 prefix/path order, not first observed error |
+> | go A(yield; raise A), go B(raise B), body waits | B on production FIFO; §6.4 go does not yield parent, A yields behind B |
+> | `task.scope((s) { s })` then go on returned s | task: go outside its scope; R1 |
+> | Join from outer-scope sibling, or channel from another run | task: join outside its scope; task: handle of another run; R1 |
+> | Channel returned from a finished scope then receive | task: channel is gone; R3; also test an outer waiter present at scope end |
+> | Share returned then get after scope exit | task: shared value is gone; R3 |
+> | Cancelled final yields, awaits fake clock, opens scope and rendezvous | Final completes, then original scope error; never boundary is not active; R4 |
+> | Parent fake Clock used after child's third resume and in its final | Fake result survives; keep_env plus retained frame, D16 workaround |
+> | Nested wait_flag while an outer sibling sets the flag | Both complete, no global hang; §6.5 Runner wait delegates to outer task |
+> | Rebind Runner with top(seed) inside a task, then nested run | New seed, preserved nested prefix/outer wait route; §6.5 contextual top |
+> | Nested raw request in request.within, with no task waiters; tasks block on channel | Wait for the request in that run's Root, then deadlock; §6.4 all-group root accounting |
+> | Infinite yield task plus an outstanding accept | Conditional status-2 polls for the waiting accept task deliver completion and its handler gets a turn; §6.4 |
+> | Pure task path/yield/join operations with no host requests | No host poll, status 2, or macrotask yield; task entry can return status 0 immediately; D5/§6.4 |
+> | test with script selecting nonexistent path [99] | NotRunnable([99]) of type ScheduleError after cleanup; §6.5 |
+> | test with real pending timer rather than a fake | task: test needs fake IO; D10; fixed seed alone does not fix host time |
+> | Net read(0); fs write with partial byte; process NUL argument | Typed invalid errors with the named operation; §7 validation |
+> | Stream write of N bytes followed by peer EOF | Peer receives the exact N-byte prefix before EOF; §7.3 write-all/half-close |
+> | Two concurrent stream reads; read concurrent with write | busy for second read; opposite directions work; §7.3 leases |
+> | Close File/Stream/Child twice | Nil both times, underlying release once; §7/§8 idempotence |
+> | Close while another worker awaits read/accept/wait | closed if close commits first; prior committed answer stays; §8.1 leases |
+> | Stop with outstanding accept and forgotten Ready spawn, then run another test | No i finals; empty new table, fresh numbers and host-owned child cleanup; §8.1/native N12 |
+> | Redeclare raw namespace or external alias | No automatic binding; local fake still works; native §3.1 |
+> | `(raw ! net.Net) { raw.read(1, 1) }` outside i/net | Constructor/field visibility error under §2.4/§7, despite the exported type name |
+> | Force a small allocator limit | Memory stop before insertion, never reuse; native N9.2 |
+> | Process args codec for ["a","é"] | Bytes `<<2,0,0,0,1,0,0,0,97,2,0,0,0,195,169>>`; §7.4 UTF-8 framing |
+> | Missing env variable; browser raw TCP | ProcessError(...,"not_found"); NetError(...,"unsupported"); §7 and target matrix |
+> | WASI pure tasks/random; WASI requiring private Fs | Pure calculations work; report blocking Int imports requiring a buffer-aware adapter; §8.2/B.7, no fd identity reuse |
+> | @main needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
+> | Existing async user service, not an IO namespace, used in two children | Overlap via Await, same request table as IO; D3, no namespace rule |
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-019 — docs/design/runtime.md, 60f37f2 line 2029
+
+Old sentence(s)/block:
+
+> **Raw request deadlock and nesting (initial assessment).** Ignoring unawaited requests would declare
+> deadlock while host work was outstanding, against S7 rule 17. Enumerating the
+> whole instance would make a nested run wait for unrelated outer work, against
+> rule 5. The first draft tried to fix this with Owner groups and per-run
+> enumeration, but missed custom groups as the later review showed. The corrected
+> Root affiliation and all-group enumeration are in §5.1/§6.4. The group capability is portable; request cells remain non-portable. This is
+> also useful to ordinary non-task batch/timeout libraries.
+
+New sentence(s)/block:
+
+> **Raw request deadlock and nesting (initial assessment).** Ignoring unawaited requests would declare
+> deadlock while host work was outstanding, against S7 rule 17. Enumerating the
+> whole instance would make a nested run wait for unrelated outer work, against
+> rule 5. The first draft tried to fix this with Owner groups and per-run
+> enumeration, but missed custom groups as the later review showed. The corrected
+> Root affiliation and all-group count/notification rules are in §5.1/§6.4. The group capability is portable; request cells remain non-portable. This is
+> also useful to ordinary non-task batch/timeout libraries.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots.
+
+### R4-020 — docs/design/runtime.md, 60f37f2 line 2129
+
+Old sentence(s)/block:
+
+> For service inference, a go body needing only Scheduler needs no parent Await/
+> Runner, a body needing a custom Clock keeps that need, and a test nested under
+> a caller still needs Runner. The revised schemes express exactly these cases.
+> A public ordinary function needing Request(Int) needs no privileged module
+> import or type declaration. RequestState's unlabeled Ready pattern agrees with
+> spec §7.1. Owner's Key(Nil) is portable while a ticket returned by outstanding
+> is not. There is no static conversion that can read a Ticket as a Request(Int).
+
+New sentence(s)/block:
+
+> For service inference, a go body needing only Scheduler needs no parent Await/
+> Runner, a body needing a custom Clock keeps that need, and a test nested under
+> a caller still needs Runner. The revised schemes express exactly these cases.
+> A public ordinary function needing Request(Int) needs no privileged module
+> import or type declaration. RequestState's unlabeled Ready pattern agrees with
+> spec §7.1. Owner's Key(Nil) is portable while Request/Ticket values are not; group
+> operations expose no ticket enumeration. There is no static conversion that can read a Ticket as a Request(Int).
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization.
+
+### R4-021 — docs/design/runtime.md, 60f37f2 line 2157
+
+Old sentence(s)/block:
+
+> 1. **Dropped join in a shielded final: confirmed.** At aa20548, R2 dropped the
+>    child, R4 shielded its joining final, and no completion arm could produce
+>    its A/E. The control code only reactivates the scheduling boundary
+>    (`emit/control.rs:260–295`); it supplies no task completion. R4a now resolves
+>    that protocol hole and §10.1 gives the exact S7 sentence changes.
+> 2. **Universal async and first-turn polling: confirmed.** The inferred env is
+>    already available to entry_point (`types/infer.rs:405–429`) and lower's
+>    entry_async (`lower.rs:916–938`). The JS call/callAsync guards explicitly
+>    separate synchronous and async signatures (`bindings/javascript/ilang.mjs:965–981`);
+>    status 2 takes a macrotask at `:894–902`. My old D5 and unconditional
+>    first-turn poll would therefore break synchronous callbacks. D5 and §6.4
+>    now preserve them and gate host polling on outstanding requests. The review
+>    executed the comparator baseline; I independently read those paths, but did
+>    not repeat that execution against a new implementation.
+> 3. **Custom groups missed by idle accounting: confirmed.** The old within made
+>    a group absent from the default Owner's table; the old idle union counted
+>    neither it nor an unawaited request in it. Root is now separate from Owner,
+>    and the idle union enumerates all groups of the run. Progress-interest tickets
+>    affect polling only, never substitute for all-group deadlock accounting.
+> 4. **Request-mode Owner effect omitted from replacement §9.7: confirmed.** The
+>    old §5.2 added Owner while the replacement paragraph did not. Both now give
+>    the callable type `(P...) -> Request(T) ! request.Owner` before inference;
+>    ordinary field-function copying/display therefore sees the same effect.
+
+New sentence(s)/block:
+
+> 1. **Dropped join in a shielded final: confirmed.** At aa20548, R2 dropped the
+>    child, R4 shielded its joining final, and no completion arm could produce
+>    its A/E. The control code only reactivates the scheduling boundary
+>    (`emit/control.rs:260–295`); it supplies no task completion. R4a now resolves
+>    that protocol hole and §10.1 gives the exact S7 sentence changes.
+> 2. **Universal async and first-turn polling: confirmed.** The inferred env is
+>    already available to entry_point (`types/infer.rs:405–429`) and lower's
+>    entry_async (`lower.rs:916–938`). The JS call/callAsync guards explicitly
+>    separate synchronous and async signatures (`bindings/javascript/ilang.mjs:965–981`);
+>    status 2 takes a macrotask at `:894–902`. My old D5 and unconditional
+>    first-turn poll would therefore break synchronous callbacks. D5 and §6.4
+>    now preserve them and gate host polling on outstanding requests. The review
+>    executed the comparator baseline; I independently read those paths, but did
+>    not repeat that execution against a new implementation.
+> 3. **Custom groups missed by idle accounting: confirmed.** The old within made
+>    a group absent from the default Owner's table; the old idle union counted
+>    neither it nor an unawaited request in it. Root is now separate from Owner,
+>    and the idle union accounts for all groups of the run without returning Tickets. Progress-interest tickets
+>    affect polling only, never substitute for all-group deadlock accounting.
+> 4. **Request-mode Owner effect omitted from replacement §9.7: confirmed.** The
+>    old §5.2 added Owner while the replacement paragraph did not. Both now give
+>    the callable type `(P...) -> Request(T) ! request.Owner` before inference;
+>    ordinary field-function copying/display therefore sees the same effect.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-022 — docs/design/runtime.md, 60f37f2 line 2304
+
+Old sentence(s)/block:
+
+> Attack O with two custom groups, then close only one. outstanding_root still
+> counts the other. Close the whole root and no group escapes its cancellation.
+> After a result becomes Ready, closing the group/root does not discard the
+> handle's answer. Rebind an outer Owner inside a nested run, then call within:
+> open_owner uses the nested Root, so the new subgroup cannot inherit the outer
+> Owner's affiliation. Deliberately starting under an already-made outer Owner
+> still uses that original group, whose tickets may be borrowed explicitly.
+> None of these cases uses instance-wide request count to decide nested deadlock.
+> Also make two shielded finals join one another after both cancellations are
+> accepted: each join is ready to stop, rather than waiting for the other unwind.
+> Keeping outcome separate from cleanup supplies that result without returning a
+> value early. No serious new rule conflict found in this pass.
+
+New sentence(s)/block:
+
+> Attack O with two custom groups, then close only one. count_root still
+> counts the other. Close the whole root and no group escapes its cancellation.
+> After a result becomes Ready, closing the group/root does not discard the
+> handle's answer. Rebind an outer Owner inside a nested run, then call within:
+> open_owner uses the nested Root, so the new subgroup cannot inherit the outer
+> Owner's affiliation. Deliberately starting under an already-made outer Owner
+> still uses that original group, whose tickets may be borrowed explicitly.
+> None of these cases uses instance-wide request count to decide nested deadlock.
+> Also make two shielded finals join one another after both cancellations are
+> accepted: each join is ready to stop, rather than waiting for the other unwind.
+> Keeping outcome separate from cleanup supplies that result without returning a
+> value early. No serious new rule conflict found in this pass.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots.
+
+### R4-023 — docs/design/multicore.md, 60f37f2 line 78
+
+Old sentence(s)/block:
+
+> **D10. Order comes from the task tree, never from time.** Each task has a **path**: the path of the task that called `go` plus the index of that `go` among all the `go` calls of that task (1, 2, …), whatever scope each went to. It is an ordinary `i/task` value (`task.path()`). Random splitting, handle ids, logs and traces use it. Paths are compared in **path order**: element by element, and a path comes before every longer path that starts with it (`[1] < [1, 1] < [2]`). A scope's error is the failure of the task with the **lowest path** among the scope's body and the children of the scope that failed. The body's path is a prefix of the path of every child, so the body comes first. `s.go`, and a join of a child of `s`, may be called only by a task whose **chain** holds `s` (part 6); the chain of a task changes only by its own steps, so this is fixed by the program, not by time. `both` and `map_concurrently` give results in argument order. *Reason:* these make results depend only on which children failed, not on which failed first, so one worker and N workers agree whenever the same children fail. Paths are unique, so no two children compare equal, also when children of `s` call `s.go` themselves.
+
+New sentence(s)/block:
+
+> **D10. Order comes from the task tree, never from time.** Each task has a **path**: the path of the task that called `go` plus the index of that `go` among that task’s `go` calls and nested runs counted together (1, 2, …), whatever scope each went to. It is an ordinary `i/task` value (`task.path()`). Random splitting, handle ids, logs and traces use it. Paths are compared in **path order**: element by element, and a path comes before every longer path that starts with it (`[1] < [1, 1] < [2]`). A scope's error is the failure of the task with the **lowest path** among the scope's body and the children of the scope that failed. The body's path is a prefix of the path of every child, so the body comes first. `s.go`, and a join of a child of `s`, may be called only by a task whose **chain** holds `s` (part 6); the chain of a task changes only by its own steps, so this is fixed by the program, not by time. `both` and `map_concurrently` give results in argument order. *Reason:* these make results depend only on which children failed, not on which failed first, so one worker and N workers agree whenever the same children fail. Paths are unique, so no two children compare equal, also when children of `s` call `s.go` themselves.
+
+Reason: N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation.
+
+### R4-024 — docs/design/multicore.md, 60f37f2 line 144
+
+Old sentence(s)/block:
+
+> **P5. Host requests stay home.** A host request value (host-concurrency.md §6.4, designed by R2) holds an id in the request table of its instance (H1 there). It is not portable (part 3.1). So only tasks on its home worker can wait on it, poll it or cancel it, and a send of it on a portable path stops. On one worker the same send stops in the same way, so a program cannot see that ids are per instance.
+
+New sentence(s)/block:
+
+> **P5. Host requests stay home.** A host request value (host-concurrency.md §6.4, designed by R2) holds an id in the request table of its instance (H1 there). It is not portable (part 3.1). Only tasks on its home worker can use that Request/Ticket to wait, poll or cancel; a send on a portable path stops. Portable Root/Owner operations instead act on group metadata, with host cancellation actions and home-cell reconciliation as runtime §5.1 specifies; they do not expose or move a Ticket. On one worker the same send stops in the same way, so a program cannot see that ids are per instance.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization.
+
+### R4-025 — docs/design/multicore.md, 60f37f2 line 226
+
+Old sentence(s)/block:
+
+> - `scheduler.detached` is a top-level record of constant functions that stop with `panic: task: no scheduler`. It is portable. Binding it before `keep_env` puts it, not the parent's scheduler, in the kept array, so the parent's scheduler boundary is never kept or captured. Inside, `! Scheduler = own` binds the real one, so `detached` is never called.
+> - `s.spawn(start)` makes the task record (part 3.3), with the handle of the scope `s`.
+> - The worker loop calls `start(own)` inside the task's new boundary (D5), with the `Scheduler` whose suspends go to that boundary. The environment statement is inside the task, in a frame that is kept, so it stays with the task's paused part (§9.4 rule 3).
+> - Kept services may still be non-portable, for example a generator's `Yield` service, or the `Assert` of `assertion.catch`, which hold a boundary. Every service bound at the place is kept, also one that `body` does not need, so a task started under such a service is pinned by P1. That costs parallelism only, and it cannot be seen. When `body` uses that service, suspending to that boundary from the task stops with `control: boundary is not active` on any number of workers, because the task runs from the loop (D5), and the loop does not run inside that boundary's body.
+> - **Runs and nested runs.** A **run** is one call of `task.run`: one loop, its tasks, and the handles they make. Nothing stops i code from calling `task.run` where a run is already going on, and the type of `task.run` cannot forbid it. So the rules are these, and they are the same on every host and every worker count:
+>   - **Which run uses N workers.** Only the run at the program's entry (open question 4) may use more than one worker. Every other run is a **nested run**: a one-worker FIFO loop on the stack of the code that called `task.run`. Its tasks are never remotely claimed. When it is called from inside a task, it runs inside that task's boundary body, so the whole nested run is part of the calling task, which is started and never moves (P2).
+>   - **The run service.** `task.run` needs one service of `i/task` (its name is R's; here `Runner`), and that is how it learns where it is, with no test for "is a service bound". Inside every task, the scheduler binds `Runner` to one that belongs to that task. The entry supplies the initial Runner from inferred needs (runtime D5); task.top(seed) uses that current Runner and replaces only its seed, retaining route and prefix. A run takes three things from `Runner`: its **path prefix**, its **root seed**, and its **wait**.
+>   - **Paths.** At the top the prefix is `[]`. In a task, it is the task's path plus the index of this `task.run` among the task's `go` calls and runs, counted together, so the paths of two runs never meet, and two sibling tasks that each start a nested run get different paths and different generators (part 5).
+>   - **Waits.** When a run has no task that can run but has outstanding host requests, it waits through `Runner`. At the top, that is the one root wait of host-concurrency §6.4 (status 1). In a task, the nested run hands its outstanding requests to the outer run and suspends **only its calling task** to the outer `Scheduler`, so the whole nested run pauses as one task, and the outer run's other tasks go on, on one worker as on N; the outer run resumes the calling task when one of those requests ends. So a nested run that waits for a host flag that another outer task sets ends on one worker too. A nested run never returns status 1 from the caller's stack.
+>   - **Deadlock.** A nested run with no task that can run and no outstanding request of its own stops with `panic: task: deadlock`. No outer task can wake it, because outer handles cannot be used in it (next point).
+>   - **Handles belong to their run.** Every channel, scope, Task, event and `Shared` handle holds the key of the run that made it. Using a handle in a task of another run (a send, a receive, a `sync`, a `go`, a join, a `get`) stops with `panic: task: handle of another run`, also when the handle is portable. So `task.run(() { scope((s) { c = channel.new()  s.go(() { c.send(1) })  task.run(() { c.receive() }) }) })` stops at `c.receive()` on any number of workers. Values that are not handles pass into and out of a nested run as captures and as its result, as with any function call.
+>   - **Boundaries.** A nested run inside a generator body at the top (`collect(() { task.run(() { scope((s) { s.go(() { yield(1) }) }) }) })`) runs inside that boundary body, so by §9.4 rule 1 a `yield` from its tasks succeeds and pauses the whole nested run. That is the same on every host, because that run is not the entry run and uses one worker. A kept function that an outer task made (D4), called inside its own nested run, suspends the outer task with the nested run inside it, which is also the same everywhere. Track R documents both.
+> - Host services given at an entry point are records of constant functions (static ids), so they are portable, and a remotely claimed task uses the remote claimant's own imports. The root environment's `Assert` closure must be a constant with a static id too (part 3.4); at c69515c it is not. §9.7 gets the rule that a host service behaves the same whichever worker calls it.
+
+New sentence(s)/block:
+
+> - `scheduler.detached` is a top-level record of constant functions that stop with `panic: task: no scheduler`. It is portable. Binding it before `keep_env` puts it, not the parent's scheduler, in the kept array, so the parent's scheduler boundary is never kept or captured. Inside, `! Scheduler = own` binds the real one, so `detached` is never called.
+> - `s.spawn(start)` makes the task record (part 3.3), with the handle of the scope `s`.
+> - The worker loop calls `start(own)` inside the task's new boundary (D5), with the `Scheduler` whose suspends go to that boundary. The environment statement is inside the task, in a frame that is kept, so it stays with the task's paused part (§9.4 rule 3).
+> - Kept services may still be non-portable, for example a generator's `Yield` service, or the `Assert` of `assertion.catch`, which hold a boundary. Every service bound at the place is kept, also one that `body` does not need, so a task started under such a service is pinned by P1. That costs parallelism only, and it cannot be seen. When `body` uses that service, suspending to that boundary from the task stops with `control: boundary is not active` on any number of workers, because the task runs from the loop (D5), and the loop does not run inside that boundary's body.
+> - **Runs and nested runs.** A **run** is one call of `task.run`: one loop, its tasks, and the handles they make. Nothing stops i code from calling `task.run` where a run is already going on, and the type of `task.run` cannot forbid it. So the rules are these, and they are the same on every host and every worker count:
+>   - **Which run uses N workers.** Only the run at the program's entry (open question 4) may use more than one worker. Every other run is a **nested run**: a one-worker FIFO loop on the stack of the code that called `task.run`. Its tasks are never remotely claimed. When it is called from inside a task, it runs inside that task's boundary body, so the whole nested run is part of the calling task, which is started and never moves (P2).
+>   - **The run service.** `task.run` needs one service of `i/task` (its name is R's; here `Runner`), and that is how it learns where it is, with no test for "is a service bound". Inside every task, the scheduler binds `Runner` to one that belongs to that task. The entry supplies the initial Runner from inferred needs (runtime D5); task.top(seed) uses that current Runner and replaces only its seed, retaining route and prefix. A run takes three things from `Runner`: its **path prefix**, its **root seed**, and its **wait**.
+>   - **Paths.** At the top the prefix is `[]`. In a task, it is the task's path plus the index of this `task.run` among the task's `go` calls and runs, counted together, so the paths of two runs never meet, and two sibling tasks that each start a nested run get different paths and different generators (part 5).
+>   - **Waits.** When a run has no task that can run but its owned-plus-borrowed program waitable set is nonempty, it waits through `Runner`. At the top, that is the one root wait of host-concurrency §6.4 (status 1). In a task, the nested run registers its owned group interests and explicitly borrowed local tickets with the outer run and suspends **only its calling task** to the outer `Scheduler`, so the whole nested run pauses as one task, and the outer run's other tasks go on, on one worker as on N; the outer run resumes the calling task when one of those requests ends. So a nested run that waits for a host flag that another outer task sets ends on one worker too. A nested run never returns status 1 from the caller's stack.
+>   - **Deadlock.** Use runtime §6.4's owned-plus-borrowed waitable set: outstanding work in every group of the run's stored program Root, union Waiting tickets explicitly awaited by its tasks, including borrowed outer-root requests on the same worker, deduplicated by identity; private group-observer tickets expand to their outstanding members (runtime §5.1). With no runnable task or pending program delivery and an empty set, stop with `panic: task: deadlock`; unrelated outer-root work does not prevent it. A borrowed outer request can wake a nested run. Observe owned groups by counts/revisions, not by returning foreign Tickets (runtime §5.1).
+>   - **Stateful handles belong to their run; events are descriptions.** Every channel, scope, Task and `Shared` handle holds its run key. Using those stateful handles in another run stops with `panic: task: handle of another run`, also when portable. An Event has a fresh identity key and need not have a creating run: always/never/map/choose need no Scheduler. At sync, validate the run of every leaf that refers to a channel, Task or scope, including losing alternatives; a pure leaf has no run restriction. Payloads and callback captures determine event portability, including local witnesses; there is no blanket portable-event promise (runtime §6.1/§6.4). So `task.run(() { scope((s) { c = channel.new()  s.go(() { c.send(1) })  task.run(() { c.receive() }) }) })` stops at `c.receive()` on any number of workers. Values that are not handles pass into and out of a nested run as captures and as its result, as with any function call.
+>   - **Boundaries.** A nested run inside a generator body at the top (`collect(() { task.run(() { scope((s) { s.go(() { yield(1) }) }) }) })`) runs inside that boundary body, so by §9.4 rule 1 a `yield` from its tasks succeeds and pauses the whole nested run. That is the same on every host, because that run is not the entry run and uses one worker. A kept function that an outer task made (D4), called inside its own nested run, suspends the outer task with the nested run inside it, which is also the same everywhere. Track R documents both.
+> - Host services given at an entry point are records of constant functions (static ids), so they are portable, and a remotely claimed task uses the remote claimant's own imports. The root environment's `Assert` closure must be a constant with a static id too (part 3.4); at c69515c it is not. §9.7 gets the rule that a host service behaves the same whichever worker calls it.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-026 — docs/design/multicore.md, 60f37f2 line 244
+
+Old sentence(s)/block:
+
+> - `task.path()` gives the task's path: a list of `go` indices from the root task. The path is portable data. It does not depend on time, worker or queue claims.
+> - `task.path()` needs no suspend: the `Scheduler` that the loop gives a task holds the task's path as data, so reading it is a field read.
+> - i has no mutable values (§11.1), so a per-task draw counter would have to live in the scheduler loop, and every draw would be a suspend to the scheduler; `i/random` would need `! Scheduler`, and code with no scheduler, such as `main = () { … }` with no `task.run`, a top-level value or a macro, could not draw. So Random is a **value**, passed explicitly: a generator is immutable data (the pinned SplitMix state and tagged derivation history of runtime §4); `random.int(g, 10)` gives a number and the next generator, and `random.split(g)` gives two derived generators under that published algorithm. `i/random` does not need `i/task`.
+> - `task.random()` gives the generator of the current task, a pure function of the root seed and `task.path()`. So a child's numbers do not depend on when or where it runs, and a `go` does not change the parent's generator. Calling `task.random()` twice in one task gives the same generator; code that needs more splits it. `go` itself does not know about Random.
+> - **The root seed** is part of the run service (part 4). At the top, the program gives it: `task.top(seed)` takes a generator, made from a host entropy service when the program has one, or from a fixed seed (`random.from_seed(n)`), which needs no service. The contextual entry default is random.from_seed(0) (runtime D5), and task.top(seed) replaces only that seed while preserving the Runner route/prefix. There is no automatic entropy draw, so the type of `task.run` needs no host service, and a macro, which has no host services (`meta.md` §8), gives a fixed seed and gets the same expansion on every run. A nested run in a task takes the seed of its outer run, and its paths start with the calling task's path (part 4), so its generators differ from every other task's.
+> - **Split and paths never meet.** A generator is a key and a **stream**: a list of steps, where a step is either a path step `P(i)` or a split step `S(i)`, and a path step is never equal to a split step. `task.random()` at path `[i1, …, in]` gives the stream `[P(i1), …, P(in)]`; `random.split(g)` gives the streams of `g` followed by `S(1)` and by `S(2)`; numbers come from the pinned published SplitMix split tree in runtime.md §4, which replaces the earlier counter-based PRF sketch. So the first half of `random.split(task.random())` in the task at path `[]` is the stream `[S(1)]`, and the child at path `[1]` has `[P(1)]`: they differ. Different tagged derivation addresses remain distinct histories; no promise of disjoint outputs or perfect statistical independence is made. Runtime.md §4 fixes the exact algorithm and encoding.
+> - Channel, scope and task handles are made of a path-based id (the path of the task that made them and a counter in that task) and the keys that type their state (D13). So `==` on handles is "the same channel" and survives copies, and nothing in them depends on the worker except key ids, which only `==` sees.
+
+New sentence(s)/block:
+
+> - `task.path()` gives the task's path: a list of combined `go`/nested-run indices from the root task. The path is portable data. It does not depend on time, worker or queue claims.
+> - `task.path()` needs no suspend: the `Scheduler` that the loop gives a task holds the task's path as data, so reading it is a field read.
+> - i has no mutable values (§11.1), so a per-task draw counter would have to live in the scheduler loop, and every draw would be a suspend to the scheduler; `i/random` would need `! Scheduler`, and code with no scheduler, such as `main = () { … }` with no `task.run`, a top-level value or a macro, could not draw. So Random is a **value**, passed explicitly: a generator is immutable data (the pinned SplitMix state and tagged derivation history of runtime §4); `random.int(g, 10)` gives a number and the next generator, and `random.split(g)` gives two derived generators under that published algorithm. `i/random` does not need `i/task`.
+> - `task.random()` gives the generator of the current task, a pure function of the root seed and `task.path()`. So a child's numbers do not depend on when or where it runs, and a `go` does not change the parent's generator. Calling `task.random()` twice in one task gives the same generator; code that needs more splits it. `go` itself does not know about Random.
+> - **The root seed** is part of the run service (part 4). At the top, the program gives it: `task.top(seed)` takes a generator, made from a host entropy service when the program has one, or from a fixed seed (`random.from_seed(n)`), which needs no service. The contextual entry default is random.from_seed(0) (runtime D5), and task.top(seed) replaces only that seed while preserving the Runner route/prefix. There is no automatic entropy draw, so the type of `task.run` needs no host service, and a macro, which has no host services (`meta.md` §8), gives a fixed seed and gets the same expansion on every run. A nested run in a task takes the seed of its outer run, and its paths start with the calling task's path (part 4), so its generators differ from every other task's.
+> - **Split and paths never meet.** A generator is a key and a **stream**: a list of steps, where a step is either a path step `P(i)` or a split step `S(i)`, and a path step is never equal to a split step. `task.random()` at path `[i1, …, in]` gives the stream `[P(i1), …, P(in)]`; `random.split(g)` gives the streams of `g` followed by `S(1)` and by `S(2)`; numbers come from the pinned published SplitMix split tree in runtime.md §4, which replaces the earlier counter-based PRF sketch. So the first half of `random.split(task.random())` in the task at path `[]` is the stream `[S(1)]`, and the child at path `[1]` has `[P(1)]`: they differ. Different tagged derivation addresses remain distinct histories; no promise of disjoint outputs or perfect statistical independence is made. Runtime.md §4 fixes the exact algorithm and encoding.
+> - Channel, scope and task handles are made of a path-based id (the path of the task that made them and a counter in that task) and the keys that type their state (D13). So `==` on handles is "the same channel" and survives copies, and nothing in them depends on the worker except key ids, which only `==` sees.
+
+Reason: N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-027 — docs/design/multicore.md, 60f37f2 line 254
+
+Old sentence(s)/block:
+
+> - A scope returns only after all its children have ended, including children that are being unwound.
+> - **Chains.** The **chain** of a scope `r` is `r` followed by the chain of the task that opened `r`, as it was when `r` was opened. The **chain** of a task, at a moment, is the scopes it has opened whose bodies it is still running (innermost first), followed by the chain of the scope it was started in (empty for a run's root task). A task's chain changes only when that task itself enters or leaves a scope body, so it is fixed by the task's own steps, not by time or placement. Every scope in a task's chain has not ended: the scopes it has opened are still running their bodies, the scope it was started in waits for it, and each scope in that scope's chain was in the opener's chain when it was opened, so by the same argument it cannot end before the opener leaves it. The scheduler keeps each task's chain as a list of scope ids, so the check is a list search.
+> - **Who may `go`.** `s.go` may be called only by a task whose chain holds `s`. Otherwise it stops with `panic: task: go outside its scope`, whether or not `s` has ended. So a `go` never meets an ended scope. Examples that stop: `h = scope((s) { s })  h.go(() { 1 })` (after the body returns, `s` is no longer in the root task's chain); `scope((u) { scope((s) { u.go(() { task.yield()  s.go(() { 1 }) }) }) })` (the `u` child was started in `u`, whose chain does not hold `s`); `scope((outer) { c = channel.new()  outer.go(() { h = c.receive()  h.go(() { 1 }) })  scope((s1) { c.send(s1) }) })` (the same). Each stops on any number of workers. A scope handle is portable and may be sent anywhere, but only tasks inside the scope may use it to start tasks. A `go` on a scope that is cancelling makes an unstarted task that is dropped at once; whether a `go` comes before or after the cancel is part of the order of D1.
+> - **Who may join.** A join of the Task handle of a child of `s` (and a `sync` of a join event made from it) may be done only by a task whose chain holds `s`. Otherwise it stops with `panic: task: join outside its scope`. A joiner still cancellable by `s` is unwound before observing a dropped/cancelled outcome; a shielded joiner, including protected final work, stops with `panic: task: join of a cancelled task` immediately when drop/cancellation is accepted, without waiting for target cleanup (runtime R4a). If R later adds a way to cancel one task while its scope goes on, a join of that task must complete with a value its type shows (for example a `Cancelled` case); no join may be left waiting.
+> - **Errors.** When a child fails, the scope cancels the other children. When all have ended, the scope gives the error of the failed task with the lowest path (D10) among the scope's body and its children; the body comes first. Later errors are dropped. Error types stay unions; there is no aggregate error type, so inference does not change. Every error given to a scope made by `scope` is portable (P3). For `scope((s) { s.go(() { s.go(() { fail.raise(A) })  fail.raise(C) }) })`, if both fail, the error is `C` (path `[1]` comes before `[1, 1]`), whichever failed first. Which children fail before the cancel reaches them depends on the order of D1: for `s.go(() { task.yield()  fail.raise(A) })` and `s.go(() { fail.raise(B) })`, one FIFO worker gives `B`, and N workers may give `A`. The `i/task` docs say so.
+> - **Results.** `both`, `race` and `map_concurrently` are ordinary i code built on `scope`, so they are portable paths: each result and error of their children is checked when the child ends (P3), and a result containing a user host reference stops with `panic: task: value is not portable`. Standard File/Listener/Stream/Child values are portable nominal Int wrappers (native N9); returning them through these combinators succeeds. R may add local forms built on `local_scope` (`local_both`, `local_race`, `local_map_concurrently`), which do not check and whose children stay home (P4); without them, the program writes the local scope itself. `both` and `map_concurrently` give results in argument order. `race` gives the first result that commits; timing chooses, as with a CML `choose`. With one worker the FIFO scheduler makes it fixed, but that is not a promise for N workers.
+> - **What a cancel of a scope reaches.** When a scope `s` is cancelled (a child failed, or a task whose chain holds `s` is itself cancelled), the cancel reaches every child of `s` **and the body of `s`**. The body is unwound back to the `scope` call: `scope` runs its body under its own boundary in the body's task, and the cancel suspends to that boundary and cancels the part up to it, so the body's final functions run and the body gives no value; `scope` then waits for its children and gives the error of D10. A cancelled task cancels every scope it is running a body of, so the cancel goes down the whole tree inside `s`. A cancelled body is not a failure; it does not take part in the choice of the error. So `scope((s) { s.go(() { fail.raise(A) })  t = s.go(() { 1 })  t.join() })` gives error `A` on the one-worker FIFO scheduler: child `[1]` fails, `t` is dropped, the body waiting in `t.join()` is unwound, and nothing waits forever.
+> - **Cancellation** is cooperative and goes to the task's home worker. An unstarted task is dropped; it has no final functions. A started task is cancelled when the cancel reaches it: when it is paused (waiting or runnable) at that time, the loop does not give it the answer it waits for and cancels it as the next point says; when it is running, at its next suspend point. When the cancel reaches a task is a step in the order of D1: on one FIFO worker it reaches every paused task at once, and on N workers it reaches a task on another worker at that worker's next poll point. A task that is being unwound is not cancelled again, and its final functions run to their end, with the scopes they open, which that cancel does not reach.
+> - **How a started task is cancelled.** The loop never calls `control.cancel(k)` on the task's continuation `k`: under §9.4 rule 4 the task's boundary `b` would stay not active while the final functions run (`$control_cancel` and `$cancel_run`, `emit/control.rs:270-300`, never set field 8 of the boundary), and a final function that uses `i/task` (a send, a receive, a join, a sleep, an async host call through the scheduler) would suspend to `b` and stop with `control: boundary is not active`. Instead the loop **resumes** `k` with a cancel answer. `b` is then active again. The `Scheduler` call inside the task that sees the answer suspends to the task's inner boundary (made by `task.unwind_inside`, part 4) or, for a scope body, to that scope's boundary, and its handler calls `control.cancel` on that inner part only. So the final functions run with `b` active, and they may suspend to `b`; `$cancel_run` already catches a capture through it and gives it the record `$cancel_reenter`, so the rest of the unwind resumes later. They get the environment of §9.4 rule 4 as part 13 amends it: the services kept by the task's kept function and the environment statements inside the task, not the loop's services. This is all ordinary i code on `i/control`.
+> - **Stops.** A stop on any worker closes the run's start/claim/delivery gate and records one message under the lock. Stopping invokes no i finals. Every user import checks the stopped-context gate, so spinning native workers cannot start new host effects while reaping delays process exit. Native's independent controller tears down host work/resources before process exit; it does not join a spinning Wasm worker. A continuing host uses stop-only epoch traps in that run's interruption domain, wakes idle reactors and joins workers, then returns the first stop (native N12). Epochs do not interrupt synchronous host code; multicore hosts must supply stop-aware synchronous imports or choose one worker/process isolation. Child cleanup follows runtime §8.1, including reaping before native exit.
+> - **Deadlock.** When no task can run and no host request is outstanding on any worker, nothing can ever go on. The run then stops with `panic: task: deadlock`, on one worker as on N. On one worker the scheduler sees this directly: its queue is empty and its request table is empty. It must not return status 1 then, which host-concurrency.md H4 makes a fault of the module. On N workers it needs quiescence detection: a shared count of runnable and running tasks and of outstanding requests; the worker that sees it reach zero with shared and local queues empty records the stop under the same lock. Queue claims, local running counts, registrations and completion publication must participate in that snapshot; idle workers alone do not prove deadlock. In a macro, which has no host services (`meta.md` §8), every wait with nothing to run is a deadlock.
+> - **Idle.** A worker with nothing to run, while others still work or requests are outstanding, waits. By host-concurrency H5, a host answers a request only through `ilang_resume:…` after the instance has returned status 1 or 2, never while it is inside Wasm. So a worker that has **outstanding requests of its own** (its pinned tasks wait on them, P2) must never park inside Wasm: it would never see its answers, and a task that waits on a 10 ms sleep would hang until something else woke the worker. The rule:
+>   - A worker with outstanding requests of its own idles only by returning status 1, on every host. Its host then waits for either an answer to one of its requests or a **wake** from another worker, whichever comes first. The wake is a request-mode ordinary host service added in the multicore wave (native N8): it resolves when another worker writes the worker's wake word (`Atomics.waitAsync` in JS; in wasmtime, a wait on that word in the host thread, raced with the reactor). The worker keeps one wake request outstanding while it idles, so status 1 is never given with no outstanding request (H4).
+>   - A native worker with no requests may park in the host queue wait; a browser worker may use memory.atomic.wait32, except browser worker 0, which never blocks: it idles like a worker with requests, with only the wake request outstanding.
+>   - A one-worker run never uses the wake request: on one worker, idle means status 1 with the run's own requests (C-D's "wait for any"), and with none it is a deadlock.
+
+New sentence(s)/block:
+
+> - A scope returns only after all its children have ended, including children that are being unwound.
+> - **Chains.** The **chain** of a scope `r` is `r` followed by the chain of the task that opened `r`, as it was when `r` was opened. The **chain** of a task, at a moment, is the scopes it has opened whose bodies it is still running (innermost first), followed by the chain of the scope it was started in (empty for a run's root task). A task's chain changes only when that task itself enters or leaves a scope body, so it is fixed by the task's own steps, not by time or placement. Every scope in a task's chain has not ended: the scopes it has opened are still running their bodies, the scope it was started in waits for it, and each scope in that scope's chain was in the opener's chain when it was opened, so by the same argument it cannot end before the opener leaves it. The scheduler keeps each task's chain as a list of scope ids, so the check is a list search.
+> - **Who may `go`.** `s.go` may be called only by a task whose chain holds `s`. Otherwise it stops with `panic: task: go outside its scope`, whether or not `s` has ended. So a `go` never meets an ended scope. Examples that stop: `h = scope((s) { s })  h.go(() { 1 })` (after the body returns, `s` is no longer in the root task's chain); `scope((u) { scope((s) { u.go(() { task.yield()  s.go(() { 1 }) }) }) })` (the `u` child was started in `u`, whose chain does not hold `s`); `scope((outer) { c = channel.new()  outer.go(() { h = c.receive()  h.go(() { 1 }) })  scope((s1) { c.send(s1) }) })` (the same). Each stops on any number of workers. A scope handle is portable and may be sent anywhere, but only tasks inside the scope may use it to start tasks. A `go` on a scope that is cancelling makes an unstarted task that is dropped at once; whether a `go` comes before or after the cancel is part of the order of D1.
+> - **Who may join.** A join of the Task handle of a child of `s` (and a `sync` of a join event made from it) may be done only by a task whose chain holds `s`. Otherwise it stops with `panic: task: join outside its scope`. A joiner still cancellable by `s` is unwound before observing a dropped/cancelled outcome; a shielded joiner, including protected final work, stops with `panic: task: join of a cancelled task` immediately when drop/cancellation is accepted, without waiting for target cleanup (runtime R4a). If R later adds a way to cancel one task while its scope goes on, a join of that task must complete with a value its type shows (for example a `Cancelled` case); no join may be left waiting.
+> - **Errors.** When a child fails, the scope cancels the other children. When all have ended, the scope gives the error of the failed task with the lowest path (D10) among the scope's body and its children; the body comes first. Later errors are dropped. Error types stay unions; there is no aggregate error type, so inference does not change. Every error given to a scope made by `scope` is portable (P3). For `scope((s) { s.go(() { s.go(() { fail.raise(A) })  fail.raise(C) }) })`, if both fail, the error is `C` (path `[1]` comes before `[1, 1]`), whichever failed first. Which children fail before the cancel reaches them depends on the order of D1: for `s.go(() { task.yield()  fail.raise(A) })` and `s.go(() { fail.raise(B) })`, one FIFO worker gives `B`, and N workers may give `A`. The `i/task` docs say so.
+> - **Results.** `both`, `race` and `map_concurrently` are ordinary i code built on `scope`, so they are portable paths: each result and error of their children is checked when the child ends (P3), and a result containing a user host reference stops with `panic: task: value is not portable`. Standard File/Listener/Stream/Child values are portable nominal Int wrappers (native N9); returning them through these combinators succeeds. R may add local forms built on `local_scope` (`local_both`, `local_race`, `local_map_concurrently`), which do not check and whose children stay home (P4); without them, the program writes the local scope itself. `both` and `map_concurrently` give results in argument order. `race` gives the first result that commits; timing chooses, as with a CML `choose`. With one worker the FIFO scheduler makes it fixed, but that is not a promise for N workers.
+> - **What a cancel of a scope reaches.** When a scope `s` is cancelled (a child failed, or a task whose chain holds `s` is itself cancelled), the cancel reaches every child of `s` **and the body of `s`**. The body is unwound back to the `scope` call: `scope` runs its body under its own boundary in the body's task, and the cancel suspends to that boundary and cancels the part up to it, so the body's final functions run and the body gives no value; `scope` then waits for its children and gives the error of D10. A cancelled task cancels every scope it is running a body of, so the cancel goes down the whole tree inside `s`. A cancelled body is not a failure; it does not take part in the choice of the error. So `scope((s) { s.go(() { fail.raise(A) })  t = s.go(() { 1 })  t.join() })` gives error `A` on the one-worker FIFO scheduler: child `[1]` fails, `t` is dropped, the body waiting in `t.join()` is unwound, and nothing waits forever.
+> - **Cancellation** is cooperative and goes to the task's home worker. An unstarted task is dropped; it has no final functions. A started task is cancelled when the cancel reaches it: when it is paused (waiting or runnable) at that time, the loop does not give it the answer it waits for and cancels it as the next point says; when it is running, at its next suspend point. When the cancel reaches a task is a step in the order of D1: on one FIFO worker it reaches every paused task at once, and on N workers it reaches a task on another worker at that worker's next poll point. A task that is being unwound is not cancelled again, and its final functions run to their end, with the scopes they open, which that cancel does not reach.
+> - **How a started task is cancelled.** The loop never calls `control.cancel(k)` on the task's continuation `k`: under §9.4 rule 4 the task's boundary `b` would stay not active while the final functions run (`$control_cancel` and `$cancel_run`, `emit/control.rs:270-300`, never set field 8 of the boundary), and a final function that uses `i/task` (a send, a receive, a join, a sleep, an async host call through the scheduler) would suspend to `b` and stop with `control: boundary is not active`. Instead the loop **resumes** `k` with a cancel answer. `b` is then active again. The `Scheduler` call inside the task that sees the answer suspends to the task's inner boundary (made by `task.unwind_inside`, part 4) or, for a scope body, to that scope's boundary, and its handler calls `control.cancel` on that inner part only. So the final functions run with `b` active, and they may suspend to `b`; `$cancel_run` already catches a capture through it and gives it the record `$cancel_reenter`, so the rest of the unwind resumes later. They get the environment of §9.4 rule 4 as part 13 amends it: the services kept by the task's kept function and the environment statements inside the task, not the loop's services. This is all ordinary i code on `i/control`.
+> - **Stops.** A stop on any worker closes the run's start/claim/delivery gate and records one message under the lock. Stopping invokes no i finals. Every user import checks the stopped-context gate, so spinning native workers cannot start new host effects while reaping delays process exit. Native's independent controller tears down host work/resources before process exit; it does not join a spinning Wasm worker. A continuing host uses stop-only epoch traps in that run's interruption domain, wakes idle reactors and joins workers, then returns the first stop (native N12). Epochs do not interrupt synchronous host code; multicore hosts must supply stop-aware synchronous imports or choose one worker/process isolation. Child cleanup follows runtime §8.1, including reaping before native exit.
+> - **Deadlock.** Use the program waitable set in part 4/runtime §6.4: all outstanding work owned by the run's program Root plus explicitly awaited borrowed Waiting tickets, deduplicated by identity, expanding group-observer tickets to their underlying members (runtime §5.1). Driver wake requests use a separate ordinary control Root/Owner; they are closed with the driver and never bound into user tasks or exposed as borrowed waits. General Root/Owner accounting distinguishes them by the roots selected by the driver, never by module/import name. With no runnable, claimed-but-unstarted or running task, no pending program completion/group-notification processing, and an empty program waitable set, record `panic: task: deadlock` under the shared lock. Start/claim/cancel/answer transitions and local work counts participate in that snapshot; an answer moves from the request count to pending delivery work atomically. Control requests and wake-only deliveries are excluded from that progress predicate. All actual outstanding requests still count for ABI status 1, so wake requests preserve H4 without masking deadlock. On one worker no wake is needed and the same predicate applies. In a macro without host services, nothing runnable and an empty waitable set is a deadlock.
+> - **Review wake trace.** Worker 0 is idle with one control wake request. The last runnable task on A executes sync(never()); program request count is zero. Once that registration finishes, runnable/running/claimed/pending-program-delivery counts are all zero, so the locked snapshot records deadlock even though the control count is one (or two if A also installed a wake). Stop closes the control roots and wakes the drivers; it does not wait for those wakes to justify progress. If an owned or explicitly borrowed program request is pending instead, its count prevents the stop until it settles.
+> - **Idle.** A worker with nothing to run, while others still work or requests are outstanding, waits. By host-concurrency H5, a host answers a request only through `ilang_resume:…` after the instance has returned status 1 or 2, never while it is inside Wasm. So a worker that has **outstanding requests of its own** (its pinned tasks wait on them, P2) must never park inside Wasm: it would never see its answers, and a task that waits on a 10 ms sleep would hang until something else woke the worker. The rule:
+>   - A worker with outstanding requests of its own idles only by returning status 1, on every host. Its host then waits for either an answer to one of its requests or a **wake** from another worker, whichever comes first. The wake is a request-mode ordinary host service added in the multicore wave (native N8): it resolves when another worker writes the worker's wake word (`Atomics.waitAsync` in JS; in wasmtime, a wait on that word in the host thread, raced with the reactor). The worker keeps one wake request outstanding while it idles, so status 1 is never given with no outstanding request (H4).
+>   - A native worker with no requests may park in the host queue wait; a browser worker may use memory.atomic.wait32, except browser worker 0, which never blocks: it idles like a worker with requests, with only the wake request outstanding.
+>   - A one-worker run never uses the wake request: on one worker, idle waits on the owned-plus-borrowed program set from part 4, and an empty set with no pending program delivery means deadlock.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-028 — docs/design/multicore.md, 60f37f2 line 601
+
+Old sentence(s)/block:
+
+> (none)
+
+New sentence(s)/block:
+
+> The N-R1–N-R6 fixtures in native §11.1 are required at 1/2/4 workers: remote
+> Root count without Ticket transfer; owned read cancellation; wake-only deadlock;
+> pure and captured events; borrowed nested requests; combined go/run paths.
+> MC-D must demonstrate atomic group subscription, cancellation actions before
+> group-cancel return, home-cell terminal reconciliation without foreign Tickets, and the
+> program/control quiescence snapshot through the one Scheduler boundary before
+> MC-I. These are fixed semantics, not choices left to that prototype.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-029 — docs/design/multicore.md, 60f37f2 line 603
+
+Old sentence(s)/block:
+
+> 1. Values pass between tasks only through `go` captures and kept services, channel and event sends, task results and errors (read by the scope or by a join of the Task handle), and `scope.share`. There is no other shared state.
+> 2. Every portable path calls `core.portable` and stops with `panic("task: value is not portable")` when it is False: a `send` on a `channel.new` channel (checked at the call), a send event on such a channel (checked when the event is made, never at `sync` or at commit), results and errors given to a scope made by `scope`, also inside `both`, `race` and `map_concurrently`, which are built on `scope`, and `share`. This happens always, also on one worker. Local forms of the combinators, if R adds them, are built on `local_scope` and do not check.
+> 3. `go` never rejects a task for non-portability. On N workers it silently classifies and encodes the complete record at go (D8/P1); failure pins locally. A shared entry has one claim/drop owner, coordinated with scope cancellation. One worker keeps its FIFO originals without encoding.
+> 4. As runtime §6.3 requires, `go` also detaches/rebinds Runner and Await while preserving Root/Owner. `go` binds `Scheduler` to the portable `scheduler.detached` and then keeps the parent's services with `control.keep_env`, and takes the real `Scheduler` as the parameter of the kept function. So the parent's scheduler is never kept or captured. The kept function binds `! Scheduler = own` and then calls the body **not** in tail position (`r = …  r`), so that the statement stays on a frame record after a resume (`lazy-reentry.md` D16, section 7a); R checks at O2 that it stays a frame. `task.keep(f)` is built the same way for callbacks that other tasks call; a function that user code keeps with `control.keep_env` inside a task is tied to that task (D4), and the docs say so.
+> 5. Every task runs directly from its run's loop, never on another task's stack, under a new boundary that the loop makes for it at its start (D5); `control.resume` makes it active again. The loop has no long-lived boundary of its own. Nested scopes, `both`, `race` and `map_concurrently` never run a loop on the caller's stack. Only the entry's `task.run` may use more than one worker; any other `task.run` is a nested run: one worker, FIFO, on the caller's stack, on every host. `task.run` needs the run service (part 4), which gives it its path prefix, root seed and wait. A nested run inside a task has paths that start with the calling task's path and its run index, waits by suspending only its calling task to the outer run (never by status 1 from the caller's stack), and stops with `panic("task: deadlock")` when it has nothing to run and no request of its own. Every handle holds the key of its run; using it in another run stops with `panic("task: handle of another run")`.
+> 6. Local channels and local scopes hold the boundary of the task that made them, only to be non-portable; no suspend ever goes to it. The Task handle of a child of a local scope, and every join event made from it, hold the local scope handle, so they are not portable either. Every task record holds the handle of its scope, so a child of a local scope is never remotely claimed. Local paths do not check. There is no flag and no special case.
+> 7. A started task never moves. A task that waits on an async host call resumes on the worker that started the call. A host request value (R2) is not portable, so only tasks on its home worker wait on it, poll it or cancel it.
+> 8. A scope returns only after all its children have ended. On a failure it cancels the rest **and its own body**, which is unwound back to the `scope` call, and then gives the error of the failed task with the lowest path in path order (D10; its own body first, `[1] < [1, 1] < [2]`); a cancelled body is not a failure. Every task has a chain of scopes (part 6), changed only by its own scope entries and exits. `s.go`, and a join of a child of `s`, may be done only by a task whose chain holds `s`; otherwise they stop with `panic("task: go outside its scope")` and `panic("task: join outside its scope")`, whether or not `s` has ended. A `go` on a cancelling scope makes an unstarted task dropped at once; a shielded caller receives its Task handle, while a cancellable caller unwinds before observing it (runtime R4a). At a valid join/selected join event, applicable cancellation first unwinds a cancellable joiner; a shielded joiner stops with `panic("task: join of a cancelled task")` as soon as target drop/cancellation is accepted, without waiting for cleanup (runtime R4a). Error types stay unions.
+> 9. `both` and `map_concurrently` give results in argument order. The docs state the rule of D1: every run gives the result of some order of steps, so a plain receive with several senders, `race`, `choose`, and anything else that depends on the order may differ between runs and worker counts.
+> 10. Cancellation is cooperative: an unstarted task is dropped; a started task is cancelled on its home worker when the cancel reaches it (at once when it is paused, at its next suspend point when it runs; when that is, is a step of D1). The loop never calls `control.cancel` on a task's continuation: it resumes the task with a cancel answer, and the task cancels its own inner part, so its boundary stays active and final functions may use `i/task`. A task being unwound is not cancelled again.
+> 11. Every task has a path (the path of the task that called `go` plus the index of that `go` among its `go` calls and nested runs), given by `task.path()` with no suspend. Random is a value: `task.random()` is a pure function of the root seed and the path, and `i/random` does not need `i/task` or `Scheduler`. The root seed comes from the run service; the entry default is random.from_seed(0), and task.top(seed) changes only the current Runner's seed/route-preserving value, with no entropy draw (runtime D5). Path steps and split steps are different kinds of stream step, so `random.split` never gives the generator of a task. Task/scope/channel/event/share ids and per-task names come from the path, never from time, a global counter, or the worker.
+> 12. Task, scope, channel, event and `Shared` handles are made of path-based ids and keys (D13), and hold no boundary, closure over scheduler state, or other non-portable value (except local handles and the handles of children of local scopes, rule 6). `==` on them means "the same handle". No API needs an order or a hash on functions, keys, boundaries or continuations; scheduler bookkeeping uses Int ids.
+> 13. Events are values. `choose` and `map` are pure, `sync` commits exactly one event, and `map` functions run in the syncing task after the commit. Nack and guard are left for later.
+> 14. `scope.share(value)` needs a portable value. A `Shared` belongs to its scope, and a `get` after the scope ends stops with `panic("task: shared value is gone")` in every build. A channel belongs to the first scope in its maker's chain (or to the run); its state is freed when that scope ends, and a later send, receive or `sync` on it, or a wait on it at that end, stops with `panic("task: channel is gone")` in every build.
+> 15. All shared mutable scheduler state is behind the one `Scheduler` service, kept as `Keyed` values where it has many types, so the multicore wave can replace its implementation without changing the API. No API needs an unsafe cast.
+> 16. The scheduler has poll points (`go`, every `sync`, joins and scope ends, `yield`, async host calls, every switch of the loop) written as one call that does nothing on one worker.
+> 17. On one worker the scheduler is FIFO and fixed, with no time unless a `Clock` service is given. It idles only by waiting for an outstanding host request (C-D's "wait for any"), never by a busy loop or a blocking import, and never returns status 1 with no request outstanding. When no task can run and no request is outstanding, it stops with `panic("task: deadlock")`. On N workers (MC), a worker with outstanding requests of its own never parks inside Wasm; it returns status 1 with a wake request outstanding (part 6, Idle).
+> 18. Many host calls may wait at once, through the request table. No code relies on one pending import per instance.
+> 19. A stop in any task stops the program. It is never caught or counted as a task error.
+> 20. No API takes a label-generic callback (records L5), and no API needs a static `Send`-like type.
+> 21. No API shows worker indices, the worker count, or queue claims.
+> 22. Tests of `i/task` and of programs that use it must not depend on the order of steps (D1: which sender a receive gets, which `race` branch, which children fail before a cancel, whether a step comes before a scope ends, which of two stops, the order of output), or must be marked with the outcomes they allow (T13).
+> 23. `Key(A)` is invariant in `A`, and keys are only used through `i/key`; no API casts.
+> 24. `s.go` and joins check the chain, channels and `Shared` values are freed with their scope, and handles check their run, all in M:1 already, so that the multicore wave changes no program.
+> 25. Only `==` reads function and key ids. The text form of a function, a key, a `Keyed` value or any task/scope/channel/event/share handle never shows an id, a worker index or anything else that depends on placement, and no `i/task` API gives one out.
+
+New sentence(s)/block:
+
+> 1. Values pass between tasks only through `go` captures and kept services, channel and event sends, task results and errors (read by the scope or by a join of the Task handle), and `scope.share`. There is no other shared state.
+> 2. Every portable path calls `core.portable` and stops with `panic("task: value is not portable")` when it is False: a `send` on a `channel.new` channel (checked at the call), a send event on such a channel (checked when the event is made, never at `sync` or at commit), results and errors given to a scope made by `scope`, also inside `both`, `race` and `map_concurrently`, which are built on `scope`, and `share`. This happens always, also on one worker. Local forms of the combinators, if R adds them, are built on `local_scope` and do not check.
+> 3. `go` never rejects a task for non-portability. On N workers it silently classifies and encodes the complete record at go (D8/P1); failure pins locally. A shared entry has one claim/drop owner, coordinated with scope cancellation. One worker keeps its FIFO originals without encoding.
+> 4. As runtime §6.3 requires, `go` also detaches/rebinds Runner and Await while preserving Root/Owner. `go` binds `Scheduler` to the portable `scheduler.detached` and then keeps the parent's services with `control.keep_env`, and takes the real `Scheduler` as the parameter of the kept function. So the parent's scheduler is never kept or captured. The kept function binds `! Scheduler = own` and then calls the body **not** in tail position (`r = …  r`), so that the statement stays on a frame record after a resume (`lazy-reentry.md` D16, section 7a); R checks at O2 that it stays a frame. `task.keep(f)` is built the same way for callbacks that other tasks call; a function that user code keeps with `control.keep_env` inside a task is tied to that task (D4), and the docs say so.
+> 5. Every task runs directly from its run's loop, never on another task's stack, under a new boundary that the loop makes for it at its start (D5); `control.resume` makes it active again. The loop has no long-lived boundary of its own. Nested scopes, `both`, `race` and `map_concurrently` never run a loop on the caller's stack. Only the entry's `task.run` may use more than one worker; any other `task.run` is a nested run: one worker, FIFO, on the caller's stack, on every host. `task.run` needs the run service (part 4), which gives it its path prefix, root seed and wait. A nested run inside a task has paths that start with the calling task's path and its run index, waits by suspending only its calling task to the outer run (never by status 1 from the caller's stack), and uses the owned-plus-explicitly-borrowed waitable set of part 4/runtime §6.4; no runnable or pending program delivery and an empty set means `panic("task: deadlock")`. Channel/Task/scope/Shared handles check their run; Event descriptions have fresh keys without a required creating run, and sync checks every stateful leaf, including losing alternatives.
+> 6. Local channels and local scopes hold the boundary of the task that made them, only to be non-portable; no suspend ever goes to it. The Task handle of a child of a local scope, and every join event made from it, hold the local scope handle, so they are not portable either. Every task record holds the handle of its scope, so a child of a local scope is never remotely claimed. Local paths do not check. There is no flag and no special case.
+> 7. A started task never moves. A task that waits on an async host call resumes on the worker that started the call. Request/Ticket values (R2) are not portable: only their home worker operates on their cells. Portable Root/Owner operations observe or cancel whole groups through shared metadata and home-worker notifications; they never return foreign Tickets (runtime §5.1).
+> 8. A scope returns only after all its children have ended. On a failure it cancels the rest **and its own body**, which is unwound back to the `scope` call, and then gives the error of the failed task with the lowest path in path order (D10; its own body first, `[1] < [1, 1] < [2]`); a cancelled body is not a failure. Every task has a chain of scopes (part 6), changed only by its own scope entries and exits. `s.go`, and a join of a child of `s`, may be done only by a task whose chain holds `s`; otherwise they stop with `panic("task: go outside its scope")` and `panic("task: join outside its scope")`, whether or not `s` has ended. A `go` on a cancelling scope makes an unstarted task dropped at once; a shielded caller receives its Task handle, while a cancellable caller unwinds before observing it (runtime R4a). At a valid join/selected join event, applicable cancellation first unwinds a cancellable joiner; a shielded joiner stops with `panic("task: join of a cancelled task")` as soon as target drop/cancellation is accepted, without waiting for cleanup (runtime R4a). Error types stay unions.
+> 9. `both` and `map_concurrently` give results in argument order. The docs state the rule of D1: every run gives the result of some order of steps, so a plain receive with several senders, `race`, `choose`, and anything else that depends on the order may differ between runs and worker counts.
+> 10. Cancellation is cooperative: an unstarted task is dropped; a started task is cancelled on its home worker when the cancel reaches it (at once when it is paused, at its next suspend point when it runs; when that is, is a step of D1). The loop never calls `control.cancel` on a task's continuation: it resumes the task with a cancel answer, and the task cancels its own inner part, so its boundary stays active and final functions may use `i/task`. A task being unwound is not cancelled again.
+> 11. Every task has a path (the path of the task that called `go` plus the index of that `go` among its `go` calls and nested runs), given by `task.path()` with no suspend. Random is a value: `task.random()` is a pure function of the root seed and the path, and `i/random` does not need `i/task` or `Scheduler`. The root seed comes from the run service; the entry default is random.from_seed(0), and task.top(seed) changes only the current Runner's seed/route-preserving value, with no entropy draw (runtime D5). Path steps and split steps are different kinds of stream step, so `random.split` never gives the generator of a task. Task/scope/channel/share ids and per-task names come from the path, never from time, a global counter, or the worker. Event identity uses a fresh key independent of any task path or run; only equality observes it, and copies retain it (runtime §6.4).
+> 12. Task, scope, channel and `Shared` handles use path-based ids and keys (D13), with local witnesses for local handles and children of local scopes (rule 6). Events instead contain a fresh identity key and ordinary descriptions, payloads and callbacks; their captures may contain boundaries or other non-portable values, which pin a capturing task under the normal complete-record test. Stateful handle implementations add no hidden closure over a live scheduler; user event callbacks may capture one and are then non-portable. `==` on these values means "the same handle", and event copies preserve their key. No API needs an order or a hash on functions, keys, boundaries or continuations; scheduler bookkeeping uses Int ids.
+> 13. Events are values. `choose` and `map` are pure, `sync` commits exactly one event, and `map` functions run in the syncing task after the commit. Nack and guard are left for later.
+> 14. `scope.share(value)` needs a portable value. A `Shared` belongs to its scope, and a `get` after the scope ends stops with `panic("task: shared value is gone")` in every build. A channel belongs to the first scope in its maker's chain (or to the run); its state is freed when that scope ends, and a later send, receive or `sync` on it, or a wait on it at that end, stops with `panic("task: channel is gone")` in every build.
+> 15. All shared mutable scheduler state is behind the one `Scheduler` service, kept as `Keyed` values where it has many types, so the multicore wave can replace its implementation without changing the API. No API needs an unsafe cast.
+> 16. The scheduler has poll points (`go`, every `sync`, joins and scope ends, `yield`, async host calls, every switch of the loop) written as one call that does nothing on one worker.
+> 17. On one worker the scheduler is FIFO and fixed, with no time unless a `Clock` service is given. It idles only by waiting for an outstanding host request (C-D's "wait for any"), never by a busy loop or a blocking import, and never returns status 1 with no request outstanding. When no task or pending program delivery can run and the owned-plus-borrowed program waitable set is empty, it stops with `panic("task: deadlock")`; control-root wakes do not prevent this (part 6). On N workers (MC), a worker with outstanding requests of its own never parks inside Wasm; it returns status 1 with a wake request outstanding (part 6, Idle).
+> 18. Many host calls may wait at once, through the request table. No code relies on one pending import per instance.
+> 19. A stop in any task stops the program. It is never caught or counted as a task error.
+> 20. No API takes a label-generic callback (records L5), and no API needs a static `Send`-like type.
+> 21. No API shows worker indices, the worker count, or queue claims.
+> 22. Tests of `i/task` and of programs that use it must not depend on the order of steps (D1: which sender a receive gets, which `race` branch, which children fail before a cancel, whether a step comes before a scope ends, which of two stops, the order of output), or must be marked with the outcomes they allow (T13).
+> 23. `Key(A)` is invariant in `A`, and keys are only used through `i/key`; no API casts.
+> 24. `s.go` and joins check the chain, channels and `Shared` values are freed with their scope, and handles check their run, all in M:1 already, so that the multicore wave changes no program.
+> 25. Only `==` reads function and key ids. The text form of a function, a key, a `Keyed` value or any task/scope/channel/event/share handle never shows an id, a worker index or anything else that depends on placement, and no `i/task` API gives one out.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-030 — docs/design/native.md, 60f37f2 line 3
+
+Old sentence(s)/block:
+
+> Status: adopted, revision 3 (2026-11-10). The ledger's “Native proposal ADOPTED” records
+> the user's adoption of revision 2, including the four replacements in §8. This revision
+> reconciles runtime.md and multicore.md and closes the lifetime, stop and forged-number
+> gaps. It changes no implementation. Performance targets are acceptance goals, not
+> measurements.
+
+New sentence(s)/block:
+
+> Status: adopted, revision 4 (2026-11-10). The ledger's “Native proposal ADOPTED” records
+> the user's adoption of revision 2, including the four replacements in §8. This revision
+> reconciles runtime.md and multicore.md and closes the lifetime, stop and forged-number
+> gaps. Revision 4 applies coordinator rulings N-R1–N-R6 after the independent
+> review of 60f37f2; §11.1 records the repairs and regression cases. It changes no implementation. Performance targets are acceptance goals, not
+> measurements.
+
+Reason: Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-031 — docs/design/native.md, 60f37f2 line 128
+
+Old sentence(s)/block:
+
+> (none)
+
+New sentence(s)/block:
+
+> N-R1/N-R3 refine that boundary: Root/Owner are portable group capabilities,
+> with shared count/readiness/cancel-all/wait-none semantics and no Ticket
+> enumeration (runtime §5.1). Request/Ticket cells and observer cells stay local;
+> metadata notifications route changes to their home workers. Group waits use
+> Await and count only their underlying producers, never their own observation
+> cells. The driver owns separate ordinary program and control Roots, selected
+> by its accounting policy, not by any module/import rule. Only the program Root
+> and explicit borrowed producer interests enter quiescence; wake requests in the
+> control Root still count for ABI status 1. Snapshot runnable/running/claimed work,
+> pending program deliveries and that program waitable set under the same lock
+> (runtime §6.4; multicore §6). Atomic delivery publication prevents a false zero.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots.
+
+### R4-032 — docs/design/native.md, 60f37f2 line 165
+
+Old sentence(s)/block:
+
+> **N9.3. Lookup, leases and close have one order.** Under a short host lock, test
+> context/kind/liveness and acquire the operation's lease. Socket directions each have one
+> lease; read+write may overlap, two reads/writes/accepts give busy. Files have one
+> read/write/flush cursor lease, children one wait lease. Removal on close revokes leases
+> and wakes pending operations with closed. A completion committed first retains its
+> answer; close committed first prevents success publication. In-flight code holds a safe
+> reference/private OS duplicate, never a pointer to a removed table entry. Release
+> happens once when references are safe. Close is idempotent/error-free; cancelling its
+> request cannot undo host cleanup. Child close awaits reaping. A context/kind-checked
+> cleanup receipt survives removal; concurrent closes join that receipt, including
+> reaping, and teardown includes already-closing jobs. Free receipts on completion without
+> permanent tombstones. Preserve the blocking-file cancellation, stdin broker,
+> partial-write and supervisor rules of runtime §8.1.
+
+New sentence(s)/block:
+
+> **N9.3. Lookup, leases and close have one order.** Under a short host lock, test
+> context/kind/liveness and acquire the operation's lease. Socket directions each have one
+> lease; read+write may overlap, two reads/writes/accepts give busy. Files have one
+> read/write/flush cursor lease, children one wait lease. Removal on close revokes leases
+> and wakes pending operations with closed. A completion committed first retains its
+> answer; close committed first prevents success publication. In-flight code holds a safe
+> reference/private OS duplicate, never a pointer to a removed table entry. Release
+> happens once when references are safe. Close is idempotent/error-free; cancelling its
+> request cannot undo host cleanup. Child close awaits reaping. A context/kind-checked
+> cleanup receipt survives removal; concurrent closes join that receipt, including
+> reaping, and teardown includes already-closing jobs. Free receipts on completion without
+> permanent tombstones. Preserve the blocking-file cancellation, stdin broker,
+> partial-write and supervisor rules of runtime §8.1. Non-creating raw operations
+> use the ordinary request.await_owned helper with an ensure/cancel final
+> (runtime §5.4); a borrowed request.await does not cancel its producer. Creators
+> retain the separate await_resource guard.
+
+Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-033 — docs/design/native.md, 60f37f2 line 351
+
+Old sentence(s)/block:
+
+> | Stage | Build now so it is not redone | What waits |
+> |---|---|---|
+> | R1 | Immutable published SplitMix and tagged paths exactly as runtime §4; no task/IO dependency | Nothing native-specific blocks R1 |
+> | R2 request layer | Local Request/Ticket cells, rooted Owner accounting, one root hand-off, consuming take and cancellation seam; no resource recognition for Int | Native packaging, worker transport |
+> | R2 scheduler | Complete task records, detached routing services, retained environment frames, silent pinning, typed keys and single Scheduler boundary; FIFO/CML semantics and R4a joins | Queue encoding/claim ownership, locked transport implementation and worker entry |
+> | IO clock, before Fs | General §2.4 nominal field-privacy fix; host ResourceContext owner/controller, non-reusing Int allocator and trusted binding-plan/grant plumbing on Rust and JS; entry exit/stop/dispose hooks | Worker count, packaging layout, browser multicore |
+> | IO fs/net/process | Private nominal resource values and raw Int signatures from first implementation; explicit wrappers, no raw-number injection exports, kind checks, leases, provisional/Ready transfer and host teardown; process supervisor | No intermediate externref services or fd-as-number adapter |
+> | IO stdio | Per-source broker with context subscribers, copied output buffers/leases, compatibility printer, complete target matrix/tests | Preview-1 adapter project |
+> | Native packaging after R2/IO | Split compile/load host configuration; compiler-free runner, authenticated payload/plan, exact artifact manifest, N4 validation and default build | Cross-target distribution/signing choices must be fixed before release |
+> | MC after MC-D/G5 | N7 queue, N8 typed locked transactions, identity/cycle-safe codec, host transport/wake, claim/cancel reclamation, N12 domains/controller, quiescence and browser stop-safe entry | Started-task migration, lock-free optimization, shared GC |
+
+New sentence(s)/block:
+
+> | Stage | Build now so it is not redone | What waits |
+> |---|---|---|
+> | R1 | Immutable published SplitMix and tagged paths exactly as runtime §4; no task/IO dependency | Nothing native-specific blocks R1 |
+> | R2 request layer | Local Request/Ticket and group-observer cells, portable group observations without Ticket enumeration, atomic subscriptions and separate program/control Root accounting; one root hand-off, consuming take, borrowed await and ordinary await_owned; no resource recognition for Int | Native packaging, worker transport |
+> | R2 scheduler | Complete task records, detached routing services, retained environment frames, silent pinning, typed keys and single Scheduler boundary; FIFO/CML semantics, pure fresh-key events, stateful-leaf validation, owned-plus-borrowed waitable sets, combined go/run counters and R4a joins | Queue encoding/claim ownership, locked transport implementation and worker entry |
+> | IO clock, before Fs | General §2.4 nominal field-privacy fix; host ResourceContext owner/controller, non-reusing Int allocator and trusted binding-plan/grant plumbing on Rust and JS; entry exit/stop/dispose hooks | Worker count, packaging layout, browser multicore |
+> | IO fs/net/process | Private nominal resource values and raw Int signatures from first implementation; owning await_owned/await_resource wrappers, no raw-number injection exports, kind checks, leases, provisional/Ready transfer and host teardown; process supervisor | No intermediate externref services or fd-as-number adapter |
+> | IO stdio | Per-source broker with context subscribers, copied output buffers/leases, compatibility printer, complete target matrix/tests | Preview-1 adapter project |
+> | Native packaging after R2/IO | Split compile/load host configuration; compiler-free runner, authenticated payload/plan, exact artifact manifest, N4 validation and default build | Cross-target distribution/signing choices must be fixed before release |
+> | MC after MC-D/G5 | N7 queue, N8 typed locked transactions, identity/cycle-safe codec, host transport/wake, claim/cancel reclamation, N12 domains/controller, program/control quiescence and browser stop-safe entry | Started-task migration, lock-free optimization, shared GC |
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-034 — docs/design/native.md, 60f37f2 line 630
+
+Old sentence(s)/block:
+
+> The documentation audit checked the three allowed paths, 20 i code blocks, 18
+> Markdown tables, balanced fences, table widths and an old-keyword scan. It also
+> searched every stealing/CAS/host-reference/resource signature reference and
+> checked the native/runtime/multicore section targets. This is a text check,
+> not a parser/type-check of the proposed APIs. The sentence ledger's coverage
+> and git diff --check are checked again before committing.
+
+New sentence(s)/block:
+
+> The revision-3 documentation audit checked the three allowed paths, 20 i code blocks, 18
+> Markdown tables, balanced fences, table widths and an old-keyword scan. It also
+> searched every stealing/CAS/host-reference/resource signature reference and
+> checked the native/runtime/multicore section targets. This is a text check,
+> not a parser/type-check of the proposed APIs. The sentence ledger's coverage
+> and git diff --check are checked again before committing.
+>
+> ### 11.1 Revision-4 review repairs and adversarial cases
+>
+> Source: the coordinator's N-R1–N-R6 rulings and independent review
+> `report-review-native3.md`; its full cases are under `/tmp/review-native3/`.
+> These rulings retain packaging, one Store per worker, publication at go, one
+> lock, nominal Int resources and all four encapsulation rules. The following
+> are design tests to implement, not programs executed against the placeholder
+> request/task/IO modules in this lane.
+>
+> **Choice for N-R1.** Compare three designs by locality, placement-independent
+> answers, principal types and the amount R2 must change later: remote/proxy
+> Tickets need a new management-handle protocol; pinning Root/Owner pins nearly
+> every task; group observations keep Root/Owner portable and never expose another
+> worker's cells. Choose the third as ruled. Keep typed local cells from the first
+> and local implementation indexes from the second, but expose neither as a public
+> enumeration. No worker-local enumeration API remains, so no new static
+> non-portability type is needed. Group waits use Await with private local
+> observation cells; they cannot stop the entire scheduler while waiting for a
+> sibling. Readiness is count zero, counts are atomic snapshots, cancel-all affects
+> current Waiting members without closing the group, and wait-none returns on its
+> next zero observation (runtime §5.1). These operations observe sets of work,
+> not worker placement, and add no inference choice. Their uses include batches,
+> timeouts and plugin cleanup, not only tasks.
+>
+> **N-R1 enumeration replacement.** Hold the host gate until after the count:
+>
+> ```i
+> (i/task, i/request)
+> @host("review:gate/v1", "request")
+> Gate { Gate(wait: () -> Request(Nil)) }
+> @main
+> main = (gate ! Gate, root ! request.Root) {
+>   pending = gate.wait()
+>   task.scope((s) {
+>     child = task.go(s, () { request.count_root(root) })
+>     count = task.join(child)
+>     request.cancel(request.ticket(pending))
+>     assert(count == 1)
+>     assert(request.settled_root(root))
+>     request.wait_none_root(root)
+>   })
+> }
+> ```
+>
+> Expected: count is 1 whether child runs on the maker or another worker; after
+> cancel the count is 0, readiness true and wait-none returns Nil. No operation
+> returns the maker's Ticket. Also run two groups on separate workers: cancel-all
+> of one leaves the other's count 1; cancel-all-root makes both zero but permits
+> later starts; close-root forbids later starts. Complete between check and
+> subscription: the waiter must still finish. A group waiter and a sibling that
+> sets the gate must finish on one worker too, since Await suspends only the
+> waiter. Cancelling a group waiter removes its observation without cancelling
+> the producer. The observer itself never adds a unit to the group it waits for.
+> After a remote cancel-all returns, query state on the maker before it processes
+> its notification: it must already observe Cancelled. Then start a second read
+> on the same Stream: the cancelled request's lease must already be revoked.
+> Host cancellation handles apply that action without a Store borrow; local cell
+> operations reconcile shared terminal state and never re-cancel a retired ABI id.
+> Merely queuing a notification failed this attack, so runtime §5.1 now requires
+> these synchronization points before the MC implementation gate.
+>
+> **N-R2 race then read.** File/Stream/Child non-creators, including close, use
+> request.await_owned (runtime §5.4/§7). Resource creators use await_resource;
+> request.await remains borrowed. Test with a live Stream and a host fixture
+> that keeps the first read pending until the second branch wins:
+>
+> ```i
+> (i/net, i/task)
+> twice = (stream: net.Stream) {
+>   task.race(() { net.read(stream, 1) }, () { <<>> })
+>   net.read(stream, 1)
+> }
+> ```
+>
+> After the race has returned, deliver byte 97 only to the second read. Expected:
+> `<<97>>`, with no busy error and no abandoned first read consuming that byte.
+> The test scheduler forces the first read to acquire its lease before selecting
+> the second branch; no sleeps decide the order. Repeat at 1/2/4 workers. For
+> File, cancellation of a blocking read instead makes the alias closed, as the
+> existing cursor rule requires. For Child, cancelled wait releases the wait lease
+> and a subsequent wait returns its cached/eventual status without busy; it does
+> not terminate the child. Cancelling a borrowed request.await waiter leaves its
+> producer live. Close cancellation never undoes independent host cleanup.
+>
+> **N-R3 wake-only deadlock.** Replay the review trace: worker 0 waits with one
+> wake request; the last runnable task on A registers sync(never()); there is no
+> program IO. Both driver wakes, if present, belong to ordinary control Roots,
+> scoped to their driver and closed at its exit. Program Root count = 0; explicit
+> borrowed producer count = 0; runnable/running/claimed work and pending program
+> delivery = 0 after registration. Record panic("task: deadlock") under the
+> shared lock even when control count is 1 or 2. The stop closes/wakes the drivers.
+> If a program request is still Waiting, postpone deadlock until it settles;
+> if its answer is ready to deliver, count that delivery until the local scheduler
+> rescans. Repeated wake-only notifications must not mask the zero snapshot.
+> The same ordinary roots and selection policy can separate maintenance work in
+> a batch dispatcher, a timeout manager or a plugin loop; no compiler rule names
+> a library, namespace or wake operation. All actual host requests still count
+> for H4/status 1, independently of this program-progress predicate.
+>
+> **N-R4 pure events.** Runtime §6.1/§6.4 wins; multicore §4 and §18 rules 5,
+> 11–12 now distinguish stateful handles from pure event descriptions:
+>
+> ```i
+> (i/task, i/control, i/core)
+> event = task.always(1)
+> @main
+> main = () {
+>   task.run(() { assert(task.sync(event) == 1) })
+>   task.run(() { assert(task.sync(event) == 1) })
+>   control.boundary((b) {
+>     e = task.map(task.always(Nil), (_) { b })
+>     assert(core.not(core.portable(e)))
+>   })
+> }
+> ```
+>
+> Expected: both syncs give 1 without a creating Scheduler or run for event; the
+> boundary capture makes e non-portable by the ordinary capture walk. Two fresh
+> always(1) constructions compare unequal; copying one preserves equality.
+> A receive/join leaf from another run still stops at sync, even when it loses
+> to always(1); validate all stateful leaves before registration. A pure event
+> has no invented task path, and user callbacks may capture any ordinary value.
+>
+> **N-R5 borrowed waitable set.** A raw outer-root gated request may be borrowed
+> by a nested run on the same worker:
+>
+> ```i
+> (i/task, i/request)
+> @host("review:gate/v1", "request")
+> Gate { Gate(wait: () -> Request(Nil)) }
+> @main
+> main = (gate ! Gate) {
+>   pending = gate.wait()
+>   task.run(() { request.await(pending) })
+> }
+> ```
+>
+> Expected: after the fixture answers, the nested run returns Nil, without a
+> deadlock stop. Its logical waitable set is owned program-root work union
+> explicitly awaited borrowed Waiting work, deduplicated by identity; group
+> observers contribute underlying members, not themselves. Repeat with an
+> unrelated outer request and sync(never()) inside: now the nested run deadlocks.
+> A captured Request pins a child normally; no cross-worker borrow is introduced.
+>
+> **N-R6 combined counter.** The review's go/run/go case is:
+>
+> ```i
+> (i/task)
+> @main
+> main = () {
+>   task.scope((s) {
+>     a = task.go(s, task.path)
+>     nested = task.run(task.path)
+>     b = task.go(s, task.path)
+>     assert((task.join(a), nested, task.join(b)) == ([1], [2], [3]))
+>   })
+> }
+> ```
+>
+> Expected: ([1], [2], [3]) on all worker counts, with the second child's generator
+> derived at P(3), not P(2) (runtime §4/§6.1; multicore D10/§5/§18.11).
+>
+> **Additional decisions and sources.** The group-operation names and private
+> observer implementation make N-R1 concrete using existing Await/typed-cell
+> rules. No observer receives a host id or registers as its own producer; this
+> follows N-R3 and prevents self-counting deadlock. A first draft made wait-none
+> a direct root wait; attack with a sibling-controlled gate showed that this could
+> pause the sibling on one worker, so the final rule routes it through Await.
+> Atomic check/subscription and atomic request-to-delivery accounting follow N-R1's
+> placement rule, N-R3's quiescence rule and N8's one-lock transaction discipline;
+> they close lost-wakeup and false-zero races, not new public capabilities.
+> Synchronous group-cancel acceptance plus host lease revocation and local terminal
+> state reconciliation are also forced by N-R1: notification delay must not expose
+> Waiting or busy after the same cancellation has already returned on another worker.
+> N9.3/N12 already require nonblocking host cancellation/cleanup independent of
+> worker progress; MC extends that existing ownership seam to group operations.
+> All observers and control Roots are bounded by structured waiter/driver lifetimes.
+> No new detached task, library-name privilege, host wire type or inference rule
+> is introduced. The helper uses existing resource.ensure (spec §9.5;
+> lib/i/resource.i:8–13); current host cancellation drops work outside its slot lock
+> (crates/ilang-host/src/requests.rs:161–184). That code supports the intended
+> ownership seam but does not yet implement the proposed resource lease behavior.
+>
+> **Revision-4 checks and two final attack passes.** After the observer and
+> cancellation fixes, pass 1 replayed the six review cases and varied group close
+> versus start, zero versus subscribe, cancel-all versus late answer, borrowed
+> waiter cancellation, and pending/Ready/Taken IO cancellation. It checked that
+> private observer dependencies cannot count themselves, group operations reveal
+> no foreign cell, and wake-only deliveries cannot defer deadlock. No further
+> serious defect was found. Pass 2 checked the same contracts against spec §2.4,
+> §9.5/§9.7/§10.3 and ABI H4/H13, runtime's exact replacement text, multicore's
+> invariants and §18, top-level events/captured boundaries, and the combined path
+> example. No further serious contradiction was found; the intentional spec
+> migration below is still required.
+>
+> Executed an abstract Python model through stdin: 2,880 group action-order/home
+> assignments, six observer subscribe/finish/cancel orders and 192 quiescence
+> snapshots with varying control counts passed their stated invariants. Two lease
+> outcomes checked cancellation/completion before a subsequent read. This model
+> assumes the required atomic transitions; it tests the design accounting, not
+> the unbuilt notification/lease implementation. The documentation audit checked
+> 26 i code blocks and 18 tables in the active notes, balanced fences, table
+> widths, accepted-syntax keyword scans, cross-reference targets and stale API
+> phrases. It is not parsing or type-checking. The existing ensure and cancellation
+> seams were read at the file/line citations above; no compiler, IO, OS, JS or
+> multicore execution was performed for this revision. The revision-4 ledger
+> records every changed paragraph/code/table block against 60f37f2 verbatim,
+> including every changed sentence; historical revision-3 records are preserved.
+>
+> **Work order and spec reconciliation.** R2 must implement these group/observer,
+> ownership, event, waitable-set and combined-counter contracts now, including the
+> separate control-root seam; IO must use await_owned from its first non-creating
+> wrapper. General field privacy, binding grants and ResourceContext plumbing still
+> precede Fs. MC-D must prove typed notification routing and the quiescence snapshot
+> before MC-I; worker transport, encoding and packaging remain later stages. The
+> six semantic defects are resolved; no known API replacement is deferred. This
+> is not a promise that an unbuilt MC prototype will need no implementation changes.
+>
+> The three notes now agree on these six findings. Spec edits remain intentional
+> pending work: runtime §10 supplies Request/Root/Owner/Await (§9.11), request-mode
+> host services (§9.7), contextual entries (§10.2), task/events (§9.9), and their
+> primitive declarations; native §10 supplies packaging and host-policy text and
+> the general §2.4/§6.7 field-privacy clarification. The unchanged §10.3 still
+> excludes nominal resource wrappers from the wire. Appendix B still counts all
+> actual host requests for status 1; it is not the task deadlock predicate.
+> No unresolved contradiction among these three active contracts was found in the
+> revision-4 passes; historical old/new quotes are not active rules.
+
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+
+### R4-035 — docs/design/native.md, 60f37f2 line 665
+
+Old sentence(s)/block:
+
+> The entries below preserve each replaced sentence/block verbatim (including code/table
+> lines), with its replacement and reason. A block may contain several sentences that
+> changed together; nothing inside the old/new quotations is a second active rule. This
+> ledger is generated from the lane base to the final three notes, excluding the ledger
+> itself. It includes native's adoption/status corrections as well as runtime/multicore
+> changes.
+
+New sentence(s)/block:
+
+> The entries below preserve each replaced sentence/block verbatim (including code/table
+> lines), with its replacement and reason. A block may contain several sentences that
+> changed together; nothing inside the old/new quotations is a second active rule. This
+> revision-3 ledger was generated from the lane base to 60f37f2, excluding the
+> ledger itself; the appended revision-4 ledger records subsequent changes. It includes native's adoption/status corrections as well as runtime/multicore
+> changes.
+
+Reason: Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
