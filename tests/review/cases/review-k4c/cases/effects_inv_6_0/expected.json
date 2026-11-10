@@ -1,17 +1,37 @@
 {
-  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
-  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
+  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 3.0,
+  "bound_seconds": 10.0,
   "outcome": {
     "check": {
       "command": [
         "check",
         "--types"
       ],
-      "exit": 1,
-      "stdout": "app/main.use : (x: A) -> A ? E ! N | S(A, E, N)\napp/main.run : (body: () -> A ? E ! N) -> A ? E ! N\n",
-      "stderr": "src/main.i:4:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\n1 error\n"
+      "exit": 0,
+      "stdout": "app/main.use : (x: A) -> A ? E ! N | S(A, E, N)\napp/main.run : (body: () -> A ? E ! N) -> A ? E ! N\napp/main.wrap : (x: A & B) -> B ? E ! N | S(C & B, E, N)\n",
+      "stderr": ""
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": ""
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": ""
     }
   }
 }

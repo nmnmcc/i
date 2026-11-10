@@ -1,8 +1,8 @@
 {
-  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
-  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
+  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 3.0,
+  "bound_seconds": 10.0,
   "outcome": {
     "check": {
       "command": [
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\n",
+      "stdout": "app/main.a : (x: Bool) -> Nil ! N | S(N)\napp/main.use : () -> Nil ! N | S(N)\napp/main.wrap : () -> Nil ! N | S(N)\napp/main.b : (x: Bool) -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\n",
       "stderr": ""
     },
     "test0": {

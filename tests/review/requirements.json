@@ -2,57 +2,739 @@
   "schema": 1,
   "requirements": [
     {
-      "pattern": "^review-k4d/(?:proj|_loose/p)/(?:x1|x4|x6|x7|x8|z1|z4)$",
-      "known_failure": true,
+      "pattern": "^review\\-k4d/_loose/p/x1$",
+      "known_failure": false,
       "outcome": "reject",
       "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
       "origin": "review-k4d/criteria.md C3/C5 and Result index",
       "diagnostic_codes": [
-        "E0501",
-        "E0522"
+        "E0515"
       ],
       "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
       "phase": "entry",
-      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute."
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
     },
     {
-      "pattern": "^review-k4d/(?:proj|_loose/p)/(?:g_(?:ann|inf)_SDep|m3|m4|r6)$",
-      "known_failure": true,
+      "pattern": "^review\\-k4d/_loose/p/x4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/x6$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/x7$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/x8$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/z1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/z4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/x1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/x4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/x6$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/x7$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/x8$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/z1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/z4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/g_ann_SDep$",
+      "known_failure": false,
       "outcome": "reject",
       "finding": "K4d F2: hidden Dep obligation must remain in the entry environment and be rejected when not supplied",
       "source": "docs/spec.md §4.5 rule 4: every member of N is a type variable that is a subtype of M, or has a member of M with the same type constructor and equal type arguments and the same value set; §9.2: The environment that a function needs is the union of the environments that its calls need",
       "origin": "review-k4d/criteria.md C1/C5 and Result index",
       "diagnostic_codes": [
-        "E0501",
-        "E0522"
+        "E0515"
       ],
       "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
       "phase": "entry",
-      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute."
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F2: persistent row comparison through type arguments"
     },
     {
-      "pattern": "^review-k4d/(?:proj|_loose/p)/(?:q2[1-35]|q3[1-9]|q40|r4|w6|w7|w14|w15|w16)$",
-      "known_failure": true,
+      "pattern": "^review\\-k4d/_loose/p/g_inf_SDep$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F2: hidden Dep obligation must remain in the entry environment and be rejected when not supplied",
+      "source": "docs/spec.md §4.5 rule 4: every member of N is a type variable that is a subtype of M, or has a member of M with the same type constructor and equal type arguments and the same value set; §9.2: The environment that a function needs is the union of the environments that its calls need",
+      "origin": "review-k4d/criteria.md C1/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F2: persistent row comparison through type arguments"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/m3$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F2: hidden Dep obligation must remain in the entry environment and be rejected when not supplied",
+      "source": "docs/spec.md §4.5 rule 4: every member of N is a type variable that is a subtype of M, or has a member of M with the same type constructor and equal type arguments and the same value set; §9.2: The environment that a function needs is the union of the environments that its calls need",
+      "origin": "review-k4d/criteria.md C1/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F2: persistent row comparison through type arguments"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/m4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F2: hidden Dep obligation must remain in the entry environment and be rejected when not supplied",
+      "source": "docs/spec.md §4.5 rule 4: every member of N is a type variable that is a subtype of M, or has a member of M with the same type constructor and equal type arguments and the same value set; §9.2: The environment that a function needs is the union of the environments that its calls need",
+      "origin": "review-k4d/criteria.md C1/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F2: persistent row comparison through type arguments"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/r6$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F2: hidden Dep obligation must remain in the entry environment and be rejected when not supplied",
+      "source": "docs/spec.md §4.5 rule 4: every member of N is a type variable that is a subtype of M, or has a member of M with the same type constructor and equal type arguments and the same value set; §9.2: The environment that a function needs is the union of the environments that its calls need",
+      "origin": "review-k4d/criteria.md C1/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F2: persistent row comparison through type arguments"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/g_ann_SDep$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F2: hidden Dep obligation must remain in the entry environment and be rejected when not supplied",
+      "source": "docs/spec.md §4.5 rule 4: every member of N is a type variable that is a subtype of M, or has a member of M with the same type constructor and equal type arguments and the same value set; §9.2: The environment that a function needs is the union of the environments that its calls need",
+      "origin": "review-k4d/criteria.md C1/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F2: persistent row comparison through type arguments"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/g_inf_SDep$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F2: hidden Dep obligation must remain in the entry environment and be rejected when not supplied",
+      "source": "docs/spec.md §4.5 rule 4: every member of N is a type variable that is a subtype of M, or has a member of M with the same type constructor and equal type arguments and the same value set; §9.2: The environment that a function needs is the union of the environments that its calls need",
+      "origin": "review-k4d/criteria.md C1/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F2: persistent row comparison through type arguments"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/m3$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F2: hidden Dep obligation must remain in the entry environment and be rejected when not supplied",
+      "source": "docs/spec.md §4.5 rule 4: every member of N is a type variable that is a subtype of M, or has a member of M with the same type constructor and equal type arguments and the same value set; §9.2: The environment that a function needs is the union of the environments that its calls need",
+      "origin": "review-k4d/criteria.md C1/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F2: persistent row comparison through type arguments"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/m4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F2: hidden Dep obligation must remain in the entry environment and be rejected when not supplied",
+      "source": "docs/spec.md §4.5 rule 4: every member of N is a type variable that is a subtype of M, or has a member of M with the same type constructor and equal type arguments and the same value set; §9.2: The environment that a function needs is the union of the environments that its calls need",
+      "origin": "review-k4d/criteria.md C1/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F2: persistent row comparison through type arguments"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/r6$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F2: hidden Dep obligation must remain in the entry environment and be rejected when not supplied",
+      "source": "docs/spec.md §4.5 rule 4: every member of N is a type variable that is a subtype of M, or has a member of M with the same type constructor and equal type arguments and the same value set; §9.2: The environment that a function needs is the union of the environments that its calls need",
+      "origin": "review-k4d/criteria.md C1/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F2: persistent row comparison through type arguments"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/q21$",
+      "known_failure": false,
       "outcome": "accept",
       "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
       "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
-      "origin": "review-k4d/criteria.md C2/C4 and Result index"
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
     },
     {
-      "pattern": "^review-k4s/soundness$",
-      "known_failure": true,
+      "pattern": "^review\\-k4d/_loose/p/q22$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/q23$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/q25$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/q31$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/q32$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/q33$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/q34$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/q35$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/q36$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/q37$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/q38$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/q39$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/q40$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/r4$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/w14$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/w15$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/w16$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/w6$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/w7$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q21$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q22$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q23$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q25$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q31$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q32$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q33$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q34$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q35$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q36$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q37$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q38$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q39$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/q40$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/r4$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/w14$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/w15$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/w16$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/w6$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/w7$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index",
+      "fixed_by": "K4 F3: finite field and generic-handler inference"
+    },
+    {
+      "pattern": "^review\\-k4s/soundness$",
+      "known_failure": false,
       "outcome": "reject",
       "finding": "K4s P1: annotated local function must not erase an unprovided service from main",
       "source": "docs/spec.md §4.5 rule 4 and §9.2; review-k4s/review-summary.json records expected E0522, with E0505 on its historical baseline",
       "origin": "review-k4s/soundness/src/main.i",
       "diagnostic_codes": [
-        "E0501",
         "E0522"
       ],
       "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
       "phase": "entry",
-      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute."
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1: shared coalescing normalization and entry validation"
     },
     {
       "pattern": "^review-rec/",
@@ -71,28 +753,2771 @@
       "origin": "review-k4d/p/q24.i; criteria C2/C5"
     },
     {
-      "pattern": "^review-(?:k4/cases/provision_(?:closure|direct|helper|inferred)_False|k4c/cases/(?:closure_statement|missing_(?:0|2|3)_(?:0_0_2|1_0_[012]|2_0_2|7_0_[012]))|k4d/(?:proj|_loose/p)/(?:b4|b7|r2|r3)|k4s/min_main_6_0)$",
-      "known_failure": true,
+      "pattern": "^review\\-k4/cases/provision_closure_False$",
+      "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0501",
+        "E0515"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4/cases/provision_direct_False$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4/cases/provision_helper_False$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4/cases/provision_inferred_False$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/closure_statement$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
         "E0522"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
       "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
       "phase": "entry",
-      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute."
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
     },
     {
-      "pattern": "^review-(?:k4/perf/(?:generic_chain_2048|wide_generic_(?:512|1024|2048))|k4c/cases/stress_wide_open_(?:512|1024)|k4d/perf/(?:mutual(?:50|100|150|200|300)|runchain4000|wideann(?:80|200))|k4s/wide_plain_(?:512|1024)|t1/stress-(?:keys-(?:5000|10000)|nested-50))$",
-      "known_failure": true,
+      "pattern": "^review\\-k4c/cases/missing_0_0_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_1_0_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_1_0_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_1_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_2_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_7_0_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_7_0_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_7_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_0_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_1_0_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_1_0_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_1_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_2_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_7_0_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_7_0_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_7_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_0_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_1_0_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_1_0_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_1_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_2_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_7_0_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_7_0_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_7_0_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/b4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/b7$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/r2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/r3$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/b4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/b7$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/r2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/r3$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4s/min_main_6_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
+      "origin": "review-k4 provision cases; review-k4c missing/closure cases; review-k4d b4,b7,r2,r3; review-k4s min_main_6_0",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 P1/F2: retained entry requirements and equal service forms"
+    },
+    {
+      "pattern": "^review\\-k4/perf/generic_chain_2048$",
+      "known_failure": false,
       "outcome": "accept",
       "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
       "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
       "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
       "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4/perf/wide_generic_1024$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4/perf/wide_generic_2048$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4/perf/wide_generic_512$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/stress_wide_open_1024$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/stress_wide_open_512$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4d/perf/mutual100$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4d/perf/mutual150$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4d/perf/mutual200$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4d/perf/mutual300$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4d/perf/mutual50$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4d/perf/runchain4000$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4d/perf/wideann200$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4d/perf/wideann80$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4s/wide_plain_1024$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-k4s/wide_plain_512$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "fixed_by": "K4 finite-bound normalization and coalescing; completion established with an explicit observation budget"
+    },
+    {
+      "pattern": "^review\\-t1/stress\\-keys\\-10000$",
+      "known_failure": true,
+      "outcome": "accept",
+      "finding": "T1 runtime-test stress: checker acceptance is established; bounded runtime observation is incomplete",
+      "source": "docs/spec.md §2.5: initialization runs before entries; docs/testing.md: a timeout is a censored observation, not a passing termination check or a numeric performance gate",
+      "origin": "review-t1 large scalar-key inputs",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
       "censored": true
+    },
+    {
+      "pattern": "^review\\-t1/stress\\-keys\\-5000$",
+      "known_failure": true,
+      "outcome": "accept",
+      "finding": "T1 runtime-test stress: checker acceptance is established; bounded runtime observation is incomplete",
+      "source": "docs/spec.md §2.5: initialization runs before entries; docs/testing.md: a timeout is a censored observation, not a passing termination check or a numeric performance gate",
+      "origin": "review-t1 large scalar-key inputs",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "censored": true
+    },
+    {
+      "pattern": "^review\\-t1/stress\\-nested\\-50$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
+      "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "resolution": "QA metadata correction: all phases already complete in the stored redesign baseline; no K4 behavior change"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4\\-lane/row_alias$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: row_alias",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4\\-lane/direct_row$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: direct_row",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4\\-lane/effect_row_alias$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: effect_row_alias",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4\\-lane/latent_row$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: latent_row",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4\\-lane/alias_kind_env$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: alias_kind_env",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4\\-lane/alias_kind_error$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: alias_kind_error",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x1$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x1",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x2$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x2",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x3$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x3",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x4$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x4",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x6$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x6",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x7$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x7",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x8$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x8",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/z1$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: z1",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/z4$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: z4",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/g_ann_SDep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: g_ann_SDep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/g_inf_SDep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: g_inf_SDep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/m3$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: m3",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/m4$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: m4",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/r6$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: r6",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4d/proj/b4$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: b4",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4d/proj/b7$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: b7",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4d/proj/r2$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: r2",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4d/proj/r3$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: r3",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q21$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q21",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q22$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q22",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q23$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q23",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q24$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q24",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q25$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q25",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q26$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q26",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q27$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q27",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q28$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q28",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q29$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q29",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q30$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q30",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q31$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q31",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q32$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q32",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q33$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q33",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q34$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q34",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q35$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q35",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q36$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q36",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q37$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q37",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q38$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q38",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q39$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q39",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q40$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q40",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4d/proj/r4$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: r4",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": "four\nthree\n"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/closed_handler_hole$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: closed_handler_hole",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/latent_row_same$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: latent_row_same",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/error_row_values$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: error_row_values",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w1\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w1-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w1\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w1-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w2\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w2-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w2\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w2-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w3\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w3-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w3\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w3-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w4\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w4-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w4\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w4-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w5\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w5-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w5\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w5-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w6\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w6-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w6\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w6-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w7\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w7-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w7\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w7-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w8\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w8-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w8\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w8-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w9\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w9-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w9\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w9-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w10\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w10-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w10\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w10-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w11\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w11-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w11\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w11-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w12\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w12-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w12\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w12-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w13\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w13-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w13\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w13-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w14\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w14-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w14\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w14-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w15\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w15-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w15\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w15-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w16\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w16-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w16\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w16-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4d/proj/a3$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: entry-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/unused\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: unused-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4s/soundness_unannotated$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: entry-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/unused\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: unused-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-0\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-0-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-0\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-0-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-1\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-1-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-2\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-2-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-2\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-2-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-3\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-3-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-3\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-3-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-4\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-4-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-4\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-4-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-5\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-5-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-5\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-5-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-6\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-6-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-6\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-6-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-chain\\-64$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-chain-64",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/handler\\-hole\\-False\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: handler-hole-False-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/handler\\-hole\\-True\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: handler-hole-True-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/handler\\-hole\\-True\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: handler-hole-True-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "run_stdout": ""
+    },
+    {
+      "pattern": "^review-k4d/(?:proj|_loose/p)/q(?:2[1-9]|3[0-9]|40)$",
+      "known_failure": false,
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "finding": "K4 principal schemes: field and pattern access retain the same callback and service rows",
+      "source": "docs/spec.md §4.8 rules 4–5 and 13: function/call environments and fields from the corresponding bound forms; §4.7 principal inference",
+      "origin": "K4 q21–q40 assertions formerly in tests/k4/review.py"
+    },
+    {
+      "pattern": "^review\\-k4/cases/conflict_2046229799906290556$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4/cases/conflict_2046229799906290556",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4/cases/conflict_4759503553685934015$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4/cases/conflict_4759503553685934015",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4/cases/hidden_conflict$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4/cases/hidden_conflict",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_1_1_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_0_1_1_0",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_1_1_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_0_1_1_1",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_1_1_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_0_1_1_2",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_4_1_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_0_4_1_0",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_4_1_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_0_4_1_1",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_4_1_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_0_4_1_2",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_7_1_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_0_7_1_0",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_7_1_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_0_7_1_1",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_0_7_1_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_0_7_1_2",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_1_1_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_2_1_1_0",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_1_1_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_2_1_1_1",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_1_1_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_2_1_1_2",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_4_1_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_2_4_1_0",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_4_1_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_2_4_1_1",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_4_1_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_2_4_1_2",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_7_1_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_2_7_1_0",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_7_1_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_2_7_1_1",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_2_7_1_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_2_7_1_2",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_1_1_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_3_1_1_0",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_1_1_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_3_1_1_1",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_1_1_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_3_1_1_2",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_7_1_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_3_7_1_0",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_7_1_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_3_7_1_1",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/missing_3_7_1_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: entry requires an unprovided service",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/missing_3_7_1_2",
+      "fixed_by": "K4 P1"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_0$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_0",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_1",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_10$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_10",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_11$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_11",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_12$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_12",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_13$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_13",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_14$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_14",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_15$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_15",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_16$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_16",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_17$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_17",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_18$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_18",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_19$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_19",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_2",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_20$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_20",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_21$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_21",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_22$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_22",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_23$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_23",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_24$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_24",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_25$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_25",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_26$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_26",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_27$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_27",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_28$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_28",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_29$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_29",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_3$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_3",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_30$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_30",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_31$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_31",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_4",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_5$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_5",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_6$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_6",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_7$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_7",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_8$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_8",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4c/cases/order_hidden_conflict_9$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4c/cases/order_hidden_conflict_9",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/f2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4d/_loose/p/f2",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/f3$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4d/_loose/p/f3",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/f4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4d/_loose/p/f4",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/f2$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4d/proj/f2",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/f3$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4d/proj/f3",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/f4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4d/proj/f4",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4s/hidden_conflict_closure$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4s/hidden_conflict_closure",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4s/hidden_conflict_nested$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4s/hidden_conflict_nested",
+      "fixed_by": "K4 F2"
+    },
+    {
+      "pattern": "^review\\-k4s/mixed_order_1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "phase": "entry",
+      "finding": "K4 additional soundness: incompatible forms of one service constructor",
+      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "origin": "review-k4s/mixed_order_1",
+      "fixed_by": "K4 F2"
     }
   ],
   "transitions": [
