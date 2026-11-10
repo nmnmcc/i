@@ -173,6 +173,19 @@ impl Syntax {
     pub fn identical(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
     }
+    /// Find a descendant by its original source span.
+    pub fn at_span(&self, span: Span) -> Option<&Syntax> {
+        if self.span() == span {
+            return Some(self);
+        }
+        match self.node() {
+            Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                xs.iter().find_map(|x| x.at_span(span))
+            }
+            Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => x.at_span(span),
+            _ => None,
+        }
+    }
 
     pub fn to_datum(&self) -> Datum {
         let children = |xs: &[Syntax]| xs.iter().map(Syntax::to_datum).collect();

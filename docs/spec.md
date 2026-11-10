@@ -134,7 +134,7 @@ Modules in `test/` are checked when their package is checked (§2.6), and compil
 
 In a module, the first part of a module path says which package the module is in. It must be one of these:
 
-- `i`, for the **library modules** (§9, §10, §13, §B.7.1) and kept paths named at the start of this document. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
+- `i`, for the **library modules** (§9, §10, §13, §B.7.1) and kept paths named at the start of this document. How it gives them is not fixed: operations that cannot be written in i may be built into the compiler. A compiler-managed macro or test instance may receive compiler-owned operations through the ordinary host ABI; these operations are not capabilities of an ordinary program entry (§10.1);
 - the `name` of the module's own package;
 - a dependency name of the module's own package (§2.6); in a test module, also a dev-dependency name.
 

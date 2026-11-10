@@ -771,7 +771,7 @@ impl<'a> Lowerer<'a> {
             }
         }
         self.start();
-        self.entries();
+        let (entry, tests, exports) = self.entries();
         while let Some((id, d)) = self.work.pop() {
             let b = self.known[&d];
             let tb = self.program.binding(b);
@@ -786,6 +786,13 @@ impl<'a> Lowerer<'a> {
             let func = self.function(b.module, f, &[], name);
             self.out.funcs[id.0 as usize] = FuncKind::Code(func);
         }
+        self.out.abi_json = abi_json(
+            self.options.target,
+            entry,
+            &tests,
+            &exports,
+            &self.out.imports,
+        );
         self.out.constants = self.constants.iter().copied().collect();
     }
 
@@ -841,7 +848,13 @@ impl<'a> Lowerer<'a> {
 
     /// The program entry, the tests, and the host exports (§10.2, B.5),
     /// and the host services that they need (§9.7).
-    fn entries(&mut self) {
+    fn entries(
+        &mut self,
+    ) -> (
+        Option<(String, bool)>,
+        Vec<(String, bool)>,
+        Vec<(String, ExportAbi, bool)>,
+    ) {
         let program = self.program;
         let mut entry = None;
         let mut tests = Vec::new();
@@ -920,13 +933,7 @@ impl<'a> Lowerer<'a> {
             }
         }
         self.out.target = self.options.target;
-        self.out.abi_json = abi_json(
-            self.options.target,
-            entry,
-            &tests,
-            &exports,
-            &self.out.imports,
-        );
+        (entry, tests, exports)
     }
 
     /// Whether an entry point is async: it may call a function of an async
@@ -1452,6 +1459,11 @@ impl<'a> Lowerer<'a> {
 
     // ---- Names ----
 
+    fn runtime_external(&self, d: DefId) -> bool {
+        self.is_library(d.module)
+            && matches!(&self.program.def(d).kind, DefKind::External { module, .. } if module.starts_with("ilang:"))
+    }
+
     /// The operation of an external function of the library.
     fn external_op(&self, d: DefId) -> Result<(Op, u32), String> {
         let DefKind::External {
@@ -1507,7 +1519,7 @@ impl<'a> Lowerer<'a> {
                 }
             },
             ValueRef::Def(d) => match self.program.def(d).kind {
-                DefKind::External { .. } if !self.is_library(d.module) => {
+                DefKind::External { .. } if !self.runtime_external(d) => {
                     match self.external_func(d) {
                         Some(f) => {
                             self.constants.insert(f);
@@ -1908,7 +1920,7 @@ impl<'a> Lowerer<'a> {
             ExprKind::Name(ValueRef::Def(d)) => match self.program.def(*d).kind {
                 // §10.1: a call of an external function is done when it is
                 // reached, like all calls.
-                DefKind::External { .. } if !self.is_library(d.module) => {
+                DefKind::External { .. } if !self.runtime_external(*d) => {
                     match self.external_func(*d) {
                         Some(f) => Target::Callee(Callee::Direct(f)),
                         None => Target::Op(Op::Panic),

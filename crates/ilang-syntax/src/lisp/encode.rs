@@ -20,12 +20,15 @@ pub fn type_syntax(t: &TypeExpr, scope: &Scope, source: &str) -> Syntax {
 struct Encoder<'a> {
     scope: &'a Scope,
     tokens: Vec<Token>,
+    close: Vec<Option<u32>>,
 }
 impl Encoder<'_> {
     fn new<'a>(scope: &'a Scope, source: &str) -> Encoder<'a> {
+        let lexed = crate::lex(source);
         Encoder {
             scope,
-            tokens: crate::lex(source).tokens,
+            tokens: lexed.tokens,
+            close: lexed.close,
         }
     }
     fn node(&self, n: Node, span: Span) -> Syntax {
@@ -48,6 +51,16 @@ impl Encoder<'_> {
                 || (spelling == "^" && *kind == TokenKind::Question)
         });
         self.symbol(spelling, span)
+    }
+    fn bracket(&self, range: Span, kind: TokenKind) -> Span {
+        let (i, token) = self
+            .tokens
+            .iter()
+            .enumerate()
+            .find(|(_, t)| range.start <= t.span.start && t.span.end <= range.end && t.kind == kind)
+            .unwrap_or_else(|| panic!("parsed syntax has no expected bracket in {range:?}"));
+        let close = self.close[i].expect("parsed syntax has an unmatched bracket") as usize;
+        token.span.to(self.tokens[close].span)
     }
     fn name(&self, n: &Ident) -> Syntax {
         self.node(
@@ -209,7 +222,11 @@ impl Encoder<'_> {
                 );
             }
             let at = self.operator("@", Span::new(attr.span.start, attr.name.span.start));
-            result = self.call(at, [head, result], item.span);
+            result = self.call(
+                at,
+                [head, result],
+                Span::new(attr.span.start, item.span.end),
+            );
         }
         result
     }
@@ -431,7 +448,7 @@ impl Encoder<'_> {
                             })
                             .collect(),
                     ),
-                    e.span,
+                    self.bracket(e.span, TokenKind::LParen),
                 );
                 let result = f.ret.as_ref().map_or_else(
                     || self.node(Node::Discard("_".into()), e.span),
@@ -439,11 +456,15 @@ impl Encoder<'_> {
                 );
                 self.form("->", [ps, result, self.block(&f.body)], e.span)
             }
-            ExprKind::Case { subject, clauses } => self.form(
-                ".",
-                [self.expr(subject), self.clauses(clauses, e.span)],
-                e.span,
-            ),
+            ExprKind::Case { subject, clauses } => {
+                let body_span =
+                    self.bracket(Span::new(subject.span.end, e.span.end), TokenKind::LBrace);
+                self.form(
+                    ".",
+                    [self.expr(subject), self.clauses(clauses, body_span)],
+                    e.span,
+                )
+            }
             ExprKind::Clauses(cs) => self.clauses(cs, e.span),
             ExprKind::Call { callee, args } => {
                 self.call(self.expr(callee), args.iter().map(|x| self.arg(x)), e.span)

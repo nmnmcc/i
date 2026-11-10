@@ -692,6 +692,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "futures-util",
+ "ilang-syntax",
  "num-bigint",
  "serde",
  "serde_json",

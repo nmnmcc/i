@@ -31,6 +31,8 @@ pub struct Built {
     pub trusted_package: String,
     /// The warnings, rendered as `path:line:col: warning[CODE]: …`.
     pub warnings: Vec<String>,
+    /// Whether this artifact contains test entries.
+    pub tests: bool,
 }
 
 impl Built {
@@ -40,7 +42,11 @@ impl Built {
         ilang_host::Program::from_bytes(&self.wasm)?.with_binding_plan(self.binding_plan.clone())
     }
     pub fn host_options(&self) -> ilang_host::HostOptions {
-        let mut options = standard_options();
+        let mut options = if self.tests {
+            test_options()
+        } else {
+            standard_options()
+        };
         options
             .imports
             .grant_package(&self.binding_plan, &self.trusted_package);
@@ -194,6 +200,7 @@ pub fn build_entry(
         binding_plan,
         trusted_package,
         warnings: graph.sources.render_all(&warnings),
+        tests: options.tests,
     })
 }
 
@@ -225,9 +232,17 @@ pub fn standard_options() -> ilang_host::HostOptions {
     ilang_host::HostOptions::new(ilang_host::services::stdout())
 }
 
+/// The test host includes the compiler syntax service for ordinary tests of
+/// macro helpers. Program entry hosts do not get this service.
+pub fn test_options() -> ilang_host::HostOptions {
+    let mut options = standard_options();
+    ilang_host::syntax::install(&mut options.imports).expect("syntax service namespace is unique");
+    options
+}
+
 /// Runs one test in a new instance (§10.2), with the standard host services.
 pub fn run_test(program: &ilang_host::Program, name: &str) -> ilang_host::TestResult {
-    run_test_with(program, name, standard_options())
+    run_test_with(program, name, test_options())
 }
 
 /// Runs one test in a new instance (§10.2) with these host services, on one

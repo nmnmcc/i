@@ -2226,9 +2226,14 @@ impl<'a> Resolver<'a> {
                     let vars = self.push_declared_frame(type_params);
                     let t = self.ty(ty);
                     self.ty_frames.pop();
-                    // The operations of the library are not host imports
-                    // (§2.1), so their types are not limited.
-                    if !self.in_library() {
+                    // Reserved `ilang:` library operations lower inside the
+                    // runtime; other externals use the ordinary host ABI.
+                    let runtime_operation = self.in_library()
+                        && matches!(
+                            &self.p.modules[m.0 as usize].defs[d as usize].kind,
+                            DefKind::External { module, .. } if module.starts_with("ilang:")
+                        );
+                    if !runtime_operation {
                         let before = self.diags.len();
                         self.external_type(&t);
                         if self.diags.len() == before
