@@ -228,8 +228,13 @@ fn compiler_run_preserves_uncatchable_macro_error_position() {
     std::fs::write(dir.path().join("src/main.i"), "(syntax = i/syntax)\nreport = (x: syntax.Syntax) -> syntax.Syntax { syntax._report_error(\"bad macro\", x) }\n").unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty());
-    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    let (mut parsed, diagnostics) = ilang_check::parse(&graph);
     assert!(diagnostics.is_empty());
+    parsed
+        .iter_mut()
+        .find(|m| m.path == "app/main")
+        .unwrap()
+        .compiler_generated = true;
     let built = ilang_macro::run::compile(&graph, &parsed, &[("app/main", "report")]).unwrap();
     let original = input();
     let context = Arc::new(DefinitionContext::new(|at| DefinitionReply::CompileError {
@@ -529,7 +534,7 @@ fn expansion_preserves_sharing_between_output_and_item_request() {
             &built,
             &format!("{path}.{name}"),
             prepared.templates.into(),
-            Arc::new(|at| DefinitionReply::CompileError {
+            Arc::new(|at, _budget| DefinitionReply::CompileError {
                 message: "unexpected query".into(),
                 at: at.clone(),
             }),
@@ -593,7 +598,7 @@ fn separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged() {
     let argument = input();
     let templates: Arc<[Syntax]> = prepared.templates.into();
     let resolver: Arc<ilang_macro::session::DefinitionResolver> =
-        Arc::new(|at| DefinitionReply::CompileError {
+        Arc::new(|at, _budget| DefinitionReply::CompileError {
             message: "unexpected query".into(),
             at: at.clone(),
         });

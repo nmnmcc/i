@@ -32,7 +32,8 @@ pub enum Failure {
 
 /// A definition callback returns a fresh, unmarked answer. The session marks
 /// it in the same way as arguments before it crosses into the guest.
-pub type DefinitionResolver = dyn Fn(&Syntax) -> DefinitionReply + Send + Sync;
+pub type DefinitionResolver =
+    dyn Fn(&Syntax, &ilang_host::macro_budget::MacroBudget) -> DefinitionReply + Send + Sync;
 
 #[derive(Default)]
 pub struct Session {
@@ -69,21 +70,26 @@ impl Session {
         let mark = self.next_mark;
         self.next_mark = mark.checked_add(1).expect("macro mark space exhausted");
         let marked = flip_mark_all(&arguments, mark);
-        let context = Arc::new(DefinitionContext::new(move |query| match resolver(query) {
-            DefinitionReply::Answer(answer) => DefinitionReply::Answer(answer.flip_mark(mark)),
-            other => other,
+        let budget = ilang_host::macro_budget::MacroBudget::default();
+        let resolver_budget = budget.clone();
+        let context = Arc::new(DefinitionContext::new(move |query| {
+            match resolver(query, &resolver_budget) {
+                DefinitionReply::Answer(answer) => DefinitionReply::Answer(answer.flip_mark(mark)),
+                other => other,
+            }
         }));
         let items = (position == MacroPosition::Item)
             .then(|| Arc::new(ItemContext::new(marked.clone().into(), call.clone())));
         self.depth += 1;
         let result = (|| {
-            let outcome = crate::run::invoke_with_items(
+            let outcome = crate::run::invoke_with_items_budget(
                 program,
                 export,
                 &marked,
                 templates,
                 context.clone(),
                 items.clone(),
+                budget,
             )
             .map_err(Failure::Host)?;
             let syntax = match outcome {
