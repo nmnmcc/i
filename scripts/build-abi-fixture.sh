@@ -10,7 +10,7 @@ fixture_dir="$repo_root/tests/browser/fixtures"
 sdk="$repo_root/bindings/javascript/ilang.mjs"
 wasm_tools="${WASM_TOOLS:-wasm-tools}"
 
-for fixture in host-abi required-features custom-imports one-thread no-continue wrong-types start-request; do
+for fixture in host-abi required-features custom-imports one-thread no-continue wrong-types start-request bg-lifecycle; do
   "$wasm_tools" parse "$fixture_dir/$fixture.wat" -o "$fixture_dir/$fixture.wasm"
   "$wasm_tools" validate "$fixture_dir/$fixture.wasm"
 done

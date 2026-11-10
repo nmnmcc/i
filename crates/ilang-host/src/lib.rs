@@ -72,7 +72,9 @@
 //! peaked at 310 MB). `ILANG_GC` and `ILANG_GC_HEAP` (in MiB) choose another
 //! collector or size, to measure them.
 
+pub mod bindings;
 mod requests;
+pub mod resources;
 mod run;
 pub mod services;
 #[cfg(test)]
@@ -91,6 +93,7 @@ use anyhow::{Context, Result, anyhow, bail, ensure};
 pub use num_bigint::BigInt;
 use num_bigint::Sign;
 use requests::{Request, Requests};
+pub use resources::{ResourceContext, ResourceHost};
 pub use run::block_on;
 use serde::{Deserialize, Serialize};
 use wasmtime::{
@@ -521,18 +524,66 @@ pub type AsyncServiceFunction = Arc<dyn Fn(&[Value]) -> ServiceFuture + Send + S
 /// An external function (spec §10.1).
 pub type ExternalFunction = Arc<dyn Fn(&[Value]) -> Result<Value> + Send + Sync>;
 
+type ContextServiceFunction = Arc<
+    dyn Fn(ResourceContext, &[Value]) -> Result<std::result::Result<Value, Value>> + Send + Sync,
+>;
+type ContextAsyncServiceFunction =
+    Arc<dyn Fn(ResourceContext, &[Value]) -> ServiceFuture + Send + Sync>;
+type ContextExternalFunction =
+    Arc<dyn Fn(ResourceContext, &[Value]) -> Result<Value> + Send + Sync>;
+
 #[derive(Clone)]
 enum HostFunction {
-    Service(ServiceFunction),
-    AsyncService(AsyncServiceFunction),
-    External(ExternalFunction),
+    Service(ContextServiceFunction),
+    AsyncService(ContextAsyncServiceFunction),
+    External(ContextExternalFunction),
 }
 
 /// The functions that the host gives, by import module and name.
-#[derive(Clone, Default)]
-pub struct HostImports(BTreeMap<(String, String), HostFunction>);
+#[derive(Clone)]
+pub struct HostImports {
+    functions: BTreeMap<(String, String), HostFunction>,
+    resource_host: ResourceHost,
+    unrestricted: std::collections::BTreeSet<(String, String)>,
+    grants: bindings::Grants,
+}
+impl Default for HostImports {
+    fn default() -> Self {
+        static HOST: std::sync::OnceLock<ResourceHost> = std::sync::OnceLock::new();
+        Self {
+            functions: BTreeMap::new(),
+            resource_host: HOST.get_or_init(ResourceHost::default).clone(),
+            unrestricted: Default::default(),
+            grants: Default::default(),
+        }
+    }
+}
 
 impl HostImports {
+    /// Choose an explicit host identity domain. Reuse it across programs/tests.
+    pub fn with_resource_host(mut self, host: ResourceHost) -> Self {
+        self.resource_host = host;
+        self
+    }
+    /// Explicitly grant one resolved declaration of this exact artifact.
+    pub fn grant(
+        &mut self,
+        plan: &bindings::BindingPlan,
+        declaration: &bindings::BindingDeclaration,
+    ) {
+        self.grants.grant(plan, declaration);
+    }
+
+    /// Approve declarations from trusted package content, never package names.
+    /// Call only with identities authenticated by the compiler/build trust path.
+    pub fn grant_package(&mut self, plan: &bindings::BindingPlan, package: &str) {
+        for declaration in &plan.declarations {
+            if declaration.package == package {
+                self.grant(plan, declaration);
+            }
+        }
+    }
+
     fn insert(&mut self, module: String, name: String, function: HostFunction) -> Result<()> {
         ensure!(
             module != HOST_MODULE,
@@ -540,12 +591,12 @@ impl HostImports {
         );
         let key = (module, name);
         ensure!(
-            !self.0.contains_key(&key),
+            !self.functions.contains_key(&key),
             "duplicate host function {} {}",
             key.0,
             key.1
         );
-        self.0.insert(key, function);
+        self.functions.insert(key, function);
         Ok(())
     }
 
@@ -556,11 +607,14 @@ impl HostImports {
         label: impl Into<String>,
         function: impl Fn(&[Value]) -> Result<std::result::Result<Value, Value>> + Send + Sync + 'static,
     ) -> Result<()> {
+        let (namespace, label) = (namespace.into(), label.into());
         self.insert(
-            namespace.into(),
-            label.into(),
-            HostFunction::Service(Arc::new(function)),
-        )
+            namespace.clone(),
+            label.clone(),
+            HostFunction::Service(Arc::new(move |_, args| function(args))),
+        )?;
+        self.unrestricted.insert((namespace, label));
+        Ok(())
     }
 
     /// A function of an async host service (`@host("…", "async")`). It starts
@@ -575,19 +629,75 @@ impl HostImports {
     where
         F: Future<Output = Result<std::result::Result<Value, Value>>> + Send + 'static,
     {
+        let (namespace, label) = (namespace.into(), label.into());
+        self.insert(
+            namespace.clone(),
+            label.clone(),
+            HostFunction::AsyncService(Arc::new(move |_, arguments| Box::pin(function(arguments)))),
+        )?;
+        self.unrestricted.insert((namespace, label));
+        Ok(())
+    }
+
+    /// A service whose start receives its immutable invocation context (N9.5).
+    pub fn context_service(
+        &mut self,
+        namespace: impl Into<String>,
+        label: impl Into<String>,
+        function: impl Fn(ResourceContext, &[Value]) -> Result<std::result::Result<Value, Value>>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Result<()> {
         self.insert(
             namespace.into(),
             label.into(),
-            HostFunction::AsyncService(Arc::new(move |arguments| Box::pin(function(arguments)))),
+            HostFunction::Service(Arc::new(function)),
+        )
+    }
+
+    /// Context-aware asynchronous start. Capture the context in the future;
+    /// subsequent invocations cannot retarget it.
+    pub fn context_async_service<F>(
+        &mut self,
+        namespace: impl Into<String>,
+        label: impl Into<String>,
+        function: impl Fn(ResourceContext, &[Value]) -> F + Send + Sync + 'static,
+    ) -> Result<()>
+    where
+        F: Future<Output = Result<std::result::Result<Value, Value>>> + Send + 'static,
+    {
+        self.insert(
+            namespace.into(),
+            label.into(),
+            HostFunction::AsyncService(Arc::new(move |context, args| {
+                Box::pin(function(context, args))
+            })),
+        )
+    }
+
+    /// A context-aware external function.
+    pub fn context_external(
+        &mut self,
+        module: impl Into<String>,
+        name: impl Into<String>,
+        function: impl Fn(ResourceContext, &[Value]) -> Result<Value> + Send + Sync + 'static,
+    ) -> Result<()> {
+        self.insert(
+            module.into(),
+            name.into(),
+            HostFunction::External(Arc::new(function)),
         )
     }
 
     /// Adds every function of `other`. A function that is in both is an
     /// error.
     pub fn merge(&mut self, other: HostImports) -> Result<()> {
-        for ((module, name), function) in other.0 {
+        for ((module, name), function) in other.functions {
             self.insert(module, name, function)?;
         }
+        self.unrestricted.extend(other.unrestricted);
+        self.grants.merge(other.grants);
         Ok(())
     }
 
@@ -598,11 +708,14 @@ impl HostImports {
         name: impl Into<String>,
         function: impl Fn(&[Value]) -> Result<Value> + Send + Sync + 'static,
     ) -> Result<()> {
+        let (module, name) = (module.into(), name.into());
         self.insert(
-            module.into(),
-            name.into(),
-            HostFunction::External(Arc::new(function)),
-        )
+            module.clone(),
+            name.clone(),
+            HostFunction::External(Arc::new(move |_, args| function(args))),
+        )?;
+        self.unrestricted.insert((module, name));
+        Ok(())
     }
 }
 
@@ -624,12 +737,13 @@ impl HostOptions {
     pub fn new(imports: HostImports) -> Self {
         Self {
             imports,
-            check_replies: false,
+            ..Self::default()
         }
     }
 }
 
 struct State {
+    resources: ResourceContext,
     references: HashMap<usize, (Weak<dyn Any + Send + Sync>, i64)>,
     next_reference: i64,
     /// The message of the `panic` import, or of a host value that is not correct.
@@ -647,6 +761,8 @@ pub struct Program {
     module: Module,
     abi: Abi,
     embedded_abi: bool,
+    artifact_digest: String,
+    binding_plan: Option<bindings::BindingPlan>,
 }
 
 impl Program {
@@ -684,6 +800,8 @@ impl Program {
             module,
             abi,
             embedded_abi,
+            artifact_digest: bindings::artifact_digest(bytes),
+            binding_plan: None,
         })
     }
 
@@ -699,6 +817,17 @@ impl Program {
         Ok(self)
     }
 
+    /// Attach a complete compiler plan. This checks the artifact and ABI, but
+    /// does not grant authority: the embedding separately approves declarations.
+    pub fn with_binding_plan(mut self, plan: bindings::BindingPlan) -> Result<Self> {
+        plan.validate(&self.artifact_digest, &self.abi)?;
+        self.binding_plan = Some(plan);
+        Ok(self)
+    }
+    pub fn binding_plan(&self) -> Option<&bindings::BindingPlan> {
+        self.binding_plan.as_ref()
+    }
+
     pub fn abi(&self) -> &Abi {
         &self.abi
     }
@@ -706,6 +835,49 @@ impl Program {
     /// Make an instance and call `ilang_start` (B.1). When the program stops
     /// during `ilang_start`, the error is a [`Stop`].
     pub fn instantiate(&self, options: HostOptions) -> Result<Instance> {
+        for table in [&self.abi.services, &self.abi.externals] {
+            for (namespace, fields) in table {
+                for name in fields.keys() {
+                    ensure!(
+                        options
+                            .imports
+                            .functions
+                            .contains_key(&(namespace.clone(), name.clone())),
+                        "missing host function {namespace} {name}"
+                    );
+                }
+            }
+        }
+        // Check every declaration before linking the coalesced import names.
+        if let Some(plan) = &self.binding_plan {
+            plan.validate(&self.artifact_digest, &self.abi)?;
+            for declaration in &plan.declarations {
+                let key = (declaration.namespace.clone(), declaration.name.clone());
+                ensure!(
+                    options.imports.unrestricted.contains(&key)
+                        || options.imports.grants.allows(plan, declaration),
+                    "ungranted host import {} {} declared by {} {}",
+                    declaration.namespace,
+                    declaration.name,
+                    declaration.module,
+                    declaration.declaration
+                );
+            }
+        } else {
+            for table in [&self.abi.services, &self.abi.externals] {
+                for (namespace, fields) in table {
+                    for name in fields.keys() {
+                        ensure!(
+                            options
+                                .imports
+                                .unrestricted
+                                .contains(&(namespace.clone(), name.clone())),
+                            "ungranted host import {namespace} {name}: a trusted binding plan or explicit declaration grant is required"
+                        );
+                    }
+                }
+            }
+        }
         let mut linker = Linker::new(&self.engine);
         define_builtins(&mut linker)?;
         for (kind, modules) in [(true, &self.abi.services), (false, &self.abi.externals)] {
@@ -713,7 +885,7 @@ impl Program {
                 for (name, signature) in functions {
                     let function = options
                         .imports
-                        .0
+                        .functions
                         .get(&(module.clone(), name.clone()))
                         .with_context(|| format!("missing host function {module} {name}"))?
                         .clone();
@@ -735,9 +907,11 @@ impl Program {
                 }
             }
         }
+        let initialization = options.imports.resource_host.context();
         let mut store = Store::new(
             &self.engine,
             State {
+                resources: initialization.clone(),
                 references: HashMap::new(),
                 next_reference: 1,
                 stop_message: None,
@@ -758,6 +932,7 @@ impl Program {
             abi: self.abi.clone(),
             unusable: None,
             checked: options.check_replies,
+            resource_host: options.imports.resource_host,
         };
         let start = instance
             .instance
@@ -840,6 +1015,7 @@ fn stop_of(error: anyhow::Error) -> Result<Stop> {
 }
 
 pub struct Instance {
+    resource_host: ResourceHost,
     store: Store<State>,
     instance: WasmInstance,
     abi: Abi,
@@ -848,7 +1024,40 @@ pub struct Instance {
     checked: bool,
 }
 
+/// Scope guard also runs when an async invocation is abandoned or unwinds.
+struct Invocation(ResourceContext);
+impl Drop for Invocation {
+    fn drop(&mut self) {
+        self.0.teardown();
+    }
+}
+impl Drop for Instance {
+    fn drop(&mut self) {
+        self.dispose();
+    }
+}
+
 impl Instance {
+    fn begin_invocation(&mut self) -> Invocation {
+        self.store.data().resources.teardown();
+        let context = self.resource_host.context();
+        self.store.data_mut().resources = context.clone();
+        Invocation(context)
+    }
+
+    /// Drain this host's cleanup diagnostics without entering Wasm.
+    pub fn take_cleanup_errors(&self) -> Vec<resources::CleanupFailure> {
+        self.resource_host.take_cleanup_errors()
+    }
+
+    /// Stop admission and release host work/resources without invoking i code.
+    pub fn dispose(&mut self) {
+        self.store.data().resources.teardown();
+        self.store.data_mut().requests.drop_all();
+        self.unusable
+            .get_or_insert_with(|| "the instance was disposed".into());
+    }
+
     pub fn abi(&self) -> &Abi {
         &self.abi
     }
@@ -961,6 +1170,7 @@ impl Instance {
     /// Run the program entry or a test by its export name (B.5).
     pub fn run(&mut self, name: &str) -> Result<Outcome> {
         self.usable()?;
+        let _invocation = self.begin_invocation();
         let function = self.export(name)?;
         match self.invoke(function, &[], &mut [])? {
             None => Ok(Outcome::Ok(Value::Nil)),
@@ -983,6 +1193,7 @@ impl Instance {
     /// correct`) without running.
     pub fn call(&mut self, name: &str, arguments: &[Value]) -> Result<Outcome> {
         self.usable()?;
+        let _invocation = self.begin_invocation();
         let signature = self.signature(name, arguments)?;
         ensure!(
             !signature.is_async,
@@ -1044,6 +1255,7 @@ impl Instance {
     /// await `call_async` on your own executor.
     pub async fn call_async(&mut self, name: &str, arguments: &[Value]) -> Result<Outcome> {
         self.usable()?;
+        let _invocation = self.begin_invocation();
         ensure!(
             self.store.data().requests.is_empty(),
             "internal error: a request is outstanding before an async call"
@@ -1102,6 +1314,7 @@ impl Instance {
     /// Run an async program entry or test by its export name.
     pub async fn run_async(&mut self, name: &str) -> Result<Outcome> {
         self.usable()?;
+        let _invocation = self.begin_invocation();
         ensure!(
             self.store.data().requests.is_empty(),
             "internal error: a request is outstanding before an async call"
@@ -1140,6 +1353,9 @@ impl Instance {
         let mut resume_continue: Option<Func> = None;
         let mut resumes: HashMap<String, HashMap<String, Func>> = HashMap::new();
         loop {
+            if let Err(error) = live_context(&self.store) {
+                return Err(self.fault(error.to_string()));
+            }
             let (id, request, reply) = match status[0].i32() {
                 Some(0) => return Ok(None),
                 Some(1) => match self.store.data_mut().requests.next().await {
@@ -1163,6 +1379,9 @@ impl Instance {
                     // Let the timers and IO of the runtime run once, then
                     // give an answer that is done, or go on without one.
                     tokio::task::yield_now().await;
+                    if let Err(error) = live_context(&self.store) {
+                        return Err(self.fault(error.to_string()));
+                    }
                     match self.store.data_mut().requests.ready() {
                         Some(done) => done,
                         None => {
@@ -1181,10 +1400,21 @@ impl Instance {
                     return Err(self.fault(text));
                 }
             };
+            if !self.store.data().resources.is_live() {
+                return Err(self.fault("the resource context has ended".into()));
+            }
             let answer = match reply {
                 Ok(answer) => answer,
                 Err(failure) => {
                     self.unusable = Some(format!("{failure:#}"));
+                    if failure.downcast_ref::<resources::ResourceError>()
+                        == Some(&resources::ResourceError::Memory)
+                    {
+                        return Ok(Some(Stop {
+                            message: None,
+                            trap: "memory exhausted".into(),
+                        }));
+                    }
                     return Err(failure);
                 }
             };
@@ -1330,6 +1560,14 @@ fn gc_settings() -> Result<(wasmtime::Collector, u64)> {
 /// stack, and room for the host functions it calls.
 pub const THREAD_STACK: usize = WASM_STACK + (16 << 20);
 
+fn live_context(context: &impl AsContext<Data = State>) -> Result<()> {
+    ensure!(
+        context.as_context().data().resources.is_live(),
+        "the resource context has ended"
+    );
+    Ok(())
+}
+
 /// Call a Wasm function inside the root scope of its arguments, on a thread
 /// with a stack of [`THREAD_STACK`] bytes: directly on the `ilang` thread of
 /// [`block_on`] when no other Wasm call runs on it, and otherwise on a new
@@ -1340,6 +1578,9 @@ fn invoke_in(
     params: &[Val],
     results: &mut [Val],
 ) -> Invoked {
+    if let Err(error) = live_context(context) {
+        return Invoked::Failed(error);
+    }
     let called = if run::fast_path() {
         run::in_wasm(|| function.call(&mut *context, params, results))
     } else {
@@ -1351,6 +1592,7 @@ fn invoke_in(
                 .stack_size(THREAD_STACK)
                 .spawn_scoped(scope, || {
                     let _entered = handle.as_ref().map(|handle| handle.enter());
+                    live_context(context).map_err(wasmtime::Error::from_anyhow)?;
                     function.call(&mut *context, params, results)
                 })
                 .expect("a thread for Wasm code");
@@ -1361,7 +1603,10 @@ fn invoke_in(
         })
     };
     let Err(error) = called else {
-        return Invoked::Done;
+        return match live_context(context) {
+            Ok(()) => Invoked::Done,
+            Err(error) => Invoked::Failed(error),
+        };
     };
     trapped_in(context, anyhow::Error::from(error))
 }
@@ -1372,6 +1617,7 @@ fn invoke_in(
 fn trapped_in(context: &mut impl AsContextMut<Data = State>, error: anyhow::Error) -> Invoked {
     let mut context = context.as_context_mut();
     let state = context.data_mut();
+    state.resources.teardown();
     state.requests.drop_all();
     if let Some(failure) = state.failure.take() {
         return Invoked::Failed(failure);
@@ -1495,6 +1741,10 @@ fn guarded<T>(
 /// failure of a call is kept, so an outer import that only sees the trap of
 /// an inner one does not hide its text.
 fn host_failure(caller: &mut Caller<'_, State>, error: anyhow::Error) -> wasmtime::Error {
+    caller.data().resources.teardown();
+    if error.downcast_ref::<resources::ResourceError>() == Some(&resources::ResourceError::Memory) {
+        return wasmtime::Error::from_anyhow(anyhow!("memory exhausted"));
+    }
     caller.data_mut().failure.get_or_insert(error);
     wasmtime::Error::from_anyhow(anyhow!("a host function failed"))
 }
@@ -1533,6 +1783,7 @@ fn define_builtins(linker: &mut Linker<State>) -> Result<()> {
                     Err(error) => format!("(the stop message is outside memory: {error})"),
                 };
                 caller.data_mut().stop_message.get_or_insert(message);
+                caller.data().resources.teardown();
             })
         },
     )?;
@@ -1600,6 +1851,13 @@ fn define_import(
     let (module_name, label) = (module.to_owned(), name.to_owned());
     linker.func_new(module, name, ty, move |mut caller, parameters, results| {
         guarded(&mut caller, |caller, admitted| {
+            let resources = caller.data().resources.clone();
+            if !resources.is_live() {
+                return Err(host_failure(
+                    caller,
+                    anyhow!("the resource context has ended"),
+                ));
+            }
             let mut offset = 0;
             // The request id is checked before the service runs (B.4).
             let id = if signature.is_async {
@@ -1627,7 +1885,14 @@ fn define_import(
             }
             let reply = match &function {
                 HostFunction::AsyncService(start) => {
-                    let work = start(&arguments);
+                    let work = start(resources.clone(), &arguments);
+                    let work = match resources.own_future(work) {
+                        Ok(work) => Box::pin(async move {
+                            work.await
+                                .unwrap_or_else(|| Err(anyhow!("the resource context has ended")))
+                        }) as ServiceFuture,
+                        Err(error) => return Err(host_failure(caller, error.into())),
+                    };
                     let request = Request {
                         namespace: module_name.clone(),
                         label: label.clone(),
@@ -1658,13 +1923,16 @@ fn define_import(
                     }
                     return Ok(());
                 }
-                HostFunction::Service(service) => service(&arguments),
-                HostFunction::External(external) => external(&arguments).map(Ok),
+                HostFunction::Service(service) => service(resources, &arguments),
+                HostFunction::External(external) => external(resources, &arguments).map(Ok),
             };
             let reply = match reply {
                 Ok(reply) => reply,
                 Err(error) => return Err(host_failure(caller, error)),
             };
+            if let Err(error) = live_context(caller) {
+                return Err(host_failure(caller, error));
+            }
             let mut values = Vec::new();
             match lower_reply(
                 &mut *caller,
@@ -1810,8 +2078,10 @@ impl Bridge {
             .alloc
             .context("the module does not export ilang_alloc")?
             .typed::<i32, i32>(context.as_context())?;
+        live_context(context)?;
         let ptr = run::in_wasm(|| alloc.call(context.as_context_mut(), len as i32))
             .map_err(|_| anyhow::Error::new(GuestTrap))? as u32;
+        live_context(context)?;
         allocations.push(Allocation { ptr, len });
         memory
             .write(context.as_context_mut(), ptr as usize, bytes)
@@ -1839,12 +2109,14 @@ impl Bridge {
             {
                 continue;
             }
+            live_context(context)?;
             run::in_wasm(|| {
                 free.call(
                     context.as_context_mut(),
                     (allocation.ptr as i32, allocation.len as i32),
                 )
             })?;
+            live_context(context)?;
         }
         Ok(())
     }

@@ -1586,8 +1586,12 @@ fn status_two_gives_ready_answers() {
     let program = program();
     let mut imports = imports(&Log::default());
     imports = {
-        let mut ready = HostImports::default();
-        for ((module, name), function) in imports.0 {
+        let mut ready = HostImports {
+            unrestricted: imports.unrestricted,
+            grants: imports.grants,
+            ..HostImports::default()
+        };
+        for ((module, name), function) in imports.functions {
             if name != "later" {
                 ready.insert(module, name, function).unwrap();
             }
@@ -2209,6 +2213,363 @@ fn a_nested_store_in_the_allocator_gets_its_own_thread() {
     assert!(recorded.iter().all(|(_, id)| *id != outer), "{recorded:?}");
 }
 
+// BG interpretation: native 3.1 authorizes each resolved declaration before
+// coalescing, including external aliases; N9.1/N9.5 own each invocation.
+fn bg_plan(program: &Program) -> bindings::BindingPlan {
+    let mut declarations = Vec::new();
+    for (kind, table) in [
+        ("service", &program.abi.services),
+        ("external", &program.abi.externals),
+    ] {
+        for (namespace, fields) in table {
+            for (name, signature) in fields {
+                declarations.push(bindings::BindingDeclaration {
+                    package: "fixture-content".into(),
+                    module: "fixture/host".into(),
+                    module_digest: bindings::artifact_digest(FIXTURE),
+                    declaration: format!("{kind}.{name}"),
+                    namespace: namespace.clone(),
+                    name: name.clone(),
+                    kind: kind.into(),
+                    signature: signature.clone(),
+                });
+            }
+        }
+    }
+    bindings::BindingPlan {
+        artifact_digest: program.artifact_digest.clone(),
+        declarations,
+    }
+}
+
+#[test]
+fn bg_grants_check_every_declaration_before_coalescing() {
+    let program = program();
+    let mut plan = bg_plan(&program);
+    let original = plan
+        .declarations
+        .iter()
+        .find(|d| d.kind == "external")
+        .unwrap()
+        .clone();
+    let mut alias = original.clone();
+    alias.declaration = "another_external_alias".into();
+    plan.declarations.push(alias.clone());
+    let program = program.with_binding_plan(plan.clone()).unwrap();
+    let mut imports = imports(&Log::default());
+    // Replace the deliberate legacy authority with a restricted registration.
+    let key = (original.namespace.clone(), original.name.clone());
+    imports.functions.remove(&key);
+    imports.unrestricted.remove(&key);
+    imports
+        .context_external(&key.0, &key.1, |_, _| Ok(Value::Float(5.0)))
+        .unwrap();
+    imports.grant(&plan, &original);
+    let expected = format!(
+        "ungranted host import {} {} declared by {} {}",
+        alias.namespace, alias.name, alias.module, alias.declaration
+    );
+    assert_eq!(
+        program
+            .instantiate(HostOptions::new(imports.clone()))
+            .err()
+            .unwrap()
+            .to_string(),
+        expected
+    );
+    imports.grant(&plan, &alias);
+    program
+        .instantiate(HostOptions::new(imports.clone()))
+        .unwrap();
+    // Even a duplicate changes the complete authenticated plan. Reapproval
+    // preserves the obligations of every original declaration.
+    let mut twice = plan.clone();
+    twice.declarations.push(original.clone());
+    assert!(
+        self::program()
+            .with_binding_plan(twice.clone())
+            .unwrap()
+            .instantiate(HostOptions::new(imports.clone()))
+            .is_err()
+    );
+    imports.grant(&twice, &original);
+    imports.grant(&twice, &alias);
+    self::program()
+        .with_binding_plan(twice)
+        .unwrap()
+        .instantiate(HostOptions::new(imports))
+        .unwrap();
+}
+
+#[test]
+fn bg_grants_are_bound_to_artifact_package_module_declaration_and_signature() {
+    let p = program();
+    let plan = bg_plan(&p);
+    let mut changed = plan.clone();
+    changed.artifact_digest.push('0');
+    assert!(p.with_binding_plan(changed).is_err());
+    for field in 0..4 {
+        let p = program();
+        let mut changed = plan.clone();
+        let d = &mut changed.declarations[0];
+        match field {
+            0 => d.package.push('x'),
+            1 => d.module.push('x'),
+            2 => d.module_digest.push('x'),
+            _ => d.declaration.push('x'),
+        }
+        let p = p.with_binding_plan(changed).unwrap();
+        let mut imports = imports(&Log::default());
+        imports.unrestricted.clear();
+        imports.grant_package(&plan, "fixture-content");
+        assert!(
+            p.instantiate(HostOptions::new(imports))
+                .err()
+                .unwrap()
+                .to_string()
+                .starts_with("ungranted host import")
+        );
+    }
+    let mut missing = plan.clone();
+    missing.declarations.pop();
+    assert!(program().with_binding_plan(missing).is_err());
+    let mut wrong = plan;
+    wrong.declarations[0].signature.params.push(AbiType::Int);
+    assert!(program().with_binding_plan(wrong).is_err());
+}
+
+#[test]
+fn bg_failed_duplicate_registration_cannot_broaden_a_grant() {
+    let mut imports = HostImports::default();
+    imports
+        .context_external("app:math/v1", "hypot", |_, _| Ok(Value::Float(0.0)))
+        .unwrap();
+    assert!(
+        imports
+            .external("app:math/v1", "hypot", |_| Ok(Value::Float(0.0)))
+            .is_err()
+    );
+    assert!(
+        !imports
+            .unrestricted
+            .contains(&("app:math/v1".into(), "hypot".into()))
+    );
+}
+
+fn bg_context_imports(
+    contexts: Arc<Mutex<Vec<(ResourceContext, BigInt)>>>,
+    disposed: Arc<std::sync::atomic::AtomicUsize>,
+) -> HostImports {
+    let mut imports = imports(&Log::default());
+    let key = ("app:console/v1".into(), "print".into());
+    imports.functions.remove(&key);
+    imports.unrestricted.remove(&key);
+    imports
+        .context_service("app:console/v1", "print", move |context, _| {
+            let disposed = disposed.clone();
+            let id = context.insert("fixture", (), move |_, _| {
+                disposed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            })?;
+            contexts.lock().unwrap().push((context, id));
+            Ok(Ok(Value::Nil))
+        })
+        .unwrap();
+    imports
+}
+
+#[test]
+fn bg_sequential_invocations_and_instances_have_fresh_tables() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let p = program();
+    let plan = bg_plan(&p);
+    let p = p.with_binding_plan(plan.clone()).unwrap();
+    let contexts = Arc::new(Mutex::new(Vec::new()));
+    let disposed = Arc::new(AtomicUsize::new(0));
+    let mut imports = bg_context_imports(contexts.clone(), disposed.clone());
+    imports.grant_package(&plan, "fixture-content");
+    let options = HostOptions::new(imports);
+    for _ in 0..2 {
+        let mut instance = p.instantiate(options.clone()).unwrap();
+        for _ in 0..2 {
+            instance
+                .call("print", &[Value::String("test".into())])
+                .unwrap();
+        }
+        instance.dispose();
+    }
+    let contexts = contexts.lock().unwrap();
+    assert_eq!(contexts.len(), 6); // Two initializations and four invocations.
+    assert_eq!(disposed.load(Ordering::SeqCst), 6);
+    for pair in contexts.windows(2) {
+        assert!(pair[0].1 < pair[1].1);
+    }
+    for (context, id) in contexts.iter() {
+        assert!(!context.is_live());
+        assert!(matches!(
+            context.acquire::<()>(id, "fixture", "read"),
+            Err(resources::ResourceError::Closed)
+        ));
+    }
+}
+
+#[test]
+fn bg_stop_failure_and_abandoned_future_teardown_captured_contexts() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    for mode in 0..3 {
+        let p = program();
+        let plan = bg_plan(&p);
+        let p = p.with_binding_plan(plan.clone()).unwrap();
+        let contexts = Arc::new(Mutex::new(Vec::new()));
+        let disposed = Arc::new(AtomicUsize::new(0));
+        let mut imports = imports(&Log::default());
+        let key = ("app:clock/v1".into(), "later".into());
+        imports.functions.remove(&key);
+        imports.unrestricted.remove(&key);
+        let saved = contexts.clone();
+        let count = disposed.clone();
+        imports
+            .context_async_service("app:clock/v1", "later", move |context, _| {
+                let count = count.clone();
+                let id = context
+                    .insert("fixture", (), move |_, _| {
+                        count.fetch_add(1, Ordering::SeqCst);
+                    })
+                    .unwrap();
+                saved.lock().unwrap().push((context, id));
+                async move {
+                    if mode == 0 {
+                        return Ok(Ok(Value::Float(1.0)));
+                    }
+                    if mode == 1 {
+                        bail!("fixture host failure");
+                    }
+                    std::future::pending::<()>().await;
+                    Ok(Ok(Value::Float(1.0)))
+                }
+            })
+            .unwrap();
+        imports.grant_package(&plan, "fixture-content");
+        let mut instance = p.instantiate(HostOptions::new(imports)).unwrap();
+        if mode == 0 {
+            assert!(matches!(
+                block_on(instance.call_async("app/async.stop_mid", &[])).unwrap(),
+                Outcome::Stop(_)
+            ));
+        } else if mode == 1 {
+            assert!(
+                block_on(instance.call_async("app/async.later", &[Value::Float(1.0)])).is_err()
+            );
+        } else {
+            let mut future = Box::pin(instance.call_async("app/async.later", &[Value::Float(1.0)]));
+            let waker = std::task::Waker::noop();
+            assert!(
+                future
+                    .as_mut()
+                    .poll(&mut std::task::Context::from_waker(waker))
+                    .is_pending()
+            );
+            drop(future);
+        }
+        assert_eq!(
+            disposed.load(Ordering::SeqCst),
+            contexts.lock().unwrap().len()
+        );
+        assert!(!contexts.lock().unwrap().is_empty());
+        for (context, _) in contexts.lock().unwrap().iter() {
+            assert!(!context.is_live());
+        }
+    }
+}
+
+#[test]
+fn bg_two_concurrent_runs_in_one_host_are_independent() {
+    let p = program();
+    let plan = bg_plan(&p);
+    let p = p.with_binding_plan(plan.clone()).unwrap();
+    let ids = Arc::new(Mutex::new(Vec::new()));
+    let barrier = Arc::new(std::sync::Barrier::new(2));
+    let mut imports = imports(&Log::default());
+    let key = ("app:console/v1".into(), "print".into());
+    imports.functions.remove(&key);
+    imports.unrestricted.remove(&key);
+    imports
+        .context_service("app:console/v1", "print", move |context, args| {
+            if !matches!(args, [Value::String(s)] if s == "run") {
+                return Ok(Ok(Value::Nil));
+            }
+            let id = context.insert("fixture", (), |_, _| {})?;
+            ids.lock().unwrap().push(id.clone());
+            barrier.wait();
+            for number in ids.lock().unwrap().iter() {
+                let result = context.acquire::<()>(number, "fixture", "read");
+                if number == &id {
+                    result.unwrap().commit(()).unwrap();
+                } else {
+                    assert!(matches!(result, Err(resources::ResourceError::Closed)));
+                }
+            }
+            barrier.wait();
+            Ok(Ok(Value::Nil))
+        })
+        .unwrap();
+    imports.grant_package(&plan, "fixture-content");
+    let options = HostOptions::new(imports);
+    std::thread::scope(|scope| {
+        for _ in 0..2 {
+            let options = options.clone();
+            let p = &p;
+            scope.spawn(move || {
+                let mut instance = p.instantiate(options).unwrap();
+                instance
+                    .call("print", &[Value::String("run".into())])
+                    .unwrap();
+            });
+        }
+    });
+}
+
+#[test]
+fn bg_close_while_a_request_is_outstanding_rejects_its_late_success() {
+    let p = program();
+    let plan = bg_plan(&p);
+    let p = p.with_binding_plan(plan.clone()).unwrap();
+    let captured = Arc::new(Mutex::new(None));
+    let save = captured.clone();
+    let mut imports = imports(&Log::default());
+    let key = ("app:clock/v1".into(), "later".into());
+    imports.functions.remove(&key);
+    imports.unrestricted.remove(&key);
+    imports
+        .context_async_service("app:clock/v1", "later", move |context, _| {
+            let id = context.insert("test", (), |_, _| {}).unwrap();
+            let lease = context.acquire::<()>(&id, "test", "read").unwrap();
+            *save.lock().unwrap() = Some((context, id));
+            async move {
+                lease.closed().await;
+                assert!(matches!(
+                    lease.commit(Value::Float(1.0)),
+                    Err(resources::ResourceError::Closed)
+                ));
+                Ok(Err(Value::String("closed".into())))
+            }
+        })
+        .unwrap();
+    imports.grant_package(&plan, "fixture-content");
+    let mut instance = p.instantiate(HostOptions::new(imports)).unwrap();
+    let args = [Value::Float(1.0)];
+    let mut call = Box::pin(instance.call_async("app/async.later", &args));
+    assert!(
+        call.as_mut()
+            .poll(&mut std::task::Context::from_waker(std::task::Waker::noop()))
+            .is_pending()
+    );
+    let (context, id) = captured.lock().unwrap().take().unwrap();
+    block_on(context.close(&id, "test"));
+    assert!(
+        matches!(block_on(call).unwrap(), Outcome::Err(GuestError(Value::String(s))) if s == "closed")
+    );
+}
+
 // Spec 4.1 and 11.4 require distinct nominal constructors to differ, even
 // when the host passes one object (or null) through both declarations.
 #[test]
@@ -2333,4 +2694,349 @@ fn opaque_imports(seed: Value) -> HostImports {
             .unwrap();
     }
     imports
+}
+
+#[test]
+fn bg_review_complete_plan_cannot_drop_a_denied_coalesced_declaration() {
+    let plan: bindings::BindingPlan = serde_json::from_str(include_str!(
+        "../../../tests/browser/fixtures/compiled.bindings.json"
+    ))
+    .unwrap();
+    let mut imports = imports(&Log::default());
+    imports
+        .async_service("app:clock/v1", "tick", |_| async {
+            Ok(Ok(Value::Int(1.into())))
+        })
+        .unwrap();
+    imports.merge(opaque_imports(Value::NullExternref)).unwrap();
+    let key = ("app:opaque/v1".into(), "get".into());
+    imports.functions.remove(&key);
+    imports.unrestricted.remove(&key);
+    imports
+        .context_external(&key.0, &key.1, |_, _| Ok(Value::NullExternref))
+        .unwrap();
+    assert_eq!(
+        plan.declarations
+            .iter()
+            .filter(|d| d.namespace == key.0 && d.name == key.1)
+            .count(),
+        2
+    );
+    let allowed = plan
+        .declarations
+        .iter()
+        .find(|d| d.declaration == "get_a")
+        .unwrap();
+    imports.grant(&plan, allowed);
+    let options = HostOptions::new(imports);
+    assert!(
+        Program::from_bytes(COMPILED)
+            .unwrap()
+            .with_binding_plan(plan.clone())
+            .unwrap()
+            .instantiate(options.clone())
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("get_b")
+    );
+    let mut omitted = plan.clone();
+    omitted.declarations.retain(|d| d.declaration != "get_b");
+    assert!(
+        Program::from_bytes(COMPILED)
+            .unwrap()
+            .with_binding_plan(omitted)
+            .unwrap()
+            .instantiate(options.clone())
+            .is_err(),
+        "a replacement plan must not reuse approval of the complete original plan"
+    );
+    let mut reordered = plan;
+    reordered.declarations.reverse();
+    assert!(
+        Program::from_bytes(COMPILED)
+            .unwrap()
+            .with_binding_plan(reordered)
+            .unwrap()
+            .instantiate(options)
+            .is_err()
+    );
+}
+
+#[test]
+fn bg_review_ended_context_blocks_runnable_continuations() {
+    use std::task::{Context, Waker};
+    let p = program();
+    let plan = bg_plan(&p);
+    let mut imports = imports(&Log::default());
+    let key = ("app:clock/v1".into(), "later".into());
+    imports.functions.remove(&key);
+    imports.unrestricted.remove(&key);
+    let saved = Arc::new(Mutex::new(None));
+    let capture = saved.clone();
+    imports
+        .context_async_service(&key.0, &key.1, move |context, _| {
+            *capture.lock().unwrap() = Some(context);
+            async { Ok(Ok(Value::Float(2.0))) }
+        })
+        .unwrap();
+    imports.grant_package(&plan, "fixture-content");
+    let mut guest = p
+        .with_binding_plan(plan)
+        .unwrap()
+        .instantiate(HostOptions::new(imports))
+        .unwrap();
+    let args = [Value::Float(100.0)];
+    let mut call = Box::pin(guest.call_async("app/async.yielding", &args));
+    let mut cx = Context::from_waker(Waker::noop());
+    assert!(call.as_mut().poll(&mut cx).is_pending());
+    assert!(call.as_mut().poll(&mut cx).is_pending());
+    saved.lock().unwrap().as_ref().unwrap().teardown();
+    assert!(
+        matches!(call.as_mut().poll(&mut cx), std::task::Poll::Ready(Err(error)) if error.to_string().contains("ended"))
+    );
+}
+
+#[test]
+fn bg_review_opaque_shape_is_not_an_async_protocol_on_rust() {
+    struct Opaque {
+        _then: fn(),
+        _finally: fn(),
+    }
+    let value = HostReference::new(Opaque {
+        _then: || panic!("opaque then must not run"),
+        _finally: || panic!("opaque finally must not run"),
+    });
+    let (mut guest, _) = fixture();
+    let Value::Externref(returned) = ok(guest
+        .call("opaque_roundtrip", &[Value::Externref(value.clone())])
+        .unwrap())
+    else {
+        panic!("expected opaque reference")
+    };
+    assert!(value.ptr_eq(&returned));
+}
+
+fn bg_lifecycle_program() -> Program {
+    let bytes = include_bytes!("../../../tests/browser/fixtures/bg-lifecycle.wasm");
+    let point = Signature::new([], AbiType::Nil).asynchronous();
+    Program::from_bytes(bytes)
+        .unwrap()
+        .with_abi(Abi {
+            entry: Some(EntryPoint {
+                name: "entry".into(),
+                is_async: true,
+            }),
+            exports: [
+                ("runnable".into(), point.clone()),
+                ("immediate".into(), point.clone()),
+                ("leftover".into(), point),
+                ("sync".into(), Signature::new([], AbiType::Nil)),
+                (
+                    "buffers".into(),
+                    Signature::new([AbiType::String, AbiType::String], AbiType::Nil),
+                ),
+            ]
+            .into(),
+            services: [
+                (
+                    "bg:control/v1".into(),
+                    [
+                        ("capture".into(), Signature::new([], AbiType::Nil)),
+                        ("end".into(), Signature::new([], AbiType::Nil)),
+                    ]
+                    .into(),
+                ),
+                (
+                    "bg:work/v1".into(),
+                    [(
+                        "wait".into(),
+                        Signature::new([], AbiType::Nil).asynchronous(),
+                    )]
+                    .into(),
+                ),
+            ]
+            .into(),
+            ..Abi::default()
+        })
+        .unwrap()
+}
+fn bg_lifecycle_counter(guest: &mut Instance, offset: usize) -> u32 {
+    let memory = guest
+        .instance
+        .get_memory(&mut guest.store, "memory")
+        .unwrap();
+    u32::from_le_bytes(
+        memory.data(&guest.store)[offset..offset + 4]
+            .try_into()
+            .unwrap(),
+    )
+}
+fn bg_lifecycle_imports(
+    p: &Program,
+    capture: impl Fn(ResourceContext) + Send + Sync + 'static,
+) -> HostImports {
+    let plan = bg_plan(p);
+    let mut imports = HostImports::default();
+    imports
+        .context_service("bg:control/v1", "capture", move |context, _| {
+            capture(context);
+            Ok(Ok(Value::Nil))
+        })
+        .unwrap();
+    imports
+        .context_service("bg:control/v1", "end", |context, _| {
+            context.teardown();
+            Ok(Ok(Value::Nil))
+        })
+        .unwrap();
+    imports
+        .context_async_service("bg:work/v1", "wait", |_, _| std::future::pending())
+        .unwrap();
+    imports.grant_package(&plan, "fixture-content");
+    imports
+}
+#[test]
+fn bg_review_no_request_runnable_and_result_paths_do_not_enter_ended_wasm() {
+    for entry in [false, true] {
+        let p = bg_lifecycle_program();
+        let plan = bg_plan(&p);
+        let saved = Arc::new(Mutex::new(None));
+        let capture = saved.clone();
+        let imports =
+            bg_lifecycle_imports(&p, move |context| *capture.lock().unwrap() = Some(context));
+        let mut guest = p
+            .with_binding_plan(plan)
+            .unwrap()
+            .instantiate(HostOptions::new(imports))
+            .unwrap();
+        let mut call: Pin<Box<dyn Future<Output = Result<Outcome>> + Send + '_>> = if entry {
+            Box::pin(guest.run_async("entry"))
+        } else {
+            Box::pin(guest.call_async("runnable", &[]))
+        };
+        assert!(
+            call.as_mut()
+                .poll(&mut std::task::Context::from_waker(std::task::Waker::noop()))
+                .is_pending()
+        );
+        saved.lock().unwrap().as_ref().unwrap().teardown();
+        assert!(matches!(block_on(call), Err(error) if error.to_string().contains("ended")));
+        assert_eq!(bg_lifecycle_counter(&mut guest, 0), 0);
+        assert_eq!(bg_lifecycle_counter(&mut guest, 4), 0);
+    }
+}
+#[test]
+fn bg_review_drop_at_status_zero_blocks_later_result_export() {
+    struct EndOnDrop(ResourceContext);
+    impl Drop for EndOnDrop {
+        fn drop(&mut self) {
+            self.0.teardown();
+        }
+    }
+    let p = bg_lifecycle_program();
+    let plan = bg_plan(&p);
+    let mut imports = bg_lifecycle_imports(&p, |_| {});
+    imports
+        .functions
+        .remove(&("bg:work/v1".into(), "wait".into()));
+    imports
+        .context_async_service("bg:work/v1", "wait", |context, _| {
+            let guard = EndOnDrop(context);
+            async move {
+                let _guard = guard;
+                std::future::pending().await
+            }
+        })
+        .unwrap();
+    let mut guest = p
+        .with_binding_plan(plan)
+        .unwrap()
+        .instantiate(HostOptions::new(imports))
+        .unwrap();
+    assert!(
+        matches!(block_on(guest.call_async("leftover", &[])), Err(error) if error.to_string().contains("ended"))
+    );
+    assert_eq!(bg_lifecycle_counter(&mut guest, 4), 0);
+}
+#[test]
+fn bg_review_gate_covers_sync_callbacks_allocations_and_each_free() {
+    for mode in [0, 16, 20] {
+        let p = bg_lifecycle_program();
+        let plan = bg_plan(&p);
+        let imports = bg_lifecycle_imports(&p, move |context| {
+            if mode == 0 {
+                context.teardown();
+            }
+        });
+        let mut guest = p
+            .with_binding_plan(plan)
+            .unwrap()
+            .instantiate(HostOptions::new(imports))
+            .unwrap();
+        let memory = guest
+            .instance
+            .get_memory(&mut guest.store, "memory")
+            .unwrap();
+        if mode != 0 {
+            memory.data_mut(&mut guest.store)[mode] = 1;
+        }
+        let result = if mode == 0 {
+            guest.call("sync", &[])
+        } else {
+            guest.call(
+                "buffers",
+                &[
+                    Value::String("first".into()),
+                    Value::String("second".into()),
+                ],
+            )
+        };
+        assert!(!matches!(result, Ok(Outcome::Ok(_))));
+        if mode == 20 {
+            assert_eq!(bg_lifecycle_counter(&mut guest, 24), 1);
+        } else {
+            assert_eq!(bg_lifecycle_counter(&mut guest, 12), 0);
+        }
+    }
+}
+
+#[test]
+fn bg_review_cleanup_failure_is_reported_without_replacing_a_success() {
+    struct PanicOnDrop;
+    impl Drop for PanicOnDrop {
+        fn drop(&mut self) {
+            panic!("request destructor failed");
+        }
+    }
+    let p = bg_lifecycle_program();
+    let plan = bg_plan(&p);
+    let mut imports = bg_lifecycle_imports(&p, |_| {});
+    imports
+        .functions
+        .remove(&("bg:work/v1".into(), "wait".into()));
+    imports
+        .context_async_service("bg:work/v1", "wait", |_, _| {
+            let guard = PanicOnDrop;
+            async move {
+                let _guard = guard;
+                std::future::pending().await
+            }
+        })
+        .unwrap();
+    let mut guest = p
+        .with_binding_plan(plan)
+        .unwrap()
+        .instantiate(HostOptions::new(imports))
+        .unwrap();
+    assert!(matches!(
+        block_on(guest.call_async("leftover", &[])).unwrap(),
+        Outcome::Ok(Value::Nil)
+    ));
+    assert_eq!(bg_lifecycle_counter(&mut guest, 4), 1);
+    let errors = guest.take_cleanup_errors();
+    assert_eq!(errors.len(), 1);
+    assert_eq!(errors[0].phase, "cancel");
+    assert_eq!(errors[0].message, "request destructor failed");
+    assert!(guest.unusable().is_none());
 }

@@ -53,12 +53,24 @@ pub fn compile(
     typed: &Typed,
     options: Options,
 ) -> Result<Vec<u8>, Error> {
-    let ir = lower::lower(graph, program, typed, options).map_err(Error::Diagnostics)?;
+    compile_with_bindings(graph, program, typed, options).map(|(wasm, _)| wasm)
+}
+
+/// The artifact and its complete resolved binding declarations, separately from
+/// ABI v3. The caller binds the plan to the final bytes after optimization.
+pub fn compile_with_bindings(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: Options,
+) -> Result<(Vec<u8>, Vec<serde_json::Value>), Error> {
+    let (ir, bindings) =
+        lower::lower_with_bindings(graph, program, typed, options).map_err(Error::Diagnostics)?;
     let text = emit::wat(&ir);
     let mut wasm = wat::parse_str(&text).map_err(|e| Error::Internal(e.to_string()))?;
     emit::add_abi_section(&mut wasm, &ir.abi_json);
     validate(&wasm).map_err(Error::Internal)?;
-    Ok(wasm)
+    Ok((wasm, bindings))
 }
 
 /// The WAT text of a checked program, for reading.
