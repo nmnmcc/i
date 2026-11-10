@@ -6,6 +6,7 @@
 
 mod capabilities;
 pub mod hir;
+pub mod hygiene;
 pub mod identity;
 pub mod macro_sandbox;
 pub mod order;
@@ -159,11 +160,22 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
 /// when a module has a syntax error, so that one mistake is not reported
 /// many times.
 pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagnostic>) {
-    let (parsed, mut diags) = parse(graph);
+    let (parsed, diags) = parse(graph);
     if diags.iter().any(Diagnostic::is_error) {
         return (None, diags);
     }
-    let (mut program, more) = resolve::resolve(graph, &parsed);
+    let (program, more) = resolve_parsed(graph, &parsed);
+    (program, diags.into_iter().chain(more).collect())
+}
+
+/// Resolve an already parsed module set. The expansion driver uses this entry
+/// point after transforming syntax, keeping source identities and spans intact.
+pub fn resolve_parsed(
+    graph: &PackageGraph,
+    parsed: &[Parsed],
+) -> (Option<hir::Program>, Vec<Diagnostic>) {
+    let mut diags = Vec::new();
+    let (mut program, more) = resolve::resolve(graph, parsed);
     diags.extend(more);
     order::order(&mut program, &mut diags);
     capabilities::check(&program, graph, &mut diags);
@@ -184,7 +196,21 @@ pub struct Checked {
 /// only inferred when resolution found no errors, so that one mistake is
 /// not reported many times.
 pub fn check(graph: &PackageGraph) -> Checked {
-    let (program, mut diags) = resolve_program(graph);
+    let (program, diags) = resolve_program(graph);
+    check_resolved(graph, program, diags)
+}
+
+/// Resolve and type-check the parsed modules after syntax expansion.
+pub fn check_parsed(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
+    let (program, diags) = resolve_parsed(graph, parsed);
+    check_resolved(graph, program, diags)
+}
+
+fn check_resolved(
+    graph: &PackageGraph,
+    program: Option<hir::Program>,
+    mut diags: Vec<Diagnostic>,
+) -> Checked {
     let types = match &program {
         Some(p) if !diags.iter().any(Diagnostic::is_error) => {
             let (typed, more) = types::check(p, &graph.sources);
