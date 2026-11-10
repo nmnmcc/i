@@ -143,3 +143,21 @@ No reference implementation was edited, built, cloned or copied. The proposed
 method follows `prior-art-compiler.md` findings 2–4 and working-method table.
 The note was read at commit `3cc1def`: the ledger names it as landed but this
 lane's starting redesign commit `1a8fee2` does not contain it.
+
+
+K4 runtime fixtures now live only in `tests/review`. Requirements using
+`types_contain` retain exact principal-scheme fragments independently of the
+observed outputs. Entry-rejection requirements also invoke `run` at O0/O2
+when source checking rejects, and require rejection before execution in all
+three commands. This preserves the former CLI boundary assertions.
+
+The one-time migration can be reconstructed with
+`UPDATE=1 scripts/review-corpus migrate-k4`. It reads the pinned local K4 test
+revision 9695b32a, formats complete programs, reuses identical permanent
+projects and registers distinct runtime variants. The source-building function
+from that pinned local test is the only historical code it calls; it does not
+execute preserved independent-review drivers. `k4-migration.json` records all
+103 old assertions and their 101 distinct permanent projects: 21 projects are
+reused and 80 entry/annotation variants are added. Original review payloads
+remain byte-for-byte intact for the integrity audit. The old K4 runners and
+fixture copies are removed; generation and timing use the QA commands above.

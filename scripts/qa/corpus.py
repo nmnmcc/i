@@ -253,6 +253,9 @@ def observe_in(binary, case, bound, runtime):
         project = materialize(case, runtime)
     check, elapsed = invoke(binary, project, ['check', '--types'], bound)
     result = {'check': check}
+    if check['exit'] == 1 and case.get('run_rejected'):
+        for opt in [0, 2]:
+            result['run' + str(opt)], _ = invoke(binary, project, ['run', '--opt', str(opt)], bound)
     if check['exit'] == 0:
         text = '\n'.join((project / f).read_text() for f in case['files'])
         has_main = bool(re.search(r'(?m)^\s*@main\b', text))
@@ -313,6 +316,9 @@ def run_corpus(args):
                 return False
         return True
     def observe_case(case):
+        if any(r.get('phase') == 'entry' and re.search(r['pattern'], case['id'])
+               for r in requirements['requirements']):
+            case = dict(case, run_rejected=True)
         bound = args.timeout
         saved = ROOT / case['project'] / 'expected.json'
         if not update and saved.exists():
@@ -351,7 +357,7 @@ def run_corpus(args):
             if wanted == 'reject':
                 met = check['exit'] == 1 and 'error[' in check['stderr'] and 'panicked at' not in check['stderr']
                 if requirement.get('phase') == 'entry':
-                    entry_checks = [check] if check['exit'] != 0 else [result['run0'], result['run2']] if 'run0' in result else [result['test0'], result['test2']]
+                    entry_checks = [check, *[result[k] for k in ['run0', 'run2'] if k in result]] if check['exit'] != 0 else [result['run0'], result['run2']] if 'run0' in result else [result['test0'], result['test2']]
                     met = all(v['exit'] == 1 and ('error[' in v['stderr'] or 'provider:' in v['stderr'])
                               and 'E0505' not in v['stderr'] and 'trap:' not in v['stderr']
                               for v in entry_checks)
@@ -649,6 +655,8 @@ def main():
     run.add_argument('--missing-only', action='store_true')
     run.add_argument('--jobs', type=int, default=1)
     sub.add_parser('parse-register')
+    migration = sub.add_parser('migrate-k4')
+    migration.add_argument('--binary', type=Path, default=ROOT / 'target/release/i')
     reporting = sub.add_parser('report')
     reporting.add_argument('--verification-log', type=Path)
     snap = sub.add_parser('snapshot')
@@ -661,7 +669,10 @@ def main():
     salvage = sub.add_parser('snapshot-tools')
     salvage.add_argument('--source', default='/tmp')
     args = parser.parse_args()
-    if args.mode == 'import':
+    if args.mode == 'migrate-k4':
+        from k4_migrate import migrate
+        migrate(args.binary)
+    elif args.mode == 'import':
         import_reviews(args)
         snapshot_tools(args)
     elif args.mode == 'run':

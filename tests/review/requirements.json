@@ -1293,6 +1293,1106 @@
       "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
       "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
       "censored": true
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4\\-lane/row_alias$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: row_alias",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4\\-lane/direct_row$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: direct_row",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4\\-lane/effect_row_alias$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: effect_row_alias",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4\\-lane/latent_row$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: latent_row",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4\\-lane/alias_kind_env$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: alias_kind_env",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4\\-lane/alias_kind_error$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: alias_kind_error",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x1$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x1",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x2$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x2",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x3$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x3",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x4$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x4",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x6$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x6",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x7$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x7",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/x8$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: x8",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/z1$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: z1",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/z4$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: z4",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/g_ann_SDep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: g_ann_SDep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/g_inf_SDep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: g_inf_SDep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/m3$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: m3",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/m4$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: m4",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "pattern": "^review\\-k4d/proj/r6$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: r6",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4d/proj/b4$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: b4",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4d/proj/b7$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: b7",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4d/proj/r2$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: r2",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4d/proj/r3$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: r3",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q21$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q21",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q22$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q22",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q23$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q23",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q24$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q24",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q25$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q25",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q26$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q26",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q27$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q27",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q28$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q28",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q29$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q29",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q30$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q30",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q31$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q31",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q32$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q32",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q33$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q33",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q34$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q34",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q35$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q35",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q36$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q36",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q37$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q37",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q38$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q38",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q39$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q39",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "pattern": "^review\\-k4\\-lane/q40$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: q40",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4d/proj/r4$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: r4",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/closed_handler_hole$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: closed_handler_hole",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/latent_row_same$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: latent_row_same",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/error_row_values$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: error_row_values",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w1\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w1-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w1\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w1-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w2\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w2-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w2\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w2-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w3\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w3-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w3\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w3-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w4\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w4-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w4\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w4-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w5\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w5-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w5\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w5-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w6\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w6-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w6\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w6-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w7\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w7-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w7\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w7-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w8\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w8-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w8\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w8-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w9\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w9-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w9\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w9-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w10\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w10-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w10\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w10-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w11\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w11-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w11\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w11-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w12\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w12-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w12\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w12-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w13\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w13-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w13\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w13-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w14\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w14-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w14\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w14-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w15\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w15-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w15\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w15-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w16\\-Never$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w16-Never",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/w16\\-Dep$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: w16-Dep",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4d/proj/a3$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: entry-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/unused\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: unused-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4s/soundness_unannotated$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: entry-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/unused\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: unused-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-0\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-0-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-0\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-0-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-1\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-1-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-2\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-2-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-2\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-2-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-3\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-3-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-3\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-3-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-4\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-4-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-4\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-4-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-5\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-5-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-5\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-5-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-6\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-6-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-6\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-6-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0522"
+      ],
+      "pattern": "^review\\-k4\\-lane/previous\\-chain\\-64$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: previous-chain-64",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/handler\\-hole\\-False\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: handler-hole-False-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/handler\\-hole\\-True\\-False$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: handler-hole-True-False",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "outcome": "accept",
+      "pattern": "^review\\-k4\\-lane/handler\\-hole\\-True\\-True$",
+      "known_failure": false,
+      "finding": "K4 runtime migration: handler-hole-True-True",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "origin": "tests/review/k4-migration.json"
+    },
+    {
+      "pattern": "^review-k4d/(?:proj|_loose/p)/q(?:2[1-9]|3[0-9]|40)$",
+      "known_failure": false,
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () -> Int ! N | S(N)",
+        "app/main.fw : () -> Int ! N | S(N)"
+      ],
+      "finding": "K4 principal schemes: field and pattern access retain the same callback and service rows",
+      "source": "docs/spec.md §4.8 rules 4–5 and 13: function/call environments and fields from the corresponding bound forms; §4.7 principal inference",
+      "origin": "K4 q21–q40 assertions formerly in tests/k4/review.py"
     }
   ],
   "transitions": [

@@ -604,3 +604,20 @@ retain their argument-equality obligation. The unchanged T1 fixture passes
 check/types and run at both optimization levels, and coalescing, generic-service
 and row-scheme tests pass (qa-error-row-fix.log). Temporary backtrace tracing
 was removed before the successful checks.
+
+
+The migration command preserves 103 former runtime assertions in 101 distinct
+permanent projects, reuses 21 existing projects after canonical formatting,
+and adds 80 distinct entry/annotation variants. Principal use/fw fragments
+for every q21–q40 spelling are explicit requirements, including both original
+review copies and the runnable entry variants. Original review bytes remain
+unchanged. The old fixture copies, Rust corpus runner and three Python K4
+runners are removed; focused checker unit tests remain. The review runner
+now also calls run O0/O2 for source-rejected entry requirements and verifies
+that all three commands reject before execution. Those additional phases
+are a harness change, recorded separately from compiler behavior changes.
+
+Promotion commits identify the finding and enumerate each promoted case.
+Semantic requirements are promoted individually. The generated observations
+and known-failure report are regenerated together in the final derived-files
+commit, following the workspace's explicit generation rule.
