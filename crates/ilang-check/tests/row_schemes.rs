@@ -97,3 +97,20 @@ T(N) { T(() -> Nil ! N) }
 widen = (x: T(S(Int))) -> T(S(Int) | Other) { x }",
     );
 }
+
+#[test]
+fn equivalent_nested_row_orders_do_not_change_handler_acceptance() {
+    // §4.4 defines unions as sets. F1's proof must use type equality,
+    // including alias equality and union order, rather than source text.
+    let base = "Dep { Dep }
+Extra { Extra }
+Svc(R) { Svc(() -> Nil ! R) }
+wrap(N) = (body: () -> Nil ! N | Svc(Extra | Dep), svc: Svc(Dep | Extra)) -> Nil ! N {
+ ! Svc(Extra | Dep) = svc
+ body()
+}";
+    let before = types(base);
+    let after = types(&base.replace("! Svc(Extra | Dep) = svc", "! Svc(Dep | Extra) = svc"));
+    assert_eq!(before, after);
+    assert!(before["app/main.wrap"].contains("Svc(Dep | Extra)"));
+}

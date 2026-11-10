@@ -62,6 +62,7 @@ fn rows_inside_type_arguments_keep_service_arguments_equal() {
     // §4.5's row ruling applies inside T's argument. These callbacks need
     // a different S form or an unprovided Dep; neither may reach runtime.
     for name in [
+        "row_alias",
         "g_ann_SDep",
         "g_inf_SDep",
         "m3",
@@ -117,22 +118,22 @@ fn generic_handlers_have_finite_types_with_or_without_annotations() {
         } else {
             "provided = S(() { 1 })"
         };
-        let service = service.strip_prefix("provided = ").unwrap();
+        let service = service.split_once('=').unwrap().1.trim();
         let call = match n {
             1 | 2 | 9 | 10 => "wrap(() { use() })".to_string(),
             3 | 4 | 5 | 11 | 12 | 13 => "wrap(() { use() }, VALUE)".replace("VALUE", service),
             _ => "wrap(VALUE)".replace("VALUE", service),
         };
+        let prefix = source.clone();
         source.push_str(&"\n@main\nmain = () { assert(CALL == 1) }\n".replace("CALL", &call));
         check_and_run(&format!("w{n}"), &source, None, "");
-        let prefix = source.split("@main").next().unwrap();
         let dependency = "Dep { Dep(value: Int) }\nget = (d ! Dep) { d.value }\n";
         let service = if n >= 9 {
             "provided = S(() { get() }, (_: Dep) { Nil })"
         } else {
             "provided = S(() { get() })"
         };
-        let service = service.strip_prefix("provided = ").unwrap();
+        let service = service.split_once('=').unwrap().1.trim();
         let call = match n {
             1 | 2 | 9 | 10 => "wrap(() { use() })".to_string(),
             3 | 4 | 5 | 11 | 12 | 13 => "wrap(() { use() }, VALUE)".replace("VALUE", service),

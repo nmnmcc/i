@@ -403,6 +403,18 @@ impl Solver {
         {
             return;
         }
+        if let Ty::Var(v) = t {
+            let st = self.var(*v);
+            if st.lower.is_empty()
+                && st.upper.is_empty()
+                && st.from.is_empty()
+                && st.into.is_empty()
+            {
+                self.observe(*v);
+                self.var_mut(*v).row = mode;
+                return;
+            }
+        }
         let mut todo = vec![t.clone()];
         let mut added = Vec::new();
         while let Some(t) = todo.pop() {
@@ -477,7 +489,6 @@ impl Solver {
                 bound_vars(self, b, true, false, &mut edges);
             }
             todo.extend(edges.drain(..).map(|e| e.0));
-            todo.extend(st.from.iter().chain(&st.into).copied());
         }
         false
     }
@@ -486,6 +497,12 @@ impl Solver {
     /// Store it there, so generalizing a member cannot lose a restriction
     /// that was reached only through a reverse inclusion link.
     fn handle(&mut self, v: V, h: &Ty) {
+        // There is nothing to retain for a constructor with just one form.
+        if matches!(h, Ty::Con(_, values, args) if values.is_all() && args.is_empty())
+            && h.scalar().is_none()
+        {
+            return;
+        }
         self.has_handlers = true;
         for w in self.reach(vec![v], true).0 {
             if self.var(w).handled.contains(h) {
@@ -504,11 +521,52 @@ impl Solver {
         }
     }
 
+    /// Equality used only to prove a scheme's handler witness. Variable
+    /// inclusions must hold both ways; row member order is immaterial.
+    fn same_form(&self, a: &Ty, b: &Ty) -> bool {
+        if a == b {
+            return true;
+        }
+        let sets = |xs: &[Ty], ys: &[Ty]| {
+            xs.iter().all(|x| ys.iter().any(|y| self.same_form(x, y)))
+                && ys.iter().all(|y| xs.iter().any(|x| self.same_form(x, y)))
+        };
+        match (a, b) {
+            (Ty::Var(v), Ty::Var(w)) => {
+                self.reach(vec![*v], true).0.contains(w)
+                    && self.reach(vec![*v], false).0.contains(w)
+            }
+            (Ty::Con(h, values, xs), Ty::Con(k, other, ys)) => {
+                h == k
+                    && values == other
+                    && xs.len() == ys.len()
+                    && xs.iter().zip(ys).all(|(x, y)| self.same_form(x, y))
+            }
+            (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => sets(xs, ys),
+            (Ty::Diff(a, hs), Ty::Diff(b, ks)) => self.same_form(a, b) && sets(hs, ks),
+            (Ty::Both(a, b), Ty::Both(c, d)) => self.same_form(a, c) && self.same_form(b, d),
+            (Ty::Fn(f), Ty::Fn(g)) => {
+                f.params.len() == g.params.len()
+                    && f.params
+                        .iter()
+                        .zip(&g.params)
+                        .all(|(p, q)| self.same_form(&p.1, &q.1))
+                    && self.same_form(&f.ret, &g.ret)
+                    && self.same_form(&f.err, &g.err)
+                    && self.same_form(&f.env, &g.env)
+            }
+            _ => false,
+        }
+    }
+
     /// A shown scheme must express every handler restriction. A visible
     /// difference or a row containing both the variable and the supplied
     /// form expresses it. A form tied to that variable, as S(N) in a
     /// parameter S(N), also keeps the obligation on that same row.
     pub fn hidden_handlers(&self, t: &Ty, level: u32) -> Vec<Ty> {
+        if !self.has_handlers {
+            return Vec::new();
+        }
         fn parts(t: &Ty, out: &mut Vec<Ty>) {
             out.push(t.clone());
             match t {
@@ -545,7 +603,7 @@ impl Solver {
             .iter()
             .filter_map(|t| if let Ty::Var(v) = t { Some(*v) } else { None })
         {
-            if self.var(v).level <= level {
+            if self.var(v).level <= level || self.var(v).row == Mode::Value {
                 continue;
             }
             let above = self.reach(vec![v], false).0;
@@ -566,9 +624,11 @@ impl Solver {
                         continue;
                     }
                     let witnessed = all.iter().any(|part| match part {
-                        Ty::Diff(a, hs) => is_var(a) && hs.contains(h),
-                        Ty::Union(ms) => ms.iter().any(&is_var) && ms.contains(h),
-                        part if part == h => {
+                        Ty::Diff(a, hs) => is_var(a) && hs.iter().any(|m| self.same_form(m, h)),
+                        Ty::Union(ms) => {
+                            ms.iter().any(&is_var) && ms.iter().any(|m| self.same_form(m, h))
+                        }
+                        part if self.same_form(part, h) => {
                             let mut edges = Vec::new();
                             bound_vars(self, h, true, false, &mut edges);
                             edges.iter().any(|e| aliases.contains(&e.0))

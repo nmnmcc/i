@@ -30,13 +30,15 @@ def main():
     p.add_argument('--after', required=True, type=Path)
     p.add_argument('--out', required=True, type=Path)
     p.add_argument('--pairs', type=int, default=30)
+    p.add_argument('--rings-before', type=Path, help='separate ring baseline when redesign rejects it with E0505')
+    p.add_argument('--skip-rings', action='store_true')
     a = p.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
     if hasattr(os, 'sched_getaffinity'):
         os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
     results = {}
     projects = [('std', Path('std'), a.pairs)]
-    for n in [25, 50, 100, 150]:
+    for n in ([] if a.skip_rings else [25, 50, 100, 150]):
         project = a.out / f'ring{n}'
         (project / 'src').mkdir(parents=True, exist_ok=True)
         (project / 'i.toml').write_text('name = "app"\n')
@@ -49,7 +51,8 @@ def main():
         values = {'before': [], 'after': []}
         for i in range(pairs):
             for label in (['before', 'after'] if i % 2 == 0 else ['after', 'before']):
-                values[label].append(measure(getattr(a, label), project))
+                binary = a.rings_before if name.startswith('ring') and label == 'before' and a.rings_before else getattr(a, label)
+                values[label].append(measure(binary, project))
         results[name] = {'samples': values, 'medians': {label: {key: statistics.median(v[key] for v in samples) for key in ['wall', 'cpu']} for label, samples in values.items()}}
         print(name, results[name]['medians'], flush=True)
         (a.out / 'results.json').write_text(json.dumps(results, indent=2) + '\n')

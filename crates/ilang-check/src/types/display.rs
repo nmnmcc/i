@@ -545,6 +545,23 @@ impl Coalescer<'_> {
                     }
                     return if mono { Ty::Never } else { Ty::Var(v) };
                 }
+                let empty = |m: V| {
+                    let st = &self.s.vars[m.0 as usize];
+                    if mono {
+                        st.lower.is_empty() && st.from.is_empty()
+                    } else if pos {
+                        st.lower.is_empty()
+                    } else {
+                        st.upper.is_empty()
+                    }
+                };
+                if self
+                    .members
+                    .get(&v)
+                    .map_or_else(|| empty(v), |ms| ms.iter().copied().all(empty))
+                {
+                    return if mono { Ty::Never } else { Ty::Var(v) };
+                }
                 if let Some(t) = self.memo.get(&(v, pos, env)) {
                     return t.clone();
                 }
@@ -572,6 +589,27 @@ impl Coalescer<'_> {
                 }
                 self.stack.remove(&v);
                 let positive = pos || mono;
+                if parts.len() <= 2
+                    && !parts.iter().any(|t| {
+                        matches!(t, Ty::Union(_) if positive)
+                            || matches!(t, Ty::Inter(_) if !positive)
+                    })
+                {
+                    if parts.len() == 2 && parts[0] == parts[1] {
+                        parts.pop();
+                    }
+                    let t = if parts.len() == 1 {
+                        parts.pop().unwrap()
+                    } else if positive {
+                        Ty::Union(parts)
+                    } else {
+                        Ty::Inter(parts)
+                    };
+                    if !self.occurs {
+                        self.memo.insert((v, pos, env), t.clone());
+                    }
+                    return t;
+                }
                 let mut flat = Vec::new();
                 let mut todo: Vec<_> = parts.into_iter().rev().collect();
                 let mut seen = HashSet::default();
@@ -743,6 +781,14 @@ impl Norm<'_> {
     /// together, because their arguments must be equal (§9.2).
     fn env(&self, t: Ty) -> Ty {
         match t {
+            Ty::Both(a, b) => {
+                let a = self.env(*a);
+                let b = self.env(*b);
+                self.norm(Ty::Both(Box::new(a), Box::new(b)))
+            }
+            Ty::Diff(a, hs) => {
+                self.diff(self.env(*a), hs.into_iter().map(|h| self.norm(h)).collect())
+            }
             Ty::Union(ms) => self.union_in(ms.into_iter().map(|m| self.norm(m)).collect(), true),
             t => self.norm(t),
         }

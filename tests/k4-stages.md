@@ -91,3 +91,49 @@ optimization levels with both binaries.
 
 Final gate results, the base-accepted/lane-rejected inventory, and precise
 function ownership are recorded after the final redesign merge.
+
+## Follow-up proof and measurement checks
+
+A later spelling probe used Svc(Extra | Dep) in a callback row and
+Svc(Dep | Extra) in its handler. Textual witness matching incorrectly
+rejected it. `same_form` now proves variable equality by inclusions in both
+directions and compares union/intersection members as sets. Nested rows
+inside invariant `Both` views also keep canonical display order. The
+regression requires both spellings to have the same accepted scheme.
+
+The first exact standard-project timing showed an approximately 7–9% CPU
+regression. Fresh variables now acquire row modes without a graph walk;
+constructors with one possible form need no retained obligation; and
+coalescing avoids allocations for unbounded variables and small, already
+flat bounds. The stack-cycle check still runs before the unbounded-variable
+fast path. Genuine recursive-type negatives retain E0505.
+
+The first archived redesign build shared the lane's Cargo target directory.
+An identity probe found the K4 diagnostic string in that supposedly base
+binary: Cargo reused a workspace artifact. Those baseline comparisons and
+timings were discarded. The final baseline uses its own target directory,
+recompiles every local crate, contains no K4 diagnostic string, accepts z1,
+and rejects q21 with the expected E0505. Third-party dependency artifacts
+alone are reused. No shared checkout was changed. An initial isolated build
+invocation had the wrong working directory and was stopped; the corrected
+isolated build and WAT export completed. A missing Binaryen scratch symlink
+and two working-directory mistakes in scratch setup were also corrected.
+
+The raw review generators produced two divergent programs,
+plain-44-188 and plain-44-361: both contain exactly
+`h0 = () { run(h0) }`, and their entries call it. Both old and new compilers
+accepted them, and both optimization levels timed out in each compiler.
+The source call rule gives no returning execution here; these are not cast
+failures or checker nontermination. The raw results are retained. An
+additional bounded corpus replaces only recursive edges of Int helper
+functions with a pure Int callback and retains every original source.
+This is explicitly a substitute runtime measurement for those recursive
+inputs, not evidence that the raw programs terminate. The CLI comparison
+reports compiler timeouts and runtime cast failures as failures; it reports
+an exact immediate self-call timeout as expected source divergence.
+
+The merged redesign rejects the recursive service timing ring with E0505.
+Consequently the ring's before/after comparison uses the pre-follow-up lane
+binary at 63e5f3a as a substitute baseline. Standard-project timing uses the
+actual merged redesign. Every sample, compiler identity probe and runtime
+result is retained under target/k4d-checks.
