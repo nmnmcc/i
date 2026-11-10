@@ -61,6 +61,8 @@ def import_reviews(args):
         raise SystemExit('import requires UPDATE=1')
     tracked = collections.defaultdict(list)
     for name in git('ls-files').splitlines():
+        if name.startswith('tests/review/'):
+            continue
         p = ROOT / name
         if p.is_file() and p.suffix in {'.i', '.py', '.mjs', '.rs'}:
             tracked[sha(p.read_bytes())].append(name)
@@ -110,7 +112,9 @@ def import_reviews(args):
                 parent = parent.parent
             if not (parent / 'i.toml').exists():
                 parent = None
+            context = None
             if parent and p.relative_to(parent).parts[0] not in {'src', 'test'}:
+                context = parent
                 parent = None
             if parent:
                 key = str(parent)
@@ -119,10 +123,17 @@ def import_reviews(args):
                 key = str(p)
                 module = 'src/main.i'
             project = projects.setdefault(key, {'origin': key, 'review': review.name, 'files': {}, 'origins': [], 'source': source_for(review.name)})
+            if context:
+                project['context'] = str(context)
+                for directory in ['src', 'test']:
+                    for helper in sorted((context / directory).rglob('*.i')):
+                        project['files'][str(helper.relative_to(context))] = helper.read_bytes().decode()
             project['files'][module] = data.decode()
             project['origins'].append(entry)
             if parent:
                 project['files']['i.toml'] = (parent / 'i.toml').read_text()
+            elif context:
+                project['files']['i.toml'] = (context / 'i.toml').read_text()
             else:
                 project['files']['i.toml'] = 'name = "app"\n'
             index['programs'].append(entry)
@@ -148,7 +159,7 @@ def import_reviews(args):
         manifest = project['files']['i.toml']
         def dependency(match):
             old = match[2]
-            dep = (Path(origin) / old).resolve() if not Path(old).is_absolute() else Path(old)
+            dep = (Path(project.get('context', origin)) / old).resolve() if not Path(old).is_absolute() else Path(old)
             if str(dep) in locations:
                 new = os.path.relpath(locations[str(dep)], path)
             elif dep.name == 'std' or str(dep).endswith('/std'):
@@ -165,11 +176,11 @@ def import_reviews(args):
         for name, data in project['files'].items():
             target = path / name
             target.parent.mkdir(parents=True, exist_ok=True)
-            if target.exists() and target.read_bytes() != data.encode():
+            if not target.exists() or target.read_bytes() != data.encode():
                 (path / 'expected.json').unlink(missing_ok=True)
             target.write_text(data)
         case_id = str(path.relative_to(CORPUS / 'cases'))
-        cases.append({'id': case_id, 'project': str(path.relative_to(ROOT)), 'origin': origin, 'source': project['source'], 'finding': Path(origin).stem, 'files': [x for x in project['files'] if x.endswith('.i')]})
+        cases.append({'id': case_id, 'project': str(path.relative_to(ROOT)), 'origin': origin, 'context': project.get('context'), 'source': project['source'], 'finding': Path(origin).stem, 'files': [x for x in project['files'] if x.endswith('.i')]})
         for entry in project['origins']:
             entry['case'] = case_id
     # Record models are review tools; read their committed versions, not another worktree.
@@ -275,6 +286,7 @@ def run_corpus(args):
         return case, observe(args.binary, case, bound)[0]
     pool = ThreadPoolExecutor(max_workers=args.jobs)
     for n, (case, result) in enumerate(pool.map(observe_case, cases)):
+        applicable = [r for r in requirements['requirements'] if re.search(r['pattern'], case['id'])]
         expected_path = ROOT / case['project'] / 'expected.json'
         if update:
             dump(expected_path, {'compiler': revision, 'binary_sha256': binary_digest, 'kind': 'observation; semantic requirements are separate', 'bound_seconds': args.timeout, 'outcome': result})
@@ -282,15 +294,20 @@ def run_corpus(args):
             failures.append(case['id'] + ': missing expected.json')
         else:
             old = json.loads(expected_path.read_text())['outcome']
-            if comparable(old) != comparable(result):
+            censored = any(r.get('censored') for r in applicable) and any(v['exit'] == 'timeout' for v in [*old.values(), *result.values()])
+            if comparable(old) != comparable(result) and not censored:
                 failures.append(case['id'] + ': full output changed')
+                dump(ROOT / case['project'] / 'actual.json', result)
+            elif censored:
+                summary['censored-observation'] += 1
                 dump(ROOT / case['project'] / 'actual.json', result)
             else:
                 (ROOT / case['project'] / 'actual.json').unlink(missing_ok=True)
         summary[str(result['check']['exit'])] += 1
-        applicable = [r for r in requirements['requirements'] if re.search(r['pattern'], case['id'])]
-        if any('cast failure' in v['stderr'] or 'panicked at' in v['stderr'] for v in result.values()) and not any(r.get('known_failure') for r in applicable):
+        if any('cast failure' in v['stderr'] or 'panicked at' in v['stderr'] or isinstance(v['exit'], int) and v['exit'] < 0 for v in result.values()) and not any(r.get('known_failure') for r in applicable):
             failures.append(case['id'] + ': unclassified cast failure or compiler panic')
+        if result['check']['exit'] == 'timeout' and not any(r.get('known_failure') for r in applicable):
+            failures.append(case['id'] + ': unclassified checker timeout')
         for requirement in requirements['requirements']:
             if not re.search(requirement['pattern'], case['id']):
                 continue
@@ -313,8 +330,8 @@ def run_corpus(args):
             for fragment in requirement.get('types_contain', []):
                 met = met and fragment in check['stdout']
             if requirement.get('known_failure'):
-                summary['XPASS' if met else 'XFAIL'] += 1
-                if met and not update:
+                summary['completed-resource-case' if met and requirement.get('censored') else 'XPASS' if met else 'XFAIL'] += 1
+                if met and not update and not requirement.get('censored'):
                     failures.append(case['id'] + ': XPASS; promote the requirement')
             elif not met:
                 failures.append(case['id'] + ': required ' + wanted)
@@ -387,6 +404,10 @@ def report(args):
     manifest = json.loads((CORPUS / 'manifest.json').read_text())
     counts = collections.defaultdict(collections.Counter)
     incidents = []
+    for tool in inventory['tools']:
+        if tool['origin'].startswith('/tmp/review-'):
+            review = Path(tool['origin']).parts[2]
+            counts[review]['tools_and_evidence'] += 1
     for entry in inventory['programs']:
         review = Path(entry['origin']).parts[2]
         counts[review]['source_occurrences'] += 1
@@ -398,8 +419,12 @@ def report(args):
         if not p.exists():
             counts[review]['not_captured'] += 1
             continue
-        result = json.loads(p.read_text())['outcome']
+        saved = json.loads(p.read_text())
+        result = saved['outcome']
         check = result['check']
+        if 'E0520' in check['stderr']:
+            saved['transitions'] = ['W520: E0520 becomes a warning; review this observed rejection when W520 lands']
+            dump(p, saved)
         counts[review]['accepted' if check['exit'] == 0 else 'rejected' if check['exit'] == 1 else 'timeout_or_crash'] += 1
         if 'E0520' in check['stderr']:
             counts[review]['W520_transition'] += 1
@@ -417,6 +442,20 @@ def report(args):
     print(json.dumps({'counts': counts, 'incidents': len(incidents)}, indent=2))
 
 
+def snapshot(args):
+    if os.environ.get('UPDATE') != '1' or not re.fullmatch(r'[a-zA-Z0-9_-]+', args.label):
+        raise SystemExit('snapshot requires UPDATE=1 and a plain label')
+    cases = select(args)
+    observations = {}
+    for case in cases:
+        path = ROOT / case['project'] / 'expected.json'
+        if not path.exists():
+            raise SystemExit('missing observation: ' + case['id'])
+        observations[case['id']] = json.loads(path.read_text())
+    dump(CORPUS / 'baselines' / (args.label + '.json'), {'label': args.label, 'observations': observations})
+    print(f'preserved {len(observations)} observations as {args.label}')
+
+
 def main():
     parser = argparse.ArgumentParser(__doc__)
     sub = parser.add_subparsers(dest='mode', required=True)
@@ -430,6 +469,9 @@ def main():
     run.add_argument('--jobs', type=int, default=1)
     sub.add_parser('parse-register')
     sub.add_parser('report')
+    snap = sub.add_parser('snapshot')
+    snap.add_argument('--label', required=True)
+    snap.add_argument('--filter', default='')
     args = parser.parse_args()
     if args.mode == 'import':
         import_reviews(args)
@@ -438,6 +480,8 @@ def main():
         run_corpus(args)
     elif args.mode == 'parse-register':
         register_parses(args)
+    elif args.mode == 'snapshot':
+        snapshot(args)
     else:
         report(args)
 

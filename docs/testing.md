@@ -25,6 +25,7 @@ diagnostics; no parser-negative input is treated as a successful parse.
 scripts/review-corpus run --filter review-t2
 scripts/test-generation --mode short
 scripts/test-generation --mode long --seed 412 --count 180 --output generation.json
+scripts/test-generation --mode long --count 1 --models --mpfr-python /path/to/venv/bin/python --output models.json
 ```
 
 Generated tests combine the T1 finite-domain model, literal/value-type/guard
@@ -37,7 +38,18 @@ matching row (§6.12). Literal/value sets follow §§4.2–4.3. A difference cau
 removing an expected type is not universally a bug (§4.8); the chosen helper
 annotation has no such role. Failures preserve source, seed, model and observed
 output under `tests/review/generated-failures`. Clause families are minimized
-by deletion with model recomputation; other families state their limitation.
+by deletion with model recomputation. Other families delete declarations while
+preserving the failure diagnostics. These are explicit local minimality claims,
+not proofs of the globally shortest counterexample.
+
+Optional model replay runs the preserved T3, URI and MPFR models. Supply a
+Python environment with gmpy2 2.3.2 (the original review used MPFR 4.2.2), keeping
+the virtual-environment executable path. Historical output/import paths are
+rewritten only in ignored lane scratch files. `--model-filter` selects a model;
+`--model-timeout` controls its separate observation budget. The old forgetting
+conflict model is an intentional failing witness to superseded rules. It must
+still fail with its documented assertion; the newer BDD/demand models must pass.
+These model checks do not validate an implemented record or float extension.
 
 Captured outputs are observations, not semantic oracles. In particular,
 agreement between O0 and O2 can preserve a shared checker defect. Requirements
@@ -51,6 +63,16 @@ from untargeted checking. The current spec says untargeted success does not
 promise that a target can run. The corpus therefore requires service failures
 before entry execution, through source or target validation. An unrelated
 E0505 rejection does not prove that the service obligation was retained.
+
+Corpus observation budgets are resource caps, not performance promises. A
+timeout preserves its partial raw output and compares only as a censored
+outcome; it is not an exact diagnostic or a passing termination check. Checker
+stress timeouts are explicit known failures. Runtime divergence and the slow
+rational-model benchmark also retain their bounded observations. The generated
+families themselves have finite witnesses and must finish their checks/runs.
+Censored stress entries report later completion without an unexpected-pass
+failure: crossing an observation budget is not a new numeric gate. When both
+observations complete, their full outputs must still match.
 
 Regeneration is explicit and belongs in the final `Regenerate derived files`
 commit. `UPDATE=1 scripts/review-corpus import` reimports review sources;
@@ -70,9 +92,12 @@ scripts/checker-bench --compare baseline.json candidate.json
 Use the coordinator's `.rd/cache/quiet` wrapper (it acquires all heavy slots)
 for baseline/publication runs. Do not nest `quiet` inside `heavy`. The harness
 records the actual command, compiler/binary hashes, complete source inputs,
-wall/user/system CPU time, per-child peak RSS, return status, output hashes and
+wall/user/system CPU time, per-checker peak RSS, return status, output hashes and
 load averages. Timings include startup, package load, parsing, inference and
-type display; they are not isolated solver times. Hardware instruction counts
+type display; they are not isolated solver times. GNU time collects CPU/RSS
+after exec, avoiding the Python parent's inherited memory high-water mark.
+Wall time includes the measurement wrapper; raw GNU time CPU counters have
+0.01-second resolution. Hardware instruction counts
 are unavailable and recorded as null. No numeric gate is installed. Record
 families are deferred until T3, with its models retained as tools.
 

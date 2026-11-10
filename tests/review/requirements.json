@@ -95,7 +95,8 @@
       "finding": "Finite checker stress inputs exceed the corpus observation budget; acceptance has not been established by this run",
       "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type; review-k4d criteria C7 and review-t1 criterion 10 require scaling measurements",
       "origin": "K4/K4c/K4d/K4s and T1 stress generators; timeout is censored evidence, not a language diagnostic",
-      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate"
+      "bound_reason": "3 seconds is a per-child resource cap for corpus observations, not a claimed checker performance requirement or benchmark gate",
+      "censored": true
     }
   ],
   "transitions": [
