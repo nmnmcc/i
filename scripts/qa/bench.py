@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import platform
 import signal
+import shutil
 import statistics
 import subprocess
 import tempfile
@@ -37,17 +38,29 @@ def workloads():
 
 
 def measure(argv, timeout):
-    # wait4 returns this child's counters. RUSAGE_CHILDREN would give cumulative RSS.
-    with tempfile.TemporaryFile(dir=CORPUS / '.work') as stdout, tempfile.TemporaryFile(dir=CORPUS / '.work') as stderr:
+    # GNU time forks after exec, avoiding the Python parent's inherited RSS floor.
+    timer = shutil.which('time')
+    if not timer:
+        raise RuntimeError('GNU time is required for per-checker peak RSS')
+    with tempfile.TemporaryFile(dir=CORPUS / '.work') as stdout, tempfile.TemporaryFile(dir=CORPUS / '.work') as stderr, tempfile.NamedTemporaryFile(dir=CORPUS / '.work') as counters:
+        measured = [timer, '-f', '%U %S %M', '-o', counters.name, '--', *argv]
         start = time.perf_counter()
-        child = subprocess.Popen(argv, cwd=ROOT, stdout=stdout, stderr=stderr, start_new_session=True)
+        child = subprocess.Popen(measured, cwd=ROOT, stdout=stdout, stderr=stderr, start_new_session=True)
         timed_out = False
         while True:
             pid, status, usage = os.wait4(child.pid, os.WNOHANG)
             if pid:
                 break
-            if time.perf_counter() - start > timeout:
+            if not timed_out and time.perf_counter() - start > timeout:
                 timed_out = True
+                # Keep GNU time alive to reap the checker and record censored CPU/RSS.
+                children = Path(f'/proc/{child.pid}/task/{child.pid}/children').read_text().split()
+                for pid_text in children:
+                    try:
+                        os.kill(int(pid_text), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+            if timed_out and time.perf_counter() - start > timeout + 2:
                 os.killpg(child.pid, signal.SIGKILL)
                 _, status, usage = os.wait4(child.pid, 0)
                 break
@@ -57,10 +70,18 @@ def measure(argv, timeout):
         stdout.seek(0)
         stderr.seek(0)
         out, err = stdout.read(), stderr.read()
+        raw_counters = Path(counters.name).read_text()
+        fields = raw_counters.splitlines()[-1].split() if raw_counters else []
+        if len(fields) == 3:
+            user, system, peak_kib = map(float, fields)
+        else:
+            raise RuntimeError('GNU time produced no counters: ' + raw_counters)
     return {'command': argv, 'exit': child.returncode, 'timeout': timed_out,
-            'wall_seconds': wall, 'user_seconds': usage.ru_utime, 'system_seconds': usage.ru_stime,
-            'cpu_seconds': usage.ru_utime + usage.ru_stime,
-            'peak_rss_bytes': usage.ru_maxrss * (1024 if platform.system() == 'Linux' else 1),
+            'measurement_tool': timer, 'raw_counters': raw_counters,
+            'cpu_resolution_seconds': 0.01,
+            'wall_seconds': wall, 'user_seconds': user, 'system_seconds': system,
+            'cpu_seconds': user + system,
+            'peak_rss_bytes': int(peak_kib * 1024),
             'instructions_retired': None, 'stdout_sha256': sha(out), 'stderr_sha256': sha(err),
             'stderr': err.decode(errors='replace'), 'load_average': list(os.getloadavg())}
 
@@ -114,12 +135,12 @@ def main():
     binaries = [('baseline', args.binary.resolve())]
     if args.candidate:
         binaries.append(('candidate', args.candidate.resolve()))
-    bundle = {'compiler': git('rev-parse', 'HEAD'), 'source_dirty': bool(git('status', '--porcelain', '--', 'crates', 'lib', 'std')),
+    bundle = {'compiler': git('rev-parse', 'HEAD'), 'compiler_tree': git('rev-parse', 'HEAD:crates'), 'source_dirty': bool(git('status', '--porcelain', '--', 'crates', 'lib', 'std')),
               'platform': platform.platform(), 'machine': platform.machine(), 'cpu_count': os.cpu_count(),
               'cpu_model': next((l.split(':', 1)[1].strip() for l in Path('/proc/cpuinfo').read_text().splitlines() if l.startswith('model name')), None),
               'binaries': {name: {'path': str(path), 'sha256': sha(path.read_bytes())} for name, path in binaries},
               'instruction_counter': 'not collected; unavailable in this harness',
-              'measurement': 'end-to-end i check --types; parse/load/check/display/process startup included',
+              'measurement': 'end-to-end i check --types through GNU time; parse/load/check/display/process startup and measurement wrapper included',
               'quiet_window': 'caller must acquire cache/quiet; load averages recorded, not proof of isolation',
               'deferred': [{'workload': 'record-growth', 'reason': 'T3 held; tests/review/tools/record-models preserves reference models'}],
               'catalogue': [], 'samples': []}
