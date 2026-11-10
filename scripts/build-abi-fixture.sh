@@ -10,7 +10,7 @@ fixture_dir="$repo_root/tests/browser/fixtures"
 sdk="$repo_root/bindings/javascript/ilang.mjs"
 wasm_tools="${WASM_TOOLS:-wasm-tools}"
 
-for fixture in host-abi required-features custom-imports one-thread no-continue; do
+for fixture in host-abi required-features custom-imports one-thread no-continue wrong-types start-request; do
   "$wasm_tools" parse "$fixture_dir/$fixture.wat" -o "$fixture_dir/$fixture.wasm"
   "$wasm_tools" validate "$fixture_dir/$fixture.wasm"
 done
@@ -28,7 +28,7 @@ check_version() {
   fi
 }
 check_version crates/ilang-host/src/lib.rs 'pub const ABI_VERSION: u32 = ([0-9]+);'
-for fixture in host-abi one-thread no-continue; do
+for fixture in host-abi one-thread no-continue wrong-types start-request; do
   check_version "tests/browser/fixtures/$fixture.wat" '\{\\"version\\":([0-9]+),'
 done
 check_version tests/browser/fixture-abi.mjs 'version: ([0-9]+),'

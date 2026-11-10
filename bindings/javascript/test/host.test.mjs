@@ -7,6 +7,8 @@ import { HOST_VALUE_REASON, instantiate, integerFromLimbs, integerToLimbs, readA
 const fixture = await readFile(new URL("../../../tests/browser/fixtures/host-abi.wasm", import.meta.url));
 const customFixture = await readFile(new URL("../../../tests/browser/fixtures/custom-imports.wasm", import.meta.url));
 const noContinueFixture = await readFile(new URL("../../../tests/browser/fixtures/no-continue.wasm", import.meta.url));
+const wrongTypesFixture = await readFile(new URL("../../../tests/browser/fixtures/wrong-types.wasm", import.meta.url));
+const startRequestFixture = await readFile(new URL("../../../tests/browser/fixtures/start-request.wasm", import.meta.url));
 const guest = (printed = [], overrides = {}) => instantiate(fixture, { imports: hostImports(GuestError, printed, overrides) });
 const custom = (overrides = {}) => instantiate(customFixture, { abi: customAbi, imports: customImports(GuestError, overrides) });
 const integers = [0n, 1n, -1n, (1n << 30n) - 1n, 1n << 30n, -(1n << 30n), 1n << 32n, -(1n << 64n), (1n << 4096n) + 0x123456789abcdefn];
@@ -405,6 +407,83 @@ test("requests start and are cancelled only during an async call", async () => {
     else await assert.rejects(gates.drive(value.callAsync(name)), { message }, name);
     assert.equal(value.unusable, message, name);
     assert.equal(gates.starts, starts, name);
+  }
+});
+
+test("an abort listener cannot start a call while the requests are dropped", async () => {
+  const baseline = await guest([], { later: async (x) => 2 * x });
+  const expected = await baseline.callAsync("app/async.leftover");
+  const reentered = [];
+  let holding = true;
+  let value;
+  value = await guest([], {
+    later: (x) => {
+      if (!holding || x === 1) return Promise.resolve(2 * x);
+      requestSignal().addEventListener("abort", () => {
+        reentered.push(value.callAsync("app/async.later", [1]).then(() => "ran", (error) => error.message));
+      });
+      return new Promise(() => {});
+    },
+  });
+  assert.equal(await value.callAsync("app/async.leftover"), expected);
+  holding = false;
+  assert.deepEqual(await Promise.all(reentered), [
+    "An async call is waiting; only its host functions may answer now",
+    "An async call is waiting; only its host functions may answer now",
+  ]);
+  assert.equal(value.unusable, null);
+  assert.equal(await value.callAsync("app/async.later", [1]), await baseline.callAsync("app/async.later", [1]));
+});
+
+test("a request started by ilang_start fails the instantiation", async () => {
+  let starts = 0;
+  const later = async (x) => {
+    starts++;
+    return x;
+  };
+  await assert.rejects(instantiate(startRequestFixture, { imports: { "app:clock/v1": { later } } }), {
+    message: "the module started request 0 outside an async call",
+  });
+  assert.equal(starts, 0);
+});
+
+test("ilang_continue and ilang_resume exports of the wrong type are faults", async () => {
+  for (const [name, message, aborted] of [
+    ["app/async.runnable", "the module is runnable, but has no ilang_continue", 0],
+    ["app/async.bad_resume", "the module does not export ilang_resume:app:clock/v1:later", 0],
+  ]) {
+    const signals = [];
+    const later = async (x) => {
+      signals.push(requestSignal());
+      return x;
+    };
+    const value = await instantiate(wrongTypesFixture, { imports: { "app:clock/v1": { later } } });
+    await assert.rejects(value.callAsync(name), { message }, name);
+    assert.equal(value.unusable, message, name);
+    assert.throws(() => value.call("app/sync.nil"), /make a new instance/, name);
+    assert.equal(value.exports.calls(), 0, name);
+    assert.equal(signals.filter((signal) => signal.aborted).length, aborted, name);
+  }
+});
+
+test("status 2 waits reuse one MessageChannel where there is no setImmediate", async () => {
+  const saved = { setImmediate: globalThis.setImmediate, MessageChannel: globalThis.MessageChannel };
+  let channels = 0;
+  globalThis.MessageChannel = class extends saved.MessageChannel {
+    constructor() {
+      super();
+      channels++;
+    }
+  };
+  delete globalThis.setImmediate;
+  try {
+    const timer = await guest([], { later: (x) => new Promise((resolve) => setTimeout(() => resolve(2 * x), 5)) });
+    const turns = await timer.callAsync("app/async.yielding", [1e7]);
+    assert.ok(turns >= 2, `${turns}`);
+    assert.ok(channels <= 1, `${channels} channels for ${turns} turns`);
+  } finally {
+    globalThis.setImmediate = saved.setImmediate;
+    globalThis.MessageChannel = saved.MessageChannel;
   }
 });
 

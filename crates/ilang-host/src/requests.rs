@@ -148,18 +148,23 @@ impl Requests {
 
     /// Polls the work that has woken, and gives the first request that is
     /// done, removed from the table; `None` when nothing is outstanding.
+    ///
+    /// Each call polls only the requests that were in the queue when it
+    /// began. Work that wakes itself while it is polled goes back in the
+    /// queue and wakes the waiter, so it is polled on the next call, after
+    /// the executor has had a turn (its timers and IO, and other tasks).
     fn poll_next(&mut self, context: &Context<'_>) -> Poll<Option<(u32, Request, Reply)>> {
         if self.outstanding.is_empty() {
             return Poll::Ready(None);
         }
         // The waker is stored first, so a wake that comes while the work is
         // polled is not lost.
-        self.lock().waiter = Some(context.waker().clone());
-        loop {
-            let next = self.lock().ready.pop_front();
-            let Some((id, sequence)) = next else {
-                return Poll::Pending;
-            };
+        let mut batch = {
+            let mut woken = self.lock();
+            woken.waiter = Some(context.waker().clone());
+            std::mem::take(&mut woken.ready)
+        };
+        while let Some((id, sequence)) = batch.pop_front() {
             let Some(entry) = self.outstanding.get_mut(&id) else {
                 continue;
             };
@@ -173,9 +178,17 @@ impl Requests {
                     .outstanding
                     .remove(&id)
                     .expect("the entry was just polled");
+                // The rest of the batch was woken before anything that
+                // woke since, so it goes back first, in its order.
+                if !batch.is_empty() {
+                    let mut woken = self.lock();
+                    batch.append(&mut woken.ready);
+                    woken.ready = batch;
+                }
                 return Poll::Ready(Some((id, entry.request, reply)));
             }
         }
+        Poll::Pending
     }
 
     /// The next request whose work is done, or `None` when nothing is

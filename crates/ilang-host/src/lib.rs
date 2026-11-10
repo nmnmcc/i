@@ -1133,6 +1133,11 @@ impl Instance {
     }
 
     async fn wait_inner(&mut self, name: &str, mut status: [Val; 1]) -> Result<Option<Stop>> {
+        // The exports that the loop calls, found and checked once per wait:
+        // `ilang_continue`, and the resume of each import by namespace and
+        // label.
+        let mut resume_continue: Option<Func> = None;
+        let mut resumes: HashMap<String, HashMap<String, Func>> = HashMap::new();
         loop {
             let (id, request, reply) = match status[0].i32() {
                 Some(0) => return Ok(None),
@@ -1151,12 +1156,15 @@ impl Instance {
                     match self.store.data_mut().requests.ready() {
                         Some(done) => done,
                         None => {
-                            let resume = self.export_or_fault(
-                                "ilang_continue",
-                                &[],
-                                &[ValType::I32],
-                                || "the module is runnable, but has no ilang_continue".into(),
-                            )?;
+                            let resume = match resume_continue {
+                                Some(resume) => resume,
+                                None => *resume_continue.insert(self.export_or_fault(
+                                    "ilang_continue",
+                                    &[],
+                                    &[ValType::I32],
+                                    || "the module is runnable, but has no ilang_continue".into(),
+                                )?),
+                            };
                             if let Some(stop) = self.invoke_accepting(resume, &[], &mut status)? {
                                 return Ok(Some(stop));
                             }
@@ -1179,12 +1187,28 @@ impl Instance {
                     return Err(failure);
                 }
             };
-            let resume_name = format!("ilang_resume:{}:{}", request.namespace, request.label);
-            let mut params = vec![ValType::I32];
-            params.extend(request.signature.result_types());
-            let resume = self.export_or_fault(&resume_name, &params, &[ValType::I32], || {
-                format!("the module does not export {resume_name}")
-            })?;
+            let found = resumes
+                .get(&request.namespace)
+                .and_then(|labels| labels.get(&request.label))
+                .copied();
+            let resume = match found {
+                Some(resume) => resume,
+                None => {
+                    let resume_name =
+                        format!("ilang_resume:{}:{}", request.namespace, request.label);
+                    let mut params = vec![ValType::I32];
+                    params.extend(request.signature.result_types());
+                    let resume =
+                        self.export_or_fault(&resume_name, &params, &[ValType::I32], || {
+                            format!("the module does not export {resume_name}")
+                        })?;
+                    resumes
+                        .entry(request.namespace.clone())
+                        .or_default()
+                        .insert(request.label.clone(), resume);
+                    resume
+                }
+            };
             let bridge = Bridge::from_instance(&self.instance, &mut self.store);
             let checked = self.checked;
             let invoked = {

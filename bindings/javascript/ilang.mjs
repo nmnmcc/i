@@ -36,16 +36,26 @@ export function requestSignal() {
   return currentSignal;
 }
 
+/**
+ * Where there is no setImmediate (in browsers), one MessageChannel serves
+ * every wait: each message resolves the oldest waiting promise.
+ */
+let macrotaskChannel = null;
+const macrotaskWaiters = [];
+
 /** Wait for one macrotask, so that timers and IO of the host can run. */
 function macrotask() {
   if (typeof setImmediate === "function") return new Promise((resolve) => setImmediate(resolve));
+  if (!macrotaskChannel) {
+    macrotaskChannel = new MessageChannel();
+    macrotaskChannel.port1.onmessage = () => macrotaskWaiters.shift()?.();
+    // The channel must not keep a server runtime alive by itself.
+    macrotaskChannel.port1.unref?.();
+    macrotaskChannel.port2.unref?.();
+  }
   return new Promise((resolve) => {
-    const channel = new MessageChannel();
-    channel.port1.onmessage = () => {
-      channel.port1.close();
-      resolve();
-    };
-    channel.port2.postMessage(null);
+    macrotaskWaiters.push(resolve);
+    macrotaskChannel.port2.postMessage(null);
   });
 }
 
@@ -490,9 +500,11 @@ class Bridge {
 
   /** Drop every request: abort its signal and forget its answer. */
   dropRequests() {
-    for (const entry of this.requests.values()) entry.abort.abort();
+    // The table is empty before any abort listener runs.
+    const dropped = [...this.requests.values()];
     this.requests.clear();
     this.settled = [];
+    for (const entry of dropped) entry.abort.abort();
   }
 
   /** The program stops with `host: value is not correct`. */
@@ -898,8 +910,10 @@ export async function instantiate(source, options = {}) {
         status = bridge.enterAccepting(() => instance.exports[resume](id, ...values));
       }
     } finally {
-      bridge.waiting = false;
+      // The abort listeners of the dropped requests run during the drop.
+      // The instance still waits then, so they cannot start a call on it.
       bridge.dropRequests();
+      bridge.waiting = false;
     }
   };
 

@@ -8,7 +8,8 @@ version 3 of `docs/spec.md` (Appendix B). They are not compiler output, except
 Regenerate the checked-in binaries with `bash scripts/build-abi-fixture.sh` from
 the Devenv shell, which has wasm-tools (`WASM_TOOLS` can point at another
 executable). The script builds `host-abi`, `required-features`,
-`custom-imports`, `one-thread` and `no-continue`, validates them, checks that
+`custom-imports`, `one-thread`, `no-continue`, `wrong-types` and
+`start-request`, validates them, checks that
 every file that names the ABI version says what the compiler writes, and writes
 the feature probe into `bindings/javascript/ilang.mjs`.
 
@@ -160,3 +161,19 @@ an async `app:clock/v1` `tick(Int) -> Int` (`compiledImports`):
 
 `crates/ilang-cli/tests/commands.rs` checks that its metadata is what the
 compiler gives now.
+
+## wrong-types.wat
+
+Like `no-continue.wat`, each async export breaks a rule of B.5, here with an
+export of the wrong type, which is a fault like a missing one:
+`app/async.runnable` gives status 2, and `ilang_continue` gives no status;
+`app/async.bad_resume` starts a request of `later` (id 0), and
+`ilang_resume:app:clock/v1:later` has no request id first. `calls` counts the
+calls of these two exports and of the sync `app/sync.nil`, which the host must
+not make.
+
+## start-request.wat
+
+Its `ilang_start` starts a request of the async `later` (id 0), which B.4 does
+not allow outside an async call: the instantiation fails, and the service does
+not run.

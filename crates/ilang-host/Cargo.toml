@@ -16,5 +16,5 @@ wasmparser.workspace = true
 wasmtime = { version = "=50.0.0", default-features = false, features = ["anyhow", "cranelift", "gc", "gc-copying", "gc-drc", "gc-null", "runtime", "std", "backtrace", "parallel-compilation"] }
 
 [dev-dependencies]
-tokio = { version = "1.53.3", default-features = false, features = ["rt", "time", "test-util"] }
+tokio = { version = "1.53.3", default-features = false, features = ["rt", "time", "test-util", "net"] }
 wat = "=1.262.0"

@@ -399,6 +399,31 @@ fn entry_and_tests_run_by_name_each_test_in_a_new_instance() {
     );
 }
 
+/// The runtime of `block_on` has IO when tokio is built with it (the dev
+/// dependency turns on `net`), so an async service may use tokio IO.
+#[test]
+fn block_on_gives_services_tokio_io() {
+    let later = |arguments: &[Value]| -> ServiceFuture {
+        let value = arguments[0].clone();
+        Box::pin(async move {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+            let address = listener.local_addr()?;
+            let _client = tokio::net::TcpStream::connect(address).await?;
+            listener.accept().await?;
+            Ok(Ok(value))
+        })
+    };
+    let mut instance = program()
+        .instantiate(HostOptions::new(imports_with(
+            |_| {},
+            |_| Ok(Ok(Value::Nil)),
+            later,
+        )))
+        .unwrap();
+    let value = ok(block_on(instance.call_async("app/async.later", &[Value::Float(1.5)])).unwrap());
+    assert!(matches!(value, Value::Float(2.5)));
+}
+
 #[test]
 fn async_exports_wait_for_host_functions() {
     let (mut instance, _) = fixture();
@@ -921,6 +946,7 @@ fn a_nested_store_gets_its_own_thread() {
 }
 
 const NO_CONTINUE: &[u8] = include_bytes!("../../../tests/browser/fixtures/no-continue.wasm");
+const WRONG_TYPES: &[u8] = include_bytes!("../../../tests/browser/fixtures/wrong-types.wasm");
 const COMPILED: &[u8] = include_bytes!("../../../tests/browser/fixtures/compiled.wasm");
 
 /// The hash that host-abi.wasm folds over the arguments of the answers, in
@@ -1710,6 +1736,36 @@ fn bad_statuses_are_faults() {
     );
 }
 
+/// `ilang_continue` and `ilang_resume:…` exports of the wrong type are
+/// faults (B.5), like missing ones, and the host never calls them.
+#[test]
+fn exports_of_the_wrong_type_are_faults() {
+    let wrong = Program::from_bytes(WRONG_TYPES).unwrap();
+    for (name, text, drops) in [
+        (
+            "app/async.runnable",
+            "the module is runnable, but has no ilang_continue",
+            0,
+        ),
+        (
+            "app/async.bad_resume",
+            "the module does not export ilang_resume:app:clock/v1:later",
+            1,
+        ),
+    ] {
+        let gates = gates(1);
+        let mut instance = wrong
+            .instantiate(HostOptions::new(gate_imports(&gates)))
+            .unwrap();
+        let error = error_text(block_on(instance.call_async(name, &[])));
+        assert_eq!(error, text, "{name}");
+        assert_eq!(instance.unusable(), Some(text), "{name}");
+        assert!(instance.call("app/sync.nil", &[]).is_err(), "{name}");
+        assert_eq!(raw(&mut instance, "calls"), 0, "{name}");
+        assert_eq!(gates.lock().unwrap().drops, drops, "{name}");
+    }
+}
+
 #[test]
 fn a_finished_program_does_not_wait_for_blocking_work() {
     for name in ["app/async.leftover", "app/async.stop_mid"] {
@@ -1763,5 +1819,117 @@ fn a_finished_program_does_not_wait_for_blocking_work() {
             }
             (_, other) => panic!("{name}: {other:?}"),
         }
+    }
+}
+
+/// Finding C-1-1: a request whose work wakes itself during its own poll
+/// must not be polled again in the same call; the wait must give the
+/// executor a turn first.
+mod self_waking_work {
+    use crate::requests::{Request, Requests};
+    use crate::{AbiType, ServiceFuture, Signature, Value};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    };
+    use std::task::Poll;
+
+    /// How many times the busy work may be polled before it gives up.
+    const LIMIT: usize = 1_000_000;
+
+    fn request(label: &str) -> Request {
+        Request {
+            namespace: "test".into(),
+            label: label.into(),
+            signature: Signature::new([], AbiType::Nil),
+        }
+    }
+
+    /// Work that wakes itself and stays pending until `flag` is set. It
+    /// gives up after LIMIT polls and records that in `gave_up`.
+    fn busy(
+        flag: Arc<AtomicBool>,
+        polls: Arc<AtomicUsize>,
+        gave_up: Arc<AtomicBool>,
+    ) -> ServiceFuture {
+        Box::pin(std::future::poll_fn(move |context| {
+            let n = polls.fetch_add(1, Ordering::SeqCst) + 1;
+            if flag.load(Ordering::SeqCst) {
+                return Poll::Ready(Ok(Ok(Value::Nil)));
+            }
+            if n >= LIMIT {
+                gave_up.store(true, Ordering::SeqCst);
+                return Poll::Ready(Ok(Ok(Value::Nil)));
+            }
+            context.waker().wake_by_ref();
+            Poll::Pending
+        }))
+    }
+
+    #[test]
+    fn ready_polls_self_waking_work_once_per_call() {
+        let flag = Arc::new(AtomicBool::new(false));
+        let polls = Arc::new(AtomicUsize::new(0));
+        let gave_up = Arc::new(AtomicBool::new(false));
+        let mut requests = Requests::default();
+        requests.insert(
+            0,
+            request("busy"),
+            busy(flag, Arc::clone(&polls), Arc::clone(&gave_up)),
+        );
+        let done = requests.ready();
+        assert!(
+            done.is_none(),
+            "ready() should give nothing for work that is still pending, \
+             but the work was polled {} times until it gave up",
+            polls.load(Ordering::SeqCst)
+        );
+        assert_eq!(
+            polls.load(Ordering::SeqCst),
+            1,
+            "one call of ready() polls the work once"
+        );
+        assert!(!gave_up.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn next_lets_a_timer_fire_while_other_work_spins() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+        let flag = Arc::new(AtomicBool::new(false));
+        let polls = Arc::new(AtomicUsize::new(0));
+        let gave_up = Arc::new(AtomicBool::new(false));
+        let mut requests = Requests::default();
+        requests.insert(
+            0,
+            request("busy"),
+            busy(Arc::clone(&flag), Arc::clone(&polls), Arc::clone(&gave_up)),
+        );
+        let setter = Arc::clone(&flag);
+        requests.insert(
+            1,
+            request("timer"),
+            Box::pin(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+                setter.store(true, Ordering::SeqCst);
+                Ok(Ok(Value::Nil))
+            }),
+        );
+        let mut order = Vec::new();
+        runtime.block_on(async {
+            while let Some((id, _, reply)) = requests.next().await {
+                reply.unwrap().unwrap();
+                order.push(id);
+            }
+        });
+        assert!(
+            !gave_up.load(Ordering::SeqCst),
+            "the busy work spun {} polls inside one wait and the timer never fired \
+             (answers in order {order:?})",
+            polls.load(Ordering::SeqCst)
+        );
+        assert_eq!(order, [1, 0]);
     }
 }

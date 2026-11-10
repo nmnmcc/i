@@ -27,7 +27,9 @@ impl Drop for Background {
 
 /// Run a future to its end on a new thread named `ilang`, with a stack of
 /// [`THREAD_STACK`] bytes and a tokio `current_thread` runtime with time
-/// enabled. Every Wasm call that the future makes runs directly on that
+/// and IO enabled. IO is there whenever tokio is built with its IO driver,
+/// which a service that uses tokio IO turns on through its own tokio
+/// features (for example `net`). Every Wasm call that the future makes runs directly on that
 /// thread, so a whole program uses one thread. A panic of the future is
 /// resumed on the caller. When the future is done, the runtime is shut down
 /// without waiting for work that a service handed to `spawn_blocking`.
@@ -49,7 +51,7 @@ where
                 ON_ILANG_THREAD.set(true);
                 let runtime = Background(Some(
                     tokio::runtime::Builder::new_current_thread()
-                        .enable_time()
+                        .enable_all()
                         .build()
                         .expect("a tokio runtime"),
                 ));

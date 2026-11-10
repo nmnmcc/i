@@ -151,7 +151,9 @@ thrown away.
 
 `ilang_host::block_on` runs such a call on one new thread named `ilang`, with a
 stack of `THREAD_STACK` bytes and a tokio `current_thread` runtime with time
-enabled; every Wasm call of the future runs directly on that thread. It needs a
+and IO enabled. IO is there whenever tokio is built with its IO driver, which a
+service that uses tokio IO turns on through its own tokio features (for example
+`net`). Every Wasm call of the future runs directly on that thread. It needs a
 `Send` future; with a future that is not `Send`, await `call_async` on your own
 executor. `Program::run_entry`, `Program::run_test_with` and
 `Program::run_tests` run each program or test inside one `block_on`.

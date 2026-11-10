@@ -5,49 +5,54 @@
 
 use super::*;
 
-/// The runtime functions of the host boundary (§9.7, B.5).
+/// The runtime functions of the host boundary (§9.7, B.4, B.5).
+///
+/// These notes stay here, not in the WAT text, because every module carries
+/// that text.
+///
+/// An async entry point runs in a root boundary, `$host_root`. A function of
+/// an async host service takes a request id from the request table
+/// (`$req_start`), starts the import with it, and suspends to the root
+/// boundary, where `$host_wait` keeps the continuation in `$host_k` and gives
+/// `$host_waiting`: the status is 1. The export `ilang_resume:…` of the
+/// import gets the id first; it checks it against the table
+/// (`$req_answer`), puts the answer in the globals of the import and resumes
+/// the continuation, so the function reads the answer with the frames of the
+/// program on the shadow stack (§11.7).
+///
+/// Stream R2 takes over the request table. These parts are correct only
+/// while one request is outstanding, and R2 must replace them together:
+/// - `$req_start`, `$req_answer`, `$req_outstanding`, `$req_clear` become a
+///   table from id to { import, answer }, with a free list. The id may be the
+///   slot index. `$req_clear` frees every entry; `$async_run` already calls
+///   it before status 0 (B.5). `$async_result` and `$async_begin` check
+///   `$async_live`, not `$req_outstanding`, because an entry point that
+///   returns status 2 may have nothing outstanding and still not have ended;
+///   keep that check, and keep clearing `$async_live` only at status 0.
+/// - The answer globals `$hr{i}_*`: each resume must decode its answer into
+///   the entry of its request before control leaves the export, or a second
+///   answer of the same import overwrites the first.
+/// - `$host_k` stays one continuation: the root continuation of whatever
+///   waits (today the one async call; under R2 the place where the scheduler
+///   waits for any answer). `$host_resume_k` keeps resuming that one `k`, and
+///   passes it which request ended. Do not store a root continuation per
+///   request: each would hold its own copy of the scheduler's state.
+/// - The scheduler returns status 1 to the root only when no task can run.
+///   At its scheduling points, while some task can still run, it returns
+///   status 2 so that the host can give finished answers, and goes on in the
+///   export `ilang_continue`, which R2 adds to the module (B.5). That export
+///   must trap when the last status the module gave was not 2.
+/// - Cancelling a request value lowers to the import `cancel(id)` from
+///   `ilang:host/v1` and frees the entry (B.4). It drops host work only; the
+///   task's continuation is an i value, and the scheduler cancels it in i
+///   code so that its final functions run.
+///
+/// None of this changes the ABI: v3 hosts already accept many outstanding
+/// requests in any order, status 2 and `cancel`. A need that v3 does not
+/// cover (a new runtime import, status or export) means ABI version 4.
 pub(super) const EFFECTS: &str = r#"
-;; # The host boundary (§9.7, B.4, B.5)
-;;
-;; An async entry point runs in a root boundary, `$host_root`. A function of
-;; an async host service takes a request id from the request table
-;; (`$req_start`), starts the import with it, and suspends to the root
-;; boundary, where `$host_wait` keeps the continuation in `$host_k` and gives
-;; `$host_waiting`: the status is 1. The export `ilang_resume:…` of the
-;; import gets the id first; it checks it against the table
-;; (`$req_answer`), puts the answer in the globals of the import and resumes
-;; the continuation, so the function reads the answer with the frames of the
-;; program on the shadow stack (§11.7).
-;;
-;; Stream R2 takes over the request table. These parts are correct only
-;; while one request is outstanding, and R2 must replace them together:
-;; - `$req_start`, `$req_answer`, `$req_outstanding`, `$req_clear` become a
-;;   table from id to { import, answer }, with a free list. The id may be the
-;;   slot index. `$req_clear` frees every entry; `$async_run` already calls
-;;   it before status 0 (B.5). `$async_result` and `$async_begin` check
-;;   `$async_live`, not `$req_outstanding`, because an entry point that
-;;   returns status 2 may have nothing outstanding and still not have ended;
-;;   keep that check, and keep clearing `$async_live` only at status 0.
-;; - The answer globals `$hr{i}_*`: each resume must decode its answer into
-;;   the entry of its request before control leaves the export, or a second
-;;   answer of the same import overwrites the first.
-;; - `$host_k` stays one continuation: the root continuation of whatever
-;;   waits (today the one async call; under R2 the place where the scheduler
-;;   waits for any answer). `$host_resume_k` keeps resuming that one `k`, and
-;;   passes it which request ended. Do not store a root continuation per
-;;   request: each would hold its own copy of the scheduler's state.
-;; - The scheduler returns status 1 to the root only when no task can run.
-;;   At its scheduling points, while some task can still run, it returns
-;;   status 2 so that the host can give finished answers, and goes on in the
-;;   export `ilang_continue`, which R2 adds to the module (B.5). That export
-;;   must trap when the last status the module gave was not 2.
-;; - Cancelling a request value lowers to the import `cancel(id)` from
-;;   `ilang:host/v1` and frees the entry (B.4). It drops host work only; the
-;;   task's continuation is an i value, and the scheduler cancels it in i
-;;   code so that its final functions run.
-;; None of this changes the ABI: v3 hosts already accept many outstanding
-;; requests in any order, status 2 and `cancel`. A need that v3 does not
-;; cover (a new runtime import, status or export) means ABI version 4.
+;; The host boundary (§9.7, B.4, B.5). The notes for stream R2 are on
+;; `EFFECTS` in emit/host.rs.
 (global $host_root (mut (ref null $boundary)) (ref.null $boundary))
 (global $host_k (mut eqref) (ref.null eq))
 ;; The request table (B.4, B.5): the import of the outstanding request (-1
@@ -83,7 +88,7 @@ pub(super) const EFFECTS: &str = r#"
     (ref.null eq) (ref.null eq) (ref.null $frame)))
 
 ;; The request table. In this module it has one entry; R2 replaces these
-;; four functions with a table of requests (see above). The traps are bare
+;; four functions with a table of requests (see the notes in emit/host.rs). The traps are bare
 ;; `unreachable`: a wrong answer is a fault of the host, not a stop.
 (func $req_start (param $import i32) (result i32)
   (local $id i32)
@@ -350,6 +355,27 @@ impl<'p> Emitter<'p> {
                 wat_string(&x.module),
                 wat_string(&x.name)
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Every module carries `EFFECTS`, so its WAT keeps only short comments;
+    /// longer notes go in the doc comment of `EFFECTS`.
+    #[test]
+    fn effects_keep_only_short_comments() {
+        let mut block = 0;
+        for line in super::EFFECTS.lines() {
+            if line.trim_start().starts_with(";;") {
+                block += 1;
+                assert!(
+                    block <= 6,
+                    "a comment of more than 6 lines in EFFECTS: {line}"
+                );
+            } else {
+                block = 0;
+            }
         }
     }
 }
