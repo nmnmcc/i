@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "app/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.f_0 : () -> Nil\napp/main.f_1 : () -> Nil\napp/main.f_2 : () -> Nil\napp/main.f_3 : () -> Nil\napp/main.f_4 : () -> Nil\napp/main.f_5 : () -> Nil\napp/main.f_6 : () -> Nil\napp/main.f_7 : () -> Nil\napp/main.f_8 : () -> Nil\napp/main.f_9 : () -> Nil\napp/main.f_10 : () -> Nil\napp/main.f_11 : () -> Nil\napp/main.f_12 : () -> Nil\napp/main.f_13 : () -> Nil\napp/main.f_14 : () -> Nil\napp/main.f_15 : () -> Nil\napp/main.f_16 : () -> Nil\napp/main.f_17 : () -> Nil\napp/main.f_18 : () -> Nil\napp/main.f_19 : () -> Nil\napp/main.f_20 : () -> Nil\napp/main.f_21 : () -> Nil\napp/main.f_22 : () -> Nil\napp/main.f_23 : () -> Nil\napp/main.f_24 : () -> Nil\napp/main.f_25 : () -> Nil\napp/main.f_26 : () -> Nil\napp/main.f_27 : () -> Nil\napp/main.f_28 : () -> Nil\napp/main.f_29 : () -> Nil\napp/main.f_30 : () -> Nil\napp/main.f_31 : () -> Nil\napp/main.f_32 : () -> Nil\napp/main.f_33 : () -> Nil\napp/main.f_34 : () -> Nil\napp/main.f_35 : () -> Nil\napp/main.f_36 : () -> Nil\napp/main.f_37 : () -> Nil\napp/main.f_38 : () -> Nil\napp/main.f_39 : () -> Nil\napp/main.f_40 : () -> Nil\napp/main.f_41 : () -> Nil\napp/main.f_42 : () -> Nil\napp/main.f_43 : () -> Nil\napp/main.f_44 : () -> Nil\napp/main.f_45 : () -> Nil\napp/main.f_46 : () -> Nil\napp/main.f_47 : () -> Nil\napp/main.f_48 : () -> Nil\napp/main.f_49 : () -> Nil\napp/main.f_50 : () -> Nil\napp/main.f_51 : () -> Nil\napp/main.f_52 : () -> Nil\napp/main.f_53 : () -> Nil\napp/main.f_54 : () -> Nil\napp/main.f_55 : () -> Nil\napp/main.f_56 : () -> Nil\napp/main.f_57 : () -> Nil\napp/main.f_58 : () -> Nil\napp/main.f_59 : () -> Nil\napp/main.f_60 : () -> Nil\napp/main.f_61 : () -> Nil\napp/main.f_62 : () -> Nil\napp/main.f_63 : () -> Nil\napp/main.f_64 : () -> Nil\napp/main.f_65 : () -> Nil\napp/main.f_66 : () -> Nil\napp/main.f_67 : () -> Nil\napp/main.f_68 : () -> Nil\napp/main.f_69 : () -> Nil\napp/main.f_70 : () -> Nil\napp/main.f_71 : () -> Nil\napp/main.f_72 : () -> Nil\napp/main.f_73 : () -> Nil\napp/main.f_74 : () -> Nil\napp/main.f_75 : () -> Nil\napp/main.f_76 : () -> Nil\napp/main.f_77 : () -> Nil\napp/main.f_78 : () -> Nil\napp/main.f_79 : () -> Nil\napp/main.f_80 : () -> Nil\napp/main.f_81 : () -> Nil\napp/main.f_82 : () -> Nil\napp/main.f_83 : () -> Nil\napp/main.f_84 : () -> Nil\napp/main.f_85 : () -> Nil\napp/main.f_86 : () -> Nil\napp/main.f_87 : () -> Nil\napp/main.f_88 : () -> Nil\napp/main.f_89 : () -> Nil\napp/main.f_90 : () -> Nil\napp/main.f_91 : () -> Nil\napp/main.f_92 : () -> Nil\napp/main.f_93 : () -> Nil\napp/main.f_94 : () -> Nil\napp/main.f_95 : () -> Nil\napp/main.f_96 : () -> Nil\napp/main.f_97 : () -> Nil\napp/main.f_98 : () -> Nil\napp/main.f_99 : () -> Nil\napp/main.f_100 : () -> Nil\napp/main.f_101 : () -> Nil\napp/main.f_102 : () -> Nil\napp/main.f_103 : () -> Nil\napp/main.f_104 : () -> Nil\napp/main.f_105 : () -> Nil\napp/main.f_106 : () -> Nil\napp/main.f_107 : () -> Nil\napp/main.f_108 : () -> Nil\napp/main.f_109 : () -> Nil\napp/main.f_110 : () -> Nil\napp/main.f_111 : () -> Nil\napp/main.f_112 : () -> Nil\napp/main.f_113 : () -> Nil\napp/main.f_114 : () -> Nil\napp/main.f_115 : () -> Nil\napp/main.f_116 : () -> Nil\napp/main.f_117 : () -> Nil\napp/main.f_118 : () -> Nil\napp/main.f_119 : () -> Nil\napp/main.f_120 : () -> Nil\napp/main.f_121 : () -> Nil\napp/main.f_122 : () -> Nil\napp/main.f_123 : () -> Nil\napp/main.f_124 : () -> Nil\napp/main.f_125 : () -> Nil\napp/main.f_126 : () -> Nil\napp/main.f_127 : () -> Nil\n",
-      "stderr": ""
+      "stderr": "src/main.i:129:1: warning[W0504]: top-level binding `f_127` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:129:1: warning[W0504]: top-level binding `f_127` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:129:1: warning[W0504]: top-level binding `f_127` is not used\n"
     }
   }
 }

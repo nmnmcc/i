@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "app/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.f_0 : () -> Nil\napp/main.f_1 : () -> Nil\napp/main.f_2 : () -> Nil\napp/main.f_3 : () -> Nil\napp/main.f_4 : () -> Nil\napp/main.f_5 : () -> Nil\napp/main.f_6 : () -> Nil\napp/main.f_7 : () -> Nil\napp/main.f_8 : () -> Nil\napp/main.f_9 : () -> Nil\napp/main.f_10 : () -> Nil\napp/main.f_11 : () -> Nil\napp/main.f_12 : () -> Nil\napp/main.f_13 : () -> Nil\napp/main.f_14 : () -> Nil\napp/main.f_15 : () -> Nil\napp/main.f_16 : () -> Nil\napp/main.f_17 : () -> Nil\napp/main.f_18 : () -> Nil\napp/main.f_19 : () -> Nil\napp/main.f_20 : () -> Nil\napp/main.f_21 : () -> Nil\napp/main.f_22 : () -> Nil\napp/main.f_23 : () -> Nil\napp/main.f_24 : () -> Nil\napp/main.f_25 : () -> Nil\napp/main.f_26 : () -> Nil\napp/main.f_27 : () -> Nil\napp/main.f_28 : () -> Nil\napp/main.f_29 : () -> Nil\napp/main.f_30 : () -> Nil\napp/main.f_31 : () -> Nil\napp/main.f_32 : () -> Nil\napp/main.f_33 : () -> Nil\napp/main.f_34 : () -> Nil\napp/main.f_35 : () -> Nil\napp/main.f_36 : () -> Nil\napp/main.f_37 : () -> Nil\napp/main.f_38 : () -> Nil\napp/main.f_39 : () -> Nil\napp/main.f_40 : () -> Nil\napp/main.f_41 : () -> Nil\napp/main.f_42 : () -> Nil\napp/main.f_43 : () -> Nil\napp/main.f_44 : () -> Nil\napp/main.f_45 : () -> Nil\napp/main.f_46 : () -> Nil\napp/main.f_47 : () -> Nil\napp/main.f_48 : () -> Nil\napp/main.f_49 : () -> Nil\napp/main.f_50 : () -> Nil\napp/main.f_51 : () -> Nil\napp/main.f_52 : () -> Nil\napp/main.f_53 : () -> Nil\napp/main.f_54 : () -> Nil\napp/main.f_55 : () -> Nil\napp/main.f_56 : () -> Nil\napp/main.f_57 : () -> Nil\napp/main.f_58 : () -> Nil\napp/main.f_59 : () -> Nil\napp/main.f_60 : () -> Nil\napp/main.f_61 : () -> Nil\napp/main.f_62 : () -> Nil\napp/main.f_63 : () -> Nil\n",
-      "stderr": ""
+      "stderr": "src/main.i:65:1: warning[W0504]: top-level binding `f_63` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:65:1: warning[W0504]: top-level binding `f_63` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:65:1: warning[W0504]: top-level binding `f_63` is not used\n"
     }
   }
 }
