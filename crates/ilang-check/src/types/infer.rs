@@ -1421,6 +1421,8 @@ impl<'a> Checker<'a> {
     /// argument.
     fn call(&mut self, callee: &Expr, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
         let (f, kf) = self.infer_k(callee, &Ty::Top);
+        let bool_pipe = first.is_some() && kf.head() == Some(Head::Named(self.b.bool_));
+        let diagnostic_start = self.diags.len();
         let kfn = known::one_fn(&kf);
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
@@ -1553,6 +1555,32 @@ impl<'a> Checker<'a> {
                 r
             }
         };
+        if bool_pipe {
+            let start = first.unwrap().span.end;
+            let end = callee.span.start.max(start);
+            let source = &self.sources.get(self.p.module(self.module).source).text;
+            let operator = ilang_syntax::lex(&source[start as usize..end as usize])
+                .tokens
+                .into_iter()
+                .find(|t| {
+                    matches!(
+                        t.kind,
+                        ilang_syntax::token::TokenKind::Pipe
+                            | ilang_syntax::token::TokenKind::PipeGt
+                    )
+                })
+                .map(|t| Span::new(start + t.span.start, start + t.span.end));
+            for diagnostic in &mut self.diags[diagnostic_start..] {
+                if diagnostic.code == code::TYPE_MISMATCH {
+                    diagnostic.message.push_str(
+                        "; the pipe target is Bool, which is not callable; use `||` for Boolean or",
+                    );
+                    if let Some(operator) = operator {
+                        diagnostic.span = operator;
+                    }
+                }
+            }
+        }
         (t, known)
     }
 

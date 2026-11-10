@@ -912,7 +912,7 @@ impl<'a> Lowerer<'a> {
                     code::NOT_SUPPORTED,
                     None,
                     Span::default(),
-                    "the WASI target needs a program entry, a `@main` (B.7)",
+                    "the WASI target needs a program entry: `main` in `src/main.i`, or select `[entries]` with `--entry` (B.7)",
                 )),
             }
         }

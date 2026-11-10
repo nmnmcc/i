@@ -48,6 +48,7 @@ pub(crate) fn add(graph: &mut PackageGraph) {
         dev_dependencies: Vec::new(),
         modules,
         wasm_exports: Vec::new(),
+        entries: Vec::new(),
         location: None,
     });
 }
