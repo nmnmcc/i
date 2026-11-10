@@ -373,6 +373,9 @@ impl Solver {
 
     /// The row parameters of a constructor, determined from its definition.
     pub fn rows(&self, h: Head, n: usize) -> Vec<Mode> {
+        if n == 0 {
+            return Vec::new();
+        }
         match h {
             Head::Named(TypeRef::Custom(id)) => self
                 .row_params
@@ -473,6 +476,9 @@ impl Solver {
     /// Hidden difference constraints cannot be thrown away by rebuilding
     /// only the visible type. Keep the bounded scheme in this case.
     pub fn has_obligations(&self, t: &Ty) -> bool {
+        if !self.has_handlers {
+            return false;
+        }
         let mut edges = Vec::new();
         bound_vars(self, t, true, false, &mut edges);
         let mut todo: Vec<_> = edges.drain(..).map(|e| e.0).collect();
