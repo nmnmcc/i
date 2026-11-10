@@ -250,6 +250,14 @@ pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
     let Node::Round(parts) = item.node() else {
         unreachable!("type definition item is round")
     };
+    if let [marker, attr, body] = parts.as_slice()
+        && matches!(marker.node(), Node::Symbol(s) if s == "@")
+    {
+        let body = expanded_definition(body, answer)?;
+        return Ok(item
+            .with_node(Node::Round(vec![marker.clone(), attr.clone(), body]))
+            .as_answer());
+    }
     let (head_index, body_index, custom) = match parts.as_slice() {
         [head, body] if matches!(body.node(), Node::Curly(_)) => {
             let _ = head;
