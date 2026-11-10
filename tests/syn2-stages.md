@@ -100,3 +100,25 @@ and all 51 browser tests passed. old-syntax-check retry exited 0 with
 The review runner wrote one untracked actual.json for an allowed timeout
 in stress-nested-50 test2; it was moved to target/syn2/stage1-stress-actual.json.
 No policy, limit, lockfile, global environment or reference tree changed.
+# SYN2 implementation notes
+
+The new surface uses postfix match, `|` for pipe and `^` for an error type.
+The default entry is `src/main.i`'s `main`; `[entries]` selects other
+functions. During migration the parser still accepts the first surface.
+`// syntax: syn1` resolves empty-tuple collisions in old fixtures; it is removed
+when those fixtures migrate. Empty tuples require an explicit semantic rewrite.
+
+Record syntax is reserved pending T3: this branch does not invent an AST for
+records. T3 owns the record expression and type nodes and their semantics;
+the parenthesised surface must construct those same nodes when T3 lands. A
+record and a tuple are distinguished by labels or spread, rather than a
+trailing comma, and an empty record is `()`.
+
+Prior art: Rust `compiler/rustc_parse/src/parser/expr.rs`,
+`parse_dot_suffix_expr` and `parse_dot_suffix`, parse postfix operators in the
+same loop as field access and calls, before binary operators. SYN2 similarly
+parses `.{` in the postfix loop. The migration tool follows the source-span
+approach: it parses the old tree, edits only operator and attribute spans,
+retains comments, and groups a compound subject before a postfix match. Its
+repository scan reports unresolved empty tuples and entry declarations for
+manual handling.
