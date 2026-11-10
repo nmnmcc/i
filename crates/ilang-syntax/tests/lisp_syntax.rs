@@ -1173,3 +1173,23 @@ fn source_syntax_agrees_across_surfaces_for_library_modules() {
         }
     }
 }
+
+#[test]
+fn host_identity_is_weak_and_does_not_keep_a_prior_run_alive() {
+    use std::sync::Arc;
+    let syntax = root("x");
+    let first = syntax.host_identity();
+    let same = syntax.host_identity();
+    assert!(Arc::ptr_eq(&first, &same));
+    let weak = Arc::downgrade(&first);
+    drop(first);
+    drop(same);
+    assert!(weak.upgrade().is_none());
+    let next_run = syntax.host_identity();
+    assert!(
+        next_run
+            .downcast_ref::<ilang_syntax::lisp::syntax::Syntax>()
+            .unwrap()
+            .identical(&syntax)
+    );
+}

@@ -1,6 +1,6 @@
 //! Source-located, hygienic syntax values for compile-time code.
 use std::collections::BTreeSet;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, Weak};
 
 use super::{Datum, DatumKind};
 use crate::span::Span;
@@ -46,7 +46,7 @@ impl ScopeIdentity {
 #[derive(Clone, Debug)]
 pub struct Syntax(Arc<SyntaxData>);
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct SyntaxData {
     node: Node,
     scope: Scope,
@@ -54,6 +54,7 @@ struct SyntaxData {
     provenance: Provenance,
     identity: Option<ScopeIdentity>,
     origin: Arc<()>,
+    host_identity: Mutex<Option<Weak<dyn std::any::Any + Send + Sync>>>,
 }
 
 /// Name provenance determines which foreign declarations `make` may reach.
@@ -134,6 +135,7 @@ impl Syntax {
             provenance: Provenance::Written,
             identity: None,
             origin: Arc::new(()),
+            host_identity: Mutex::new(None),
         }))
     }
     pub fn from_datum(d: &Datum, scope: &Scope) -> Self {
@@ -161,6 +163,7 @@ impl Syntax {
             provenance: Provenance::Written,
             identity: None,
             origin: Arc::new(()),
+            host_identity: Mutex::new(None),
         }))
     }
     pub fn node(&self) -> &Node {
@@ -206,6 +209,7 @@ impl Syntax {
             provenance: Provenance::Answer,
             identity: Some(identity),
             origin: Arc::new(()),
+            host_identity: Mutex::new(None),
         }))
     }
     pub(super) fn with_node(&self, node: Node) -> Self {
@@ -216,6 +220,7 @@ impl Syntax {
             provenance: self.provenance(),
             identity: self.scope_identity().cloned(),
             origin: Arc::new(()),
+            host_identity: Mutex::new(None),
         }))
     }
 
@@ -246,6 +251,7 @@ impl Syntax {
             provenance: self.provenance(),
             identity: self.scope_identity().cloned(),
             origin: self.0.origin.clone(),
+            host_identity: Mutex::new(None),
         }))
     }
 
@@ -269,14 +275,27 @@ impl Syntax {
             provenance: Provenance::Answer,
             identity: self.scope_identity().cloned(),
             origin: Arc::new(()),
+            host_identity: Mutex::new(None),
         }))
     }
     pub fn identical(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
     }
-    /// Stable identity while this value is alive, for host reference interning.
-    pub fn identity_key(&self) -> usize {
-        Arc::as_ptr(&self.0) as usize
+    /// A weakly held host identity for this value. The host reference owns the
+    /// Syntax, while the Syntax holds only a weak reference, so no cycle or
+    /// process-wide cache survives a run.
+    pub fn host_identity(&self) -> Arc<dyn std::any::Any + Send + Sync> {
+        let mut cached = self
+            .0
+            .host_identity
+            .lock()
+            .expect("syntax host identity lock poisoned");
+        if let Some(identity) = cached.as_ref().and_then(Weak::upgrade) {
+            return identity;
+        }
+        let identity: Arc<dyn std::any::Any + Send + Sync> = Arc::new(self.clone());
+        *cached = Some(Arc::downgrade(&identity));
+        identity
     }
     pub(super) fn replace_scope_identity(&self, identity: ScopeIdentity) -> Self {
         Self(Arc::new(SyntaxData {
@@ -286,6 +305,7 @@ impl Syntax {
             provenance: self.provenance(),
             identity: Some(identity),
             origin: Arc::new(()),
+            host_identity: Mutex::new(None),
         }))
     }
     /// Find a descendant by its original source span.
@@ -394,6 +414,7 @@ impl Syntax {
             },
             identity: like.scope_identity().cloned(),
             origin: Arc::new(()),
+            host_identity: Mutex::new(None),
         })))
     }
 
@@ -708,6 +729,7 @@ pub fn flip_mark_all(values: &[Syntax], mark: u64) -> Vec<Syntax> {
             provenance: value.provenance(),
             identity: value.scope_identity().cloned(),
             origin: value.0.origin.clone(),
+            host_identity: Mutex::new(None),
         }));
         seen.insert(key, result.clone());
         result
