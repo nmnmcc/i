@@ -199,7 +199,7 @@ and observation rules.
 
 ## Base-accepted programs now rejected
 
-Both the review base (94789e6) and the actual merged redesign (c2f41b7)
+Both the review base (94789e6) and the actual merged redesign (82375c0)
 accepted every row below. The named comparison runs both base binaries and
 the lane at both optimization levels. Base behavior in this table was the
 same at opt 0 and opt 2.
@@ -219,6 +219,9 @@ same at opt 0 and opt 2.
 | row_alias | Pure unused-code entry returns normally | E0515: a closed alias contains incompatible S forms. Invalid under F2; no runtime failure claimed for its unused code. |
 | alias_kind_env | Pure unused-code entry returns normally | E0515: the function alias makes N an environment row; concrete Svc(Int) and Svc(Nil) cannot inhabit that row. |
 | alias_kind_error | Pure unused-code entry returns normally | E0515: the same contract applies to an error-row parameter. |
+| direct_row | Pure unused-code entry returns normally | E0515: a directly written row argument contains incompatible S forms. |
+| effect_row_alias | Pure unused-code entry returns normally | E0515: using the closed alias as a function environment must retain its row comparison. |
+| latent_row | Pure unused-code entry returns normally | E0515: instantiating the returned callback's row union cannot combine S(Int) and S(String), even when the callback is unused. |
 
 The review bases already reject x1/x4/x6/x7/x8/g_ann_SDep with E0505.
 The lane now gives E0515 for their actual same-form violation. They are not
@@ -319,13 +322,13 @@ when an annotation shows the wider result row.
 
 ## Functions changed for merge planning
 
-This inventory compares K4 with merged redesign c2f41b7, excluding T1/T2
+This inventory compares K4 with merged redesign 82375c0, excluding T1/T2/W0503
 changes inherited by the merges. Test functions are covered by their test
 files above.
 
 | File | Functions |
 | --- | --- |
-| `types/solve.rs` | `Solver::new`, `for_closed_types`, `fresh_at`, `variances`, `fail`, `constrain`, `constrain_env`, `rows`, `mark_row`, `mark_mode`, `is_row`, `mode`, `constrain_row`, `has_obligations`, `handle`, `same_form`, `same_form_in`, `hidden_handlers` (and its `parts` walker), `constrain_in`, `constrain_by`, `add_bound`, `compare`, `join`, `route`, `diff_left`, `extrude`, `freshen`, `env_union`, `union_mode`, `merge`, `merge_arg`, `diff`, `env_diff`, `diff_mode`, `normalize_mode`, `diff_bound`, `diff_bound_mode`, `occurs`, `normalize_bounds`, `normalize_type`, `normalized`, `occurs_from`; `edge_vars`, `bound_vars`, `env_vars`, `builtin_variance`, `builtin_variance_values`; `ParamModes::{repeated,from_slice,next,size_hint}`. |
+| `types/solve.rs` | `Solver::new`, `for_closed_types`, `fresh_at`, `variances`, `fail`, `constrain`, `constrain_env`, `rows`, `mark_row`, `mark_mode`, `is_row`, `mode`, `constrain_row`, `has_obligations`, `handle`, `same_form`, `same_form_in`, `hidden_handlers` (and its `parts` walker), `constrain_in`, `constrain_by`, `add_bound`, `compare`, `join`, `route`, `diff_left`, `extrude`, `freshen`, `env_union`, `union`, `union_mode`, `inter`, `merge`, `merge_arg`, `diff`, `env_diff`, `diff_mode`, `normalize_mode`, `diff_bound`, `diff_bound_mode`, `occurs`, `normalize_bounds`, `normalize_type`, `normalized`, `occurs_from`; `edge_vars`, `bound_vars`, `env_vars`, `builtin_variance`, `builtin_variance_values`; `ParamModes::{repeated,from_slice,next,size_hint}`. |
 | `types/infer.rs` | `Checker::new`, `run`, `group`, `entry_point`, `exported_type`, `check_occurs`, `report_coalescing`, `add_err`, `add_env`, `pop_effects`, `conv`, `conv_mode`, `fresh_args`, `function`, `local_binding`, `generalize`, `rebuild`; `row_parameters` and its `walk`. |
 | `types/display.rs` | `scheme_in`, `scheme_names`, `simplify_steps`, `cycles`; `Coalescer::go`; `Norm::{norm,env,union_in,step,walk}`; `record`, `hide`. |
 | `types/alias.rs` | `Checker::instantiate_alias`; `normalize`. |
@@ -439,3 +442,142 @@ The scalar-error runtime fixture initially used the wrong constructor name
 Err. Its check failed with E0201 (`algebra-final-build`); §9.3 and i/fail
 specify Error. The fixture now checks Error(1) and Error(2), preserving both
 literal expectations. No implementation or diagnostic check was relaxed.
+
+
+The final redesign merge is 82375c0 (W0503), integrated by 78f942e. Its
+known-disjoint-comparison warnings, literal/value-type changes and generated
+expectations are retained. The isolated baseline tree was refreshed with
+exactly its changed paths; 1,020 compiler, library, spec-test and build files
+were compared byte for byte with the merged revision, with no mismatches
+(`baseline-source-82375.json`). Its release build and WAT export use the
+separate baseline Cargo target, preserving the contamination fix above.
+
+The four K4 golden changes are generated, not hand edited:
+`entry_checks/expected.out` sorts the main row and adds E0515 for unequal
+scalar arguments inside a row member in an already negative program;
+`environments.out` and `spec.out` sort rows; `soundness.out` names the complete
+Reader service forms in two diagnostics. F5 requires the canonical display.
+The later F2 ruling requires equal arguments wherever the row occurs and
+supersedes the original request to freeze all existing golden text. No
+previously accepted golden program becomes rejected.
+
+
+## Final verification on merged redesign 82375c0
+
+The compiler source is frozen at 78f942e for these checks. Subsequent commits
+record this evidence and generate expectations only. The initial lane was
+clean at 25c569e; all earlier K4 work was retained.
+
+Commands run from this lane, with H denoting
+`/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i`:
+
+- `H env UPDATE=1 cargo test -p ilang-check --test types --locked` generates
+  exactly the four files listed above.
+- `H env ILANG_BROWSER_PORT=4185 ./scripts/dev-verify` passes formatting,
+  Clippy with warnings denied, the workspace Rust tests, 1,465 std tests,
+  two hello tests and 12 benchmark tests at each optimization level, WASI
+  smoke tests, the JS tests and all 51 browser tests.
+- `H cargo test -p ilang-cli --test spec --locked` passes all 242 cases at
+  both optimization levels.
+- `H python3 tests/k4/review.py` with the three compiler paths and output
+  directory recorded in `comparisons-82375.log` passes all 80 named cases,
+  including check/types and both run optimization levels in every compiler.
+  The base-accepted/rejected table above contains all 16 changed negatives.
+- `H python3 tests/k4/compare.py --count 400 --seed 44` was run both raw
+  against the review base and with `--bound-recursion` against merged
+  redesign, using `--runtime-timeout 5`. Each corpus has 1,200 programs:
+  991 rejected by both, 185 newly accepted, 24 accepted by both, no newly
+  rejected program and no unexpected runtime failure. The raw lane runs
+  have 414 successes and four expected timeouts (two source programs at
+  both optimization levels); the base has 44 successes and the same four
+  timeouts. The bounded substitute changes 94 sources, retaining originals,
+  and has 418 successful lane runs and 48 successful base runs.
+
+The three ordinary project type exports contain exactly 2,197 std, five
+hello and 23 benchmark bindings in both compilers. Only three std row orders
+change: list_test.collect, sequence_test.observe and
+string_additions_test.observe. Each change permutes a union's members;
+§4.4 explicitly says “Order has no effect.” There are no added or missing
+bindings (`types-82375-comparison.json`).
+
+The exact commands, generated sources, stderr/stdout and per-compiler exit
+statuses are retained in this lane's ignored `target/k4d-checks`, in
+`delivery-82375-gates.log`, `baseline-82375.log`, `comparisons-82375.log`,
+`raw-82375.log`, `named-82375/results.json`, the two generated-82375 output
+directories and `generator-82375-summary.json`.
+
+
+`direnv exec /home/agent/Programming/i ./scripts/old-syntax-check` passes
+1,762 extracted literals/blocks with exact expected diagnostics and 17
+future-track entries. It runs after the outer heavy wrapper has released its
+slot; its own Cargo step still uses the required heavy wrapper.
+
+`H env WAT_DUMP=<dir> cargo test -p ilang-cli --test wat_dump --locked`
+passes in both isolated baseline and lane. All 906 baseline export records
+are byte-identical, including all 577 actual WAT modules; 329 records contain
+expected error output. There are no missing or changed records. The only
+four additions are the ilang/wasi, optimized/unoptimized exports of the new
+generic_service_rows spec case (`wat-82375-comparison.json`). The release
+binary used for every final comparison matches the gate's release binary
+byte for byte.
+
+
+The final quiet measurement passes the std not-worse criterion at the
+measurement's resolution. It uses 60 alternating, CPU-pinned pairs against
+actual merged redesign, after all other own gates and comparisons finish.
+Median wall time is 0.311437 -> 0.311232 seconds; median child CPU time is
+0.3057525 -> 0.3057615 seconds. The nine-microsecond CPU difference is flat
+against millisecond-scale variation. Paired median differences are -2.407 ms
+wall and -2.282 ms CPU; 10,000 paired bootstrap resamples (seed 44) give
+95% intervals [-5.513, 1.030] ms and [-5.127, 0.750] ms respectively. Both
+include zero: no speedup is claimed for std. Raw samples and the derived
+intervals are `timing-82375-quiet/results.json` and
+`timing-82375-std-interval.json`.
+
+Command: `/home/agent/Programming/i/.rd/cache/quiet direnv exec
+/home/agent/Programming/i python3 tests/k4/perf.py --pairs 60`, with
+`--before` i-redesign-82375, `--after` i-delivery-82375, and `--rings-before`
+i-before at 63e5f3a. The quiet wrapper takes all three heavy slots; waiting
+for QA's active corpus did not interrupt or modify its work.
+
+The ring figures are the explicitly labeled substitute comparison described
+above, three alternating pairs per size. Median seconds:
+
+| Functions | Wall before | Wall after | CPU before | CPU after |
+| --- | ---: | ---: | ---: | ---: |
+| 25 | 0.047367 | 0.012836 | 0.045198 | 0.011440 |
+| 50 | 0.518331 | 0.041652 | 0.510706 | 0.040085 |
+| 100 | 8.615122 | 0.362887 | 8.495138 | 0.354910 |
+| 150 | 41.217351 | 1.585129 | 40.664603 | 1.561601 |
+
+The cause was repeated expansion of the same coalescing paths and repeated
+type-tree/occurrence copying during simplification. Completed-expansion
+memoization and borrowing remove that redundant work while keeping cycle
+checks, polarity, row mode and substitution order. The 100- and 150-function
+cases improve about 24x and 26x. The original recursive-type negative tests
+still require E0505; the dedicated exact-bound proof test also stops at a
+constructor cycle.
+
+All done criteria are met on these measurements: F1 and F2 reject their
+unsafe definitions/instances with service-naming diagnostics, F3's finite
+spellings and correct annotations agree, F4's owned coalescing bottleneck is
+fixed, F5 is canonical, and first-review coalescing/entry/interface/lowering
+regressions remain covered. The final redesign ref is still 82375c0.
+The only source disagreement was the earlier golden-text freeze versus the
+later F2/F5 rulings, resolved in favor of those rulings and documented above.
+All failed/interrupted checks and temporary environment incidents are listed
+in this record; discarded measurements are not final evidence. Trace code
+is removed, normal per-command environment variables have expired, no
+shared checkout/configuration was changed, and ignored scratch evidence and
+normal dev-verify browser dependencies are retained in this lane.
+
+
+## Escalations and handoff
+
+The compiler follow-up is complete. Ledger entries 156 and 159 assign the
+five waiting std/log probes to promotion after K4 lands, in std/log.i,
+std/log_test.i and docs/design/std-2.md. Those files are outside this lane's
+owned implementation paths and are unchanged here. The coordinator/Std-2
+owner must promote them after integration. No other source work is left in
+this lane. The final commit contains only generated expectations and is
+named “Regenerate derived files.”
