@@ -1,0 +1,13 @@
+one : (n: a) -> a
+many : (a) -> Int
+blocks : List((a) -> Int)
+loop : (Int) -> Done
+local : () -> Done
+mutual : () -> (Bool, Bool)
+get : (opt: Option(User)) -> String ! Assert
+map : (opts: List(Option(User))) -> List(String)
+list_map : (xs: List(A), f: (A) -> B) -> List(B)
+expected : () -> String
+f : (x: Int) -> Int
+subject_scope : () -> Int
+empty : (x: Never) -> Never

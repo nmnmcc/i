@@ -1,4 +1,4 @@
-src/main.i:1:1: error[E0301]: there is no attribute `@inline`; the attributes are `@external`, `@host`, `@main`, `@test`, and `@deprecated`
+src/main.i:1:1: error[E0301]: the attribute `@inline` is kept for macros; the built-in attributes are `@external`, `@host`, `@main`, `@test`, and `@deprecated`
 src/main.i:4:1: error[E0302]: this attribute is written `@main`, with no arguments
 src/main.i:7:1: error[E0302]: this attribute is written `@external("module", "function")`
 src/main.i:10:1: error[E0302]: this attribute is written `@host("namespace")` or `@host("namespace", "async")`
@@ -6,4 +6,4 @@ src/main.i:13:1: error[E0302]: this attribute is written `@deprecated("note")`
 src/main.i:16:1: error[E0303]: `@host` may only be on a type definition
 src/main.i:19:1: error[E0303]: `@main` may only be on a binding
 src/main.i:23:1: error[E0309]: `@deprecated` is given more than once on this item
-src/main.i:26:1: error[E0308]: the declaration `g` needs `@external` (§2.5)
+src/main.i:26:1: error[E0308]: a declaration with no `@external` is kept for macros

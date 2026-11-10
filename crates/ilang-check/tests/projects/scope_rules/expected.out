@@ -4,5 +4,5 @@ src/main.i:4:15: error[E0201]: `c` is not defined
 src/main.i:6:3: error[E0201]: `unknown_fn` is not defined
 src/main.i:12:11: error[E0201]: `z` is not defined
 src/main.i:18:15: error[E0201]: `q` is not defined
-src/main.i:22:4: error[E0202]: the type `Unknown` is not defined
+src/main.i:22:4: error[E0202]: the type `Unknown` is not defined; to use a type variable, declare it after the name of the binding, as in `f(A) = …`
 src/main.i:23:4: error[E0201]: there is no module `m`

@@ -11,7 +11,7 @@ src/main.i:14:17: error[E0224]: the type `Int` has 0 type parameters, but 1 is g
 src/main.i:15:17: error[E0224]: the type `Result` has 2 type parameters, but 1 is given
 src/main.i:16:17: error[E0224]: the type `Box` has 1 type parameter, but 0 are given
 src/main.i:17:42: error[E0224]: the type `Continuation` has 4 type parameters, but 1 is given
-src/main.i:18:19: error[E0202]: the type `Nothing` is not defined
+src/main.i:18:19: error[E0202]: the type `Nothing` is not defined; to use a type parameter, declare it in the head, as in `Box(A) { … }`
 src/main.i:25:24: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
 src/main.i:25:31: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
 src/main.i:25:42: error[E0228]: two environment parameters of this function have the type constructor `Clock` (§9.2)
