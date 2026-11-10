@@ -137,3 +137,29 @@ fn conversion_does_not_write_an_unrepresentable_module() {
     assert_eq!(std::fs::read_to_string(&file).unwrap(), source);
     assert!(!file.with_extension("i").exists());
 }
+
+#[test]
+fn macro_quote_formats_in_lisp_and_cannot_convert_to_normal() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("macros.is");
+    std::fs::write(&file, "(@ macro (= wrap (-> (x) _ `(f ~x))))\n").unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_i"))
+        .arg("fmt")
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let before = std::fs::read_to_string(&file).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--to=i"])
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), before);
+    assert!(!file.with_extension("i").exists());
+}

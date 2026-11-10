@@ -169,6 +169,7 @@ fn binder(d: &Datum) -> Result<Binder> {
 /// Read a datum in pattern position.
 pub fn parse_pattern(d: &Datum) -> Result<Pattern> {
     let kind = match &d.kind {
+        K::Quote(_) => PatternKind::Quote(Box::new(d.clone())),
         K::Name(n) => PatternKind::Var(n.clone()),
         K::Discard(n) => PatternKind::Discard(n.clone()),
         K::UpName(_) => {
@@ -341,6 +342,7 @@ fn binary(d: &Datum) -> Option<BinOp> {
 /// Read a datum in expression position without first printing normal syntax.
 pub fn parse_expression(d: &Datum) -> Result<Expr> {
     let kind = match &d.kind {
+        K::Quote(_) => ExprKind::Quote(Box::new(d.clone())),
         K::Int(n) => ExprKind::Int(n.clone()),
         K::Float(n) => ExprKind::Float(*n),
         K::String(s) => ExprKind::String(s.clone()),

@@ -26,6 +26,17 @@ fn quote_rules_are_checked() {
 }
 
 #[test]
+fn macro_quotes_are_core_nodes_and_can_be_formatted() {
+    let source = "(@ macro (= when (-> (condition body) _ `(if ~condition ~body))))\n";
+    let doc = parse(source).unwrap();
+    let module = ilang_syntax::lisp::parse_module(&doc).unwrap();
+    let printed = print_module(&module);
+    assert!(printed.contains("`(if ~condition ~body)"), "{printed}");
+    assert_eq!(ilang_syntax::lisp::format(source).unwrap(), printed);
+    assert!(normal_source(&doc).is_err());
+}
+
+#[test]
 fn invalid_datums_do_not_make_core_items() {
     for source in [
         "(@ (m) (= x 1))",

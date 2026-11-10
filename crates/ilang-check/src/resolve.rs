@@ -2491,6 +2491,14 @@ impl<'a> Resolver<'a> {
     fn expr(&mut self, e: &ast::Expr) -> Expr {
         use ast::ExprKind as E;
         let kind = match &e.kind {
+            E::Quote(_) => {
+                self.error(
+                    code::MACRO_RESERVED,
+                    e.span,
+                    "a quote must be evaluated inside a macro",
+                );
+                ExprKind::Error
+            }
             E::Int(n) => ExprKind::Int(n.clone()),
             E::Float(f) => ExprKind::Float(*f),
             E::String(s) => ExprKind::String(s.clone()),
@@ -2918,6 +2926,14 @@ impl<'a> Resolver<'a> {
     ) -> Pattern {
         use ast::PatternKind as P;
         let kind = match &p.kind {
+            P::Quote(_) => {
+                self.error(
+                    code::MACRO_RESERVED,
+                    p.span,
+                    "a quote pattern must be evaluated inside a macro",
+                );
+                PatternKind::Error(Vec::new())
+            }
             P::Var(n) => PatternKind::Var(self.bind(n, p.span, binders, shared)),
             P::Discard(_) => PatternKind::Discard,
             P::Typed { binder, ty } => {

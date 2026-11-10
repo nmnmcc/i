@@ -6,6 +6,53 @@ use crate::walk::{Visitor, Walk};
 use crate::{Code, Diagnostic};
 
 type Result<T> = std::result::Result<T, Diagnostic>;
+
+pub(super) fn show_as(d: &Datum, position: super::syntax::Position) -> Result<String> {
+    use super::syntax::Position::*;
+    match position {
+        ImportItem => import(d),
+        ExportItem => export(d),
+        Item => match &d.kind {
+            K::Curly(xs) => joined(xs, item, "\n"),
+            _ => item(d),
+        },
+        Attribute => attribute(d),
+        Constructor => constructor(d),
+        Field => field_type(d),
+        Type => typ(d),
+        FunctionResult => return_type(d),
+        Parameter => parameter(d),
+        Expression => checked_expression(d),
+        Statement => statement(d),
+        CallArgument => argument(d),
+        Clause => clause(d),
+        ClauseHead => clause_head(d),
+        Pattern => pattern(d),
+        Segment => expression_segment(d),
+        Format => format_spec(d),
+    }
+}
+fn checked_expression(d: &Datum) -> Result<String> {
+    let expected = super::to_ast::parse_expression(d)?;
+    let text = expr(d)?;
+    let (parsed, errors) = crate::parse_module(&format!("value = {text}\n"));
+    if !errors.is_empty() {
+        return Err(bad(d, "a normal-surface expression"));
+    }
+    let mut wanted = parsed.clone();
+    let Some(crate::ast::Item {
+        kind: crate::ast::ItemKind::Binding(binding),
+        ..
+    }) = wanted.items.first_mut()
+    else {
+        return Err(bad(d, "a normal-surface expression"));
+    };
+    binding.value = expected;
+    if crate::shape::canon(&wanted) != crate::shape::canon(&parsed) {
+        return Err(bad(d, "a normal-surface expression"));
+    }
+    Ok(text)
+}
 fn bad(d: &Datum, position: &str) -> Diagnostic {
     Diagnostic::new(
         Code::Unexpected,
@@ -529,6 +576,9 @@ fn clause(d: &Datum) -> Result<String> {
     if !symbol(h, "->") {
         return Err(bad(d, "a clause"));
     }
+    Ok(format!("{} -> {}", clause_head(p)?, expr(body)?))
+}
+fn clause_head(p: &Datum) -> Result<String> {
     let (p, guard) = match round(p) {
         Some([h, p, g]) if symbol(h, "?") => (p, Some(g)),
         _ => (p, None),
@@ -538,13 +588,12 @@ fn clause(d: &Datum) -> Result<String> {
         _ => pattern(p)?,
     };
     Ok(format!(
-        "{}{} -> {}",
+        "{}{}",
         patterns,
         guard
             .map(|g| expr(g).map(|s| format!(" ? {s}")))
             .transpose()?
             .unwrap_or_default(),
-        expr(body)?
     ))
 }
 fn pattern(d: &Datum) -> Result<String> {

@@ -11,6 +11,7 @@ use num_bigint::BigUint;
 
 mod comments;
 mod from_ast;
+pub mod syntax;
 mod to_ast;
 mod to_source;
 pub use from_ast::{print_module, print_with_comments};

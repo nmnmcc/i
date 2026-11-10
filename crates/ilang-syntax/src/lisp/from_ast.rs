@@ -308,6 +308,7 @@ fn segment<T>(s: &Segment<T>, f: impl Fn(&T) -> String) -> String {
 }
 fn expr(e: &Expr) -> String {
     match &e.kind {
+        ExprKind::Quote(d) => super::show(d),
         ExprKind::Int(n) => n.to_string(),
         ExprKind::Float(n) => float(*n),
         ExprKind::String(s) => string_literal(s),
@@ -400,6 +401,7 @@ fn clause_block(cs: &[Clause]) -> String {
 }
 fn pattern(p: &Pattern) -> String {
     match &p.kind {
+        PatternKind::Quote(d) => super::show(d),
         PatternKind::Var(s) | PatternKind::Discard(s) => s.clone(),
         PatternKind::Typed { binder, ty } => form(":", [binder.name.clone(), typ(ty)]),
         PatternKind::Named {

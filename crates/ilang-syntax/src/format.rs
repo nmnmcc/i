@@ -1156,6 +1156,7 @@ impl<'a> Formatter<'a> {
     fn expr_raw(&mut self, e: &Expr) -> Doc {
         let span = e.span;
         match &e.kind {
+            ExprKind::Quote(_) => panic!("quote has no normal-surface spelling"),
             ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_) => text(self.slice(span)),
             ExprKind::Name { module, name } => match module {
                 Some(m) => text(format!("{}.{}", m.name, name.name)),
@@ -1464,6 +1465,7 @@ impl<'a> Formatter<'a> {
     fn pattern_raw(&mut self, p: &Pattern, clause: bool) -> Doc {
         let span = p.span;
         match &p.kind {
+            PatternKind::Quote(_) => panic!("quote pattern has no normal-surface spelling"),
             PatternKind::Var(n) | PatternKind::Discard(n) => text(n.as_str()),
             PatternKind::Typed { binder, ty } => {
                 let t = if clause && ends_with_tuple(ty) {

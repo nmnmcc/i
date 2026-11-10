@@ -41,9 +41,11 @@ pub(crate) fn level(e: &Expr) -> u8 {
 /// An expression with no block, function, or `case` inside it.
 fn is_simple(e: &Expr) -> bool {
     match &e.kind {
-        ExprKind::Block(_) | ExprKind::Fn(_) | ExprKind::Case { .. } | ExprKind::Clauses(_) => {
-            false
-        }
+        ExprKind::Quote(_)
+        | ExprKind::Block(_)
+        | ExprKind::Fn(_)
+        | ExprKind::Case { .. }
+        | ExprKind::Clauses(_) => false,
         ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_) | ExprKind::Name { .. } => true,
         ExprKind::Tuple(items) => items.iter().all(is_simple),
         ExprKind::List { items, rest } => {
@@ -197,7 +199,11 @@ fn walk_expr(e: &Expr, f: &mut impl FnMut(&Expr)) {
         }
     };
     match &e.kind {
-        ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_) | ExprKind::Name { .. } => {}
+        ExprKind::Quote(_)
+        | ExprKind::Int(_)
+        | ExprKind::Float(_)
+        | ExprKind::String(_)
+        | ExprKind::Name { .. } => {}
         ExprKind::Tuple(items) => items.iter().for_each(f),
         ExprKind::List { items, rest } => items.iter().chain(rest.as_deref()).for_each(f),
         ExprKind::BitArray(segs) => {
@@ -518,6 +524,7 @@ impl Printer {
 
     fn expr_raw(&mut self, e: &Expr) {
         match &e.kind {
+            ExprKind::Quote(_) => panic!("quote has no normal-surface spelling"),
             ExprKind::Int(v) => self.w(&v.to_string()),
             ExprKind::Float(x) => self.w(&float(*x)),
             ExprKind::String(s) => self.w(&string_literal(s)),
@@ -687,6 +694,7 @@ impl Printer {
     /// comes after it.
     fn pattern(&mut self, p: &Pattern, clause: bool) {
         match &p.kind {
+            PatternKind::Quote(_) => panic!("quote pattern has no normal-surface spelling"),
             PatternKind::Var(n) | PatternKind::Discard(n) => self.w(n),
             PatternKind::Typed { binder, ty } => {
                 self.w(&format!("{}: ", binder.name));
