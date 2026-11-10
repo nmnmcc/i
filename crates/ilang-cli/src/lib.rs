@@ -1,6 +1,7 @@
 //! The pipeline behind the `i` command: load a package, check it, compile
 //! it to Wasm, optimize it with Binaryen, and run it with the Wasmtime host.
 
+pub mod macro_prepare;
 pub mod macro_run;
 
 use ilang_package::{Diagnostic, PackageGraph};

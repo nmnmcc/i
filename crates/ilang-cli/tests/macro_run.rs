@@ -114,3 +114,64 @@ fn expression_quote_is_compiled_and_keeps_unquote_identity() {
     assert_eq!(result.show(), "(f (f x))");
     assert!(items[1].identical(&original));
 }
+
+#[test]
+fn quote_splice_preserves_order_and_reuses_original_syntax() {
+    use ilang_syntax::lisp::syntax::Node;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(= quoted (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(f ~x ~..[x x] z)))\n").unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (mut parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let mut templates = Vec::new();
+    for (id, module) in parsed.iter_mut().enumerate() {
+        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+            &mut module.ast,
+            id as u32,
+            &mut templates,
+        );
+    }
+    let built = ilang_cli::macro_run::compile(&graph, &parsed, &[("app/main", "quoted")]).unwrap();
+    let original = input();
+    let result = ilang_cli::macro_run::invoke_with_templates(
+        &built,
+        "app/main.quoted",
+        &[original.clone()],
+        templates.into(),
+    )
+    .unwrap();
+    let Node::Round(items) = result.node() else {
+        panic!("quote did not return a round datum")
+    };
+    assert_eq!(result.show(), "(f (f x) (f x) (f x) z)");
+    assert!(items[1..4].iter().all(|item| item.identical(&original)));
+}
+
+#[test]
+fn prepares_and_executes_a_real_macro_binding() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, wrap)\n(@ macro (= wrap (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(wrapped ~x))))\n").unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (mut parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let prepared = ilang_cli::macro_prepare::prepare(&graph, &mut parsed).unwrap();
+    assert_eq!(prepared.bindings.len(), 1);
+    assert_eq!(prepared.bindings[0].name, "wrap");
+    assert_eq!(prepared.bindings[0].parameters, ["x"]);
+    let built = ilang_cli::macro_run::compile(&graph, &parsed, &[("app/macros", "wrap")]).unwrap();
+    let original = input();
+    let result = ilang_cli::macro_run::invoke_with_templates(
+        &built,
+        "app/macros.wrap",
+        &[original],
+        prepared.templates.into(),
+    )
+    .unwrap();
+    assert_eq!(result.show(), "(wrapped (f x))");
+}
