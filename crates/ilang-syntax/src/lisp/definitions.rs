@@ -3,6 +3,26 @@ use super::syntax::{Node, Scope, ScopeIdentity, Syntax, SyntaxError};
 use super::{Datum, DatumKind, parse};
 use crate::span::Span;
 
+/// Mark only the original parameterized head of a query answer. A parameter
+/// taken out of it cannot bind in another head; copies of the whole head carry
+/// this identity and freshening changes it together with all its parameters.
+fn mark_definition_head(definition: Syntax, answer: u64) -> Syntax {
+    let Node::Round(parts) = definition.node() else {
+        return definition;
+    };
+    let head = match parts.as_slice() {
+        [eq, _, _] if matches!(eq.node(), Node::Symbol(s) if s == "=") => 1,
+        [_, body] if matches!(body.node(), Node::Curly(_)) => 0,
+        _ => return definition,
+    };
+    if !matches!(parts[head].node(), Node::Round(_)) {
+        return definition;
+    }
+    let mut parts = parts.clone();
+    parts[head] = parts[head].with_definition_head(answer);
+    definition.replace_children(parts)
+}
+
 /// The written definition of a queryable built-in type. `answer` is fresh for
 /// each query so the type parameters in separate answers cannot capture one
 /// another. Every node is located at the query that caused this answer.
@@ -44,7 +64,10 @@ pub fn builtin_definition(name: &str, scope: &Scope, at: Span, answer: u64) -> O
         }
     }
     let document = parse(source).expect("compiler builtin definition must parse");
-    Some(convert(&document[0], scope, at, answer, name == "Result").as_answer())
+    Some(mark_definition_head(
+        convert(&document[0], scope, at, answer, name == "Result").as_answer(),
+        answer,
+    ))
 }
 
 /// Give a written type definition as a query answer with fresh identities for
@@ -156,7 +179,7 @@ pub fn source_definition(
         syntax.with_node(node)
     }
     let syntax = super::item_syntax(item, scope, source);
-    annotate(&syntax, &sites, answer).as_answer()
+    mark_definition_head(annotate(&syntax, &sites, answer).as_answer(), answer)
 }
 
 /// Freshen one copied definition's bound parameter identities as a unit.
@@ -191,7 +214,12 @@ pub fn freshen_parameters(definition: &Syntax, old_answer: u64, new_answer: u64)
             Node::Splice(x) => Node::Splice(walk(x, old_answer, new_answer)),
             leaf => leaf.clone(),
         };
-        syntax.with_node(node)
+        let rewritten = syntax.with_node(node);
+        if rewritten.definition_head() == Some(old_answer) {
+            rewritten.with_definition_head(new_answer)
+        } else {
+            rewritten
+        }
     }
     walk(definition, old_answer, new_answer)
 }
