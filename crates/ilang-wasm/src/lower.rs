@@ -499,6 +499,9 @@ pub fn lower_with_bindings(
     typed: &Typed,
     options: Options,
 ) -> Result<(ir::Program, Vec<serde_json::Value>), Vec<Diagnostic>> {
+    if !typed.coalescing_errors().is_empty() {
+        return Err(typed.coalescing_errors().to_vec());
+    }
     let mut l = Lowerer::new(graph, program, typed, options);
     l.run();
     if l.diags.is_empty() {

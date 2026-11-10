@@ -1,27 +1,17 @@
 {
-  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
-  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
+  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 3.0,
+  "bound_seconds": 10.0,
   "outcome": {
     "check": {
       "command": [
         "check",
         "--types"
       ],
-      "exit": 0,
-      "stdout": "app/main.get : () -> Int ! Dep\napp/main.use : () -> Int ! N | S(A & N)\napp/main.uset : () -> Int ! N | T(N)\napp/main.main : () -> Nil\n",
-      "stderr": ""
-    },
-    "test0": {
-      "command": [
-        "test",
-        "--opt",
-        "0"
-      ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "exit": 1,
+      "stdout": "app/main.get : () -> Int ! Dep\napp/main.use : () -> Int ! N | S(N)\napp/main.uset : () -> Int ! N | T(N)\napp/main.main : () -> Nil\n",
+      "stderr": "src/main.i:14:33: error[E0515]: `_` and `Dep` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 14:17 needs it)\n1 error\n"
     },
     "run0": {
       "command": [
@@ -31,17 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    "test2": {
-      "command": [
-        "test",
-        "--opt",
-        "2"
-      ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:14:33: error[E0515]: `_` and `Dep` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 14:17 needs it)\n1 error\n"
     },
     "run2": {
       "command": [
@@ -51,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "trap: wasm trap: cast failure\n"
+      "stderr": "src/main.i:14:33: error[E0515]: `_` and `Dep` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 14:17 needs it)\n1 error\n"
     }
   }
 }

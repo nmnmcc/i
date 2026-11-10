@@ -56,12 +56,11 @@
       "source_occurrences": 144,
       "preserved": 144,
       "projects": 144,
-      "rejected": 99,
-      "main_entries": 21,
-      "startup_entries_completed": 41,
-      "accepted": 41,
-      "library_or_test_entries": 20,
-      "timeout_or_crash": 4
+      "rejected": 30,
+      "main_entries": 85,
+      "startup_entries_completed": 114,
+      "accepted": 114,
+      "library_or_test_entries": 29
     },
     "review-k4c": {
       "tools_and_evidence": 1221,
@@ -69,12 +68,11 @@
       "preserved": 507,
       "already_present": 439,
       "projects": 507,
-      "library_or_test_entries": 157,
-      "startup_entries_completed": 210,
-      "accepted": 210,
-      "rejected": 295,
-      "main_entries": 53,
-      "timeout_or_crash": 2
+      "library_or_test_entries": 214,
+      "startup_entries_completed": 220,
+      "accepted": 220,
+      "rejected": 287,
+      "main_entries": 6
     },
     "review-k4d": {
       "tools_and_evidence": 746,
@@ -82,12 +80,11 @@
       "already_present": 593,
       "preserved": 365,
       "projects": 365,
-      "main_entries": 34,
-      "startup_entries_completed": 72,
-      "accepted": 72,
-      "rejected": 285,
-      "library_or_test_entries": 38,
-      "timeout_or_crash": 8
+      "main_entries": 24,
+      "startup_entries_completed": 175,
+      "accepted": 175,
+      "rejected": 190,
+      "library_or_test_entries": 151
     },
     "review-k4s": {
       "tools_and_evidence": 295,
@@ -95,12 +92,10 @@
       "preserved": 130,
       "already_present": 39,
       "projects": 129,
-      "library_or_test_entries": 18,
-      "startup_entries_completed": 18,
-      "accepted": 19,
-      "rejected": 108,
-      "main_entries": 1,
-      "timeout_or_crash": 2
+      "library_or_test_entries": 75,
+      "startup_entries_completed": 74,
+      "accepted": 75,
+      "rejected": 54
     },
     "review-native": {
       "tools_and_evidence": 13,
@@ -166,11 +161,11 @@
       "source_occurrences": 21,
       "preserved": 21,
       "projects": 21,
-      "rejected": 9,
-      "library_or_test_entries": 8,
-      "startup_entries_completed": 12,
-      "accepted": 12,
-      "main_entries": 4
+      "library_or_test_entries": 15,
+      "startup_entries_completed": 19,
+      "accepted": 19,
+      "main_entries": 4,
+      "rejected": 2
     },
     "review-std3": {
       "tools_and_evidence": 23,
@@ -187,7 +182,7 @@
       "preserved": 260,
       "projects": 260,
       "main_entries": 84,
-      "startup_entries_completed": 133,
+      "startup_entries_completed": 134,
       "accepted": 134,
       "library_or_test_entries": 50,
       "rejected": 126
@@ -201,402 +196,19 @@
       "library_or_test_entries": 132,
       "startup_entries_completed": 132,
       "accepted": 132
+    },
+    "review-k4-lane": {
+      "projects": 80,
+      "rejected": 20,
+      "main_entries": 60,
+      "startup_entries_completed": 60,
+      "accepted": 60
     }
   },
-  "optimization_pairs": 1066,
+  "optimization_pairs": 1598,
   "optimization_mismatches": [],
   "incidents": [
     {
-      "case": "review-k4/cases/provision_closure_False",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4/cases/provision_closure_False",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4/cases/provision_direct_False",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4/cases/provision_direct_False",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4/cases/provision_helper_False",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4/cases/provision_helper_False",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4/cases/provision_inferred_False",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4/cases/provision_inferred_False",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4/perf/generic_chain_2048",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4/perf/wide_2048",
-      "phase": "test2",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4/perf/wide_generic_1024",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4/perf/wide_generic_2048",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4/perf/wide_generic_512",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4c/cases/closure_statement",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/closure_statement",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_0_0_2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_0_0_2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_1_0_0",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_1_0_0",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_1_0_1",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_1_0_1",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_1_0_2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_1_0_2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_2_0_2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_2_0_2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_7_0_0",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_7_0_0",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_7_0_1",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_7_0_1",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_7_0_2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_0_7_0_2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_0_0_2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_0_0_2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_1_0_0",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_1_0_0",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_1_0_1",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_1_0_1",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_1_0_2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_1_0_2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_2_0_2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_2_0_2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_7_0_0",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_7_0_0",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_7_0_1",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_7_0_1",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_7_0_2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_2_7_0_2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_0_0_2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_0_0_2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_1_0_0",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_1_0_0",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_1_0_1",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_1_0_1",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_1_0_2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_1_0_2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_2_0_2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_2_0_2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_7_0_0",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_7_0_0",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_7_0_1",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_7_0_1",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_7_0_2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/missing_3_7_0_2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4c/cases/stress_wide_open_1024",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4c/cases/stress_wide_open_512",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
       "case": "review-k4d/_loose/fuzz/bad/run_44_188",
       "phase": "run0",
       "exit": "timeout",
@@ -621,258 +233,6 @@
       "stderr": ""
     },
     {
-      "case": "review-k4d/_loose/p/b4",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/b4",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/b7",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/b7",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/g_inf_SDep",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/g_inf_SDep",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/m3",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/m3",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/m4",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/m4",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/r2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/r2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/r3",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/r3",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/r6",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/_loose/p/r6",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/perf/mutual100",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4d/perf/mutual150",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4d/perf/mutual200",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4d/perf/mutual300",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4d/perf/mutual50",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4d/perf/runchain4000",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4d/perf/wideann200",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4d/perf/wideann80",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4d/proj/b4",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/b4",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/b7",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/b7",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/g_inf_SDep",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/g_inf_SDep",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/m3",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/m3",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/m4",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/m4",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/r2",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/r2",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/r3",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/r3",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/r6",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4d/proj/r6",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4s/min_main_6_0",
-      "phase": "run0",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
-      "case": "review-k4s/min_main_6_0",
-      "phase": "run2",
-      "exit": 1,
-      "stderr": "trap: wasm trap: cast failure\n"
-    },
-    {
       "case": "review-k4s/std",
       "phase": "test0",
       "exit": "timeout",
@@ -881,18 +241,6 @@
     {
       "case": "review-k4s/std",
       "phase": "test2",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4s/wide_plain_1024",
-      "phase": "check",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-k4s/wide_plain_512",
-      "phase": "check",
       "exit": "timeout",
       "stderr": ""
     },
@@ -910,18 +258,6 @@
     },
     {
       "case": "review-t1/stress-keys-10000",
-      "phase": "test0",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-t1/stress-keys-10000",
-      "phase": "test2",
-      "exit": "timeout",
-      "stderr": ""
-    },
-    {
-      "case": "review-t1/stress-keys-2000",
       "phase": "test2",
       "exit": "timeout",
       "stderr": ""
