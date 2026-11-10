@@ -621,3 +621,166 @@ Promotion commits identify the finding and enumerate each promoted case.
 Semantic requirements are promoted individually. The generated observations
 and known-failure report are regenerated together in the final derived-files
 commit, following the workspace's explicit generation rule.
+
+
+## Comparison with the type-inference references
+
+The requested note is absent from merged redesign d655684b despite the ledger
+calling it landed. I read docs/design/prior-art-types.md at immutable commit
+3beae77d706433c56f7a99b3a1f2a927f1119a6c (also the unchanged note-pa-types
+worktree), including §§1–3, 7.2, 8 and the numbered handoff recommendations.
+In its priority table, 1 and 2 are obligations/row roles, 3 is advisory
+equality (already inherited as W0503), and 8 is coverage-witness validation.
+Finite-bound normalization is priority 6. The four mechanisms specifically
+requested in this follow-up are compared below without renumbering that table.
+The cited code was read directly under .rd/ref, never edited, built or run.
+The comparisons are source-based; they do not claim a transferred theorem.
+
+### Handler obligations kept in schemes
+
+GHC/compiler/GHC/Tc/Solver.hs, simplifyInfer (944–1030), solves the captured
+wanted constraints, chooses quantified variables and predicates through
+decideQuantification, creates evidence variables for the chosen predicates,
+and calls emitResidualConstraints. That function (1044 onward) partitions
+constraints whose coercion variables must remain outside from the residual
+inner wanted set, then emits the latter in an implication with quantified
+skolems and given evidence. An obligation absent from the visible result
+type is still owned and discharged. The empty-wanted fast path is explicit.
+
+K4 uses that lifetime idea, not GHC's quantifier/evidence algorithm. VarState
+keeps handled forms separately from ordinary bounds; generalize retains the
+bounded scheme when it has obligations, and freshen/extrude copy them with
+the same map as visible variables. hidden_handlers checks that an annotation
+is valid for every permitted instance. This is narrower than a general
+qualified-scheme language: an annotation hiding the restriction in x1/z1 is
+rejected, rather than acquiring a new implicit surface predicate. A GHC-style
+qualified scheme could state such a premise explicitly; i has no such written
+constraint syntax, and F1 explicitly requires an annotation omitting the
+difference to prove the obligation for every instance. No additional accepted
+i case follows from GHC's greater expressiveness.
+
+A concrete language difference is GHC's own “Inferring principal types” note
+(867): f x = show [x] is assigned Show a => a -> String, whereas a caller
+with only Show [a] cannot use f even though it can use the inlined body.
+That is not an acceptable inference rule for i (§4.7). GHC also handles
+classes, higher-rank/partial signatures and coercion evidence that K4 does not.
+Its explicit residual-constraint container is a more general representation
+than K4's service-form list, but importing it would add machinery and language
+features rather than fix a demonstrated missing i case.
+
+### Row mode on variables and constructor parameters
+
+Koka/src/Type/Unify.hs, unifyEffect (375), extracts ordered labels, calls
+unifyLabels (419), extends missing tails and unifies them. Matching labels
+call unify on the entire label including its arguments; the remaining lists
+are substituted before continuing. unify recursively traverses ordinary
+applications (257), so nesting an effect row under another constructor does
+not switch its rule. unifyTVar (333) checks the variable kind before binding.
+The row role is structural/kinded rather than an accidental caller flag.
+
+K4 has the same equality-of-matching-label-arguments idea. Its inferred
+Value/Row/Env roles belong to variables and formal type parameters; a finite
+fixed point discovers formal roles, and an upgrade rechecks older bounds.
+conv_mode supplies the role before written algebra can merge constructors;
+freshen, extrusion, alias expansion and coalescing retain it. Koka's explicit
+kinded representation is simpler at each unification call. i has no explicit
+effect-kind declarations, so replacing the fixed point with that representation
+would require an additional language design. The distinguishing i cases are
+g_inf_SDep and direct_row: nesting the row cannot make its S arguments covariant.
+
+Koka handles duplicate effect extensions and distinct rigid heap-scope labels
+(the unmatched-label branch of unifyLabels). i intentionally has idempotent
+union and one form per service constructor; S(Dep) | S(Dep) is S(Dep), not
+two handler layers. Koka's labels also are not i's arbitrary scalar errors.
+Applying label equality to scalar error subtraction caused the real
+review-t1/error_rows regression above. The implemented correction follows
+i's §4.4 and rule 8; service forms still follow rule 4.
+
+### Entailed-bound removal before the occurs decision
+
+Simple-sub/shared/src/main/scala/simplesub/TypeSimplifier.scala, compactType
+(49), tracks polar variables in process and a separate parent chain. It
+returns an empty bound for a repeated variable still in that chain, removing
+a pure link cycle. Under Function/Record it resets parents: a later recurrence
+then gets a recursive binder in CompactTypeScheme.recVars. Its later
+canonicalizeType explicitly notes the powerset-style worst case.
+
+The common idea is to distinguish a cyclic graph from structural recursion.
+K4 additionally proves i's redundant inclusions before the finite-type check:
+A <: A | B, A - H <: A, and exact types proved by both bounds. It removes
+only entailed bounds, preserving handled forms separately. For example the
+constraint graph N <: A and A <: N | S(N) admits the finite A = N; it is not
+the equation A = N | S(N). q21 and its annotated/unannotated field/pattern
+variants are runnable programs distinguishing that finite case from the old
+occurs rejection. The same reductions are used when coalescing retries.
+
+The reference's cycle treatment is simpler and more permissive because it
+accepts regular recursive types. Its self-application term fun x -> x x can
+have a recursive domain type; the corresponding i function requires E0505.
+i's spec forbids that structural self-containment. Replacing an active i proof
+with a recursive binder would change the language, not complete this fix.
+No broader entailed-bound rule justified by these reads was found missing
+from a demonstrated accepted-fragment i program.
+
+### Coalescing, simplification and invariant sharing
+
+MLstruct/shared/src/main/scala/mlscript/TypeSimplifier.scala, simplifyType
+(318), counts occurrences at both polarities for invariant positions and
+records occursInvariantly. Its analysis and transform agree that a field
+whose lower and upper types are identical is invariant. transform (613)
+refuses normal polar bound inlining for such a variable, allocates a single
+renewal per old variable and copies the relevant bounds. Co-occurrence
+unification also merges the bounds and intersects opposite-polarity
+co-occurrence sets, rather than just renaming printed variables.
+
+MLstruct's ConstraintSolver.scala, freshenAbove (549), installs the fresh
+variable mapping before copying both bound lists, preserving sharing even
+when those lists are recursive. extrude (495) caches by variable and polarity,
+reverses function inputs, and uses TypeRange for invariant arguments. K4 uses
+the same shared-map and polar-level ideas. Its invariant traversal visits
+both polarities even after an equal Both has collapsed, and generalize keeps
+a raw bounded graph when Both or a handler restriction remains. Completed
+coalescing expansions are memoized by representative, polarity and row mode.
+An active constructor cycle is a diagnostic, not a completed cache result.
+The borrowed occurrence contexts still compute the same intersections; only
+a selected substitution is copied.
+
+MLstruct handles full negation, recursive types, TypeRange intervals and
+record lower/upper fields; i's current language does not. For example its
+TypeRef with an invariant parameter can expose an interval for independently
+extruded polar bounds, while i retains Both internally and requires the
+service's equal argument at use. The distinguishing current i regressions
+are alias_kind_env/error, latent_row and the nested invariant row-order unit
+test: fresh copies or one-sided simplification must not erase the shared
+argument equation. The reference's invariant-occurrence guard is a useful
+local rule already present in K4's traversal. Its richer interval/negation
+representation is not a simpler replacement under i's equality rule. No
+additional implementation change was made solely from the analogy.
+
+
+The complete QA audit also found 118 baseline-accepted programs that now
+reject: incompatible same-constructor services (including reordered groups,
+unused invalid callbacks and nested A/B rows) or unprovided entry services.
+The previously unclassified 68 cases now have explicit reject requirements
+and run-before-entry checks. Their source families were inspected separately
+from the observed diagnostics. Generic service conflict examples require
+S(Int) and S(String) in one row; missing_* entries install S(Dep) without
+providing Dep. The nested f2/f3/f4 examples require two incompatible A forms.
+These follow §4.5 rule 4 and §9.2, including unused invalid definitions.
+The new `run_stdout` requirements preserve the former explicit empty outputs
+and r4's four/three output, rather than deriving semantic assertions from
+fresh observations.
+
+Sixteen K4 resource cases complete: fourteen at the explicit ten-second
+capture budget, mutual300 and wide_generic_2048 at sixty seconds. The latter
+commands finish all checker/startup/O0/O2 phases; their total command times
+are about 75 seconds each, not isolated checker timings. An increased budget
+is an observation change, not evidence of a speedup. The catalogue separately
+measures the 100-function ring. The T1 stress-nested-50 known marker was
+already obsolete: its saved redesign observation has all phases at exit 0.
+Removing that marker is a metadata correction, not a K4 repair.
+
+Per-case actual.json files are diagnostic scratch, now ignored and removed
+from tracking in the derived-files commit. No expectation is removed: every
+expected.json stays checked, censored raw observations stay in those files,
+and the original QA revision retains the historical diagnostic scratch.

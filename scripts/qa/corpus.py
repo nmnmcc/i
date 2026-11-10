@@ -280,6 +280,14 @@ def observe_in(binary, case, bound, runtime):
 
 def select(args):
     cases = json.loads((CORPUS / 'manifest.json').read_text())['cases']
+    if getattr(args, 'case_list', None):
+        names = json.loads(args.case_list.read_text())
+        if not isinstance(names, list) or not names or not all(isinstance(n, str) for n in names):
+            raise SystemExit('case-list must be a nonempty JSON list of case IDs')
+        missing = set(names) - {c['id'] for c in cases}
+        if missing:
+            raise SystemExit('unknown cases: ' + ', '.join(sorted(missing)))
+        cases = [c for c in cases if c['id'] in names]
     cases = [c for c in cases if args.filter in c['id']]
     if not cases:
         raise SystemExit('no cases selected')
@@ -321,15 +329,15 @@ def run_corpus(args):
             case = dict(case, run_rejected=True)
         bound = args.timeout
         saved = ROOT / case['project'] / 'expected.json'
-        if not update and saved.exists():
+        if (not update or args.keep_bounds) and saved.exists():
             bound = json.loads(saved.read_text()).get('bound_seconds', 3)
-        return case, observe(args.binary, case, bound)[0]
+        return case, observe(args.binary, case, bound)[0], bound
     pool = ThreadPoolExecutor(max_workers=args.jobs)
-    for n, (case, result) in enumerate(pool.map(observe_case, cases)):
+    for n, (case, result, bound) in enumerate(pool.map(observe_case, cases)):
         applicable = [r for r in requirements['requirements'] if re.search(r['pattern'], case['id'])]
         expected_path = ROOT / case['project'] / 'expected.json'
         if update:
-            dump(expected_path, {'compiler': revision, 'binary_sha256': binary_digest, 'kind': 'observation; semantic requirements are separate', 'bound_seconds': args.timeout, 'outcome': result})
+            dump(expected_path, {'compiler': revision, 'binary_sha256': binary_digest, 'kind': 'observation; semantic requirements are separate', 'bound_seconds': bound, 'outcome': result})
         elif not expected_path.exists():
             failures.append(case['id'] + ': missing expected.json')
         else:
@@ -371,6 +379,9 @@ def run_corpus(args):
                 met = met and bool(actual_codes.intersection(requirement['diagnostic_codes'])) and 'E0505' not in actual_codes
             for fragment in requirement.get('types_contain', []):
                 met = met and fragment in check['stdout']
+            if 'run_stdout' in requirement:
+                met = met and all(phase in result and result[phase]['stdout'] == requirement['run_stdout']
+                                  for phase in ['run0', 'run2'])
             if requirement.get('known_failure'):
                 summary['completed-resource-case' if met and requirement.get('censored') else 'XPASS' if met else 'XFAIL'] += 1
                 if met and not update and not requirement.get('censored'):
@@ -651,8 +662,10 @@ def main():
     run = sub.add_parser('run')
     run.add_argument('--binary', type=Path, default=ROOT / 'target/release/i')
     run.add_argument('--filter', default='')
+    run.add_argument('--case-list', type=Path)
     run.add_argument('--timeout', type=float, default=10)
     run.add_argument('--missing-only', action='store_true')
+    run.add_argument('--keep-bounds', action='store_true', help='retain each saved observation budget during UPDATE=1')
     run.add_argument('--jobs', type=int, default=1)
     sub.add_parser('parse-register')
     migration = sub.add_parser('migrate-k4')

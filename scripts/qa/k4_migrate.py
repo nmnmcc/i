@@ -124,6 +124,8 @@ def migrate(binary):
             record = {'name': name, 'case': case['id'], 'outcome': 'reject' if diagnostic else 'accept'}
             if diagnostic:
                 record['diagnostic_codes'] = [diagnostic]
+            else:
+                record['run_stdout'] = 'four\nthree\n' if name == 'r4' else ''
             if re.fullmatch(r'q\d+', name):
                 record['types_contain'] = [f'app/main.{binding} : () -> Int ! N | S(N)' for binding in ['use', 'fw']]
             records.append(record)

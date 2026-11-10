@@ -161,3 +161,13 @@ execute preserved independent-review drivers. `k4-migration.json` records all
 reused and 80 entry/annotation variants are added. Original review payloads
 remain byte-for-byte intact for the integrity audit. The old K4 runners and
 fixture copies are removed; generation and timing use the QA commands above.
+
+
+For a targeted promotion, `run --case-list cases.json` selects a nonempty
+JSON list of registered IDs and rejects missing IDs. With UPDATE=1,
+`--keep-bounds` retains each saved observation budget; otherwise --timeout
+sets the capture budget. An optional requirement `run_stdout` asserts exact
+main output at both optimization levels, independently of expected.json.
+Per-case actual.json files are ignored diagnostic scratch; committed
+expected.json retains bounded observations, and the historical baseline
+remains available at its recorded revision.
