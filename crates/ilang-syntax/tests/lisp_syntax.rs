@@ -231,3 +231,72 @@ fn marking_preserves_shared_value_identity_across_arguments() {
     assert!(parts[0].identical(&parts[1]));
     assert!(parts[0].identical(&marked[1]));
 }
+
+#[test]
+fn expansion_runs_mark_arguments_and_freshen_templates() {
+    use ilang_syntax::lisp::expansion::ExpansionSession;
+    use ilang_syntax::lisp::syntax::{Node, Syntax};
+    let argument = root("x");
+    let template = root("y");
+    let mut session = ExpansionSession::default();
+    let result = session
+        .run(
+            std::slice::from_ref(&argument),
+            &argument,
+            |args| {
+                Syntax::make(
+                    Node::Round(vec![args[0].clone(), template.clone()]),
+                    &template,
+                )
+            },
+            |_, result| Ok(result),
+        )
+        .unwrap();
+    let Node::Round(parts) = result.node() else {
+        panic!("expected round")
+    };
+    assert_eq!(parts[0].scope(), argument.scope());
+    assert_eq!(parts[1].scope().marks.len(), 1);
+    let another = session
+        .run(
+            &[],
+            &argument,
+            |_| Ok(template.clone()),
+            |_, result| Ok(result),
+        )
+        .unwrap();
+    assert_ne!(parts[1].scope().marks, another.scope().marks);
+}
+
+#[test]
+fn expansion_depth_is_bounded_and_restored_after_failure() {
+    use ilang_syntax::lisp::expansion::ExpansionSession;
+    use ilang_syntax::lisp::syntax::{Syntax, SyntaxError};
+    fn nested(
+        session: &mut ExpansionSession,
+        value: &Syntax,
+        n: usize,
+    ) -> Result<Syntax, SyntaxError> {
+        session.run(
+            &[],
+            value,
+            |_| Ok(value.clone()),
+            |session, result| {
+                if n == 0 {
+                    Ok(result)
+                } else {
+                    nested(session, value, n - 1)
+                }
+            },
+        )
+    }
+    let value = root("x");
+    let mut session = ExpansionSession::default();
+    assert!(
+        nested(&mut session, &value, 256)
+            .unwrap_err()
+            .message
+            .contains("256")
+    );
+    nested(&mut session, &value, 1).unwrap();
+}

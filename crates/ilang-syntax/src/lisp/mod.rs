@@ -11,6 +11,7 @@ use num_bigint::BigUint;
 
 mod comments;
 mod encode;
+pub mod expansion;
 mod from_ast;
 pub mod syntax;
 mod to_ast;
