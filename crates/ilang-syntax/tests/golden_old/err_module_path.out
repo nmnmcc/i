@@ -1,0 +1,2 @@
+--- errors ---
+E0104 @1:9 a module path has at least two parts, as in `i/fail`

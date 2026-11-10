@@ -1,0 +1,5 @@
+a = 1
+
+b = 2
+--- errors ---
+E0103 @2:1 `import` and `export` come first in a file, `import` before `export`, at most once each

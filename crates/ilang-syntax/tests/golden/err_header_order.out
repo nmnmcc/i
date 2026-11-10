@@ -1,0 +1,5 @@
+(main)
+
+main = 1
+--- errors ---
+E0115 @2:1 the imports come before the exports

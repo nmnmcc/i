@@ -1,0 +1,4 @@
+f = () {
+}
+--- errors ---
+E0106 @1:10 a discard binds nothing, so it may not be used as a value

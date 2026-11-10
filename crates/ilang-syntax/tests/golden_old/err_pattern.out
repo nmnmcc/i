@@ -1,0 +1,10 @@
+f = (x) {
+  case x {}
+}
+
+g = (x) {
+  case x {}
+}
+--- errors ---
+E0108 @1:21 in a pattern, `-` comes before an int literal and `-.` before a float literal
+E0108 @2:21 in a pattern, `-` comes before an int literal and `-.` before a float literal

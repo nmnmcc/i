@@ -1,0 +1,11 @@
+a = v |> {}
+
+b = v |> {
+  0 -> 1
+}
+
+c = case v {}
+--- errors ---
+E0101 @1:14 a guard in a clause block is written with `?`
+E0101 @2:22 a guard in a clause block is written with `?`
+E0101 @3:16 expected `->`, found `?`

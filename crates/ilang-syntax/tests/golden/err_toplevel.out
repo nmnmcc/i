@@ -1,4 +1,6 @@
+f(x)
+
 Some(x) = y
---- errors ---
-E0101 @1:1 expected an item: a type definition, or a binding `pattern = value`, found `f`
-E0101 @4:3 expected `:`, found `=`
+
+@external("m", "f")
+g = 1
