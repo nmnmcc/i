@@ -432,6 +432,11 @@ deferred = () -> Nil ! Assert {
   Nil
 }
 @test
+macro_error = () -> Nil ! Assert {
+  fail.catch(() { syntax._report_error("macro failed", syntax._template(1)) })
+  Nil
+}
+@test
 compile_error = () -> Nil ! Assert {
   ! syntax.Definitions = syntax._definitions()
   fail.catch(() { syntax.definition(syntax._template(3)) })
@@ -463,7 +468,13 @@ compile_error = () -> Nil ! Assert {
         )
         .unwrap();
         let program = built.host_program().unwrap();
-        for name in ["answer", "catchable", "deferred", "compile_error"] {
+        for name in [
+            "answer",
+            "catchable",
+            "deferred",
+            "compile_error",
+            "macro_error",
+        ] {
             let answer = templates[4].clone();
             let context = Arc::new(DefinitionContext::new(move |of| match of.show().as_str() {
                 "Box" => DefinitionReply::Answer(answer.clone()),
@@ -501,6 +512,12 @@ compile_error = () -> Nil ! Assert {
                     assert!(!matches!(result, ilang_host::TestResult::Passed));
                     assert!(
                         matches!(context.take_abort(), Some(DefinitionAbort::Deferred { at }) if at.show() == "Waiting")
+                    );
+                }
+                "macro_error" => {
+                    assert!(!matches!(result, ilang_host::TestResult::Passed));
+                    assert!(
+                        matches!(context.take_abort(), Some(DefinitionAbort::MacroError { message, at }) if message == "macro failed" && at.show() == "Hidden")
                     );
                 }
                 "compile_error" => {

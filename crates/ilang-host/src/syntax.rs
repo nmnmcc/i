@@ -32,6 +32,7 @@ pub enum DefinitionReply {
 pub enum DefinitionAbort {
     Deferred { at: Syntax },
     CompileError { message: String, at: Syntax },
+    MacroError { message: String, at: Syntax },
 }
 
 type DefinitionCallback = dyn Fn(&Syntax) -> DefinitionReply + Send + Sync;
@@ -435,6 +436,23 @@ pub fn install_with_context(
     for &name in NAMES {
         imports.external("i:compiler/syntax/v1", name, move |args| invoke(name, args))?;
     }
+    let report_context = definition.clone();
+    imports.external("i:compiler/syntax/v1", "report_error", move |args| {
+        let [message, at] = args else {
+            bail!("macro error reporter expects message and syntax")
+        };
+        let context = report_context
+            .as_ref()
+            .expect("compiler instance has no macro run context");
+        *context
+            .abort
+            .lock()
+            .expect("definition context lock poisoned") = Some(DefinitionAbort::MacroError {
+            message: text(message)?.to_owned(),
+            at: get::<Syntax>(at)?.clone(),
+        });
+        bail!("macro reported a syntax error")
+    })?;
     imports.external("i:compiler/syntax/v1", "definition", move |args| {
         let [value] = args else {
             bail!("definition resolver expects one syntax value")

@@ -24,6 +24,7 @@
 	_match_one
 	_match_many
 	_definitions
+	_report_error
 )
 
 Syntax {}
@@ -88,6 +89,9 @@ definition = (
 	of: Syntax
 	service ! Definitions
 ) -> Syntax ^ SyntaxError ! Definitions { service.definition(of) }
+
+@external("i:compiler/syntax/v1", "report_error")
+_report_error: (String, Syntax) -> Syntax
 
 @external("i:compiler/syntax/v1", "definition")
 raw_definition: (Syntax) -> DefinitionResult
