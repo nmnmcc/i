@@ -27,13 +27,22 @@ pub(super) fn transfer(
         .collect();
     let mut positions = Vec::with_capacity(candidates.len());
     let mut cursor = 0;
-    for (_, text) in &candidates {
+    let mut previous = None;
+    for (span, text) in &candidates {
+        if previous.is_some_and(|start| span.start > start) && cursor < output.len() {
+            cursor += output[cursor..]
+                .chars()
+                .next()
+                .expect("cursor before end")
+                .len_utf8();
+        }
         let position = output[cursor..]
             .match_indices(text)
             .map(|(offset, _)| cursor + offset)
             .find(|pos| starts.contains(pos));
         if let Some(pos) = position {
             cursor = pos;
+            previous = Some(span.start);
         }
         positions.push(position);
     }

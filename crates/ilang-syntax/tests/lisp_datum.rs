@@ -119,6 +119,18 @@ fn comment_anchors_do_not_match_text_inside_documentation() {
 }
 
 #[test]
+fn comments_remain_with_repeated_statements() {
+    let source = "f = () {\n// first\nlog(1)\n// second\nlog(1)\nNil\n}\n";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let (out, lost) = ilang_syntax::lisp::print_with_comments(source, &module);
+    assert!(lost.is_empty(), "{lost:?}");
+    assert!(out.contains("// first\n(log 1)"), "{out}");
+    assert!(out.contains("// second\n(log 1)"), "{out}");
+    assert!(out.find("// first").unwrap() < out.find("// second").unwrap());
+}
+
+#[test]
 fn dots_and_spreads_are_separate_datums() {
     let xs = parse("(. a 12) [1 .. x] <<1 (: 2 u8)>>").unwrap();
     let DatumKind::Round(parts) = &xs[0].kind else {
