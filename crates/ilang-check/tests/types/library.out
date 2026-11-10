@@ -63,6 +63,7 @@ i/random.zeros : (h: State, count: Int) -> State
 i/random.follow : (h: State, bits: List(Int)) -> State
 i/random.derive_path : (g: Generator, path: List(Int)) -> Generator
 i/random.at_path : (g: Generator, path: List(Int)) -> Generator ? RandomError
+i/syntax.definition : (of: Syntax) -> Syntax ? SyntaxError ! Definitions
 i/syntax.raw_kind : (Syntax) -> Int
 i/syntax.raw_text : (Syntax) -> String
 i/syntax.raw_int : (Syntax) -> Int
