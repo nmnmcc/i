@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "requirements": [
+    {
+      "pattern": "^review-k4d/(?:proj|_loose/p)/(?:x1|x4|x6|x7|x8|z1|z4)$",
+      "known_failure": true,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index"
+    },
+    {
+      "pattern": "^review-k4d/(?:proj|_loose/p)/(?:g_(?:ann|inf)_SDep|m3|m4|r6)$",
+      "known_failure": true,
+      "outcome": "reject",
+      "finding": "K4d F2: hidden Dep obligation must remain in the entry environment and be rejected when not supplied",
+      "source": "docs/spec.md §4.5 rule 4: every member of N is a type variable that is a subtype of M, or has a member of M with the same type constructor and equal type arguments and the same value set; §9.2: The environment that a function needs is the union of the environments that its calls need",
+      "origin": "review-k4d/criteria.md C1/C5 and Result index"
+    },
+    {
+      "pattern": "^review-k4d/(?:proj|_loose/p)/(?:q2[1-5]|q3[1-9]|q40|r4|w6|w7|w14|w15|w16)$",
+      "known_failure": true,
+      "outcome": "accept",
+      "finding": "K4d F3: finite generic service/field-access types must not be rejected as structural recursion",
+      "source": "docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance",
+      "origin": "review-k4d/criteria.md C2/C4 and Result index"
+    },
+    {
+      "pattern": "^review-k4s/soundness$",
+      "known_failure": true,
+      "outcome": "reject",
+      "finding": "K4s P1: annotated local function must not erase an unprovided service from main",
+      "source": "docs/spec.md §4.5 rule 4 and §9.2; review-k4s/review-summary.json records expected E0522, with E0505 on its historical baseline",
+      "origin": "review-k4s/soundness/src/main.i"
+    },
+    {
+      "pattern": "^review-rec/",
+      "known_failure": true,
+      "outcome": "held",
+      "finding": "T3 exact-record syntax and substitution tests are specified but not implemented",
+      "source": "docs/design/records.md; ledger 2026-11-11: T3 implementation is held until prior-art-types.md reports",
+      "origin": "review-rec plus committed lane/note-rec models"
+    }
+  ],
+  "transitions": [
+    {
+      "diagnostic": "E0520",
+      "track": "W520",
+      "source": "ledger 2026-11-11: E0520 becomes a warning",
+      "policy": "Every observation mentioning E0520 is a marked baseline transition, not a required rejection. Regenerate only after checking the warning and acceptance against the rule."
+    }
+  ]
+}

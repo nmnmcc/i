@@ -1,0 +1,337 @@
+"""Permanent review fixtures, using the public CLI's existing test commands."""
+import argparse
+import collections
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import runpy
+import shutil
+import signal
+import subprocess
+import tempfile
+import time
+import tomllib
+
+ROOT = Path(__file__).resolve().parents[2]
+CORPUS = ROOT / 'tests/review'
+SKIP = {'.git', 'target', 'base-target', 'venv', 'node_modules', 'syntax-debug'}
+SNAPSHOTS = {'base-src', 'redesign', 'mutation', 'baseline-check', 'after-check', 'before-check'}
+TEXT = {'.py', '.mjs', '.js', '.sh', '.rs', '.c', '.cpp', '.wat', '.md', '.txt', '.json', '.jsonl', '.log', '.out', '.types', '.stderr', '.diff'}
+SOURCES = {
+    'review-a1': 'docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12',
+    'review-t1': 'docs/spec.md §§4.2, 4.8, 7.4: literal sets and coverage',
+    'review-t2': 'docs/spec.md §§2.5, 4.3, 4.7: completed value types',
+    'review-k4': 'docs/spec.md §§4.5 rule 4, 4.7, 9.2: equal service arguments and principal inference',
+    'review-rec': 'docs/design/records.md; T3 is held in the ledger',
+}
+
+
+def dump(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + '\n')
+
+
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def git(*args):
+    return subprocess.check_output(['git', *args], cwd=ROOT, text=True).strip()
+
+
+def source_for(review):
+    return SOURCES.get(review, SOURCES['review-k4'] if review.startswith('review-k4') else 'docs/spec.md §§10–11; review criteria preserved under tools/')
+
+
+def walk(root):
+    for directory, dirs, files in os.walk(root):
+        dirs[:] = sorted(d for d in dirs if d not in SKIP)
+        for name in sorted(files):
+            p = Path(directory) / name
+            if not p.is_symlink():
+                yield p
+
+
+def import_reviews(args):
+    """Preserve bytes first. Never execute historical scripts or copy build products."""
+    if os.environ.get('UPDATE') != '1':
+        raise SystemExit('import requires UPDATE=1')
+    tracked = collections.defaultdict(list)
+    for name in git('ls-files').splitlines():
+        p = ROOT / name
+        if p.is_file() and p.suffix in {'.i', '.py', '.mjs', '.rs'}:
+            tracked[sha(p.read_bytes())].append(name)
+    roots = sorted(Path(args.source).glob('review-*'))
+    if not roots:
+        raise SystemExit('no review directories')
+    index = {'schema': 1, 'source_root': str(Path(args.source)), 'compiler_base': git('rev-parse', 'HEAD'), 'programs': [], 'tools': [], 'excluded': []}
+    projects = {}
+    for review in roots:
+        for p in walk(review):
+            rel = p.relative_to(review)
+            if p.suffix != '.i':
+                if p.suffix in TEXT and not any(x in SNAPSHOTS for x in rel.parts):
+                    data = p.read_bytes()
+                    if len(data) > 4_000_000 or b'\0' in data:
+                        index['excluded'].append({'origin': str(p), 'reason': 'large log or binary; not a program'})
+                        continue
+                    # Historical host drivers are data, not active repository snippets.
+                    target = CORPUS / 'tools' / review.name / (str(rel) + ('.source' if p.suffix in {'.rs', '.mjs', '.js', '.sh', '.md'} else ''))
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(data)
+                    index['tools'].append({'origin': str(p), 'path': str(target.relative_to(ROOT)), 'sha256': sha(data)})
+                continue
+            data = p.read_bytes()
+            entry = {'origin': str(p), 'sha256': sha(data), 'source': source_for(review.name)}
+            matches = tracked.get(sha(data), [])
+            if matches:
+                entry['existing'] = matches
+                index['programs'].append(entry)
+                continue
+            if any(x in SNAPSHOTS for x in rel.parts):
+                # Retain changed snapshot sources as well; origins distinguish them.
+                entry['snapshot'] = True
+            parent = p.parent
+            while parent != review and not (parent / 'i.toml').exists():
+                parent = parent.parent
+            if not (parent / 'i.toml').exists():
+                parent = None
+            if parent:
+                key = str(parent)
+                module = str(p.relative_to(parent))
+            else:
+                key = str(p)
+                module = 'src/main.i'
+            project = projects.setdefault(key, {'origin': key, 'review': review.name, 'files': {}, 'origins': [], 'source': source_for(review.name)})
+            project['files'][module] = data.decode()
+            project['origins'].append(entry)
+            if parent:
+                project['files']['i.toml'] = (parent / 'i.toml').read_text()
+            else:
+                project['files']['i.toml'] = 'name = "app"\n'
+            index['programs'].append(entry)
+    # Keep a complete mirrored package tree so relative cross-package paths survive.
+    locations = {}
+    for origin, project in projects.items():
+        review = project['review']
+        base = Path(args.source) / review
+        rel = Path(origin).relative_to(base)
+        if Path(origin).suffix == '.i':
+            rel = Path('_loose') / rel.with_suffix('')
+        locations[origin] = CORPUS / 'cases' / review / rel
+    cases = []
+    for origin, project in sorted(projects.items()):
+        if Path(origin).is_dir():
+            for directory in ['src', 'test']:
+                for module_path in sorted((Path(origin) / directory).rglob('*.i')):
+                    project['files'][str(module_path.relative_to(origin))] = module_path.read_text()
+        path = locations[origin]
+        if path == CORPUS / 'cases' / project['review']:
+            path = path / '_root'
+            locations[origin] = path
+        manifest = project['files']['i.toml']
+        def dependency(match):
+            old = match[2]
+            dep = (Path(origin) / old).resolve() if not Path(old).is_absolute() else Path(old)
+            if str(dep) in locations:
+                new = os.path.relpath(locations[str(dep)], path)
+            elif dep.name == 'std' or str(dep).endswith('/std'):
+                new = os.path.relpath(ROOT / 'std', path)
+            elif dep.is_dir() and (dep / 'i.toml').is_file():
+                # Installed review dependencies outside /tmp need an explicit escalation.
+                new = old
+                index['excluded'].append({'origin': origin, 'dependency': old, 'reason': 'external dependency; source not owned by this review'})
+            else:
+                new = old
+            return match[1] + json.dumps(new)
+        manifest = re.sub(r'(\bpath\s*=\s*)[\"\']([^\"\']+)[\"\']', dependency, manifest)
+        project['files']['i.toml'] = manifest
+        for name, data in project['files'].items():
+            target = path / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(data)
+        case_id = str(path.relative_to(CORPUS / 'cases'))
+        cases.append({'id': case_id, 'project': str(path.relative_to(ROOT)), 'origin': origin, 'source': project['source'], 'finding': Path(origin).stem, 'files': [x for x in project['files'] if x.endswith('.i')]})
+        for entry in project['origins']:
+            entry['case'] = case_id
+    # Record models are review tools; read their committed versions, not another worktree.
+    for name in git('ls-tree', '-r', '--name-only', 'lane/note-rec', '--', 'tests').splitlines():
+        if name.endswith('.py') and '/t3-' in name:
+            data = subprocess.check_output(['git', 'show', 'lane/note-rec:' + name], cwd=ROOT)
+            dest = CORPUS / 'tools/record-models' / Path(name).name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
+            index['tools'].append({'origin': 'lane/note-rec:' + name, 'path': str(dest.relative_to(ROOT)), 'sha256': sha(data)})
+    dump(CORPUS / 'inventory.json', index)
+    dump(CORPUS / 'manifest.json', {'schema': 1, 'cases': cases})
+    print(f'imported {len(cases)} projects, {len(index["programs"])} source occurrences, {len(index["tools"])} tools/evidence files')
+
+
+def invoke(binary, project, command, bound):
+    argv = [str(binary), *command, '--offline', '--project', str(project)]
+    started = time.monotonic()
+    env = dict(os.environ, NO_COLOR='1', TERM='dumb')
+    with subprocess.Popen(argv, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True) as process:
+        try:
+            stdout, stderr = process.communicate(timeout=bound)
+            code = process.returncode
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            stdout, stderr = process.communicate()
+            code = 'timeout'
+    def normalize(data):
+        text = data.decode(errors='replace').replace(str(project), '<project>').replace(str(ROOT), '<repo>')
+        text = re.sub(r'\x1b\[[0-9;]*m', '', text)
+        return text
+    return {'command': command, 'exit': code, 'stdout': normalize(stdout), 'stderr': normalize(stderr)}, time.monotonic() - started
+
+
+def observe(binary, case, bound):
+    project = ROOT / case['project']
+    check, elapsed = invoke(binary, project, ['check', '--types'], bound)
+    result = {'check': check}
+    if check['exit'] == 0:
+        text = '\n'.join((project / f).read_text() for f in case['files'])
+        for opt in [0, 2]:
+            test, _ = invoke(binary, project, ['test', '--opt', str(opt)], bound)
+            result['test' + str(opt)] = test
+            if re.search(r'(?m)^\s*@main\b', text):
+                run, _ = invoke(binary, project, ['run', '--opt', str(opt)], bound)
+                result['run' + str(opt)] = run
+    return result, elapsed
+
+
+def select(args):
+    cases = json.loads((CORPUS / 'manifest.json').read_text())['cases']
+    cases = [c for c in cases if args.filter in c['id']]
+    if not cases:
+        raise SystemExit('no cases selected')
+    return cases
+
+
+def run_corpus(args):
+    update = os.environ.get('UPDATE') == '1'
+    failures = []
+    summary = collections.Counter()
+    cases = select(args)
+    requirements = json.loads((CORPUS / 'requirements.json').read_text())
+    for n, case in enumerate(cases):
+        expected_path = ROOT / case['project'] / 'expected.json'
+        result, _ = observe(args.binary, case, args.timeout)
+        if update:
+            dump(expected_path, {'compiler': git('rev-parse', 'HEAD'), 'binary_sha256': sha(args.binary.read_bytes()), 'kind': 'observation; semantic requirements are separate', 'outcome': result})
+        elif not expected_path.exists():
+            failures.append(case['id'] + ': missing expected.json')
+        else:
+            old = json.loads(expected_path.read_text())['outcome']
+            if old != result:
+                failures.append(case['id'] + ': full output changed')
+                dump(ROOT / case['project'] / 'actual.json', result)
+        summary[str(result['check']['exit'])] += 1
+        for requirement in requirements['requirements']:
+            if not re.search(requirement['pattern'], case['id']):
+                continue
+            wanted = requirement['outcome']
+            check = result['check']
+            if wanted == 'reject':
+                met = check['exit'] == 1 and 'error[' in check['stderr'] and 'panicked at' not in check['stderr']
+            elif wanted == 'accept':
+                met = check['exit'] == 0 and all(value['exit'] == 0 for value in result.values())
+            else:
+                met = False
+            if requirement.get('known_failure'):
+                summary['XPASS' if met else 'XFAIL'] += 1
+                if met and not update:
+                    failures.append(case['id'] + ': XPASS; promote the requirement')
+            elif not met:
+                failures.append(case['id'] + ': required ' + wanted)
+        if result['check']['exit'] == 'timeout' or (isinstance(result['check']['exit'], int) and result['check']['exit'] < 0) or 'panicked at' in result['check']['stderr']:
+            summary['checker-crash-or-timeout'] += 1
+        if (n + 1) % 50 == 0:
+            print(f'{n+1}/{len(cases)} {dict(summary)}', flush=True)
+    print(json.dumps({'selected': len(cases), 'checks': dict(summary), 'failures': failures}, indent=2))
+    if failures:
+        raise SystemExit(1)
+
+
+def register_parses(args):
+    if os.environ.get('UPDATE') != '1':
+        raise SystemExit('parse-register requires UPDATE=1')
+    scanner = runpy.run_path(str(ROOT / 'scripts/old-syntax-check'))
+    files = sorted((CORPUS / 'cases').rglob('*.i'))
+    sources = [re.sub(r'(?m)^// old-syntax-check:.*\n?', '', p.read_text()) for p in files]
+    results = scanner['parse'](sources)
+    config_path = ROOT / 'scripts/old-syntax-check.json'
+    config = json.loads(config_path.read_text())
+    invalid = 0
+    for path, source, diagnostics in zip(files, sources, results):
+        if not diagnostics:
+            continue
+        relative = str(path.relative_to(ROOT))
+        key = scanner['identity'](relative, source)
+        config[key] = {'reason': 'Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.', 'diagnostics': diagnostics}
+        if '/review-rec/' in relative:
+            config[key]['track'] = 'T3'
+        else:
+            marker = '// old-syntax-check: ' + ','.join(d.split(':', 1)[0] for d in diagnostics) + '\n'
+            path.write_text(marker + source)
+        invalid += 1
+    dump(config_path, config)
+    print(f'{len(files)} review modules parsed, {invalid} exact negative fixtures registered')
+
+
+def report(args):
+    inventory = json.loads((CORPUS / 'inventory.json').read_text())
+    manifest = json.loads((CORPUS / 'manifest.json').read_text())
+    counts = collections.defaultdict(collections.Counter)
+    incidents = []
+    for entry in inventory['programs']:
+        review = Path(entry['origin']).parts[2]
+        counts[review]['source_occurrences'] += 1
+        counts[review]['already_present' if 'existing' in entry else 'preserved'] += 1
+    for case in manifest['cases']:
+        p = ROOT / case['project'] / 'expected.json'
+        review = case['id'].split('/')[0]
+        counts[review]['projects'] += 1
+        if not p.exists():
+            counts[review]['not_captured'] += 1
+            continue
+        result = json.loads(p.read_text())['outcome']
+        check = result['check']
+        counts[review]['accepted' if check['exit'] == 0 else 'rejected' if check['exit'] == 1 else 'timeout_or_crash'] += 1
+        if 'E0520' in check['stderr']:
+            counts[review]['W520_transition'] += 1
+        for phase, value in result.items():
+            if value['exit'] == 'timeout' or isinstance(value['exit'], int) and value['exit'] < 0 or 'trap' in value['stderr'] or 'panicked at' in value['stderr']:
+                incidents.append({'case': case['id'], 'phase': phase, 'exit': value['exit'], 'stderr': value['stderr'][:1000]})
+    dump(CORPUS / 'summary.json', {'counts': counts, 'incidents': incidents, 'exclusions': inventory['excluded']})
+    print(json.dumps({'counts': counts, 'incidents': len(incidents)}, indent=2))
+
+
+def main():
+    parser = argparse.ArgumentParser(__doc__)
+    sub = parser.add_subparsers(dest='mode', required=True)
+    imp = sub.add_parser('import')
+    imp.add_argument('--source', default='/tmp')
+    run = sub.add_parser('run')
+    run.add_argument('--binary', type=Path, default=ROOT / 'target/release/i')
+    run.add_argument('--filter', default='')
+    run.add_argument('--timeout', type=float, default=10)
+    sub.add_parser('parse-register')
+    sub.add_parser('report')
+    args = parser.parse_args()
+    if args.mode == 'import':
+        import_reviews(args)
+    elif args.mode == 'run':
+        args.binary = args.binary.resolve()
+        run_corpus(args)
+    elif args.mode == 'parse-register':
+        register_parses(args)
+    else:
+        report(args)
+
+
+if __name__ == '__main__':
+    main()
