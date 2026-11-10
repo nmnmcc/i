@@ -159,7 +159,6 @@ fn all<'a>(wat: &'a str, head: &str) -> Vec<&'a str> {
 }
 
 #[test]
-#[ignore = "turned on by the lazy re-entry commit"]
 fn reentry_rebuilds_one_frame() {
     let text = wat(PROGRAM);
     assert!(!text.contains("$reenter_next"), "$reenter_next is gone");
@@ -205,7 +204,6 @@ fn reentry_rebuilds_one_frame() {
 }
 
 #[test]
-#[ignore = "turned on by the lazy re-entry commit"]
 fn record_kinds() {
     let text = wat(PROGRAM);
     let records: Vec<Vec<String>> = all(&text, "(struct.new $frame (ref.func $r")
@@ -282,7 +280,6 @@ fn record_kinds() {
 }
 
 #[test]
-#[ignore = "turned on by the lazy re-entry commit"]
 fn host_seam_kept() {
     let text = wat(PROGRAM);
     let calls: Vec<Vec<String>> = text
@@ -982,7 +979,6 @@ impl Runner {
 }
 
 #[test]
-#[ignore = "turned on by the lazy re-entry commit"]
 fn resume_cost_is_flat() {
     let runner = Runner::new(32 * 1024 * 1024);
     let mut shallow = 0.;
@@ -1002,7 +998,6 @@ fn resume_cost_is_flat() {
 }
 
 #[test]
-#[ignore = "turned on by the lazy re-entry commit"]
 fn deep_resume() {
     let runner = Runner::new(32 * 1024 * 1024);
     let depth = if runner.native >= 64 * 1024 * 1024 {
@@ -1102,7 +1097,6 @@ fn recursion_source(paused: bool) -> String {
 }
 
 #[test]
-#[ignore = "turned on by the lazy re-entry commit"]
 fn deep_resume_in_recursion() {
     let runner = Runner::new(RECURSION_STACK);
     assert_eq!(
@@ -1110,42 +1104,6 @@ fn deep_resume_in_recursion() {
         "baseline needs this fixed S11"
     );
     assert!(runner.finishes(&recursion_source(true)));
-}
-
-/// Manual step-2 measurements; remains a normal passing test in the
-/// eager baseline, then is removed when its constants have been recorded.
-#[test]
-fn eager_stack_calibration() {
-    if env::var_os("CALIBRATE_EAGER").is_none() {
-        return;
-    }
-    for depth in [10_000, 100_000] {
-        assert!(
-            Runner::new(32 * 1024 * 1024).finishes(&bench_source(depth, 1, true)),
-            "first capture at depth {depth}"
-        );
-    }
-    let source = recursion_source(false);
-    let mut low = 1024_u64;
-    let mut high = 32 * 1024 * 1024;
-    assert!(Runner::new(high).finishes(&source));
-    while high - low > 1024 {
-        let mid = (high + low) / 2;
-        if Runner::new(mid).finishes(&source) {
-            high = mid;
-        } else {
-            low = mid;
-        }
-    }
-    eprintln!("minimum recursion-only stack in ({low}, {high}] bytes");
-    for factor in [1.5, 1.2, 1.1] {
-        let s11 = (high as f64 * factor) as u64;
-        let finishes = Runner::new(s11).finishes(&recursion_source(true));
-        eprintln!("chosen stack {s11} bytes: factor {factor}, eager finishes {finishes}");
-        if !finishes {
-            break;
-        }
-    }
 }
 
 fn runs_cleanly(source: &str) {
