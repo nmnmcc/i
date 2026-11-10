@@ -79,6 +79,9 @@ uri_parse_errors = () {
 		("é%GG", uri.UriError(uri.WholePart, 0, uri.BadCharacter))
 		("/a\u{0}", uri.UriError(uri.WholePart, 2, uri.BadCharacter))
 		("1:x", uri.UriError(uri.PathPart, 1, uri.BadPath))
+		("1:x?[", uri.UriError(uri.PathPart, 1, uri.BadPath))
+		("1:x[", uri.UriError(uri.PathPart, 1, uri.BadPath))
+		("[1:x", uri.UriError(uri.PathPart, 0, uri.BadPath))
 		(":x", uri.UriError(uri.PathPart, 0, uri.BadPath))
 		("http://[::1", uri.UriError(uri.HostPart, 11, uri.BadHost))
 		("http://h:abc/", uri.UriError(uri.PortPart, 9, uri.BadPort))
@@ -196,6 +199,11 @@ uri_build_errors = () {
 			uri.UriError(uri.QueryPart, 0, uri.BadCharacter)
 		)
 	]
+	// U8 build checks query grammar before the path's cross-field constraints.
+	assert(
+		uri.build(uri.Parts(None, None, "a:b", Some("["), None)) ==
+			Error(uri.UriError(uri.QueryPart, 0, uri.BadCharacter))
+	)
 	list.each(cases, (pair) {
 		(p, expected) = pair
 		assert(uri.build(p) == Error(expected))

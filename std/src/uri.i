@@ -140,7 +140,7 @@ parse = (text: String) -> Result(Uri, UriError) {
 				(FragmentPart, fragment_start)
 			]
 		)
-		build(p) |> {
+		validated(p, True) |> {
 			Ok(u) -> u
 			Error(UriError(part, offset, problem)) -> {
 				origin = list.fold(offsets, 0, (acc, pair) {
@@ -157,12 +157,7 @@ parse = (text: String) -> Result(Uri, UriError) {
 }
 
 /// Validates raw candidate fields and their cross-field grammar constraints.
-build = (parts: Parts) -> Result(Uri, UriError) {
-	fail.catch(() {
-		validate(parts)
-		Uri(parts)
-	})
-}
+build = (parts: Parts) -> Result(Uri, UriError) { validated(parts, False) }
 
 /// Projects the original raw fields in constant field work.
 parts = (uri: Uri) -> Parts {
@@ -311,8 +306,16 @@ build_query = (pairs: List((String, String))) -> String {
 	}), "&")
 }
 
-// All lexical scans precede all grammar checks, in U8's field order.
-validate = (p: Parts) -> Nil ? UriError {
+validated = (p: Parts, parsing: Bool) -> Result(Uri, UriError) {
+	fail.catch(() {
+		validate(p, parsing)
+		Uri(p)
+	})
+}
+
+// Parse validates complete components in order after its whole-input scan.
+// Build scans all fields, then checks their grammar, then cross-field rules.
+validate = (p: Parts, parsing: Bool) -> Nil ? UriError {
 	scan_option(p.scheme, SchemePart)
 	p.authority |> {
 		None -> Nil
@@ -349,9 +352,20 @@ validate = (p: Parts) -> Nil ? UriError {
 			grammar_option(a.port, PortPart, BadPort, digit)
 		}
 	}
+	parsing |> {
+		True  -> path_constraints(p)
+		False -> Nil
+	}
 	grammar(bytes(p.path), PathPart, BadPath, path_char, 0)
 	grammar_option(p.query, QueryPart, BadCharacter, query_char)
 	grammar_option(p.fragment, FragmentPart, BadCharacter, query_char)
+	parsing |> {
+		True  -> Nil
+		False -> path_constraints(p)
+	}
+}
+
+path_constraints = (p: Parts) -> Nil ? UriError {
 	path_bytes = bytes(p.path)
 	p.authority |> {
 		Some(_) -> path_bytes |> {
