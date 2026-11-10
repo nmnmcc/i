@@ -412,7 +412,7 @@ fn normalize_closed(s: &Solver, t: Ty) -> Result<Ty, &'static str> {
         return Err(code::VALUE_TYPE_NOT_FIXED);
     }
     let mut scratch = Solver::new(s.variance.clone(), Vec::new());
-    let t = super::alias::normalize(&mut scratch, &t);
+    let t = super::alias::normalize(&mut scratch, t);
     if scratch.failures.is_empty() {
         Ok(t)
     } else {

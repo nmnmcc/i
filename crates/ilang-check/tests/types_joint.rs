@@ -149,10 +149,12 @@ fn j5_completed_literal_aliases_produce_exact_runtime_tests() {
         tests[0].head,
         types::Head::Named(TypeRef::Builtin(BuiltinType::String))
     );
-    let text = format!("{:?}", tests[0].values);
-    assert!(
-        text.contains("GET") && text.contains("POST") && !text.contains("All"),
-        "{text}"
+    assert_eq!(
+        tests[0].values,
+        types::TestValues::Only(vec![
+            types::LitValue::Str("GET".into()),
+            types::LitValue::Str("POST".into()),
+        ])
     );
     bad(
         "source:\"GET\"|\"POST\"=\"GET\"\nMethods=source\nf=(x:Methods){x |> {\"GET\" ? True -> 1}}",

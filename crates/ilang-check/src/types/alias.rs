@@ -12,6 +12,20 @@ pub(super) struct Template {
     pub ty: Ty,
     pub params: usize,
     pub slots: usize,
+    pub has_algebra: bool,
+}
+
+fn has_algebra(t: &Ty) -> bool {
+    match t {
+        Ty::Union(_) | Ty::Inter(_) | Ty::Diff(_, _) => true,
+        Ty::Con(_, _, ts) => ts.iter().any(has_algebra),
+        Ty::Fn(f) => {
+            f.params.iter().any(|(_, t)| has_algebra(t))
+                || [&f.ret, &f.err, &f.env].into_iter().any(has_algebra)
+        }
+        Ty::Both(a, b) => has_algebra(a) || has_algebra(b),
+        Ty::Var(_) | Ty::Never | Ty::Top => false,
+    }
 }
 
 impl Template {
@@ -102,6 +116,7 @@ impl Checker<'_> {
                 .collect();
             let mut slots = def.params.len();
             let template = self.template(body, &params, &mut slots).map(|ty| Template {
+                has_algebra: has_algebra(&ty),
                 ty,
                 params: def.params.len(),
                 slots,
@@ -206,37 +221,50 @@ impl Checker<'_> {
     }
 
     pub(super) fn instantiate_alias(&mut self, id: TypeId, args: Vec<Ty>) -> Ty {
-        let Some(template) = self.reads.templates.get(&id).cloned() else {
+        let Some(template) = self.reads.templates.get(&id) else {
             if !self.recovery && !self.reads.aliases.contains_key(&id) {
                 panic!("pending alias {id:?}");
             }
             return Ty::Never;
         };
+        let has_algebra = template.has_algebra || args.iter().any(has_algebra);
         let ty = template.apply(args, || self.s.fresh_input());
-        normalize(&mut self.s, &ty)
+        // With no operators in either the template or its arguments,
+        // normalization would only copy constructors and variables unchanged.
+        if has_algebra {
+            normalize(&mut self.s, ty)
+        } else {
+            ty
+        }
     }
 
     pub(super) fn known_alias(&self, id: TypeId, args: Vec<Ty>) -> Option<Ty> {
-        self.raw_alias(id, args)
-            .map(|t| self.normalize_known_alias(&t))
+        let template = self.reads.templates.get(&id)?;
+        let has_algebra = template.has_algebra || args.iter().any(has_algebra);
+        let t = template.apply(args, || Ty::Top);
+        Some(if has_algebra {
+            self.normalize_known_alias(t)
+        } else {
+            t
+        })
     }
-    fn normalize_known_alias(&self, t: &Ty) -> Ty {
-        let go = |t: &Ty| self.normalize_known_alias(t);
+    fn normalize_known_alias(&self, t: Ty) -> Ty {
+        let go = |t| self.normalize_known_alias(t);
         match t {
-            Ty::Con(h, values, ts) => Ty::Con(*h, values.clone(), ts.iter().map(go).collect()),
+            Ty::Con(h, values, ts) => Ty::Con(h, values, ts.into_iter().map(go).collect()),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f.params.iter().map(|(n, t)| (n.clone(), go(t))).collect(),
-                ret: go(&f.ret),
-                err: go(&f.err),
-                env: go(&f.env),
+                params: f.params.into_iter().map(|(n, t)| (n, go(t))).collect(),
+                ret: go(f.ret),
+                err: go(f.err),
+                env: go(f.env),
             })),
-            Ty::Union(ts) => self.kunion(ts.iter().map(go).collect()),
-            Ty::Inter(ts) => super::display::known_inter(&self.s, ts.iter().map(go).collect()),
+            Ty::Union(ts) => self.kunion(ts.into_iter().map(go).collect()),
+            Ty::Inter(ts) => super::display::known_inter(&self.s, ts.into_iter().map(go).collect()),
             Ty::Diff(t, ts) => {
-                super::display::known_diff(&self.s, go(t), ts.iter().map(go).collect())
+                super::display::known_diff(&self.s, go(*t), ts.into_iter().map(go).collect())
             }
-            Ty::Both(a, b) => Ty::Both(Box::new(go(a)), Box::new(go(b))),
-            Ty::Var(_) | Ty::Never | Ty::Top => t.clone(),
+            Ty::Both(a, b) => Ty::Both(Box::new(go(*a)), Box::new(go(*b))),
+            Ty::Var(_) | Ty::Never | Ty::Top => t,
         }
     }
 
@@ -248,30 +276,30 @@ impl Checker<'_> {
     }
 }
 
-pub(super) fn normalize(s: &mut super::solve::Solver, t: &Ty) -> Ty {
-    let mut go = |t: &Ty| normalize(s, t);
+pub(super) fn normalize(s: &mut super::solve::Solver, t: Ty) -> Ty {
+    let mut go = |t| normalize(s, t);
     match t {
         Ty::Union(ts) => {
-            let ts = ts.iter().map(&mut go).collect();
+            let ts = ts.into_iter().map(&mut go).collect();
             s.union(ts)
         }
         Ty::Inter(ts) => {
-            let ts = ts.iter().map(&mut go).collect();
+            let ts = ts.into_iter().map(&mut go).collect();
             s.inter(ts)
         }
         Ty::Diff(t, ts) => {
-            let t = go(t);
-            let ts = ts.iter().map(&mut go).collect();
+            let t = go(*t);
+            let ts = ts.into_iter().map(&mut go).collect();
             s.diff(t, ts)
         }
-        Ty::Con(h, values, ts) => Ty::Con(*h, values.clone(), ts.iter().map(&mut go).collect()),
+        Ty::Con(h, values, ts) => Ty::Con(h, values, ts.into_iter().map(&mut go).collect()),
         Ty::Fn(g) => Ty::Fn(Box::new(FnTy {
-            params: g.params.iter().map(|(n, t)| (n.clone(), go(t))).collect(),
-            ret: go(&g.ret),
-            err: go(&g.err),
-            env: go(&g.env),
+            params: g.params.into_iter().map(|(n, t)| (n, go(t))).collect(),
+            ret: go(g.ret),
+            err: go(g.err),
+            env: go(g.env),
         })),
-        Ty::Both(a, b) => Ty::Both(Box::new(go(a)), Box::new(go(b))),
-        Ty::Var(_) | Ty::Top | Ty::Never => t.clone(),
+        Ty::Both(a, b) => Ty::Both(Box::new(go(*a)), Box::new(go(*b))),
+        Ty::Var(_) | Ty::Top | Ty::Never => t,
     }
 }
