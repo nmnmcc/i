@@ -10,6 +10,7 @@
 
 use super::display;
 use super::infer::Checker;
+use super::lits::ValueSet;
 use super::{FnTy, Head, Ty, V};
 use crate::hir::*;
 use std::collections::HashMap;
@@ -125,6 +126,30 @@ pub(super) fn open_fn(e: &Expr) -> bool {
 }
 
 impl Checker<'_> {
+    pub fn hidden_inputs(&self, f: &FnTy) -> Vec<V> {
+        hidden_inputs(&self.s, f)
+    }
+
+    pub fn whole_sigma(&self, sigma: &Sigma, hidden: &[V]) -> Sigma {
+        sigma
+            .iter()
+            .map(|(v, ts)| {
+                (
+                    *v,
+                    ts.iter()
+                        .map(|t| {
+                            if hidden.contains(v) {
+                                whole_lits(&self.s, t)
+                            } else {
+                                t.clone()
+                            }
+                        })
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+
     pub fn kunion(&self, ms: Vec<Ty>) -> Ty {
         display::known_union(&self.s, ms)
     }
@@ -275,21 +300,40 @@ impl Checker<'_> {
             Ty::Never => Ty::Never,
             Ty::Con(h, values, xs) => Ty::Con(
                 *h,
-                values.clone(),
-                xs.iter().map(|x| self.known_bound(x)).collect(),
+                if k.scalar().is_some() {
+                    ValueSet::ALL
+                } else {
+                    values.clone()
+                },
+                xs.iter()
+                    .zip(self.s.variances(*h, xs.len()))
+                    .map(|(x, v)| {
+                        if v == super::Variance::Co {
+                            self.known_bound(x)
+                        } else {
+                            self.s.fresh()
+                        }
+                    })
+                    .collect(),
             ),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
                 params: f
                     .params
                     .iter()
-                    .map(|(l, p)| (l.clone(), self.known_bound(p)))
+                    .map(|(l, _)| (l.clone(), self.s.fresh()))
                     .collect(),
                 ret: self.known_bound(&f.ret),
                 err: self.known_bound(&f.err),
-                env: self.known_bound(&f.env),
+                env: self.s.fresh(),
             })),
             Ty::Union(xs) => Ty::Union(xs.iter().map(|x| self.known_bound(x)).collect()),
             Ty::Inter(xs) => Ty::Inter(xs.iter().map(|x| self.known_bound(x)).collect()),
+            Ty::Diff(a, h)
+                if h.iter()
+                    .any(|t| t.scalar().is_some() && !t.values().is_all()) =>
+            {
+                self.known_bound(a)
+            }
             Ty::Diff(a, h) => Ty::Diff(Box::new(self.known_bound(a)), h.clone()),
         }
     }
@@ -357,12 +401,15 @@ impl Checker<'_> {
     /// the types its type variables get. `_` in `k`, and a type variable
     /// that is generalized in `k`, match nothing.
     pub fn match_k(&self, p: &Ty, k: &Ty, sigma: &mut Sigma, depth: u32) {
-        if *k == Ty::Top || depth > 64 {
+        if depth > 64 {
             return;
         }
-        if let Ty::Var(v) = k
-            && self.kgen.contains(v)
-        {
+        if *k == Ty::Top || matches!(k, Ty::Var(v) if self.kgen.contains(v)) {
+            let mut vars = Vec::new();
+            ty_vars(p, &mut vars);
+            for v in vars {
+                sigma.entry(v).or_default().push(Ty::Top);
+            }
             return;
         }
         match p {
@@ -384,16 +431,12 @@ impl Checker<'_> {
                 _ => {}
             },
             Ty::Union(ps) => {
-                let heads: Vec<Head> = ps.iter().filter_map(Ty::head).collect();
+                let concrete: Vec<Ty> = ps.iter().filter(|t| t.head().is_some()).cloned().collect();
                 for m in ps {
                     if m.head().is_some() {
                         self.match_k(m, k, sigma, depth + 1);
                     } else if let Ty::Var(v) = m {
-                        let rest = members(k)
-                            .into_iter()
-                            .filter(|x| x.head().is_none_or(|h| !heads.contains(&h)))
-                            .collect();
-                        let rest = self.kunion(rest);
+                        let rest = display::known_diff(&self.s, k.clone(), concrete.clone());
                         sigma.entry(*v).or_default().push(rest);
                     }
                 }
@@ -452,6 +495,7 @@ impl Checker<'_> {
         for ((_, p), k) in f.params.iter().zip(args) {
             self.match_k(p, k, &mut sigma, 0);
         }
+        let sigma = self.whole_sigma(&sigma, &self.hidden_inputs(f));
         self.ksubst(&f.ret, &sigma, false).unwrap_or(Ty::Top)
     }
 
@@ -483,7 +527,11 @@ impl Checker<'_> {
             PatternKind::List { .. } => Head::Named(TypeRef::Builtin(BuiltinType::List)),
             PatternKind::Error(_) => return Ty::Top,
         };
-        one_member(b, head).unwrap_or(Ty::Top)
+        let m = one_member(b, head).unwrap_or(Ty::Top);
+        match coverage_literal(q) {
+            Some(t) => display::known_inter(&self.s, vec![m, t]),
+            None => m,
+        }
     }
 
     /// Names in patterns (§4.8): when `q` is fitted to a value with the
@@ -508,8 +556,7 @@ impl Checker<'_> {
                 self.fit_known(pattern, b, in_case);
             }
             PatternKind::Prefix { rest: Some(x), .. } => {
-                let k = self.member_for(q, b);
-                self.kbind(x.var, k, in_case);
+                self.kbind(x.var, prim(BuiltinType::String), in_case);
             }
             PatternKind::Constructor { ctor, args, spread } => {
                 let args_k = match member(b, Some(Head::Named(TypeRef::Custom(ctor.ty)))) {
@@ -587,10 +634,16 @@ impl Checker<'_> {
     pub fn written_known(&self, e: &Expr) -> Ty {
         let prim = |t| Ty::named(TypeRef::Builtin(t), Vec::new());
         match &e.kind {
-            ExprKind::Int(_) => prim(BuiltinType::Int),
+            ExprKind::Int(n) => scalar_literal(BuiltinType::Int, n.to_string()),
             ExprKind::Float(_) => prim(BuiltinType::Float),
-            ExprKind::String(_) => prim(BuiltinType::String),
+            ExprKind::String(s) => scalar_literal(BuiltinType::String, s.clone()),
             ExprKind::BitArray(_) => prim(BuiltinType::BitArray),
+            ExprKind::Unary {
+                op: ilang_syntax::ast::UnOp::Neg,
+                expr,
+            } if neg_literal(expr).is_some() => {
+                scalar_literal(BuiltinType::Int, neg_literal(expr).unwrap())
+            }
             ExprKind::Unary { op, .. } => prim(match op {
                 ilang_syntax::ast::UnOp::Neg => BuiltinType::Int,
                 ilang_syntax::ast::UnOp::NegFloat => BuiltinType::Float,
@@ -729,7 +782,6 @@ pub(super) fn format_prim(name: &str) -> Option<BuiltinType> {
 }
 
 /// Widen known literal facts only in covariant parts (literal-types decision 7).
-#[cfg(test)]
 pub(super) fn whole_lits(s: &super::solve::Solver, t: &Ty) -> Ty {
     match t {
         Ty::Never => Ty::Top,
@@ -772,7 +824,6 @@ pub(super) fn whole_lits(s: &super::solve::Solver, t: &Ty) -> Ty {
 }
 
 /// Inputs not shown by a covariant structural part of an actual argument.
-#[cfg(test)]
 pub(super) fn hidden_inputs(s: &super::solve::Solver, f: &FnTy) -> Vec<V> {
     fn walk(s: &super::solve::Solver, t: &Ty, given: bool, shown: bool, out: &mut Vec<V>) {
         match t {
@@ -823,6 +874,31 @@ pub(super) fn hidden_inputs(s: &super::solve::Solver, f: &FnTy) -> Vec<V> {
     walk(s, &f.ret, false, false, &mut out);
     walk(s, &f.env, true, false, &mut out);
     out
+}
+
+/// A scalar singleton uses the same canonical text in inference and coverage.
+pub(super) fn scalar_literal(b: BuiltinType, text: String) -> Ty {
+    Ty::lit(b, ValueSet::only([text.into()]).unwrap())
+}
+
+fn coverage_literal(q: &Pattern) -> Option<Ty> {
+    match super::coverage::literal(q)? {
+        super::coverage::Lit::Int(n) => Some(scalar_literal(BuiltinType::Int, n)),
+        super::coverage::Lit::Str(s) => Some(scalar_literal(BuiltinType::String, s)),
+        _ => None,
+    }
+}
+
+/// Only brace groups around an unsigned literal are transparent to unary minus.
+pub(super) fn neg_literal(e: &Expr) -> Option<String> {
+    match &e.kind {
+        ExprKind::Int(n) => Some(super::lits::int_text(true, n)),
+        ExprKind::Block(b) => match b.stmts.as_slice() {
+            [Stmt::Expr(x)] => neg_literal(x),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 #[cfg(test)]

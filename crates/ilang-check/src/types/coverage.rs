@@ -60,6 +60,8 @@ pub(crate) enum Pat {
     Head(Head, usize),
     /// Choices `p1 | p2`, and the members of a union in a type test.
     Or(Vec<Pat>),
+    /// A cofinite scalar set (items are excluded values).
+    Except(Head, ValueSet),
 }
 
 /// The values a column of the matrix may have.
@@ -307,7 +309,7 @@ impl Ctor {
 fn of_head(p: &Pat, h: Head) -> bool {
     match p {
         Pat::Wild(_) => true,
-        Pat::Head(x, _) => *x == h,
+        Pat::Head(x, _) | Pat::Except(x, _) => *x == h,
         Pat::Ctor(c, _) => c.head() == h,
         Pat::Or(_) => false,
     }
@@ -369,6 +371,7 @@ impl Checker<'_> {
                 self.useful(&rows, &q2, cols)
             }),
             Pat::Ctor(c, args) => self.useful_ctor(&rows, c, args, &q[1..], cols),
+            Pat::Except(h, set) => self.useful_scalar(&rows, *h, &q[1..], cols, Some(set)),
             Pat::Head(h, n) => {
                 if !self.col_values(&cols[0]).has(*h) {
                     return None;
@@ -420,6 +423,16 @@ impl Checker<'_> {
             let mut x = match &r[0] {
                 Pat::Wild(_) => vec![Pat::Wild(None); k],
                 Pat::Head(x, _) if *x == h => vec![Pat::Wild(None); k],
+                Pat::Except(x, set)
+                    if *x == h
+                        && match c {
+                            Ctor::Lit(Lit::Int(v) | Lit::Str(v)) => set.contains(v),
+                            Ctor::Lit(Lit::Prefix(p)) => !set.items().any(|v| v.starts_with(p)),
+                            _ => false,
+                        } =>
+                {
+                    vec![Pat::Wild(None); k]
+                }
                 Pat::Ctor(c2, a2) if c2.covers(c) => {
                     if a2.len() == k {
                         a2.clone()
@@ -452,6 +465,9 @@ impl Checker<'_> {
         rest_q: &[Pat],
         cols: &[Col],
     ) -> Option<Vec<Pat>> {
+        if scalar_head(h).is_some() {
+            return self.useful_scalar(rows, h, rest_q, cols, None);
+        }
         let rows: Vec<Vec<Pat>> = rows.iter().filter(|r| of_head(&r[0], h)).cloned().collect();
         let default = |all_strings: bool| -> Vec<Vec<Pat>> {
             rows.iter()
@@ -498,6 +514,102 @@ impl Checker<'_> {
                 Some(w)
             }
         }
+    }
+
+    /// Listed values need their own specialization; cofinite rows only cover the default.
+    fn useful_scalar(
+        &mut self,
+        rows: &[Vec<Pat>],
+        h: Head,
+        rest_q: &[Pat],
+        cols: &[Col],
+        query: Option<&ValueSet>,
+    ) -> Option<Vec<Pat>> {
+        let vals = self.col_values(&cols[0]);
+        let set = if vals.other {
+            ValueSet::ALL
+        } else {
+            vals.heads.iter().find(|x| x.0 == h)?.1.clone()
+        };
+        let set = match query {
+            Some(q) => set.meet(q)?,
+            None => set,
+        };
+        let rows: Vec<_> = rows.iter().filter(|r| of_head(&r[0], h)).cloned().collect();
+        let mut listed = std::collections::BTreeSet::<String>::new();
+        for r in &rows {
+            match &r[0] {
+                Pat::Ctor(Ctor::Lit(Lit::Int(v) | Lit::Str(v)), _) => {
+                    listed.insert(v.clone());
+                }
+                Pat::Except(_, s) => listed.extend(s.items().map(|v| v.to_string())),
+                _ => {}
+            }
+        }
+        listed.extend(set.items().map(|v| v.to_string()));
+        let is_int = scalar_head(h) == Some(BuiltinType::Int);
+        // Int display/witness ordering is numeric, not canonical-text order.
+        let mut items: Vec<_> = listed.iter().filter(|v| set.contains(v)).cloned().collect();
+        if is_int {
+            items.sort_by_key(|s| s.parse::<num_bigint::BigInt>().unwrap());
+        }
+        for v in items {
+            let c = Ctor::Lit(if is_int { Lit::Int(v) } else { Lit::Str(v) });
+            if let Some(w) = self.useful_ctor(&rows, &c, &[], rest_q, cols) {
+                return Some(w);
+            }
+        }
+        if set.is_finite() {
+            return None;
+        }
+        let default: Vec<_> = rows
+            .iter()
+            .filter(|r| match &r[0] {
+                Pat::Wild(_) | Pat::Head(..) | Pat::Except(..) => true,
+                Pat::Ctor(Ctor::Lit(Lit::Prefix(p)), _) => p.is_empty(),
+                _ => false,
+            })
+            .map(|r| r[1..].to_vec())
+            .collect();
+        let mut w = self.useful(&default, rest_q, &cols[1..])?;
+        let v = if is_int {
+            let mut n = 0usize;
+            loop {
+                let v = n.to_string();
+                if set.contains(&v) && !listed.contains(&v) {
+                    break v;
+                }
+                n += 1;
+            }
+        } else if set.contains("") && !listed.contains("") {
+            String::new()
+        } else {
+            let prefixes: Vec<_> = rows
+                .iter()
+                .filter_map(|r| match &r[0] {
+                    Pat::Ctor(Ctor::Lit(Lit::Prefix(p)), _) if !p.is_empty() => Some(p),
+                    _ => None,
+                })
+                .collect();
+            let c = ('a'..='z')
+                .chain('0'..='9')
+                .chain((123..=0x10ffff).filter_map(char::from_u32))
+                .find(|c| !prefixes.iter().any(|p| p.starts_with(*c)))
+                .unwrap();
+            let mut v = c.to_string();
+            while !set.contains(&v) || listed.contains(&v) {
+                v.push(c);
+            }
+            v
+        };
+        w.insert(
+            0,
+            Pat::Ctor(
+                Ctor::Lit(if is_int { Lit::Int(v) } else { Lit::Str(v) }),
+                Vec::new(),
+            ),
+        );
+        Some(w)
     }
 
     fn col_values(&self, col: &Col) -> Vals {
@@ -608,6 +720,120 @@ impl Checker<'_> {
         Some(out)
     }
 
+    /// Explain whole scalar inference at a shared place, using the actual witness.
+    pub(crate) fn shared_hint(&mut self, witness: &Pat, rows: &[Vec<Pat>]) -> Option<String> {
+        fn literals(p: &Pat, b: BuiltinType, out: &mut Vec<String>) -> bool {
+            match p {
+                Pat::Wild(_) => true,
+                Pat::Or(ps) => ps.iter().all(|p| literals(p, b, out)),
+                Pat::Ctor(Ctor::Lit(Lit::Int(n)), _) if b == BuiltinType::Int => {
+                    out.push(n.clone());
+                    true
+                }
+                Pat::Ctor(Ctor::Lit(Lit::Str(s)), _) if b == BuiltinType::String => {
+                    out.push(ilang_syntax::print::string_literal(s));
+                    true
+                }
+                _ => false,
+            }
+        }
+        fn children(p: &Pat, c: &Ctor, i: usize, out: &mut Vec<Pat>) {
+            match p {
+                Pat::Wild(_) => out.push(Pat::Wild(None)),
+                Pat::Or(ps) => {
+                    for p in ps {
+                        children(p, c, i, out);
+                    }
+                }
+                Pat::Ctor(d, parts) if c == d => {
+                    if let Some(p) = parts.get(i) {
+                        out.push(p.clone());
+                    }
+                }
+                _ => {}
+            }
+        }
+        fn go(
+            ch: &mut Checker<'_>,
+            w: &Pat,
+            ps: &[Pat],
+            shared: Option<(&str, &[Pat])>,
+        ) -> Option<String> {
+            if let Pat::Ctor(Ctor::Lit(l), _) = w {
+                let b = match l {
+                    Lit::Int(_) => BuiltinType::Int,
+                    Lit::Str(_) => BuiltinType::String,
+                    _ => return None,
+                };
+                if let Some((owner, candidates)) = shared {
+                    let mut ls = Vec::new();
+                    if candidates.iter().all(|p| literals(p, b, &mut ls)) && !ls.is_empty() {
+                        ls.sort();
+                        ls.dedup();
+                        let whole = b.name();
+                        let example = format!("{owner}({})", ls.join(" | "));
+                        let start = if owner == "List" {
+                            format!(
+                                "the items of a list get the whole type `{whole}` from literal patterns (§4.8)"
+                            )
+                        } else {
+                            format!(
+                                "the fields of `{owner}` share one type, so they get the whole type `{whole}` from literal patterns"
+                            )
+                        };
+                        return Some(format!(
+                            "{start}; if only these values can come, write the type, such as `{example}`"
+                        ));
+                    }
+                }
+            }
+            let Pat::Ctor(c, args) = w else { return None };
+            let mut family = Vec::new();
+            let owner = match c {
+                Ctor::Cons => Some("List".to_string()),
+                Ctor::Custom(r) => {
+                    let TypeBody::Custom(cs) = &ch.p.ty(r.ty).body else {
+                        return None;
+                    };
+                    for (ci, ctor) in cs.iter().enumerate() {
+                        let cr = CtorRef {
+                            ty: r.ty,
+                            index: ci as u32,
+                        };
+                        for i in 0..ctor.fields.len() {
+                            if ch.field_shared(cr, i) {
+                                for p in ps {
+                                    children(p, &Ctor::Custom(cr), i, &mut family);
+                                }
+                            }
+                        }
+                    }
+                    Some(ch.p.ty(r.ty).name.clone())
+                }
+                _ => None,
+            };
+            for (i, w) in args.iter().enumerate() {
+                let mut next = Vec::new();
+                for p in ps {
+                    children(p, c, i, &mut next);
+                }
+                let here = match c {
+                    Ctor::Cons if i == 0 => Some(("List", next.as_slice())),
+                    Ctor::Custom(r) if ch.field_shared(*r, i) => {
+                        Some((owner.as_deref().unwrap(), family.as_slice()))
+                    }
+                    _ => shared,
+                };
+                if let Some(h) = go(ch, w, &next, here) {
+                    return Some(h);
+                }
+            }
+            None
+        }
+        let ps: Vec<_> = rows.iter().filter_map(|r| r.first().cloned()).collect();
+        go(self, witness, &ps, None)
+    }
+
     // ---- Text ----
 
     /// The text of a witness, in the syntax of patterns (§7.1).
@@ -619,6 +845,10 @@ impl Checker<'_> {
                 .map(|a| self.show_pat(a))
                 .collect::<Vec<_>>()
                 .join(" | "),
+            Pat::Except(h, set) => {
+                let t = Ty::lit(scalar_head(*h).unwrap(), set.clone());
+                format!("_: {}", super::display::show_known(&self.s, &t))
+            }
             Pat::Head(h, n) => format!("_: {}", self.show_head(*h, *n)),
             Pat::Ctor(Ctor::Tuple(_), args) => {
                 let parts: Vec<String> = args.iter().map(|a| self.show_pat(a)).collect();
@@ -786,9 +1016,93 @@ pub(crate) fn fit_pat(p: &Program, q: &Pattern) -> Pat {
     }
 }
 
+fn scalar_head(h: Head) -> Option<BuiltinType> {
+    match h {
+        Head::Named(TypeRef::Builtin(b @ (BuiltinType::Int | BuiltinType::String))) => Some(b),
+        _ => None,
+    }
+}
+
+/// A runtime type-test pattern; used by narrowing and coverage together.
+pub(crate) fn scalar_pat(t: &Ty) -> Pat {
+    let h = t.head().unwrap();
+    if t.values().is_all() {
+        Pat::Head(h, 0)
+    } else if t.values().is_finite() {
+        let b = t.scalar().unwrap();
+        Pat::Or(
+            t.values()
+                .items()
+                .map(|v| {
+                    Pat::Ctor(
+                        Ctor::Lit(if b == BuiltinType::Int {
+                            Lit::Int(v.to_string())
+                        } else {
+                            Lit::Str(v.to_string())
+                        }),
+                        Vec::new(),
+                    )
+                })
+                .collect(),
+        )
+    } else {
+        Pat::Except(h, t.values().clone())
+    }
+}
+
 #[cfg(test)]
 mod literal_coverage_tests {
     use super::*;
+    #[test]
+    fn complements_preserve_cross_columns_and_prefixes() {
+        // §5.5: excluded values are specialized separately; prefixes cannot
+        // be treated as literal strings when testing a cofinite row.
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::create_dir(root.path().join("src")).unwrap();
+        std::fs::write(root.path().join("src/main.i"), "x = 1\n").unwrap();
+        let (graph, ds) = ilang_package::load(root.path());
+        assert!(ds.is_empty());
+        let checked = crate::check(&graph);
+        let p = checked.program.unwrap();
+        let mut ch = Checker::new(&p, &graph.sources);
+        let h = Head::Named(TypeRef::Builtin(BuiltinType::String));
+        let except = ValueSet::except([std::sync::Arc::from("ab")]);
+        let row = vec![Pat::Except(h, except.clone()), Pat::Wild(None)];
+        let prefix = Pat::Ctor(Ctor::Lit(Lit::Prefix("a".into())), Vec::new());
+        assert!(
+            ch.useful(
+                std::slice::from_ref(&row),
+                &[prefix, Pat::Wild(None)],
+                &[Col::Any, Col::Any]
+            )
+            .is_some()
+        );
+        let literal = Pat::Ctor(Ctor::Lit(Lit::Str("ab".into())), Vec::new());
+        assert!(
+            ch.useful(
+                std::slice::from_ref(&row),
+                &[literal.clone(), Pat::Wild(None)],
+                &[Col::Any, Col::Any]
+            )
+            .is_some()
+        );
+        let col = [Col::of(Ty::named(
+            TypeRef::Builtin(BuiltinType::String),
+            Vec::new(),
+        ))];
+        assert!(
+            ch.useful(
+                &[vec![row[0].clone()], vec![literal]],
+                &[Pat::Wild(None)],
+                &col
+            )
+            .is_none()
+        );
+        let q = Pat::Except(h, except);
+        assert!(ch.useful(&[vec![row[0].clone()]], &[q], &col).is_none());
+    }
+
     #[test]
     fn unknown_alternatives_are_whole_even_beside_an_explicit_head() {
         // literal-types §5.5: a side with other counts as all values of every head.

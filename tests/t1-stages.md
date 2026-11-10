@@ -472,3 +472,68 @@ full switched-on corpus audit, performance scripts/budget, final soundness
 review and T1 future-entry removal are not done. No quiet-window performance
 claim or finished-T1 claim is made. The coordinator must amend the §10
 acceptance example or authorize different known-type rules before resumption.
+
+### Resumption: coordinator ruling and stage 7
+
+The coordinator (2026-11-10) keeps decision 7 and spec rule 13, and amends
+only the §10 None-accumulator example to `Some(p: (Int, Int))`. That ruling
+is quoted beside the edited acceptance row. The preserved stage-7 source
+patch and seven new files were restored. The reduced unannotated source
+stays unchanged; an interpretation test asserts its entire sole E0506
+message. The tuple-shape-from-inference question remains open for a later
+track, with no change to rule 13 in T1.
+
+New production behavior follows decision 4 (no widening), decision 5
+(group-transparent negative literals), decision 6 (whole scalar patterns
+when fitted/shared), decision 7 (unknown matching, hidden inputs, whole
+known bounds), §5.5 (listed-value/complement coverage and witnesses), and
+§5.8 (inferred host inputs must be whole). Long private hovers also use
+limited text; stored schemes and interfaces stay exact, as decision 11
+requires. The new scheme_hovers map contains human text only.
+
+K2 from report-std1b §5 was reproduced with literal patterns enabled: one
+E0501, Int not a subtype of Never. Its cause was ours: an unguarded list
+rest covered later item positions at runtime but did not mark those item
+places as catch-alls in rule 11. Record the earliest rest index, propagate
+to existing items and to later-created item places. Source: §5.3 says a
+catch-all “at the place or above it” supplies rule-11 slack; a list rest
+is a catch-all at each remaining item. The exact reported program and a
+runtime test of all paths now pass. Guarded rests do not grant slack.
+
+Stage-7 interpretation checks also cover negative groups in SCCs, fitted
+scalar bounds, immediate versus delayed Values failures, exact E0520
+operators, list/shared-field coverage, once-occurring Option parameters,
+prefix witnesses, inferred export rejection and the exact E0506 ruling.
+Runtime tests exercise scalar uses, scalar/tuple/Box/empty-list/annotated
+None folds, grouped/chosen callbacks, continuation/setter inputs,
+contravariant Sink, returned functions and own/callback service inputs.
+
+The corpus script compares explicit before/after binaries across package
+roots and standalone checker/spec fixtures. Stage 7: 272 cases, 265 kept,
+6 new, 1 newly rejected: types/spec.i's `assert(1 == 2)`. It is required by
+§8's named E0520 case and decision 8, not a lost correct program. All std,
+hello, bench and browser packages keep checking. Std has 1989 type lines;
+exactly 10 constants change, as §8 predicts. All other interface lines are
+unchanged. Artifacts: target/t1/continued/stage7-corpus.{json,log} and
+std-{before-stage7,stage7}.types. The baseline binary is the actual
+pre-stage-7 checkpoint, copied before the release rebuild.
+
+Existing runtime equality tests named by §8 keep their operands behind
+parameters; stop traces still pass. The scalar missing-value diagnostics
+and finite coverage changes were read individually. The generated audit
+lists every changed golden line with a controlling rule; it is an audit,
+not proof by regeneration, and remains for the final derived-files commit.
+
+Failed checks on this resumption: K2 failed before its fix; an import in
+one added Rust source fixture lacked the outer header group and was fixed.
+The first old-syntax scan found two generated TOML strings and one rendered
+diagnostic fragment; explicit not_source entries classify only those host
+strings. The final scan passes 1122 snippets and 20 future entries. No i
+source was exempted. No check was interrupted. The first full stage-7 gate
+passed (174 spec cases); the expanded final gate includes the added tests.
+
+Final stage-7 gate: full dev-verify exit 0, 175 spec cases at O0/O2,
+1422 std tests per level and 33 browser tests. Clippy -D warnings, the K1
+fixtures, 13 interpretation tests and all existing Rust targets pass.
+Log: target/t1/continued/resumed-stage7-verified-full.log. Source stage 7
+is committed with all generated outputs held for the final derived commit.

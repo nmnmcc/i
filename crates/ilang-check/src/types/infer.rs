@@ -225,6 +225,9 @@ impl<'a> Checker<'a> {
                 // A type with itself inside it has been reported by the
                 // occurs check, and is not shown.
                 if let Ok(shown) = display::scheme(&self.s, &scheme.ty, opts) {
+                    typed
+                        .scheme_hovers
+                        .insert(id, shown.text_limited(&self.s.type_names, 12));
                     typed.schemes.insert(id, shown.text(&self.s.type_names));
                     if d.exported || opts.written {
                         typed.scheme_types.insert(id, shown);
@@ -482,10 +485,10 @@ impl<'a> Checker<'a> {
         let parts = f
             .params
             .iter()
-            .map(|p| ("a parameter", &p.1))
-            .chain([("the value", &f.ret)]);
-        for (what, t) in parts {
-            if !self.host_type(t) {
+            .map(|p| ("a parameter", &p.1, true))
+            .chain([("the value", &f.ret, false)]);
+        for (what, t, input) in parts {
+            if !self.host_type(t) || input && !t.values().is_all() {
                 let t = show(self, t);
                 self.error(
                     code::ENTRY_TYPE,
@@ -1125,9 +1128,9 @@ impl<'a> Checker<'a> {
     pub fn infer_k(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
         let same = |t: Ty| (t.clone(), t);
         match &e.kind {
-            ExprKind::Int(_) => same(self.prim(BuiltinType::Int)),
+            ExprKind::Int(n) => same(known::scalar_literal(BuiltinType::Int, n.to_string())),
             ExprKind::Float(_) => same(self.prim(BuiltinType::Float)),
-            ExprKind::String(_) => same(self.prim(BuiltinType::String)),
+            ExprKind::String(s) => same(known::scalar_literal(BuiltinType::String, s.clone())),
             ExprKind::Name(ValueRef::Local(v)) => {
                 self.note_use(*v, e.span);
                 let t = match self.locals.get(v).cloned() {
@@ -1243,7 +1246,13 @@ impl<'a> Checker<'a> {
                 });
                 let t = self.infer(expr);
                 self.sub(&t, &want, expr.span);
-                same(want)
+                if *op == UnOp::Neg
+                    && let Some(n) = known::neg_literal(expr)
+                {
+                    same(known::scalar_literal(BuiltinType::Int, n))
+                } else {
+                    same(want)
+                }
             }
             ExprKind::Binary { op, lhs, rhs } => self.binary(*op, lhs, rhs, e.span),
             ExprKind::Error => (self.s.fresh_input(), Ty::Top),
@@ -1292,13 +1301,36 @@ impl<'a> Checker<'a> {
                 display::show_known(&self.s, &lk),
                 display::show_known(&self.s, &rk),
             );
-            self.error(
-                code::EQ_DISJOINT,
-                span,
+            let (operator, result) = if op == Eq {
+                ("==", "False")
+            } else {
+                ("!=", "True")
+            };
+            let finite = |t: &Ty| {
+                let ms = known::members(t);
+                !ms.is_empty()
+                    && ms
+                        .iter()
+                        .all(|m| m.scalar().is_some() && m.values().is_finite())
+            };
+            let single = |t: &Ty| {
+                let ms = known::members(t);
+                ms.len() == 1 && ms[0].values().is_finite() && ms[0].values().items().count() == 1
+            };
+            let message = if single(&lk) && single(&rk) {
+                format!(
+                    "both sides are constants, `{l}` and `{r}`, so `{operator}` is always `{result}` (§6.9). To compare two constants when the program runs, pass them as parameters."
+                )
+            } else if finite(&lk) && finite(&rk) {
+                format!(
+                    "the values `{l}` and `{r}` are never equal, so `{operator}` is always `{result}` (§6.9)"
+                )
+            } else {
                 format!(
                     "the two sides have the known types `{l}` and `{r}`, which are disjoint, so the result would always be the same (§6.9)"
-                ),
-            );
+                )
+            };
+            self.error(code::EQ_DISJOINT, span, message);
         }
         if let Some(want) = operand {
             self.sub(&lt, &want, lhs.span);
@@ -1357,13 +1389,18 @@ impl<'a> Checker<'a> {
             .collect();
         let mut typed: Vec<Option<(Ty, Ty)>> = vec![None; n];
         let mut sigma = known::Sigma::new();
+        let hidden = kfn
+            .as_ref()
+            .map_or_else(Vec::new, |k| self.hidden_inputs(k));
         for later in [false, true] {
             for (i, a) in values.iter().enumerate() {
                 if (params.is_some() && known::open_fn(a)) != later {
                     continue;
                 }
                 let expected = match &params {
-                    Some(ps) => self.ksubst(&ps[i], &sigma, true).unwrap_or(Ty::Top),
+                    Some(ps) => self
+                        .ksubst(&ps[i], &self.whole_sigma(&sigma, &hidden), true)
+                        .unwrap_or(Ty::Top),
                     None => Ty::Top,
                 };
                 let (t, k) = self.infer_k(a, &expected);

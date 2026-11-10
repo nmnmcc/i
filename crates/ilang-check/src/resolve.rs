@@ -1823,7 +1823,7 @@ impl<'a> Resolver<'a> {
                 true
             }
             E::Unary { expr, .. } => {
-                matches!(expr.kind, E::Int(_) | E::Float(_) | E::String(_))
+                matches!(ungroup(expr).kind, E::Int(_) | E::Float(_) | E::String(_))
             }
             E::Field { target, .. } => match &target.kind {
                 // `m.x` is a name when `m` is a module.

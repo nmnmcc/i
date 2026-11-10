@@ -427,7 +427,7 @@ fn types_of_parameters_that_share_a_type_variable() {
     assert_eq!(f.hover("app/main", "f, v", 0), "f: (A) -> B ? E ! N");
     assert_eq!(f.hover("app/main", "v)", 0), "v: A");
     // Not shared: as before.
-    assert_eq!(f.hover("app/main", "f) {", 0), "f: (Int) -> A ? E ! N");
+    assert_eq!(f.hover("app/main", "f) {", 0), "f: (1) -> A ? E ! N");
     assert_eq!(f.hover("app/main", "a) {", 0), "a: A");
 }
 
@@ -505,23 +505,23 @@ fn local_types_name_one_sided_variables_as_the_scheme() {
          effonly = (f, x) {\n  r = f(x)\n  Nil\n}\n",
     )]);
     assert!(!f.checked.diags.iter().any(|d| d.is_error()));
-    assert_eq!(f.hover("app/main", "one", 0), "one: (x: A) -> Int");
+    assert_eq!(f.hover("app/main", "one", 0), "one: (x: A) -> 1");
     assert_eq!(f.hover("app/main", "x) {\n  y = x\n  1", 0), "x: A");
     assert_eq!(f.hover("app/main", "y = x\n  1", 0), "y: A");
     assert_eq!(f.hover("app/main", "x\n  1", 0), "x: A");
     assert_eq!(
         f.hover("app/main", "drop =", 0),
-        "drop: (x: A, g: (Int) -> B ? E ! N) -> B ? E ! N"
+        "drop: (x: A, g: (1) -> B ? E ! N) -> B ? E ! N"
     );
     assert_eq!(f.hover("app/main", "x, g) {\n  y = x\n  g", 0), "x: A");
     assert_eq!(f.hover("app/main", "y = x\n  g", 0), "y: A");
     assert_eq!(
         f.hover("app/main", "g) {\n  y = x", 0),
-        "g: (Int) -> B ? E ! N"
+        "g: (1) -> B ? E ! N"
     );
     assert_eq!(
         f.hover("app/main", "drop2", 0),
-        "drop2: (x: A, g: (Int) -> B ? E ! N, h: C) -> B ? E ! N"
+        "drop2: (x: A, g: (1) -> B ? E ! N, h: C) -> B ? E ! N"
     );
     assert_eq!(f.hover("app/main", "x, g, h", 0), "x: A");
     assert_eq!(f.hover("app/main", "h) {", 0), "h: C");
@@ -606,5 +606,9 @@ fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
         }
         assert!(query.definition_at(module, at).is_none());
     }
-    assert!(fixture.hover("app/main", "many", 0).contains("(A) -> Int"));
+    assert!(
+        fixture
+            .hover("app/main", "many", 0)
+            .contains("(A) -> 1 | 2")
+    );
 }

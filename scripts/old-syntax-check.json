@@ -1640,5 +1640,14 @@
       "E0101: expected a type, found a string",
       "E0101: expected a type, found a string"
     ]
+  },
+  "crates/ilang-check/tests/literal_types.rs:74282c580560b9e5": {
+    "not_source": "Generated temporary Cargo-style i.toml dependency manifest"
+  },
+  "crates/ilang-check/tests/literal_types.rs:58bbc7c45c65d2e4": {
+    "not_source": "Generated i.toml wasm export configuration"
+  },
+  "crates/ilang-check/tests/literal_types.rs:8a7cb2c96d8ba744": {
+    "not_source": "Rendered diagnostic substring with format placeholders"
   }
 }

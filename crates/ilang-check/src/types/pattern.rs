@@ -71,6 +71,8 @@ struct Place {
     heads: Vec<(Head, Vec<Ty>)>,
     /// A clause without a guard has a catch-all here.
     catch_here: bool,
+    /// Earliest item index covered by an unguarded list rest.
+    rest_from: Option<u32>,
     parent: Option<usize>,
     children: Vec<(Step, usize)>,
     /// The type constructors of the patterns here that are not catch-alls:
@@ -209,15 +211,22 @@ impl Checker<'_> {
                 }
                 list
             }
-            _ => self.leaf(q, false),
+            _ => self.leaf(q, false, false),
         }
     }
 
     /// The pattern types of literals, prefixes, and bit arrays, with their
     /// names bound.
-    fn leaf(&mut self, q: &Pattern, in_case: bool) -> Ty {
+    fn leaf(&mut self, q: &Pattern, in_case: bool, literal: bool) -> Ty {
         let prim = |b| Ty::named(TypeRef::Builtin(b), Vec::new());
         match &q.kind {
+            PatternKind::Int { negative, value } if literal => super::known::scalar_literal(
+                BuiltinType::Int,
+                super::lits::int_text(*negative, value),
+            ),
+            PatternKind::String(s) if literal => {
+                super::known::scalar_literal(BuiltinType::String, s.clone())
+            }
             PatternKind::Int { .. } => prim(BuiltinType::Int),
             PatternKind::Float { .. } => prim(BuiltinType::Float),
             PatternKind::String(_) => prim(BuiltinType::String),
@@ -421,6 +430,7 @@ impl Checker<'_> {
             pats: Vec::new(),
             heads: Vec::new(),
             catch_here: false,
+            rest_from: None,
             parent: None,
             children: Vec::new(),
             seen: Vec::new(),
@@ -665,13 +675,14 @@ impl Checker<'_> {
         let missing = self.useful(&rows, &[Pat::Wild(None)], &col);
         if let Some(w) = missing {
             let text = self.show_pat(&w[0]);
-            self.error(
-                code::CASE_NOT_COVERED,
-                c.span,
-                format!(
-                    "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `{text}`"
-                ),
+            let mut message = format!(
+                "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `{text}`"
             );
+            if let Some(hint) = self.shared_hint(&w[0], &rows) {
+                message.push_str("; ");
+                message.push_str(&hint);
+            }
+            self.error(code::CASE_NOT_COVERED, c.span, message);
         } else {
             for (failure, span) in c.held {
                 self.s.failures.push(failure);
@@ -680,7 +691,7 @@ impl Checker<'_> {
         }
     }
 
-    fn field_shared(&mut self, ctor: CtorRef, index: usize) -> bool {
+    pub(super) fn field_shared(&mut self, ctor: CtorRef, index: usize) -> bool {
         if !self.shared_fields.contains_key(&ctor)
             && let TypeBody::Custom(ctors) = &self.p.ty(ctor.ty).body
         {
@@ -740,12 +751,15 @@ impl Checker<'_> {
                 Step::Field(c, i) => self.field_shared(c, i as usize),
                 _ => false,
             };
+        let catch_here =
+            matches!(step, Step::Item(i) if places[at].rest_from.is_some_and(|from| i>=from));
         places.push(Place {
             ty,
             known,
             pats: Vec::new(),
             heads: Vec::new(),
-            catch_here: false,
+            catch_here,
+            rest_from: None,
             parent: Some(at),
             children: Vec::new(),
             seen: Vec::new(),
@@ -818,6 +832,9 @@ impl Checker<'_> {
                         members
                             .iter()
                             .filter_map(|m| match m {
+                                m @ Ty::Con(..) if m.scalar().is_some() => {
+                                    Some(coverage::scalar_pat(m))
+                                }
                                 Ty::Con(h, _, args) => Some(Pat::Head(*h, args.len())),
                                 Ty::Fn(f) => Some(Pat::Head(Head::Fn, f.params.len())),
                                 _ => None,
@@ -963,6 +980,21 @@ impl Checker<'_> {
                     pats.push(self.visit(x, c, v, places).1);
                 }
                 if let Some(r) = rest {
+                    if v.unguarded {
+                        let from = items.len() as u32;
+                        places[at].rest_from =
+                            Some(places[at].rest_from.map_or(from, |old| old.min(from)));
+                        let covered: Vec<_> = places[at]
+                            .children
+                            .iter()
+                            .filter_map(|(step, i)| {
+                                matches!(step,Step::Item(j) if *j>=from).then_some(*i)
+                            })
+                            .collect();
+                        for i in covered {
+                            places[i].catch_here = true;
+                        }
+                    }
                     let c = self.child(places, at, Step::Rest, list.clone(), klist.clone());
                     if let Some(b) = r {
                         self.bind(b, list.clone(), true);
@@ -976,7 +1008,7 @@ impl Checker<'_> {
                 (list, coverage::list(pats, rest.is_some()))
             }
             _ => {
-                let t = self.leaf(q, true);
+                let t = self.leaf(q, true, !places[at].shared);
                 let k = places[at].known.clone();
                 self.fit_known(q, &k, true);
                 let pat = match coverage::literal(q) {

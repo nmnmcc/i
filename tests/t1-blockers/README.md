@@ -93,3 +93,14 @@ stage 6b. They retain the implementation, eight interpretation tests, and
 four runtime/error fixtures, including the failing acceptance example.
 They are unfinished work, not a verified stage-7 commit. Stage 8, fitted
 choices, performance and final soundness review have not started.
+
+
+## Resolution (2026-11-10)
+
+The coordinator ruled: “docs/spec.md §4.8 rule 13 and decision 7 stand”.
+The §10 acceptance example now writes `Some(p: (Int, Int))`. The reduced
+unannotated package remains unchanged and is checked by the exact E0506
+assertion in `ilang-check/tests/literal_types.rs`. The implementation work
+has resumed from its saved patch; the earlier conflict record is historical.
+Whether rule 13 may take tuple shape from inference without losing principal
+types remains an open language question for a later track, outside T1.

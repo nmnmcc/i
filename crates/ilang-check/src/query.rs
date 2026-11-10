@@ -241,10 +241,7 @@ impl<'a> Query<'a> {
     }
 
     fn def_type(&self, d: DefId) -> Option<String> {
-        if let Some(tree) = self.types.and_then(|t| t.scheme_types.get(&d)) {
-            return Some(tree.text_limited(&crate::types::type_names(self.program, d.module), 12));
-        }
-        if let Some(s) = self.types.and_then(|t| t.schemes.get(&d)) {
+        if let Some(s) = self.types.and_then(|t| t.scheme_hovers.get(&d)) {
             return Some(s.clone());
         }
         match &self.program.def(d).kind {

@@ -1,0 +1,6 @@
+# spec: 4.8
+# expect: compile-error E0520
+name = "spec"
+
+[dependencies]
+std = { path = "../../../../std" }

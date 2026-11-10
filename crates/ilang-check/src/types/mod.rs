@@ -244,6 +244,8 @@ pub struct Typed {
     /// The type scheme of each top-level name, simplified and shown in the
     /// syntax of §3 (§4.7).
     pub schemes: HashMap<DefId, String>,
+    /// Human-facing text; full scheme trees and interfaces stay exact.
+    pub scheme_hovers: HashMap<DefId, String>,
     /// The type scheme of each exported top-level name and of each
     /// declaration (§10.1), whether exported or not: the type of
     /// `schemes`, simplified and named in the same way, as a tree whose

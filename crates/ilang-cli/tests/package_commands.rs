@@ -655,7 +655,7 @@ fn publish_compares_the_interface() {
     write(&dir, &[("src/api.i", &added)]);
     commit(&dir, "two");
     let err = w.fails(&["publish", "1.0.2", "--project", &project]);
-    assert!(err.contains("added value api.two: Int"), "{err}");
+    assert!(err.contains("added value api.two: 2"), "{err}");
     assert!(err.contains("a new minor version, at least 1.1.0"), "{err}");
     let out = w.ok(&["publish", "1.1.0", "--dry-run", "--project", &project]);
     assert!(out.contains("something was added since v1.0.1"), "{out}");
@@ -694,7 +694,7 @@ fn publish_compares_the_interface() {
     write(&dir, &[("src/api.i", &hidden)]);
     commit(&dir, "hide");
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
-    assert!(err.contains("removed value api.two: Int"), "{err}");
+    assert!(err.contains("removed value api.two: 2"), "{err}");
     assert!(
         err.contains("removed constructors api.Shape: Circle(r: Float) | Square(side: Float)"),
         "{err}"
@@ -967,7 +967,7 @@ fn publish_sees_a_new_major_version_of_a_dependency() {
     let (ok, out) = try_publish(&w, &dir, &[], "1.0.1");
     assert!(!ok, "{out}");
     assert!(
-        out.contains("changed value api.f: (x: example.com/dep@1:v.V) -> Int"),
+        out.contains("changed value api.f: (x: example.com/dep@1:v.V) -> 1"),
         "{out}"
     );
     assert!(
