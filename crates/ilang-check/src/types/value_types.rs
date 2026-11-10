@@ -455,7 +455,7 @@ impl Checker<'_> {
                 .to_string();
         } else if let ValueRef::Def(d) = info.value {
             let name = &self.p.def(d).name;
-            let aliases = self
+            let mut aliases = self
                 .p
                 .types
                 .iter()
@@ -463,40 +463,42 @@ impl Checker<'_> {
                 .filter(|(i, a)| {
                     a.module == d.module && self.out.alias_types.contains_key(&TypeId(*i as u32))
                 })
-                .map(|(_, a)| a)
-                .filter(|a| {
+                .filter(|(_, a)| {
                     let TypeBody::Alias(t) = &a.body else {
                         return false;
                     };
-                    let mut found = false;
-                    walk_type(t, &mut |t| {
-                        if matches!(t.kind, TypeKind::Of { value: ValueRef::Def(x), .. } if x == d)
-                        {
-                            found = true;
-                        }
-                    });
-                    found
+                    let mut sources = Vec::new();
+                    crate::order::type_sources(self.p, t, &mut Default::default(), &mut sources);
+                    sources.iter().any(|(_, value)| *value == ValueRef::Def(d))
                 })
-                .map(|a| a.name.clone())
+                .map(|(_, a)| a)
                 .collect::<Vec<_>>();
+            aliases.sort_by_key(|a| !a.exported);
             message = format!(
                 "the type of {}.{name} is still open after source completion",
                 self.p.module(d.module).path
             );
             if let Some(alias) = aliases.first() {
+                let name = &alias.name;
+                let qualified = self
+                    .p
+                    .module(info.module)
+                    .import_names
+                    .iter()
+                    .find(|(_, m)| *m == d.module)
+                    .map_or_else(|| name.clone(), |(m, _)| format!("{m}.{name}"));
+                let shown = if d.module == info.module {
+                    name.as_str()
+                } else {
+                    &qualified
+                };
                 message.push_str(&format!(
-                    "; use {alias}, the alias made by {}",
+                    "; use {shown}, the alias made by {}",
                     self.p.module(d.module).path
                 ));
-                if d.module != info.module
-                    && !self
-                        .p
-                        .types
-                        .iter()
-                        .any(|a| a.module == d.module && a.name == *alias && a.exported)
-                {
+                if d.module != info.module && !alias.exported {
                     message.push_str(&format!(
-                        "; export {alias} from {}",
+                        "; export {name} from {}",
                         self.p.module(d.module).path
                     ));
                 }

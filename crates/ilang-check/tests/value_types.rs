@@ -148,7 +148,7 @@ fn source_module_alias_is_the_foreign_closed_read_boundary() {
     let (g, c) = checked(&[("src/lib.i", lib), ("src/client.i", client)]);
     assert!(
         c.diags.iter().any(|d| d.code == code::VALUE_TYPE_NOT_FIXED
-            && d.message.contains("LocalSize")
+            && d.message.contains("lib.LocalSize")
             && d.message.contains("export")),
         "{:?}",
         g.sources.render_all(&c.diags)
@@ -170,6 +170,20 @@ fn source_module_alias_is_the_foreign_closed_read_boundary() {
     let p = c.program.as_ref().unwrap();
     let (_, ds) = types::check(p, &g.sources);
     assert!(!ds.iter().any(Diagnostic::is_error));
+    // R7's guidance should prefer an exported transitive alias over a private one.
+    let lib = [
+        lib.replace("(Codec, size, LocalSize)", "(Codec, size, PublicSize)"),
+        "\nPublicSize = LocalSize".into(),
+    ]
+    .concat();
+    let (_, c) = checked(&[("src/lib.i", &lib), ("src/client.i", client)]);
+    assert!(
+        c.diags.iter().any(|d| d.code == code::VALUE_TYPE_NOT_FIXED
+            && d.message.contains("use lib.PublicSize")
+            && !d.message.contains("; export")),
+        "{:?}",
+        c.diags
+    );
 }
 
 #[test]
