@@ -327,3 +327,79 @@ fn seeded_script_replays_200_times_at_each_optimization_level() {
         );
     }
 }
+
+#[test]
+fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
+    // runtime.md R2 explicitly orders already-observed failures, independently
+    // of their observation order. Seed the private typed storage directly in
+    // a source copy; the two IO primitives are unused by this pure unit probe.
+    let source = include_str!("../../../lib/i/task.i");
+    let source = source.replace(
+        "@external(\"ilang:request\", \"observe_change\")\nobserve_change: (root: Key(Nil)) -> Request(Nil)",
+        "observe_change = (_root: Key(Nil)) -> Request(Nil) { request.ready(Nil) }",
+    ).replace(
+        "@external(\"ilang:request\", \"has_work\")\nhas_work: (ticket: Ticket) -> Bool",
+        "has_work = (_ticket: Ticket) -> Bool { False }",
+    );
+    assert!(!source.contains("@external(\"ilang:request\""));
+    let source = source
+        + r#"
+@main
+main = () {
+  k: Key(String) = key.new()
+  extension = key.wrap(k, "extension")
+  prefix = key.wrap(k, "prefix")
+  later = key.wrap(k, "later")
+  assert(read(k, lowest_error([([1], prefix), ([2], later)], ([1, 1], extension))) == "prefix")
+  assert(read(k, lowest_error([([1, 1], extension), ([1], prefix)], ([2], later))) == "prefix")
+  assert(read(k, lowest_error([([2], later)], ([1, 1], extension))) == "extension")
+}
+
+"#;
+    for opt in [Level::O0, Level::O2] {
+        let outcome = program(&source, opt)
+            .run_entry(HostOptions::default())
+            .unwrap();
+        assert!(matches!(outcome, Outcome::Ok(Value::Nil)), "{outcome:?}");
+    }
+}
+
+#[test]
+fn user_examples_have_documented_outputs() {
+    for opt in [Level::O0, Level::O2] {
+        for (name, expected) in [
+            ("scope", vec!["42"]),
+            ("race", vec!["loser cancelled", "7"]),
+            ("channel", vec!["hello"]),
+            ("deadlock", vec![]),
+        ] {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/r2-examples")
+                .join(name);
+            let built = build(
+                &path,
+                BuildOptions {
+                    opt,
+                    tests: false,
+                    offline: false,
+                    target: Default::default(),
+                },
+            )
+            .unwrap();
+            let program = Program::from_bytes(&built.wasm).unwrap();
+            let log = services::Log::default();
+            let printed = log.clone();
+            let imports = services::standard(move |text| printed.lock().unwrap().push(text.into()));
+            let outcome = program.run_entry(HostOptions::new(imports)).unwrap();
+            if name == "deadlock" {
+                assert!(
+                    matches!(outcome, Outcome::Stop(ref stop) if stop.message.as_ref().unwrap().lines().next() == Some("panic: task: deadlock")),
+                    "{outcome:?}"
+                );
+            } else {
+                assert!(matches!(outcome, Outcome::Ok(_)), "{name}: {outcome:?}");
+            }
+            assert_eq!(*log.lock().unwrap(), expected, "{name}");
+        }
+    }
+}

@@ -114,3 +114,72 @@ counts a retained current task as runnable, while preserving the current turn.
 The 20 additional exports are five late laws at four dump configurations each:
 derived_seed, public_schemes, invalid_losing_join, invalid_losing_gone and
 shielded_final_io. No source code or test was changed to hide a WAT residual.
+
+After merging f6f9cc3, the repeated full export passed in 315.80 s and produced
+1,232 files (target/r2-wat-merged). All 522 reference files remain present:
+188 ERROR files are byte-identical and 334 compiling files have the already
+explained R2/prerequisite differences. There are 710 added exports.
+Against the stable pre-merge R2 dump, 1,005 of 1,010 shared files are byte-equal.
+The five differences are exactly the source edits inherited from T1:
+
+- 6/strings and 11/equality compare distinct literals through ordinary generic
+  functions so they still exercise runtime equality after literal-type checking.
+  Their new closures/calls add the corresponding capture/re-entry code and sites.
+- 6/blocks makes the same generic comparison change and widens its local n with
+  an ordinary Int-annotated identity call, retaining its runtime pattern test.
+- 11/stop_tail_service (both targets) adds the written Int parameter annotation;
+  the only WAT change is its one source-site column, 14 to 19.
+
+These are the actual changes in git diff 94789e6..f6f9cc3 for those four source
+files; none was edited by R2 to obtain WAT equality. The 222 added dumps include
+T1's new spec cases and the final R2 failure/literal-boundary cases. There is no
+missing export, new ERROR, or unexplained operation change.
+
+The final export after merging c2f41b7 passed in 343.56 s and produced 1,282
+files (target/r2-wat-t2). Every one of the previous 1,232 files is byte-equal:
+822 compiling files and 410 ERROR results. T2 adds 50 exports. Against 1df2fe0,
+all 522 files remain: the same 188 byte-equal ERROR results and the same 334
+compiling-file differences explained above; 760 files are added. Thus the T2
+integration introduces no further operation or numbering difference in any
+previously audited export. The rebuilt O2 r2 fixture also prints byte-identical
+WAT to the artifact used for the final functions 70–72 inspection.
+
+The approved performance follow-up's frozen-source export passed in 405.64 s:
+target/r2-wat-complete-head contains 1,286 results. Against 1df2fe0, all 522
+reference results remain present: 188 byte-equal ERROR results and the 334
+compiling differences attributed above; 764 results are added. There is no
+error-status transition. Against target/r2-wat-t2, all 433 ERROR results are
+byte-equal, all 849 compiling exports change, and four task_index exports are
+added (the four dump configurations). The later redesign merge 1a8fee2 adds
+only the two prior-art Markdown studies, so it changes no exported module.
+
+The exact, unnormalized runtime-function comparison across those 849 compiling
+files finds only $ilang_start changed, in every file. Every other common named
+compiler-runtime function is byte-identical. This comparison excludes numeric
+source-function names ($f/$s/$r/$j followed by digits) and the generated $start
+wrapper; those are examined by their source ownership instead. The result is
+recorded in target/r2-runtime-complete-exact.json. It is a raw runtime-code
+comparison, not the unsupported stock-normalizer substitution described above.
+
+The universal initializer change registers private NoTasks and TaskNode. The
+hello constructor table grows from 120 to 122 entries. Constructor/type/constant
+references consequently shift as K3 specifies; unused library types still
+participate in numbering. The source-operation changes are confined to i/task:
+TaskTree insertion/removal/replacement and path indexes, the two-list FIFO,
+ScopeState pending counts and child retirement, State/TaskState private fields,
+maintenance and ticket-interest selection, deferred complete-generator path
+derivation, and projected boundary-callback captures. Their additional helpers
+and changed layouts also renumber source functions, re-entry functions, data
+and source points. No Rust runtime or compiler lowering was optimized in this
+follow-up. The recorded_failure arbitration probe and new literal-boundary cases
+account for their own new test bodies. The nested_interest fixture adds its
+bounded inner CPU sibling, and the regenerated law fixture adds task_index.
+No remaining difference requires an unaccounted compiler-operation change.
+
+The projected-capture O0 boundary callback stores exactly path, run key, Runner
+and body in its four-value closure array, rather than State or TaskState. Its
+surrounding re-entry frame saves no scheduler snapshot. O2 attribution checks
+every optimized function body against the actual timed artifact before using
+debug names. The hot WAT and executed allocation/call counts in r2-performance.md
+come from that same frozen source. Public task/request schemes are unchanged;
+all O0/O2 retention, cancellation and re-entry laws remain independent checks.

@@ -152,9 +152,27 @@ forever = () -> Never ! task.Scheduler {
 // §12.8: nested waiter interests reach the root despite a CPU-yielding sibling.
 nested_interest = (gates ! Gates) {
 	task.race(
-		() { task.run(() { request.await_owned(gates.wait(9)) }) }
+		() {
+			task.run(() {
+				task.race(() { request.await_owned(gates.wait(9)) }, () {
+					bounded_cpu(32)
+				})
+			})
+		}
 		forever
 	)
+}
+
+// A missing nested progress-interest route fails after turns, without a timer
+// or an indefinitely hanging test process. A delivered answer gets a FIFO turn.
+bounded_cpu = (turns: Int) -> Never ! task.Scheduler {
+	turns |> {
+		0 -> panic("nested IO progress was not forwarded")
+		_ -> {
+			task.yield()
+			bounded_cpu(turns - 1)
+		}
+	}
 }
 
 // §6.4: every Owner affiliated with this run's Root counts as work.

@@ -140,7 +140,7 @@ Scheduler {
 	Scheduler(
 		run:     Key(Nil)
 		path:    Keyed
-		seed:    rng.Generator
+		seed:    () -> rng.Generator
 		witness: Witness
 		step:    (Command) -> StepAnswer
 		runner:  Runner
@@ -210,6 +210,8 @@ Status {
 TaskState {
 	TaskState(
 		path:            List(Int)
+		serial:          Int
+		queued:          Bool
 		parent:          Maybe(Address)
 		origin:          Maybe(ScopeInfo)
 		base:            List(Address)
@@ -241,6 +243,7 @@ ScopeState {
 		foreign:      List(Hop)
 		token:        Key(Nil)
 		children:     List(List(Int))
+		pending:      Int
 		mark:         BodyMark
 		errors:       List((List(Int), Keyed))
 		cancellation: Maybe(Cause)
@@ -296,25 +299,32 @@ Forward {
 
 State {
 	State(
-		run:           Key(Nil)
-		runner:        Runner
-		root:          request.Root
-		tasks:         List(TaskState)
-		scopes:        List(ScopeState)
-		channels:      List(ChannelState)
-		shares:        List(ShareState)
-		current:       Maybe(List(Int))
-		waiting:       List(List(Int))
-		ready:         List(List(Int))
-		registrations: List(Registration)
-		forwards:      List(Forward)
-		choices:       List(List(Int))
-		scripted:      Bool
-		failure:       Maybe(List(Int))
-		cancellation:  Maybe(Cause)
-		outer_cancel:  Maybe(() -> Never)
-		epoch:         Int
-		registration:  Int
+		run:             Key(Nil)
+		runner:          Runner
+		root:            request.Root
+		tasks:           TaskTree(TaskState)
+		active:          TaskTree(List(Int))
+		unclean:         TaskTree(List(Int))
+		task_serial:     Int
+		root_path:       List(Int)
+		cancel_history:  Bool
+		message_history: Bool
+		scopes:          List(ScopeState)
+		channels:        List(ChannelState)
+		shares:          List(ShareState)
+		current:         Maybe(List(Int))
+		waiting:         List(List(Int))
+		ready:           List(List(Int))
+		ready_back:      List(List(Int))
+		registrations:   List(Registration)
+		forwards:        List(Forward)
+		choices:         List(List(Int))
+		scripted:        Bool
+		failure:         Maybe(List(Int))
+		cancellation:    Maybe(Cause)
+		outer_cancel:    Maybe(() -> Never)
+		epoch:           Int
+		registration:    Int
 	)
 }
 
@@ -473,23 +483,195 @@ without(A) = (xs: List(A), value: A) -> List(A) {
 	}
 }
 
-find_task = (tasks: List(TaskState), path: List(Int)) -> TaskState {
-	tasks |> {
-		[] -> panic("task: task is gone")
-		[t, ..rest] -> { t.path == path } |> {
-			True  -> t
-			False -> find_task(rest, path)
+// Persistent AVL storage gives retained results logarithmic lookup without
+// scanning them at every scheduling point. Active and unfinished-cleanup
+// indexes use creation serials, preserving cancellation and delivery order.
+TaskTree(A) {
+	NoTasks
+	TaskNode(Int, List(Int), A, TaskTree(A), TaskTree(A))
+}
+
+tree_height(A) = (tree: TaskTree(A)) -> Int {
+	tree |> {
+		NoTasks                 -> 0
+		TaskNode(h, _, _, _, _) -> h
+	}
+}
+
+tree_node(A) = (
+	id: List(Int)
+	task: A
+	left: TaskTree(A)
+	right: TaskTree(A)
+) -> TaskTree(A) {
+	a = tree_height(left)
+	b = tree_height(right)
+	h = { a > b } |> {
+		True  -> a
+		False -> b
+	}
+	TaskNode(h + 1, id, task, left, right)
+}
+
+tree_balance(A) = (
+	id: List(Int)
+	task: A
+	left: TaskTree(A)
+	right: TaskTree(A)
+) -> TaskTree(A) {
+	delta = tree_height(left) - tree_height(right)
+	(delta, left, right) |> {
+		(d, TaskNode(_, lid, lt, ll, lr), _) ? d > 1 -> {
+			{ tree_height(ll) >= tree_height(lr) } |> {
+				True -> tree_node(lid, lt, ll, tree_node(id, task, lr, right))
+				False -> lr |> {
+					TaskNode(_, mid, mt, ml, mr) -> tree_node(
+						mid
+						mt
+						tree_node(lid, lt, ll, ml)
+						tree_node(id, task, mr, right)
+					)
+					NoTasks -> panic("task: invalid left rotation")
+				}
+			}
+		}
+		(d, _, TaskNode(_, rid, rt, rl, rr)) ? d < -1 -> {
+			{ tree_height(rr) >= tree_height(rl) } |> {
+				True -> tree_node(rid, rt, tree_node(id, task, left, rl), rr)
+				False -> rl |> {
+					TaskNode(_, mid, mt, ml, mr) -> tree_node(
+						mid
+						mt
+						tree_node(id, task, left, ml)
+						tree_node(rid, rt, mr, rr)
+					)
+					NoTasks -> panic("task: invalid right rotation")
+				}
+			}
+		}
+		_ -> tree_node(id, task, left, right)
+	}
+}
+
+tree_find(A) = (tree: TaskTree(A), wanted: List(Int)) -> Maybe(A) {
+	tree |> {
+		NoTasks -> Absent
+		TaskNode(_, id, task, left, right) -> { wanted == id } |> {
+			True -> Present(task)
+			False -> { first_path(wanted, id) } |> {
+				True  -> tree_find(left, wanted)
+				False -> tree_find(right, wanted)
+			}
 		}
 	}
 }
 
-put_task = (tasks: List(TaskState), task: TaskState) -> List(TaskState) {
-	tasks |> {
-		[] -> [task]
-		[t, ..rest] -> { t.path == task.path } |> {
-			True  -> [task, ..rest]
-			False -> [t, ..put_task(rest, task)]
+find_task = (tasks: TaskTree(TaskState), path: List(Int)) -> TaskState {
+	tree_find(tasks, path) |> {
+		Present(t) -> t
+		Absent     -> panic("task: task is gone")
+	}
+}
+
+put_task(A) = (tree: TaskTree(A), id: List(Int), task: A) -> TaskTree(A) {
+	tree |> {
+		NoTasks -> tree_node(id, task, NoTasks, NoTasks)
+		TaskNode(_, old, value, left, right) -> { id == old } |> {
+			True -> tree_node(id, task, left, right)
+			False -> { first_path(id, old) } |> {
+				True -> tree_balance(
+					old
+					value
+					put_task(left, id, task)
+					right
+				)
+				False -> tree_balance(
+					old
+					value
+					left
+					put_task(right, id, task)
+				)
+			}
 		}
+	}
+}
+
+// Replacing a value cannot change subtree heights. Rebalance only insertions
+// and removals; normal task status updates preserve the existing shape.
+update_task(A) = (
+	tree: TaskTree(A)
+	wanted: List(Int)
+	value: A
+) -> TaskTree(A) {
+	tree |> {
+		NoTasks -> panic("task: missing task update")
+		TaskNode(h, id, task, left, right) -> { wanted == id } |> {
+			True -> TaskNode(h, id, value, left, right)
+			False -> { first_path(wanted, id) } |> {
+				True -> TaskNode(
+					h
+					id
+					task
+					update_task(left, wanted, value)
+					right
+				)
+				False -> TaskNode(
+					h
+					id
+					task
+					left
+					update_task(right, wanted, value)
+				)
+			}
+		}
+	}
+}
+
+tree_first(A) = (tree: TaskTree(A)) -> (List(Int), A) {
+	tree |> {
+		NoTasks                        -> panic("task: empty task index")
+		TaskNode(_, id, t, NoTasks, _) -> (id, t)
+		TaskNode(_, _, _, left, _)     -> tree_first(left)
+	}
+}
+
+drop_task(A) = (tree: TaskTree(A), wanted: List(Int)) -> TaskTree(A) {
+	tree |> {
+		NoTasks -> NoTasks
+		TaskNode(_, id, task, left, right) -> { wanted == id } |> {
+			True -> (left, right) |> {
+				(NoTasks, _) -> right
+				(_, NoTasks) -> left
+				_ -> {
+					(next, value) = tree_first(right)
+					tree_balance(next, value, left, drop_task(right, next))
+				}
+			}
+			False -> { first_path(wanted, id) } |> {
+				True  -> tree_balance(id, task, drop_task(left, wanted), right)
+				False -> tree_balance(id, task, left, drop_task(right, wanted))
+			}
+		}
+	}
+}
+
+tree_rows(A) = (tree: TaskTree(A), rest: List(A)) -> List(A) {
+	tree |> {
+		NoTasks -> rest
+		TaskNode(_, _, task, left, right) -> tree_rows(
+			left
+			[task, ..tree_rows(right, rest)]
+		)
+	}
+}
+
+drop_children = (
+	tree: TaskTree(TaskState)
+	paths: List(List(Int))
+) -> TaskTree(TaskState) {
+	paths |> {
+		[]             -> tree
+		[path, ..rest] -> drop_children(drop_task(tree, path), rest)
 	}
 }
 
@@ -513,10 +695,81 @@ put_scope = (scopes: List(ScopeState), scope: ScopeState) -> List(ScopeState) {
 	}
 }
 
-set_task = (s: State, t: TaskState) { State(..s, tasks: put_task(s.tasks, t)) }
+// Index payloads are immutable paths, so status updates only copy the main
+// tree. Touch active membership on insertion/cleanup, never on every switch.
+index_add = (tree: TaskTree(List(Int)), id: List(Int), path: List(Int)) {
+	tree_find(tree, id) |> {
+		Present(_) -> tree
+		Absent     -> put_task(tree, id, path)
+	}
+}
+
+index_drop = (tree: TaskTree(List(Int)), id: List(Int)) {
+	tree_find(tree, id) |> {
+		Present(_) -> drop_task(tree, id)
+		Absent     -> tree
+	}
+}
+
+record_task = (
+	s: State
+	t: TaskState
+	tasks: TaskTree(TaskState)
+	active: TaskTree(List(Int))
+) {
+	id = [t.serial]
+	unclean = t.status |> {
+		Ended ? core.not(t.clean) -> index_add(s.unclean, id, t.path)
+		_                         -> index_drop(s.unclean, id)
+	}
+	next = State(
+		..s
+		tasks:           tasks
+		active:          active
+		unclean:         unclean
+		cancel_history:  s.cancel_history || t.cancelled_by != Absent
+		message_history: s.message_history || core.not(t.messages == [])
+	)
+	{ t.clean } |> {
+		False -> next
+		True -> tree_find(s.active, id) |> {
+			Absent -> next
+			Present(_) -> t.parent |> {
+				Absent -> next
+				Present(parent) -> {
+					scope = find_scope(next.scopes, parent)
+					set_scope(
+						next
+						ScopeState(..scope, pending: scope.pending - 1)
+					)
+				}
+			}
+		}
+	}
+}
+
+set_task = (s: State, t: TaskState) {
+	active = { t.clean } |> {
+		True  -> index_drop(s.active, [t.serial])
+		False -> s.active
+	}
+	record_task(s, t, update_task(s.tasks, t.path, t), active)
+}
+
+add_task = (s: State, t: TaskState) {
+	active = { t.clean } |> {
+		True  -> s.active
+		False -> put_task(s.active, [t.serial], t.path)
+	}
+	record_task(s, t, put_task(s.tasks, t.path, t), active)
+}
 
 set_scope = (s: State, scope: ScopeState) {
-	State(..s, scopes: put_scope(s.scopes, scope))
+	State(
+		..s
+		scopes:         put_scope(s.scopes, scope)
+		cancel_history: s.cancel_history || scope.cancellation != Absent
+	)
 }
 
 /// An inner delimiter has a fixed pure result type. Its body was kept at
@@ -596,7 +849,7 @@ path = (own ! Scheduler) {
 random = (own ! Scheduler) {
 	own |> {
 		DetachedScheduler -> panic("task: no scheduler")
-		Scheduler(..)     -> own.seed
+		Scheduler(..)     -> own.seed()
 	}
 }
 
@@ -668,9 +921,9 @@ run_control = (reply: StepAnswer) {
 make_scheduler = (
 	b: Boundary(Turn, Never, Never)
 	task_path: List(Int)
-	s: State
+	run: Key(Nil)
+	upstream: Runner
 ) -> Scheduler {
-	upstream = s.runner
 	upstream |> {
 		DetachedRunner -> panic("task: no scheduler")
 		Runner(..) -> {
@@ -725,14 +978,17 @@ make_scheduler = (
 				answer(route(Wait([ticket])))
 				Nil
 			})
-			generator = fail.catch(() {
-				rng.at_path(upstream.seed, task_path)
-			}) |> {
-				Ok(g)    -> g
-				Error(_) -> panic("task: invalid task path")
+			// Derive only when random() is read. Task paths/seed are immutable;
+			// starting an empty child does not need any of the generator's words.
+			seed = upstream.seed
+			generator = () {
+				fail.catch(() { rng.at_path(seed, task_path) }) |> {
+					Ok(g)    -> g
+					Error(_) -> panic("task: invalid task path")
+				}
 			}
 			Scheduler(
-				s.run
+				run
 				key.wrap(path_key, task_path)
 				generator
 				Local(b)
@@ -867,11 +1123,17 @@ remove_registration = (s: State, task_path: List(Int)) {
 }
 
 queue = (s: State, task_path: List(Int)) {
-	{ contains(s.ready, task_path) } |> {
-		True  -> s
-		False -> State(..s, ready: append(s.ready, [task_path]))
+	task = find_task(s.tasks, task_path)
+	{ task.queued } |> {
+		True -> s
+		False -> {
+			next = set_task(s, TaskState(..task, queued: True))
+			State(..next, ready_back: [task_path, ..next.ready_back])
+		}
 	}
 }
+
+has_ready = (s: State) { core.not(s.ready == [] && s.ready_back == []) }
 
 reply = (
 	s: State
@@ -900,9 +1162,14 @@ accept_cancel = (s: State, t: TaskState, c: Cause) -> State {
 						status:  Ended
 						outcome: Cancelled(c)
 						clean:   True
+						queued:  False
 					)
 				)
-				State(..next, ready: without(next.ready, t.path))
+				State(
+					..next
+					ready:      without(next.ready, t.path)
+					ready_back: without(next.ready_back, t.path)
+				)
 			}
 			Ended | Running -> s
 			_ -> frame_plan(t.frames, c) |> {
@@ -977,10 +1244,11 @@ accept_cancel = (s: State, t: TaskState, c: Cause) -> State {
 	}
 }
 
-propagate_tasks = (s: State, rows: List(TaskState)) -> State {
+propagate_tasks = (s: State, rows: List(List(Int))) -> State {
 	rows |> {
 		[] -> s
-		[t, ..rest] -> {
+		[path, ..rest] -> {
+			t = find_task(s.tasks, path)
 			next = cause_for_chain(s, t, t.chain) |> {
 				Absent     -> s
 				Present(c) -> accept_cancel(s, t, c)
@@ -990,7 +1258,12 @@ propagate_tasks = (s: State, rows: List(TaskState)) -> State {
 	}
 }
 
-propagate = (s: State) { propagate_tasks(s, s.tasks) }
+propagate = (s: State) {
+	{ s.cancel_history || s.cancellation != Absent } |> {
+		False -> s
+		True  -> propagate_tasks(s, tree_rows(s.active, []))
+	}
+}
 
 cancel_scope = (s: State, id: Address) -> State {
 	scope = find_scope(s.scopes, id)
@@ -1296,17 +1569,23 @@ scopes_of = (s: State, task_path: List(Int)) {
 	any(s.scopes, (scope: ScopeState) { scope.body == task_path })
 }
 
-refresh_clean = (s: State) {
-	State(..s, tasks: list_map(s.tasks, (t: TaskState) {
-		t.status |> {
-			Ended ? core.not(t.clean) -> TaskState(
-				..t
-				clean: core.not(scopes_of(s, t.path))
-			)
-			_ -> t
+refresh_rows = (s: State, rows: List(List(Int))) -> State {
+	rows |> {
+		[] -> s
+		[path, ..rest] -> {
+			t = find_task(s.tasks, path)
+			{ scopes_of(s, t.path) } |> {
+				True -> refresh_rows(s, rest)
+				False -> refresh_rows(
+					set_task(s, TaskState(..t, clean: True))
+					rest
+				)
+			}
 		}
-	}))
+	}
 }
+
+refresh_clean = (s: State) { refresh_rows(s, tree_rows(s.unclean, [])) }
 
 channel_owned = (c: ChannelState, id: Address) {
 	c.owner |> {
@@ -1345,9 +1624,7 @@ retire_scope = (s: State, scope: ScopeState) -> State {
 		shares: filter(s.shares, (row: ShareState) {
 			row.owner != scope.address
 		})
-		tasks: filter(s.tasks, (t: TaskState) {
-			t.parent != Present(scope.address)
-		})
+		tasks: drop_children(s.tasks, scope.children)
 	)
 	body = find_task(next.tasks, scope.body)
 	body.status |> {
@@ -1368,16 +1645,15 @@ retire_scope = (s: State, scope: ScopeState) -> State {
 retire_scopes = (s: State, rows: List(ScopeState)) -> State {
 	rows |> {
 		[] -> s
-		[scope, ..rest] -> {
+		[row, ..rest] -> {
+			scope = find_scope(s.scopes, row.address)
 			closed = scope.mark |> {
 				BodyOpen -> False
 				_        -> True
 			}
 			can_retire = { closed } |> {
 				False -> False
-				True -> core.not(any(s.tasks, (t: TaskState) {
-					t.parent == Present(scope.address) && core.not(t.clean)
-				}))
+				True  -> scope.pending == 0
 			}
 			{ can_retire } |> {
 				False -> retire_scopes(s, rest)
@@ -1524,6 +1800,8 @@ do_command = (
 			}
 			child = TaskState(
 				child_path
+				s.task_serial + 1
+				False
 				Present(scope.address)
 				Present(info)
 				scope.chain
@@ -1543,12 +1821,19 @@ do_command = (
 				clean
 			)
 			opener = TaskState(..t, spawn: index)
-			next = set_task(set_task(s, opener), child)
+			next = add_task(
+				set_task(State(..s, task_serial: s.task_serial + 1), opener)
+				child
+			)
 			recorded = set_scope(
 				next
 				ScopeState(
 					..scope
-					children: append(scope.children, [child_path])
+					children: [child_path, ..scope.children]
+					pending: { clean } |> {
+						True  -> scope.pending
+						False -> scope.pending + 1
+					}
 				)
 			)
 			queued = { clean } |> {
@@ -1584,6 +1869,7 @@ do_command = (
 				[]
 				key.new()
 				[]
+				0
 				BodyOpen
 				[]
 				Absent
@@ -1816,22 +2102,33 @@ observe_completion = (s: State, t: TaskState, completion: Completion) -> State {
 }
 
 turn = (s: State, t: TaskState) -> Turn {
+	// Project before the callback: suspended tasks must not retain State or a
+	// TaskState snapshot through the boundary body's closure environment.
 	t.status |> {
-		Dormant(start) -> control.boundary((b) {
-			own = make_scheduler(b, t.path, s)
-			Finished(t.path, start.body(own))
-		})
+		Dormant(start) -> {
+			path = t.path
+			run = s.run
+			runner = s.runner
+			body = start.body
+			control.boundary((b) {
+				own = make_scheduler(b, path, run, runner)
+				Finished(path, body(own))
+			})
+		}
 		Runnable(k, value) -> control.resume(k, value)
 		_                  -> panic("task: task is not runnable")
 	}
 }
 
-interests_tasks = (tasks: List(TaskState)) -> List(Ticket) {
-	tasks |> {
+interests_tasks = (s: State, paths: List(List(Int))) -> List(Ticket) {
+	paths |> {
 		[] -> []
-		[t, ..rest] -> t.status |> {
-			WaitingTicket(_, tickets) -> append(tickets, interests_tasks(rest))
-			_                         -> interests_tasks(rest)
+		[path, ..rest] -> find_task(s.tasks, path).status |> {
+			WaitingTicket(_, tickets) -> append(
+				tickets
+				interests_tasks(s, rest)
+			)
+			_ -> interests_tasks(s, rest)
 		}
 	}
 }
@@ -1844,7 +2141,7 @@ interests_forward = (rows: List(Forward)) -> List(Ticket) {
 }
 
 interests = (s: State) {
-	all = append(interests_tasks(s.tasks), interests_forward(s.forwards))
+	all = append(interests_tasks(s, s.waiting), interests_forward(s.forwards))
 	filter(all, (ticket: Ticket) { core.not(request.settled(ticket)) })
 }
 
@@ -1859,7 +2156,10 @@ apply_run_control = (s: State, result: RunControl) {
 }
 
 finished_run = (s: State) {
-	core.not(any(s.tasks, (t: TaskState) { core.not(t.clean) }))
+	s.active |> {
+		NoTasks -> True
+		_       -> False
+	}
 }
 
 run_reply = (s: State) -> RunReply {
@@ -1867,33 +2167,46 @@ run_reply = (s: State) -> RunReply {
 		Present(abort) -> RunCancelled(abort)
 		Absent -> s.failure |> {
 			Present(p) -> RunError(p)
-			Absent -> s.tasks |> {
-				[root] -> root.outcome |> {
-					Success(v) | Failure(v) -> RunOk(v)
-					_                       -> panic("task: missing root result")
-				}
-				_ -> panic("task: invalid root task")
+			Absent -> find_task(s.tasks, s.root_path).outcome |> {
+				Success(v) | Failure(v) -> RunOk(v)
+				_                       -> panic("task: missing root result")
 			}
 		}
 	}
 }
 
-choose_turn = (s: State) -> State {
+choose_turn = (state: State) -> State {
+	s = (state.ready, state.ready_back) |> {
+		([], [_, .._]) -> State(
+			..state
+			ready:      reverse(state.ready_back, [])
+			ready_back: []
+		)
+		_ -> state
+	}
 	s.current |> {
 		Present(_) -> s
 		Absent -> s.choices |> {
 			[] -> s.ready |> {
-				[]          -> s
-				[p, ..rest] -> State(..s, current: Present(p), ready: rest)
+				[] -> s
+				[p, ..rest] -> {
+					t = find_task(s.tasks, p)
+					next = set_task(s, TaskState(..t, queued: False))
+					State(..next, current: Present(p), ready: rest)
+				}
 			}
-			[wanted, ..rest] -> { contains(s.ready, wanted) } |> {
-				True -> State(
-					..s
-					current: Present(wanted)
-					ready:   without(s.ready, wanted)
-					choices: rest
-				)
-				False -> cancel_run(
+			[wanted, ..rest] -> tree_find(s.tasks, wanted) |> {
+				Present(t) ? t.queued -> {
+					next = set_task(s, TaskState(..t, queued: False))
+					State(
+						..next
+						current:    Present(wanted)
+						ready:      without(s.ready, wanted)
+						ready_back: without(s.ready_back, wanted)
+						choices:    rest
+					)
+				}
+				_ -> cancel_run(
 					State(..s, failure: Present(wanted), choices: [])
 				)
 			}
@@ -1922,14 +2235,25 @@ loop = (state: State) -> RunReply {
 							runner.poll(
 								s.run
 								work
-								s.current != Absent || core.not(s.ready == [])
+								s.current != Absent || has_ready(s)
 							)
 						)
 					}
 
-					prepared = choose_turn(
-						maintain(choose_turn(maintain(polled)))
-					)
+					after_poll = {
+						work == [] &&
+							polled.epoch == s.epoch &&
+							core.not(polled.message_history) &&
+							polled.cancellation == s.cancellation
+					} |> {
+						True  -> polled
+						False -> maintain(polled)
+					}
+					chosen = choose_turn(after_poll)
+					prepared = { chosen.epoch == after_poll.epoch } |> {
+						True  -> chosen
+						False -> choose_turn(maintain(chosen))
+					}
 					prepared.current |> {
 						Present(p) -> {
 							t = find_task(prepared.tasks, p)
@@ -1954,9 +2278,26 @@ loop = (state: State) -> RunReply {
 										State(
 											..prepared
 											current: Absent
-											ready:   without(prepared.ready, p)
+											ready: { t.queued } |> {
+												True -> without(
+													prepared.ready
+													p
+												)
+												False -> prepared.ready
+											}
+											ready_back: { t.queued } |> {
+												True -> without(
+													prepared.ready_back
+													p
+												)
+												False -> prepared.ready_back
+											}
 										)
-										TaskState(..t, status: Running)
+										TaskState(
+											..t
+											status: Running
+											queued: False
+										)
 									)
 									turn(running, t) |> {
 										Switched(path, command, k) -> loop(
@@ -2333,6 +2674,8 @@ execute_body(A, E, N) = (
 			start = make_start(body, results, errors, False)
 			root_task = TaskState(
 				prefix
+				0
+				True
 				Absent
 				Absent
 				[]
@@ -2360,13 +2703,20 @@ execute_body(A, E, N) = (
 				run_id
 				routing
 				root
-				[root_task]
+				put_task(NoTasks, prefix, root_task)
+				put_task(NoTasks, [0], prefix)
+				NoTasks
+				0
+				prefix
+				False
+				False
 				[]
 				[]
 				[]
 				Absent
 				[]
 				[prefix]
+				[]
 				[]
 				[]
 				choices
@@ -2977,7 +3327,7 @@ post_notice = (s: State, notice: ForeignNotice) -> State {
 		[hop, .._] -> {
 			check_run(s.run, hop.run)
 			path = read(path_key, hop.task)
-			alive = any(s.tasks, (t: TaskState) { t.path == path })
+			alive = tree_find(s.tasks, path) != Absent
 			{ alive } |> {
 				False -> s
 				True -> {
@@ -3060,17 +3410,22 @@ pump_task_messages = (s: State, path: List(Int)) -> State {
 	}
 }
 
-pump_rows = (s: State, rows: List(TaskState)) -> State {
+pump_rows = (s: State, rows: List(List(Int))) -> State {
 	rows |> {
 		[] -> s
-		[t, ..rest] -> t.messages |> {
+		[path, ..rest] -> find_task(s.tasks, path).messages |> {
 			[] -> pump_rows(s, rest)
-			_  -> pump_rows(pump_task_messages(s, t.path), rest)
+			_  -> pump_rows(pump_task_messages(s, path), rest)
 		}
 	}
 }
 
-pump_messages = (s: State) { pump_rows(s, s.tasks) }
+pump_messages = (s: State) {
+	{ s.message_history } |> {
+		False -> s
+		True  -> pump_rows(s, tree_rows(s.active, []))
+	}
+}
 
 relay_notice = (
 	s: State

@@ -724,3 +724,334 @@ design). Git refused to overwrite the pending old-syntax-check inventory edits;
 it changed no source and left no merge in progress. This green checkpoint is
 committed first, then redesign is merged and the gates are repeated. No stash,
 branch switch, root-checkout write or shared lock change was used.
+
+## Stage 7: integrate current redesign and close failure-order laws
+
+The merge to f6f9cc3 needed four textual resolutions. The host-field validator
+keeps R2's normalization of Request/Result and adds T1's diagnostic on that
+normalized wire result/error type. Spec §10.3 now says host-given Int/String
+members “must have all its values”; the request result is such a host-given
+value. literal_answer rejects Request("ok") with E0320, while literal_parameter
+accepts a finite outgoing String parameter and checks its full String answer.
+Both pass at O0/O2. The spec merge preserves that paragraph and the R2 boundary
+exclusions together. The solver keeps both the invariant-key test and all T1
+literal tests. The syntax inventory uses a three-way key merge, retaining T1's
+consumed parser entries and R2's genuine non-source classifications.
+
+The merge message initially retained Git's conflict comments after the trailer;
+it was immediately amended so its last line is the required co-author line.
+There was no persistent Git configuration change. The prior refused merge
+changed no files; the four later conflicts were resolved and committed.
+
+failed_sibling_join is R2/R4a's named trace: a child fails before its sibling
+starts, while the body is joining that sibling. The body final yields and ends,
+then the original error is returned; the cancelled join does not stop the body.
+For the separate least-path law, the Rust integration test copies the actual
+plain-i scheduler source into a temporary pure probe and seeds its private
+Keyed error storage. The two unused IO observation declarations get pure stubs
+only in that copy. Its calls to the unchanged lowest_error/read code check both
+observation orders, prefix [1] before [1,1], and [1,1] before [2]. This is a
+storage/arbitration unit test, not a claim of simultaneous M:1 failures or a
+replacement scheduler. It passes on the Rust host at O0/O2.
+
+The default initial seed follows spec §2.6.1's “run remains FIFO, path [], seed
+0, with no entropy draw” and runtime D5's corresponding shipped-adapter text.
+Explicit top uses §6.5's “replaces only the seed ... preserves its path allocator
+and wait route.” The generator golden was rerun after the merge; the inferred
+library interface did not change, including the documented row intersections.
+
+The post-merge full Rust gate found one upstream fixture ambiguity:
+types::pattern::shared_place_tests::written_occurrences_include_other_constructors_and_aliases
+searches all program types by the spelling Event and selects i/task.Event rather
+than the fixture's app/main.Event. The failed assertion is pattern.rs:1267.
+Spec §2.3's ordinary module-qualified identities permit both types, and runtime
+§6.1 requires R2's public Event name. The precise prepared fix adds the module
+app/main to that test's id lookup, preserving every assertion. This file is
+outside R2's owned regions, so it remains unmodified pending the requested
+ownership ruling. The one-line diff is target/r2-pattern-fixture.patch.
+No test was skipped or weakened to obtain a green full-Rust claim.
+
+Independent post-merge checks completed: the full spec suite passed 322/322
+cases at O0/O2; dev-verify i passed 1,465 std, two hello and fifteen bench tests
+per level plus WASI smoke; dev-verify js passed 79 Node and 57 browser tests;
+old-syntax-check passed 1,459 blocks with seventeen future parser entries after
+T1 consumed its entries; the complete ilang-wasm test package passed. These
+independent results are not a substitute for the currently failed full Rust
+gate. The direct Rust R2 matrix (four tests, including all 200 repeats at O0/O2)
+also passed after the merge.
+
+The nested-interest host probe now contains both an inner CPU-yielding sibling
+and an outer one. This explicitly exercises Runner.poll forwarding while the
+nested loop is runnable, rather than proving only idle Runner.wait forwarding.
+Its inner CPU branch stops after 32 unanswered turns, so a missing route fails
+without a timer or an indefinitely hung test. The expected answer still comes
+only from the explicit completion gate. The four-test Rust matrix passed this
+stronger probe; the JS artifact and test repeat follow its regeneration.
+
+Final busy-machine benchmark repetition, after the go poll correction and T1
+merge, used the same five-sample script and checked sums. Wall-time samples:
+
+| Aggregate operation | Samples, seconds | Median cost |
+| --- | --- | --- |
+| 1,000 spawn/scope/join/retire cycles | .527, .631, .576, .537, .543 | 543 microseconds/cycle |
+| 1,000 yields | .022, .014, .018, .014, .016 | 16 microseconds/switch |
+| 1,000 rendezvous transfers | .053, .057, .065, .053, .061 | 57 microseconds/transfer, 28.5 per endpoint |
+
+These replace the earlier checkpoint numbers for the final implementation.
+They remain aggregate, busy-machine substitutes for isolated primitive costs;
+no quiet-machine latency or absent numeric target is claimed.
+
+Native §5 does state a within-2% goal for existing one-worker benchmarks against
+the M:1 baseline. That is a multicore implementation/epoch-fallback comparison;
+its table also asks for a 1/2/4/8/16-worker curve and encode/lock measurements.
+Native §7 explicitly defers queue encoding/claim ownership and transport to MC.
+This R2 implementation supplies that M:1 baseline; it has no multicore variant
+to compare and does not claim the 2% target. There is no prior i/task API at the
+1df2fe0 executable for a task-spawn/channel before-and-after comparison.
+
+The prepared pattern fixture fix was validated in an isolated git-archive copy
+under this lane's target/r2-pattern-probe: the exact formerly failing test passed
+with every assertion unchanged (target/r2-pattern-isolated.log). This is a
+substitute isolated verification of the proposed fix, not a green check of the
+unchanged repository file. No owned-path exception is assumed from silence.
+The final stronger JS artifact passed dev-verify js: 79 Node and 57 browser
+tests, including all 81 runtime spec bodies at O0/O2 and the 200-run matrix.
+The O2 retention functions 70–72 were re-inspected in the final artifact; the
+restoring/non-tail-call and saved-base re-entry bodies remain byte-identical to
+the earlier inspected versions.
+
+The next redesign merge, c2f41b7 (T2 value types and alias patterns), needed two
+textual resolutions. Its early host-field skip for value-dependent types is
+retained before R2's function destructuring and wire normalization. T2's joint
+J6 sentence is “T2’s context check precedes host/service shape checks”; such
+signatures are rejected with E0531, not deferred accepted ABI declarations.
+The existing early-context provenance tests verify that distinction. The
+syntax inventory again uses a three-way key merge, so T2's consumed entries
+stay removed and R2's non-source strings remain classified.
+
+The merge's git diff --cached --check reported upstream review cases.tsv's
+empty second-column tabs as trailing whitespace, and an upstream main.i blank
+line at EOF. These are T2 review fixtures outside R2's paths; the merge keeps
+their bytes. This whitespace diagnostic is reported separately from the real
+format/lint/test gates. The merge commit ends with the required co-author line.
+
+After that merge, the full gate again passed fmt and Clippy and failed the
+same outside-owned-path Event fixture (29 passed, one failed, four pre-existing
+ignored tests). Independent checks passed all 337 spec cases at O0/O2 and the
+four Rust R2 integration tests, including the 200-repeat matrix. Regenerating
+the inferred library golden produced no diff. The O2 fixture printed with
+wasm-tools is byte-identical to the previously inspected final O2 WAT, so the
+retention inspection still describes the rebuilt artifact.
+
+The repeated WAT export passed in 343.56 s: 1,282 files. All 1,232 files from the
+post-T1 audit are byte-identical; T2 adds 50 exports. The 1df2fe0 comparison is
+unchanged for all 522 reference files. See r2-wat.md for the source attribution
+of every existing difference and the explicitly labeled diagnostic substitutes.
+
+Final post-T2 independent gates passed: dev-verify i/js, exit 0, with 1,465 std,
+two hello and fifteen bench tests at each optimization level, WASI smoke, 79
+Node tests and 57 browser tests (target/r2-t2-i-js.log). The final fixture
+generation completed before the release build reached the JS tests; the shared
+artifacts contain the stronger nested-poll probe and all 81 runtime law bodies.
+old-syntax-check passed, exit 0: 1,726 extracted blocks, exact diagnostics and
+seventeen existing future parser entries (target/r2-t2-syntax.log). No R2
+parser exemption was added. The full gate's Rust fixture failure remains an
+explicit outstanding check, rather than being hidden by these independent
+passes. Redesign is merged through c2f41b7.
+
+A fresh isolated archive of the post-T2 merge was checked with that same
+one-line fixture qualification. The complete checker library test target passed:
+30 passed, zero failed, four pre-existing ignored tests
+(target/r2-t2-pattern-isolated.log). Every assertion is retained. This remains
+an explicitly labeled isolated substitute; the real pattern.rs is unmodified
+because the plan's ownership table assigns types/pattern.rs to T1. The pending
+ownership question is required by the user's “Change only the paths your scope
+owns” instruction. No full-gate or final-stage green claim is made from this
+substitute. Final-stage source/tests and generated artifacts stay uncommitted
+until the real full gate passes; the earlier green stages and both redesign
+integration merges are committed.
+
+## Final follow-up: approved fixture repair and quiet measurements
+
+The user approved the prepared fixture qualification. Commit 3b9393a changes
+only that test's lookup to app/main and retains every assertion. Its commit
+message states that this is test-only and explains the new library Event
+collision. Redesign was already merged through c2f41b7. The earlier ownership
+block is resolved; the isolated passes are not substituted for the final gate.
+
+The quiet harness reserves all three heavy slots and executes the already
+built Rust test binary, without nesting heavy inside quiet. It reuses one
+real Rust-host instance, compiles at O2, checks results, alternates paired
+measurement order, and subtracts both the n=0 kernel and the empty-loop delta.
+There are five batches of 21 paired samples at each of n=32,64,128. Compilation,
+initialization and warmup are outside timing. The in-scope variant additionally
+excludes opening/retiring the enclosing scope; its two synchronous timer imports
+are removed by the zero-work pair. Both methods and limitations are reported
+in r2-performance.md. Instrumented binaries are counted separately, never timed.
+
+The first quiet measurement demonstrated an algorithmic defect: retained clean
+children were traversed at every switch, so empty spawn/join grew from about
+328 us at 32 children to 907 us at 128. The new persistent AVL task store gives
+logarithmic lookup/update while separate creation-ordered path indexes track
+active tasks and unfinished cleanup. Status changes update only the main store;
+index membership changes only at insertion/cleanup. This avoids duplicating
+TaskState updates in both indexes. A two-list FIFO queue and queued flag avoid
+linear enqueue copies and normal-turn membership scans. Scope child counts
+avoid repeated child scans, and retirement removes exactly the scope's recorded
+children. Child paths are consed for retirement only; no scheduling order uses
+that reversed list. The 513-child task_index case checks all results and repeated
+late joins before scope retirement, independently of any generated expectation.
+
+These changes preserve §6.2's “A normal exit waits for every child” and §6.4's
+“Cancellation bookkeeping runs before another normal task turn”. Creation
+serials preserve the previous cancellation/message order, independently of
+semantic path order. The root path and combined go/run counter are unchanged.
+The interest set now uses the existing Await registration index, following
+§6.4's “tasks actually suspended in Await.wait on Waiting tickets”. Pending
+counts change in the same indivisible M:1 state transition as task cleanup.
+
+The profile also found eager at_path derivation in every task start. The private
+Scheduler now retains a pure thunk over the complete root generator and immutable
+task path; random() computes the same at_path value on demand. Runtime §6.1 says
+“path and random are data reads without a suspend”, and §4 says task.random
+derives from the root's “complete generator, including previous draws/splits”.
+Neither sentence requires computing unused words at spawn. The thunk makes no
+Scheduler command, adds no suspension, and retains the complete generator rather
+than reconstructing it from a seed integer. Public schemes and constructor
+privacy are unchanged. No compiler optimization or random-module change is made.
+
+The user examples in r2-examples run at O0/O2 with complete output assertions.
+The release CLI also ran all four packages at O2: scope prints 42; race prints
+loser cancelled then 7; channel prints hello; the missing sender exits 1 with
+panic: task: deadlock. r2-user-guide.md contains the three complete programs.
+Their expected outputs come from §§6.1/6.2/6.4, not generated observations.
+
+Intermediate failures and corrections in this follow-up:
+
+- The first performance fixture put imports after exports (E0115). The imports
+  now precede exports. Example declarations initially used invalid () ! Io
+  spelling; the actual programs use the environment parameter (io ! Io).
+- The first AVL draft used positional patterns with labeled fields (E0510),
+  and an ungrouped pending-count expression piped an Int into Bool clauses
+  (E0501/E0516). TaskNode has positional fields; the count branches are explicit.
+- New spec headers initially said ok and left a stop message unquoted. The
+  harness requires pass and a quoted complete panic message. No expectation
+  value or assertion was weakened. task_index's join helper also needed Assert
+  in its explicit environment; a first textual correction missed the formatted
+  signature, so that same failure repeated before the exact signature was fixed.
+- Example code first imported a nonexistent i/io.print binding. Io is a service
+  with a print field, so the programs now call io.print. They are standalone
+  packages tested with the standard service, rather than custom test namespaces.
+- The new Rust example test was accidentally inserted inside the arbitration
+  probe's raw i string. It was moved outside the string; the i probe is unchanged.
+- The lazy RNG edit first left the private field annotated Generator instead
+  of () -> Generator. The annotation was corrected before functional testing.
+- The profiling panic closure first returned anyhow::Result, which does not
+  satisfy Wasmtime 50's IntoFunc. It now returns wasmtime::Result. Its initial
+  max_wasm_stack exceeded async_stack_size; both profiler limits are explicit.
+- A timer registration Result was initially unused. It is now unwrapped, so a
+  registration failure fails the measurement rather than being ignored.
+- Keeping debug names changed declarative elem ordering; formatting also changed
+  source-site data. A whole-binary strip comparison therefore failed. Every O2
+  function body was instead checked byte-for-byte, and counters were inserted
+  into the actual timed artifact, using names only for attribution. This is not
+  a claim of whole-binary equality. Counter runs validate all returned results
+  and require status 0, so pure tasks make no progress hand-off.
+- Two concurrent dev-shell entries printed a transient devenv chmod/load-exports
+  race. The commands still executed; later serialized entries succeeded. No
+  persistent environment or shell configuration was changed.
+
+The preliminary full verification and WAT export began before the last path-index
+refinement. They provide intermediate evidence and are superseded by the final
+head's gates and fresh export, rather than being claimed as a consistent final
+checkpoint. All source changes are frozen before the final regeneration/commit.
+
+The first in-scope timer probe used Int subtraction on Float timestamps and
+failed E0501 before measurement. It now uses the specified Float operator -.
+(spec §6.9); the fixture passed source checking before the quiet repetition.
+
+The first successful in-scope timer run was followed by an outer-measurement
+failure: keeping the clock declaration in that module required its host import
+even for the pure exports. The clock wrappers now live in intervals.i and are
+appended only to the temporary interval package. The ordinary fixture and its
+counted/timed artifact retain only the panic import; an unused clock callback
+is not silently supplied to make the pure measurement pass.
+
+The final hot-function review found a further algorithmic mistake: replacing
+an existing AVL value called the insertion balancer up every ancestor, even
+though subtree heights cannot change. update_task now preserves each height
+and shape for status/value replacement. Only insertion and removal rebalance.
+record_task shares the bookkeeping between insertion and replacement without
+copying the tree twice. This is a scheduler algorithm correction, not a compiler
+optimization. The following quiet repeat and full final-head checks include it.
+
+A measurement-driver repeat initially chose cargo's i binary from JSON output
+instead of the test executable, so it rejected --test-threads and measured
+nothing. The driver now selects the r2_performance test artifact by both target
+name and kind. The failed invocation is not a timing sample.
+
+The final export was queued before the quiet runner had acquired all slots,
+which delayed measurement. That premature wat_dump child was terminated with
+SIGTERM, selected by its exact lane and WAT_DUMP path. No other process was
+stopped. Its partial target/r2-wat-final is not used for acceptance. The quiet
+run finishes first, then a fresh authoritative export runs on frozen source.
+
+Early quiet samples used only 10/20 warmups. The first, n=32 experiments were
+consistently slower than later sizes on a fresh 256 MiB heap. The final protocol
+uses 200 warmups per kernel/size, matching the numeric profile's steady-state
+method and allowing heap pages/collector state to warm before sampling. The
+earlier measurements remain intermediate evidence, not the final cost table.
+
+A CPU-heavy diagnostic was initially outside the shared slot wrapper. It was
+briefly paused to protect the quiet window; the pause helper also matched
+itself. Both owned processes were resumed, and the diagnostic was moved under
+a heavy-slot lease. No other process was changed and no process remains paused.
+Because that transition could overlap the first 200-warmup run, that timing is
+not used as the final quiet result. A clean repetition waits for the leased
+diagnostic to finish. Counter values are unaffected by timing overlap.
+
+The all-file owner-normalizing diagnostic was stopped after more than five CPU
+minutes without a result. It is replaced by an exact, unnormalized comparison
+of every common runtime function in every changed compiling export. The slow
+check is reported as interrupted, not passed; the replacement is a diagnostic
+of unchanged compiler-runtime code, alongside the source-based library audit.
+The slot lease ended and both previously paused processes were restored/ended.
+
+The boundary callback in turn formerly captured s and t to select a few fields.
+That could retain the whole scheduler State and an obsolete TaskState through
+another task's continuation, even though the loop's control continuation was
+outside the boundary. The fields are now projected before constructing the
+callback, which captures only run key, Runner, path and body. Runtime §6.3 says
+“the loop is outside the task boundary”; its plain-i state must not become an
+incidental task capture either. make_scheduler receives only run key/Runner,
+not State. This is an owned retention fix, not compiler field specialization.
+The final export, profiles and gates include these projected captures.
+
+The accepted 200-warmup quiet run passed all three harness tests with unchanged
+source hashes (target/r2-measurement-accepted). Inside-scope costs at n=128 are
+107.251 us per empty spawn+join, 13.045 us per ready-task switch and 34.870 us per
+send+receive transfer. The comparable outside-only spawn/join is 109.681 us,
+against the old quiet 907.413 us. These are still not Go-level costs. Full raw
+samples, the separate count artifact and hot WAT are retained; r2-performance.md
+states the baseline formula, scope exclusion, timer imports and limitations.
+
+The final syntax inventory first rejected the performance harness's generated
+TOML manifest literal as if it were i source. That one host-data literal now
+has the existing not_source classification, with its reason. No i source or
+expected parser diagnostic is exempted. The corrected precommit check parses
+1,747 extracted literals/blocks with 17 future-track entries.
+
+Redesign advanced to 1a8fee2 with the concurrency and numeric prior-art studies.
+The lane merged it in fed3bda; no compiler, library or test code changed in
+that merge. The final frozen-source WAT dump passed in 405.64 seconds. Its
+1,286 results retain all 522 original reference files: 188 byte-equal ERROR
+results, 334 explained compiling-file differences and 764 added results. The
+four additions since the T2 dump are task_index at all dump configurations.
+The exact runtime comparison and final private-source attribution are recorded
+in r2-wat.md.
+
+The latest user instruction supersedes the earlier precommit stopping point:
+commit the source/tests/audits and then the generated artifacts, and run both
+the complete dev-verify and old-syntax-check on that final committed head.
+The final report records those final-head commands and outcomes; preliminary
+passes and the interrupted exports are not substituted for them.

@@ -102,3 +102,10 @@ Per the coordinator's R2/JP ruling it receives the inferred environment now.
 JP can pass the chosen provider closure to that same function. Provider tables
 are rejected with E0522. The inherited JP clauses are listed in r2-stages.md;
 they do not change any of the schemes above.
+
+The quiet-performance follow-up changes only private storage and helpers:
+TaskTree(A), creation-ordered path indexes, FIFO storage, cleanup counters and
+the private seed thunk. Regenerating library.out changes only private inferred
+bindings. Every public row above remains unchanged, including random's result
+and its lack of a suspension point. The exact-name and public_schemes tests
+remain the independent contract checks.

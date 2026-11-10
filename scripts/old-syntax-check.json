@@ -1720,5 +1720,9 @@
   },
   "crates/ilang-package/tests/manifest.rs:f09186ea668f8c28": {
     "not_source": "TOML manifest for the future JP provider plan; R2 explicitly rejects it"
+  },
+  "crates/ilang-cli/tests/r2_performance.rs:2dbd953bfd83802f": {
+    "not_source": true,
+    "reason": "Generated TOML manifest for the isolated interval measurement package; this is not i source."
   }
 }
