@@ -180,10 +180,34 @@ fn many_uses_of_a_parameter() {
     let out = output(&graph, true, false);
     let elapsed = start.elapsed();
     assert!(
-        out.contains("f : (b: Boundary(a, b, c), x: Int) -> Int\n") && !out.contains("error"),
+        out.contains("f : (b: Boundary(A, B, C), x: Int) -> Int\n") && !out.contains("error"),
         "{out}"
     );
     assert!(elapsed.as_secs() < 30, "{elapsed:?}");
+}
+
+#[test]
+fn shown_names_skip_types_and_ignore_written_variable_names() {
+    // A1 §8: first-use names skip unqualified types and never keep the
+    // spelling of a declared variable. Error/environment roles keep E/N.
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    fs::create_dir(dir.path().join("src")).unwrap();
+    fs::write(
+        dir.path().join("src/main.i"),
+        "A { A }\nE { E }\nN { N }\nkeep(Z) = (v: Z) -> Z { v }\nagain(K) = (v: K) -> K { v }\neffect(X, Y, Z) = (f: () -> X ? Y ! Z) { f() }\n",
+    )
+    .unwrap();
+    let (graph, diags) = ilang_package::load(dir.path());
+    assert!(diags.is_empty());
+    let out = output(&graph, true, false);
+    assert!(out.contains("keep : (v: B) -> B\n"), "{out}");
+    assert!(out.contains("again : (v: B) -> B\n"), "{out}");
+    assert!(
+        out.contains("effect : (f: () -> B ? E2 ! N2) -> B ? E2 ! N2\n"),
+        "{out}"
+    );
+    assert!(!out.contains("error"), "{out}");
 }
 
 /// The tree of a type scheme names each custom type by its `TypeId`, whose
@@ -268,8 +292,8 @@ fn scheme_types_know_each_type_by_what_it_is() {
             name: "T".into(),
         }
     );
-    assert_eq!(f.params[2].1, ShownType::Var("a".into()));
-    assert_eq!(f.ret, ShownType::Var("a".into()));
+    assert_eq!(f.params[2].1, ShownType::Var("A".into()));
+    assert_eq!(f.ret, ShownType::Var("A".into()));
     assert_eq!((&f.err, &f.env), (&None, &None));
 
     // `g`: a type of the library.

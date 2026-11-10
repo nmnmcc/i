@@ -989,7 +989,7 @@ catch = (body) {
     Ok(body())
   })
 }
-// type: (body: () -> a ? e ! n) -> Result(a, AssertionFailure) ? e ! n - Assert
+// type: (body: () -> A ? E ! N) -> Result(A, AssertionFailure) ? E ! N - Assert
 ```
 
 `Assert` is for mistakes in the program. A failure that may be expected uses an error (§9.3). `fail.catch` and `fail.map_error` do not take `Assert` failures.

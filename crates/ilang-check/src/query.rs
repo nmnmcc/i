@@ -1067,10 +1067,10 @@ fn with_type(name: &str, ty: Option<&str>) -> String {
 }
 
 fn builtin_head(b: BuiltinType) -> String {
-    const PARAMS: [&str; 4] = ["a", "r", "e", "n"];
+    const PARAMS: [&str; 4] = ["A", "R", "E", "N"];
     match b {
-        BuiltinType::List => "List(a)".into(),
-        BuiltinType::Boundary => "Boundary(r, e, n)".into(),
+        BuiltinType::List => "List(A)".into(),
+        BuiltinType::Boundary => "Boundary(R, E, N)".into(),
         BuiltinType::Continuation => format!("Continuation({})", PARAMS.join(", ")),
         b => b.name().into(),
     }

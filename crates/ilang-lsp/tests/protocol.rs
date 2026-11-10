@@ -662,14 +662,14 @@ fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(hover("k ="), "k: (f: (a) -> b ? e ! n, x: a) -> b ? e ! n");
-    assert_eq!(hover("y ="), "y: b");
-    assert_eq!(hover("f, x"), "f: (a) -> b ? e ! n");
-    assert_eq!(hover("g) {"), "g: (b) -> c ? e2 ! n2");
-    assert_eq!(hover("f, g"), "f: (a) -> b ? e ! n");
-    assert_eq!(hover("x) { g"), "x: a");
-    assert_eq!(hover("b) {"), "b: b");
-    assert_eq!(hover("a, b"), "a: a");
+    assert_eq!(hover("k ="), "k: (f: (A) -> B ? E ! N, x: A) -> B ? E ! N");
+    assert_eq!(hover("y ="), "y: B");
+    assert_eq!(hover("f, x"), "f: (A) -> B ? E ! N");
+    assert_eq!(hover("g) {"), "g: (B) -> C ? E2 ! N2");
+    assert_eq!(hover("f, g"), "f: (A) -> B ? E ! N");
+    assert_eq!(hover("x) { g"), "x: A");
+    assert_eq!(hover("b) {"), "b: B");
+    assert_eq!(hover("a, b"), "a: A");
     c.shutdown();
 }
 
@@ -698,21 +698,21 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(hover("one"), "one: (x: a) -> Int");
-    assert_eq!(hover("x) {\n  y = x"), "x: a");
-    assert_eq!(hover("y = x"), "y: a");
+    assert_eq!(hover("one"), "one: (x: A) -> Int");
+    assert_eq!(hover("x) {\n  y = x"), "x: A");
+    assert_eq!(hover("y = x"), "y: A");
     assert_eq!(
         hover("drop2"),
-        "drop2: (x: a, g: (Int) -> b ? e ! n, h: c) -> b ? e ! n"
+        "drop2: (x: A, g: (Int) -> B ? E ! N, h: C) -> B ? E ! N"
     );
-    assert_eq!(hover("x, g, h"), "x: a");
-    assert_eq!(hover("h) {"), "h: c");
-    assert_eq!(hover("y = (x, h)"), "y: (a, c)");
+    assert_eq!(hover("x, g, h"), "x: A");
+    assert_eq!(hover("h) {"), "h: C");
+    assert_eq!(hover("y = (x, h)"), "y: (A, C)");
     assert_eq!(
         hover("effonly"),
-        "effonly: (f: (a) -> b ? e ! n, x: a) -> Nil ? e ! n"
+        "effonly: (f: (A) -> B ? E ! N, x: A) -> Nil ? E ! N"
     );
-    assert_eq!(hover("f, x) {\n  r"), "f: (a) -> b ? e ! n");
-    assert_eq!(hover("r = "), "r: b");
+    assert_eq!(hover("f, x) {\n  r"), "f: (A) -> B ? E ! N");
+    assert_eq!(hover("r = "), "r: B");
     c.shutdown();
 }

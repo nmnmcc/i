@@ -20,7 +20,7 @@ fn check_types() {
     assert!(out.status.success());
     assert_eq!(
         String::from_utf8(out.stdout).unwrap(),
-        "app/main.id : (x: a) -> a\napp/main.elapsed : (start: Int) -> Int ! Clock\n"
+        "app/main.id : (x: A) -> A\napp/main.elapsed : (start: Int) -> Int ! Clock\n"
     );
 }
 

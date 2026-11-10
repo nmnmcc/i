@@ -150,7 +150,7 @@ fn clause_function_labels_and_synthetic_spans_follow_the_rule() {
         .unwrap()
         .lines(p, common::module(p, "app/main"));
     assert!(
-        lines.iter().any(|s| s == "app/main.many : (a) -> Int"),
+        lines.iter().any(|s| s == "app/main.many : (A) -> Int"),
         "{lines:?}"
     );
     assert!(!lines.iter().any(|s| s.contains("%arg")));

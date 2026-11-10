@@ -65,7 +65,7 @@ catch = (body) {
     Ok(body())
   })
 }
-// type: (body: () -> a ? e ! n) -> Result(a, AssertionFailure) ? e ! n - Assert
+// type: (body: () -> A ? E ! N) -> Result(A, AssertionFailure) ? E ! N - Assert
 
 checked = () { catch(() { assert(False)  1 }) }
 checked_library = () { assertion.catch(() { assert(1 == 2)  "x" }) }
