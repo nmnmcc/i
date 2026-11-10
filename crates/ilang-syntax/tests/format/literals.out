@@ -10,7 +10,7 @@ line three"
 )
 
 patterns = (n) {
-	n |> {
+	n.{
 		-1_000          -> "minus a thousand"
 		0x10            -> "sixteen"
 		"pre\n" <> rest -> rest

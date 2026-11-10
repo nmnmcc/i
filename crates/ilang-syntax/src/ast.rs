@@ -210,7 +210,7 @@ impl BinOp {
             GtFloat => ">.",
             GtEqFloat => ">=.",
             Concat => "<>",
-            Pipe => "|>",
+            Pipe => "|",
             Add => "+",
             Sub => "-",
             AddFloat => "+.",
@@ -226,6 +226,8 @@ impl BinOp {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprKind {
+    /// A Lisp template; expanded by the compile-time macro phase.
+    Quote(Box<crate::lisp::Datum>),
     Int(BigUint),
     Float(f64),
     String(String),
@@ -350,6 +352,8 @@ pub struct Binder {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum PatternKind {
+    /// A Lisp quote pattern used by a compile-time macro.
+    Quote(Box<crate::lisp::Datum>),
     Var(String),
     Discard(String),
     /// `x: T` (§7.1).

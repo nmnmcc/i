@@ -1,8 +1,6 @@
 # Syntax 2: feasibility of the six proposed surface changes
 
-Status: study, not approval or an implementation contract. The ledger's
-2026-11-11 entry says that these changes were relayed by a peer and await the
-user's confirmation. This note does not authorize T3 to change syntax.
+Status: accepted for SYN2 by the user on 2026-11-11. The coordinator rulings in the SYN2 scope settle §10. The conditional wording below records the feasibility study; the installed language text is docs/spec.md. Old forms remain accepted during the coordinated lane migration.
 
 Source baseline: `d655684bdb809c5a38bf86b61fc5ef26f5bc5392`, branch
 `lane/note-syn2`. All unqualified i code citations below are at that commit.

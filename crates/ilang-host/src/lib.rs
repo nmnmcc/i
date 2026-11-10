@@ -77,6 +77,7 @@ mod requests;
 pub mod resources;
 mod run;
 pub mod services;
+pub mod syntax;
 #[cfg(test)]
 mod tests;
 

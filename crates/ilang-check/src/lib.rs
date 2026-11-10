@@ -4,8 +4,10 @@
 //!
 //! The only authority is `docs/spec.md`; section numbers refer to it.
 
+mod capabilities;
 pub mod hir;
 pub mod identity;
+pub mod macro_sandbox;
 pub mod order;
 pub mod query;
 pub mod resolve;
@@ -79,6 +81,7 @@ pub mod code {
     pub const EXTERNAL_TYPE_VAR: &str = "E0317";
     pub const EXTERNAL_HOST_TYPE: &str = "E0318";
     pub const EXTERNAL_EFFECTS: &str = "E0319";
+    pub const COMPILER_CAPABILITY: &str = "E0322";
     pub const HOST_TYPE: &str = "E0320";
     pub const EXPORT_NAME_TWICE: &str = "E0321";
     pub const DEPRECATED: &str = "W0301";
@@ -129,7 +132,12 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
     let mut diags = Vec::new();
     for (package, p) in graph.packages.iter().enumerate() {
         for m in &p.modules {
-            let (ast, errors) = ilang_syntax::parse_module(&graph.sources.get(m.source).text);
+            let source = graph.sources.get(m.source);
+            let (ast, errors) = if source.display.ends_with(".is") {
+                ilang_syntax::lisp::parse_source(&source.text)
+            } else {
+                ilang_syntax::parse_module(&source.text)
+            };
             diags.extend(
                 errors
                     .into_iter()
@@ -158,6 +166,7 @@ pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagn
     let (mut program, more) = resolve::resolve(graph, &parsed);
     diags.extend(more);
     order::order(&mut program, &mut diags);
+    capabilities::check(&program, graph, &mut diags);
     (Some(program), diags)
 }
 

@@ -692,6 +692,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "futures-util",
+ "ilang-syntax",
  "num-bigint",
  "serde",
  "serde_json",
@@ -733,6 +734,7 @@ name = "ilang-syntax"
 version = "0.1.0"
 dependencies = [
  "num-bigint",
+ "serde_json",
  "thiserror",
 ]
 
