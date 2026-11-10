@@ -2,19 +2,214 @@
   "schema": 1,
   "requirements": [
     {
-      "pattern": "^review-k4d/(?:proj|_loose/p)/(?:x1|x4|x6|x7|x8|z1|z4)$",
-      "known_failure": true,
+      "pattern": "^review\\-k4d/_loose/p/x1$",
+      "known_failure": false,
       "outcome": "reject",
       "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
       "origin": "review-k4d/criteria.md C3/C5 and Result index",
       "diagnostic_codes": [
-        "E0501",
-        "E0522"
+        "E0515"
       ],
       "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
       "phase": "entry",
-      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute."
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/x4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/x6$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/x7$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/x8$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/z1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/z4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/x1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/x4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/x6$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/x7$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/x8$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/z1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
+    },
+    {
+      "pattern": "^review\\-k4d/proj/z4$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "K4d F1/F2: annotated handler drops same-service obligation or compares row arguments covariantly",
+      "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction, because a service is a value that goes in and comes out",
+      "origin": "review-k4d/criteria.md C3/C5 and Result index",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
+      "phase": "entry",
+      "phase_source": "docs/spec.md §2.6.2: Untargeted checking promises none of these: success does not promise that any target can build or run the program. Required rejection is before entry execution; a cast failure is never an acceptable substitute.",
+      "fixed_by": "K4 F1: retained handler obligations in schemes"
     },
     {
       "pattern": "^review-k4d/(?:proj|_loose/p)/(?:g_(?:ann|inf)_SDep|m3|m4|r6)$",
