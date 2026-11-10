@@ -223,7 +223,7 @@ fn incompatible_service_arguments_still_fail() {
 Sink(E, N) { Sink((Entry) -> Nil ? E ! N, (N) -> Nil) }
 Consumer(A) { Consumer((A) -> Nil) }
 bad = (s: Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never)) { s }",
-        "E0501",
+        "E0515",
     );
     // §9.2: forms of one service in a row must have equal arguments,
     // including the error argument, regardless of its ordinary variance.

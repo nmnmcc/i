@@ -15,9 +15,25 @@ use crate::hir::{BuiltinType, TypeId, TypeRef};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::collections::HashMap as StdHashMap;
 
+/// Row identity is persistent. Error rows preserve scalar set inclusion;
+/// service environments additionally require equal member value sets.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum Mode {
+    #[default]
+    Value,
+    Row,
+    Env,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct VarState {
     pub level: u32,
+    /// A row keeps rule 4's member comparison even inside type arguments.
+    pub row: Mode,
+    /// A difference imposes a same-form obligation even if an annotation
+    /// hides the difference from the result type.
+    pub difference: bool,
+    pub handled: Vec<Ty>,
     pub lower: Vec<Ty>,
     pub upper: Vec<Ty>,
     /// The name written in an annotation (§4.7), kept when it is shown.
@@ -96,14 +112,16 @@ pub(crate) struct Solver {
     pub level: u32,
     /// The constraints with a variable that are already made, each with
     /// whether it was made between environments.
-    cache: HashSet<(Ty, Ty, bool)>,
+    cache: HashSet<(Ty, Ty, Mode)>,
     /// The variables that got a bound, in order, for the occurs check.
     pub touched: Vec<V>,
     /// The variables of the cycles that the occurs check has reported.
     reported: HashSet<V>,
     /// The pairs of bounds whose parts `add_bound` has put together.
-    compared: HashSet<(Ty, Ty, bool, bool)>,
+    compared: HashSet<(Ty, Ty, bool, Mode)>,
     pub variance: StdHashMap<TypeId, Vec<Variance>>,
+    has_handlers: bool,
+    pub row_params: StdHashMap<TypeId, Vec<Mode>>,
     pub failures: Vec<Failure>,
     /// The names of the custom types, by `TypeId`, to show types.
     pub type_names: Vec<String>,
@@ -152,6 +170,8 @@ impl Solver {
             touched: Vec::new(),
             reported: HashSet::default(),
             variance,
+            row_params: StdHashMap::new(),
+            has_handlers: false,
             failures: Vec::new(),
             type_names,
         }
@@ -178,6 +198,9 @@ impl Solver {
     pub fn fresh_at(&mut self, level: u32) -> V {
         self.vars.push(VarState {
             level,
+            row: Mode::Value,
+            difference: false,
+            handled: Vec::new(),
             lower: Vec::new(),
             upper: Vec::new(),
             name: None,
@@ -234,6 +257,13 @@ impl Solver {
     }
 
     fn fail(&mut self, kind: FailKind, lhs: &Ty, rhs: &Ty) {
+        if self
+            .failures
+            .iter()
+            .any(|f| f.kind == kind && f.lhs == *lhs && f.rhs == *rhs)
+        {
+            return;
+        }
         self.failures.push(Failure {
             kind,
             lhs: lhs.clone(),
@@ -270,7 +300,7 @@ impl Solver {
 
     /// Makes `l <: r` true, or records why it cannot be.
     pub fn constrain(&mut self, l: &Ty, r: &Ty) {
-        self.constrain_in(l, r, false);
+        self.constrain_in(l, r, Mode::Value);
     }
 
     /// Makes `N` **in** `M` true for two environments (§4.5 rule 4): every
@@ -278,14 +308,205 @@ impl Solver {
     /// member of `M` with the same type constructor and equal arguments,
     /// whatever the variance of the parameters.
     pub fn constrain_env(&mut self, l: &Ty, r: &Ty) {
-        self.constrain_in(l, r, true);
+        self.constrain_in(l, r, Mode::Env);
+    }
+
+    /// The row parameters of a constructor, determined from its definition.
+    pub fn rows(&self, h: Head, n: usize) -> Vec<Mode> {
+        match h {
+            Head::Named(TypeRef::Custom(id)) => self
+                .row_params
+                .get(&id)
+                .cloned()
+                .unwrap_or_else(|| vec![Mode::Value; n]),
+            Head::Named(TypeRef::Builtin(BuiltinType::Continuation)) => {
+                vec![Mode::Value, Mode::Value, Mode::Row, Mode::Env]
+            }
+            Head::Named(TypeRef::Builtin(BuiltinType::Boundary)) => {
+                vec![Mode::Value, Mode::Row, Mode::Env]
+            }
+            _ => vec![Mode::Value; n],
+        }
+    }
+
+    /// Row identity belongs to variables. Upgrade their whole bound
+    /// component and recheck existing bounds, including ones added before
+    /// the variable was discovered to be a row.
+    pub fn mark_row(&mut self, t: &Ty) {
+        self.mark_mode(t, Mode::Env);
+    }
+
+    pub fn mark_mode(&mut self, t: &Ty, mode: Mode) {
+        let mut todo = vec![t.clone()];
+        let mut added = Vec::new();
+        while let Some(t) = todo.pop() {
+            match t {
+                Ty::Var(v) if self.var(v).row < mode => {
+                    self.var_mut(v).row = mode;
+                    added.push(v);
+                    let st = self.var(v);
+                    todo.extend(st.lower.iter().chain(&st.upper).cloned());
+                    todo.extend(st.from.iter().chain(&st.into).copied().map(Ty::Var));
+                }
+                Ty::Union(ms) | Ty::Inter(ms) => todo.extend(ms),
+                Ty::Diff(a, _) => todo.push(*a),
+                Ty::Both(a, b) => {
+                    todo.push(*a);
+                    todo.push(*b);
+                }
+                _ => {}
+            }
+        }
+        for v in added {
+            for b in self.var(v).lower.clone() {
+                self.constrain_in(&b, &Ty::Var(v), mode);
+            }
+            for b in self.var(v).upper.clone() {
+                self.constrain_in(&Ty::Var(v), &b, mode);
+            }
+        }
+    }
+
+    pub fn is_row(&self, t: &Ty) -> bool {
+        match t {
+            Ty::Var(v) => self.var(*v).row != Mode::Value,
+            Ty::Union(ms) | Ty::Inter(ms) => ms.iter().any(|m| self.is_row(m)),
+            Ty::Diff(a, _) => self.is_row(a),
+            _ => false,
+        }
+    }
+
+    fn mode(&self, t: &Ty) -> Mode {
+        match t {
+            Ty::Var(v) => self.var(*v).row,
+            Ty::Union(ms) | Ty::Inter(ms) => {
+                ms.iter().map(|m| self.mode(m)).max().unwrap_or_default()
+            }
+            Ty::Diff(a, _) => self.mode(a),
+            _ => Mode::Value,
+        }
+    }
+
+    pub fn constrain_row(&mut self, l: &Ty, r: &Ty) {
+        self.constrain_in(l, r, Mode::Row);
+    }
+
+    /// Hidden difference constraints cannot be thrown away by rebuilding
+    /// only the visible type. Keep the bounded scheme in this case.
+    pub fn has_obligations(&self, t: &Ty) -> bool {
+        let mut edges = Vec::new();
+        bound_vars(self, t, true, false, &mut edges);
+        let mut todo: Vec<_> = edges.drain(..).map(|e| e.0).collect();
+        let mut seen = HashSet::default();
+        while let Some(v) = todo.pop() {
+            if !seen.insert(v) {
+                continue;
+            }
+            let st = self.var(v);
+            if st.difference {
+                return true;
+            }
+            for b in st.lower.iter().chain(&st.upper) {
+                bound_vars(self, b, true, false, &mut edges);
+            }
+            todo.extend(edges.drain(..).map(|e| e.0));
+            todo.extend(st.from.iter().chain(&st.into).copied());
+        }
+        false
+    }
+
+    /// A shown scheme must express every handler restriction. A visible
+    /// difference or a row containing both the variable and the supplied
+    /// form expresses it. A form tied to that variable, as S(N) in a
+    /// parameter S(N), also keeps the obligation on that same row.
+    pub fn hidden_handlers(&self, t: &Ty, level: u32) -> Vec<Ty> {
+        fn parts(t: &Ty, out: &mut Vec<Ty>) {
+            out.push(t.clone());
+            match t {
+                Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+                    for x in xs {
+                        parts(x, out);
+                    }
+                }
+                Ty::Fn(f) => {
+                    for p in &f.params {
+                        parts(&p.1, out);
+                    }
+                    for x in [&f.ret, &f.err, &f.env] {
+                        parts(x, out);
+                    }
+                }
+                Ty::Diff(a, hs) => {
+                    parts(a, out);
+                    for h in hs {
+                        parts(h, out);
+                    }
+                }
+                Ty::Both(a, b) => {
+                    parts(a, out);
+                    parts(b, out);
+                }
+                _ => {}
+            }
+        }
+        let mut all = Vec::new();
+        parts(t, &mut all);
+        let mut hidden = Vec::new();
+        for v in all
+            .iter()
+            .filter_map(|t| if let Ty::Var(v) = t { Some(*v) } else { None })
+        {
+            if self.var(v).level <= level {
+                continue;
+            }
+            let above = self.reach(vec![v], false).0;
+            let below = self.reach(vec![v], true).0;
+            let aliases: Vec<_> = above
+                .iter()
+                .filter(|w| below.contains(w))
+                .copied()
+                .collect();
+            let is_var = |t: &Ty| matches!(t, Ty::Var(w) if aliases.contains(w));
+            for w in &above {
+                for h in &self.var(*w).handled {
+                    let witnessed = all.iter().any(|part| match part {
+                        Ty::Diff(a, hs) => is_var(a) && hs.contains(h),
+                        Ty::Union(ms) => ms.iter().any(&is_var) && ms.contains(h),
+                        part if part == h => {
+                            let mut edges = Vec::new();
+                            bound_vars(self, h, true, false, &mut edges);
+                            edges.iter().any(|e| aliases.contains(&e.0))
+                        }
+                        _ => false,
+                    });
+                    if !witnessed && !hidden.contains(h) {
+                        hidden.push(h.clone());
+                    }
+                }
+            }
+        }
+        hidden
     }
 
     /// `l <: r`, or `l` in `r` when `env` (§4.5 rule 4). The mode goes
     /// through the bounds of variables, but not into type arguments: those
     /// are compared as normal types.
-    fn constrain_in(&mut self, l: &Ty, r: &Ty, env: bool) {
+    fn constrain_in(&mut self, l: &Ty, r: &Ty, env: Mode) {
+        let env = env.max(self.mode(l)).max(self.mode(r));
+        if env != Mode::Value {
+            self.mark_mode(l, env);
+            self.mark_mode(r, env);
+        }
         if l == r || matches!(l, Ty::Never) || matches!(r, Ty::Top) {
+            return;
+        }
+        // §4.5 rule 3: subtracting members never adds values. The
+        // difference's separate same-form obligation remains in the scheme.
+        if let Ty::Diff(a, _) = l
+            && (a.as_ref() == r
+                || matches!((a.as_ref(), r), (Ty::Var(u), Ty::Var(v))
+                if self.reach(vec![*u], false).0.contains(v)))
+        {
             return;
         }
         // §4.5 rule 2: these are inclusions, not recursive bounds such as
@@ -309,7 +530,7 @@ impl Solver {
                     self.constrain_in(l, m, env);
                 }
             }
-            (Ty::Var(_), Ty::Var(v)) if env => {
+            (Ty::Var(_), Ty::Var(v)) if env != Mode::Value => {
                 // Collect requirements in the receiving row. An upper
                 // bound on its member can lead back through a service's
                 // invariant argument: n <: row, S(n) <: row is finite.
@@ -318,8 +539,8 @@ impl Solver {
                 // whole receiving row.
                 let level = self.var(*v).level;
                 if self.level_of(l) > level {
-                    let l2 = self.extrude(l, Pol::Pos, level, true, &mut HashMap::default());
-                    self.constrain_in(&l2, r, true);
+                    let l2 = self.extrude(l, Pol::Pos, level, env, &mut HashMap::default());
+                    self.constrain_in(&l2, r, env);
                     return;
                 }
                 self.add_bound(*v, l.clone(), true, env);
@@ -391,7 +612,7 @@ impl Solver {
                         || h.iter()
                             .any(|m| m.head() == l.head() && !m.values().is_all());
                     self.fail(
-                        if partial && !env {
+                        if partial && env == Mode::Value {
                             FailKind::Values
                         } else {
                             FailKind::Mismatch
@@ -404,9 +625,9 @@ impl Solver {
                 }
             }
             (Ty::Con(h1, s1, a1), Ty::Con(h2, s2, a2)) if h1 == h2 && a1.len() == a2.len() => {
-                if (env && s1 != s2) || (!env && !s1.subset(s2)) {
+                if (env == Mode::Env && s1 != s2) || (env != Mode::Env && !s1.subset(s2)) {
                     self.fail(
-                        if env {
+                        if env != Mode::Value {
                             FailKind::EnvForms
                         } else {
                             FailKind::Values
@@ -416,7 +637,7 @@ impl Solver {
                     );
                     return;
                 }
-                if env {
+                if env != Mode::Value {
                     // §4.5 rule 4: service arguments are equal.
                     for (x, y) in a1.iter().zip(a2) {
                         self.equal(x, y, FailKind::EnvForms);
@@ -424,8 +645,8 @@ impl Solver {
                     return;
                 }
                 let vs = self.variances(*h1, a1.len());
-                for ((x, y), v) in a1.iter().zip(a2).zip(vs) {
-                    self.constrain_by(x, y, v);
+                for (((x, y), v), row) in a1.iter().zip(a2).zip(vs).zip(self.rows(*h1, a1.len())) {
+                    self.constrain_by(x, y, v, row);
                 }
             }
             (Ty::Fn(f), Ty::Fn(g)) => {
@@ -437,20 +658,20 @@ impl Solver {
                     self.constrain(&q.1, &p.1);
                 }
                 self.constrain(&f.ret, &g.ret);
-                self.constrain(&f.err, &g.err);
+                self.constrain_row(&f.err, &g.err);
                 self.constrain_env(&f.env, &g.env);
             }
             _ => self.fail(FailKind::Mismatch, l, r),
         }
     }
 
-    fn constrain_by(&mut self, x: &Ty, y: &Ty, v: Variance) {
+    fn constrain_by(&mut self, x: &Ty, y: &Ty, v: Variance, row: Mode) {
         match v {
-            Variance::Co => self.constrain(x, y),
-            Variance::Contra => self.constrain(y, x),
+            Variance::Co => self.constrain_in(x, y, row),
+            Variance::Contra => self.constrain_in(y, x, row),
             Variance::Inv => {
-                self.constrain(x, y);
-                self.constrain(y, x);
+                self.constrain_in(x, y, row);
+                self.constrain_in(y, x, row);
             }
             Variance::Bi => {}
         }
@@ -474,7 +695,7 @@ impl Solver {
     /// upper bounds of one type constructor, as a parameter used at many
     /// calls, would make a number of constraints that grows with the
     /// square of their number.
-    fn add_bound(&mut self, v: V, t: Ty, lower: bool, env: bool) -> bool {
+    fn add_bound(&mut self, v: V, t: Ty, lower: bool, env: Mode) -> bool {
         // Only argumentless Con bounds can fuse without touching variables,
         // variance, or service argument comparisons.
         let fusion = if let Ty::Con(h, values, args) = &t {
@@ -487,7 +708,7 @@ impl Solver {
                     .find(|(_, b)| matches!(b, Ty::Con(g, _, xs) if g == h && xs.is_empty()))
                 {
                     let old_values = old.values();
-                    if !env
+                    if env == Mode::Value
                         && if lower {
                             values.subset(old_values)
                         } else {
@@ -496,7 +717,7 @@ impl Solver {
                     {
                         return false;
                     }
-                    if env {
+                    if env != Mode::Value {
                         None
                     } else if lower {
                         Some((i, old_values.union(values)))
@@ -533,6 +754,19 @@ impl Solver {
             for a in &new {
                 for b in &others {
                     self.compare(a, b, lower, env, level);
+                }
+            }
+        }
+        if !new.is_empty() && self.has_handlers {
+            let mut handlers = Vec::new();
+            for w in self.reach(vec![v], false).0 {
+                handlers.extend(self.var(w).handled.clone());
+            }
+            for a in &new {
+                for h in &handlers {
+                    if a.head() == h.head() {
+                        self.equal(a, h, FailKind::EnvForms);
+                    }
                 }
             }
         }
@@ -612,7 +846,7 @@ impl Solver {
     }
 
     /// The checks of `add_bound` for two bounds on one side of a variable.
-    fn compare(&mut self, a: &Ty, b: &Ty, lower: bool, env: bool, level: u32) {
+    fn compare(&mut self, a: &Ty, b: &Ty, lower: bool, env: Mode, level: u32) {
         if a == b || a.head() != b.head() {
             return;
         }
@@ -628,20 +862,21 @@ impl Solver {
                     // must agree in number to be put together.
                     self.fail(FailKind::Arity, b, a);
                 } else if lower {
-                    self.join(&f.ret, &g.ret, level, false);
-                    self.join(&f.err, &g.err, level, false);
-                    self.join(&f.env, &g.env, level, true);
+                    self.join(&f.ret, &g.ret, level, Mode::Value);
+                    self.join(&f.err, &g.err, level, Mode::Row);
+                    self.join(&f.env, &g.env, level, Mode::Env);
                 }
             }
             (Ty::Con(h, _, xs), Ty::Con(_, _, ys)) if xs.len() == ys.len() => {
                 let vs = self.variances(*h, xs.len());
-                for ((x, y), var) in xs.iter().zip(ys).zip(&vs) {
-                    if env {
+                for (((x, y), var), row) in xs.iter().zip(ys).zip(&vs).zip(self.rows(*h, xs.len()))
+                {
+                    if env != Mode::Value {
                         self.equal(x, y, FailKind::EnvForms);
                     } else if *var == Variance::Inv {
                         self.equal(x, y, FailKind::Invariant);
                     } else if *var == Variance::Co && lower {
-                        self.join(x, y, level, false);
+                        self.join(x, y, level, row);
                     }
                 }
             }
@@ -651,7 +886,7 @@ impl Solver {
 
     /// Puts two types together by union in a new variable, only for the
     /// checks of `add_bound`: the variable is used nowhere else.
-    fn join(&mut self, x: &Ty, y: &Ty, level: u32, env: bool) {
+    fn join(&mut self, x: &Ty, y: &Ty, level: u32, env: Mode) {
         if x == y || !(needs_join(x) && needs_join(y)) {
             return;
         }
@@ -676,7 +911,7 @@ impl Solver {
     /// `l <: m1 | m2 | …` for an `l` with a type constructor: the member
     /// with the same type constructor, or else the one member that is a type
     /// variable (§4.4).
-    fn route(&mut self, l: &Ty, ms: &[Ty], env: bool) {
+    fn route(&mut self, l: &Ty, ms: &[Ty], env: Mode) {
         let mut flat = Vec::new();
         flatten_union(ms, &mut flat);
         let h = l.head();
@@ -684,7 +919,7 @@ impl Solver {
         if h.is_some()
             && let Some(m) = flat.iter().find(|m| m.head() == h)
         {
-            if l.scalar().is_some() && !env {
+            if l.scalar().is_some() && env != Mode::Env {
                 // A raw union need not have passed union_in. Join all scalar
                 // members of this head before splitting its uncovered part.
                 let sets: Vec<_> = flat
@@ -728,7 +963,7 @@ impl Solver {
     /// `A - H <: R`, where `R` is not a variable. For a variable `a`, its
     /// values whose type constructor is in `H` go to `H`, and the rest go
     /// to `R`: `a <: H | R`, with the members of `H` first.
-    fn diff_left(&mut self, a: &Ty, h: &[Ty], r: &Ty, env: bool) {
+    fn diff_left(&mut self, a: &Ty, h: &[Ty], r: &Ty, env: Mode) {
         match a {
             Ty::Never => {}
             Ty::Union(ms) => {
@@ -782,9 +1017,10 @@ impl Solver {
         t: &Ty,
         pol: Pol,
         level: u32,
-        env: bool,
-        cache: &mut HashMap<(V, Pol, bool), V>,
+        env: Mode,
+        cache: &mut HashMap<(V, Pol, Mode), V>,
     ) -> Ty {
+        let env = env.max(self.mode(t));
         if self.level_of(t) <= level {
             return t.clone();
         }
@@ -795,7 +1031,15 @@ impl Solver {
                 }
                 let nv = self.fresh_at(level);
                 self.vars[nv.0 as usize].input = self.var(*v).input;
+                self.vars[nv.0 as usize].row = self.var(*v).row;
+                self.vars[nv.0 as usize].difference = self.var(*v).difference;
                 cache.insert((*v, pol, env), nv);
+                let handled = self.var(*v).handled.clone();
+                let handled = handled
+                    .iter()
+                    .map(|h| self.extrude(h, Pol::Both, level, Mode::Value, cache))
+                    .collect();
+                self.var_mut(nv).handled = handled;
                 if pol != Pol::Neg {
                     self.var_mut(*v).upper.push(Ty::Var(nv));
                     self.var_mut(nv).from.push(*v);
@@ -819,7 +1063,7 @@ impl Solver {
                 }
                 Ty::Var(nv)
             }
-            Ty::Con(h, values, args) if env => {
+            Ty::Con(h, values, args) => {
                 // §4.5 rule 4: service arguments stay equal across levels,
                 // independently of their ordinary value variance. Inside
                 // an argument, ordinary type rules apply again.
@@ -827,7 +1071,21 @@ impl Solver {
                     *h,
                     values.clone(),
                     args.iter()
-                        .map(|a| self.extrude(a, Pol::Both, level, false, cache))
+                        .zip(self.variances(*h, args.len()))
+                        .zip(self.rows(*h, args.len()))
+                        .map(|((a, variance), row)| {
+                            self.extrude(
+                                a,
+                                if env != Mode::Value {
+                                    Pol::Both
+                                } else {
+                                    pol.by(variance)
+                                },
+                                level,
+                                row,
+                                cache,
+                            )
+                        })
                         .collect(),
                 )
             }
@@ -838,13 +1096,13 @@ impl Solver {
                     .map(|(label, p)| {
                         (
                             label.clone(),
-                            self.extrude(p, pol.flip(), level, false, cache),
+                            self.extrude(p, pol.flip(), level, Mode::Value, cache),
                         )
                     })
                     .collect(),
-                ret: self.extrude(&f.ret, pol, level, false, cache),
-                err: self.extrude(&f.err, pol, level, false, cache),
-                env: self.extrude(&f.env, pol, level, true, cache),
+                ret: self.extrude(&f.ret, pol, level, Mode::Value, cache),
+                err: self.extrude(&f.err, pol, level, Mode::Row, cache),
+                env: self.extrude(&f.env, pol, level, Mode::Env, cache),
             })),
             _ => self.map_children(t, pol, &mut |s, x, p| s.extrude(x, p, level, env, cache)),
         }
@@ -863,6 +1121,14 @@ impl Solver {
                 }
                 let nv = self.fresh_at(self.level);
                 map.insert(*v, nv);
+                self.var_mut(nv).row = self.var(*v).row;
+                self.var_mut(nv).difference = self.var(*v).difference;
+                let handled = self.var(*v).handled.clone();
+                let handled = handled
+                    .iter()
+                    .map(|h| self.freshen(h, above, map))
+                    .collect();
+                self.var_mut(nv).handled = handled;
                 let (lower, upper) = (self.var(*v).lower.clone(), self.var(*v).upper.clone());
                 let lower = lower.iter().map(|b| self.freshen(b, above, map)).collect();
                 let upper = upper.iter().map(|b| self.freshen(b, above, map)).collect();
@@ -1090,11 +1356,13 @@ impl Solver {
                     values
                 };
                 let vs = self.variances(h, xs.len());
+                let rows = self.rows(h, xs.len());
                 let args = xs
                     .into_iter()
                     .zip(ys)
                     .zip(vs)
-                    .map(|((x, y), v)| self.merge_arg(x, y, v, union))
+                    .zip(rows)
+                    .map(|(((x, y), v), row)| self.merge_arg(x, y, v, union, row))
                     .collect();
                 Ty::Con(h, values, args)
             }
@@ -1107,7 +1375,10 @@ impl Solver {
                     .zip(g.params)
                     .map(|((l1, p), (l2, q))| {
                         let label = if l1 == l2 { l1 } else { None };
-                        (label, self.merge_arg(p, q, Variance::Contra, union))
+                        (
+                            label,
+                            self.merge_arg(p, q, Variance::Contra, union, Mode::Value),
+                        )
                     })
                     .collect();
                 // The environments of two function types are put together
@@ -1119,8 +1390,8 @@ impl Solver {
                 };
                 Ty::Fn(Box::new(FnTy {
                     params,
-                    ret: self.merge_arg(f.ret, g.ret, Variance::Co, union),
-                    err: self.merge_arg(f.err, g.err, Variance::Co, union),
+                    ret: self.merge_arg(f.ret, g.ret, Variance::Co, union, Mode::Value),
+                    err: self.merge_arg(f.err, g.err, Variance::Co, union, Mode::Row),
                     env,
                 }))
             }
@@ -1131,12 +1402,12 @@ impl Solver {
         }
     }
 
-    fn merge_arg(&mut self, x: Ty, y: Ty, v: Variance, union: bool) -> Ty {
+    fn merge_arg(&mut self, x: Ty, y: Ty, v: Variance, union: bool, row: Mode) -> Ty {
         match v {
-            Variance::Co | Variance::Bi if union => self.union(vec![x, y]),
-            Variance::Co | Variance::Bi => self.inter(vec![x, y]),
-            Variance::Contra if union => self.inter(vec![x, y]),
-            Variance::Contra => self.union(vec![x, y]),
+            Variance::Co | Variance::Bi if union => self.union_in(vec![x, y], row != Mode::Value),
+            Variance::Co | Variance::Bi => self.inter_in(vec![x, y], row != Mode::Value),
+            Variance::Contra if union => self.inter_in(vec![x, y], row != Mode::Value),
+            Variance::Contra => self.union_in(vec![x, y], row != Mode::Value),
             Variance::Inv => {
                 self.equal(&x, &y, FailKind::Invariant);
                 x
@@ -1229,10 +1500,30 @@ impl Solver {
         if !matches!(a, Ty::Var(_)) {
             return;
         }
+        if let Ty::Var(v) = a
+            && env
+        {
+            self.var_mut(*v).difference = true;
+            self.has_handlers = true;
+            self.mark_row(a);
+            for h in hs {
+                if !self.var(*v).handled.contains(h) {
+                    self.var_mut(*v).handled.push(h.clone());
+                }
+                let mut bounds = self.reach(vec![*v], true).1;
+                bounds.extend(self.reach(vec![*v], false).1);
+                for b in bounds {
+                    if b.head() == h.head() {
+                        self.equal(&b, h, FailKind::EnvForms);
+                    }
+                }
+            }
+            return;
+        }
         let r = Ty::Var(self.fresh_at(self.level_of(a)));
         let mut ms = hs.to_vec();
         ms.push(r);
-        self.constrain_in(a, &Ty::Union(ms), env);
+        self.constrain_in(a, &Ty::Union(ms), if env { Mode::Env } else { Mode::Value });
     }
 }
 
@@ -1279,8 +1570,13 @@ impl Solver {
             if !done.insert(v) {
                 continue;
             }
+            let (below, lower) = self.reach(vec![v], true);
+            let before = self.var(v).lower.len();
+            self.var_mut(v).lower.retain(|b| {
+                !matches!(b, Ty::Diff(a, _) if matches!(a.as_ref(), Ty::Var(u) if below.contains(u)))
+            });
+            changed |= before != self.var(v).lower.len();
             let upper = self.var(v).upper.clone();
-            let lower = self.reach(vec![v], true).1;
             let exact = upper.iter().find(|t| match t {
                 Ty::Never => true,
                 Ty::Con(..) | Ty::Fn(_) => lower.contains(t),
@@ -1353,6 +1649,7 @@ impl Solver {
     pub fn normalized(&self, t: &Ty) -> Option<Solver> {
         let mut view = Solver::new(self.variance.clone(), self.type_names.clone());
         view.vars = self.vars.clone();
+        view.row_params = self.row_params.clone();
         view.normalize_type(t).then_some(view)
     }
 
@@ -1374,7 +1671,11 @@ impl Solver {
                     let bounds = if p { &st.lower } else { &st.upper };
                     let mut out = Vec::new();
                     for b in bounds {
-                        bound_vars(self, b, p, con, &mut out);
+                        if st.row != Mode::Value {
+                            env_vars(self, b, p, con, &mut out);
+                        } else {
+                            bound_vars(self, b, p, con, &mut out);
+                        }
                     }
                     for (u, q, c) in out {
                         if u == r && c {
@@ -1588,7 +1889,11 @@ fn edge_vars(s: &Solver, (v, p): (V, bool)) -> Vec<(V, bool, bool)> {
     let bounds = if p { &st.lower } else { &st.upper };
     let mut out = Vec::new();
     for b in bounds {
-        bound_vars(s, b, p, false, &mut out);
+        if st.row != Mode::Value {
+            env_vars(s, b, p, false, &mut out);
+        } else {
+            bound_vars(s, b, p, false, &mut out);
+        }
     }
     out
 }
@@ -1601,7 +1906,11 @@ fn bound_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, 
         Ty::Var(v) => out.push((*v, pos, con)),
         Ty::Con(h, _, args) => {
             let vs = s.variances(*h, args.len());
-            for (a, v) in args.iter().zip(vs) {
+            for ((a, v), row) in args.iter().zip(vs).zip(s.rows(*h, args.len())) {
+                if row != Mode::Value {
+                    env_vars(s, a, pos, true, out);
+                    continue;
+                }
                 match v {
                     Variance::Co | Variance::Bi => bound_vars(s, a, pos, true, out),
                     Variance::Contra => bound_vars(s, a, !pos, true, out),
@@ -1616,11 +1925,9 @@ fn bound_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, 
             for p in &f.params {
                 bound_vars(s, &p.1, !pos, true, out);
             }
-            for x in [&f.ret, &f.err] {
-                bound_vars(s, x, pos, true, out);
-            }
-            // Environment arguments are compared as equal.
-            env_vars(s, &f.env, pos, out);
+            bound_vars(s, &f.ret, pos, true, out);
+            env_vars(s, &f.err, pos, true, out);
+            env_vars(s, &f.env, pos, true, out);
         }
         Ty::Union(ms) | Ty::Inter(ms) => ms.iter().for_each(|a| bound_vars(s, a, pos, con, out)),
         Ty::Diff(a, h) => {
@@ -1637,7 +1944,7 @@ fn bound_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, 
 
 /// `bound_vars` for an environment: the arguments of its members are on
 /// both sides.
-fn env_vars(s: &Solver, t: &Ty, pos: bool, out: &mut Vec<(V, bool, bool)>) {
+fn env_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, bool)>) {
     match t {
         Ty::Con(_, _, args) => {
             for a in args {
@@ -1645,12 +1952,12 @@ fn env_vars(s: &Solver, t: &Ty, pos: bool, out: &mut Vec<(V, bool, bool)>) {
                 bound_vars(s, a, false, true, out);
             }
         }
-        Ty::Union(ms) | Ty::Inter(ms) => ms.iter().for_each(|a| env_vars(s, a, pos, out)),
+        Ty::Union(ms) | Ty::Inter(ms) => ms.iter().for_each(|a| env_vars(s, a, pos, con, out)),
         Ty::Diff(a, h) => {
-            env_vars(s, a, pos, out);
+            env_vars(s, a, pos, con, out);
             h.iter().for_each(|x| bound_vars(s, x, pos, true, out));
         }
-        t => bound_vars(s, t, pos, true, out),
+        t => bound_vars(s, t, pos, con, out),
     }
 }
 
@@ -1790,13 +2097,13 @@ mod literal_tests {
         ] {
             let mut s = solver();
             let out = s.fresh();
-            s.diff_left(&source, &[strings(&["a"])], &out, false);
+            s.diff_left(&source, &[strings(&["a"])], &out, Mode::Value);
             assert!(s.failures.is_empty());
             assert_eq!(s.var(variable(&out)).lower, expected);
         }
         let mut s = solver();
         let (v, out) = (s.fresh(), s.fresh());
-        s.diff_left(&v, &[strings(&["a"])], &out, false);
+        s.diff_left(&v, &[strings(&["a"])], &out, Mode::Value);
         s.constrain(&except(&[]), &v);
         assert_eq!(s.var(variable(&out)).lower, [except(&["a"])]);
         assert!(s.failures.is_empty());

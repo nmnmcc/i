@@ -9,7 +9,7 @@
 //! not removed for being on one side only. Shown names are chosen independently
 //! of written names.
 
-use super::solve::Solver;
+use super::solve::{Mode, Solver};
 use super::{FnTy, Head, ShownFn, ShownType, Ty, V, Variance};
 // Fast hashing for the small keys of coalescing (docs/performance.md).
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -170,6 +170,7 @@ fn simplify_steps(
         keep,
         mono: opts.mono,
         stack: HashMap::default(),
+        memo: HashMap::default(),
         occurs: false,
         rep,
         members,
@@ -506,6 +507,10 @@ struct Coalescer<'s> {
     /// The variables being expanded, with the number of type constructors
     /// above them.
     stack: HashMap<V, u32>,
+    /// Completed expansions have no dependence on the path that reaches
+    /// them. Alias SCCs already have one representative; recursive
+    /// constructor paths are diagnosed before a result can be reused.
+    memo: HashMap<(V, bool, bool), Ty>,
     occurs: bool,
     /// The variables that stand for a cycle of variables.
     rep: HashMap<V, V>,
@@ -526,6 +531,7 @@ impl Coalescer<'_> {
     /// are compared as equal (§4.5 rule 4), so they are both outputs and
     /// inputs.
     fn go(&mut self, t: &Ty, pos: bool, depth: u32, env: bool) -> Ty {
+        let env = env || self.s.is_row(t);
         match t {
             Ty::Var(v) => {
                 let v = self.rep.get(v).copied().unwrap_or(*v);
@@ -538,6 +544,9 @@ impl Coalescer<'_> {
                         self.occurs = true;
                     }
                     return if mono { Ty::Never } else { Ty::Var(v) };
+                }
+                if let Some(t) = self.memo.get(&(v, pos, env)) {
+                    return t.clone();
                 }
                 self.stack.insert(v, depth);
                 let mut parts = Vec::new();
@@ -562,27 +571,46 @@ impl Coalescer<'_> {
                     }
                 }
                 self.stack.remove(&v);
-                if pos || mono {
-                    Ty::Union(parts)
-                } else {
-                    Ty::Inter(parts)
+                let positive = pos || mono;
+                let mut flat = Vec::new();
+                let mut todo: Vec<_> = parts.into_iter().rev().collect();
+                let mut seen = HashSet::default();
+                while let Some(t) = todo.pop() {
+                    match t {
+                        Ty::Union(ms) if positive => todo.extend(ms.into_iter().rev()),
+                        Ty::Inter(ms) if !positive => todo.extend(ms.into_iter().rev()),
+                        t if seen.insert(t.clone()) => flat.push(t),
+                        _ => {}
+                    }
                 }
+                let t = if positive {
+                    Ty::Union(flat)
+                } else {
+                    Ty::Inter(flat)
+                };
+                if !self.occurs {
+                    self.memo.insert((v, pos, env), t.clone());
+                }
+                t
             }
             Ty::Con(h, values, args) => {
                 let vs = self.s.variances(*h, args.len());
                 let args = args
                     .iter()
                     .zip(vs)
-                    .map(|(a, v)| match v {
+                    .zip(self.s.rows(*h, args.len()))
+                    .map(|((a, v), row)| match v {
                         _ if env => Ty::Both(
-                            Box::new(self.go(a, true, depth + 1, false)),
-                            Box::new(self.go(a, false, depth + 1, false)),
+                            Box::new(self.go(a, true, depth + 1, row != Mode::Value)),
+                            Box::new(self.go(a, false, depth + 1, row != Mode::Value)),
                         ),
-                        Variance::Co | Variance::Bi => self.go(a, pos, depth + 1, false),
-                        Variance::Contra => self.go(a, !pos, depth + 1, false),
+                        Variance::Co | Variance::Bi => {
+                            self.go(a, pos, depth + 1, row != Mode::Value)
+                        }
+                        Variance::Contra => self.go(a, !pos, depth + 1, row != Mode::Value),
                         Variance::Inv => Ty::Both(
-                            Box::new(self.go(a, true, depth + 1, false)),
-                            Box::new(self.go(a, false, depth + 1, false)),
+                            Box::new(self.go(a, true, depth + 1, row != Mode::Value)),
+                            Box::new(self.go(a, false, depth + 1, row != Mode::Value)),
                         ),
                     })
                     .collect();
@@ -595,14 +623,14 @@ impl Coalescer<'_> {
                     .map(|(l, p)| (l.clone(), self.go(p, !pos, depth + 1, false)))
                     .collect(),
                 ret: self.go(&f.ret, pos, depth + 1, false),
-                err: self.go(&f.err, pos, depth + 1, false),
+                err: self.go(&f.err, pos, depth + 1, true),
                 env: self.go(&f.env, pos, depth + 1, true),
             })),
             Ty::Union(ms) => Ty::Union(ms.iter().map(|m| self.go(m, pos, depth, env)).collect()),
             Ty::Inter(ms) => Ty::Inter(ms.iter().map(|m| self.go(m, pos, depth, env)).collect()),
             Ty::Diff(a, h) => Ty::Diff(
                 Box::new(self.go(a, pos, depth, env)),
-                h.iter().map(|m| self.go(m, pos, depth, false)).collect(),
+                h.iter().map(|m| self.go(m, pos, depth, env)).collect(),
             ),
             Ty::Both(a, b) => Ty::Both(
                 Box::new(self.go(a, true, depth, env)),
@@ -666,11 +694,23 @@ impl Norm<'_> {
             Ty::Diff(a, h) => {
                 self.diff(self.norm(*a), h.into_iter().map(|m| self.norm(m)).collect())
             }
-            Ty::Con(h, values, args) => Ty::Con(
-                h,
-                values.clone(),
-                args.into_iter().map(|a| self.norm(a)).collect(),
-            ),
+            Ty::Con(h, values, args) => {
+                let rows = self.s.rows(h, args.len());
+                Ty::Con(
+                    h,
+                    values,
+                    args.into_iter()
+                        .zip(rows)
+                        .map(|(a, row)| {
+                            if row != Mode::Value {
+                                self.env(a)
+                            } else {
+                                self.norm(a)
+                            }
+                        })
+                        .collect(),
+                )
+            }
             Ty::Fn(f) => {
                 let f = *f;
                 Ty::Fn(Box::new(FnTy {
@@ -680,7 +720,7 @@ impl Norm<'_> {
                         .map(|(l, p)| (l, self.norm(p)))
                         .collect(),
                     ret: self.norm(f.ret),
-                    err: self.norm(f.err),
+                    err: self.env(f.err),
                     env: self.env(f.env),
                 }))
             }
@@ -759,6 +799,36 @@ impl Norm<'_> {
             _ => false,
         }) {
             return Ty::Top;
+        }
+        if env {
+            out.sort_by_cached_key(|t| match t.head() {
+                Some(Head::Named(crate::hir::TypeRef::Custom(id))) => (
+                    1,
+                    self.s
+                        .type_names
+                        .get(id.0 as usize)
+                        .cloned()
+                        .unwrap_or_default(),
+                ),
+                Some(Head::Named(crate::hir::TypeRef::Builtin(b))) => (1, b.name().to_string()),
+                Some(_) => (2, String::new()),
+                None => (0, String::new()),
+            });
+            let mut ranks = Vec::new();
+            for member in out.iter().filter(|m| m.head().is_some()) {
+                visit(member, &mut |t| {
+                    if let Ty::Var(v) = t
+                        && !ranks.contains(v)
+                    {
+                        ranks.push(*v);
+                    }
+                });
+            }
+            out.sort_by_key(|t| match t {
+                Ty::Var(v) => (0, ranks.iter().position(|w| w == v).unwrap_or(usize::MAX)),
+                t if t.head().is_none() => (0, usize::MAX),
+                _ => (1, 0),
+            });
         }
         match out.len() {
             0 => Ty::Never,
@@ -978,6 +1048,28 @@ impl Norm<'_> {
         let mut occ: HashMap<V, Occ> = HashMap::default();
         let mut order = Vec::new();
         self.walk(t, true, &mut occ, &mut order, false);
+        // A handler's arguments constrain input variables even when a
+        // result annotation hides that relation. Do not turn an otherwise
+        // output-only row into an input merely because it excludes itself.
+        let input_only: HashSet<_> = occ
+            .iter()
+            .filter_map(|(v, o)| (o.neg > 0 && o.pos == 0).then_some(*v))
+            .collect();
+        visit(t, &mut |part| {
+            if let Ty::Diff(a, hs) = part
+                && self.s.is_row(a)
+            {
+                for h in hs {
+                    visit(h, &mut |x| {
+                        if let Ty::Var(v) = x
+                            && input_only.contains(v)
+                        {
+                            record(&mut occ, &mut order, *v, true, Vec::new());
+                        }
+                    });
+                }
+            }
+        });
         for v in &order {
             if rigid(self.s, self.keep, *v) {
                 continue;
@@ -1072,14 +1164,14 @@ impl Norm<'_> {
                 },
                 Ty::Con(h, _, args) => {
                     let vs = self.s.variances(*h, args.len());
-                    for (a, v) in args.iter().zip(vs) {
+                    for ((a, v), row) in args.iter().zip(vs).zip(self.s.rows(*h, args.len())) {
                         match v {
                             _ if env || v == Variance::Inv => {
-                                self.walk(a, true, occ, order, false);
-                                self.walk(a, false, occ, order, false);
+                                self.walk(a, true, occ, order, row != Mode::Value);
+                                self.walk(a, false, occ, order, row != Mode::Value);
                             }
-                            Variance::Contra => self.walk(a, !pos, occ, order, false),
-                            _ => self.walk(a, pos, occ, order, false),
+                            Variance::Contra => self.walk(a, !pos, occ, order, row != Mode::Value),
+                            _ => self.walk(a, pos, occ, order, row != Mode::Value),
                         }
                     }
                 }
@@ -1088,7 +1180,7 @@ impl Norm<'_> {
                         self.walk(p, !pos, occ, order, false);
                     }
                     self.walk(&f.ret, pos, occ, order, false);
-                    self.walk(&f.err, pos, occ, order, false);
+                    self.walk(&f.err, pos, occ, order, true);
                     self.walk(&f.env, pos, occ, order, true);
                 }
                 Ty::Both(a, b) => {

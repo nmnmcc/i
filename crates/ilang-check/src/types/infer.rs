@@ -8,7 +8,7 @@
 
 use super::display;
 use super::known;
-use super::solve::{FailKind, Pol, Solver, builtin_variance};
+use super::solve::{FailKind, Mode, Pol, Solver, builtin_variance};
 use super::{FnTy, Head, HostSignature, HostType, Ty, Typed, Variance};
 use crate::code;
 use crate::hir::*;
@@ -138,10 +138,12 @@ impl<'a> Checker<'a> {
             nil: find("Nil"),
             assert: find("Assert"),
         };
+        let mut solver = Solver::new(variances(p), Vec::new());
+        solver.row_params = row_parameters(p);
         Checker {
             p,
             sources,
-            s: Solver::new(variances(p), Vec::new()),
+            s: solver,
             diags: Vec::new(),
             module: ModuleId(0),
             locals: HashMap::new(),
@@ -944,6 +946,7 @@ impl<'a> Checker<'a> {
     // ---- Effects ----
 
     fn add_err(&mut self, t: Ty) {
+        self.s.mark_mode(&t, Mode::Row);
         if t != Ty::Never
             && let Some(e) = self.effects.last_mut()
         {
@@ -952,6 +955,7 @@ impl<'a> Checker<'a> {
     }
 
     pub fn add_env(&mut self, t: Ty) {
+        self.s.mark_row(&t);
         if t != Ty::Never
             && let Some(e) = self.effects.last_mut()
         {
@@ -996,7 +1000,13 @@ impl<'a> Checker<'a> {
                 if *ty == TypeRef::Builtin(BuiltinType::Never) {
                     return Ty::Never;
                 }
-                let args = args.iter().map(|a| self.conv(a, local)).collect();
+                let args: Vec<_> = args.iter().map(|a| self.conv(a, local)).collect();
+                let h = Head::Named(*ty);
+                for (a, row) in args.iter().zip(self.s.rows(h, args.len())) {
+                    if row != Mode::Value {
+                        self.s.mark_mode(a, row);
+                    }
+                }
                 Ty::named(*ty, args)
             }
             TypeKind::Var(tv) => {
@@ -1031,6 +1041,8 @@ impl<'a> Checker<'a> {
                 let ret = self.conv(ret, local);
                 let err = err.as_ref().map_or(Ty::Never, |e| self.conv(e, local));
                 let env = env.as_ref().map_or(Ty::Never, |e| self.conv(e, local));
+                self.s.mark_mode(&err, Mode::Row);
+                self.s.mark_row(&env);
                 Ty::Fn(Box::new(FnTy {
                     params,
                     ret,
@@ -1156,8 +1168,16 @@ impl<'a> Checker<'a> {
     }
 
     pub fn fresh_args(&mut self, t: TypeId) -> Vec<Ty> {
-        (0..self.p.ty(t).params.len())
-            .map(|_| self.s.fresh())
+        self.s
+            .rows(Head::Named(TypeRef::Custom(t)), self.p.ty(t).params.len())
+            .into_iter()
+            .map(|row| {
+                let a = self.s.fresh();
+                if row != Mode::Value {
+                    self.s.mark_mode(&a, row);
+                }
+                a
+            })
             .collect()
     }
 
@@ -2196,7 +2216,8 @@ impl<'a> Checker<'a> {
                 let espan = written.err.as_ref().map_or(wspan, |t| t.span);
                 let nspan = written.env.as_ref().map_or(wspan, |t| t.span);
                 self.sub2(&a, &value, body_span, wspan);
-                self.sub2(&err, &rerr, f.body.span, espan);
+                self.s.constrain_row(&err, &rerr);
+                self.flush(f.body.span, Some(espan));
                 self.sub_env(&env, &renv, f.body.span, Some(nspan));
                 for t in &env_tys {
                     self.sub_env(t, &renv, nspan, None);
@@ -2334,7 +2355,12 @@ impl<'a> Checker<'a> {
                 return t.clone();
             }
         };
-        if has_both(&simple) {
+        for service in self.s.hidden_handlers(&simple, level) {
+            self.error(code::ENV_FORMS, span, format!(
+                "the type hides the environment statement's obligation for `{}`: every instance must use the same service form (§4.8 rule 9, §9.2)",
+                display::show(&self.s, &service)));
+        }
+        if has_both(&simple) || self.s.has_obligations(t) {
             // An argument that does not change, with different bounds as
             // an output and as an input: keep the bounds.
             return t.clone();
@@ -2365,6 +2391,7 @@ impl<'a> Checker<'a> {
                 let n = self.s.fresh_at(level + 1);
                 self.s.vars[n.0 as usize].name =
                     self.s.vars.get(v.0 as usize).and_then(|x| x.name.clone());
+                self.s.vars[n.0 as usize].row = self.s.vars[v.0 as usize].row;
                 map.insert(*v, Ty::Var(n));
                 Ty::Var(n)
             }
@@ -2459,6 +2486,100 @@ fn host_builtin(b: BuiltinType) -> bool {
         b,
         BuiltinType::Int | BuiltinType::Float | BuiltinType::String | BuiltinType::BitArray
     )
+}
+
+/// A parameter used as an environment or error row stays a row through
+/// other constructors and aliases (§4.5). The finite boolean table grows
+/// to a fixed point, independently of declaration order.
+fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
+    fn walk(
+        t: &Type,
+        row: Mode,
+        params: &[(String, TyVarId)],
+        acc: &mut [Mode],
+        table: &HashMap<TypeId, Vec<Mode>>,
+    ) {
+        match &t.kind {
+            TypeKind::Var(v) if row != Mode::Value => {
+                if let Some(i) = params.iter().position(|x| x.1 == *v) {
+                    acc[i] = acc[i].max(row);
+                }
+            }
+            TypeKind::Named { ty, args } => {
+                let modes = match ty {
+                    TypeRef::Custom(id) => table[id].clone(),
+                    TypeRef::Builtin(BuiltinType::Continuation) => {
+                        vec![Mode::Value, Mode::Value, Mode::Row, Mode::Env]
+                    }
+                    TypeRef::Builtin(BuiltinType::Boundary) => {
+                        vec![Mode::Value, Mode::Row, Mode::Env]
+                    }
+                    _ => vec![Mode::Value; args.len()],
+                };
+                for (a, mode) in args.iter().zip(modes) {
+                    walk(a, mode, params, acc, table);
+                }
+            }
+            TypeKind::Fn {
+                params: ps,
+                ret,
+                err,
+                env,
+            } => {
+                for x in ps {
+                    walk(&x.ty, Mode::Value, params, acc, table);
+                }
+                walk(ret, Mode::Value, params, acc, table);
+                if let Some(x) = err {
+                    walk(x, Mode::Row, params, acc, table);
+                }
+                if let Some(x) = env {
+                    walk(x, Mode::Env, params, acc, table);
+                }
+            }
+            TypeKind::Tuple(ts) => {
+                for x in ts {
+                    walk(x, Mode::Value, params, acc, table);
+                }
+            }
+            TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
+                for x in ts {
+                    walk(x, row, params, acc, table);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut table: HashMap<_, _> = p
+        .types
+        .iter()
+        .enumerate()
+        .map(|(i, t)| (TypeId(i as u32), vec![Mode::Value; t.params.len()]))
+        .collect();
+    loop {
+        let mut changed = false;
+        for (i, t) in p.types.iter().enumerate() {
+            let id = TypeId(i as u32);
+            let mut acc = table[&id].clone();
+            match &t.body {
+                TypeBody::Custom(cs) => {
+                    for c in cs {
+                        for f in &c.fields {
+                            walk(&f.ty, Mode::Value, &t.params, &mut acc, &table);
+                        }
+                    }
+                }
+                TypeBody::Alias(body) => walk(body, Mode::Value, &t.params, &mut acc, &table),
+            }
+            if acc != table[&id] {
+                table.insert(id, acc);
+                changed = true;
+            }
+        }
+        if !changed {
+            return table;
+        }
+    }
 }
 
 /// §4.5 rules 6 and 7: the variance of every parameter of every custom
