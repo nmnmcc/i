@@ -981,7 +981,7 @@ drop_children(A) = (store: TaskStore(A), ids: List(Int)) -> TaskStore(A) {
 
 address_index = (id: Address) -> Int {
 	n = id.task + id.index
-	n * (n + 1) / 2 + id.index
+	n * { n + 1 } / 2 + id.index
 }
 
 find_scope = (scopes: TaskStore(ScopeState), id: Address) -> ScopeState {
@@ -4010,7 +4010,7 @@ finish_scope = (
 	info: ScopeInfo
 ) -> State {
 	id = read(address_key, info.id)
-	alive = any(s.scopes, (scope: ScopeState) { scope.address == id })
+	alive = store_find(s.scopes, address_index(id)) != Absent
 	{ alive } |> {
 		False -> reply(s, t.serial, k, Proceed(unit()), False)
 		True -> {
