@@ -228,3 +228,24 @@ fn control_and_error_handlers_preserve_frame_accounting() {
         assert_eq!(counts[0], counts[1], "{name}");
     }
 }
+
+#[test]
+fn logical_frame_limit_precedes_native_stack_exhaustion_for_large_expressions() {
+    // All these argument values have to survive the recursive call.  They
+    // are expression temporaries, not written local bindings.
+    let parameters = std::iter::repeat_n("_: Int", 900)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let arguments = (1..=900)
+        .map(|i| format!("n + {i}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let source = format!(
+        "many = ({parameters}, last: Int) -> Int {{ last }}\n\
+         f = (n: Int) -> Int {{ n |> {{ 0 -> 0 _ -> many({arguments}, f(n - 1)) }} }}\n\
+         @main\nmain = () {{ f(3300) Nil }}\n"
+    );
+    let wasm = compile(&source, false);
+    let (outcome, budget) = run(&wasm, Limits::default());
+    assert_eq!(budget.exceeded(), Some(Limit::Frames), "{outcome:?}");
+}
