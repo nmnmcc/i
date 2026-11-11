@@ -68,13 +68,16 @@ impl Session {
                 span: call.span(),
             }));
         }
+        let budget = ilang_host::macro_budget::MacroBudget::default();
         let arguments = definition
             .arguments(arguments, item, call)
             .map_err(Failure::Syntax)?;
         let mark = self.next_mark;
         self.next_mark = mark.checked_add(1).expect("macro mark space exhausted");
+        for argument in &arguments {
+            ilang_host::syntax::charge_tree(&budget, argument, true).map_err(Failure::Host)?;
+        }
         let marked = flip_mark_all(&arguments, mark);
-        let budget = ilang_host::macro_budget::MacroBudget::default();
         let resolver_budget = budget.clone();
         let context = Arc::new(DefinitionContext::new(move |query| {
             match resolver(query, &resolver_budget) {
@@ -101,6 +104,7 @@ impl Session {
                 RunOutcome::Aborted(abort) => return Err(Failure::Aborted(abort)),
                 RunOutcome::Stopped(stop) => return Err(Failure::Stopped(stop)),
             };
+            ilang_host::syntax::charge_tree(&budget, &syntax, true).map_err(Failure::Host)?;
             validate_expansion(&syntax, &marked).map_err(Failure::Syntax)?;
             let requests = items
                 .as_ref()

@@ -13,7 +13,7 @@ use ilang_syntax::ast::{self, Expr, ExprKind, Ident, Stmt, TypeExpr};
 use ilang_syntax::lisp::{
     Datum, DatumKind,
     expansion::MacroArgument,
-    scoped::{ScopedError, ScopedSource},
+    scoped::{MeteredError, ScopedError, ScopedSource},
     source_syntax::{source_expression_syntax, source_type_syntax},
     syntax::{Scope, Syntax},
 };
@@ -27,6 +27,7 @@ pub enum Error {
     Preparation(Vec<ilang_package::Diagnostic>),
     Run(Failure),
     Conversion(ScopedError),
+    Resource(Box<dyn std::error::Error + Send + Sync>),
     SameModule(Span),
     Depth(Span),
 }
@@ -138,7 +139,14 @@ impl<'a> BodyEngine<'a> {
         args: Vec<MacroArgument>,
         call: &Syntax,
         position: MacroPosition,
-    ) -> Result<Syntax, Error> {
+    ) -> Result<
+        (
+            Syntax,
+            ilang_host::macro_budget::MacroBudget,
+            Vec<Transaction>,
+        ),
+        Error,
+    > {
         if mac.source == self.source {
             return Err(Error::SameModule(call.span()));
         }
@@ -176,6 +184,7 @@ impl<'a> BodyEngine<'a> {
             );
         }
         let compiled = &self.cache[&key];
+        let mut output_budget = None;
         let result = self
             .session
             .run(
@@ -188,7 +197,8 @@ impl<'a> BodyEngine<'a> {
                 &compiled.export,
                 compiled.templates.clone(),
                 self.resolver.clone(),
-                |_, syntax, _budget| {
+                |_, syntax, budget| {
+                    output_budget = Some(budget.clone());
                     Ok(Expanded {
                         syntax,
                         transactions: Vec::new(),
@@ -196,8 +206,11 @@ impl<'a> BodyEngine<'a> {
                 },
             )
             .map_err(Error::Run)?;
-        self.transactions.extend(result.transactions);
-        Ok(result.syntax)
+        Ok((
+            result.syntax,
+            output_budget.expect("successful run supplies its budget"),
+            result.transactions,
+        ))
     }
 }
 impl Hook for BodyEngine<'_> {
@@ -225,10 +238,16 @@ impl Hook for BodyEngine<'_> {
             syntax: self.expr_syntax(&arg.value),
         }));
         let call = self.expr_syntax(expression);
-        let result = self.execute(&mac, args, &call, MacroPosition::Expression)?;
-        self.scoped
-            .expression(&result, &call)
-            .map_err(Error::Conversion)
+        let (result, budget, transactions) =
+            self.execute(&mac, args, &call, MacroPosition::Expression)?;
+        let expression = self
+            .scoped
+            .expression_metered(&result, &call, |work, words| {
+                budget.charge(work, words).map_err(|e| Box::new(e) as _)
+            })
+            .map_err(metered_error)?;
+        self.transactions.extend(transactions);
+        Ok(expression)
     }
     fn is_type_macro(
         &mut self,
@@ -260,8 +279,16 @@ impl Hook for BodyEngine<'_> {
             })
             .collect();
         let call = self.ty_syntax(ty);
-        let result = self.execute(&mac, args, &call, MacroPosition::Type)?;
-        self.scoped.ty(&result, &call).map_err(Error::Conversion)
+        let (result, budget, transactions) =
+            self.execute(&mac, args, &call, MacroPosition::Type)?;
+        let ty = self
+            .scoped
+            .ty_metered(&result, &call, |work, words| {
+                budget.charge(work, words).map_err(|e| Box::new(e) as _)
+            })
+            .map_err(metered_error)?;
+        self.transactions.extend(transactions);
+        Ok(ty)
     }
     fn depth_error(&mut self, span: Span) -> Error {
         Error::Depth(span)
@@ -324,5 +351,12 @@ impl Hook for BodyEngine<'_> {
             }
             _ => false,
         }
+    }
+}
+
+fn metered_error(error: MeteredError) -> Error {
+    match error {
+        MeteredError::Syntax(error) => Error::Conversion(error),
+        MeteredError::Resource(error) => Error::Resource(error),
     }
 }
