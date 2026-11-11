@@ -1183,3 +1183,18 @@ edited. No environment setting was changed. There are no derived files to
 regenerate. Full generic logging waits for K4; IO adapters and their fake/host
 tests wait for the separate IO phase. Neither requires an API change here.
 The final redesign merge check was already up to date at `7b3cea3`.
+
+
+## 13. IO adapter implementation
+
+`time.now`, `sleep`, and `measure` use `i/clock`; `calendar.now` and
+`format_now` observe the clock in UTC. `cli.read` reads `i/process` arguments,
+and `cli.run` prints diagnostics and usage through `i/stdio` before invoking
+the body or failing. `log.stderr`, `stdout`, and `file` deliver formatted lines
+through the corresponding services; `log.timestamped` explicitly supplies a
+clock observation to an entry. The five positive generic sink probes are
+ordinary tests.
+
+The process service currently has no exit-status operation. Consequently
+`cli.run` raises the parsing error after reporting bad arguments, giving a nonzero
+status rather than requesting an exit through that service. This remains open.
