@@ -224,7 +224,7 @@ fn an_editor_session() {
     c.open(&main, MAIN);
     assert_eq!(
         c.diagnostics(&main),
-        unused_diagnostics(MAIN, &["greet", "main"])
+        unused_diagnostics(MAIN, &["greet"])
     );
 
     // Hover shows the type, with the documentation.
@@ -316,7 +316,7 @@ fn an_editor_session() {
     c.change(&main, 4, MAIN);
     assert_eq!(
         c.diagnostics(&main),
-        unused_diagnostics(MAIN, &["greet", "main"])
+        unused_diagnostics(MAIN, &["greet"])
     );
 
     // Completion after `u.` in an unsaved buffer that does not parse.
@@ -371,7 +371,7 @@ fn unsaved_changes_in_another_file() {
     c.open(&main, MAIN);
     assert_eq!(
         c.diagnostics(&main),
-        unused_diagnostics(MAIN, &["greet", "main"])
+        unused_diagnostics(MAIN, &["greet"])
     );
     // `double` is no longer exported, in the buffer only.
     c.open(&util, &UTIL.replace(" (double)", " "));
@@ -387,7 +387,7 @@ fn unsaved_changes_in_another_file() {
     }));
     assert_eq!(
         c.diagnostics(&main),
-        unused_diagnostics(MAIN, &["greet", "main"])
+        unused_diagnostics(MAIN, &["greet"])
     );
     c.shutdown();
 }
@@ -582,7 +582,7 @@ fn answers_from_the_last_check() {
     c.open(&main, MAIN);
     assert_eq!(
         c.diagnostics(&main),
-        unused_diagnostics(MAIN, &["greet", "main"])
+        unused_diagnostics(MAIN, &["greet"])
     );
     let started = Instant::now();
     // A line before everything.
@@ -629,7 +629,7 @@ fn completion_after_a_dot_just_written() {
     c.open(&main, &text);
     assert_eq!(
         c.diagnostics(&main),
-        unused_diagnostics(&text, &["greet", "main", "m"])
+        unused_diagnostics(&text, &["greet", "m"])
     );
     let started = Instant::now();
     for (version, (from, to)) in [("u.name", "u."), ("make().name", "make().")]
@@ -658,7 +658,7 @@ fn quick_changes_are_checked_once() {
     c.open(&main, MAIN);
     assert_eq!(
         c.diagnostics(&main),
-        unused_diagnostics(MAIN, &["greet", "main"])
+        unused_diagnostics(MAIN, &["greet"])
     );
     for i in 0..10 {
         let text = format!("{MAIN}{}bad = nope\n", "\n".repeat(i));
