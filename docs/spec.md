@@ -333,8 +333,8 @@ This is the full version-1 schema; string cells are its nullary shorthand. A ser
 The package plan is data, not executable macro code. The root package selects target cells over the shipped plan; dependency packages cannot override its selections. There is no wildcard or implicit service discovery. The shipped capability registry is plan data: a registered row without a cell for this target is unsupplied, including user-registered capabilities. An absent root cell inherits the shipped cell when one exists. A plan is resolved with
 its declaring package's authority: it may name that package's private bindings;
 references into dependencies must be exported. Inherited cells keep their
-original declaring authority. Copying a dependency's private path into a root
-cell is an access error. This gives every package the same plan-only access,
+original declaring authority. Copying a dependency's private path into a
+root cell is an access error. This gives every package the same plan-only access,
 without making a private factory callable from ordinary outside source. It
 preserves private root-runner construction. The rule does not change source visibility (§2.4).
 Unknown keys, duplicate resolved rows/cells, unknown

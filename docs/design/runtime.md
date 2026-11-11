@@ -521,8 +521,8 @@ outstanding slot contains import index, ABI id, a fresh GC generation token,
 Owner group key, immutable Root key, and a reference to its request cell.
 Root/group indexes must remove a request on answer or cancel; completed cells
 are not retained by either index. Root accounting spans every live group,
-while closing a group touches only its own slots. Keep count/revision and local
-cell indexing separate from the start; MC adds shared metadata and home-worker
+while closing a group touches only its own slots. Keep count/revision and
+local cell indexing separate from the start; MC adds shared metadata and home-worker
 notifications without exposing an enumeration API. Normal entry-context exit
 retires every root/group registered in that context, including an independent
 root its caller forgot to close. Clearing requests at status 0 must clear those
