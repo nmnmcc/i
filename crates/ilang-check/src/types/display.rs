@@ -1347,63 +1347,82 @@ impl Norm<'_> {
         order: &mut Vec<V>,
         env: bool,
     ) {
-        // Only a union in an output place and an intersection in an input
-        // place say that a variable comes with the other members.
-        // This walk only reads the group. Cloning the enclosing tree at
-        // each recursive step costs quadratic work on nested types.
-        let (group, together): (&[Ty], bool) = match t {
-            Ty::Union(ms) => (ms, pos),
-            Ty::Inter(ms) => (ms, !pos),
-            _ => (std::slice::from_ref(t), true),
-        };
-        for (i, m) in group.iter().enumerate() {
-            match m {
-                Ty::Var(v) => {
-                    let with: Vec<&Ty> = if together {
+        enum Task<'a> {
+            Visit(&'a Ty, bool, bool),
+            Member(&'a Ty, &'a [Ty], usize, bool, bool, bool),
+        }
+        let mut tasks = vec![Task::Visit(t, pos, env)];
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Visit(t, pos, env) => {
+                    let (group, together): (&[Ty], bool) = match t {
+                        Ty::Union(ms) => (ms, pos),
+                        Ty::Inter(ms) => (ms, !pos),
+                        _ => (std::slice::from_ref(t), true),
+                    };
+                    tasks.extend(
                         group
                             .iter()
                             .enumerate()
-                            .filter(|(j, _)| *j != i)
-                            .map(|(_, x)| x)
-                            .collect()
-                    } else {
-                        Vec::new()
-                    };
-                    record(occ, order, *v, pos, with);
+                            .rev()
+                            .map(|(i, m)| Task::Member(m, group, i, together, pos, env)),
+                    );
                 }
-                Ty::Union(_) | Ty::Inter(_) => self.walk(m, pos, occ, order, env),
-                // Only the type constructors of `H` matter in `A - H`
-                // (§4.4), so the variables in `H` are not counted.
-                Ty::Diff(a, _) => match &**a {
-                    Ty::Var(v) => record(occ, order, *v, pos, Vec::new()),
-                    a => self.walk(a, pos, occ, order, env),
-                },
-                Ty::Con(h, _, args) => {
-                    let vs = self.s.variances(*h, args.len());
-                    for ((a, v), row) in args.iter().zip(vs).zip(self.s.rows(*h, args.len())) {
-                        match v {
-                            _ if env || v == Variance::Inv => {
-                                self.walk(a, true, occ, order, row != Mode::Value);
-                                self.walk(a, false, occ, order, row != Mode::Value);
+                Task::Member(m, group, i, together, pos, env) => match m {
+                    Ty::Var(v) => {
+                        let with = if together {
+                            group
+                                .iter()
+                                .enumerate()
+                                .filter(|(j, _)| *j != i)
+                                .map(|(_, x)| x)
+                                .collect()
+                        } else {
+                            Vec::new()
+                        };
+                        record(occ, order, *v, pos, with);
+                    }
+                    Ty::Union(_) | Ty::Inter(_) => tasks.push(Task::Visit(m, pos, env)),
+                    Ty::Diff(a, _) => match &**a {
+                        Ty::Var(v) => record(occ, order, *v, pos, Vec::new()),
+                        a => tasks.push(Task::Visit(a, pos, env)),
+                    },
+                    Ty::Con(h, _, args) => {
+                        let children: Vec<_> = args
+                            .iter()
+                            .zip(self.s.variances(*h, args.len()))
+                            .zip(self.s.rows(*h, args.len()))
+                            .collect();
+                        for ((a, v), row) in children.into_iter().rev() {
+                            if env || v == Variance::Inv {
+                                tasks.push(Task::Visit(a, false, row != Mode::Value));
+                                tasks.push(Task::Visit(a, true, row != Mode::Value));
+                            } else {
+                                tasks.push(Task::Visit(
+                                    a,
+                                    if v == Variance::Contra { !pos } else { pos },
+                                    row != Mode::Value,
+                                ));
                             }
-                            Variance::Contra => self.walk(a, !pos, occ, order, row != Mode::Value),
-                            _ => self.walk(a, pos, occ, order, row != Mode::Value),
                         }
                     }
-                }
-                Ty::Fn(f) => {
-                    for (_, p) in &f.params {
-                        self.walk(p, !pos, occ, order, false);
+                    Ty::Fn(f) => {
+                        tasks.push(Task::Visit(&f.env, pos, true));
+                        tasks.push(Task::Visit(&f.err, pos, true));
+                        tasks.push(Task::Visit(&f.ret, pos, false));
+                        tasks.extend(
+                            f.params
+                                .iter()
+                                .rev()
+                                .map(|(_, p)| Task::Visit(p, !pos, false)),
+                        );
                     }
-                    self.walk(&f.ret, pos, occ, order, false);
-                    self.walk(&f.err, pos, occ, order, true);
-                    self.walk(&f.env, pos, occ, order, true);
-                }
-                Ty::Both(a, b) => {
-                    self.walk(a, true, occ, order, false);
-                    self.walk(b, false, occ, order, false);
-                }
-                Ty::Never | Ty::Top => {}
+                    Ty::Both(a, b) => {
+                        tasks.push(Task::Visit(b, false, false));
+                        tasks.push(Task::Visit(a, true, false));
+                    }
+                    Ty::Never | Ty::Top => {}
+                },
             }
         }
     }
@@ -2163,10 +2182,16 @@ mod deep_walk_tests {
                     members: HashMap::default(),
                 };
                 assert_eq!(coalescer.go(&expected, true, 0, false), expected);
+                let mut occ = HashMap::default();
+                let mut order = Vec::new();
+                norm.walk(&expected, true, &mut occ, &mut order, false);
+                assert_eq!(order, vec![V(0)]);
                 let shown = tree(&expected, &mut |v| format!("V{}", v.0));
                 assert!(shown.text(&[]).contains("V0"));
                 let copied = shown.clone();
                 assert_eq!(shown, copied);
+                let full = scheme(&s, &expected, Opts::default()).expect("deep type scheme");
+                assert!(full.text(&[]).contains("Never"));
             })
             .unwrap()
             .join()
