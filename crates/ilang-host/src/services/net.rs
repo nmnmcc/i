@@ -77,6 +77,20 @@ fn insert_stream(
         },
     )
 }
+
+/// Consume an idle TCP stream so a transport such as TLS can own the socket.
+pub(super) fn take_stream(
+    context: &ResourceContext,
+    id: &crate::BigInt,
+) -> Result<TcpStream, crate::resources::ResourceError> {
+    let stream = context.take_idle::<Stream>(id, STREAM)?;
+    let stream = Arc::try_unwrap(stream).unwrap_or_else(|_| panic!("idle TCP stream is shared"));
+    let read = stream.read.into_inner();
+    let write = stream.write.into_inner();
+    Ok(read
+        .reunite(write)
+        .expect("TCP halves belong to the same stream"))
+}
 fn port(n: &crate::BigInt, zero: bool) -> Option<u16> {
     u16::try_from(n).ok().filter(|p| zero || *p != 0)
 }
