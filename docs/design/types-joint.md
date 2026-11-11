@@ -104,7 +104,7 @@ Every row below is a shared region. “No addition” means preserve the earlier
 |---|---|
 | `crates/ilang-syntax/src/ast.rs:371–406` | On A1's nodes, T1 adds literal leaves and simplifies TypeArg → T2 preserves ValueOf/pattern classification → T3 adds Record/base/parts. Keep attribute/item macro nodes from A1. |
 | `crates/ilang-syntax/src/parser.rs:452–531,1150–1291` | One type-primary dispatch: literals/negative groups → lowercase value reads and syntactic alias-pattern classification → records versus groups. Preserve TypeCall and the complete §5 lookahead contract. |
-| `crates/ilang-syntax/src/print.rs:528–629`, `format.rs:1472–1552` | Literal/negative type text → Of and alias-pattern text → record parts and required first-field comma. All use the same precedence and exact-tree rules. Here `format.rs` is in the same syntax directory. |
+| `crates/ilang-syntax/src/print.rs:528–629`, `format.rs:1472–1552` | Literal/negative type text → Of and alias-pattern text → record parts. All use the same precedence and exact-tree rules. Here `format.rs` is in the same syntax directory. |
 | `hir.rs:167–192,273–296,349–365` | Lit → Of/pattern metadata → Record/labels. Keep aliases as aliases. |
 | `resolve.rs:1329–1467,1568–1660,2630–2697` | Dispatch/visitors above; directional literal ABI checks → Of readiness/context and deferred exports → labels/record rejection at service and host boundaries. No catch-all that hides a new type. |
 | `types/mod.rs:40–102,133–210` | One algebra and the additive tables above. T2’s solver snapshot remains private. |
@@ -243,18 +243,17 @@ Diff       = Prim { "-" Prim } .
 Prim       = FnType | TupleType | NamedType | TypeCall | ValueType
            | Literal | "_" | "{" Type "}" | RecordType .
 FnType     = "(" [ ParamType { "," ParamType } [ "," ] ] ")"
-             "->" Union [ "?" Union ] [ "!" Union ] .
+             "->" Union [ "^" Union ] [ "!" Union ] .
 ParamType  = [ name ":" ] Type .
-TupleType  = "(" [ Type { "," Type } [ "," ] ] ")" .
+TupleType  = "(" Type { "," Type } [ "," ] ")" .
 NamedType  = [ name "." ] UpName [ "(" Type { "," Type } [ "," ] ")" ] .
 ValueType  = [ name "." ] name .
 TypeCall   = [ name "." ] name "(" [ TypeArg { "," TypeArg } [ "," ] ] ")" .
 TypeArg    = Type .
 Literal    = int_lit | "-" IntPart | string_lit .
 IntPart    = int_lit | "{" IntPart "}" .
-RecordType = "{" ".." "}"
-           | "{" ".." Type { "," RPart } [ "," ] "}"
-           | "{" FPart { "," FPart } [ "," ] "}" .
+RecordType = "(" ".." Type { "," RPart } [ "," ] ")"
+           | "(" FPart { "," FPart } [ "," ] ")" .
 RPart      = Label ":" Type | "-" Label .
 FPart      = Label ":" Type .
 Label      = name | string_lit | UpName .
@@ -263,8 +262,8 @@ Label      = name | string_lit | UpName .
 The grammar is deterministic with these existing or accepted lookaheads; it is not claimed to be LL(1):
 
 1. At a lowercase head, consume the optional one-part qualifier and final name. A joined `(` chooses TypeCall; otherwise ValueType. No import lookup changes this decision. Only a final UpName chooses NamedType. There is no postfix type application of `{ x }`.
-2. After `{`, `..` or `Label :` chooses RecordType. Otherwise read exactly one Type and `}` as a group. An empty `{}` is invalid in a type; it is an empty clause block only in an expression. A record with one field is not a group.
-3. After `(`, the matching `)` followed by `->` chooses FnType; otherwise TupleType. A function type consumes its result union greedily; `?` and `!` attach to the nearest arrow, in that order. Labels are allowed only in the parameter reading.
+2. Braces group exactly one type. An empty `{}` is invalid in a type; it is an empty clause block in an expression.
+3. After `(`, matching-close lookahead selects a function first; otherwise a spread or labelled field selects a record, and positional parts select a tuple. A function type consumes its result union greedily; `^` and `!` attach to the nearest arrow, in that order. Tuple parts are positional; function parameters may be labelled.
 4. A `-` where a Prim starts requires IntPart. After a complete Prim it is difference. Thus negative literals are not lexer tokens. The braces in IntPart contain only an unsigned integer, recursively grouped.
 5. Breaks inside a record type separate parts as commas; a break directly inside a type group remains an error. Joined calls use §1.7’s line rule. Delimiter lookahead respects nested braces/parentheses, not textual searches for a colon or arrow.
 
@@ -273,19 +272,19 @@ The grammar is deterministic with these existing or accepted lookaheads; it is n
 | `x`, `{ x }`, `m.x` | Value type, grouped value type, module value type; field access on a value qualifier is E0207 |
 | `x()`, `a.m(Int, -{1}, ( x: "a" ))` | Macro reservation E0234 until M2; arguments are types |
 | `m.T("a")`, `A(Int)` | Named application; second is E0230 if A is a declared variable |
-| `{ "a" }`, `{ "a": x }`, `( K: "a" )` | Grouped literal; fixed-label record with an Of field; parameter-label record subject to L1/L2 |
+| `{ "a" }`, `( "a": x )`, `( K: "a" )` | Grouped literal; fixed-label record with an Of field; parameter-label record subject to L1/L2 |
 | `Record`, `( ..x )`, `( ..x, -a )` | All records; records of Of(x); forgetting label a from Of(x) |
 | `{ x, }`, `{}`, `{ -a }` in a type | Errors: no tuple braces, empty type, or free-standing forgotten label |
 | `Int - -1`, `-{ {1} }`, `-{-1}` | Difference excluding negative one; literal negative one; error (IntPart cannot contain a minus) |
 | `Int - {1}`, `(1)`, `-(1)` | Difference excluding one; one-part tuple type; error |
 | `(x) -> ( name: String )` | Function type with an Of parameter and a record result |
-| `(x) -> { name: String } { name: x }` in an expression | Function with record result annotation and record body; x in the body is a value expression |
+| `(x) -> (name: String) { (name: x) }` in an expression | Function with record result annotation and record body; x in the body is a value expression |
 | `{ x: 1 -> 2 }` in an expression | One-clause block, fitted annotation 1; T1 replaces A1’s old example |
 | `{ x: y -> 2 }` in an expression | One-clause block with Of(y), not a record |
-| `( f: (x) -> Int { x }, )` in an expression | Record; the explicit comma disambiguates T3’s expression scan |
+| `(f: (x) -> Int { x })` in an expression | Record containing a function; no comma is needed for disambiguation |
 | `v \|> { x: Int \| y -> 0  _ -> 1 }` | The whole `Int \| y` is a type; after T2 its validity depends on y, so it is not an unconditional syntax error |
 
-The last table row escapes pipes only for Markdown; the i tokens are `|>` and `|`. Record-type parsing does not reuse the expression rule that scans for top-level `->`, `?`, `|`, and `=`: `( f: (Int) -> String )` in a type is always a record type. T3’s expression printer must retain its required comma even in multiline output.
+The last table row escapes pipes only for Markdown; the i tokens are `|>` and `|`. Matching-close lookahead and the first field distinguish function and record forms. `( f: (Int) -> String )` in a type is a record type; commas only separate parts.
 
 ### Answer to meta.md open question 2
 
@@ -614,7 +613,7 @@ For type-only changes, compare WAT under the existing dump policy. T2 demands do
 1. Start after landed T1; implement independent tests/runtime work, then rebase shared edits onto T2. Adopt J8 or obtain an alternative sound coordinator decision before implementing E4. Gate: shared-file and spec region map includes T2’s trial state, not only T1’s Con field.
 2. Add Label/Rec/Without/smart constructors and record solver rules `[shared: mod, solve, display]`. Gate: per-site Con/Fn/head audit, width/spread/routing/occurs tests, J8 substitution test, K1 invariant child test; no catch-all that loses bounds.
 3. Add exact full display, structured shown labels/key-slot metadata, known summaries, hidden-input and inferred-shape traversal `[shared: shown, display, known, T2 closure module]`. Gate: read-back, label alpha-renaming before sorting, no foreign Param in expected types, no false E0520 in full-literal fold.
-4. Add record syntax/HIR and reusable label/context checks `[shared: syntax, hir, resolve, order]`. Gate: grammar table, comma printer round-trip, decoded duplicate labels, L2a/L5 Of rejection, expression SCC restriction. Add record base/field dependencies and runtime-use walking.
+4. Add record syntax/HIR and reusable label/context checks `[shared: syntax, hir, resolve, order]`. Gate: grammar table, printer round-trip, decoded duplicate labels, L2a/L5 Of rejection, expression SCC restriction. Add record base/field dependencies and runtime-use walking.
 5. Add record inference/access and call preparation `[shared: infer, pattern, coverage, mod]`. Gate: key inferred once, singleton subtype check, repeated-key and recursive-key tests, effect order, Record/All coverage/test tables, shown-place checks on weak bindings.
 6. Extend T2 closure, provenance and exports with records/Without `[shared]`. Gate: exact Schema and two-parameter Codec builders, closed own-module alias and rejected foreign partial extraction, failed-batch rollback including record constraints and label escape state.
 7. Add runtime/IR/lowering and ordinary record module; preserve T1 TestValues `[shared: lower, library registration]`. Gate: tag tests and complements, empty nominal access, label constants/effect preservation, Wasm validation and O0/O2 equality/hash/inspect tests including size limits.
@@ -650,7 +649,7 @@ These are instructions for the owning tracks after acceptance, not edits made by
 6. **§5.9, alias stability.** Old: “So `Codec(User, _) = user` binds `User` to `( age: Int, name: String )`, whatever the rest of the module does.” New: “When the own-module completion batch succeeds, User is `( name: String, age: Int )`; later uses must respect its checked fixation equations. Distinct open encode variables stay live. A foreign partial extraction is E0534; import User, or first close the whole source.” Reason: T2 M1/R7 and ledger G2(S6), not unconditional shape freezing.
 7. **§6 and §12, rule 13a/13c.** Old: “the type of `v` must be a subtype of its known type.” New: “the inferred type of v must be a subtype of the bound of its known type, with T1's covariant whole-literal bound and fresh holes at noncovariant places.” Reason: preserve T1's fitted-literal fix. Use the full joint replacement for rule 13 in §6 above; rule 13b keeps only its structural field constraint.
 8. **§8.2, grammar.** Old: `Prim       = FnType | TupleType | NamedType | "_" | "{" Type "}" | RecordType .` New: “Use types-joint §5's complete grammar, including Literal, ValueType, TypeCall and TypeArg=Type.” Reason: the displayed pre-A1 grammar would remove T1, T2 and macro reservations. Keep T3's record lines and place restrictions.
-9. **§8.3, formatter.** Old: “a record on one line when it fits, `( name: "ada", age: 36 )`, and else one field per line with no commas.” New: “Use one field per line when needed, retaining a comma after the first field whenever §8.1's scan requires it.” Reason: §8.1's exact-tree rule wins over this summary; a function-valued first field otherwise becomes a clause block.
+9. **§8.3, formatter.** Print a record on one line when it fits and otherwise one field per line. Commas separate fields; a function-valued field does not require one for disambiguation.
 10. **§11, allocation.** Old: “T1 and T2 number their new codes from E0523 upward and stay below E0540.” New: “T1 reserves E0523–E0529, T2 owns E0530–E0537, E0538–E0539 remain unallocated, and T3 owns E0540–E0549. Preserve A1 E0113–E0115 and E0229–E0236.” Reason: accepted T2 allocation and A1 ledger; see the combined table.
 11. **§11, E0541 hint.** Old: “A clause that matches the key does not help”. New: “Matching does not turn the original subject name into a singleton-typed key. A new binder whose inferred type is a singleton after T1 rule 12 can be a key; a fitted binder with only a singleton known fact still fails the inferred subtype check.” Reason: T-C versus T-B. The existing example using the original s remains rejected.
 12. **§12, §4.5 addition.** Old: “Add after rule 7: "8. Records: see §4.9.3."” New: “Add after rule 8: 9. Records: see §4.9.3. T1 owns rule 8.” Reason: T1's value-set subset rule is already present. No other rules are renumbered.
