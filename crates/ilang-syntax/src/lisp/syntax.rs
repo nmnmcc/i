@@ -253,31 +253,80 @@ impl Syntax {
     }
 
     pub fn to_datum(&self) -> Datum {
-        let children = |xs: &[Syntax]| xs.iter().map(Syntax::to_datum).collect();
-        let kind = match self.node() {
-            Node::Name(s) => DatumKind::Name(s.clone()),
-            Node::Discard(s) => DatumKind::Discard(s.clone()),
-            Node::Up(s) => DatumKind::UpName(s.clone()),
-            Node::Symbol(s) => DatumKind::Symbol(s.clone()),
-            Node::Int(n) => DatumKind::Int(n.clone()),
-            Node::Float(n) => DatumKind::Float(*n),
-            Node::Text(s) => DatumKind::String(s.clone()),
-            Node::Round(xs) => DatumKind::Round(children(xs)),
-            Node::Square(xs) => DatumKind::Square(children(xs)),
-            Node::Curly(xs) => DatumKind::Curly(children(xs)),
-            Node::Bits(xs) => DatumKind::Bits(children(xs)),
-            Node::Quote(x) => DatumKind::Quote(Box::new(x.to_datum())),
-            Node::Unquote(x) => DatumKind::Unquote(Box::new(x.to_datum())),
-            Node::Splice(x) => DatumKind::Splice(Box::new(x.to_datum())),
-        };
-        Datum {
-            kind,
-            span: self.span(),
-            docs: Vec::new(),
+        enum Task<'a> {
+            Visit(&'a Syntax),
+            Finish(&'a Syntax, usize),
         }
+        let mut tasks = vec![Task::Visit(self)];
+        let mut values = Vec::new();
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Visit(value) => {
+                    let children = match value.node() {
+                        Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                            Some(xs.as_slice())
+                        }
+                        Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => {
+                            Some(std::slice::from_ref(x))
+                        }
+                        _ => None,
+                    };
+                    if let Some(children) = children {
+                        tasks.push(Task::Finish(value, children.len()));
+                        tasks.extend(children.iter().rev().map(Task::Visit));
+                    } else {
+                        let kind = match value.node() {
+                            Node::Name(s) => DatumKind::Name(s.clone()),
+                            Node::Discard(s) => DatumKind::Discard(s.clone()),
+                            Node::Up(s) => DatumKind::UpName(s.clone()),
+                            Node::Symbol(s) => DatumKind::Symbol(s.clone()),
+                            Node::Int(n) => DatumKind::Int(n.clone()),
+                            Node::Float(n) => DatumKind::Float(*n),
+                            Node::Text(s) => DatumKind::String(s.clone()),
+                            _ => unreachable!("composite syntax has children"),
+                        };
+                        values.push(Datum {
+                            kind,
+                            span: value.span(),
+                            docs: Vec::new(),
+                        });
+                    }
+                }
+                Task::Finish(value, count) => {
+                    let at = values
+                        .len()
+                        .checked_sub(count)
+                        .expect("syntax child stack underflow");
+                    let mut children = values.split_off(at);
+                    let kind = match value.node() {
+                        Node::Round(_) => DatumKind::Round(children),
+                        Node::Square(_) => DatumKind::Square(children),
+                        Node::Curly(_) => DatumKind::Curly(children),
+                        Node::Bits(_) => DatumKind::Bits(children),
+                        Node::Quote(_) => {
+                            DatumKind::Quote(Box::new(children.pop().expect("quote child")))
+                        }
+                        Node::Unquote(_) => {
+                            DatumKind::Unquote(Box::new(children.pop().expect("unquote child")))
+                        }
+                        Node::Splice(_) => {
+                            DatumKind::Splice(Box::new(children.pop().expect("splice child")))
+                        }
+                        _ => unreachable!("leaf syntax has no finish task"),
+                    };
+                    values.push(Datum {
+                        kind,
+                        span: value.span(),
+                        docs: Vec::new(),
+                    });
+                }
+            }
+        }
+        assert_eq!(values.len(), 1, "syntax conversion has one result");
+        values.pop().expect("syntax conversion result")
     }
     pub fn show(&self) -> String {
-        super::show(&self.to_datum())
+        super::show_tree(self)
     }
     pub fn show_as(&self, position: Position) -> Result<String, SyntaxError> {
         super::to_source::show_as(&self.to_datum(), position).map_err(|e| SyntaxError {
