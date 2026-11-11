@@ -2926,5 +2926,13 @@
   "crates/ilang-wasm/tests/expansion_sites.rs:dbceb65de7aa8500": {
     "not_source": true,
     "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/providers.rs:7cd5922e9be2739b": {
+    "not_source": true,
+    "reason": "TOML named-entry/test manifest or dependency path format template."
+  },
+  "crates/ilang-cli/tests/providers.rs:cb4a79fc55a008e5": {
+    "not_source": true,
+    "reason": "TOML named-entry/test manifest or dependency path format template."
   }
 }
