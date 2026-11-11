@@ -62,6 +62,7 @@ pub mod code {
 pub enum Severity {
     Error,
     Warning,
+    Note,
 }
 
 /// A problem found by any part of the compiler after parsing, in a file.
@@ -113,6 +114,13 @@ impl Diagnostic {
         }
     }
 
+    pub fn note(source: Option<SourceId>, span: Span, message: impl Into<String>) -> Diagnostic {
+        Diagnostic {
+            severity: Severity::Note,
+            ..Diagnostic::error("N0001", source, span, message)
+        }
+    }
+
     pub fn is_error(&self) -> bool {
         self.severity == Severity::Error
     }
@@ -161,6 +169,7 @@ impl Sources {
         let kind = match d.severity {
             Severity::Error => "error",
             Severity::Warning => "warning",
+            Severity::Note => "note",
         };
         let _ = write!(out, "{kind}[{}]: {}", d.code, d.message);
         for note in &d.related {

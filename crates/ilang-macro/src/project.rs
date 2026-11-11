@@ -1,0 +1,221 @@
+//! Project-wide, dependency-ordered syntax expansion.
+use crate::{
+    body_engine::BodyEngine,
+    body_walk,
+    definition_world::DefinitionWorld,
+    diagnostics,
+    item_phase::{self, PhaseError},
+    module_order,
+    registry::Registry,
+    session::{DefinitionResolver, Session, Transaction},
+    validate,
+};
+use ilang_check::Parsed;
+use ilang_package::{Diagnostic, PackageGraph, SourceId};
+use ilang_syntax::lisp::scoped::ScopedSource;
+use std::sync::Arc;
+
+pub struct Expanded {
+    pub parsed: Vec<Parsed>,
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+/// Parse and expand each module after its dependencies. On failure the
+/// diagnostics are returned without publishing partial output to the checker.
+pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
+    let (mut parsed, mut diagnostics) = ilang_check::parse(graph);
+    if diagnostics.iter().any(Diagnostic::is_error) {
+        return Err(diagnostics);
+    }
+    if !parsed.iter().any(|module| {
+        module.ast.items.iter().any(|item| {
+            item.attributes
+                .iter()
+                .any(|attribute| attribute.module.is_none() && attribute.name.name == "macro")
+        })
+    }) {
+        return Ok(Expanded {
+            parsed,
+            diagnostics,
+        });
+    }
+    let order = match module_order::order(graph, &parsed) {
+        Ok(order) => order,
+        Err(_) => {
+            diagnostics.extend(ilang_check::check_parsed(graph, &parsed).diags);
+            return Err(diagnostics);
+        }
+    };
+    let mut session = Session::default();
+    for source in order {
+        let index = parsed
+            .iter()
+            .position(|module| module.source == source)
+            .expect("ordered module belongs to project");
+        let registry = Registry::new(graph, &parsed)?;
+        let definitions = Arc::new(DefinitionWorld::new(graph, &parsed));
+        let mut ast = parsed[index].ast.clone();
+        let scoped = parsed[index]
+            .scoped
+            .clone()
+            .unwrap_or_else(|| ScopedSource::new(graph.sources.get(source).text.clone()));
+        let initial: Arc<DefinitionResolver> =
+            Arc::new(|_, _| panic!("definition resolver must be installed before execution"));
+        let mut engine = BodyEngine::new(
+            graph,
+            &parsed,
+            &registry,
+            source,
+            scoped,
+            initial,
+            &mut session,
+        );
+        let item_transactions =
+            match item_phase::expand_items(&mut engine, &mut ast, definitions.clone()) {
+                Ok(transactions) => transactions,
+                Err(error) => {
+                    return Err(map_failure(source, &engine.scoped, phase(source, error)));
+                }
+            };
+        let scoped = engine.scoped.clone();
+        let replacements = engine.type_replacements.clone();
+        drop(engine);
+        graph.sources.set_text(source, scoped.text().to_owned());
+        parsed[index].ast = ast;
+        parsed[index].scoped = Some(scoped);
+        let registry = Registry::new(graph, &parsed)?;
+        let mut ast = parsed[index].ast.clone();
+        let scoped = parsed[index]
+            .scoped
+            .clone()
+            .expect("item phase installs source map");
+        let initial: Arc<DefinitionResolver> =
+            Arc::new(|_, _| panic!("definition resolver must be installed before execution"));
+        let mut engine = BodyEngine::new(
+            graph,
+            &parsed,
+            &registry,
+            source,
+            scoped,
+            initial,
+            &mut session,
+        );
+        engine.type_replacements = replacements;
+        engine.use_completed_definitions(definitions, &ast);
+        if let Err(error) = body_walk::expressions(&mut ast, &mut engine) {
+            return Err(map_failure(
+                source,
+                &engine.scoped,
+                diagnostics::body(source, error),
+            ));
+        }
+        let scoped = engine.scoped.clone();
+        let body_transactions = std::mem::take(&mut engine.transactions);
+        drop(engine);
+        graph.sources.set_text(source, scoped.text().to_owned());
+        parsed[index].ast = ast;
+        parsed[index].scoped = Some(scoped);
+        diagnostics.extend(notes(
+            item_transactions.into_iter().chain(body_transactions),
+        ));
+        validate::module(graph, &parsed, source)?;
+    }
+    Ok(Expanded {
+        parsed,
+        diagnostics,
+    })
+}
+fn notes(transactions: impl IntoIterator<Item = Transaction>) -> Vec<Diagnostic> {
+    transactions
+        .into_iter()
+        .flat_map(|transaction| {
+            let (source, span) = transaction
+                .location
+                .expect("completed transaction has a call location");
+            transaction
+                .notes
+                .into_iter()
+                .map(move |message| Diagnostic::note(Some(source), span, message))
+        })
+        .collect()
+}
+fn phase(source: SourceId, error: PhaseError) -> Vec<Diagnostic> {
+    match error {
+        PhaseError::Step(error) => diagnostics::body(source, error),
+        PhaseError::Waiting(queries) => queries
+            .into_iter()
+            .map(|query| {
+                Diagnostic::error(
+                    ilang_check::code::MACRO_RESERVED,
+                    Some(SourceId(query.scope().module)),
+                    query.span(),
+                    "cyclic macro type-definition query",
+                )
+            })
+            .collect(),
+        PhaseError::Changed { query, .. } => vec![Diagnostic::error(
+            ilang_check::code::MACRO_RESERVED,
+            Some(SourceId(query.scope().module)),
+            query.span(),
+            "an early macro type-definition answer changed during expansion",
+        )],
+    }
+}
+
+/// Expand and type-check a project through the same path used by builds.
+pub fn check(graph: &mut PackageGraph) -> ilang_check::Checked {
+    match expand(graph) {
+        Ok(mut expanded) => {
+            let mut checked = ilang_check::check_parsed(graph, &expanded.parsed);
+            if let Some(program) = &checked.program {
+                ilang_check::map_expansion_diagnostics(
+                    program,
+                    &graph.sources,
+                    &mut expanded.diagnostics,
+                );
+            }
+            expanded.diagnostics.append(&mut checked.diags);
+            checked.diags = expanded.diagnostics;
+            checked
+        }
+        Err(diagnostics) => ilang_check::Checked {
+            program: None,
+            types: None,
+            diags: diagnostics,
+        },
+    }
+}
+
+fn map_failure(
+    source: SourceId,
+    scoped: &ScopedSource,
+    mut diagnostics: Vec<Diagnostic>,
+) -> Vec<Diagnostic> {
+    for diagnostic in &mut diagnostics {
+        if diagnostic.source != Some(source) || !scoped.is_generated(diagnostic.span) {
+            continue;
+        }
+        let origin = scoped
+            .origin(diagnostic.span)
+            .expect("expanded diagnostic has an origin");
+        let syntax = &origin.syntax;
+        let template = syntax.scope().module != source.0 || !syntax.scope().marks.is_empty();
+        if template {
+            let primary = origin
+                .call_chain
+                .first()
+                .map_or(&origin.call_site, |call| &call.syntax);
+            diagnostic.related.push(ilang_package::DiagnosticNote {
+                source: SourceId(syntax.scope().module),
+                span: syntax.span(),
+                message: "expanded from this template".into(),
+            });
+            diagnostic.source = Some(SourceId(primary.scope().module));
+            diagnostic.span = primary.span();
+        } else {
+            diagnostic.source = Some(SourceId(syntax.scope().module));
+            diagnostic.span = syntax.span();
+        }
+    }
+    diagnostics
+}

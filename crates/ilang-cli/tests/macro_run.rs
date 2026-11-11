@@ -1186,6 +1186,17 @@ fn unused_macro_definitions_are_checked_for_signature_and_capabilities() {
     };
     assert!(check("(, (= syntax (/ i syntax)))\n(@ macro (= ok (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").is_ok());
     let wrong = check("(@ macro (= wrong (-> (x) _ 1)))\n").unwrap_err();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let checked = ilang_macro::project::check(&mut graph);
+    assert!(
+        checked
+            .diags
+            .iter()
+            .any(|d| d.is_error() && d.message.contains("macro `wrong`")),
+        "{:?}",
+        checked.diags
+    );
     assert!(
         wrong.iter().any(|d| d.message.contains("macro `wrong`")),
         "{wrong:?}"
@@ -1354,4 +1365,119 @@ fn item_phase_retries_definition_after_a_later_item() {
     assert!(
         matches!(&ast.items[0].kind, ilang_syntax::ast::ItemKind::TypeDef(t) if t.name.name == "T")
     );
+}
+
+#[test]
+fn project_expands_imported_macro_and_runs_generated_program() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        "name = \"app\"\n[wasm]\nexports = [\"app/main.value\"]\n",
+    )
+    .unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, twice)\n(@ macro (= twice (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(+ ~x ~x))))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\n(value)\nvalue = () { m.twice(21) }\n",
+    )
+    .unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let expanded = ilang_macro::project::expand(&mut graph).unwrap();
+    let checked = ilang_check::check_parsed(&graph, &expanded.parsed);
+    assert!(
+        !checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        checked.diags
+    );
+    let wasm = ilang_wasm::compile(
+        &graph,
+        checked.program.as_ref().unwrap(),
+        checked.types.as_ref().unwrap(),
+        ilang_wasm::Options {
+            tests: false,
+            target: ilang_wasm::Target::Ilang,
+        },
+    )
+    .unwrap();
+    let program = ilang_host::Program::from_bytes(&wasm).unwrap();
+    let mut instance = program
+        .instantiate(ilang_host::HostOptions::default())
+        .unwrap();
+    let result = instance.call("app/main.value", &[]).unwrap();
+    assert!(
+        matches!(result, ilang_host::Outcome::Ok(ilang_host::Value::Int(ref value)) if value.to_string() == "42"),
+        "{result:?}"
+    );
+    let built = ilang_cli::build(
+        dir.path(),
+        ilang_cli::BuildOptions {
+            tests: false,
+            opt: ilang_cli::Level::O0,
+            offline: true,
+            target: ilang_cli::Target::Ilang,
+        },
+    )
+    .unwrap();
+    let program = ilang_host::Program::from_bytes(&built.wasm).unwrap();
+    let mut instance = program.instantiate(built.host_options()).unwrap();
+    let result = instance.call("app/main.value", &[]).unwrap();
+    assert!(
+        matches!(result, ilang_host::Outcome::Ok(ilang_host::Value::Int(ref value)) if value.to_string() == "42"),
+        "{result:?}"
+    );
+}
+
+#[test]
+fn successful_macro_note_is_a_compiler_note_not_a_warning() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, mark)\n(@ macro (= mark (-> (x (! d (. syntax Diagnostics))) _ { ((. d note) \"hello\") x })))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nmain = () { m.mark(1) }\n",
+    )
+    .unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let checked = ilang_macro::project::check(&mut graph);
+    assert!(
+        !checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        checked.diags
+    );
+    let notes = checked
+        .diags
+        .iter()
+        .filter(|d| d.severity == ilang_package::Severity::Note)
+        .collect::<Vec<_>>();
+    assert_eq!(notes.len(), 1);
+    assert_eq!(notes[0].message, "hello");
+}
+
+#[test]
+fn cli_check_and_run_expand_imported_macros() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, twice)\n(@ macro (= twice (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(+ ~x ~x))))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nmain = () { m.twice(21) }\n",
+    )
+    .unwrap();
+    for command in ["check", "run"] {
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+            .args([command, "--offline", "--project"])
+            .arg(dir.path())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{command}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 }

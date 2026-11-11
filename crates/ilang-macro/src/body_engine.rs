@@ -227,7 +227,10 @@ impl<'a> BodyEngine<'a> {
             );
         }
         let compiled = &self.cache[&key];
-        self.run_mark.store(self.session.next_mark(), std::sync::atomic::Ordering::Relaxed);
+        self.run_mark.store(
+            self.session.next_mark(),
+            std::sync::atomic::Ordering::Relaxed,
+        );
         let mut output_budget = None;
         let result = self
             .session
@@ -255,10 +258,14 @@ impl<'a> BodyEngine<'a> {
                 call: call.clone(),
                 invocation_span,
             })?;
+        let mut transactions = result.transactions;
+        for transaction in &mut transactions {
+            transaction.location = Some((self.source, invocation_span));
+        }
         Ok((
             result.syntax,
             output_budget.expect("successful run supplies its budget"),
-            result.transactions,
+            transactions,
         ))
     }
 }
@@ -295,12 +302,20 @@ impl Hook for BodyEngine<'_> {
             None,
             MacroPosition::Expression,
         )?;
+        let invocation_span = expression.span;
+        let start = u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
         let expression = self
             .scoped
             .expression_metered(&result, &call, |work, words| {
                 budget.charge(work, words).map_err(|e| Box::new(e) as _)
             })
             .map_err(|error| metered_error(error, &mac.definition.name, &call, expression.span))?;
+        let end = u32::try_from(self.scoped.text().len()).expect("source span overflow");
+        self.scoped.inherit_call_chain(
+            Span::new(start, end),
+            invocation_span,
+            &mac.definition.name,
+        );
         self.transactions.extend(transactions);
         Ok(expression)
     }
@@ -337,12 +352,16 @@ impl Hook for BodyEngine<'_> {
         let call = self.ty_syntax(ty);
         let (result, budget, transactions) =
             self.execute(&mac, args, &call, ty.span, None, MacroPosition::Type)?;
+        let start = u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
         let ty = self
             .scoped
             .ty_metered(&result, &call, |work, words| {
                 budget.charge(work, words).map_err(|e| Box::new(e) as _)
             })
             .map_err(|error| metered_error(error, &mac.definition.name, &call, ty.span))?;
+        let end = u32::try_from(self.scoped.text().len()).expect("source span overflow");
+        self.scoped
+            .inherit_call_chain(Span::new(start, end), old_span, &mac.definition.name);
         self.type_replacements.push((old_span, ty.span, result));
         self.transactions.extend(transactions);
         Ok(ty)

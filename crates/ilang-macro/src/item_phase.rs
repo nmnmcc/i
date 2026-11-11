@@ -152,14 +152,35 @@ impl BodyEngine<'_> {
                 let call = self.atom(&attribute.name);
                 let original_names = item_names(&item);
                 let is_type = matches!(item.kind, ItemKind::TypeDef(_));
-                let (result, budget, transactions) =
-                    self.execute(&mac, args, &call, attribute.span, Some(inner), MacroPosition::Item)?;
+                let (result, budget, transactions) = self.execute(
+                    &mac,
+                    args,
+                    &call,
+                    attribute.span,
+                    Some(inner),
+                    MacroPosition::Item,
+                )?;
+                let start =
+                    u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
                 let mut items = self
                     .scoped
                     .items_metered(&result, &call, |work, words| {
                         budget.charge(work, words).map_err(|e| Box::new(e) as _)
                     })
-                    .map_err(|error| crate::body_engine::metered_error(error, &mac.definition.name, &call, attribute.span))?;
+                    .map_err(|error| {
+                        crate::body_engine::metered_error(
+                            error,
+                            &mac.definition.name,
+                            &call,
+                            attribute.span,
+                        )
+                    })?;
+                let end = u32::try_from(self.scoped.text().len()).expect("source span overflow");
+                self.scoped.inherit_call_chain(
+                    Span::new(start, end),
+                    attribute.span,
+                    &mac.definition.name,
+                );
                 reject_macro_definitions(&items)?;
                 if !is_type && !item.doc.is_empty() {
                     if let Some(first) = items.iter_mut().find(|out| {
@@ -197,12 +218,27 @@ impl BodyEngine<'_> {
                 let call = self.item_syntax(&item);
                 let (result, budget, transactions) =
                     self.execute(&mac, args, &call, item.span, None, MacroPosition::Item)?;
+                let start =
+                    u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
                 let items = self
                     .scoped
                     .items_metered(&result, &call, |work, words| {
                         budget.charge(work, words).map_err(|e| Box::new(e) as _)
                     })
-                    .map_err(|error| crate::body_engine::metered_error(error, &mac.definition.name, &call, item.span))?;
+                    .map_err(|error| {
+                        crate::body_engine::metered_error(
+                            error,
+                            &mac.definition.name,
+                            &call,
+                            item.span,
+                        )
+                    })?;
+                let end = u32::try_from(self.scoped.text().len()).expect("source span overflow");
+                self.scoped.inherit_call_chain(
+                    Span::new(start, end),
+                    item.span,
+                    &mac.definition.name,
+                );
                 reject_macro_definitions(&items)?;
                 return Ok(Step::Expanded {
                     retained: None,
@@ -472,7 +508,10 @@ fn expand_items_inner(
                 }
                 transactions.extend(engine.transactions.drain(old_transactions..));
             }
-            Err(Error::Run { failure: crate::session::Failure::Aborted(DefinitionAbort::Deferred { at }), .. }) => {
+            Err(Error::Run {
+                failure: crate::session::Failure::Aborted(DefinitionAbort::Deferred { at }),
+                ..
+            }) => {
                 engine.scoped = old_scoped;
                 engine.transactions.truncate(old_transactions);
                 waits.retain(|(waiting, _)| *waiting != id);

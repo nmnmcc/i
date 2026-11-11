@@ -612,6 +612,7 @@ impl<'c> Server<'c> {
                 severity: Some(match d.severity {
                     Severity::Error => lsp::DiagnosticSeverity::ERROR,
                     Severity::Warning => lsp::DiagnosticSeverity::WARNING,
+                    Severity::Note => lsp::DiagnosticSeverity::INFORMATION,
                 }),
                 code: Some(lsp::NumberOrString::String(d.code.to_string())),
                 source: Some("i".to_string()),

@@ -15,6 +15,7 @@ use crate::run::{MacroProgram, RunOutcome};
 pub struct Transaction {
     pub notes: Vec<String>,
     pub requests: Vec<ItemRequest>,
+    pub location: Option<(ilang_package::SourceId, ilang_syntax::span::Span)>,
 }
 
 pub struct Expanded {
@@ -143,9 +144,14 @@ impl Session {
                 ilang_host::syntax::flip_output_and_requests(&syntax, &requests, mark);
             let notes = context.take_notes();
             let mut expanded = expand_result(self, syntax, &budget)?;
-            expanded
-                .transactions
-                .insert(0, Transaction { notes, requests });
+            expanded.transactions.insert(
+                0,
+                Transaction {
+                    notes,
+                    requests,
+                    location: None,
+                },
+            );
             Ok(expanded)
         })();
         self.depth -= 1;

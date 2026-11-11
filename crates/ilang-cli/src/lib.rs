@@ -150,7 +150,7 @@ pub fn build_entry(
     let Some(root) = graph.root else {
         return Err(program_error(&graph, &diags));
     };
-    let checked = ilang_check::check(&graph);
+    let checked = ilang_macro::project::check(&mut graph);
     diags.extend(checked.diags);
     let (Some(program), Some(typed)) = (&checked.program, &checked.types) else {
         return Err(program_error(&graph, &diags));

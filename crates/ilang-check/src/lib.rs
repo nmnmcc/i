@@ -322,7 +322,7 @@ pub fn map_expansion_diagnostics(
         let Some(origin) = program.origin(hir::ModuleId(index as u32), d.span) else {
             return true;
         };
-        if origin.template.is_some() && !d.is_error() {
+        if origin.template.is_some() && d.severity == ilang_package::Severity::Warning {
             return false;
         }
         if let Some((template_source, template_span)) = origin.template {

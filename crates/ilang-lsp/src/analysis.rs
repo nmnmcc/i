@@ -190,7 +190,18 @@ fn analyze(job: &Job) -> (Analysis, bool) {
         }
     }
     let checked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        query::check_for_queries(&graph)
+        let original_graph = graph.clone();
+        match ilang_macro::project::expand(&mut graph) {
+            Ok(expanded) => {
+                query::check_parsed_for_queries(&graph, &expanded.parsed, expanded.diagnostics)
+            }
+            Err(diagnostics) => {
+                graph = original_graph;
+                let mut checked = query::check_for_queries(&graph);
+                checked.diags = diagnostics;
+                checked
+            }
+        }
     }));
     let ok = checked.is_ok();
     let checked = checked.unwrap_or_else(|_| Checked {
