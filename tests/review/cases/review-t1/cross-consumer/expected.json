@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
+  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -53,8 +53,5 @@
       "stdout": "",
       "stderr": "src/main.i:4:20: warning[W0503]: the values `\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | … (10 more)` and `\"v19\"` can never be equal, so `==` is always `False` (§6.9)\nassertion failed: assert\nprobe/main:4:13\n"
     }
-  },
-  "transitions": [
-    "W520 applied: E0520 -> W0503; docs/spec.md §6.9 requires Bool, no widening or new narrowing fact"
-  ]
+  }
 }
