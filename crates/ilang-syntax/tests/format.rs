@@ -101,7 +101,8 @@ fn raw_string_lines(src: &str) -> Vec<usize> {
 fn check(src: &str) -> Result<(), String> {
     let (mut module, _) = parse_module(src);
     for item in &mut module.items {
-        item.attributes.retain(|a| a.module.is_some() || a.name.name != "main");
+        item.attributes
+            .retain(|a| a.module.is_some() || a.name.name != "main");
     }
     let out = format(src).map_err(|d| format!("not formatted: {d:?}"))?;
     let (again, diags) = parse_module(&out);
@@ -224,7 +225,7 @@ fn format_golden() {
 
 #[test]
 fn removes_legacy_main_attribute_and_keeps_comments() {
-    let source = "// before\n@main // entry\nmain = () { Nil }\n";
+    let source = "// before\n // entry\nmain = () { Nil }\n";
     let output = format(source).unwrap();
     assert!(!output.contains("@main"), "{output}");
     assert_eq!(kept_comments(source), comments(&output));

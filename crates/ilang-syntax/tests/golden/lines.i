@@ -77,5 +77,5 @@ negative =  n |> {
 }
 
 // Attributes are part of the item after them.
-@main
+@custom
 main = () { Nil }

@@ -3,7 +3,7 @@
 @external("app:math/v1", "add")
 add: (Int, Int) -> Int
 
-@main
+@custom
 main = () { Nil }
 
 // not documentation

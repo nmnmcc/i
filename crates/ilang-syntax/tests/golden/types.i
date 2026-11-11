@@ -9,10 +9,10 @@ T8 = Record
 T9 = (Int)
 T10 = m.T(_, A)
 T11 = List(List(Int))
-T12 = (A) -> (B) -> C ? E ! N
-T13 = (A) -> { (B) -> C ? E } ! N
+T12 = (A) -> (B) -> C ^ E ! N
+T13 = (A) -> { (B) -> C ^ E } ! N
 T14 = { A - B } - C
-T15 = (body: () -> A ? E ! N) -> Result(A, E) ! N
+T15 = (body: () -> A ^ E ! N) -> Result(A, E) ! N
 T16 = { A | B } | C
 T17 = A & { (B) -> C } & D
 T18 = (in: String, each: String) -> String
@@ -24,4 +24,4 @@ Shape { Circle(Float) Rect(w: Float, h: Float) Dot }
 Gen(A) { Yield(emit: (value: A) -> Nil) }
 
 @external("m", "f")
-f(B): (a: Int, B) -> Int | String ? E ! N
+f(B): (a: Int, B) -> Int | String ^ E ! N

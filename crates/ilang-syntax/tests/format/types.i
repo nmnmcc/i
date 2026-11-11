@@ -7,4 +7,4 @@ Handler = { (Int) -> Int } | { (String) -> String }
 @external("env", "log")
 log: (String) -> Nil
 
-apply = (f: (Int) -> Int ? E ! N, x: Int | Float - Nil & Any) -> Int ? E ! N { f(x) }
+apply = (f: (Int) -> Int ^ E ! N, x: Int | Float - Nil & Any) -> Int ^ E ! N { f(x) }

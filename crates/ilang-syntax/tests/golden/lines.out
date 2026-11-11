@@ -49,7 +49,7 @@ negative = n |> {
   _ -> 3
 }
 
-@main
+@custom
 main = () { Nil }
 --- explicit ---
 goes_on = {
