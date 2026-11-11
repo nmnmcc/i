@@ -22,6 +22,7 @@ pub mod source_syntax;
 pub mod syntax;
 mod to_ast;
 mod to_source;
+mod trampoline;
 pub use encode::{expression_syntax, item_syntax, pattern_syntax, type_syntax};
 pub use from_ast::{print_module, print_with_comments};
 pub use to_ast::{
@@ -29,7 +30,7 @@ pub use to_ast::{
 };
 pub use to_source::{normal_source, normal_with_comments};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Datum {
     pub kind: DatumKind,
     pub span: Span,
@@ -55,31 +56,107 @@ pub enum DatumKind {
     Splice(Box<Datum>),
 }
 
+// Datum trees may be supplied by macros and can be much deeper than the host
+// call stack. Both copying quotes and disposing failed conversions must walk
+// the tree explicitly; a depth limit here would change the language contract.
+impl Clone for Datum {
+    fn clone(&self) -> Self {
+        enum Work<'a> {
+            Visit(&'a Datum),
+            Build(&'a Datum, usize),
+        }
+        let mut work = vec![Work::Visit(self)];
+        let mut values: Vec<Datum> = Vec::new();
+        while let Some(task) = work.pop() {
+            match task {
+                Work::Visit(d) => {
+                    let children: &[Datum] = match &d.kind {
+                        DatumKind::Round(xs)
+                        | DatumKind::Square(xs)
+                        | DatumKind::Curly(xs)
+                        | DatumKind::Bits(xs) => xs,
+                        DatumKind::Quote(x) | DatumKind::Unquote(x) | DatumKind::Splice(x) => {
+                            std::slice::from_ref(x)
+                        }
+                        _ => &[],
+                    };
+                    work.push(Work::Build(d, children.len()));
+                    work.extend(children.iter().rev().map(Work::Visit));
+                }
+                Work::Build(d, n) => {
+                    let children = values.split_off(values.len() - n);
+                    let kind = match &d.kind {
+                        DatumKind::Name(x) => DatumKind::Name(x.clone()),
+                        DatumKind::Discard(x) => DatumKind::Discard(x.clone()),
+                        DatumKind::UpName(x) => DatumKind::UpName(x.clone()),
+                        DatumKind::Int(x) => DatumKind::Int(x.clone()),
+                        DatumKind::Float(x) => DatumKind::Float(*x),
+                        DatumKind::String(x) => DatumKind::String(x.clone()),
+                        DatumKind::Symbol(x) => DatumKind::Symbol(x.clone()),
+                        DatumKind::Round(_) => DatumKind::Round(children),
+                        DatumKind::Square(_) => DatumKind::Square(children),
+                        DatumKind::Curly(_) => DatumKind::Curly(children),
+                        DatumKind::Bits(_) => DatumKind::Bits(children),
+                        DatumKind::Quote(_) => {
+                            DatumKind::Quote(Box::new(children.into_iter().next().unwrap()))
+                        }
+                        DatumKind::Unquote(_) => {
+                            DatumKind::Unquote(Box::new(children.into_iter().next().unwrap()))
+                        }
+                        DatumKind::Splice(_) => {
+                            DatumKind::Splice(Box::new(children.into_iter().next().unwrap()))
+                        }
+                    };
+                    values.push(Datum {
+                        kind,
+                        span: d.span,
+                        docs: d.docs.clone(),
+                    });
+                }
+            }
+        }
+        values.pop().expect("datum clone has a root")
+    }
+}
 impl Drop for Datum {
     fn drop(&mut self) {
-        fn children(kind: DatumKind, pending: &mut Vec<Datum>) {
+        if matches!(
+            &self.kind,
+            DatumKind::Name(_)
+                | DatumKind::Discard(_)
+                | DatumKind::UpName(_)
+                | DatumKind::Int(_)
+                | DatumKind::Float(_)
+                | DatumKind::String(_)
+                | DatumKind::Symbol(_)
+        ) {
+            return;
+        }
+        let mut work = vec![std::mem::replace(
+            &mut self.kind,
+            DatumKind::Symbol(String::new()),
+        )];
+        while let Some(kind) = work.pop() {
             match kind {
                 DatumKind::Round(mut xs)
                 | DatumKind::Square(mut xs)
                 | DatumKind::Curly(mut xs)
-                | DatumKind::Bits(mut xs) => pending.append(&mut xs),
-                DatumKind::Quote(x) | DatumKind::Unquote(x) | DatumKind::Splice(x) => {
-                    pending.push(*x);
+                | DatumKind::Bits(mut xs) => {
+                    for child in &mut xs {
+                        work.push(std::mem::replace(
+                            &mut child.kind,
+                            DatumKind::Symbol(String::new()),
+                        ));
+                    }
+                }
+                DatumKind::Quote(mut x) | DatumKind::Unquote(mut x) | DatumKind::Splice(mut x) => {
+                    work.push(std::mem::replace(
+                        &mut x.kind,
+                        DatumKind::Symbol(String::new()),
+                    ));
                 }
                 _ => {}
             }
-        }
-
-        let mut pending = Vec::new();
-        children(
-            std::mem::replace(&mut self.kind, DatumKind::Name(String::new())),
-            &mut pending,
-        );
-        while let Some(mut datum) = pending.pop() {
-            children(
-                std::mem::replace(&mut datum.kind, DatumKind::Name(String::new())),
-                &mut pending,
-            );
         }
     }
 }
