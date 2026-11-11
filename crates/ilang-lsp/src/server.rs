@@ -919,7 +919,12 @@ impl<'c> Server<'c> {
             None => std::fs::read_to_string(&path).unwrap_or_default(),
         };
         // `None`: the text has a syntax error, and is left as it is.
-        let edits = format(&text).filter(|f| *f != text).map(|formatted| {
+        let formatted = if path.extension().is_some_and(|e| e == "is") {
+            ilang_syntax::lisp::format(&text).ok()
+        } else {
+            format(&text)
+        };
+        let edits = formatted.filter(|f| *f != text).map(|formatted| {
             let ix = LineIndex::new(&text);
             vec![lsp::TextEdit {
                 range: lsp::Range::new(lsp::Position::new(0, 0), ix.position(text.len() as u32)),
