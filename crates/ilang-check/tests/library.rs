@@ -28,6 +28,7 @@ fn library_resolves_cleanly() {
             "i/task",
             "i/clock",
             "i/random",
+            "i/syntax",
             "i/fs",
             "i/process",
             "i/net",

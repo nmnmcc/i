@@ -809,6 +809,7 @@ mod tests {
             funcs: vec![FuncKind::Code(Func {
                 name: "f".into(),
                 arity: 1,
+                budget_frame: 2,
                 locals: vec![
                     LocalType::Value,
                     LocalType::I64,

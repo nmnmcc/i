@@ -3,6 +3,9 @@
 	i/request
 	i/fail
 	std/time
+	std/calendar
+	std/log
+	(Some) = std/option
 )
 
 @test
@@ -21,6 +24,11 @@ clock_fake = () {
 	assert(clock.unix_ns() == -7)
 	clock.sleep_ns(0)
 	assert(time.unix_nanoseconds(time.now()) == -7)
+	assert(calendar.format_now() == "1969-12-31T23:59:59.999999993Z")
+	entry = log.timestamped(
+		log.Entry(log.Info, "clock", [], Some(time.from_unix_nanoseconds(0)))
+	)
+	assert(entry.at == Some(time.from_unix_nanoseconds(-7)))
 	time.sleep(time.nanoseconds(0))
 	assert(time.measure(() { 12 }) == (12, time.nanoseconds(0)))
 	assert(

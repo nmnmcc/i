@@ -15,6 +15,9 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+wasmparser.workspace = true
 clap.workspace = true
 ilang-package.workspace = true
 ilang-check.workspace = true
@@ -24,6 +27,7 @@ ilang-host.workspace = true
 toml_edit.workspace = true
 tempfile.workspace = true
 ilang-lsp.workspace = true
+ilang-macro.workspace = true
 ilang-syntax.workspace = true
 
 [dev-dependencies]

@@ -823,3 +823,33 @@ fn disjoint_comparison_is_a_warning_at_the_comparison() {
     assert!(ds[0].message.contains("`1` and `2`"), "{ds:?}");
     assert!(ds[0].message.contains("can never be equal"), "{ds:?}");
 }
+
+#[test]
+fn macro_expansion_preserves_hover_on_user_argument() {
+    let dir = tempfile::tempdir().unwrap();
+    let main_text = "(m = app/macros)\nmain = () {\n  x = 42\n  m.pass(x)\n}\n";
+    let macro_text = "(, (= syntax (/ i syntax)))\n(, pass)\n(@ macro (= pass (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
+    package(
+        dir.path(),
+        &[("src/main.i", main_text), ("src/macros.is", macro_text)],
+    );
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut client = Client::start();
+    client.open(&main, main_text);
+    let diagnostics = client.diagnostics(&main);
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|d| d.severity == Some(lsp::DiagnosticSeverity::ERROR)),
+        "{diagnostics:?}"
+    );
+    let (line, character) = find(main_text, "pass(x)", 0);
+    let hover =
+        client.request::<lsp::request::HoverRequest>(position_params(&main, line, character + 5));
+    assert!(
+        hover["contents"]["value"]
+            .as_str()
+            .is_some_and(|value| value.contains("x: 42")),
+        "{hover:?}"
+    );
+}

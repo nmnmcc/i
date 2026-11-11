@@ -903,14 +903,14 @@ impl Parser<'_> {
             return Ok(None);
         };
         while let Some(outer) = pats.pop() {
-            let PatternKind::Var(name) = outer.kind else {
+            let PatternKind::Var(ref name) = outer.kind else {
                 unreachable!("only names are chained")
             };
             pattern = Pattern {
                 span: outer.span.to(pattern.span),
                 kind: PatternKind::Named {
                     name: Ident {
-                        name,
+                        name: name.clone(),
                         span: outer.span,
                     },
                     pattern: Box::new(pattern),
@@ -1011,13 +1011,13 @@ impl Parser<'_> {
             if op == BinOp::Pipe
                 && let ExprKind::Clauses(_) = rhs.kind
             {
-                let ExprKind::Clauses(clauses) = rhs.kind else {
+                let ExprKind::Clauses(ref clauses) = rhs.kind else {
                     unreachable!()
                 };
                 lhs = Expr {
                     kind: ExprKind::Case {
                         subject: Box::new(lhs),
-                        clauses,
+                        clauses: clauses.clone(),
                     },
                     span: self.span_from(start),
                 };

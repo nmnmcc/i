@@ -404,7 +404,7 @@ pub enum NumValue {
 }
 
 /// A test, as an `i32`.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Cond {
     /// A Bool value that is `True`.
     True(Atom),
@@ -444,7 +444,7 @@ pub enum Cond {
     BitsEqual(Atom, Atom),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Stmt {
     /// `dst = value`. With a site, the site is put on the shadow stack first.
     Let {
@@ -531,6 +531,8 @@ pub struct Func {
     /// A name for reading the Wasm text.
     pub name: String,
     pub arity: u32,
+    /// Logical frame units (source parameters and local names), before optimization.
+    pub budget_frame: u32,
     /// The types of the locals; the first `arity` are the parameters.
     pub locals: Vec<LocalType>,
     pub body: Vec<Stmt>,
@@ -782,6 +784,8 @@ pub struct Program {
     pub start: Option<Func>,
     pub exports: Vec<Export>,
     pub sites: Vec<SitePos>,
+    /// Optional template/call-chain notes, parallel to `sites`.
+    pub site_notes: Vec<Option<String>>,
     /// The module paths of the site table, by module index (§11.7).
     pub site_modules: Vec<String>,
     /// The constructor names, from `FIRST_CONSTRUCTOR` on.
@@ -798,3 +802,6 @@ pub struct Program {
     /// calls after `ilang_start` (B.7).
     pub entry: Option<String>,
 }
+
+#[path = "ir_tree.rs"]
+mod tree;

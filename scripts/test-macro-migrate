@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""Rewrite legacy test attributes using parser spans, preserving untouched text."""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tomllib
+
+ROOT = Path(__file__).resolve().parent.parent
+BINARY = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')) / 'debug/examples/migrate-tests'
+
+
+def package_of(path):
+    for parent in path.resolve().parents:
+        if (parent / 'i.toml').is_file():
+            return parent
+    return None
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('paths', nargs='+', type=Path)
+    args = parser.parse_args()
+    if not BINARY.exists() or BINARY.stat().st_mtime < (ROOT / 'crates/ilang-syntax/examples/migrate-tests.rs').stat().st_mtime:
+        heavy, shell = ROOT.parent / 'cache/heavy', ROOT.parent.parent
+        if not heavy.is_file():
+            heavy, shell = ROOT / '.rd/cache/heavy', ROOT
+        subprocess.run([str(heavy), 'direnv', 'exec', str(shell),
+                        'cargo', 'build', '-p', 'ilang-syntax', '--example', 'migrate-tests', '--locked'], cwd=ROOT, check=True)
+    files = sorted({f for p in args.paths for f in (p.rglob('*.i') if p.is_dir() else [p]) if f.suffix == '.i' and f.is_file()})
+    sources = [f.read_text() for f in files]
+    process = subprocess.run([str(BINARY)], input=''.join(json.dumps(s, ensure_ascii=False) + '\n' for s in sources), text=True, capture_output=True, check=True)
+    results = [json.loads(line) for line in process.stdout.splitlines()]
+    assert len(results) == len(files), 'parser result count mismatch'
+    failures, packages, count = [], {}, 0
+    for path, source, result in zip(files, sources, results):
+        if 'error' in result:
+            if re.search(r'(?m)^\s*@test\b', source):
+                failures.append(f'{path}: {result["error"]}')
+            continue
+        tests = result['tests']
+        if not tests:
+            continue
+        if result['has_test_import'] or result['test_name_taken']:
+            failures.append(f'{path}: existing test name or std/test import requires review')
+            continue
+        package = package_of(path)
+        if package is None and not re.search(r'(?m)^// spec:', source):
+            failures.append(f'{path}: no package manifest')
+            continue
+        data = source.encode()
+        edits = []
+        for test in tests:
+            name = test['name']
+            a, b = test['attr_start'], test['attr_end']
+            start, end = test['binding_start'], test['binding_end']
+            value_start, value_end = test['value_start'], test['value_end']
+            if test['referenced'] or b'AssertionFailure(' in data[value_start:value_end]:
+                edits.append((a, b, b''))
+                edits.append((end, end, f'\n\ntest({json.dumps(name)}, () {{ {name}() }})'.encode()))
+            else:
+                edits.append((a, b, b''))
+                edits.append((start, value_start, f'test({json.dumps(name)}, '.encode()))
+                edits.append((value_end, value_end, b')'))
+        imports = result['imports']
+        if imports:
+            edits.append((imports[0] + 1, imports[0] + 1, b'\n\ttestlib = (test) = std/test\n\t'))
+        else:
+            prefix = re.match(r'(?:(?:[ \t]*//[^\n]*|[ \t]*)\n)*', source).group()
+            at = len(prefix.encode())
+            edits.append((at, at, b'(testlib = (test) = std/test)\n\n'))
+        for start, end, replacement in sorted(edits, reverse=True):
+            data = data[:start] + replacement + data[end:]
+        path.write_bytes(data)
+        if package is not None:
+            source_module = path.resolve().is_relative_to(package / "src")
+            packages[package] = packages.get(package, False) or source_module
+        count += len(tests)
+    for package, source_module in packages.items():
+        manifest = package / 'i.toml'
+        text = manifest.read_text()
+        manifest_data = tomllib.loads(text)
+        if manifest_data.get('name') != 'std' and 'std' not in manifest_data.get('dependencies', {}) and (source_module or 'std' not in manifest_data.get('dev-dependencies', {})):
+            relative = os.path.relpath(ROOT / 'std', package)
+            dev_std = re.search(r'(?m)^std\s*=.*$', text) if 'std' in manifest_data.get('dev-dependencies', {}) else None
+            dependency = (dev_std.group() + '\n') if dev_std else f'std = {{ path = {json.dumps(relative)} }}\n'
+            section = re.search(r'(?m)^\[dependencies\][^\n]*\n', text)
+            if section:
+                text = text[:section.end()] + dependency + text[section.end():]
+            else:
+                text += '\n[dependencies]\n' + dependency
+        existing = manifest_data.get('test', {})
+        if 'collection' in existing:
+            if existing['collection'] != 'std/test.tests':
+                failures.append(f'{manifest}: existing collection needs review')
+            manifest.write_text(text)
+            continue
+        section = re.search(r'(?m)^\[test\][^\n]*\n', text)
+        if section:
+            text = text[:section.end()] + 'collection = "std/test.tests"\n' + text[section.end():]
+        else:
+            text += '\n[test]\ncollection = "std/test.tests"\n'
+        manifest.write_text(text)
+    print(f'{count} tests migrated in {len(packages)} packages')
+    for failure in failures:
+        print(failure, file=sys.stderr)
+    return bool(failures)
+
+
+if __name__ == '__main__':
+    sys.exit(main())

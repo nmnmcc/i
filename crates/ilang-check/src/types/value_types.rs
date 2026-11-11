@@ -1966,10 +1966,10 @@ mod tests {
         let before = s.clone();
         let mut c = Closure::new(&s, &fixed, 0, u32::MAX, false);
         let exposed = c.expose(&Ty::Var(root)).unwrap();
-        let Ty::Con(Head::Tuple(2), _, parts) = exposed else {
+        let Ty::Con(Head::Tuple(2), _, parts) = &exposed else {
             panic!("tuple required")
         };
-        for part in &parts {
+        for part in parts {
             let mut vars = HashSet::new();
             super::super::alias::map_vars(part, &mut |v| {
                 vars.insert(v);

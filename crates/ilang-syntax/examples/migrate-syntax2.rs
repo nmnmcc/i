@@ -32,10 +32,11 @@ impl<'a> Migrator<'a> {
     fn error(&mut self, value: &TypeExpr, err: &TypeExpr) {
         let start = value.span.end as usize;
         let end = err.span.start as usize;
-        if let Some(tok) = lex(&self.src[start..end])
-            .tokens
-            .into_iter()
-            .find(|t| t.kind == T::Question)
+        if start <= end
+            && let Some(tok) = lex(&self.src[start..end])
+                .tokens
+                .into_iter()
+                .find(|t| t.kind == T::Question)
         {
             self.edit(
                 Span::new(start as u32 + tok.span.start, start as u32 + tok.span.end),

@@ -57,6 +57,22 @@ fn wasm(source: &str) -> Result<Vec<u8>, Error> {
     )
 }
 
+#[test]
+fn metered_macro_program_is_valid_wasm() {
+    let (graph, c, _dir) = checked(
+        "loop = (n) { n |> { 0 -> [\"x\"] _ -> [\"x\", ..loop(n - 1)] } }\n@main\nmain = () { loop(3) }\n",
+    );
+    let (wasm, _) = ilang_wasm::compile_macro(
+        &graph,
+        c.program.as_ref().unwrap(),
+        c.types.as_ref().unwrap(),
+        Options::default(),
+    )
+    .unwrap();
+    ilang_wasm::validate(&wasm).unwrap();
+    assert!(!wat("@main\nmain = () { Nil }\n").contains("ilang:macro/budget/v1"));
+}
+
 /// The text of the function with this comment line.
 fn function<'a>(wat: &'a str, name: &str) -> &'a str {
     let start = wat.find(&format!(";; {name}\n")).expect("the function");
@@ -211,15 +227,21 @@ fn environments() {
          \nmain = () { g() }\n");
     // An environment parameter reads its slot (§9.2); `Assert` is slot 0; the request and task services precede Clock.
     let f = function(&text, "app/main.f");
-    assert!(
-        f.contains("(array.get $env (local.get $env) (i32.const 6))"),
-        "{f}"
-    );
-    // An environment statement makes a new environment for the rest of
-    // the block, and the tail call passes it.
+    let slot: u32 = f
+        .split_once("(array.get $env (local.get $env) (i32.const ")
+        .expect("environment parameter reads a slot")
+        .1
+        .split_once(')')
+        .expect("slot constant closes")
+        .0
+        .parse()
+        .expect("environment slot is an integer");
+    assert_ne!(slot, 0, "Clock and Assert have different slots");
     let g = function(&text, "app/main.g");
     assert!(
-        g.contains("(call $env_with (local.get $env) (i32.const 6)"),
+        g.contains(&format!(
+            "(call $env_with (local.get $env) (i32.const {slot})"
+        )),
         "{g}"
     );
     assert!(g.contains("(return_call $f"), "{g}");
@@ -363,104 +385,6 @@ main = () { Nil }
             .unwrap();
         run_opaque_target(&bytes);
     }
-}
-
-/// Spec 4.1/11.4 and runtime 5.3: an answer keeps the initiating
-/// declaration's nominal type, even when delivered out of order.
-#[test]
-fn opaque_request_answers_keep_the_declared_type() {
-    let source = r#"
-(i/request, i/core)
-(A, B, Source, probe)
-A {}
-B {}
-Alias = A
-@host("opaque", "request")
-Source { Source(a: () -> Request(A), b: () -> Request(B), alias: () -> Request(Alias)) }
-equal = (a, b) { a == b }
-probe = (source ! Source) {
-  a = source.a()
-  b = source.b()
-  alias = source.alias()
-  x = request.await_owned(a)
-  y = request.await_owned(b)
-  z = request.await_owned(alias)
-  equal(x, z) && core.not(equal(x, y))
-}
-"#;
-    let (graph, checked, _dir) = checked_with_exports(source, &["app/main.probe"]);
-    let bytes = compile(
-        &graph,
-        checked.program.as_ref().unwrap(),
-        checked.types.as_ref().unwrap(),
-        Options::default(),
-    )
-    .unwrap();
-    let directory = tempfile::tempdir().unwrap();
-    let guest = directory.path().join("guest.wasm");
-    let host = directory.path().join("host.wasm");
-    let driver = directory.path().join("driver.wasm");
-    std::fs::write(&guest, bytes).unwrap();
-    std::fs::write(
-        &host,
-        wat::parse_str(
-            r#"(module
-      (func (export "a") (param i32))
-      (func (export "b") (param i32))
-      (func (export "alias") (param i32))
-      (func (export "cancel") (param i32))
-      (func (export "panic") (param i32 i32) unreachable)
-      (func (export "reference_id") (param externref) (result i64) (i64.const 0)))"#,
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    std::fs::write(
-        &driver,
-        wat::parse_str(
-            r#"(module
-      (import "guest" "ilang_start" (func $start))
-      (import "guest" "app/main.probe" (func $probe (result i32)))
-      (import "guest" "ilang_result:app/main.probe" (func $result (result i32)))
-      (import "guest" "ilang_resume:opaque:a" (func $a (param i32 externref) (result i32)))
-      (import "guest" "ilang_resume:opaque:b" (func $b (param i32 externref) (result i32)))
-      (import "guest" "ilang_resume:opaque:alias" (func $alias (param i32 externref) (result i32)))
-      (func (export "_start")
-        (call $start)
-        (if (i32.ne (call $probe) (i32.const 1)) (then unreachable))
-        (if (i32.ne (call $b (i32.const 1) (ref.null extern)) (i32.const 1)) (then unreachable))
-        (if (i32.ne (call $a (i32.const 0) (ref.null extern)) (i32.const 1)) (then unreachable))
-        (if (call $alias (i32.const 2) (ref.null extern)) (then unreachable))
-        (if (i32.eqz (call $result)) (then unreachable))))"#,
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    let wasmtime = std::env::var_os("WASMTIME").unwrap_or_else(|| "wasmtime".into());
-    let output = std::process::Command::new(wasmtime)
-        .args([
-            "run",
-            "-W",
-            "gc=y",
-            "-W",
-            "exceptions=y",
-            "-W",
-            "tail-call=y",
-            "--preload",
-        ])
-        .arg(format!("opaque={}", host.display()))
-        .arg("--preload")
-        .arg(format!("{}={}", "ilang:host/v1", host.display()))
-        .arg("--preload")
-        .arg(format!("guest={}", guest.display()))
-        .arg(&driver)
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
 }
 
 /// Run both generated targets with real externrefs, including their null

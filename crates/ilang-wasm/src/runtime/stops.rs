@@ -25,6 +25,27 @@ pub fn wat() -> String {
     )
 }
 
+/// Expanded programs install a parallel note for each site. Ordinary programs
+/// keep the original runtime and WAT byte-for-byte.
+pub fn wat_with_expansion_sites() -> String {
+    let base = wat().replacen(
+        "(func $site_line (param $site i32)",
+        "(func $site_line_base (param $site i32)",
+        1,
+    );
+    format!(
+        "{base}{}",
+        r#"
+(global $site_notes (mut (ref null $values)) (ref.null $values))
+(func $site_notes_install (param $notes (ref $values))
+  (global.set $site_notes (local.get $notes)))
+(func $site_line (param $site i32) (result eqref)
+  (return_call $string_append (call $site_line_base (local.get $site))
+    (array.get $values (ref.as_non_null (global.get $site_notes)) (local.get $site))))
+"#
+    )
+}
+
 const WAT: &str = r#"
 (global $shadow (mut (ref $frames)) (array.new_default $frames (i32.const 256)))
 (global $sp (mut i32) (i32.const 0))

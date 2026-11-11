@@ -3,6 +3,8 @@ use crate::{ast::*, span::Span};
 
 pub(crate) trait Visitor {
     fn expr(&mut self, _: &mut Expr, _: bool) {}
+    fn pattern(&mut self, _: &mut Pattern) {}
+    fn float(&mut self, _: &mut f64) {}
     fn span(&mut self, _: &mut Span) {}
     fn string(&mut self, _: &mut String) {}
 }
@@ -76,7 +78,13 @@ fields!(Clause { patterns, guard, body, span } skip {});
 fields!(Function { params, ret, body } skip {});
 fields!(RetType { value, err, env } skip {});
 fields!(Format { name, arg } skip {});
-fields!(Pattern { kind, span } skip {});
+impl Walk for Pattern {
+    fn walk(&mut self, v: &mut impl Visitor) {
+        v.pattern(self);
+        self.kind.walk(v);
+        self.span.walk(v);
+    }
+}
 fields!(Binder { name, span } skip { discard });
 fields!(TypeExpr { kind, span } skip {});
 fields!(FnParamType { label, ty } skip {});
@@ -144,7 +152,9 @@ impl Walk for Param {
 impl Walk for ExprKind {
     fn walk(&mut self, v: &mut impl Visitor) {
         match self {
-            Self::Int(_) | Self::Float(_) => {}
+            Self::Int(_) => {}
+            Self::Quote(d) => d.walk(v),
+            Self::Float(value) => v.float(value),
             Self::String(s) => s.walk(v),
             Self::Name { module, name } => {
                 module.walk(v);
@@ -203,7 +213,16 @@ impl Walk for ExprKind {
 impl Walk for PatternKind {
     fn walk(&mut self, v: &mut impl Visitor) {
         match self {
-            Self::Int { .. } | Self::Float { .. } => {}
+            Self::Int { .. } => {}
+            Self::Float { value, .. } => v.float(value),
+            Self::Quote {
+                datum, captures, ..
+            } => {
+                datum.walk(v);
+                for (_, pattern) in captures {
+                    pattern.walk(v);
+                }
+            }
             Self::Var(s) | Self::Discard(s) | Self::String(s) => s.walk(v),
             Self::Typed { binder, ty } => {
                 binder.walk(v);
@@ -284,5 +303,23 @@ impl Walk for TypeKind {
 impl Walk for RecordLabel {
     fn walk(&mut self, v: &mut impl Visitor) {
         self.ident.walk(v);
+    }
+}
+
+impl Walk for crate::lisp::Datum {
+    fn walk(&mut self, v: &mut impl Visitor) {
+        use crate::lisp::DatumKind as D;
+        self.span.walk(v);
+        for doc in &mut self.docs {
+            doc.span.walk(v);
+            doc.text.walk(v);
+        }
+        match &mut self.kind {
+            D::Name(s) | D::Discard(s) | D::UpName(s) | D::String(s) | D::Symbol(s) => s.walk(v),
+            D::Round(xs) | D::Square(xs) | D::Curly(xs) | D::Bits(xs) => xs.walk(v),
+            D::Quote(x) | D::Unquote(x) | D::Splice(x) => x.walk(v),
+            D::Int(_) => {}
+            D::Float(x) => v.float(x),
+        }
     }
 }

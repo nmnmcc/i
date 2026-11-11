@@ -9,7 +9,7 @@ main = () { Nil }
 @deprecated("old")
 @host("app:storage/v1", "async")
 Storage {
-  Storage(read: (key: String) -> String ^ String)
+  Storage(read: (key: String) -> String ? String)
 }
 
 @test

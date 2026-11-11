@@ -1,5 +1,5 @@
 {
-  "artifact_digest": "sha256-a3517b48aefa4604f1c7f80caf34c4f4e44d81227aada89d2086f080fac26d47",
+  "artifact_digest": "sha256-ea9c360456eee6feaa7d2ed4748f1e484b2e4570b520bffef166ce5d12004dfe",
   "declarations": [
     {
       "package": "sha256-de8e2ee0f64fcab60976bbca9cf8cd08bd89727b879f132fdb8ac1b98004f8c7",
@@ -229,7 +229,7 @@
     {
       "package": "sha256-de8e2ee0f64fcab60976bbca9cf8cd08bd89727b879f132fdb8ac1b98004f8c7",
       "module": "app/s9_9_cancel_points",
-      "module_digest": "sha256-b10f57a8268e78a6638facb3f6fad994c0481f01e700645676a0a072e6ba9572",
+      "module_digest": "sha256-3fc90c7a7124eb164184d411413155f2038b8f5cf99a5bf6563fdd705314bef9",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:cancel_points:test:io/v1",
       "name": "print",

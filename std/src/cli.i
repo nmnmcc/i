@@ -1,6 +1,6 @@
 //// Pure command argument descriptions with typed results. Parser hides fixed
 //// metadata and a decoder; Names, DefinitionError and CliError expose their
-//// constructors. No process, printing, exit, reserved flag or implicit default.
+//// constructors. The pure parser has no reserved flag or implicit default.
 ////
 //// pure stores a value; flag returns Bool; option/argument return a converted
 //// value; optional returns Option; many/rest return List. map and map2 preserve
@@ -49,7 +49,7 @@
 ////   InvalidArgument(index:Int,name:String,text:String,reason:String)
 ////   ExtraArgument(index:Int,token:String) }
 //// Parser(A) is opaque.
-//// Public signatures (all pure):
+//// Pure signatures:
 //// pure(A): (value: A) -> Parser(A)
 //// flag: (names: Names, help: String) -> Parser(Bool)
 //// option(A): (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(A)
@@ -63,8 +63,13 @@
 //// help(A): (parser: Parser(A), program: String) -> Result(String, DefinitionError)
 //// text: (text: String) -> Result(String, String)
 //// integer: (text: String) -> Result(Int, String)
+//// read obtains process arguments; run reports errors and runs a body.
 
 (
+	i/process
+	i/stdio
+	i/core
+	i/fail
 	std/list
 	std/string
 	std/int
@@ -86,6 +91,8 @@
 	map
 	map2
 	parse
+	read
+	run
 	help
 	text
 	integer
@@ -671,5 +678,23 @@ help(A) = (
 				})
 			])
 		)
+	}
+}
+
+/// Parses the arguments supplied by the process service.
+read(A) = (parser: Parser(A)) { parse(parser, process.args()) }
+
+/// Runs a command after parsing its arguments, reporting failures on stderr.
+run(A, E, N) = (parser: Parser(A), program: String, body: (A) -> Nil ^ E ! N) {
+	read(parser) |> {
+		Ok(value) -> body(value)
+		Error(error) -> {
+			stdio.print_error(core.inspect(error))
+			help(parser, program) |> {
+				Ok(usage)         -> stdio.print_error(usage)
+				Error(definition) -> stdio.print_error(core.inspect(definition))
+			}
+			fail.raise(error)
+		}
 	}
 }

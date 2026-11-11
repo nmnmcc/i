@@ -1156,6 +1156,7 @@ impl<'a> Formatter<'a> {
     fn expr_raw(&mut self, e: &Expr) -> Doc {
         let span = e.span;
         match &e.kind {
+            ExprKind::Quote(_) => panic!("quote has no normal-surface spelling"),
             ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_) => text(self.slice(span)),
             ExprKind::Name { module, name } => match module {
                 Some(m) => text(format!("{}.{}", m.name, name.name)),
@@ -1227,10 +1228,9 @@ impl<'a> Formatter<'a> {
             ExprKind::Block(b) => self.block(b, false),
             ExprKind::Fn(func) => self.function(func, span.start),
             ExprKind::Case { subject, clauses } => {
-                // §6.9: `|>` is stronger than the operators of levels 1 to 5.
                 let subject_doc = self.expr(subject, 6);
-                let open = self.tok_after(subject.span.end);
-                let open = self.tok_after(open.span.end).span.start;
+                let op = self.tok_after(subject.span.end);
+                let open = self.tok_after(op.span.end).span.start;
                 let body = self.clause_block(open, span.end - 1, clauses);
                 cat(vec![subject_doc, text(" |> "), body])
             }
@@ -1488,6 +1488,7 @@ impl<'a> Formatter<'a> {
     fn pattern_raw(&mut self, p: &Pattern, clause: bool) -> Doc {
         let span = p.span;
         match &p.kind {
+            PatternKind::Quote { .. } => panic!("quote pattern has no normal-surface spelling"),
             PatternKind::Var(n) | PatternKind::Discard(n) => text(n.as_str()),
             PatternKind::Typed { binder, ty } => {
                 let t = if clause && ends_with_tuple(ty) {
@@ -1747,7 +1748,7 @@ impl<'a> Formatter<'a> {
     ) -> Doc {
         let mut out = vec![self.ty_in(ret, 1, tail && err.is_none() && env.is_none())];
         if let Some(err) = err {
-            out.push(text(" ^ "));
+            out.push(text(" ? "));
             out.push(self.ty_in(err, 1, tail && env.is_none()));
         }
         if let Some(env) = env {

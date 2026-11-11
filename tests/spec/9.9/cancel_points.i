@@ -10,8 +10,8 @@
 // finals may yield. R4a processes scope cancellation before cancelled joins.
 (
 	i/task
-	i/resource
 	i/request
+	i/resource
 	i/fail
 )
 

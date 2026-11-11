@@ -15,7 +15,7 @@ const grammarPath = path.join(__dirname, "..", "syntaxes", "i.tmLanguage.json");
 const samplePath = path.join(__dirname, "sample.i");
 const snapshotPath = path.join(__dirname, "sample.i.snap");
 
-async function loadGrammar() {
+async function loadGrammar(scope = "source.i") {
   const wasm = fs.readFileSync(require.resolve("vscode-oniguruma/release/onig.wasm"));
   await oniguruma.loadWASM(wasm.buffer.slice(wasm.byteOffset, wasm.byteOffset + wasm.byteLength));
   const registry = new textmate.Registry({
@@ -24,15 +24,29 @@ async function loadGrammar() {
       createOnigString: (s) => new oniguruma.OnigString(s),
     }),
     loadGrammar: async (scopeName) => {
-      if (scopeName !== "source.i") {
+      if (scopeName !== "source.i" && scopeName !== "source.i-lisp") {
         return null;
       }
-      const text = fs.readFileSync(grammarPath, "utf8");
-      return textmate.parseRawGrammar(text, grammarPath);
+      const file = scopeName === "source.i" ? grammarPath : path.join(__dirname, "..", "syntaxes", "is.tmLanguage.json");
+      const text = fs.readFileSync(file, "utf8");
+      return textmate.parseRawGrammar(text, file);
     },
   });
-  return registry.loadGrammar("source.i");
+  return registry.loadGrammar(scope);
 }
+
+test("Lisp surface highlights datums without keywords", async () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  assert.ok(pkg.contributes.languages.some((l) => l.id === "i-lisp" && l.extensions.includes(".is")));
+  const grammar = await loadGrammar("source.i-lisp");
+  const line = '(= value `(if ~name ~..parts "x" 1.0)) // comment';
+  const tokens = grammar.tokenizeLine(line, textmate.INITIAL).tokens;
+  const scopes = (text) => tokens.filter((t) => line.slice(t.startIndex, t.endIndex) === text).flatMap((t) => t.scopes);
+  assert.ok(scopes("`").includes("keyword.operator.quote.i"));
+  assert.ok(scopes("~..").includes("keyword.operator.quote.i"));
+  assert.ok(scopes("if").includes("variable.other.i"));
+  assert.ok(scopes('"').includes("string.quoted.double.i") || scopes('"x"').includes("string.quoted.double.i"));
+});
 
 /** Each token of the text, as `text  scope scope …` without `source.i`. */
 function tokenize(grammar, text) {
