@@ -836,11 +836,12 @@ impl Printer {
         }
     }
 
-    /// Whether the printed type ends with a tuple type, which becomes a
-    /// function type when `->` comes after it (§7.1).
+    /// Whether the printed type ends with a tuple or record type: both are
+    /// written in `( )`, which becomes the parameters of a function type when
+    /// `->` comes after it (§7.1).
     fn ends_with_tuple(&self, t: &TypeExpr) -> bool {
         match &t.kind {
-            TypeKind::Tuple(_) => true,
+            TypeKind::Tuple(_) | TypeKind::Record { .. } => true,
             TypeKind::Union(v) | TypeKind::Inter(v) | TypeKind::Diff(v) => {
                 let last = v.last().unwrap();
                 !self.braced(last, type_prec(t) + 1) && self.ends_with_tuple(last)
