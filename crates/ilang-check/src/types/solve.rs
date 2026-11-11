@@ -1307,48 +1307,47 @@ impl Solver {
     /// values whose type constructor is in `H` go to `H`, and the rest go
     /// to `R`: `a <: H | R`, with the members of `H` first.
     fn diff_left(&mut self, a: &Ty, h: &[Ty], r: &Ty, env: Mode) {
-        match a {
-            Ty::Never => {}
-            Ty::Union(ms) => {
-                for m in ms {
-                    self.diff_left(m, h, r, env);
-                }
-            }
-            Ty::Con(..) if a.scalar().is_some() => {
-                let sets: Vec<_> = h
-                    .iter()
-                    .filter(|m| m.head() == a.head())
-                    .map(|m| m.values().clone())
-                    .collect();
-                if sets.is_empty() {
-                    self.constrain_in(a, r, env);
-                } else {
-                    let excluded = super::lits::ValueSet::join_all(&sets);
-                    if !a.values().subset(&excluded) {
-                        let rest = a.with_values(a.values().minus(&excluded));
-                        self.constrain_in(&rest, r, env);
+        let mut pending = vec![a];
+        while let Some(a) = pending.pop() {
+            match a {
+                Ty::Never => {}
+                Ty::Union(ms) => pending.extend(ms.iter().rev()),
+                Ty::Con(..) if a.scalar().is_some() => {
+                    let sets: Vec<_> = h
+                        .iter()
+                        .filter(|m| m.head() == a.head())
+                        .map(|m| m.values().clone())
+                        .collect();
+                    if sets.is_empty() {
+                        self.constrain_in(a, r, env);
+                    } else {
+                        let excluded = super::lits::ValueSet::join_all(&sets);
+                        if !a.values().subset(&excluded) {
+                            let rest = a.with_values(a.values().minus(&excluded));
+                            self.constrain_in(&rest, r, env);
+                        }
                     }
                 }
-            }
-            Ty::Con(..) | Ty::Fn(_) => match h.iter().find(|m| m.head() == a.head()) {
-                Some(m) => {
-                    let m = m.clone();
-                    self.constrain_in(a, &m, env);
-                }
-                None => self.constrain_in(a, r, env),
-            },
-            _ => {
-                // `H | R`, flat and with no member twice, so that the same
-                // constraint is not made again in a bigger form.
-                let mut ms = Vec::new();
-                flatten_union(&[Ty::Union(h.to_vec()), r.clone()], &mut ms);
-                let mut out: Vec<Ty> = Vec::new();
-                for m in ms {
-                    if !out.contains(&m) {
-                        out.push(m);
+                Ty::Con(..) | Ty::Fn(_) => match h.iter().find(|m| m.head() == a.head()) {
+                    Some(m) => {
+                        let m = m.clone();
+                        self.constrain_in(a, &m, env);
                     }
+                    None => self.constrain_in(a, r, env),
+                },
+                _ => {
+                    // `H | R`, flat and with no member twice, so that the same
+                    // constraint is not made again in a bigger form.
+                    let mut ms = Vec::new();
+                    flatten_union(&[Ty::Union(h.to_vec()), r.clone()], &mut ms);
+                    let mut out: Vec<Ty> = Vec::new();
+                    for m in ms {
+                        if !out.contains(&m) {
+                            out.push(m);
+                        }
+                    }
+                    self.constrain_in(a, &Ty::Union(out), env);
                 }
-                self.constrain_in(a, &Ty::Union(out), env);
             }
         }
     }
@@ -3694,6 +3693,25 @@ mod deep_tree_tests {
                     t = Ty::Union(vec![t]);
                 }
                 assert_eq!(s.diff(t, vec![string]), int);
+                assert!(s.failures.is_empty());
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+    #[test]
+    fn left_difference_checks_deep_unions_on_small_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut s = Solver::new(StdHashMap::new(), Vec::new());
+                let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+                let string = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+                let mut t = int.clone();
+                for _ in 0..10_000 {
+                    t = Ty::Union(vec![t]);
+                }
+                s.constrain(&Ty::Diff(Box::new(t), vec![string]), &int);
                 assert!(s.failures.is_empty());
             })
             .unwrap()
