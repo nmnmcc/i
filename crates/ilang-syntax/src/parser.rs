@@ -1245,52 +1245,7 @@ impl Parser<'_> {
         )
     }
 
-    fn record_label(&mut self, types: bool) -> PResult<()> {
-        if !self.label_start() {
-            return Err(self.mixed());
-        }
-        if !types && matches!(self.kind(), T::UpName(_)) {
-            return self.error("a name or string as a record value label");
-        }
-        self.bump();
-        self.expect(&T::Colon)?;
-        Ok(())
-    }
-
-    // T3 replaces these two reservation paths with the nodes of records §8.3.
     fn datum(&mut self) -> PResult<ExprKind> {
-        if self.old_empty && self.at(&T::RParen) {
-            self.bump();
-            return Ok(ExprKind::Tuple(Vec::new()));
-        }
-        if self.at(&T::RParen) || self.at(&T::DotDot) || self.label_start() {
-            let at = self.tok().span;
-            if self.eat(&T::RParen) {
-                return Err(Diagnostic::new(
-                    Code::RecordReserved,
-                    at,
-                    "the empty tuple is removed; use `Nil` for a unit value; `()` is the empty record, kept for T3",
-                ));
-            }
-            let spread = self.eat(&T::DotDot);
-            if spread {
-                self.expr()?;
-            }
-            if !(spread && self.eat(&T::RParen)) {
-                if spread && !self.eat(&T::Comma) && !self.tok().brk {
-                    return self.error("a record field separator");
-                }
-                self.seq(T::RParen, true, |p| {
-                    p.record_label(false)?;
-                    p.expr()
-                })?;
-            }
-            return Err(Diagnostic::new(
-                Code::RecordReserved,
-                at,
-                "parenthesised records are kept for T3",
-            ));
-        }
         Ok(ExprKind::Tuple(self.seq(T::RParen, false, |p| {
             if p.label_start() {
                 return Err(p.mixed());
@@ -1307,35 +1262,6 @@ impl Parser<'_> {
             }
             return self
                 .error("`Record` for all records, or `Nil` for a unit type; `()` is not a type");
-        }
-        if self.at(&T::DotDot) || self.label_start() {
-            let at = self.tok().span;
-            let spread = self.eat(&T::DotDot);
-            if spread {
-                self.ty()?;
-            }
-            if !(spread && self.eat(&T::RParen)) {
-                if spread && !self.eat(&T::Comma) && !self.tok().brk {
-                    return self.error("a record type separator");
-                }
-                self.seq(T::RParen, true, |p| {
-                    if spread && p.eat(&T::Minus) {
-                        if matches!(p.kind(), T::Name(_) | T::UpName(_) | T::Str(_)) {
-                            p.bump();
-                            return Ok(());
-                        }
-                        return p.error("a forgotten record label");
-                    }
-                    p.record_label(true)?;
-                    p.ty()?;
-                    Ok(())
-                })?;
-            }
-            return Err(Diagnostic::new(
-                Code::RecordReserved,
-                at,
-                "parenthesised record types are kept for T3",
-            ));
         }
         Ok(TypeKind::Tuple(self.seq(T::RParen, false, |p| {
             if p.label_start() {
