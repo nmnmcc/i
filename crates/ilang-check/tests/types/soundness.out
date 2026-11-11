@@ -1,4 +1,4 @@
-with_int : (body: () -> A ? E ! N) -> A ? E ! N - Reader(Int)
+with_int : (body: () -> A ^ E ! N) -> A ^ E ! N - Reader(Int)
 get_s : () -> String ! Reader(String)
 g : () -> String
 k : () -> String
@@ -7,7 +7,7 @@ use_str : (c: Cell(String)) -> String
 pass : (y: Cell(String)) -> String
 through_var : (x: Cell(String)) -> Int
 through_top : (x: Cell(String)) -> Int
-arity : (k: (1) -> A ? E ! N) -> Never ? E ! N
+arity : (k: (1) -> A ^ E ! N) -> Never ^ E ! N
 use_state_int : () -> 1 ! State(Int)
 use_state_str : () -> 1 ! State(String)
 nested : List(Cell(A))
@@ -25,7 +25,7 @@ not_string : String
 18:18: error[E0515]: `String` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 18:11 needs it)
 35:10: error[E0503]: `Int` and `String` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4) (the type at 35:2 needs it)
 40:10: error[E0503]: `Int` and `String` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4) (the type at 40:2 needs it)
-45:2: error[E0502]: the function types `(1) -> _ ? _ ! _` and `(1, 2) -> _ ? _ ! _` have different numbers of parameters
+45:2: error[E0502]: the function types `(1) -> _ ^ _ ! _` and `(1, 2) -> _ ^ _ ! _` have different numbers of parameters
 59:2: error[E0503]: `_` and `_` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4)
 71:6: error[E0501]: `String` is not a subtype of `Int`
 72:6: error[E0501]: `Int` is not a subtype of `String`

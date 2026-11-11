@@ -1,13 +1,13 @@
 app/main.add : (a: Int, b: Int) -> Int
 app/main.opaque : (h: Handle, flag: Bool) -> Handle
-app/main.errors : (x: Int) -> Nil ? Int | String
+app/main.errors : (x: Int) -> Nil ^ Int | String
 app/main.never : (s: String) -> Never
 app/main.never_param : (x: Never) -> Int
 app/main.bad_param : (xs: List(Int)) -> 1
 app/main.bad_value : () -> (1, 2)
 app/main.generic : (x: A) -> A
-app/main.bad_errors : () -> Int ? (Int, Int)
-app/main.twice_error : () -> Int ? Handle
+app/main.bad_errors : () -> Int ^ (Int, Int)
+app/main.twice_error : () -> Int ^ Handle
 app/main.number : 1
 app/main.with_host : () -> 1 ! Assert | Storage
 app/main.with_clock : () -> Int ! Clock

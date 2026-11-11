@@ -35,7 +35,7 @@ fn default_and_private_named_function_keep_the_existing_metadata_shape() {
     // Rule 2 and ruling [entries]: only src/main.main is the default;
     // named entries may point at an unexported function in another module.
     let dir = project(
-        "name = \"app\"\n[entries]\nworker = \"app/tools.work\"\n",
+        "name = \"app\"\n[entries]\nworker = \"tools.work\"\n",
         &[
             ("src/main.i", "main = () { Nil }"),
             ("src/tools.i", "work = () { Nil }\nmain = (x) { x }"),
@@ -48,6 +48,17 @@ fn default_and_private_named_function_keep_the_existing_metadata_shape() {
     );
 }
 #[test]
+fn dotted_entry_path_is_relative_to_the_package() {
+    let dir = project(
+        "name = \"app\"\n[entries]\nworker = \"tools.jobs.work\"\n",
+        &[("src/tools/jobs.i", "work = () { Nil }")],
+    );
+    assert_eq!(
+        entry(dir.path(), Some("worker")).as_deref(),
+        Some("app/tools/jobs.work")
+    );
+}
+#[test]
 fn missing_default_and_other_module_main_have_no_entry() {
     // Rules 4/5: main has no special meaning in other modules.
     let dir = project("name = \"app\"\n", &[("src/tools.i", "main = (x) { x }")]);
@@ -57,7 +68,7 @@ fn missing_default_and_other_module_main_have_no_entry() {
 fn every_declared_target_is_checked_and_selection_must_exist() {
     // Rule 5: value parameters are an error, even for an unselected target.
     let dir = project(
-        "name = \"app\"\n[entries]\nbad = \"app/tools.work\"\n",
+        "name = \"app\"\n[entries]\nbad = \"tools.work\"\n",
         &[
             ("src/main.i", "main = () { Nil }"),
             ("src/tools.i", "work = (x) { x }"),

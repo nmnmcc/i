@@ -539,20 +539,13 @@ FPart      = Label ":" Type .
 Label      = name | string_lit | UpName .
 ```
 
-- A `{` in a type is a record type when `..` follows it, or a label and then `:`. Otherwise it groups a type, as today.
-- `{ ..R }` alone is allowed and is `R & {..}`. It is the written form of the type of the expression `{ ..e }`.
-- **Places (§4.4, E0518).** The §4.4 rule "an intersection with a type variable only in an input place" counts members that are type variables. In `{ ..R, f: T }`, which is `Without(R, {f}) & { f: T }`, no member is a type variable: `Without(R, {f})` is a form with `R` in a covariant place inside it, as `List(R)` is. So a spread with at least one field or `-` part may be in any place, and `put(R, K, V): (…) -> { ..R, K: V }` is correct. `{ ..R }` alone has no such form: it is `R & {..}`, an intersection with the type variable `R`, so in an output place it is E0518, the same as `R & {..}` written out. Two spellings of one type always get the same verdict.
-- **Record unions (§4.4, U4).** Record unions are legal in every place. U3 rejects only unproved inclusions that would need alternative-specific bounds. Apply this to actual obligations after substitution/completion; do not count record alternatives for E0518. Section 20 gives accepted closed cases and the remaining generic-result restrictions with workarounds.
-- `check_places` (`infer.rs:696`) gets a `TypeKind::Record` arm. It visits every field type with the polarity of the record (fields are output places, as in a tuple), and the base of a spread with the same polarity (the base is covariant). A spread with no fields and no `-` parts whose base is a type variable (after aliases are expanded) is E0518 when the polarity is not `Neg`. Its union arm retains ordinary-variable place restrictions only. U4 permits record unions; U3 checks actual inclusion obligations. So `bad(A) = (x: A) -> { a: A & Int } { … }` is E0518, because the field `a` is an output place. `walk_variance` (`infer.rs:2502`) gets the same arm: field types and the base of a spread are covariant, so a type parameter used only in record fields of a custom type's fields goes in the same direction as the type.
-- A `string_lit` label has no interpolation (8.1).
-- `-label` parts are allowed only after a `..` part (the grammar says so: `FPart` has no `-`).
-- An `UpName` label must be a declared type variable, which makes it a label parameter (L1). A label that starts with a capital letter is written as a string: `{ "Type": String }`.
-- Inside a record type, a break is a `,`. `TypeGroupBreak` (`parser.rs:1816`) applies only to groups.
-- `{ x }` (T2's type of a value, in a group) and `{ x: T }` (a record type) differ only by the `:`.
-- In a function's `->` part, a `{` right after `->` is part of the type (syntax.md §1.7), so `(x) -> { name: String } { name: x }` is a function with a record type and a record body.
-- `Person = { name: String }` is an alias. `Person { name: String }` stays a parse error, with the hint "a record type is written `Person = { name: String }`".
-
-This answers meta.md §11 question 2 for records: a `{ }` with one part in a type is a group, unless it is `{..}`, begins with `..`, or is `label: T`.
+`(..R)` means `R & Record`. Label scope, duplicate checking, spread order,
+forgetting, variance and place rules keep their accepted meaning. This
+surface amendment does not change exact unions, Without, U3/U4 or the
+bounded compact representation. Record expressions use name or string
+labels; record types also accept declared label parameters. Strings used
+as labels have no interpolation. Bare `..` remains in list and constructor
+patterns and constructor exports. Record spreads require a base.
 
 ### 8.3 AST, HIR and the printer
 

@@ -1760,6 +1760,9 @@ impl<'a> Checker<'a> {
                 (Ty::tuple(ts), Ty::tuple(ks))
             }
             ExprKind::Record { base, fields } => {
+                if base.is_none() && fields.is_empty() {
+                    self.out.empty_records.insert((self.module, e.span));
+                }
                 use super::records::Label;
                 let mut names = HashSet::new();
                 let mut labels = Vec::new();

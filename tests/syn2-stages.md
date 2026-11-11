@@ -3,24 +3,21 @@
 Baseline: 2d1cfc56 on lane/syn2. The lane was clean. The study experiments
 under target/syn2 were retained as evidence, not installed as production code.
 The coordinator explicitly resumed the uncommitted stage-1 documents; they
-were kept and the seventh decision was folded into them.
+were kept and the entry decision was folded into them.
 
 ## Sources and interpretations
 
-The six confirmed decisions and coordinator rulings a–i control syntax.
-The seventh decision removes @main and selects the default from src/main.i.
+The retained USER decisions control syntax. The entry decision removes @main
+and selects the default from src/main.i.
 The sentence “each may point at any function in any module of the package”
 permits private functions in [entries]. Keys use ordinary name syntax; the
-values reuse [wasm].exports paths. --entry chooses a named entry; metadata
+values use dotted package-relative module paths. --entry chooses a named entry; metadata
 keeps the selected function path so ABI v3 and both hosts need no new shape.
 The sentence “main functions and [entries] of dependency packages have no
 effect” restricts all discovery and declaration checking to the root package.
 Duplicate binding names and TOML keys replace the old attribute-count error.
 
-Ruling c requires groups around every whole binary/unary match subject.
-Ruling d preserves numeric lexing; printers prefer { 1 }.{ ... }.
-Ruling f explicitly removes empty tuples: reviewed replacements use Nil;
-record forms remain reserved for T3 until its consumers land.
+Ruling f explicitly removes empty tuples: migration flags them for manual review.
 Ruling g requires ordinary shadowable Record lookup. No generated code in
 this stage inserts Record; T3 must provide a qualified ordinary exported
 alias before its record type printer claims capture-free source output. The hand-off name is
@@ -32,10 +29,9 @@ requires T3 library integration; no keyword or privileged module lookup is added
 
 ## Prior art
 
-Read actual source before stage 1: Rust parser/expr.rs parse_dot_suffix;
-Dart parser_impl.dart parseParenthesizedExpressionFunctionLiteralOrRecordLiteral
+Read actual source before stage 1: Dart parser_impl.dart parseParenthesizedExpressionFunctionLiteralOrRecordLiteral
 and parseParenthesizedExpressionOrRecordLiteral; Gleam parse.rs
-parse_case_clause. Take suffix reuse, matching-close lookahead and separate
+parse_case_clause. Take matching-close lookahead and separate
 head/guard/body parsing. Leave keywords and comma-based disambiguation.
 Gleam format/src/lib.rs pretty and Intermediate::from_extra separate comment
 positions from AST printing; retain i's existing equivalent structure.
@@ -59,13 +55,10 @@ precedent; i has one default plus a small table, without target inference.
 
 ## T3 surface contract
 
-Read refs/heads/lane/a:tests/t3-stages.md and the syntax crate at that ref.
-There are no committed structural record AST nodes there yet. The planned
-nodes in records §8.3 are ExprKind::Record { base, fields }, RecordField
-{ label, label_span, value }, LabelName::{Name, Str}, and TypeKind::Record
-{ base, parts }. SYN2 reserves parenthesised records with E0114 until T3
-connects those nodes and consumers. The layer must select function suffixes
-first, keep call/constructor contexts, and never add a comma to disambiguate.
+The integration merge supplies ExprKind::Record { base, fields } and
+TypeKind::Record { base, fields, removed }. Both surfaces construct these
+nodes. The parser selects function suffixes first, preserves call and
+constructor contexts, and does not add a comma to disambiguate.
 
 ## Verification
 
@@ -102,23 +95,27 @@ in stress-nested-50 test2; it was moved to target/syn2/stage1-stress-actual.json
 No policy, limit, lockfile, global environment or reference tree changed.
 # SYN2 implementation notes
 
-The new surface uses postfix match, `|` for pipe and `^` for an error type.
-The default entry is `src/main.i`'s `main`; `[entries]` selects other
-functions. During migration the parser still accepts the first surface.
-`// syntax: syn1` resolves empty-tuple collisions in old fixtures; it is removed
-when those fixtures migrate. Empty tuples require an explicit semantic rewrite.
+The pipe remains `|>` and a match remains a pipe into a clause block.
+The new error marker is `^`; the default entry is `src/main.i`'s `main`,
+with other entries declared in `[entries]`. Record nodes come from T3.
 
-Record syntax is reserved pending T3: this branch does not invent an AST for
-records. T3 owns the record expression and type nodes and their semantics;
-the parenthesised surface must construct those same nodes when T3 lands. A
-record and a tuple are distinguished by labels or spread, rather than a
-trailing comma, and an empty record is `()`.
+Integration note: old braced and new parenthesised record forms construct the
+T3 record nodes. At a clause head, `?` begins a guard; a legacy error type
+in that position must be grouped. This is decided by grammar.
+The Go `cmd/gofmt/rewrite.go` comment-map approach motivates retaining source
+between span edits, and Cargo `src/workspace/parser/targets.rs` and Gleam
+`compiler-cli/src/run.rs` distinguish conventional and explicitly selected
+entry modules.
 
-Prior art: Rust `compiler/rustc_parse/src/parser/expr.rs`,
-`parse_dot_suffix_expr` and `parse_dot_suffix`, parse postfix operators in the
-same loop as field access and calls, before binary operators. SYN2 similarly
-parses `.{` in the postfix loop. The migration tool follows the source-span
-approach: it parses the old tree, edits only operator and attribute spans,
-retains comments, and groups a compound subject before a postfix match. Its
-repository scan reports unresolved empty tuples and entry declarations for
-manual handling.
+## Current migration state
+
+The 10.2 fixture expects E0305 because `both` is not the default entry and
+`@test` is outside `test/`. Manifest entry targets are dotted module paths
+relative to the package. Clause-head `?` starts a guard by grammar (§4.1).
+The formatter removes `@main`; migration declares non-default entries.
+
+For `{..}`, migration keeps the legacy spelling where `Record` appears in
+the module, avoiding capture. Empty expressions are accepted only when the
+package checker, including tests, succeeds and records an empty-record type
+at that span; otherwise they are reported for manual review. The old forms
+are listed in `scripts/old-syntax-check.json`.

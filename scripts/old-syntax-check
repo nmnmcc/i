@@ -143,6 +143,7 @@ def main():
             break
     subprocess.run(command, check=True)
     config = json.loads(DATA.read_text())
+    config.pop("_syn2_old_forms")
     all_snippets = list(snippets())
     sources = []
     used = set()

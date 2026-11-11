@@ -81,6 +81,8 @@ def build():
     if heavy.is_file():
         command = [str(heavy), 'direnv', 'exec', str(shell)] + command
     subprocess.run(command, cwd=ROOT, check=True)
+    command[-5:] = ['-p', 'ilang-check', '--example', 'migration-types', '--locked']
+    subprocess.run(command, cwd=ROOT, check=True)
 
 
 def migrate_many(sources):
@@ -126,11 +128,10 @@ def entry_migration(item, result):
         return source, None, None
     if package is None:
         return None, None, f'legacy entry `{name}` needs a reviewed rename or [entries] declaration'
-    manifest = tomllib.loads((package / 'i.toml').read_text())
     relative = path.relative_to(package)
     if relative.parts[0] not in ('src', 'test'):
         return None, None, f'entry outside src/test: {relative}'
-    module = manifest['name'] + '/' + '/'.join(relative.with_suffix('').parts[1:])
+    module = '.'.join(relative.with_suffix('').parts[1:])
     return source, (package / 'i.toml', module + '.' + name), None
 
 
@@ -159,19 +160,33 @@ def main():
     parser.add_argument('paths', nargs='*')
     parser.add_argument('--repo', action='store_true', help='all extracted repository sources, including host literals')
     parser.add_argument('--write', action='store_true')
-    parser.add_argument('--check', action='store_true', help='fail if a source still needs migration')
+    parser.add_argument('--check', action='store_true', help='report changes without writing files')
     parser.add_argument('--report', type=Path)
     parser.add_argument('--use-built-tool', action='store_true', help='reuse an already built migration example')
     args = parser.parse_args()
     os.chdir(ROOT)
+    if not args.check:
+        args.write = True
     if not args.use_built_tool:
         build()
     selected = [str(Path(p)) for p in args.paths]
     items = [item for item in EXTRACT.snippets() if args.repo or any(item['path'] == p or item['path'].startswith(p.rstrip('/') + '/') for p in selected)]
+    known = {item['path'] for item in items if item['kind'] == 'file'}
+    for selected_path in selected:
+        path = Path(selected_path)
+        files = path.rglob('*.i') if path.is_dir() else [path]
+        for file in files:
+            name = str(file)
+            if file.suffix == '.i' and file.is_file() and name not in known:
+                source = file.read_bytes().decode()
+                items.append({'path': name, 'kind': 'file', 'host': source,
+                              'source': source, 'start': 0, 'end': len(source), 'line': 1})
+                known.add(name)
     if not items:
         parser.error('name source files/directories, or use --repo')
     results = migrate_many([item['host'] if item['kind'] == 'file' else item['source'] for item in items])
     changes = collections.defaultdict(list)
+    checked_packages = {}
     report = {'areas': {}, 'changed': [], 'manual': [], 'invalid': [], 'entries': []}
     for item, result in zip(items, results):
         label = f"{item['path']}:{item['line']}"
@@ -179,20 +194,34 @@ def main():
             report['invalid'].append({'source': label, 'diagnostics': result['diagnostics']})
             continue
         if result['empty']:
-            report['manual'].append({'source': label, 'empty_tuples': result['empty']})
-            continue
+            package = package_of(ROOT / item['path']) if item['kind'] == 'file' else None
+            records = {}
+            if package is not None:
+                if package not in checked_packages:
+                    binary = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')) / 'debug/examples/migration-types'
+                    checked_packages[package] = json.loads(subprocess.run([str(binary), str(package)], cwd=ROOT, text=True, capture_output=True, check=True).stdout)
+                records = checked_packages[package]
+            path = str((ROOT / item['path']).relative_to(package)) if package else ''
+            source_bytes = item['source'].encode()
+            for case in result['empty']:
+                offset = int(case.rsplit(' ', 1)[1])
+                if case.startswith('empty tuple expression ') and offset in records.get(path, []):
+                    continue
+                line = item['line'] + source_bytes[:offset].count(b'\n')
+                report['manual'].append({'source': f"{item['path']}:{line}", 'empty_tuples': case})
+            if any(case['source'].startswith(item['path'] + ':') for case in report['manual']):
+                continue
         after, declaration, error = entry_migration(item, result)
         if error:
             report['manual'].append({'source': label, 'entry': error})
             continue
-        after = re.sub(r'(?m)^// syntax: syn1\r?\n', '', after)
         before = item['host'] if item['kind'] == 'file' else item['source']
         if after == before:
             continue
         if declaration:
             path, target = declaration
             name = add_entry(path, target) if args.write else '(pending)'
-            report['entries'].append({'manifest': str(path.relative_to(ROOT)), 'name': name, 'target': target, 'command': '--entry ' + name})
+            report['entries'].append({'manifest': str(path), 'name': name, 'target': target, 'command': '--entry ' + name})
         area = item['path'].split('/')[0]
         counts = report['areas'].setdefault(area, [0, 0, 0, 0])
         for i, count in enumerate(result['counts']):
@@ -218,7 +247,9 @@ def main():
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(report, indent=2, ensure_ascii=False) + '\n')
     print(json.dumps({key: value if key == 'areas' else len(value) for key, value in report.items()}, indent=2))
-    if report['manual'] or args.check and report['changed']:
+    if report['invalid'] or report['manual']:
+        for case in report['invalid'] + report['manual']:
+            print(f"{case['source']}: {case.get('diagnostics', case.get('empty_tuples', case.get('entry')))}", file=sys.stderr)
         raise SystemExit(1)
 
 

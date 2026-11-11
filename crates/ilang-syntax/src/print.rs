@@ -72,6 +72,11 @@ fn is_simple(e: &Expr) -> bool {
     }
 }
 
+/// A match `e |> { … }` (§6.12).
+pub(crate) fn is_match(e: &Expr) -> bool {
+    matches!(e.kind, ExprKind::Case { .. })
+}
+
 /// The function that `e` starts with, through operators, calls, `.f`, and
 /// `.k`.
 pub(crate) fn leading_fn(e: &Expr) -> Option<&Function> {

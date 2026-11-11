@@ -10,6 +10,7 @@ struct Migrator<'a> {
     edits: Vec<(usize, usize, &'static str)>,
     counts: [usize; 4],
     empty: Vec<String>,
+    record_shadowed: bool,
 }
 impl<'a> Migrator<'a> {
     fn edit(&mut self, span: Span, text: &'static str) {
@@ -18,6 +19,15 @@ impl<'a> Migrator<'a> {
     }
     fn mark_empty(&mut self, span: Span, kind: &str) {
         self.empty.push(format!("{kind} at byte {}", span.start));
+    }
+    fn record_delimiters(&mut self, span: Span) {
+        let start = span.start as usize;
+        let end = span.end as usize;
+        if self.src.as_bytes()[start] == b'{' {
+            self.edit(Span::new(span.start, span.start + 1), "(");
+            self.edit(Span::new(span.end - 1, span.end), ")");
+        }
+        assert!(end > start, "record span must not be empty");
     }
     fn error(&mut self, value: &TypeExpr, err: &TypeExpr) {
         let start = value.span.end as usize;
@@ -37,11 +47,42 @@ impl<'a> Migrator<'a> {
     }
     fn ty(&mut self, t: &TypeExpr) {
         match &t.kind {
+            TypeKind::Record { base, fields, .. } => {
+                self.record_delimiters(t.span);
+                if let Some(base) = base {
+                    self.ty(base);
+                }
+                for (_, field) in fields {
+                    self.ty(field);
+                }
+            }
             TypeKind::Tuple(xs) => {
                 if xs.is_empty() {
                     self.mark_empty(t.span, "empty tuple type");
                 }
                 for x in xs {
+                    self.ty(x);
+                }
+            }
+            TypeKind::Named { name, args, .. }
+                if name.name == "Record" && self.src.as_bytes()[t.span.start as usize] == b'{' =>
+            {
+                if self.record_shadowed {
+                    return;
+                }
+                let source = &self.src[t.span.start as usize..t.span.end as usize];
+                let dots = lex(source)
+                    .tokens
+                    .into_iter()
+                    .find(|tok| tok.kind == T::DotDot)
+                    .expect("record type has dots");
+                self.edit(Span::new(t.span.start, t.span.start + 1), "");
+                self.edit(
+                    Span::new(t.span.start + dots.span.start, t.span.start + dots.span.end),
+                    "Record",
+                );
+                self.edit(Span::new(t.span.end - 1, t.span.end), "");
+                for x in args {
                     self.ty(x);
                 }
             }
@@ -139,6 +180,15 @@ impl<'a> Migrator<'a> {
     }
     fn expr(&mut self, e: &Expr) {
         match &e.kind {
+            ExprKind::Record { base, fields } => {
+                self.record_delimiters(e.span);
+                if let Some(base) = base {
+                    self.expr(base);
+                }
+                for (_, field) in fields {
+                    self.expr(field);
+                }
+            }
             ExprKind::Tuple(xs) => {
                 if xs.is_empty() {
                     self.mark_empty(e.span, "empty tuple expression");
@@ -188,30 +238,6 @@ impl<'a> Migrator<'a> {
             ExprKind::Case { subject, clauses } => {
                 self.expr(subject);
                 self.clauses(clauses);
-                let start = subject.span.end as usize;
-                let end = e.span.end as usize;
-                if let Some(t) = lex(&self.src[start..end])
-                    .tokens
-                    .into_iter()
-                    .next()
-                    .filter(|t| t.kind == T::PipeGt)
-                {
-                    self.edit(
-                        Span::new(start as u32 + t.span.start, start as u32 + t.span.end),
-                        ".",
-                    );
-                    self.counts[0] += 1;
-                    if matches!(
-                        subject.kind,
-                        ExprKind::Binary { .. }
-                            | ExprKind::Unary { .. }
-                            | ExprKind::Int(_)
-                            | ExprKind::Float(_)
-                    ) {
-                        self.edit(Span::new(subject.span.start, subject.span.start), "{ ");
-                        self.edit(Span::new(subject.span.end, subject.span.end), " }");
-                    }
-                }
             }
             ExprKind::Clauses(cs) => self.clauses(cs),
             ExprKind::Call { callee, args } => {
@@ -235,24 +261,9 @@ impl<'a> Migrator<'a> {
                 }
             }
             ExprKind::Unary { expr, .. } => self.expr(expr),
-            ExprKind::Binary { op, lhs, rhs } => {
+            ExprKind::Binary { lhs, rhs, .. } => {
                 self.expr(lhs);
                 self.expr(rhs);
-                if *op == BinOp::Pipe {
-                    let start = lhs.span.end as usize;
-                    let end = rhs.span.start as usize;
-                    if let Some(t) = lex(&self.src[start..end])
-                        .tokens
-                        .into_iter()
-                        .find(|t| t.kind == T::PipeGt)
-                    {
-                        self.edit(
-                            Span::new(start as u32 + t.span.start, start as u32 + t.span.end),
-                            "|",
-                        );
-                        self.counts[1] += 1;
-                    }
-                }
             }
             _ => {}
         }
@@ -274,6 +285,11 @@ fn migrate(src: &str) -> Value {
         edits: vec![],
         counts: [0; 4],
         empty: vec![],
+        // Keep the unambiguous legacy form if a local Record could capture it.
+        record_shadowed: lex(src)
+            .tokens
+            .iter()
+            .any(|t| matches!(&t.kind, T::UpName(n) if n == "Record")),
     };
     let mut mains = vec![];
     for item in &m.items {
@@ -361,12 +377,22 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn migrates_old_pipe_inside_new_match_without_rewriting_outer_dot() {
-        let source = "result = x.{ _ -> y |> f }";
+    fn new_surface_keeps_records() {
+        let source = "result = (name: 1)";
         let result = migrate(source);
         assert_eq!(result["diagnostics"], json!([]));
-        assert_eq!(result["source"], "result = x.{ _ -> y | f }");
+        assert_eq!(result["empty"], json!([]));
+        assert_eq!(result["source"], source);
+    }
+
+    #[test]
+    fn shadowed_record_keeps_uncapturable_legacy_type() {
+        let source = "Record = Int\nT = {..}";
+        let result = migrate(source);
+        assert_eq!(result["source"], source);
+        assert_eq!(result["diagnostics"], json!([]));
     }
 
     #[test]
@@ -376,6 +402,8 @@ mod tests {
             "result = x // a comment\n |> { 0 -> 1 _ -> 2 }",
             "result = (x) -> Int ? String { x }",
             "result = x |> f",
+            "T = {..}",
+            "result = { name: 1 }",
         ] {
             let result = migrate(source);
             assert_eq!(result["diagnostics"], json!([]), "{result}");

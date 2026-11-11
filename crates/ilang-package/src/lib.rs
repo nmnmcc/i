@@ -531,7 +531,15 @@ impl Loader {
             dev_dependencies: Vec::new(),
             modules: Vec::new(),
             wasm_exports: manifest.wasm_exports.clone(),
-            entries: manifest.entries.clone(),
+            entries: manifest
+                .entries
+                .iter()
+                .map(|(name, entry)| {
+                    let mut entry = entry.clone();
+                    entry.module = format!("{}/{}", manifest.name, entry.module.replace('.', "/"));
+                    (name.clone(), entry)
+                })
+                .collect(),
             location: None,
         });
         self.by_dir.insert(dir.clone(), id);

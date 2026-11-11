@@ -6,6 +6,7 @@
 	i/task
 	i/request
 	i/control
+	i/request
 	i/core
 )
 

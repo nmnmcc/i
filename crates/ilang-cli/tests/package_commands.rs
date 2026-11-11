@@ -209,7 +209,7 @@ fn new_makes_a_package_that_checks_runs_and_tests() {
     assert_eq!(read(&dir.join("i.toml")), "name = \"demo\"\n");
     assert_eq!(read(&dir.join(".gitignore")), "/build/\n");
     assert!(read(&dir.join("src/main.i")).contains("(Io) = i/io"));
-    assert!(read(&dir.join("src/main.i")).contains("@main"));
+    assert!(read(&dir.join("src/main.i")).contains("main = (io ! Io)"));
     assert!(read(&dir.join("test/main_test.i")).contains("@test"));
 
     let project = dir.display().to_string();

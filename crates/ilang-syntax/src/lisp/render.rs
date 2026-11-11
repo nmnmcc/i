@@ -404,7 +404,7 @@ pub(super) fn render_anchored(
                         text!("_");
                     } else {
                         node!(Type, r);
-                        text!(" ? ");
+                        text!(" ^ ");
                         node!(Type, e);
                     }
                 } else if let Some([h, r, e]) = round(d)

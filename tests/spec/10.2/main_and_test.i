@@ -1,8 +1,7 @@
 // spec: 10.2, B.5
-// expect: compile-error E0321
+// expect: compile-error E0305
 
-// The program entry and a test have the same export name, so one function
-// may not be both.
+// This function is not the default entry, and tests belong under test/.
 @main
 @test
 both = () { Nil }

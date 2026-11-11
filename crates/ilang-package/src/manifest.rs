@@ -338,7 +338,7 @@ fn entry_table(value: &Spanned<DeValue>, diags: &mut Vec<Diagnostic>) -> Vec<(St
     for (key, value) in table.iter() {
         let name = key.get_ref().to_string();
         let parsed = match value.get_ref() {
-            DeValue::String(s) => parse_wasm_export(s),
+            DeValue::String(s) => parse_entry(s),
             _ => None,
         };
         if is_name(&name)
@@ -356,11 +356,17 @@ fn entry_table(value: &Spanned<DeValue>, diags: &mut Vec<Diagnostic>) -> Vec<(St
             diags.push(err(
                 code::MANIFEST_SHAPE,
                 span(value.span()),
-                "an entry is `name = \"package/module.function\"` in `[entries]`",
+                "an entry is `name = \"module.path.function\"` in `[entries]`",
             ));
         }
     }
     out
+}
+
+fn parse_entry(s: &str) -> Option<(String, String)> {
+    let (module, function) = s.rsplit_once('.')?;
+    (module.split('.').all(is_name) && is_name(function))
+        .then(|| (module.to_string(), function.to_string()))
 }
 
 /// `app/math.add` into `("app/math", "add")`.

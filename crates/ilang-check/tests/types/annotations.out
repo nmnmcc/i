@@ -8,7 +8,7 @@ fn_type : (Int) -> Int
 union_arg : (x: Int | String) -> Int | String
 inter_arg : (x: A & Int) -> A
 list_union : List(Int | String)
-result_written : (r: Result(A, B)) -> A ? B
+result_written : (r: Result(A, B)) -> A ^ B
 diff_written : (x: Int | String | Nil) -> Int | Nil
 alias_use : (p: (Int, Int)) -> (Int, Int)
 pair_use : (p: (String, String)) -> (String, String)

@@ -1,4 +1,3 @@
-// syntax: syn1
 // spec: 6.4, 6.5, 6.7, 4.3
 // expect: pass
 (

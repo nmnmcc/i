@@ -1,4 +1,3 @@
-// syntax: syn1
 (
 	i/core
 	dict = std/dict

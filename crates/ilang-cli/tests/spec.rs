@@ -152,7 +152,15 @@ fn cases(root: &Path) -> Vec<Result<Case, String>> {
                 let text = std::fs::read_to_string(&path).unwrap();
                 let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
                 out.push(header(&text, "//").map_err(|e| format!("{name}: {e}")).map(
-                    |(expect, output)| {
+                    |(mut expect, output)| {
+                        if let Expect::Stop(_, positions) = &mut expect {
+                            let old = format!("spec/{stem}:");
+                            for position in positions {
+                                if let Some(suffix) = position.strip_prefix(&old) {
+                                    *position = format!("spec/main:{suffix}");
+                                }
+                            }
+                        }
                         let dir = tempfile::tempdir().unwrap();
                         std::fs::write(dir.path().join("i.toml"), "name = \"spec\"\n").unwrap();
                         single_file::write(dir.path(), &stem, &text);

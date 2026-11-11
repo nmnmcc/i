@@ -21,7 +21,7 @@
 
 use crate::ast::*;
 use crate::lexer::{Comment, lex};
-use crate::print::{level, type_prec};
+use crate::print::{is_match, level, type_prec};
 use crate::span::Span;
 use crate::token::{Token, TokenKind as T};
 use crate::{Diagnostic, parse_module};
@@ -884,6 +884,23 @@ impl<'a> Formatter<'a> {
         let mut out = Vec::new();
         for a in &item.attributes {
             out.push(self.leading(a.span.start));
+            if a.module.is_none() && a.name.name == "main" {
+                let next = match &item.kind {
+                    ItemKind::TypeDef(def) => def.name.span.start,
+                    ItemKind::Binding(b) => b.span.start,
+                    ItemKind::Declaration { name, .. } => name.span.start,
+                    ItemKind::MacroItem { module, name, .. } => {
+                        module.as_ref().unwrap_or(name).span.start
+                    }
+                };
+                if self.peek().is_some_and(|c| {
+                    c.span.start < next && self.trails(a.span.end, c.span.start)
+                }) {
+                    out.push(self.take());
+                    out.push(self.hard());
+                }
+                continue;
+            }
             match &a.module {
                 Some(m) => out.push(text(format!("@{}.{}", m.name, a.name.name))),
                 None => out.push(text(format!("@{}", a.name.name))),
@@ -1131,7 +1148,7 @@ impl<'a> Formatter<'a> {
     fn expr(&mut self, e: &Expr, min: u8) -> Doc {
         self.continued(e.span.start, |f| {
             // A match is an operation at level 6 (§6.9).
-            if level(e) < min {
+            if level(e) < min || is_match(e) && min > 6 {
                 let before = f.hard;
                 let body = f.expr_raw(e);
                 if f.hard == before {

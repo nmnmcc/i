@@ -232,6 +232,12 @@ fn expanded_record_labels_keep_their_original_syntax_identity() {
 fn normal_lisp_normal_round_trip_preserves_records() {
     let source = r#"
 empty = ()
+single = (1)
+Single = (Int)
+old = { name: 1 }
+Old = { name: Int }
+f = (x) -> Int ^ String { x }
+g = (x) -> Int ? String { x }
 first = (name: "Ada", "x-y": 7)
 second = (..first, count: 2)
 choose(K, R) = (key: K, r: (..R, -other, K: Int)) -> (K: Int) { r }

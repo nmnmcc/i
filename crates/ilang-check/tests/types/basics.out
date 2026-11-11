@@ -17,9 +17,9 @@ id : (x: A) -> A
 const : (x: A, y: B) -> A
 add : (x: Int, y: Int) -> Int
 inc : (x: A & Int) -> A
-apply : (f: (A) -> B ? E ! N, x: A) -> B ? E ! N
-compose : (f: (A) -> B ? E ! N, g: (C) -> A ? E2 ! N2) -> (x: C) -> B ? E2 | E ! N2 | N
-twice : (f: (A | B) -> B & C ? E ! N, x: A) -> C ? E ! N
+apply : (f: (A) -> B ^ E ! N, x: A) -> B ^ E ! N
+compose : (f: (A) -> B ^ E ! N, g: (C) -> A ^ E2 ! N2) -> (x: C) -> B ^ E2 | E ! N2 | N
+twice : (f: (A | B) -> B & C ^ E ! N, x: A) -> C ^ E ! N
 ignore : (x: A) -> 1
 31:8: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
 41:2: warning[W0502]: this value is not used, and working it out does nothing

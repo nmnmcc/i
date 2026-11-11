@@ -133,7 +133,7 @@ boolean = () {
         accepts(
             &source,
             "use",
-            "(x: A) -> A ? E ! N | Outer(A, E, N)",
+            "(x: A) -> A ^ E ! N | Outer(A, E, N)",
             &["integer", "boolean"],
         );
     }
