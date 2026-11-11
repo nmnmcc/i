@@ -76,6 +76,7 @@ fn graph_with_path_dependencies() {
             "i/request",
             "i/key",
             "i/core",
+            "i/record",
             "i/io",
             "i/task",
             "i/clock",
