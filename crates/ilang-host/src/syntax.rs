@@ -433,6 +433,13 @@ pub fn charge_definition(
         ilang_syntax::lisp::definition_table::DefinitionCost::Syntax(syntax) => {
             charge_tree(budget, syntax, true)
         }
+        // The source constructor lexes and converts source before producing
+        // the answer; charge its full input before any of those allocations.
+        ilang_syntax::lisp::definition_table::DefinitionCost::Written(source) => {
+            let bytes = source.len() as u64;
+            budget.charge(bytes.saturating_mul(128), bytes.saturating_mul(128).saturating_add(128))?;
+            Ok(())
+        }
         // All five synthesized builtins fit this fixed bound, including the
         // lexer, answer nodes, parameter identities and temporary strings.
         ilang_syntax::lisp::definition_table::DefinitionCost::Builtin(_) => {

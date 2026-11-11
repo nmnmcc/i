@@ -2076,3 +2076,28 @@ fn item_collection_resolves_qualified_import() {
     assert_eq!(entries.len(), 1);
     assert_eq!(checked.program.as_ref().unwrap().module(entries[0].collection.module).path, "app/anchors");
 }
+
+#[test]
+fn definition_query_charges_source_before_constructing_answer() {
+    use ilang_host::{macro_budget::{Limit, Limits, MacroBudget}, syntax::DefinitionReply};
+    use ilang_macro::{definition_world::DefinitionWorld, item_phase::{Definitions, Snapshot}};
+    use ilang_syntax::lisp::{definition_schedule::Mode, scoped::ScopedSource};
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    let text = format!("T = Int\n// {}\n", "x".repeat(20_000));
+    std::fs::write(dir.path().join("src/main.i"), text).unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let module = parsed.iter().find(|p| p.path == "app/main").unwrap();
+    let snapshot = Snapshot { module: module.ast.clone(), ready: vec![true; module.ast.items.len()], scoped: ScopedSource::new(graph.sources.get(module.source).text.clone()), source: module.source.0, other_runs: false, active: None, epoch: 0, item_overrides: Default::default() };
+    let world = DefinitionWorld::new(&graph, &parsed);
+    world.prepare(&snapshot);
+    let query = Syntax::from_datum(&parse("T").unwrap()[0], &Scope { module: module.source.0, marks: BTreeSet::new() });
+    let budget = MacroBudget::new(Limits { work: 100_000, allocation: 100_000, frames: 100 });
+    let result = world.resolve(&snapshot, &query, &query, Mode::Normal, 99, &budget);
+    assert!(matches!(result.reply, DefinitionReply::CompileError { .. }));
+    assert!(matches!(budget.exceeded(), Some(Limit::Work | Limit::Allocation)));
+}

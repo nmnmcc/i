@@ -1328,7 +1328,7 @@ fn definition_table_charges_before_freshening_written_and_expanded_answers() {
             10,
             |_, _| Lookup::Found(key),
             |cost| {
-                assert!(matches!(cost, DefinitionCost::Syntax(_)));
+                assert!(matches!((key, cost), (1, DefinitionCost::Written(_)) | (2, DefinitionCost::Syntax(_))));
                 charged = true;
                 Err(Box::new(std::io::Error::other("allocation limit")))
             },

@@ -19,7 +19,7 @@ use ilang_syntax::{
     lisp::{
         Datum, DatumKind,
         definition_schedule::Mode,
-        definition_table::{Definition, DefinitionTable, Lookup, QueryResult},
+        definition_table::{Definition, DefinitionCost, DefinitionTable, Lookup, QueryResult},
         definitions::type_query,
         scoped::ScopedSource,
         syntax::{Node, Scope, ScopeIdentity, Syntax},
@@ -39,6 +39,8 @@ struct TypeEntry {
     exported: bool,
     constructors_visible: bool,
     ready: bool,
+    position: usize,
+    expanded: Option<Syntax>,
 }
 #[derive(Default)]
 struct ModuleNames {
@@ -47,7 +49,6 @@ struct ModuleNames {
     aliases: HashMap<String, u32>,
 }
 struct Index {
-    table: DefinitionTable<DefinitionIdentity>,
     entries: Vec<TypeEntry>,
     modules: HashMap<u32, ModuleNames>,
     generated: Vec<Binding<usize>>,
@@ -128,7 +129,6 @@ impl DefinitionWorld {
     }
     fn build(&self, snapshot: &Snapshot) -> Index {
         let mut index = Index {
-            table: DefinitionTable::default(),
             entries: Vec::new(),
             modules: HashMap::new(),
             generated: Vec::new(),
@@ -141,8 +141,6 @@ impl DefinitionWorld {
             } else {
                 p.scoped.as_ref()
             };
-            let file = self.graph.sources.get(p.source);
-            let text = scoped.map_or(file.text.as_str(), ScopedSource::text);
             let scope = Scope {
                 module: p.source.0,
                 marks: Default::default(),
@@ -193,53 +191,19 @@ impl DefinitionWorld {
                     } else {
                         scoped.and_then(|source| source.item_override(item.span))
                     };
-                    let definition = if let Some((syntax, _)) = override_syntax {
-                        let syntax = ilang_syntax::lisp::definitions::expanded_definition(
-                            syntax,
-                            TEMPLATE_ANSWER,
-                        )
-                        .expect("expanded type item remains valid");
-                        Definition::Expanded {
-                            syntax,
-                            parameter_answer: Some(TEMPLATE_ANSWER),
-                            ready,
-                        }
-                    } else if scoped.is_some_and(|s| s.is_generated(item.span)) {
-                        let syntax = scoped
-                            .and_then(|s| s.origin(item.span))
-                            .expect("generated type item retains its origin")
-                            .syntax
-                            .clone();
-                        let syntax = ilang_syntax::lisp::definitions::expanded_definition(
-                            &syntax,
-                            TEMPLATE_ANSWER,
-                        )
-                        .expect("expanded type item remains valid");
-                        Definition::Expanded {
-                            syntax,
-                            parameter_answer: Some(TEMPLATE_ANSWER),
-                            ready,
-                        }
-                    } else {
-                        let syntax = ilang_syntax::lisp::definitions::source_definition(
-                            item,
-                            text,
-                            &scope,
-                            TEMPLATE_ANSWER,
-                        );
-                        Definition::Expanded {
-                            syntax,
-                            parameter_answer: Some(TEMPLATE_ANSWER),
-                            ready,
-                        }
-                    };
-                    index.table.insert(key.clone(), definition);
+                    let expanded = override_syntax.map(|(syntax, _)| syntax.clone()).or_else(|| {
+                        scoped.filter(|s| s.is_generated(item.span)).map(|s| {
+                            s.origin(item.span).expect("generated type item retains its origin").syntax.clone()
+                        })
+                    });
                     let n = index.entries.len();
                     index.entries.push(TypeEntry {
                         key: key.clone(),
                         exported,
                         constructors_visible,
                         ready,
+                        position,
+                        expanded,
                     });
                     if atom.scope().marks.is_empty() {
                         names.own.entry(binder.name).or_insert(n);
@@ -501,40 +465,28 @@ impl Definitions for DefinitionWorld {
             }
             let key = entry.key.clone();
             let answer = self.answer_id();
-            match index.table.query_metered(
-                result,
-                mode,
-                answer,
-                |_, _| Lookup::Found(key.clone()),
-                |cost| charge_definition(budget, cost).map_err(|e| e.into()),
-            ) {
-                Ok(QueryResult::Answer { syntax, .. }) => {
-                    resolution(DefinitionReply::Answer(syntax), early.then_some(key))
-                }
-                Ok(QueryResult::Deferred { at }) => {
-                    resolution(DefinitionReply::Deferred { at }, None)
-                }
-                Ok(QueryResult::Error(e)) => resolution(
-                    DefinitionReply::Error {
-                        message: e.message,
-                        at: e.at,
-                    },
-                    early.then(|| error_id(&query.name, "error")),
-                ),
-                Ok(QueryResult::CompileError(e)) => resolution(
-                    DefinitionReply::CompileError {
-                        message: e.message,
-                        at: e.at,
-                    },
-                    None,
-                ),
-                Err(error) => resolution(
-                    DefinitionReply::CompileError {
-                        message: error.to_string(),
-                        at: query.name,
-                    },
-                    None,
-                ),
+            let construction = if let Some(syntax) = &entry.expanded {
+                charge_definition(budget, DefinitionCost::Syntax(syntax))
+                    .and_then(|()| charge_definition(budget, DefinitionCost::Syntax(syntax)))
+                    .map(|()| ilang_syntax::lisp::definitions::expanded_definition(syntax, answer)
+                        .expect("expanded type item remains valid"))
+            } else {
+                let parsed = self.source_module(entry.key.source).expect("definition source exists");
+                let current = entry.key.source == snapshot.source;
+                let module = if current { &snapshot.module } else { &parsed.ast };
+                let scoped = if current { Some(&snapshot.scoped) } else { parsed.scoped.as_ref() };
+                let file = self.graph.sources.get(parsed.source);
+                let text = scoped.map_or(file.text.as_str(), ScopedSource::text);
+                charge_definition(budget, DefinitionCost::Written(text)).map(|()| {
+                    ilang_syntax::lisp::definitions::source_definition(
+                        &module.items[entry.position], text,
+                        &Scope { module: parsed.source.0, marks: Default::default() }, answer,
+                    )
+                })
+            };
+            match construction {
+                Ok(syntax) => resolution(DefinitionReply::Answer(syntax), early.then_some(key)),
+                Err(error) => resolution(DefinitionReply::CompileError { message: error.to_string(), at: query.name }, None),
             }
         } else if builtin_name {
             let key = DefinitionIdentity {

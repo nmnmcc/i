@@ -67,34 +67,20 @@ pub enum QueryResult<Key> {
 pub enum DefinitionCost<'a> {
     Syntax(&'a Syntax),
     Builtin(&'a str),
+    /// The source that must be scanned to construct a written definition.
+    Written(&'a str),
 }
 
 const TEMPLATE_ANSWER: u64 = u64::MAX;
 struct Entry {
     definition: Definition,
-    template: Option<Syntax>,
 }
 impl Entry {
     fn new(definition: Definition) -> Self {
-        let template = match &definition {
-            Definition::Written {
-                item,
-                source,
-                scope,
-                ..
-            } => {
-                assert!(
-                    matches!(item.kind, ItemKind::TypeDef(_)),
-                    "definition table accepts type definitions only"
-                );
-                Some(source_definition(item, source, scope, TEMPLATE_ANSWER))
-            }
-            _ => None,
-        };
-        Self {
-            definition,
-            template,
+        if let Definition::Written { item, .. } = &definition {
+            assert!(matches!(item.kind, ItemKind::TypeDef(_)), "definition table accepts type definitions only");
         }
+        Self { definition }
     }
 }
 
@@ -230,13 +216,9 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
                     at: parsed.name.clone(),
                 });
             }
-            Definition::Written { ready: true, .. } => {
-                let template = definition
-                    .template
-                    .as_ref()
-                    .expect("written definition has a template");
-                preflight(DefinitionCost::Syntax(template))?;
-                freshen_parameters(template, TEMPLATE_ANSWER, answer)
+            Definition::Written { item, source, scope, ready: true } => {
+                preflight(DefinitionCost::Written(source))?;
+                source_definition(item, source, scope, answer)
             }
             Definition::Expanded {
                 syntax,
