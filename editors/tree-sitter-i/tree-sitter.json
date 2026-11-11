@@ -1,0 +1,4 @@
+{
+  "grammars": [{"name": "i", "camelcase": "I", "scope": "source.i", "path": ".", "file-types": ["i"], "highlights": "queries/highlights.scm"}],
+  "metadata": {"version": "0.1.0", "license": "Apache-2.0", "description": "i language grammar", "authors": [{"name": "i contributors"}]}
+}

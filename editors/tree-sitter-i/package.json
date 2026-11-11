@@ -1,0 +1,19 @@
+{
+  "name": "tree-sitter-i",
+  "version": "0.1.0",
+  "description": "Tree-sitter grammar for the i programming language",
+  "license": "Apache-2.0",
+  "files": [
+    "grammar.js",
+    "tree-sitter.json",
+    "src/**",
+    "queries/**"
+  ],
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "test": "tree-sitter test"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.27.2"
+  }
+}
