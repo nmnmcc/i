@@ -211,6 +211,89 @@ pub fn build_entry(
     })
 }
 
+pub fn build_tests(
+    project: &Path,
+    options: BuildOptions,
+    collection: Option<&str>,
+) -> Result<(Built, Vec<CollectionEntry>), BuildError> {
+    let (mut graph, mut diags) = load(project, options.tests, options.offline);
+    graph.test_run = options.tests;
+    let Some(root) = graph.root else {
+        return Err(program_error(&graph, &diags));
+    };
+    let revision = snapshot(&graph);
+    let checked = ilang_macro::project::check_tests(&mut graph, collection);
+    diags.extend(checked.diags);
+    let (Some(program), Some(typed)) = (&checked.program, &checked.types) else {
+        return Err(program_error(&graph, &diags));
+    };
+    if diags.iter().any(Diagnostic::is_error) {
+        return Err(program_error(&graph, &diags));
+    }
+    let manifest = make_manifest(&graph, program, revision, &checked.collections);
+    let selected: Vec<_> = manifest
+        .entries
+        .iter()
+        .zip(&checked.collections)
+        .enumerate()
+        .filter(|(_, (entry, _))| Some(entry.collection.as_str()) == collection)
+        .map(|(index, (entry, item))| (entry.clone(), item.target, format!("i.tool.{index}")))
+        .collect();
+    let exports: Vec<_> = selected
+        .iter()
+        .map(|(_, target, name)| (*target, name.clone()))
+        .collect();
+    let warnings: Vec<Diagnostic> = diags.iter().filter(|d| !d.is_error()).cloned().collect();
+    let (wasm, declarations) = match ilang_wasm::compile_tests_with_bindings(
+        &graph,
+        program,
+        typed,
+        ilang_wasm::Options {
+            tests: options.tests,
+            target: options.target,
+        },
+        &exports,
+    ) {
+        Ok(w) => w,
+        Err(ilang_wasm::Error::Diagnostics(more)) => {
+            diags.extend(more);
+            return Err(program_error(&graph, &diags));
+        }
+        Err(ilang_wasm::Error::Internal(m)) => return Err(BuildError::Internal(m)),
+    };
+    let wasm = optimize(&wasm, options.opt)?;
+    let declarations = declarations
+        .into_iter()
+        .map(|d| ilang_host::bindings::BindingDeclaration::from_json(&d.to_string()))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| BuildError::Internal(error.to_string()))?;
+    let binding_plan = ilang_host::bindings::BindingPlan::new(&wasm, declarations);
+    // The library is selected by the package loader, never by a caller's name.
+    use ilang_package::lock::{FileKind, PackageFile, hash};
+    let files: Vec<_> = graph.packages[graph.library]
+        .modules
+        .iter()
+        .map(|m| PackageFile {
+            path: m.path.clone(),
+            kind: FileKind::Regular,
+            bytes: graph.sources.get(m.source).text.as_bytes().to_vec(),
+        })
+        .collect();
+    let trusted_package = hash(&files);
+    Ok((
+        Built {
+            name: graph.packages[root].name.clone(),
+            wasm,
+            binding_plan,
+            trusted_package,
+            warnings: graph.sources.render_all(&warnings),
+            tests: options.tests,
+            templates: checked.templates,
+        },
+        selected.into_iter().map(|(entry, _, _)| entry).collect(),
+    ))
+}
+
 /// Persistable description of a checked collection. Handles identify one
 /// contribution in this exact source snapshot; they do not expose compiler IDs.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]

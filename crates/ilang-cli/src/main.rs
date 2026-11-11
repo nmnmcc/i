@@ -241,10 +241,6 @@ fn options(opt: u8, tests: bool, offline: bool) -> anyhow::Result<BuildOptions> 
     })
 }
 
-fn built(project: &Path, options: BuildOptions) -> anyhow::Result<Option<ilang_cli::Built>> {
-    built_entry(project, options, None)
-}
-
 fn built_entry(
     project: &Path,
     options: BuildOptions,
@@ -395,25 +391,21 @@ fn cmd_test(
 ) -> anyhow::Result<ExitCode> {
     let manifest_text = std::fs::read_to_string(project.join("i.toml"))?;
     let manifest: toml_edit::DocumentMut = manifest_text.parse()?;
-    let entries = if let Some(collection) = manifest
+    let collection = manifest
         .get("test")
         .and_then(|t| t.get("collection"))
-        .and_then(|v| v.as_str())
-    {
-        match ilang_cli::collections(project, true, offline) {
-            Ok(manifest) => manifest
-                .entries
-                .into_iter()
-                .filter(|e| e.collection == collection)
-                .collect::<Vec<_>>(),
+        .and_then(|v| v.as_str());
+    let (b, entries) =
+        match ilang_cli::build_tests(project, options(opt, true, offline)?, collection) {
+            Ok(value) => value,
             Err(error) => {
                 eprintln!("{error}");
                 return Ok(ExitCode::FAILURE);
             }
-        }
-    } else {
-        Vec::new()
-    };
+        };
+    for warning in &b.warnings {
+        eprintln!("{warning}");
+    }
     let focused = entries
         .iter()
         .any(|e| e.data.iter().any(|(k, v)| k == "mode" && v == "only"));
@@ -434,15 +426,13 @@ fn cmd_test(
             }
         }
     }
-    let Some(b) = built(project, options(opt, true, offline)?)? else {
-        return Ok(ExitCode::FAILURE);
-    };
     let program = b.host_program()?;
     let tests: Vec<String> = program
         .abi()
         .tests
         .iter()
         .map(|t| t.name.clone())
+        .filter(|n| !n.starts_with("i.tool."))
         .filter(|n| filter.is_none_or(|f| n.contains(f)))
         .collect();
     let mut failed = 0;
@@ -503,19 +493,25 @@ fn cmd_test(
                 println!("skip {name}");
                 continue;
             }
-            let selected = match ilang_cli::build_collection(
-                project,
-                options(opt, true, offline)?,
-                &entry.handle,
-                ilang_cli::CollectionResult::Nil,
-            ) {
-                Ok(selected) => selected,
-                Err(error) => {
-                    eprintln!("{error}");
-                    return Ok(ExitCode::FAILURE);
+            let index = entry
+                .handle
+                .rsplit(':')
+                .next()
+                .expect("collection handle index");
+            let export = format!("i.tool.{index}");
+            let outcome = ilang_host::block_on(async {
+                let mut instance = program.instantiate(b.host_options())?;
+                if program
+                    .abi()
+                    .tests
+                    .iter()
+                    .any(|t| t.name == export && t.is_async)
+                {
+                    instance.run_async(&export).await
+                } else {
+                    instance.run(&export)
                 }
-            };
-            let outcome = selected.run_with(selected.built.host_options());
+            });
             let success = matches!(outcome, Ok(Outcome::Ok(_)));
             if outcome.is_ok() && success != (mode == "fails") {
                 passed += 1;

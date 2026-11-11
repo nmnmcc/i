@@ -37,6 +37,15 @@ pub fn resolve(
     typed: &Typed,
     transactions: &[Transaction],
 ) -> Result<Vec<Entry>, Vec<Diagnostic>> {
+    resolve_with_types(parsed, program, Some(typed), transactions)
+}
+
+pub fn resolve_with_types(
+    parsed: &[Parsed],
+    program: &Program,
+    typed: Option<&Typed>,
+    transactions: &[Transaction],
+) -> Result<Vec<Entry>, Vec<Diagnostic>> {
     let by_source: HashMap<u32, ModuleId> = program
         .modules
         .iter()
@@ -134,10 +143,13 @@ pub fn resolve(
                 target: target_id,
                 data: data.clone(),
                 signature: typed
-                    .schemes
-                    .get(&target_id)
-                    .expect("checked target has a type scheme")
-                    .clone(),
+                    .map(|t| {
+                        t.schemes
+                            .get(&target_id)
+                            .expect("checked target has a type scheme")
+                            .clone()
+                    })
+                    .unwrap_or_default(),
                 target_span: program.def(target_id).span,
                 target_origin: parsed
                     .iter()
