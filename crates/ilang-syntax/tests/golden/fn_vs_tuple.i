@@ -1,3 +1,4 @@
+// syntax: syn1
 a = (x) { x }
 b = (x)
 c = (x, y) -> Int { x }

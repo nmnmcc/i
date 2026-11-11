@@ -81,6 +81,8 @@ test("starts `i lsp` from the configured path", async () => {
   assert.deepStrictEqual(c.clientOptions.documentSelector, [
     { scheme: "file", language: "i" },
     { scheme: "untitled", language: "i" },
+    { scheme: "file", language: "i-lisp" },
+    { scheme: "untitled", language: "i-lisp" },
   ]);
 
   // A new path starts a new server.

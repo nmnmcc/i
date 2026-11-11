@@ -27,7 +27,15 @@ fn render(src: &str) -> String {
     }
     if diags.is_empty() {
         assert_eq!(ilang_syntax::print::unprintable(&module), None);
-        let (again, diags2) = parse(&print_module(&module));
+        // The migration marker keeps old empty tuples parseable until the
+        // fixtures are rewritten. It does not belong to the printed AST.
+        let printed = print_module(&module);
+        let marked = if src.lines().any(|line| line.trim() == "// syntax: syn1") {
+            format!("// syntax: syn1\n{printed}")
+        } else {
+            printed
+        };
+        let (again, diags2) = parse(&marked);
         assert!(
             diags2.is_empty(),
             "the print does not parse: {diags2:?}\n{out}"

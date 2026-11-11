@@ -1,3 +1,4 @@
+// syntax: syn1
 T1 = A | B & C - D - E
 T2 = { A | B } & C
 T3 = A - { B - C }
