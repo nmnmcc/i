@@ -3366,16 +3366,7 @@ mod deep_lower_tests {
                 let value = lowerer.expr(&mut fx, &mut output, &expr);
                 assert!(matches!(value, Atom::Local(_)));
                 assert_eq!(output.len(), 9_999);
-                // HIR ownership is independently tested by the HIR lane. Peel
-                // this test's input without recursive Rust destruction.
-                let mut e = expr;
-                loop {
-                    match e.kind {
-                        ExprKind::Unary { expr, .. } => e = *expr,
-                        ExprKind::Float(_) => break,
-                        _ => panic!("unexpected expression"),
-                    }
-                }
+                drop(expr);
 
                 let mut pattern = Pattern {
                     kind: PatternKind::Discard,
@@ -3391,14 +3382,7 @@ mod deep_lower_tests {
                 let mut output = Vec::new();
                 lowerer.bind_checked(&mut fx, &mut output, &pattern, Atom::Nil, 0);
                 assert_eq!(output.len(), 10_000);
-                let mut p = pattern;
-                loop {
-                    match p.kind {
-                        PatternKind::Tuple(mut parts) => p = parts.pop().unwrap(),
-                        PatternKind::Discard => break,
-                        _ => panic!("unexpected pattern"),
-                    }
-                }
+                drop(pattern);
             })
             .unwrap()
             .join()
@@ -3448,21 +3432,7 @@ mod deep_lower_tests {
                     Atom::Local(_)
                 ));
                 assert_eq!(output.len(), 6_666);
-                // HIR destruction is handled independently; peel the input
-                // here to isolate lowering's continuation stack.
-                let mut e = expr;
-                loop {
-                    e = match e.kind {
-                        ExprKind::Unary { expr, .. } => *expr,
-                        ExprKind::Call { mut args, .. } => args.pop().unwrap().value,
-                        ExprKind::Block(mut block) => match block.stmts.pop().unwrap() {
-                            hir::Stmt::Expr(e) => e,
-                            _ => panic!("unexpected statement"),
-                        },
-                        ExprKind::Int(_) => break,
-                        _ => panic!("unexpected expression"),
-                    };
-                }
+                drop(expr);
             })
             .unwrap()
             .join()
@@ -3570,16 +3540,7 @@ mod deep_lower_tests {
                     }
                 ));
                 drop(output);
-                // HIR destruction is tested by its own lane; peel this input
-                // so this test isolates lowering and IR ownership.
-                let mut e = expr;
-                loop {
-                    e = match e.kind {
-                        ExprKind::Case { mut clauses, .. } => clauses.pop().unwrap().body,
-                        ExprKind::Int(_) => break,
-                        _ => panic!("unexpected expression"),
-                    };
-                }
+                drop(expr);
             })
             .unwrap()
             .join()
@@ -3626,8 +3587,6 @@ mod deep_source_tests {
                 w.pattern(&p);
                 assert_eq!(w.used.into_iter().collect::<Vec<_>>(), [VarId(42)]);
                 assert_eq!(w.bound, HashSet::from([VarId(7)]));
-                // HIR destruction is handled in the checker lane; this test
-                // isolates the two lowering traversals until that change lands.
                 drop(e);
                 drop(p);
             })
