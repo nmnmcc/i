@@ -52,14 +52,14 @@ both optimization levels 0 and 2.
   table, and Simple-sub `Typer.scala`'s `extrude` and `freshenAbove`.
 - Spec 11.1 makes values immutable and spec 9.9 makes channels rendezvous
   channels. To retain pool and body positions without HTTP-specific host or
-  compiler state, added general `task.cell` and pure atomic `task.update`,
+  compiler state, added general `task.ref` and pure atomic `task.update`,
   owned by the current scope/run and using the ordinary scheduler share table.
   Their public contract is recorded in spec 9.9 and runtime design 6.1.
 - The existing Request byte-body API remains the buffered `serve` interface;
   `serve_stream` provides the head plus a scoped pull reader. This follows the
   separate head/body approach in Go without changing message-value framing.
 - `redesign` advanced during implementation to `7e240a4e`. Merged it as
-  `0c382ea0`, retaining the cell API and its new `^` notation in the one doc
+  `0c382ea0`, retaining the ref API and its new `^` notation in the one doc
   conflict. Its formatter required canonical syntax in the acceptance source
   trees; that mechanical pass is isolated in `c70bca62`.
 
@@ -84,10 +84,10 @@ All cargo commands used `/home/agent/Programming/i/.rd/cache/heavy direnv exec
 - Targeted `http_timeout` and `http_reuse`: passed.
 - HTTP/TLS/echo suite: passed before and after merging redesign.
 - `cargo test --locked -p ilang-cli --test spec -- callback_open_service_row`
-  and the `task_cell` filter: passed at O0/O2.
+  and the `task_ref` filter: passed at O0/O2.
 - The first checker/package/host run found the old exported-name expectation:
   `assertion left == right failed: i/task` in `library_names`. Updated it for
-  `cell`/`update`.
+  `ref`/`update`.
 - A checker run started before the syntax merge subsequently read the formatted
   hello example with its old executable:
   `warning[W0504]: top-level binding main is not used` in `hello_example_checks`.
@@ -95,7 +95,7 @@ All cargo commands used `/home/agent/Programming/i/.rd/cache/heavy direnv exec
 - The first merged acceptance run reached the golden library-type check and
   reported `library types differ (run with UPDATE=1 to bless)`. Reviewed the
   complete diff: only task callback rows lose the redundant `N & (H | N - H)`
-  restrictions, and `cell`/`update` are added. Updated only `library.out`; the
+  restrictions, and `ref`/`update` are added. Updated only `library.out`; the
   targeted `cargo test --locked -p ilang-check --test types library -- --exact`
   passed, followed by the full acceptance rerun.
 - The merged formatter initially listed files such as

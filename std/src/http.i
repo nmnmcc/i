@@ -936,7 +936,7 @@ connection_loop = (stream, handler, buffer) {
 		Complete(req, rest) -> {
 			result = fail.catch(() {
 				task.scope((_) {
-					cursor = task.cell(
+					cursor = task.ref(
 						BodyCursor(
 							rest
 							request_framing(req.headers)
@@ -1052,7 +1052,7 @@ request_framing = (hs: Headers) -> BodyFraming ^ HttpError {
 	}
 }
 
-read_request_piece = (stream, cursor: task.Cell(BodyCursor), max: Int) {
+read_request_piece = (stream, cursor: task.Ref(BodyCursor), max: Int) {
 	require(max > 0, "body read size must be positive")
 	state = task.update(cursor, (state) { (state, state) })
 	(piece, next) = body_piece(stream, state, max)
@@ -1162,7 +1162,7 @@ drain_body = (reader) {
 
 /// A provider is a record containing a send function, so callers can replace it.
 client = () {
-	pool = task.cell(Pool([], []))
+	pool = task.ref(Pool([], []))
 	(send: (req) { follow(pool, req, 0) }, close: () { close_client(pool) })
 }
 
@@ -1196,7 +1196,7 @@ close_connection = (connection: Connection) {
 	}
 }
 
-close_client = (pool: task.Cell(Pool)) {
+close_client = (pool: task.Ref(Pool)) {
 	idle = task.update(pool, (state) { (Pool([], state.released), state.idle) })
 	list.each(idle, (entry) { close_connection(entry.connection) })
 }
@@ -1234,7 +1234,7 @@ send = (req: Request) {
 	resource.ensure(() { provider.send(req) }, provider.close)
 }
 
-follow = (pool: task.Cell(Pool), req: Request, count: Int) {
+follow = (pool: task.Ref(Pool), req: Request, count: Int) {
 	{ count > 10 } |> {
 		True -> fail.raise(Protocol("too many redirects"))
 		False -> {
@@ -1332,7 +1332,7 @@ redirect_headers = (hs: Headers, base, next, drop_body: Bool) -> Headers {
 	}))
 }
 
-send_once = (pool: task.Cell(Pool), req: Request) {
+send_once = (pool: task.Ref(Pool), req: Request) {
 	u = uri.parse(req.target) |> {
 		Ok(value) -> value
 		Error(_)  -> fail.raise(Protocol("invalid URL"))
@@ -1451,7 +1451,7 @@ dial = (secure: Bool, hostname: String, port: Int) {
 	}
 }
 
-exchange = (pool: task.Cell(Pool), entry: Idle, req: Request, wire: BitArray) {
+exchange = (pool: task.Ref(Pool), entry: Idle, req: Request, wire: BitArray) {
 	lease: Key(Nil) = key.new()
 	resource.ensure(() {
 		transport = entry.connection |> {

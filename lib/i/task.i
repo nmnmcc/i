@@ -18,7 +18,7 @@
 	Channel
 	Event
 	Shared
-	Cell
+	Ref
 	ScheduleError(..)
 	top
 	run
@@ -45,7 +45,7 @@
 	sync
 	share
 	get
-	cell
+	ref
 	update
 	both
 	race
@@ -89,8 +89,8 @@ Shared(A) {
 	Shared(run: Key(Nil), owner: Keyed, id: Keyed, values: Key(A))
 }
 
-Cell(A) {
-	Cell(run: Key(Nil), id: Keyed, values: Key(A))
+Ref(A) {
+	Ref(run: Key(Nil), id: Keyed, values: Key(A))
 }
 
 ScheduleError {
@@ -406,8 +406,8 @@ Command {
 	Select(List(Leaf))
 	NewShare(ScopeInfo, Keyed)
 	GetShare(Key(Nil), Keyed, Keyed)
-	NewCell(Keyed)
-	UpdateCell(Key(Nil), Keyed, (Keyed) -> (Keyed, Keyed))
+	NewRef(Keyed)
+	UpdateRef(Key(Nil), Keyed, (Keyed) -> (Keyed, Keyed))
 	Drain
 }
 
@@ -2285,7 +2285,7 @@ prevalidate = (s: State, t: TaskState, command: Command) {
 		)
 		Select(leaves)   -> check_leaves(s, t, leaves)
 		SendNow(info, _) -> check_channel(s, info)
-		GetShare(run, _, id) | UpdateCell(run, id, _) -> {
+		GetShare(run, _, id) | UpdateRef(run, id, _) -> {
 			check_run(s.run, run)
 			find_share(s.shares, read(address_key, id))
 			Nil
@@ -2617,7 +2617,7 @@ do_command = (
 			)
 			reply(next, t.serial, k, Proceed(key.wrap(address_key, id)), False)
 		}
-		NewCell(value) -> {
+		NewRef(value) -> {
 			portable(value)
 			id = new_address(t)
 			owner = head_scope(t.chain)
@@ -2641,7 +2641,7 @@ do_command = (
 			}
 			reply(next, t.serial, k, Proceed(key.wrap(address_key, id)), False)
 		}
-		UpdateCell(_, id, change) -> {
+		UpdateRef(_, id, change) -> {
 			address = read(address_key, id)
 			row = store_find(s.shares, address_index(address)) |> {
 				Present(row) -> row
@@ -3305,26 +3305,26 @@ keep(S, A, E, N) = (
 	(value: S, own ! Scheduler) { kept((value, own)) }
 }
 
-/// A state cell owned by the current scope, or by the run at its root.
+/// A state ref owned by the current scope, or by the run at its root.
 /// Values are portable; update callbacks are pure and execute atomically.
-cell(A) = (value: A, own ! Scheduler) -> Cell(A) ! Scheduler {
+ref(A) = (value: A, own ! Scheduler) -> Ref(A) ! Scheduler {
 	values: Key(A) = key.new()
-	id = ask(own, NewCell(key.wrap(values, value)))
+	id = ask(own, NewRef(key.wrap(values, value)))
 	own |> {
 		DetachedScheduler -> panic("task: no scheduler")
-		Scheduler(..)     -> Cell(own.run, id, values)
+		Scheduler(..)     -> Ref(own.run, id, values)
 	}
 }
 
 update(A, B) = (
-	cell: Cell(A)
+	ref: Ref(A)
 	change: (A) -> (A, B)
 	own ! Scheduler
 ) -> B ! Scheduler {
 	answers: Key(B) = key.new()
-	read(answers, ask(own, UpdateCell(cell.run, cell.id, (value: Keyed) {
-		(next, answer) = change(read(cell.values, value))
-		(key.wrap(cell.values, next), key.wrap(answers, answer))
+	read(answers, ask(own, UpdateRef(ref.run, ref.id, (value: Keyed) {
+		(next, answer) = change(read(ref.values, value))
+		(key.wrap(ref.values, next), key.wrap(answers, answer))
 	})))
 }
 

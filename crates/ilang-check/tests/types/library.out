@@ -258,8 +258,8 @@ i/task.receive : (c: Channel(A)) -> A ! Scheduler
 i/task.share : (s: Scope(A), value: B) -> Shared(B) ! Scheduler
 i/task.get : (s: Shared(A)) -> A ! Scheduler
 i/task.keep : (f: (A) -> B ^ E ! N) -> { (A) -> B ^ E ! Scheduler } ! N - Scheduler - Runner - request.Await | Scheduler
-i/task.cell : (value: A) -> Cell(A) ! Scheduler
-i/task.update : (cell: Cell(A), change: (A) -> (A, B)) -> B ! Scheduler
+i/task.ref : (value: A) -> Ref(A) ! Scheduler
+i/task.update : (ref: Ref(A), change: (A) -> (A, B)) -> B ! Scheduler
 i/task.both : (left: () -> A ^ E ! N, right: () -> B ^ E ! N) -> (A, B) ^ E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
 i/task.race : (left: () -> A ^ E ! N, right: () -> A ^ E ! N) -> A ^ E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
 i/task.spawn_values : (s: Scope(A), xs: List(B), f: (B) -> C ^ A ! N) -> List(Task(C, A)) ! N - Scheduler - Runner - request.Await | Scheduler

@@ -169,7 +169,7 @@ fn library_names() {
                 "sync",
                 "share",
                 "get",
-                "cell",
+                "ref",
                 "update",
                 "both",
                 "race",
