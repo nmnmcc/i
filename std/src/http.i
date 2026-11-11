@@ -474,7 +474,8 @@ chunks = (
 ) -> (BitArray, Headers, List(Int)) ? HttpError {
 	(size_line, rest) = line(xs)
 	(size_raw, extension, has_extension) = cut(size_line, 59)
-	size_bytes = trim(size_raw)
+	size_bytes = list.reverse(list.drop_while(list.reverse(size_raw), space))
+	require(has_extension || size_bytes == size_raw, "invalid chunk size")
 	{ has_extension } |> {
 		True  -> validate_extensions(extension)
 		False -> Nil

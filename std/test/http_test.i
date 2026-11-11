@@ -833,3 +833,12 @@ http_response_transfer_close = () {
 	)
 	assert(res.body == <<"abc":utf8>>)
 }
+
+@test
+http_reject_chunk_size_leading_space = () {
+	input = <<
+		"POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n 1\r\na\r\n0\r\n\r\n":utf8
+	>>
+	http.Invalid(_) = http.feed_request(<<>>, input)
+	Nil
+}
