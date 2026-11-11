@@ -419,21 +419,20 @@ impl<'a> Checker<'a> {
                         .insert(id, shown.text_limited(&self.s.type_names, 12));
                     typed.schemes.insert(id, shown.text(&self.s.type_names));
                     typed.provider_scheme_types.insert(id, shown.clone());
+                    let catalog = artifact_catalog.get_or_insert_with(|| {
+                        std::sync::Arc::new(super::scheme_wire::SchemeCatalog {
+                            solver: std::sync::Mutex::new(self.s.scheme_snapshot()),
+                            schemes: artifact_schemes.clone(),
+                            externals: std::sync::OnceLock::new(),
+                        })
+                    });
+                    let artifact = super::SchemeArtifact {
+                        catalog: catalog.clone(),
+                        scheme: scheme.clone(),
+                    };
+                    typed.provider_scheme_artifacts.insert(id, artifact.clone());
                     if d.exported || opts.written {
-                        let catalog = artifact_catalog.get_or_insert_with(|| {
-                            std::sync::Arc::new(super::scheme_wire::SchemeCatalog {
-                                solver: std::sync::Mutex::new(self.s.scheme_snapshot()),
-                                schemes: artifact_schemes.clone(),
-                                externals: std::sync::OnceLock::new(),
-                            })
-                        });
-                        typed.scheme_artifacts.insert(
-                            id,
-                            super::SchemeArtifact {
-                                catalog: catalog.clone(),
-                                scheme: scheme.clone(),
-                            },
-                        );
+                        typed.scheme_artifacts.insert(id, artifact);
                         typed.scheme_types.insert(id, shown);
                     }
                 } else {

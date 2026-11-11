@@ -186,3 +186,28 @@ _entry = (body) {
 		retain(body())
 	}, () { entry_end() })
 }
+
+// Plan factories keep replacement values ordinary, including adapter seeds.
+_provider_root = (seeds: List(Root), key: Key(Nil)) -> Root {
+	seeds |> {
+		[root] -> root
+		[]     -> Root(key)
+		_      -> panic("provider: invalid root seed")
+	}
+}
+
+_provider_owner = (seeds: List(Owner), root ! Root) -> Owner ! Root {
+	seeds |> {
+		[owner] -> owner
+		[]      -> Owner(new_owner(root.key), root)
+		_       -> panic("provider: invalid owner seed")
+	}
+}
+
+_provider_await = (seeds: List(Await)) -> Await {
+	seeds |> {
+		[waiter] -> waiter
+		[]       -> Await((r) { wait_any([r]) })
+		_        -> panic("provider: invalid await seed")
+	}
+}

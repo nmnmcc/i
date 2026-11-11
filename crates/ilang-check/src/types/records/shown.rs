@@ -160,6 +160,10 @@ impl ShownGraph {
         }
     }
 
+    pub(crate) fn graph_is_closed(&self) -> bool {
+        self.graph.variables().is_empty()
+    }
+
     pub fn named_types(&self) -> Vec<TypeRef> {
         self.graph
             .nodes()

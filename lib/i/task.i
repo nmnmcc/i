@@ -4162,3 +4162,19 @@ notice_hops = (notice: ForeignNotice) -> List(Hop) {
 		EndForeign(hops, _)         -> hops
 	}
 }
+
+// Selected by package data with this module's private authority.
+_provider_runner = (seeds: List(Runner), root ! request.Root) -> Runner ! request.Root {
+	seeds |> {
+		[runner] -> runner
+		[]       -> initial(root)
+		_        -> panic("provider: invalid runner seed")
+	}
+}
+
+_provider_scheduler = (seeds: List(Scheduler)) -> Scheduler {
+	seeds |> {
+		[scheduler] -> scheduler
+		_           -> panic("provider: scheduler seed required")
+	}
+}

@@ -25,6 +25,7 @@ mod infer;
 mod known;
 mod lits;
 mod pattern;
+mod provider;
 mod records;
 mod scheme_wire;
 mod shown;
@@ -424,6 +425,8 @@ pub struct Typed {
     /// Inferred schemes for all top-level names, including private bindings
     /// that may be named by their own package's provider plan.
     pub provider_scheme_types: HashMap<DefId, ShownType>,
+    /// Complete schemes for plan-only private factories and adapters.
+    pub provider_scheme_artifacts: HashMap<DefId, SchemeArtifact>,
     /// Full graph schemes, including their retained bounds and obligations.
     pub scheme_artifacts: HashMap<DefId, SchemeArtifact>,
     /// §7.5: each use of a name that is known to be made by a constructor,

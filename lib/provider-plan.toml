@@ -1,15 +1,92 @@
-# Registered capabilities with no implicit Host cell. Implementations selected
-# by the target backends will be installed as ordinary factories in JP.
+# Standard capabilities are registered explicitly; absent target cells are unsupplied.
 [providers."i/io.Io"]
+native = {host=true}
+nodejs = {host=true}
+js = {host=true}
+wasi = {host=true}
+
 [providers."i/clock.Clock"]
-[providers."i/process.Entropy"]
-[providers."i/process.Arguments"]
-[providers."i/process.Environment"]
-[providers."i/process.WorkingDirectory"]
-[providers."i/process.Process"]
-[providers."i/fs.Fs"]
-[providers."i/net.Net"]
-[providers."i/tls.Tls"]
+native = {host=true}
+nodejs = {host=true}
+js = {host=true}
+
 [providers."i/stdio.Stdio"]
-[providers."i/target.Target"]
-discriminant = { js = "i/target.Js", nodejs = "i/target.NodeJS", native = "i/target.Native", wasi = "i/target.Wasi", host = "i/target.Host" }
+native = {host=true}
+nodejs = {host=true}
+js = {host=true}
+
+[providers."i/fs.Fs"]
+native = {host=true}
+nodejs = {host=true}
+
+[providers."i/net.Net"]
+native = {host=true}
+nodejs = {host=true}
+
+[providers."i/tls.Tls"]
+native = {host=true}
+nodejs = {host=true}
+
+[providers."i/process.Arguments"]
+native = {host=true}
+nodejs = {host=true}
+
+[providers."i/process.Environment"]
+native = {host=true}
+nodejs = {host=true}
+
+[providers."i/process.WorkingDirectory"]
+native = {host=true}
+nodejs = {host=true}
+
+[providers."i/process.Entropy"]
+native = {host=true}
+nodejs = {host=true}
+js = {host=true}
+
+[providers."i/process.Process"]
+native = {host=true}
+nodejs = {host=true}
+
+[providers."i/request.Root"]
+js = {factory="i/request._provider_root", arguments=["seed", "entry-root-key"]}
+nodejs = {factory="i/request._provider_root", arguments=["seed", "entry-root-key"]}
+native = {factory="i/request._provider_root", arguments=["seed", "entry-root-key"]}
+wasi = {factory="i/request._provider_root", arguments=["seed", "entry-root-key"]}
+host = {factory="i/request._provider_root", arguments=["seed", "entry-root-key"]}
+
+[providers."i/request.Owner"]
+js = {factory="i/request._provider_owner", arguments=["seed"]}
+nodejs = {factory="i/request._provider_owner", arguments=["seed"]}
+native = {factory="i/request._provider_owner", arguments=["seed"]}
+wasi = {factory="i/request._provider_owner", arguments=["seed"]}
+host = {factory="i/request._provider_owner", arguments=["seed"]}
+
+[providers."i/request.Await"]
+js = {factory="i/request._provider_await", arguments=["seed"]}
+nodejs = {factory="i/request._provider_await", arguments=["seed"]}
+native = {factory="i/request._provider_await", arguments=["seed"]}
+wasi = {factory="i/request._provider_await", arguments=["seed"]}
+host = {factory="i/request._provider_await", arguments=["seed"]}
+
+[providers."i/task.Runner"]
+role = "runner"
+adapter = "i/task.run"
+js = {factory="i/task._provider_runner", arguments=["seed"]}
+nodejs = {factory="i/task._provider_runner", arguments=["seed"]}
+native = {factory="i/task._provider_runner", arguments=["seed"]}
+wasi = {factory="i/task._provider_runner", arguments=["seed"]}
+host = {factory="i/task._provider_runner", arguments=["seed"]}
+
+[providers."i/task.Scheduler"]
+role = "scheduler"
+adapter = "i/task.run"
+js = {factory="i/task._provider_scheduler", arguments=["seed"], seed_required=true}
+nodejs = {factory="i/task._provider_scheduler", arguments=["seed"], seed_required=true}
+native = {factory="i/task._provider_scheduler", arguments=["seed"], seed_required=true}
+wasi = {factory="i/task._provider_scheduler", arguments=["seed"], seed_required=true}
+host = {factory="i/task._provider_scheduler", arguments=["seed"], seed_required=true}
+
+[provider_adapters."i/task.run"]
+supplies = ["i/task.Scheduler", "i/task.Runner", "i/request.Await", "i/request.Owner", "i/request.Root"]
+requires = ["i/task.Runner"]

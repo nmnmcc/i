@@ -46,6 +46,8 @@ pub enum Cell {
 pub struct ProviderRow {
     pub service: String,
     pub role: Role,
+    /// Distinguishes an omitted role from an explicit metadata redeclaration.
+    pub role_declared: bool,
     pub adapter: Option<String>,
     pub discriminant: BTreeMap<Target, String>,
     pub cells: BTreeMap<Target, Cell>,
@@ -277,6 +279,7 @@ pub(crate) fn rows(v: &Spanned<DeValue>, plan: &mut ProviderPlan, d: &mut Vec<Di
         let mut r = ProviderRow {
             service,
             role: Role::None,
+            role_declared: false,
             adapter: None,
             discriminant: BTreeMap::new(),
             cells: BTreeMap::new(),
@@ -288,6 +291,7 @@ pub(crate) fn rows(v: &Spanned<DeValue>, plan: &mut ProviderPlan, d: &mut Vec<Di
             let name: &str = key.get_ref().as_ref();
             match name {
                 "role" => {
+                    r.role_declared = true;
                     role_span = at(val.span());
                     if let Some(s) = string(val, d, "role") {
                         r.role = match s.as_str() {
