@@ -3619,6 +3619,56 @@ mod deep_written_type_tests {
     }
 
     #[test]
+    fn deeply_nested_row_parameters_use_an_explicit_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let variable = TyVarId(0);
+                let mut written = Type {
+                    kind: TypeKind::Fn {
+                        params: vec![],
+                        ret: Box::new(Type {
+                            kind: TypeKind::Named {
+                                ty: TypeRef::Builtin(BuiltinType::Int),
+                                args: vec![],
+                            },
+                            span: Span::default(),
+                        }),
+                        err: None,
+                        env: Some(Box::new(Type {
+                            kind: TypeKind::Var(variable),
+                            span: Span::default(),
+                        })),
+                    },
+                    span: Span::default(),
+                };
+                for _ in 0..10_000 {
+                    written = Type {
+                        kind: TypeKind::Tuple(vec![written]),
+                        span: Span::default(),
+                    };
+                }
+                let mut program = Program::default();
+                program.types.push(TypeDef {
+                    name: "A".into(),
+                    span: Span::default(),
+                    module: ModuleId(0),
+                    params: vec![("x".into(), variable)],
+                    body: TypeBody::Alias(written),
+                    exported: false,
+                    constructors_exported: false,
+                    host: None,
+                    deprecated: None,
+                });
+                assert_eq!(row_parameters(&program)[&TypeId(0)], vec![Mode::Env]);
+                std::mem::forget(program);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
     fn deeply_nested_variance_walk_uses_an_explicit_stack() {
         std::thread::Builder::new()
             .stack_size(256 * 1024)
