@@ -1304,3 +1304,33 @@ both target checks are unchanged. An initial attempt to omit main instead
 correctly produced `E0701: the WASI target needs a program entry`; that attempt
 was discarded. `cargo check -p ilang-wasm --all-targets` and the complete
 `cargo test -p ilang-wasm --locked` now pass, including all ten codegen tests.
+
+Interpretation: removing by-name service wiring means removing entry service
+construction/selection, not the existing raw request ABI's lookup of the bound
+Owner or invocation of await_owned (§9.11). Those operations consume the chosen
+ordinary values; no default service is constructed there.
+
+Final JP acceptance passed with exit status 0 on the final sources. The exact
+acceptance sequence is recorded in target/jp-acceptance-clean.sh and its log:
+
+- No PROVIDERS_PENDING or services_require_async remains under crates/.
+- Two consecutive `cargo test --workspace --locked` runs passed. Their logs
+  contain no failed test summary, panic, or error line. Both ran all 408 spec
+  cases at --opt 0 and --opt 2.
+- `timeout 60 ./target/debug/i run --project examples/io-{clock,fs,net} --opt 0`
+  produced the respective exact `clock ok`, `fs ok`, and `net ok` lines.
+- `direnv exec /home/agent/Programming/i npm test` passed all 87 tests with no
+  failures, skips or ignored tests, including the two new provider Node tests.
+
+Earlier unsuccessful cargo summaries were corrected and rerun successfully:
+`cargo test -p ilang-check --test provider_graph --locked` initially ended
+`test result: FAILED. 11 passed; 28 failed` during adapter-scheme validation.
+The initial combined core run ended
+`error: test failed, to rerun pass -p ilang-host --lib` during temporary trap
+instrumentation. Earlier workspace attempts ended with
+`error: test failed, to rerun pass -p ilang-cli --test wasi`, then
+`error: test failed, to rerun pass -p ilang-lsp --test protocol`, then
+`error: test failed, to rerun pass -p ilang-wasm --test codegen`; their causes
+and the unchanged behavioral assertions are documented above.
+
+Nothing remains unfinished for JP step 3.
