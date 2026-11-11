@@ -101,6 +101,14 @@ fn deep_conversion_and_drop_work_on_a_small_host_stack() {
             let pattern = wrapped(name("x"), || upper("Some"), 10_000);
             drop(parse_pattern(&pattern).unwrap());
             drop(pattern);
+            let quoted = datum(
+                K::Quote(Box::new(wrapped(name("x"), || name("f"), 20_000))),
+                0,
+            );
+            let copied = quoted.clone();
+            drop(parse_expression(&quoted).unwrap());
+            drop(quoted);
+            drop(copied);
         })
         .unwrap()
         .join()
@@ -147,4 +155,16 @@ fn deeply_nested_functions_mix_expression_pattern_and_type_positions() {
         .unwrap()
         .join()
         .unwrap();
+}
+
+#[test]
+fn deep_quote_splice_error_preserves_its_origin() {
+    let splice = datum(K::Splice(Box::new(name("capture"))), 77);
+    let mut body = datum(K::Round(vec![splice, name("later")]), 0);
+    for _ in 0..10_000 {
+        body = datum(K::Square(vec![body]), 0);
+    }
+    let quoted = datum(K::Quote(Box::new(body)), 0);
+    let error = parse_pattern(&quoted).unwrap_err();
+    assert_eq!(error.span, Span::new(77, 78));
 }
