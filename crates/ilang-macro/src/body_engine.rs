@@ -44,10 +44,14 @@ pub struct BodyEngine<'a> {
     pub registry: &'a Registry,
     pub source: SourceId,
     pub scoped: ScopedSource,
+    failure_scoped: Option<ScopedSource>,
+    pub(crate) phase_notes: Vec<crate::item_phase::PhaseNote>,
     pub resolver: Arc<DefinitionResolver>,
     pub transactions: Vec<Transaction>,
     cache: HashMap<(u32, String, u8), Compiled>,
     pub(crate) item_locals: Vec<Local>,
+    pub(crate) item_overrides: HashMap<Span, (Syntax, Span)>,
+    pub(crate) type_replacements: Vec<(Span, Span, ilang_host::macro_budget::MacroBudget)>,
     pub(crate) run_mark: Arc<std::sync::atomic::AtomicU64>,
     session: &'a mut Session,
 }
@@ -67,13 +71,28 @@ impl<'a> BodyEngine<'a> {
             registry,
             source,
             scoped,
+            failure_scoped: None,
+            phase_notes: Vec::new(),
             resolver,
             transactions: Vec::new(),
             cache: HashMap::new(),
             item_locals: Vec::new(),
+            item_overrides: HashMap::new(),
+            type_replacements: Vec::new(),
             run_mark: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             session,
         }
+    }
+    /// Virtual origins produced by the most recent failed item phase.
+    pub fn failed_notes(&self) -> &[crate::item_phase::PhaseNote] { &self.phase_notes }
+    pub fn failure_scoped(&self) -> Option<&ScopedSource> {
+        self.failure_scoped.as_ref()
+    }
+    pub(crate) fn save_failure_source(&mut self) {
+        self.failure_scoped = Some(self.scoped.clone());
+    }
+    pub(crate) fn clear_failure_source(&mut self) {
+        self.failure_scoped = None;
     }
     pub(crate) fn scope(&self) -> Scope {
         Scope {
@@ -298,6 +317,7 @@ impl Hook for BodyEngine<'_> {
             })
             .map_err(Error::Metered)?;
         self.transactions.extend(transactions);
+        self.type_replacements.push((ty.span, output.span, budget));
         Ok(output)
     }
     fn depth_error(&mut self, span: Span) -> Error {

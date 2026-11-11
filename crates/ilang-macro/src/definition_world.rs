@@ -58,17 +58,16 @@ struct Index {
 pub struct DefinitionWorld {
     graph: PackageGraph,
     parsed: Vec<Parsed>,
-    next_answer: AtomicU64,
+    next_answer: Arc<AtomicU64>,
     current: Mutex<Option<(u32, u64, Arc<Index>)>>,
 }
 impl DefinitionWorld {
     pub fn new(graph: &PackageGraph, parsed: &[Parsed]) -> Self {
-        Self {
-            graph: graph.clone(),
-            parsed: parsed.to_vec(),
-            next_answer: AtomicU64::new(0),
-            current: Mutex::new(None),
-        }
+        Self::new_shared(graph, parsed, Arc::new(AtomicU64::new(0)))
+    }
+    /// All modules in one project share the same answer identity allocator.
+    pub fn new_shared(graph: &PackageGraph, parsed: &[Parsed], next_answer: Arc<AtomicU64>) -> Self {
+        Self { graph: graph.clone(), parsed: parsed.to_vec(), next_answer, current: Mutex::new(None) }
     }
     fn answer_id(&self) -> u64 {
         self.next_answer
@@ -180,7 +179,20 @@ impl DefinitionWorld {
                             .exports
                             .iter()
                             .any(|e| e.name.name == binder.name && e.constructors);
-                    let definition = if scoped.is_some_and(|s| s.is_generated(item.span)) {
+                    let definition = if current && snapshot.item_overrides.contains_key(&item.span)
+                    {
+                        let syntax = &snapshot.item_overrides[&item.span].0;
+                        let syntax = ilang_syntax::lisp::definitions::expanded_definition(
+                            syntax,
+                            TEMPLATE_ANSWER,
+                        )
+                        .expect("expanded type item remains valid");
+                        Definition::Expanded {
+                            syntax,
+                            parameter_answer: Some(TEMPLATE_ANSWER),
+                            ready,
+                        }
+                    } else if scoped.is_some_and(|s| s.is_generated(item.span)) {
                         let syntax = scoped
                             .and_then(|s| s.origin(item.span))
                             .expect("generated type item retains its origin")
@@ -316,6 +328,9 @@ fn resolution(reply: DefinitionReply, audit: Option<DefinitionIdentity>) -> Reso
 }
 
 impl Definitions for DefinitionWorld {
+    fn fresh_answer(&self) -> u64 {
+        self.answer_id()
+    }
     fn prepare(&self, snapshot: &Snapshot) {
         let index = Arc::new(self.build(snapshot));
         *self.current.lock().expect("definition index lock poisoned") =

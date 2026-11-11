@@ -15,6 +15,16 @@ use crate::run::{MacroProgram, RunOutcome};
 pub struct Transaction {
     pub notes: Vec<String>,
     pub requests: Vec<ItemRequest>,
+    /// Filled by the item driver after the entire result validates.
+    pub item_origin: Option<ItemOrigin>,
+    /// Unique invocation mark, used to discard only a run invalidated by audit.
+    pub mark: u64,
+}
+#[derive(Clone, Debug)]
+pub struct ItemOrigin {
+    pub source: u32,
+    pub call: ilang_syntax::span::Span,
+    pub path: Vec<u32>,
 }
 
 pub struct Expanded {
@@ -112,9 +122,15 @@ impl Session {
                 ilang_host::syntax::flip_output_and_requests(&syntax, &requests, mark);
             let notes = context.take_notes();
             let mut expanded = expand_result(self, syntax, &budget)?;
-            expanded
-                .transactions
-                .insert(0, Transaction { notes, requests });
+            expanded.transactions.insert(
+                0,
+                Transaction {
+                    notes,
+                    requests,
+                    item_origin: None,
+                    mark,
+                },
+            );
             Ok(expanded)
         })();
         self.depth -= 1;

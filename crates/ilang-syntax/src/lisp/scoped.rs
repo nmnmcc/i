@@ -41,6 +41,7 @@ pub struct ScopedSource {
     original_len: u32,
     spans: HashMap<Span, Origin>,
     starts: HashMap<u32, Origin>,
+    children: HashMap<Span, Vec<Span>>,
 }
 
 impl ScopedSource {
@@ -51,6 +52,7 @@ impl ScopedSource {
             original_len,
             spans: HashMap::new(),
             starts: HashMap::new(),
+            children: HashMap::new(),
         }
     }
     pub fn text(&self) -> &str {
@@ -67,6 +69,85 @@ impl ScopedSource {
     }
     pub fn is_generated(&self, span: Span) -> bool {
         span.start > self.original_len
+    }
+    /// Occurrence span of a child in an appended syntax tree.
+    pub fn child_span(&self, parent: Span, index: usize) -> Option<Span> {
+        self.children.get(&parent)?.get(index).copied()
+    }
+
+    /// Rebuild a previously encoded item after type expansions. Replacement
+    /// spans are occurrence spans, not the original nodes' source spans: two
+    /// splices of one Syntax may expand independently. Each replacement target
+    /// names the virtual root produced by the corresponding expansion.
+    pub fn rewrite_occurrences(
+        &self,
+        root: &Syntax,
+        root_span: Span,
+        replacements: &[(Span, Span)],
+    ) -> Syntax {
+        enum Task {
+            Enter(Syntax, Span),
+            Finish(Syntax, usize, bool),
+        }
+        let replacements: HashMap<Span, Span> = replacements.iter().copied().collect();
+        let mut tasks = vec![Task::Enter(root.clone(), root_span)];
+        let mut values: Vec<(Syntax, bool)> = Vec::new();
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Enter(mut node, mut span) => {
+                    let mut replaced = false;
+                    let mut transitions = 0;
+                    while let Some(&target) = replacements.get(&span) {
+                        transitions += 1;
+                        assert!(
+                            transitions <= replacements.len(),
+                            "cyclic type expansion replacements"
+                        );
+                        span = target;
+                        node = self
+                            .origin(span)
+                            .expect("expanded type has an origin")
+                            .syntax
+                            .clone();
+                        replaced = true;
+                    }
+                    let nodes: Vec<Syntax> = match node.node() {
+                        Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                            xs.clone()
+                        }
+                        Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => vec![x.clone()],
+                        _ => Vec::new(),
+                    };
+                    if nodes.is_empty() {
+                        values.push((node, replaced));
+                        continue;
+                    }
+                    let spans = self
+                        .children
+                        .get(&span)
+                        .cloned()
+                        .unwrap_or_else(|| nodes.iter().map(Syntax::span).collect());
+                    assert_eq!(nodes.len(), spans.len(), "origin children match syntax");
+                    tasks.push(Task::Finish(node, nodes.len(), replaced));
+                    for (child, span) in nodes.into_iter().zip(spans).rev() {
+                        tasks.push(Task::Enter(child, span));
+                    }
+                }
+                Task::Finish(node, count, replaced) => {
+                    let children = values.split_off(values.len() - count);
+                    let changed = children.iter().any(|(_, changed)| *changed);
+                    let result = if changed {
+                        node.replace_children(
+                            children.into_iter().map(|(child, _)| child).collect(),
+                        )
+                    } else {
+                        node
+                    };
+                    values.push((result, changed || replaced));
+                }
+            }
+        }
+        values.pop().expect("one rewritten syntax root").0
     }
 
     fn position(&self) -> u32 {
@@ -201,6 +282,7 @@ impl ScopedSource {
                 } => {
                     self.text.push_str(close);
                     let children = built.split_off(built.len() - count);
+                    let child_spans = children.iter().map(|child| child.span).collect();
                     let kind = match current.node() {
                         Node::Round(_) => DatumKind::Round(children),
                         Node::Square(_) => DatumKind::Square(children),
@@ -220,6 +302,7 @@ impl ScopedSource {
                     };
                     let span = Span::new(start, self.position());
                     self.record(span, current, call_site, owner);
+                    self.children.insert(span, child_spans);
                     built.push(Datum {
                         kind,
                         span,
@@ -367,6 +450,36 @@ mod tests {
             .unwrap()
             .join()
             .unwrap();
+    }
+
+    #[test]
+    fn rewriting_one_duplicate_occurrence_preserves_the_other() {
+        let scope = Scope {
+            module: 0,
+            marks: BTreeSet::new(),
+        };
+        let parsed = crate::lisp::parse("(Pair X X)").unwrap();
+        let original = Syntax::from_datum(&parsed[0], &scope);
+        let Node::Round(parts) = original.node() else {
+            panic!("round");
+        };
+        let shared = parts[1].clone();
+        let root =
+            original.replace_children(vec![parts[0].clone(), shared.clone(), shared.clone()]);
+        let replacement = Syntax::from_datum(&crate::lisp::parse("Int").unwrap()[0], &scope);
+        let mut source = ScopedSource::new(String::new());
+        let datum = source.append(&root, &root);
+        let DatumKind::Round(children) = &datum.kind else {
+            panic!("round");
+        };
+        let old = children[1].span;
+        let target = source.append(&replacement, &root).span;
+        let rewritten = source.rewrite_occurrences(&root, datum.span, &[(old, target)]);
+        assert_eq!(rewritten.show(), "(Pair Int X)");
+        let Node::Round(parts) = rewritten.node() else {
+            panic!("round");
+        };
+        assert!(parts[2].identical(&shared));
     }
 
     #[test]

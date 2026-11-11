@@ -402,3 +402,51 @@ pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
     }
     Ok(item.with_node(Node::Round(result)).as_answer())
 }
+
+/// Freshen repeated copies of a query-provided definition head within one
+/// item result. The caller supplies globally fresh answer identities.
+pub fn freshen_duplicate_heads(result: &Syntax, mut fresh: impl FnMut() -> u64) -> Syntax {
+    use std::collections::HashSet;
+    fn owner(item: &Syntax) -> Option<u64> {
+        let Node::Round(parts) = item.node() else {
+            return None;
+        };
+        match parts.as_slice() {
+            [marker, _, inner] if matches!(marker.node(), Node::Symbol(s) if s == "@") => {
+                owner(inner)
+            }
+            [head, body] if matches!(body.node(), Node::Curly(_)) => head.definition_head(),
+            [marker, head, _] if matches!(marker.node(), Node::Symbol(s) if s == "=") => {
+                head.definition_head()
+            }
+            _ => None,
+        }
+    }
+    let items: Vec<_> = match result.node() {
+        Node::Curly(items) => items.clone(),
+        _ => vec![result.clone()],
+    };
+    let mut reserved: HashSet<_> = items.iter().filter_map(owner).collect();
+    let mut seen = HashSet::new();
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        let Some(id) = owner(&item) else {
+            out.push(item);
+            continue;
+        };
+        if seen.insert(id) {
+            out.push(item);
+            continue;
+        }
+        let next = fresh();
+        assert!(
+            reserved.insert(next),
+            "definition answer identity must be fresh"
+        );
+        out.push(freshen_parameters(&item, id, next));
+    }
+    match result.node() {
+        Node::Curly(_) => result.replace_children(out),
+        _ => out.pop().expect("a single item result is present"),
+    }
+}
