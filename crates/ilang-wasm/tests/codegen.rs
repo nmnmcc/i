@@ -237,7 +237,9 @@ fn environments() {
     assert_ne!(slot, 0, "Clock and Assert have different slots");
     let g = function(&text, "app/main.g");
     assert!(
-        g.contains(&format!("(call $env_with (local.get $env) (i32.const {slot})")),
+        g.contains(&format!(
+            "(call $env_with (local.get $env) (i32.const {slot})"
+        )),
         "{g}"
     );
     assert!(g.contains("(return_call $f"), "{g}");

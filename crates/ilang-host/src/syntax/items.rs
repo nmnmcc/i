@@ -72,7 +72,9 @@ impl Drop for MetadataLink {
     fn drop(&mut self) {
         let mut next = self.previous.take();
         while let Some(mut link) = next {
-            let Some(unique) = Arc::get_mut(&mut link) else { break };
+            let Some(unique) = Arc::get_mut(&mut link) else {
+                break;
+            };
             next = unique.previous.take();
         }
     }
@@ -328,16 +330,23 @@ mod tests {
 
     #[test]
     fn long_metadata_tail_drops_on_a_small_stack() {
-        std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
-            let mut list = None;
-            for _ in 0..50_000 {
-                list = Some(Arc::new(MetadataLink {
-                    key: String::new(), value: String::new(), previous: list,
-                }));
-            }
-            let shared = list.clone();
-            drop(list);
-            drop(shared);
-        }).unwrap().join().unwrap();
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut list = None;
+                for _ in 0..50_000 {
+                    list = Some(Arc::new(MetadataLink {
+                        key: String::new(),
+                        value: String::new(),
+                        previous: list,
+                    }));
+                }
+                let shared = list.clone();
+                drop(list);
+                drop(shared);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 }

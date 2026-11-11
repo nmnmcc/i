@@ -19,7 +19,9 @@ impl Drop for Link {
     fn drop(&mut self) {
         let mut next = self.previous.take();
         while let Some(mut link) = next {
-            let Some(unique) = Arc::get_mut(&mut link) else { break };
+            let Some(unique) = Arc::get_mut(&mut link) else {
+                break;
+            };
             next = unique.previous.take();
         }
     }
@@ -733,17 +735,31 @@ mod tests {
 
     #[test]
     fn long_syntax_list_drops_on_a_small_stack() {
-        std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
-            let parsed = parse("x").unwrap();
-            let value = Syntax::from_datum(&parsed[0], &Scope { module: 0, marks: BTreeSet::new() });
-            let mut list = None;
-            for _ in 0..50_000 {
-                list = Some(Arc::new(Link { value: value.clone(), previous: list }));
-            }
-            let shared = list.clone();
-            drop(list);
-            drop(shared);
-        }).unwrap().join().unwrap();
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let parsed = parse("x").unwrap();
+                let value = Syntax::from_datum(
+                    &parsed[0],
+                    &Scope {
+                        module: 0,
+                        marks: BTreeSet::new(),
+                    },
+                );
+                let mut list = None;
+                for _ in 0..50_000 {
+                    list = Some(Arc::new(Link {
+                        value: value.clone(),
+                        previous: list,
+                    }));
+                }
+                let shared = list.clone();
+                drop(list);
+                drop(shared);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 
     #[test]
