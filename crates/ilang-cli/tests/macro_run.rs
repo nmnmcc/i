@@ -1938,3 +1938,20 @@ fn cli_nested_macro_stop_preserves_outer_call_and_templates() {
         "{stderr}"
     );
 }
+
+#[test]
+fn collection_manifest_from_a_real_item_macro() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (c x (! it (. syntax Items))) _ { ((. it add) c x [] x) `(= ~x (-> () _ { 42 })) })))\n").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "(m = app/macros)\n(anchor)\nanchor = Nil\nm.emit(anchor, generated)\n").unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let expanded = ilang_macro::project::expand(&mut graph).unwrap_or_else(|d| panic!("{d:?}"));
+    let checked = ilang_check::check_parsed(&graph, &expanded.parsed);
+    assert!(checked.diags.iter().all(|d| !d.is_error()), "{:?}", checked.diags);
+    let entries = ilang_macro::collections::resolve(&expanded.parsed, checked.program.as_ref().unwrap(), checked.types.as_ref().unwrap(), &expanded.transactions).unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(checked.program.as_ref().unwrap().def(entries[0].target).name, "generated");
+}
