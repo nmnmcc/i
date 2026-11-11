@@ -1,6 +1,6 @@
 //! Span-based first-surface migration. Source between edits stays untouched.
 use ilang_syntax::{
-    ast::*, lexer::lex, parser::parse_module_legacy, span::Span, token::TokenKind as T,
+    ast::*, lexer::lex, parser_legacy::parse_module_legacy, span::Span, token::TokenKind as T,
 };
 use serde_json::{Value, json};
 use std::io::{self, BufRead};

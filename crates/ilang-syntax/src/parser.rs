@@ -36,29 +36,23 @@ pub struct ParseStats {
 /// far as the source allows; the diagnostics say what was wrong, sorted by
 /// position.
 pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
-    let (module, diags, _) = run(source, true, false);
+    let (module, diags, _) = run(source, true);
     (module, diags)
 }
 
 #[doc(hidden)]
 pub fn parse_stats(source: &str) -> ParseStats {
-    run(source, true, false).2
+    run(source, true).2
 }
 
 /// Parses without reusing brace decisions, for the cache equivalence test.
 #[doc(hidden)]
 pub fn parse_module_uncached(source: &str) -> (Module, Vec<Diagnostic>) {
-    let (module, diags, _) = run(source, false, false);
+    let (module, diags, _) = run(source, false);
     (module, diags)
 }
 
-/// The frozen first-surface reader, used only for migration and comparison.
-pub fn parse_module_legacy(source: &str) -> (Module, Vec<Diagnostic>) {
-    let (module, diagnostics, _) = run(source, true, true);
-    (module, diagnostics)
-}
-
-fn run(source: &str, cache: bool, legacy: bool) -> (Module, Vec<Diagnostic>, ParseStats) {
+fn run(source: &str, cache: bool) -> (Module, Vec<Diagnostic>, ParseStats) {
     let lexed = lex(source);
     let mut parser = Parser {
         toks: &lexed.tokens,
@@ -72,8 +66,6 @@ fn run(source: &str, cache: bool, legacy: bool) -> (Module, Vec<Diagnostic>, Par
         decisions: 0,
         tuple_type: false,
         cache,
-        legacy,
-        old_empty: legacy,
         clause_head: false,
     };
     let module = parser.module();
@@ -118,8 +110,6 @@ struct Parser<'a> {
     /// clause (§7.1).
     tuple_type: bool,
     cache: bool,
-    legacy: bool,
-    old_empty: bool,
     clause_head: bool,
 }
 
@@ -1198,8 +1188,7 @@ impl Parser<'_> {
                 Brace::Block => ExprKind::Block(self.block()?),
                 Brace::Clauses => ExprKind::Clauses(self.clauses()?),
                 Brace::Record => {
-                    self.bump();
-                    self.record_expr(T::RBrace)?
+                    return self.error("a block or clause block; record fields use `( )`");
                 }
             },
             _ => return self.error("an expression"),
@@ -1258,10 +1247,6 @@ impl Parser<'_> {
 
     fn type_datum(&mut self) -> PResult<TypeKind> {
         if self.at(&T::RParen) {
-            if self.old_empty {
-                self.bump();
-                return Ok(TypeKind::Tuple(Vec::new()));
-            }
             return self
                 .error("`Record` for all records, or `Nil` for a unit type; `()` is not a type");
         }
@@ -1282,8 +1267,6 @@ impl Parser<'_> {
         self.bump();
         let kind = if is_fn {
             ExprKind::Fn(Box::new(self.function()?))
-        } else if self.legacy && self.eat(&T::RParen) {
-            ExprKind::Tuple(Vec::new())
         } else if self.eat(&T::RParen) {
             ExprKind::Record {
                 base: None,
@@ -1659,14 +1642,14 @@ impl Parser<'_> {
             }
             T::LParen => {
                 self.bump();
-                if !self.old_empty && self.at(&T::RParen) {
+                if self.at(&T::RParen) {
                     return Err(Diagnostic::new(
                         Code::BadPattern,
                         self.tok().span,
                         "the empty tuple pattern is removed; use `Nil` for a unit pattern, or a binder/discard for a record",
                     ));
                 }
-                PatternKind::Tuple(self.seq(T::RParen, self.old_empty, Self::pattern)?)
+                PatternKind::Tuple(self.seq(T::RParen, false, Self::pattern)?)
             }
             T::LBracket => self.list_pattern()?,
             T::LtLt => {
@@ -1793,7 +1776,7 @@ impl Parser<'_> {
     #[allow(clippy::type_complexity)]
     fn arrow_tail(&mut self) -> PResult<(TypeExpr, Option<TypeExpr>, Option<TypeExpr>)> {
         let value = self.ty()?;
-        let err = if self.eat(&T::Caret) || (!self.clause_head && self.eat(&T::Question)) {
+        let err = if self.eat(&T::Caret) {
             Some(self.ty()?)
         } else {
             None
@@ -1805,10 +1788,7 @@ impl Parser<'_> {
             None
         };
         // §3: this `->` is the nearest one, and it has taken what it can.
-        if self.at(&T::Caret)
-            || (!self.clause_head && self.at(&T::Question))
-            || self.at_joined(&T::Bang)
-        {
+        if self.at(&T::Caret) || self.at_joined(&T::Bang) {
             let msg = format!(
                 "the nearest `->` cannot take this {}: it already has one, or `!` came first; put the inner function type in `{{ }}`",
                 self.kind()
@@ -1925,31 +1905,6 @@ impl Parser<'_> {
             }
             T::LBrace => {
                 self.bump();
-                if self.at(&T::DotDot) && *self.nth(1) == T::RBrace {
-                    self.bump();
-                    self.bump();
-                    return Ok(TypeExpr {
-                        kind: TypeKind::Named {
-                            module: None,
-                            name: Ident {
-                                name: "Record".into(),
-                                span: self.span_from(start),
-                            },
-                            args: Vec::new(),
-                        },
-                        span: self.span_from(start),
-                    });
-                }
-                if self.at(&T::DotDot)
-                    || matches!(self.kind(), T::Name(_) | T::UpName(_) | T::Str(_))
-                        && *self.nth(1) == T::Colon
-                {
-                    let kind = self.record_type(T::RBrace)?;
-                    return Ok(TypeExpr {
-                        kind,
-                        span: self.span_from(start),
-                    });
-                }
                 let inner = self.nested(Self::ty)?;
                 if self.tok().brk {
                     let msg = "a line break directly inside a `{ }` that groups a type is a compile error";

@@ -620,10 +620,8 @@ impl<'a> Resolver<'a> {
                 .module
                 .as_ref()
                 .map_or_else(|| format!("@{name}"), |m| format!("@{}.{name}", m.name));
-            if a.module.is_some()
-                || !matches!(name, "external" | "host" | "main" | "test" | "deprecated")
-            {
-                self.error(code::UNKNOWN_ATTRIBUTE, a.span, format!("the attribute `{written}` is kept for macros; the built-in attributes are `@external`, `@host`, `@main`, `@test`, and `@deprecated`"));
+            if a.module.is_some() || !matches!(name, "external" | "host" | "test" | "deprecated") {
+                self.error(code::UNKNOWN_ATTRIBUTE, a.span, format!("the attribute `{written}` is kept for macros; the built-in attributes are `@external`, `@host`, `@test`, and `@deprecated`"));
                 continue;
             }
             if !seen.insert(name) {

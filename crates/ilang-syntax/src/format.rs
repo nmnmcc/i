@@ -883,23 +883,6 @@ impl<'a> Formatter<'a> {
         let mut out = Vec::new();
         for a in &item.attributes {
             out.push(self.leading(a.span.start));
-            if a.module.is_none() && a.name.name == "main" {
-                let next = match &item.kind {
-                    ItemKind::TypeDef(def) => def.name.span.start,
-                    ItemKind::Binding(b) => b.span.start,
-                    ItemKind::Declaration { name, .. } => name.span.start,
-                    ItemKind::MacroItem { module, name, .. } => {
-                        module.as_ref().unwrap_or(name).span.start
-                    }
-                };
-                if self.peek().is_some_and(|c| {
-                    c.span.start < next && self.trails(a.span.end, c.span.start)
-                }) {
-                    out.push(self.take());
-                    out.push(self.hard());
-                }
-                continue;
-            }
             match &a.module {
                 Some(m) => out.push(text(format!("@{}.{}", m.name, a.name.name))),
                 None => out.push(text(format!("@{}", a.name.name))),
