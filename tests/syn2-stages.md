@@ -17,8 +17,6 @@ The sentence “main functions and [entries] of dependency packages have no
 effect” restricts all discovery and declaration checking to the root package.
 Duplicate binding names and TOML keys replace the old attribute-count error.
 
-Ruling c requires groups around every whole binary/unary match subject.
-Ruling d preserves numeric lexing; printers prefer { 1 }.{ ... }.
 Ruling f explicitly removes empty tuples: reviewed replacements use Nil;
 record forms remain reserved for T3 until its consumers land.
 Ruling g requires ordinary shadowable Record lookup. No generated code in
@@ -102,23 +100,6 @@ in stress-nested-50 test2; it was moved to target/syn2/stage1-stress-actual.json
 No policy, limit, lockfile, global environment or reference tree changed.
 # SYN2 implementation notes
 
-The new surface uses postfix match, `|` for pipe and `^` for an error type.
-The default entry is `src/main.i`'s `main`; `[entries]` selects other
-functions. During migration the parser still accepts the first surface.
-`// syntax: syn1` resolves empty-tuple collisions in old fixtures; it is removed
-when those fixtures migrate. Empty tuples require an explicit semantic rewrite.
-
-Record syntax is reserved pending T3: this branch does not invent an AST for
-records. T3 owns the record expression and type nodes and their semantics;
-the parenthesised surface must construct those same nodes when T3 lands. A
-record and a tuple are distinguished by labels or spread, rather than a
-trailing comma, and an empty record is `()`.
-
-Prior art: Rust `compiler/rustc_parse/src/parser/expr.rs`,
-`parse_dot_suffix_expr` and `parse_dot_suffix`, parse postfix operators in the
-same loop as field access and calls, before binary operators. SYN2 similarly
-parses `.{` in the postfix loop. The migration tool follows the source-span
-approach: it parses the old tree, edits only operator and attribute spans,
-retains comments, and groups a compound subject before a postfix match. Its
-repository scan reports unresolved empty tuples and entry declarations for
-manual handling.
+The pipe remains `|>` and a match remains a pipe into a clause block.
+The new error marker is `^`; the default entry is `src/main.i`'s `main`,
+with other entries declared in `[entries]`. Record nodes come from T3.

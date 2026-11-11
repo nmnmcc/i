@@ -1227,18 +1227,12 @@ impl<'a> Formatter<'a> {
             ExprKind::Block(b) => self.block(b, false),
             ExprKind::Fn(func) => self.function(func, span.start),
             ExprKind::Case { subject, clauses } => {
-                let subject_doc = if matches!(subject.kind, ExprKind::Int(_) | ExprKind::Float(_)) {
-                    group_of(
-                        Kind::Block,
-                        cat(vec![text("{ "), self.expr(subject, 0), text(" }")]),
-                    )
-                } else {
-                    self.expr(subject, 10)
-                };
-                let op = self.tok_after(subject.span.end);
-                let open = self.tok_after(op.span.end).span.start;
+                // §6.9: `|>` is stronger than the operators of levels 1 to 5.
+                let subject_doc = self.expr(subject, 6);
+                let open = self.tok_after(subject.span.end);
+                let open = self.tok_after(open.span.end).span.start;
                 let body = self.clause_block(open, span.end - 1, clauses);
-                cat(vec![subject_doc, text("."), body])
+                cat(vec![subject_doc, text(" |> "), body])
             }
             ExprKind::Clauses(clauses) => self.clause_block(span.start, span.end - 1, clauses),
             ExprKind::Call { callee, args } => {
@@ -1349,7 +1343,7 @@ impl<'a> Formatter<'a> {
                     tail.push(self.force());
                 }
                 tail.push(Doc::Line);
-                tail.push(text("| "));
+                tail.push(text("|> "));
             } else if let Some(c) = comments {
                 tail.push(text(format!(" {}", op.text())));
                 tail.push(c);

@@ -224,7 +224,7 @@ impl BinOp {
             GtFloat => ">.",
             GtEqFloat => ">=.",
             Concat => "<>",
-            Pipe => "|",
+            Pipe => "|>",
             Add => "+",
             Sub => "-",
             AddFloat => "+.",

@@ -594,14 +594,9 @@ impl Printer {
             ExprKind::Block(b) => self.block(b),
             ExprKind::Fn(f) => self.function(f),
             ExprKind::Case { subject, clauses } => {
-                if matches!(subject.kind, ExprKind::Int(_) | ExprKind::Float(_)) {
-                    self.w("{ ");
-                    self.expr(subject, 0);
-                    self.w(" }");
-                } else {
-                    self.expr(subject, 10);
-                }
-                self.w(".");
+                // §6.9: `|>` is stronger than the operators of levels 1 to 5.
+                self.expr(subject, 6);
+                self.w(" |> ");
                 self.clauses(clauses);
             }
             ExprKind::Clauses(clauses) => self.clauses(clauses),

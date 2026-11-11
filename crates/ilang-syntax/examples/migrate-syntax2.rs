@@ -19,6 +19,15 @@ impl<'a> Migrator<'a> {
     fn mark_empty(&mut self, span: Span, kind: &str) {
         self.empty.push(format!("{kind} at byte {}", span.start));
     }
+    fn record_delimiters(&mut self, span: Span) {
+        let start = span.start as usize;
+        let end = span.end as usize;
+        if self.src.as_bytes()[start] == b'{' {
+            self.edit(Span::new(span.start, span.start + 1), "(");
+            self.edit(Span::new(span.end - 1, span.end), ")");
+        }
+        assert!(end > start, "record span must not be empty");
+    }
     fn error(&mut self, value: &TypeExpr, err: &TypeExpr) {
         let start = value.span.end as usize;
         let end = err.span.start as usize;
@@ -36,6 +45,11 @@ impl<'a> Migrator<'a> {
     }
     fn ty(&mut self, t: &TypeExpr) {
         match &t.kind {
+            TypeKind::Record { base, fields, .. } => {
+                self.record_delimiters(t.span);
+                if let Some(base) = base { self.ty(base); }
+                for (_, field) in fields { self.ty(field); }
+            }
             TypeKind::Tuple(xs) => {
                 if xs.is_empty() {
                     self.mark_empty(t.span, "empty tuple type");
@@ -138,6 +152,11 @@ impl<'a> Migrator<'a> {
     }
     fn expr(&mut self, e: &Expr) {
         match &e.kind {
+            ExprKind::Record { base, fields } => {
+                self.record_delimiters(e.span);
+                if let Some(base) = base { self.expr(base); }
+                for (_, field) in fields { self.expr(field); }
+            }
             ExprKind::Tuple(xs) => {
                 if xs.is_empty() {
                     self.mark_empty(e.span, "empty tuple expression");
@@ -187,30 +206,7 @@ impl<'a> Migrator<'a> {
             ExprKind::Case { subject, clauses } => {
                 self.expr(subject);
                 self.clauses(clauses);
-                let start = subject.span.end as usize;
-                let end = e.span.end as usize;
-                if let Some(t) = lex(&self.src[start..end])
-                    .tokens
-                    .into_iter()
-                    .next()
-                    .filter(|t| t.kind == T::PipeGt)
-                {
-                    self.edit(
-                        Span::new(start as u32 + t.span.start, start as u32 + t.span.end),
-                        ".",
-                    );
-                    self.counts[0] += 1;
-                    if matches!(
-                        subject.kind,
-                        ExprKind::Binary { .. }
-                            | ExprKind::Unary { .. }
-                            | ExprKind::Int(_)
-                            | ExprKind::Float(_)
-                    ) {
-                        self.edit(Span::new(subject.span.start, subject.span.start), "{ ");
-                        self.edit(Span::new(subject.span.end, subject.span.end), " }");
-                    }
-                }
+
             }
             ExprKind::Clauses(cs) => self.clauses(cs),
             ExprKind::Call { callee, args } => {
@@ -234,24 +230,9 @@ impl<'a> Migrator<'a> {
                 }
             }
             ExprKind::Unary { expr, .. } => self.expr(expr),
-            ExprKind::Binary { op, lhs, rhs } => {
+            ExprKind::Binary { lhs, rhs, .. } => {
                 self.expr(lhs);
                 self.expr(rhs);
-                if *op == BinOp::Pipe {
-                    let start = lhs.span.end as usize;
-                    let end = rhs.span.start as usize;
-                    if let Some(t) = lex(&self.src[start..end])
-                        .tokens
-                        .into_iter()
-                        .find(|t| t.kind == T::PipeGt)
-                    {
-                        self.edit(
-                            Span::new(start as u32 + t.span.start, start as u32 + t.span.end),
-                            "|",
-                        );
-                        self.counts[1] += 1;
-                    }
-                }
             }
             _ => {}
         }
@@ -360,13 +341,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn migrates_old_pipe_inside_new_match_without_rewriting_outer_dot() {
-        let source = "result = x.{ _ -> y |> f }";
-        let result = migrate(source);
-        assert_eq!(result["diagnostics"], json!([]));
-        assert_eq!(result["source"], "result = x.{ _ -> y | f }");
-    }
+
 
     #[test]
     fn preserves_comments_and_tree_and_is_idempotent() {

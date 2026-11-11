@@ -154,8 +154,8 @@ In the tables, `e` is an expression, `p` a pattern, `T` a type, `x` and `a` a na
 | Literal | `1`, `1.5`, `"a"` | `1`, `1.5`, `"a"` |
 | Name, member of a module | `x`, `C`, `a.x` | `x`, `C`, `(. a x)` |
 | Call | `f(e1, x: e2)`, `f()` | `(f e1 (: x e2))`, `(f)` |
-| Pipe | `x \| f` | `(\| x f)` |
-| Match | `x.{ p -> e }` | `(. x { (-> p e) })` |
+| Pipe | `x \|> f` | `(\|> x f)` |
+| Match | `x |> { p -> e }` | `(. x { (-> p e) })` |
 | Binary operator | `e1 + e2` | `(+ e1 e2)` |
 | Unary operator | `-e`, `-.e` | `(- e)`, `(-. e)` |
 | Field, tuple part | `e.x`, `e.0` | `(. e x)`, `(. e 0)` |

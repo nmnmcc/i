@@ -168,6 +168,17 @@ def main():
         build()
     selected = [str(Path(p)) for p in args.paths]
     items = [item for item in EXTRACT.snippets() if args.repo or any(item['path'] == p or item['path'].startswith(p.rstrip('/') + '/') for p in selected)]
+    known = {item['path'] for item in items if item['kind'] == 'file'}
+    for selected_path in selected:
+        path = Path(selected_path)
+        files = path.rglob('*.i') if path.is_dir() else [path]
+        for file in files:
+            name = str(file)
+            if file.suffix == '.i' and file.is_file() and name not in known:
+                source = file.read_bytes().decode()
+                items.append({'path': name, 'kind': 'file', 'host': source,
+                              'source': source, 'start': 0, 'end': len(source), 'line': 1})
+                known.add(name)
     if not items:
         parser.error('name source files/directories, or use --repo')
     results = migrate_many([item['host'] if item['kind'] == 'file' else item['source'] for item in items])
@@ -192,7 +203,7 @@ def main():
         if declaration:
             path, target = declaration
             name = add_entry(path, target) if args.write else '(pending)'
-            report['entries'].append({'manifest': str(path.relative_to(ROOT)), 'name': name, 'target': target, 'command': '--entry ' + name})
+            report['entries'].append({'manifest': str(path), 'name': name, 'target': target, 'command': '--entry ' + name})
         area = item['path'].split('/')[0]
         counts = report['areas'].setdefault(area, [0, 0, 0, 0])
         for i, count in enumerate(result['counts']):
