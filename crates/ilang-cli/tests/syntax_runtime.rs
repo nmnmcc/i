@@ -84,15 +84,15 @@ fn syntax_library_round_trips_through_the_host() {
 @external("test:syntax", "source")
 source: () -> syntax.Syntax
 @test
-exercise = () -> Nil ^ syntax.SyntaxError ! Assert {
+exercise = () -> Nil ? syntax.SyntaxError ! Assert {
   value = source()
   assert(source() == value)
   ! syntax.Definitions = syntax.Definitions((of) { of })
   assert(syntax.definition(value) == value)
   assert(syntax.show(value) == "(f x)")
-  syntax.node(value).{
+  syntax.node(value) |> {
     syntax.Round([first, second]) -> {
-      syntax.node(value).{
+      syntax.node(value) |> {
         syntax.Round([again, _]) -> assert(first == again)
         _ -> panic("unexpected syntax node")
       }
@@ -107,7 +107,7 @@ exercise = () -> Nil ^ syntax.SyntaxError ! Assert {
   assert(syntax.show_as(made, syntax.Expression) == "made")
   pair = syntax.make(syntax.Round([made, value]), value)
   assert(syntax.show(pair) == "(made (f x))")
-  fail.catch(() { syntax.make(syntax.Name("Bad Name"), value) }).{
+  fail.catch(() { syntax.make(syntax.Name("Bad Name"), value) }) |> {
     Error(syntax.SyntaxError(message, at)) -> {
       assert(message != "")
       assert(syntax.same_code(at, value))
@@ -116,7 +116,7 @@ exercise = () -> Nil ^ syntax.SyntaxError ! Assert {
   }
   comma = syntax.make(syntax.Symbol(","), value)
   bad = syntax.make(syntax.Round([comma]), value)
-  fail.catch(() { syntax.show_as(bad, syntax.Expression) }).{
+  fail.catch(() { syntax.show_as(bad, syntax.Expression) }) |> {
     Error(syntax.SyntaxError(message, at)) -> {
       assert(message != "")
       assert(syntax.same_code(at, bad))
@@ -233,7 +233,7 @@ show = () { syntax.show(source()) }
 (syntax = i/syntax)
 @external("test:syntax", "source")
 source: () -> syntax.Syntax
-main = () -> Nil ^ syntax.SyntaxError {
+main = () -> Nil ? syntax.SyntaxError {
   ! syntax.Definitions = syntax.Definitions((s) { s })
   syntax.definition(source())
   Nil
@@ -326,10 +326,10 @@ fn compiler_templates_rebuild_through_wasm() {
         r#"
 (syntax = i/syntax)
 make_many = (value: syntax.Syntax, n: Int, acc: List(syntax.Syntax)) -> List(syntax.Syntax) {
-  n.{ 0 -> acc _ -> make_many(value, n - 1, [value, ..acc]) }
+  n |> { 0 -> acc _ -> make_many(value, n - 1, [value, ..acc]) }
 }
 count = (items: List(syntax.Syntax), n: Int) -> Int {
-  items.{ [] -> n [_, ..rest] -> count(rest, n + 1) }
+  items |> { [] -> n [_, ..rest] -> count(rest, n + 1) }
 }
 @test
 exercise = () {
@@ -341,7 +341,7 @@ exercise = () {
   assert(syntax.show(syntax._rebuild(template, combined)) == "(f y f)")
   assert(count(syntax._append(make_many(first, 3000, []), [replacement]), 0) == 3001)
   assert(syntax.show(result) == "(f y)")
-  syntax.node(result).{
+  syntax.node(result) |> {
     syntax.Round([_, child]) -> assert(child == replacement)
     _ -> panic("unexpected template")
   }
@@ -400,7 +400,7 @@ exercise = () {
   matched = syntax._match(pattern, input)
   assert(syntax._match_ok(matched))
   assert(syntax.show(syntax._match_one(matched, 0)) == "x")
-  syntax._match_many(matched, 1).{
+  syntax._match_many(matched, 1) |> {
     [a, b] -> {
       assert(syntax.show(a) == "y")
       assert(syntax.show(b) == "z")
@@ -455,7 +455,7 @@ fn compiler_definition_service_returns_and_aborts_at_the_query() {
         r#"
 (i/fail, syntax = i/syntax)
 @test
-answer = () -> Nil ^ syntax.SyntaxError ! Assert {
+answer = () -> Nil ? syntax.SyntaxError ! Assert {
   ! syntax.Definitions = syntax._definitions()
   answer = syntax.definition(syntax._template(0))
   assert(syntax.show(answer) == "(Box {(Box Int)})")
@@ -465,7 +465,7 @@ answer = () -> Nil ^ syntax.SyntaxError ! Assert {
 catchable = () -> Nil ! Assert {
   ! syntax.Definitions = syntax._definitions()
   query = syntax._template(1)
-  fail.catch(() { syntax.definition(query) }).{
+  fail.catch(() { syntax.definition(query) }) |> {
     Error(syntax.SyntaxError(message, at)) -> {
       assert(message == "not visible")
       assert(at == query)
@@ -615,18 +615,18 @@ fn compiler_items_service_buffers_valid_requests_and_rejects_bad_ones() {
         r#"
 (i/fail, syntax = i/syntax)
 @test
-item = () -> Nil ^ syntax.SyntaxError ! Assert {
+item = () -> Nil ? syntax.SyntaxError ! Assert {
   service = syntax._items()
   collection = syntax._template(0)
   target = syntax._template(1)
   at = syntax._template(2)
   service.add(collection, target, [("group", "bench"), ("size", "large")], at)
   service.expose(target)
-  fail.catch(() { service.add(collection, target, [("x", "1"), ("x", "2")], at) }).{
+  fail.catch(() { service.add(collection, target, [("x", "1"), ("x", "2")], at) }) |> {
     Error(syntax.SyntaxError(message, at)) -> { assert(message != "") assert(at == syntax._template(2)) }
     Ok(_) -> panic("duplicate metadata was accepted")
   }
-  fail.catch(() { service.add(collection, target, [], syntax._template(3)) }).{
+  fail.catch(() { service.add(collection, target, [], syntax._template(3)) }) |> {
     Error(_) -> Nil
     Ok(_) -> panic("unrelated source location was accepted")
   }
@@ -796,13 +796,13 @@ note = () {
   Nil
 }
 @test
-query = () -> Nil ^ syntax.SyntaxError {
+query = () -> Nil ? syntax.SyntaxError {
   ! syntax.Definitions = syntax._definitions()
   syntax.definition(syntax._template(0))
   Nil
 }
 @test
-item = () -> Nil ^ syntax.SyntaxError {
+item = () -> Nil ? syntax.SyntaxError {
   service = syntax._items()
   service.add(syntax._template(1), syntax._template(2), [], syntax._template(2))
   Nil

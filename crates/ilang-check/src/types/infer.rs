@@ -1002,21 +1002,19 @@ impl<'a> Checker<'a> {
         };
         let mut found = Vec::new();
         uses_types(&shown, &mut found);
-        let mut names: Vec<String> = Vec::new();
+        let mut names: Vec<(String, bool)> = Vec::new();
         for id in found {
             let def = self.p.ty(id);
-            if !def.exported && !names.contains(&def.name) {
-                names.push(def.name.clone());
+            if !def.exported && !names.iter().any(|(name, _)| name == &def.name) {
+                names.push((def.name.clone(), def.module == self.module));
             }
         }
-        for name in names {
+        for (name, local) in names {
+            let location = if local { " of this module" } else { "" };
             self.error(
                 code::EXPORT_HIDDEN_TYPE,
                 d.span,
-                format!(
-                    "`{}` is exported, but its inferred type uses the private type `{name}`, which is not exported (§2.4)",
-                    d.name
-                ),
+                format!("`{}` is exported, but its inferred type uses the type `{name}`{location}, which is not exported (§2.4)", d.name),
             );
         }
     }
