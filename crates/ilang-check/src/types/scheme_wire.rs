@@ -1325,6 +1325,112 @@ mod tests {
     }
 
     #[test]
+    fn a_reverse_subtype_failure_is_not_a_coverage_counterexample() {
+        let source = Solver::new(HashMap::new(), Vec::new());
+        let mut target = Solver::new(HashMap::new(), Vec::new());
+        let x = target.fresh_at(1);
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]);
+        let result = source.records.union(&[int.clone(), string.clone()]);
+        let ground = Ty::Fn(Box::new(FnTy {
+            params: vec![(Some("x".into()), int), (Some("y".into()), string)],
+            ret: source.records.record(vec![(Label::name("value"), result)]),
+            err: Ty::Never,
+            env: Ty::Never,
+        }));
+        let generic = Ty::Fn(Box::new(FnTy {
+            params: vec![
+                (Some("x".into()), Ty::Var(x)),
+                (Some("y".into()), Ty::Var(x)),
+            ],
+            ret: target
+                .records
+                .record(vec![(Label::name("value"), Ty::Var(x))]),
+            err: Ty::Never,
+            env: Ty::Never,
+        }));
+        let mut forward = target.scheme_snapshot();
+        forward.constrain(&generic, &ground);
+        assert!(forward.failures.is_empty());
+        let mut backward = target.scheme_snapshot();
+        backward.constrain(&ground, &generic);
+        assert!(definite_failure(&backward));
+        assert_eq!(
+            shared_group_counterexample(&source, &ground, &[], &target, &generic, &[], &[]),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn scheme_coverage_combines_structured_subject_bounds() {
+        let subject = Solver::new(HashMap::new(), Vec::new());
+        let mut cover = Solver::new(HashMap::new(), Vec::new());
+        let x = cover.fresh_at(1);
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]);
+        let either = subject.records.union(&[int.clone(), string.clone()]);
+        let left = subject.records.record(vec![
+            (Label::name("a"), int.clone()),
+            (Label::name("b"), string.clone()),
+        ]);
+        let right = subject
+            .records
+            .record(vec![(Label::name("a"), string), (Label::name("b"), int)]);
+        let out_a = subject
+            .records
+            .record(vec![(Label::name("a"), either.clone())]);
+        let out_b = subject.records.record(vec![(Label::name("b"), either)]);
+        let fun = |a, b, result| {
+            Ty::Fn(Box::new(FnTy {
+                params: vec![(Some("x".into()), a), (Some("y".into()), b)],
+                ret: result,
+                err: Ty::Never,
+                env: Ty::Never,
+            }))
+        };
+        let subject_root = fun(left, right, Ty::tuple(vec![out_a, out_b]));
+        let cover_root = fun(
+            Ty::Var(x),
+            Ty::Var(x),
+            Ty::tuple(vec![Ty::Var(x), Ty::Var(x)]),
+        );
+        let meta = Variable {
+            depth: Some(1),
+            external: None,
+            name: None,
+            label: None,
+            mode: 0,
+            difference: false,
+            input: true,
+            lower: 0,
+            upper: 0,
+            handled: 0,
+            from: vec![],
+            into: vec![],
+        };
+        let mut demand = records::Demand::new(records::Demand::LIMIT, true);
+        assert_eq!(
+            find_cover(
+                CoverSide {
+                    solver: &cover,
+                    root: &cover_root,
+                    metadata: &[meta]
+                },
+                CoverSide {
+                    solver: &subject,
+                    root: &subject_root,
+                    metadata: &[]
+                },
+                &[],
+                &[],
+                100,
+                &mut demand
+            ),
+            Ok(true)
+        );
+    }
+
+    #[test]
     fn scheme_comparison_aligns_variables_by_use_not_allocation_order() {
         let build = |reversed: bool| {
             let mut solver = Solver::new(HashMap::new(), Vec::new());
@@ -2920,6 +3026,30 @@ fn shared_group_counterexample(
     source_labels: &[usize],
     target_labels: &[usize],
 ) -> Option<bool> {
+    // In this fragment decomposition produces only conjunctive lower and
+    // upper bounds on variables. No record/Boolean branch can require a
+    // different choice, so an incompatible pair of closed bounds refutes
+    // every instantiation of the target.
+    let flat_target = target.vars.iter().all(|state| {
+        state.row == Mode::Value
+            && state.label_key.is_none()
+            && !state.difference
+            && state.handled.is_empty()
+    }) && std::iter::once(target_root)
+        .chain(
+            target
+                .vars
+                .iter()
+                .flat_map(|state| state.lower.iter().chain(&state.upper)),
+        )
+        .all(|ty| {
+            target.records.graph(ty).nodes().iter().all(|(_, node)| {
+                matches!(
+                    node,
+                    Node::Never | Node::Top | Node::Var(_) | Node::Con(..) | Node::Fn(_)
+                )
+            })
+        });
     let inputs = source
         .vars
         .iter()
@@ -3087,11 +3217,29 @@ fn shared_group_counterexample(
             if !forward.failures.is_empty() {
                 continue;
             }
-            let mut backward = forward.clone();
-            forward.constrain(&target_root, &ground);
-            backward.constrain(&ground, &target_root);
-            if definite_failure(&forward)
-                || definite_failure(&backward)
+            let closed = forward.vars.iter().all(|state| state.label_key.is_some());
+            let comparable = if closed {
+                super::alias::map_vars(&target_root, &mut |v| {
+                    let label = forward.vars[v.0 as usize]
+                        .label_key
+                        .expect("closed key parameter");
+                    Ty::literal(&super::LitValue::Str(
+                        keys[target_labels[label.0 as usize]].clone(),
+                    ))
+                })
+            } else {
+                target_root.clone()
+            };
+            forward.constrain(&comparable, &ground);
+            let flat_ground = source
+                .records
+                .graph(&ground)
+                .nodes()
+                .iter()
+                .all(|(_, node)| {
+                    matches!(node, Node::Never | Node::Top | Node::Con(..) | Node::Fn(_))
+                });
+            if ((closed || (flat_target && flat_ground)) && definite_failure(&forward))
                 || rejected_service_witness(target, &target_root, &ground)
             {
                 return Some(true);
@@ -3485,7 +3633,7 @@ fn find_cover(
         .filter(|ty| match ty {
             Ty::Var(_) => true,
             Ty::Con(Head::Named(_), _, args) => args.is_empty(),
-            _ => false,
+            _ => matches!(subject.records.graph(ty).node(), Node::Rec(_)),
         })
         .cloned()
         .collect();
