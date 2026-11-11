@@ -17,8 +17,7 @@ The sentence “main functions and [entries] of dependency packages have no
 effect” restricts all discovery and declaration checking to the root package.
 Duplicate binding names and TOML keys replace the old attribute-count error.
 
-Ruling f explicitly removes empty tuples: reviewed replacements use Nil;
-record forms remain reserved for T3 until its consumers land.
+Ruling f explicitly removes empty tuples: migration flags them for manual review.
 Ruling g requires ordinary shadowable Record lookup. No generated code in
 this stage inserts Record; T3 must provide a qualified ordinary exported
 alias before its record type printer claims capture-free source output. The hand-off name is
@@ -56,13 +55,10 @@ precedent; i has one default plus a small table, without target inference.
 
 ## T3 surface contract
 
-Read refs/heads/lane/a:tests/t3-stages.md and the syntax crate at that ref.
-There are no committed structural record AST nodes there yet. The planned
-nodes in records §8.3 are ExprKind::Record { base, fields }, RecordField
-{ label, label_span, value }, LabelName::{Name, Str}, and TypeKind::Record
-{ base, parts }. SYN2 reserves parenthesised records with E0114 until T3
-connects those nodes and consumers. The layer must select function suffixes
-first, keep call/constructor contexts, and never add a comma to disambiguate.
+The integration merge supplies ExprKind::Record { base, fields } and
+TypeKind::Record { base, fields, removed }. Both surfaces construct these
+nodes. The parser selects function suffixes first, preserves call and
+constructor contexts, and does not add a comma to disambiguate.
 
 ## Verification
 
