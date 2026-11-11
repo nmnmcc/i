@@ -157,6 +157,7 @@ fn standard_library_modules() {
             "std/set",
             "std/stream",
             "std/string",
+            "std/test",
             "std/time",
             "std/uri",
         ]
