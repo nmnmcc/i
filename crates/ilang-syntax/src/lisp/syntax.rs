@@ -677,81 +677,75 @@ impl Syntax {
         let Node::Quote(pattern) = self.node() else {
             return Err(self.error("expected a quote pattern"));
         };
-        fn validate(pattern: &Syntax) -> Result<(), SyntaxError> {
-            match pattern.node() {
-                Node::Splice(_) => Err(pattern.error("a splice must be the last part of brackets")),
-                Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
-                    for (i, child) in xs.iter().enumerate() {
-                        if matches!(child.node(), Node::Splice(_)) {
-                            if i + 1 != xs.len() {
-                                return Err(
-                                    child.error("a splice must be the last part of brackets")
-                                );
-                            }
-                        } else {
-                            validate(child)?;
-                        }
-                    }
-                    Ok(())
+        let mut validate = vec![(pattern, false)];
+        while let Some((current, allowed_splice)) = validate.pop() {
+            match current.node() {
+                Node::Splice(_) if !allowed_splice => {
+                    return Err(current.error("a splice must be the last part of brackets"));
                 }
-                _ => Ok(()),
+                Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                    validate.extend(
+                        xs.iter()
+                            .enumerate()
+                            .rev()
+                            .map(|(i, child)| (child, i + 1 == xs.len())),
+                    );
+                }
+                _ => {}
             }
         }
-        validate(pattern)?;
-        fn pair(
-            pattern: &Syntax,
-            value: &Syntax,
-            captures: &mut Vec<Capture>,
-        ) -> Result<bool, SyntaxError> {
+        enum Task<'a> {
+            Pair(&'a Syntax, &'a Syntax),
+            Splice(&'a Syntax, &'a [Syntax]),
+        }
+        let mut tasks = vec![Task::Pair(pattern, value)];
+        let mut captures = Vec::new();
+        while let Some(task) = tasks.pop() {
+            let (pattern, value) = match task {
+                Task::Splice(p, values) => {
+                    captures.push(Capture {
+                        pattern: p.clone(),
+                        value: Substitution::Many(values.to_vec()),
+                    });
+                    continue;
+                }
+                Task::Pair(pattern, value) => (pattern, value),
+            };
             if let Node::Unquote(p) = pattern.node() {
                 captures.push(Capture {
                     pattern: p.clone(),
                     value: Substitution::One(value.clone()),
                 });
-                return Ok(true);
+                continue;
             }
-            if matches!(pattern.node(), Node::Splice(_)) {
-                return Err(pattern.error("a splice must be the last part of brackets"));
-            }
-            fn parts(
-                ps: &[Syntax],
-                vs: &[Syntax],
-                captures: &mut Vec<Capture>,
-            ) -> Result<bool, SyntaxError> {
-                let splice = ps.last().and_then(|p| {
-                    if let Node::Splice(x) = p.node() {
-                        Some((p, x))
-                    } else {
-                        None
-                    }
-                });
-                let fixed = ps.len() - usize::from(splice.is_some());
-                if vs.len() < fixed || (splice.is_none() && vs.len() != fixed) {
-                    return Ok(false);
-                }
-                for (p, v) in ps[..fixed].iter().zip(vs) {
-                    if !pair(p, v, captures)? {
-                        return Ok(false);
-                    }
-                }
-                if let Some((_, p)) = splice {
-                    captures.push(Capture {
-                        pattern: p.clone(),
-                        value: Substitution::Many(vs[fixed..].to_vec()),
-                    });
-                }
-                Ok(true)
-            }
-            match (pattern.node(), value.node()) {
+            let (ps, vs) = match (pattern.node(), value.node()) {
                 (Node::Round(p), Node::Round(v))
                 | (Node::Square(p), Node::Square(v))
                 | (Node::Curly(p), Node::Curly(v))
-                | (Node::Bits(p), Node::Bits(v)) => parts(p, v, captures),
-                _ => Ok(pattern.same_code(value)),
+                | (Node::Bits(p), Node::Bits(v)) => (p, v),
+                _ if pattern.same_code(value) => continue,
+                _ => return Ok(None),
+            };
+            let splice = ps.last().and_then(|p| match p.node() {
+                Node::Splice(x) => Some(x),
+                _ => None,
+            });
+            let fixed = ps.len() - usize::from(splice.is_some());
+            if vs.len() < fixed || (splice.is_none() && vs.len() != fixed) {
+                return Ok(None);
             }
+            if let Some(p) = splice {
+                tasks.push(Task::Splice(p, &vs[fixed..]));
+            }
+            tasks.extend(
+                ps[..fixed]
+                    .iter()
+                    .zip(vs)
+                    .rev()
+                    .map(|(p, v)| Task::Pair(p, v)),
+            );
         }
-        let mut captures = Vec::new();
-        Ok(pair(pattern, value, &mut captures)?.then_some(captures))
+        Ok(Some(captures))
     }
 
     fn error(&self, message: &str) -> SyntaxError {
