@@ -621,9 +621,6 @@ pub fn lower_with_bindings(
     typed: &Typed,
     options: Options,
 ) -> Result<(ir::Program, Vec<serde_json::Value>), Vec<Diagnostic>> {
-    if !typed.coalescing_errors().is_empty() {
-        return Err(typed.coalescing_errors().to_vec());
-    }
     lower_tests_with_bindings(graph, program, typed, options, &[])
 }
 
@@ -634,6 +631,9 @@ pub fn lower_tests_with_bindings(
     options: Options,
     tests: &[(DefId, String)],
 ) -> Result<(ir::Program, Vec<serde_json::Value>), Vec<Diagnostic>> {
+    if !typed.coalescing_errors().is_empty() {
+        return Err(typed.coalescing_errors().to_vec());
+    }
     let mut l = Lowerer::new(graph, program, typed, options, None);
     l.extra_tests = tests.to_vec();
     l.run();
