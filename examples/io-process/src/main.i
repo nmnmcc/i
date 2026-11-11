@@ -91,6 +91,7 @@ main = () {
 		})
 	}) == Error("scope failed"))
 	assert(clock.monotonic_ns() - start < 2000000000)
+	// Check actual sleep processes, not unrelated command lines containing their arguments.
 	check = process.spawn_piped(
 		"sh"
 		["-c", "ps -C sleep -o args= | grep -qx 'sleep 30'; test $? -eq 1"]
