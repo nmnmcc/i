@@ -331,13 +331,24 @@ fn deep_structural_records_clone_compare_normalize_and_drop() {
             assert!(expr == cloned_expr);
             assert!(ty == cloned_ty);
             assert!(equivalent_expression(&expr, &cloned_expr));
+            let mut different_expr = cloned_expr.clone();
+            let ExprKind::Record { fields, .. } = &mut different_expr.kind else {
+                unreachable!()
+            };
+            fields[0].0.span = Span::new(30, 31);
+            assert!(equivalent_expression(&expr, &different_expr));
+            let ExprKind::Record { fields, .. } = &mut different_expr.kind else {
+                unreachable!()
+            };
+            fields[0].0.name = "other".into();
+            assert!(!equivalent_expression(&expr, &different_expr));
             let mut different = cloned_ty.clone();
             let TypeKind::Record { removed, .. } = &mut different.kind else {
                 unreachable!()
             };
             removed[0].parameter = true;
             assert!(ty != different);
-            drop((expr, cloned_expr, ty, cloned_ty, different));
+            drop((expr, cloned_expr, different_expr, ty, cloned_ty, different));
         })
         .unwrap()
         .join()
