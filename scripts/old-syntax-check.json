@@ -2538,23 +2538,11 @@
     "not_source": true,
     "reason": "i.toml manifest text in a test, not an i module."
   },
-  "bindings/javascript/test/providers.test.mjs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
   "bindings/javascript/test/providers.test.mjs:e973fd792f5b2fd6": {
     "not_source": true,
     "reason": "TOML provider/entry manifest data or its host format template."
   },
   "bindings/javascript/test/providers.test.mjs:da44a6505ea7c74e": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-check/src/types/coverage.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-check/src/types/pattern.rs:dbceb65de7aa8500": {
     "not_source": true,
     "reason": "TOML provider/entry manifest data or its host format template."
   },
@@ -2634,64 +2622,12 @@
     "not_source": true,
     "reason": "TOML provider/entry manifest data or its host format template."
   },
-  "crates/ilang-check/tests/unused.rs:457d83ee5c71dce9": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-check/tests/unused_audit.rs:85ab6ac1cb862bc6": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-check/tests/value_types.rs:85ab6ac1cb862bc6": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/src/commands/package.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/src/lib.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/tests/collections.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
   "crates/ilang-cli/tests/collections.rs:3217c18163fcdf28": {
     "prefix": "",
     "suffix": "app/macros)\n",
     "reason": "Import header fragment used as a replacement in the collection fixture."
   },
   "crates/ilang-cli/tests/collections.rs:50181c3a3e4d4456": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/tests/compile_time_tests.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/tests/entries.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/tests/entries.rs:8db2da95784fa101": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/tests/expansion_sites.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/tests/lisp.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/tests/macro_budget.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/tests/macro_run.rs:dbceb65de7aa8500": {
     "not_source": true,
     "reason": "TOML provider/entry manifest data or its host format template."
   },
@@ -2731,39 +2667,7 @@
     "not_source": true,
     "reason": "TOML provider/entry manifest data or its host format template."
   },
-  "crates/ilang-cli/tests/r2_runtime.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/tests/syntax_runtime.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/tests/tls.rs:5dd0b9222349f905": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/tests/unused.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/tests/value_type_performance.rs:acb7f090421fb4e4": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-cli/tests/value_types.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-lsp/src/analysis.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
   "crates/ilang-package/src/library.rs:3ed222fdc68eeb85": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-package/tests/load.rs:720334f508f898b3": {
     "not_source": true,
     "reason": "TOML provider/entry manifest data or its host format template."
   },
@@ -2916,14 +2820,6 @@
     "reason": "TOML provider/entry manifest data or its host format template."
   },
   "crates/ilang-package/tests/providers.rs:0f5edf0bf4377f9c": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-wasm/tests/control_lazy.rs:dbceb65de7aa8500": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "crates/ilang-wasm/tests/expansion_sites.rs:dbceb65de7aa8500": {
     "not_source": true,
     "reason": "TOML provider/entry manifest data or its host format template."
   },
