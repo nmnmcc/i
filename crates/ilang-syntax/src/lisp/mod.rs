@@ -17,6 +17,7 @@ mod encode;
 pub mod expansion;
 mod from_ast;
 pub mod quote_lower;
+mod render;
 pub mod scoped;
 pub mod source_syntax;
 pub mod syntax;
