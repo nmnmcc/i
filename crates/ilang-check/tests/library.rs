@@ -58,7 +58,7 @@ fn library_modules_have_sources() {
     assert_eq!(package.modules.len(), count);
 }
 
-/// The exported names of each library module, as in §9.3–§9.6, §9.10 and §13.
+/// The exported names of each library module, as in §9, §13 and §14.
 #[test]
 fn library_names() {
     let (_, program, _) = common::check_files(&[]);
@@ -136,6 +136,10 @@ fn library_names() {
             ],
         ),
         ("i/prelude", &["panic", "assert"]),
+        (
+            "i/record",
+            &["get", "put", "remove", "has", "keys", "size", "texts"],
+        ),
         ("i/io", &[]),
         (
             "i/task",
@@ -194,7 +198,25 @@ fn library_names() {
                 "read_lines",
             ],
         ),
-        ("i/process", &["args", "env", "cwd", "entropy", "spawn", "spawn_piped", "spawn_config", "read_stdout", "read_stderr", "write_stdin", "close_stdin", "wait", "terminate", "close"]),
+        (
+            "i/process",
+            &[
+                "args",
+                "env",
+                "cwd",
+                "entropy",
+                "spawn",
+                "spawn_piped",
+                "spawn_config",
+                "read_stdout",
+                "read_stderr",
+                "write_stdin",
+                "close_stdin",
+                "wait",
+                "terminate",
+                "close",
+            ],
+        ),
         (
             "i/net",
             &[
@@ -212,7 +234,22 @@ fn library_names() {
                 "byte_stream",
             ],
         ),
-        ("i/tls", &["options", "identity", "connect", "accept", "dial", "alpn", "read", "write", "shutdown_write", "close", "byte_stream"]),
+        (
+            "i/tls",
+            &[
+                "options",
+                "identity",
+                "connect",
+                "accept",
+                "dial",
+                "alpn",
+                "read",
+                "write",
+                "shutdown_write",
+                "close",
+                "byte_stream",
+            ],
+        ),
         (
             "i/stdio",
             &[
@@ -356,10 +393,9 @@ fn reserved_modules_import_cleanly() {
     assert!(program.is_some());
 }
 
-/// A name imported from a reserved module, or used through its alias, is
-/// reported as missing from that module.
+/// Missing names are reported for imports and qualified references.
 #[test]
-fn reserved_modules_have_no_names() {
+fn missing_library_names_are_reported() {
     let imports: String = RESERVED
         .iter()
         .map(|p| format!("  (nothing) = {p}\n"))
