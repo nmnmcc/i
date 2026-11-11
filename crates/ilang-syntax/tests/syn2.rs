@@ -34,8 +34,8 @@ fn pipe_and_match_keep_their_spelling() {
         assert!(printed.contains("|>"), "{printed}");
         assert_eq!(canon(&parse_module(&printed).0), canon(&tree));
     }
-    assert!(!parse_module("answer = x.{ _ -> 1 }").1.is_empty());
-    assert!(!parse_module("answer = x | f").1.is_empty());
+    assert!(!parse_module(/* old-syntax-check: E0101 */ "answer = x.{ _ -> 1 }").1.is_empty());
+    assert!(!parse_module(/* old-syntax-check: E0101 */ "answer = x | f").1.is_empty());
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn records_tuples_and_guard_are_distinct() {
         let (_, diagnostics) = parse_module(source);
         assert!(diagnostics.is_empty(), "{source}: {diagnostics:?}");
     }
-    for source in ["T = ()", "answer = (1, name: 2)", "answer = (name: 1, 2)"] {
+    for source in [/* old-syntax-check: E0101 */ "T = ()", /* old-syntax-check: E0101 */ "answer = (1, name: 2)", /* old-syntax-check: E0101 */ "answer = (name: 1, 2)"] {
         assert!(!parse_module(source).1.is_empty(), "{source}");
     }
 }

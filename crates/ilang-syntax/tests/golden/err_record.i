@@ -1,3 +1,3 @@
-// old-syntax-check: E0114,E0101,E0114,E0101
+// old-syntax-check: E0102
 a = { name: 1 }
 b = { p: (Int, Int) -> e }
