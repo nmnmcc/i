@@ -191,7 +191,11 @@ def main():
             report['invalid'].append({'source': label, 'diagnostics': result['diagnostics']})
             continue
         if result['empty']:
-            report['manual'].append({'source': label, 'empty_tuples': result['empty']})
+            source_bytes = item['source'].encode()
+            for case in result['empty']:
+                offset = int(case.rsplit(' ', 1)[1])
+                line = item['line'] + source_bytes[:offset].count(b'\n')
+                report['manual'].append({'source': f"{item['path']}:{line}", 'empty_tuples': case})
             continue
         after, declaration, error = entry_migration(item, result)
         if error:
