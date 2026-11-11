@@ -5,6 +5,7 @@
 	suspend
 	resume
 	cancel
+	keep_env
 )
 
 /// Makes a boundary `b` and does `body(b)`.
@@ -26,3 +27,8 @@ resume(A, R, E, N): (k: Continuation(A, R, E, N), value: A) -> R ? E ! N
 /// Unwinds the paused computation (§9.5).
 @external("ilang:control", "cancel")
 cancel(A, R, E, N): (k: Continuation(A, R, E, N)) -> Nil ! N
+
+/// Keeps every service bound at this call, including services unused by f.
+/// Resume and cancel inside the returned function keep these services too.
+@external("ilang:control", "keep_env")
+keep_env(S, A, E, N): (f: (x: S) -> A ? E ! N) -> { (x: S) -> A ? E } ! N

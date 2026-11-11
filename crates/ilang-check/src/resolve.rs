@@ -784,7 +784,7 @@ impl<'a> Resolver<'a> {
                 continue;
             }
             if !counts.contains(&args.len())
-                || (name == "host" && args.len() == 2 && args[1] != "async")
+                || (name == "host" && args.len() == 2 && !matches!(args[1], "async" | "request"))
             {
                 self.error(
                     code::ATTRIBUTE_ARGS,
@@ -822,6 +822,7 @@ impl<'a> Resolver<'a> {
                         out.host = Some(Host {
                             namespace: args[0].to_string(),
                             is_async: args.len() == 2,
+                            is_request: args.get(1).is_some_and(|m| *m == "request"),
                         });
                     }
                 }
@@ -2162,35 +2163,134 @@ impl<'a> Resolver<'a> {
     /// service are types that the host can take (§10.3), and they have no
     /// environment. Each such function is put in `host_fns`.
     fn host_fns(&mut self) {
+        let request_module = self
+            .p
+            .modules
+            .iter()
+            .position(|m| m.path == "i/request")
+            .map(|i| ModuleId(i as u32));
+        let service = |name: &str| {
+            self.p
+                .types
+                .iter()
+                .position(|t| Some(t.module) == request_module && t.name == name)
+                .map(|i| TypeId(i as u32))
+        };
+        let await_type = service("Await");
+        let owner_type = service("Owner");
         for t in 0..self.p.types.len() {
             let def = &self.p.types[t];
-            let (Some(_), TypeBody::Custom(ctors)) = (&def.host, &def.body) else {
+            let (Some(host), TypeBody::Custom(ctors)) = (&def.host, &def.body) else {
                 continue;
             };
-            let [ctor] = ctors.as_slice() else {
-                continue;
-            };
-            let module = def.module;
-            let fields: Vec<FieldDef> = ctor.fields.clone();
+            let [ctor] = ctors.as_slice() else { continue };
+            let (module, asynchronous, raw) = (def.module, host.is_async, host.is_request);
+            let fields = ctor.fields.clone();
             for (i, f) in fields.iter().enumerate() {
                 if value_dependent(&self.p, &f.ty) {
                     continue;
                 }
-                if !matches!(f.ty.kind, TypeKind::Fn { .. }) {
+                let TypeKind::Fn {
+                    params,
+                    ret,
+                    err,
+                    env,
+                } = &f.ty.kind
+                else {
                     continue;
+                };
+                let mut wire = f.ty.clone();
+                let mut wrapped = false;
+                let mut valid = true;
+                if raw {
+                    valid = err.is_none() && env.is_none();
+                    let expanded = self.expand(ret);
+                    if let TypeKind::Named {
+                        ty: TypeRef::Builtin(BuiltinType::Request),
+                        args,
+                    } = expanded.kind
+                        && args.len() == 1
+                    {
+                        let answer = self.expand(&args[0]);
+                        let (value, error) = if let TypeKind::Named {
+                            ty: TypeRef::Custom(id),
+                            args,
+                        } = &answer.kind
+                            && self.p.ty(*id).name == "Result"
+                            && Some(self.p.ty(*id).module) == self.p.prelude
+                            && args.len() == 2
+                        {
+                            wrapped = true;
+                            (args[0].clone(), Some(Box::new(args[1].clone())))
+                        } else {
+                            (answer, None)
+                        };
+                        wire.kind = TypeKind::Fn {
+                            params: params.clone(),
+                            ret: Box::new(value),
+                            err: error,
+                            env: None,
+                        };
+                    } else {
+                        valid = false;
+                    }
                 }
-                match self.host_fn(&f.ty, true) {
-                    Some(hf) => {
-                        self.p.host_fns.insert((TypeId(t as u32), i as u32), hf);
+                let signature = valid.then(|| self.host_fn(&wire, true)).flatten();
+                if let Some(mut hf) = signature {
+                    hf.request_result = wrapped;
+                    self.p.host_fns.insert((TypeId(t as u32), i as u32), hf);
+                    if asynchronous {
+                        let mut needs = Vec::new();
+                        if !raw && let Some(id) = await_type {
+                            needs.push(Type {
+                                kind: TypeKind::Named {
+                                    ty: TypeRef::Custom(id),
+                                    args: vec![],
+                                },
+                                span: f.ty.span,
+                            });
+                        }
+                        if let Some(id) = owner_type {
+                            needs.push(Type {
+                                kind: TypeKind::Named {
+                                    ty: TypeRef::Custom(id),
+                                    args: vec![],
+                                },
+                                span: f.ty.span,
+                            });
+                        }
+                        if let TypeBody::Custom(cs) = &mut self.p.types[t].body
+                            && let TypeKind::Fn { env, .. } = &mut cs[0].fields[i].ty.kind
+                        {
+                            *env = Some(Box::new(Type {
+                                kind: TypeKind::Union(needs),
+                                span: f.ty.span,
+                            }));
+                        }
+                        if let Some(dependency) = request_module
+                            && dependency != module
+                            && !self.p.modules[module.0 as usize]
+                                .imports
+                                .contains(&dependency)
+                        {
+                            self.p.modules[module.0 as usize].imports.push(dependency);
+                        }
                     }
-                    None => {
-                        self.cur = module;
-                        self.error(
-                            code::HOST_TYPE,
-                            f.ty.span,
-                            format!("the parameters and the value of a function of a host service are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors; its errors are a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; and it has no environment (§9.7, §10.3){}", match &f.ty.kind { TypeKind::Fn{ret,err,..}=>[Some(&**ret),err.as_deref()].into_iter().flatten().find_map(|t| { let n=self.host_input_note(t); (!n.is_empty()).then_some(n) }).unwrap_or_default(),_=>String::new() }),
-                        );
-                    }
+                } else {
+                    self.cur = module;
+                    let input_note = match &wire.kind {
+                        TypeKind::Fn { ret, err, .. } => [Some(&**ret), err.as_deref()]
+                            .into_iter()
+                            .flatten()
+                            .find_map(|ty| {
+                                let note = self.host_input_note(ty);
+                                (!note.is_empty()).then_some(note)
+                            })
+                            .unwrap_or_default(),
+                        _ => String::new(),
+                    };
+                    self.error(code::HOST_TYPE, f.ty.span,
+                        format!("a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3){input_note}"));
                 }
             }
         }
@@ -2243,6 +2343,7 @@ impl<'a> Resolver<'a> {
             params,
             result,
             errors: members,
+            request_result: false,
         })
     }
 

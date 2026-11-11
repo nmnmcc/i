@@ -1,0 +1,4 @@
+name = "app"
+
+[wasm]
+exports = ["app/r2.go_progress", "app/r2.unlisted_answer", "app/r2.overlap", "app/r2.cancel_owned", "app/r2.cancel_borrowed", "app/r2.race_read", "app/r2.nested_interest", "app/r2.owned_idle", "app/r2.unrelated_idle", "app/r2.raw_only", "app/r2.pure_tasks", "app/r2.cmp", "app/r2.cmp2", "app/r2.fake", "app/r2.sync_poll", "app/r2.trace", "app/r2.expected_trace"]

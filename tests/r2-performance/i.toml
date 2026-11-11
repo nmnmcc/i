@@ -1,0 +1,4 @@
+name = "r2perf"
+
+[wasm]
+exports = ["r2perf/kernels.empty", "r2perf/kernels.spawn_join", "r2perf/kernels.switch_pair", "r2perf/kernels.channel_pair"]
