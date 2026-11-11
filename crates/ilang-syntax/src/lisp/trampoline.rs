@@ -3,8 +3,7 @@ use std::cell::RefCell;
 use std::future::{Future, poll_fn};
 use std::pin::Pin;
 use std::rc::Rc;
-use std::sync::Arc;
-use std::task::{Context, Poll, Wake, Waker};
+use std::task::{Context, Poll, Waker};
 
 type Task<'a> = Pin<Box<dyn Future<Output = ()> + 'a>>;
 
@@ -33,11 +32,6 @@ impl<'a> Scheduler<'a> {
         .await
     }
 }
-struct Noop;
-impl Wake for Noop {
-    fn wake(self: Arc<Self>) {}
-}
-
 pub(super) fn run<'a, T: 'a, F, Fut>(f: F) -> T
 where
     F: FnOnce(Scheduler<'a>) -> Fut + 'a,
@@ -50,8 +44,7 @@ where
     let mut stack: Vec<Task<'a>> = vec![Box::pin(async move {
         *target.borrow_mut() = Some(f(root_scheduler).await);
     })];
-    let waker = Waker::from(Arc::new(Noop));
-    let mut cx = Context::from_waker(&waker);
+    let mut cx = Context::from_waker(Waker::noop());
     while let Some(mut task) = stack.pop() {
         if task.as_mut().poll(&mut cx).is_pending() {
             let children = std::mem::take(&mut *scheduler.0.borrow_mut());
