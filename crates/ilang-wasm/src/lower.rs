@@ -1235,7 +1235,7 @@ impl<'a> Lowerer<'a> {
                     code::NOT_SUPPORTED,
                     None,
                     Span::default(),
-                    "the WASI target needs a selected program entry (B.7)",
+                    "the WASI target needs a program entry selected from src/main.i or [entries] (B.7)",
                 )),
             }
         }
