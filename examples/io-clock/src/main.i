@@ -4,7 +4,6 @@
 	i/task
 )
 
-
 main = () {
 	start = clock.monotonic_ns()
 	clock.sleep_ns(10000000)
