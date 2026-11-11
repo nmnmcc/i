@@ -140,3 +140,10 @@ all 1,460 are byte-identical. Focused recaptures preserved source line positions
 and selected the declared named entries. The temporarily changed invalid
 attribute fixture produced no WAT once its expected error was restored. The
 manifest-package sweep and longer retries of baseline timeouts remain in progress.
+
+Stress capture reproduction: `target/debug/i build --offline --opt 0 --wat
+--project tests/review/cases/review-k4/perf/wide_generic_1024 --out
+ target/syn2-wide1024.wasm` exceeded both the initial 12-second sweep limit and
+the 120-second retry while other shared-slot jobs were running. Its archived
+baseline built in the longer retry; no migrated WAT was produced in those two
+attempts. This is a capture timeout, not evidence of a semantic difference.
