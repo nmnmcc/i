@@ -1205,6 +1205,11 @@ fn deeply_nested_syntax_marks_and_drops_without_host_stack_growth() {
             for _ in 0..20_000 {
                 syntax = Syntax::make(Node::Round(vec![syntax.clone()]), &syntax).unwrap();
             }
+            let datum = syntax.to_datum();
+            let rebuilt = Syntax::from_datum(&datum, syntax.scope());
+            assert!(syntax.same_code(&rebuilt));
+            drop(rebuilt);
+            drop(datum);
             let marked = syntax.flip_mark(7);
             assert!(marked.scope().marks.contains(&7));
             ilang_syntax::lisp::syntax::validate_expansion(&marked, &[]).unwrap();

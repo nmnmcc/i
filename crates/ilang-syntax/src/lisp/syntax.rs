@@ -171,33 +171,39 @@ impl Syntax {
         }))
     }
     pub fn from_datum(d: &Datum, scope: &Scope) -> Self {
-        let children = |xs: &[Datum]| xs.iter().map(|x| Self::from_datum(x, scope)).collect();
-        let node = match &d.kind {
-            DatumKind::Name(s) => Node::Name(s.clone()),
-            DatumKind::Discard(s) => Node::Discard(s.clone()),
-            DatumKind::UpName(s) => Node::Up(s.clone()),
-            DatumKind::Symbol(s) => Node::Symbol(s.clone()),
-            DatumKind::Int(n) => Node::Int(n.clone()),
-            DatumKind::Float(n) => Node::Float(*n),
-            DatumKind::String(s) => Node::Text(s.clone()),
-            DatumKind::Round(xs) => Node::Round(children(xs)),
-            DatumKind::Square(xs) => Node::Square(children(xs)),
-            DatumKind::Curly(xs) => Node::Curly(children(xs)),
-            DatumKind::Bits(xs) => Node::Bits(children(xs)),
-            DatumKind::Quote(x) => Node::Quote(Self::from_datum(x, scope)),
-            DatumKind::Unquote(x) => Node::Unquote(Self::from_datum(x, scope)),
-            DatumKind::Splice(x) => Node::Splice(Self::from_datum(x, scope)),
-        };
-        Self(Arc::new(SyntaxData {
-            node,
-            scope: scope.clone(),
-            span: d.span,
-            provenance: Provenance::Written,
-            identity: None,
-            definition_head: None,
-            origin: Arc::new(()),
-            host_identity: Mutex::new(None),
-        }))
+        let mut tasks = vec![(d, false)];
+        let mut built = Vec::new();
+        while let Some((datum, finish)) = tasks.pop() {
+            let children: &[Datum] = match &datum.kind {
+                DatumKind::Round(xs) | DatumKind::Square(xs) | DatumKind::Curly(xs) | DatumKind::Bits(xs) => xs,
+                DatumKind::Quote(x) | DatumKind::Unquote(x) | DatumKind::Splice(x) => std::slice::from_ref(x.as_ref()),
+                _ => &[],
+            };
+            if !finish && !children.is_empty() {
+                tasks.push((datum, true));
+                tasks.extend(children.iter().rev().map(|child| (child, false)));
+                continue;
+            }
+            let values = built.split_off(built.len() - children.len());
+            let node = match &datum.kind {
+                DatumKind::Name(s) => Node::Name(s.clone()),
+                DatumKind::Discard(s) => Node::Discard(s.clone()),
+                DatumKind::UpName(s) => Node::Up(s.clone()),
+                DatumKind::Symbol(s) => Node::Symbol(s.clone()),
+                DatumKind::Int(n) => Node::Int(n.clone()),
+                DatumKind::Float(n) => Node::Float(*n),
+                DatumKind::String(s) => Node::Text(s.clone()),
+                DatumKind::Round(_) => Node::Round(values),
+                DatumKind::Square(_) => Node::Square(values),
+                DatumKind::Curly(_) => Node::Curly(values),
+                DatumKind::Bits(_) => Node::Bits(values),
+                DatumKind::Quote(_) => Node::Quote(values.into_iter().next().unwrap()),
+                DatumKind::Unquote(_) => Node::Unquote(values.into_iter().next().unwrap()),
+                DatumKind::Splice(_) => Node::Splice(values.into_iter().next().unwrap()),
+            };
+            built.push(Self::written(node, scope, datum.span));
+        }
+        built.pop().expect("datum conversion produces one syntax")
     }
     pub fn node(&self) -> &Node {
         &self.0.node
@@ -584,26 +590,24 @@ impl Syntax {
     /// Compare datums, ignoring provenance, scopes, and value identity.
     pub fn same_code(&self, other: &Self) -> bool {
         use Node::*;
-        fn all(a: &[Syntax], b: &[Syntax]) -> bool {
-            a.len() == b.len() && a.iter().zip(b).all(|(a, b)| a.same_code(b))
-        }
-        match (self.node(), other.node()) {
-            (Name(a), Name(b))
-            | (Discard(a), Discard(b))
-            | (Up(a), Up(b))
-            | (Symbol(a), Symbol(b))
-            | (Text(a), Text(b)) => a == b,
-            (Int(a), Int(b)) => a == b,
-            (Float(a), Float(b)) => a == b,
-            (Round(a), Round(b))
-            | (Square(a), Square(b))
-            | (Curly(a), Curly(b))
-            | (Bits(a), Bits(b)) => all(a, b),
-            (Quote(a), Quote(b)) | (Unquote(a), Unquote(b)) | (Splice(a), Splice(b)) => {
-                a.same_code(b)
+        let mut pending = vec![(self, other)];
+        while let Some((left, right)) = pending.pop() {
+            match (left.node(), right.node()) {
+                (Name(a), Name(b)) | (Discard(a), Discard(b)) | (Up(a), Up(b))
+                | (Symbol(a), Symbol(b)) | (Text(a), Text(b)) if a == b => {},
+                (Int(a), Int(b)) if a == b => {},
+                (Float(a), Float(b)) if a == b => {},
+                (Round(a), Round(b)) | (Square(a), Square(b))
+                | (Curly(a), Curly(b)) | (Bits(a), Bits(b)) if a.len() == b.len() => {
+                    pending.extend(a.iter().zip(b));
+                }
+                (Quote(a), Quote(b)) | (Unquote(a), Unquote(b)) | (Splice(a), Splice(b)) => {
+                    pending.push((a, b));
+                }
+                _ => return false,
             }
-            _ => false,
         }
+        true
     }
 
     /// Evaluate a quoted template. The caller evaluates each embedded i
