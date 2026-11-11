@@ -69,7 +69,7 @@ pub struct Program {
     pub types: Vec<TypeDef>,
     /// The module of the built-in names (§12), in the package `i`.
     pub prelude: Option<ModuleId>,
-    /// The package that is compiled: its `@main` and `@test` bindings are
+    /// The package that is compiled: its entry and `@test` bindings are
     /// entry points (§10.2).
     pub root: Option<PackageId>,
     /// The host exports (§10.2): the names in `[wasm].exports` of the
@@ -170,7 +170,7 @@ pub struct TopBinding {
     pub binding: Binding,
     /// The names it binds, in pattern order.
     pub defs: Vec<DefId>,
-    /// `@main` (§10.2).
+    /// Program entry (§10.2).
     pub main: bool,
     /// `@test` (§10.2).
     pub test: bool,

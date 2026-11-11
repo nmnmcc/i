@@ -1,4 +1,4 @@
-src/main.i:1:1: error[E0301]: the attribute `@inline` is kept for macros; the built-in attributes are `@external`, `@host`, `@main`, `@test`, and `@deprecated`
+src/main.i:1:1: error[E0301]: the attribute `@inline` is kept for macros; the built-in attributes are `@external`, `@host`, `@test`, and `@deprecated`
 src/main.i:7:1: error[E0302]: this attribute is written `@external("module", "function")`
 src/main.i:10:1: error[E0302]: this attribute is written `@host("namespace")` or `@host("namespace", "async")`
 src/main.i:15:1: error[E0302]: this attribute is written `@deprecated("note")`

@@ -86,7 +86,7 @@ fn brace_decisions_follow_the_ordered_tests() {
     // §3.5 test 4 and test 5: records vs a clause with a wrong pattern.
     for (src, code) in [
         (
-            /* old-syntax-check: E0101 */ "a = { p: (Int, Int) -> e }",
+            /* old-syntax-check: E0101 */ /* old-syntax-check: E0101 */ "a = { p: (Int, Int) -> e }",
             Code::Unexpected,
         ),
         (
@@ -141,7 +141,7 @@ fn header_groups_and_attributes() {
             .iter()
             .any(|d| d.code == Code::Unexpected)
     );
-    let m = module("@main()\nx = 1\n@a.m(1, b: x)\ny = 2");
+    let m = module("@custom()\nx = 1\n@a.m(1, b: x)\ny = 2");
     assert!(m.items[0].attributes[0].call.is_some());
     assert_eq!(m.items[1].attributes[0].module.as_ref().unwrap().name, "a");
 }

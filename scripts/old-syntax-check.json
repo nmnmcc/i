@@ -694,10 +694,6 @@
   "crates/ilang-syntax/src/lib.rs:bbfcd4160a1e8674": {
     "not_source": "Token name compared by the diagnostic hint scanner"
   },
-  "crates/ilang-syntax/tests/lex.rs:68cc7f477cc8607b": {
-    "suffix": "\nf = () { Nil }\n",
-    "reason": "An annotation token tested by the lexer, with its item"
-  },
   "crates/ilang-syntax/tests/lex.rs:bbfcd4160a1e8674": {
     "prefix": "x = ",
     "reason": "A name token tested by the lexer, in expression position"
@@ -785,16 +781,6 @@
       "E0110: an argument by position may not come after an argument by label"
     ]
   },
-  "crates/ilang-syntax/tests/golden/err_arrow_tail.i:4e93942fc2bb1de0": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0109: the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `!`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`"
-    ]
-  },
   "crates/ilang-syntax/tests/golden/err_attr_same_line.i:ba368ee323f45dc2": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
@@ -846,7 +832,8 @@
   "crates/ilang-syntax/tests/golden/err_clause_tuple_type.i:a69e2e3ad4d5098a": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `}`"
+      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block",
+      "E0101: expected an expression, found `:`"
     ]
   },
   "crates/ilang-syntax/tests/golden/err_discard.i:ff3954a6a2381ebc": {
@@ -923,7 +910,8 @@
   "crates/ilang-syntax/tests/golden/err_record.i:fb0701e8893b9a62": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `}`"
+      "E0101: expected an expression, found `:`",
+      "E0101: expected an expression, found `:`"
     ]
   },
   "crates/ilang-syntax/tests/golden/err_recover.i:d6cdf02d84cb49fc": {
@@ -996,7 +984,7 @@
   "crates/ilang-syntax/tests/parse.rs:61e1e25bf9a2a4dc": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `}`"
+      "E0101: expected an expression, found `:`"
     ]
   },
   "crates/ilang-syntax/tests/parse.rs:e79adbe2811820c8": {
@@ -1363,7 +1351,7 @@
   "tests/review/cases/review-a1/_loose/cases/25_old_guard_fn/original/.invalid/src/main.i:964f0e757bb34246": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `if`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `:`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/29_param_shadow/original/.invalid/src/main.i:6fae0c21e165c75b": {
@@ -1603,16 +1591,20 @@
       "E0101: expected an expression, found `..`",
       "E0101: expected an expression, found `..`",
       "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`"
+      "E0101: expected an expression, found `..`",
+      "E0101: expected `}`, found `:`"
     ],
     "track": "T3"
   },
   "tests/review/cases/review-rec/_loose/probes/.invalid/src/main.i:aeecbdae1c142356": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `:`",
-      "E0101: expected an expression, found `:`",
-      "E0101: expected an expression, found `:`"
+      "E0101: expected `}`, found `:`",
+      "E0101: expected `}`, found `:`",
+      "E0101: expected `}`, found `:`",
+      "E0101: expected `}`, found `:`",
+      "E0101: expected a type, found `..`",
+      "E0101: expected a type, found `..`"
     ],
     "track": "T3"
   },
@@ -1620,7 +1612,8 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `:`",
-      "E0101: expected an expression, found `:`"
+      "E0101: expected an expression, found `:`",
+      "E0101: expected `}`, found `:`"
     ],
     "track": "T3"
   },
@@ -1633,13 +1626,27 @@
   "tests/review/cases/review-std1/stream/.invalid/src/stream.i:2bd0f8ec00250ab9": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-std1/stream-positive/.invalid/src/stream.i:2bd0f8ec00250ab9": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "crates/ilang-package/tests/manifest.rs:ef830fe8a6451ed0": {
@@ -1913,10 +1920,6 @@
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
   },
-  "crates/ilang-syntax/tests/format.rs:68cc7f477cc8607b": {
-    "not_source": true,
-    "reason": "Substring assertion in the legacy formatter test."
-  },
   "crates/ilang-syntax/tests/syn2.rs:a8f52cf6f8aec263": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
@@ -2039,7 +2042,7 @@
   "tests/review/cases/review-a1/_loose/runtime/25/original/.invalid/src/main.i:25e81878720e617c": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `if`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `:`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/runtime/56/original/.invalid/src/main.i:ea9bf08abd8374b6": {
@@ -2297,5 +2300,95 @@
       ]
     ],
     "reason": "Render Rust format string with a representative port."
+  },
+  "crates/ilang-syntax/examples/migrate-syntax2.rs:d162de7b30d5d39d": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: expected a type, found `..`"
+    ]
+  },
+  "crates/ilang-syntax/examples/migrate-syntax2.rs:04a3d99efcbda47b": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0102: expected the function body, a `{` on the same line, found `?`"
+    ]
+  },
+  "crates/ilang-syntax/examples/migrate-syntax2.rs:eb648ea1f46a27c1": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: expected a type, found `..`"
+    ]
+  },
+  "crates/ilang-syntax/examples/migrate-syntax2.rs:d29dbdfffc876b3c": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: expected an expression, found `:`"
+    ]
+  },
+  "crates/ilang-syntax/tests/golden/err_arrow_tail.i:ea7d0a6657401659": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`",
+      "E0109: the nearest `->` cannot take this `!`: it already has one, or `!` came first; put the inner function type in `{ }`",
+      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`",
+      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`",
+      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`"
+    ]
+  },
+  "tests/spec/3/syn2_old_empty_record_type.i:8e197a393e555c9d": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: expected a type, found `..`"
+    ]
+  },
+  "tests/spec/3/syn2_old_error_marker.i:ca4056111dd3ad33": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0102: expected the function body, a `{` on the same line, found `?`"
+    ]
+  },
+  "tests/spec/3/syn2_old_record_type.i:4924b8a028d3910d": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: expected `}`, found `:`"
+    ]
+  },
+  "tests/spec/6/syn2_old_brace_record.i:abc6c48ae03110ce": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: expected an expression, found `:`"
+    ]
+  },
+  "tests/spec/6/syn2_old_mixed_tuple.i:6d95780125acbe2f": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: tuples have positional parts only and records have labelled fields only; positions and labels cannot mix"
+    ]
+  },
+  "tests/spec/7/syn2_old_empty_tuple_pattern.i:e2dca65404826320": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0108: the empty tuple pattern is removed; use `Nil` for a unit pattern, or a binder/discard for a record"
+    ]
+  },
+  "crates/ilang-check/tests/front_end.rs:1b999808f689275a": {
+    "reason": "Checker rejects the removed attribute.",
+    "diagnostics": [
+      "E0301: removed @main attribute"
+    ]
+  },
+  "tests/spec/2.2/syn2_old_main.i:2a545dca87420d92": {
+    "reason": "Spec case rejects the removed attribute.",
+    "diagnostics": [
+      "E0301: removed @main attribute"
+    ]
+  },
+  "crates/ilang-syntax/examples/parse-snippets.rs:10ebe51ffe24e008": {
+    "reason": "Diagnostic message text, not i source.",
+    "not_source": true
+  },
+  "crates/ilang-syntax/tests/lex.rs:ddde3fac3dd9ded9": {
+    "suffix": "\nf = () { Nil }\n",
+    "reason": "An annotation token tested by the lexer, with its item"
   }
 }

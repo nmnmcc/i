@@ -99,9 +99,7 @@ The pipe remains `|>` and a match remains a pipe into a clause block.
 The new error marker is `^`; the default entry is `src/main.i`'s `main`,
 with other entries declared in `[entries]`. Record nodes come from T3.
 
-Integration note: old braced and new parenthesised record forms construct the
-T3 record nodes. At a clause head, `?` begins a guard; a legacy error type
-in that position must be grouped. This is decided by grammar.
+At a clause head, `?` begins a guard. Records use parentheses.
 The Go `cmd/gofmt/rewrite.go` comment-map approach motivates retaining source
 between span edits, and Cargo `src/workspace/parser/targets.rs` and Gleam
 `compiler-cli/src/run.rs` distinguish conventional and explicitly selected
@@ -112,10 +110,10 @@ entry modules.
 The 10.2 fixture expects E0305 because `both` is not the default entry and
 `@test` is outside `test/`. Manifest entry targets are dotted module paths
 relative to the package. Clause-head `?` starts a guard by grammar (§4.1).
-The formatter removes `@main`; migration declares non-default entries.
+Migration removes the entry attribute and declares non-default entries.
 
-For `{..}`, migration keeps the legacy spelling where `Record` appears in
-the module, avoiding capture. Empty expressions are accepted only when the
+The migration reports an empty-record type for manual review where `Record`
+appears in the module, avoiding capture. Empty expressions are accepted only when the
 package checker, including tests, succeeds and records an empty-record type
 at that span; otherwise they are reported for manual review. The old forms
 are listed in `scripts/old-syntax-check.json`.

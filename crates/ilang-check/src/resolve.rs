@@ -7,7 +7,7 @@
 //! 3. resolve the type definitions, and find alias circles;
 //! 4. resolve the declarations and bindings;
 //! 5. check that exported definitions use only exported types (§2.4);
-//! 6. check the rules about the whole program (`@main`, host services,
+//! 6. check the rules about the whole program (entries, host services,
 //!    `[wasm] exports`).
 
 use crate::Parsed;
@@ -725,10 +725,7 @@ impl<'a> Resolver<'a> {
         out
     }
 
-    /// §2.2: `@main` and `@test` are on a binding whose pattern binds one
-    /// name and whose value is a function expression. §10.2: in the
-    /// compiled package, they are entry points, which have no parameters.
-    /// `@main` in other packages is not used, so only §2.2 is checked there.
+    /// Entries and tests bind one name to a function; compiled entries take no value parameters.
     fn entry_form(&mut self, name: &str, span: Span, b: &ast::Binding, compiled: bool) -> bool {
         let mut names = Vec::new();
         ast_binders(&b.pattern, &mut names);
@@ -3489,7 +3486,7 @@ impl<'a> Resolver<'a> {
             match def {
                 Some(d) if self.p.def(d).exported => {
                     let def = self.p.def(d);
-                    // Only the `@main` and `@test` of the compiled package
+                    // Only the entry and tests of the compiled package
                     // are entry points; the others are not used (§10.2).
                     if let DefKind::Binding { binding, .. } = def.kind
                         && self.p.module(d.module).package == root

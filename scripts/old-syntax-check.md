@@ -38,3 +38,6 @@ exercise the full generators. `--inventory` prints the extracted sources and
 parser results for review; it does not update expectations or make a failing
 check pass. Run `python3 -I scripts/old-syntax-check-test` for the extraction and
 expectation regressions.
+
+The inventory driver also reports an unqualified `@main` attribute as E0301;
+the parser accepts general attribute syntax, and the checker rejects this name.

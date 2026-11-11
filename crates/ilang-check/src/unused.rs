@@ -7,7 +7,6 @@ use ilang_package::{Diagnostic, ModuleKind};
 use std::collections::HashSet;
 
 /// The entry policy of one package, independent of the package being built.
-/// SYN2 changes this function when it replaces `@main` with package entries.
 fn is_package_entry(p: &Program, d: DefId) -> bool {
     match p.def(d).kind {
         DefKind::Binding { binding, .. } => p.module(d.module).bindings[binding as usize].main,

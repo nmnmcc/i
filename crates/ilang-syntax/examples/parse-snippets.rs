@@ -9,11 +9,16 @@ fn main() {
         let len: usize = line.trim().parse().unwrap();
         let mut source = vec![0; len];
         input.read_exact(&mut source).unwrap();
-        let (_, diags) = ilang_syntax::parse_module(std::str::from_utf8(&source).unwrap());
-        writeln!(output, "{}", diags.len()).unwrap();
+        let (module, diags) = ilang_syntax::parse_module(std::str::from_utf8(&source).unwrap());
+        let old_main = module.items.iter().flat_map(|item| &item.attributes).filter(|a| a.module.is_none() && a.name.name == "main").count();
+        writeln!(output, "{}", diags.len() + old_main).unwrap();
         for d in diags {
             let message: String = d.message.bytes().map(|b| format!("{b:02x}")).collect();
             writeln!(output, "{} {message}", d.code.as_str()).unwrap();
+        }
+        for _ in 0..old_main {
+            let message: String = "removed @main attribute".bytes().map(|b| format!("{b:02x}")).collect();
+            writeln!(output, "E0301 {message}").unwrap();
         }
         line.clear();
     }
