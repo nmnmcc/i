@@ -2093,3 +2093,20 @@ fn cli_queries_a_dependency_type_after_its_type_macro_expands() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+#[test]
+fn collection_error_from_template_points_at_call() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (x (! it (. syntax Items))) _ { ((. it add) `missing x [] x) `(= ~x (-> () _ { 42 })) })))\n").unwrap();
+    let source_text = "(m = app/macros)\nm.emit(generated)\n";
+    std::fs::write(dir.path().join("src/main.i"), source_text).unwrap();
+    let (mut graph, _) = ilang_cli::load(dir.path(), false, true);
+    let expanded = ilang_macro::project::expand(&mut graph).unwrap_or_else(|d| panic!("{d:?}"));
+    let checked = ilang_check::check_parsed(&graph, &expanded.parsed);
+    let errors = ilang_macro::collections::resolve(&expanded.parsed, checked.program.as_ref().unwrap(), checked.types.as_ref().unwrap(), &expanded.transactions).unwrap_err();
+    let main = expanded.parsed.iter().find(|p| p.path == "app/main").unwrap();
+    assert_eq!(errors[0].source, Some(main.source));
+    assert_eq!(errors[0].span.start as usize, source_text.find("m.emit").unwrap());
+}

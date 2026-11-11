@@ -23,6 +23,8 @@ pub struct Entry {
     pub data: Vec<(String, String)>,
     pub signature: String,
     pub target_span: Span,
+    pub target_origin: Option<ilang_syntax::lisp::scoped::Origin>,
+    pub call_chain: Vec<ilang_syntax::lisp::scoped::Invocation>,
     pub at: Syntax,
     pub origin: ItemOrigin,
     pub ordinal: u32,
@@ -60,10 +62,21 @@ pub fn resolve(
                 continue;
             };
             let report = |node: &Syntax, msg: &str| {
+                let scoped = parsed
+                    .iter()
+                    .find(|p| p.source.0 == origin.source)
+                    .and_then(|p| p.scoped.as_ref());
+                let span = if node.scope().module == origin.source
+                    && scoped.is_some_and(|s| node.span().end <= s.original_len())
+                {
+                    node.span()
+                } else {
+                    origin.call
+                };
                 Diagnostic::error(
                     ilang_check::code::MACRO_RESERVED,
                     Some(SourceId(origin.source)),
-                    node.span(),
+                    span,
                     msg,
                 )
             };
@@ -126,6 +139,18 @@ pub fn resolve(
                     .expect("checked target has a type scheme")
                     .clone(),
                 target_span: program.def(target_id).span,
+                target_origin: parsed
+                    .iter()
+                    .find(|p| p.source.0 == origin.source)
+                    .and_then(|p| p.scoped.as_ref())
+                    .and_then(|s| s.origin(program.def(target_id).span))
+                    .cloned(),
+                call_chain: parsed
+                    .iter()
+                    .find(|p| p.source.0 == origin.source)
+                    .and_then(|p| p.scoped.as_ref())
+                    .and_then(|s| transaction.location.and_then(|(_, span)| s.origin(span)))
+                    .map_or_else(Vec::new, |o| o.call_chain.clone()),
                 at: at.clone(),
                 origin: origin.clone(),
                 ordinal: ordinal as u32,
@@ -164,6 +189,11 @@ fn lookup(
         }
         _ => return None,
     };
+    #[derive(Clone)]
+    enum Target {
+        Def(DefId),
+        Module(ModuleId),
+    }
     let mut generated = Vec::new();
     for (module_index, module) in program.modules.iter().enumerate() {
         let Some(p) = parsed.iter().find(|p| p.source == module.source) else {
@@ -177,15 +207,15 @@ fn lookup(
                     text: def.name.clone(),
                     scope: origin.syntax.scope().clone(),
                     identity: origin.syntax.scope_identity().cloned(),
-                    target: DefId {
+                    target: Target::Def(DefId {
                         module: ModuleId(module_index as u32),
                         index: index as u32,
-                    },
+                    }),
                 });
             }
         }
     }
-    let module_lookup = |scope: u32, text: &str| -> Option<hygiene::ModuleName<DefId>> {
+    let module_lookup = |scope: u32, text: &str| -> Option<hygiene::ModuleName<Target>> {
         let id = *by_source.get(&scope)?;
         let module = program.module(id);
         if let Some((index, def)) = module
@@ -195,10 +225,10 @@ fn lookup(
             .find(|(_, d)| d.name == text && !p_is_marked(parsed, module.source, d.span))
         {
             return Some(hygiene::ModuleName {
-                target: DefId {
+                target: Target::Def(DefId {
                     module: id,
                     index: index as u32,
-                },
+                }),
                 exported: def.exported,
             });
         }
@@ -224,23 +254,38 @@ fn lookup(
                 .find(|(_, d)| d.name == text && d.exported)
             {
                 return Some(hygiene::ModuleName {
-                    target: DefId {
+                    target: Target::Def(DefId {
                         module: imported,
                         index: index as u32,
-                    },
+                    }),
                     exported: true,
                 });
             }
         }
-        None
+        module
+            .import_names
+            .iter()
+            .find(|(name, _)| name == text)
+            .map(|(_, id)| hygiene::ModuleName {
+                target: Target::Module(*id),
+                exported: false,
+            })
+    };
+    let resolve_name = |atom: &Syntax| {
+        hygiene::lookup(
+            atom,
+            program.module(caller).source.0,
+            &[],
+            &generated,
+            &module_lookup,
+            |_| None,
+            |_| None,
+        )
     };
     if let Some(qualifier) = qualifier {
-        let Node::Name(alias) = qualifier.node() else {
+        let hygiene::Lookup::Found(Target::Module(imported)) = resolve_name(qualifier) else {
             return None;
         };
-        let scope_module = *by_source.get(&qualifier.scope().module)?;
-        let module = program.module(scope_module);
-        let imported = module.import_names.iter().find(|(n, _)| n == alias)?.1;
         let Node::Name(text) = name.node() else {
             return None;
         };
@@ -256,16 +301,8 @@ fn lookup(
             index: index as u32,
         });
     }
-    match hygiene::lookup(
-        name,
-        program.module(caller).source.0,
-        &[],
-        &generated,
-        module_lookup,
-        |_| None,
-        |_| None,
-    ) {
-        hygiene::Lookup::Found(id) => Some(id),
+    match resolve_name(name) {
+        hygiene::Lookup::Found(Target::Def(id)) => Some(id),
         _ => None,
     }
 }
