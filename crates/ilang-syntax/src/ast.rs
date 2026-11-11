@@ -462,3 +462,251 @@ impl LitValue {
         }
     }
 }
+
+// Trees produced by macros can be much deeper than the host call stack. Move
+// children onto one explicit worklist before dropping their owning node.
+mod iterative_drop {
+    use super::*;
+
+    enum Part {
+        Expr(ExprKind),
+        Pattern(PatternKind),
+        Type(TypeKind),
+    }
+    fn expr(e: &mut Expr, work: &mut Vec<Part>) {
+        work.push(Part::Expr(std::mem::replace(
+            &mut e.kind,
+            ExprKind::Tuple(Vec::new()),
+        )));
+    }
+    fn pattern(p: &mut Pattern, work: &mut Vec<Part>) {
+        work.push(Part::Pattern(std::mem::replace(
+            &mut p.kind,
+            PatternKind::Discard(String::new()),
+        )));
+    }
+    fn ty(t: &mut TypeExpr, work: &mut Vec<Part>) {
+        work.push(Part::Type(std::mem::replace(&mut t.kind, TypeKind::Hole)));
+    }
+    fn format(f: &mut Option<Format>, work: &mut Vec<Part>) {
+        if let Some(arg) = f.as_mut().and_then(|f| f.arg.as_mut()) {
+            expr(arg, work);
+        }
+    }
+    fn block(b: &mut Block, work: &mut Vec<Part>) {
+        for stmt in &mut b.stmts {
+            match stmt {
+                Stmt::Bind(b) => {
+                    pattern(&mut b.pattern, work);
+                    expr(&mut b.value, work);
+                }
+                Stmt::Env { ty: t, value, .. } => {
+                    ty(t, work);
+                    expr(value, work);
+                }
+                Stmt::Expr(e) => expr(e, work),
+            }
+        }
+    }
+    fn clauses(cs: &mut [Clause], work: &mut Vec<Part>) {
+        for c in cs {
+            for p in &mut c.patterns {
+                pattern(p, work);
+            }
+            if let Some(g) = &mut c.guard {
+                expr(g, work);
+            }
+            expr(&mut c.body, work);
+        }
+    }
+    fn drain(mut work: Vec<Part>) {
+        while let Some(part) = work.pop() {
+            match part {
+                Part::Expr(mut kind) => match &mut kind {
+                    ExprKind::Tuple(xs) => {
+                        for x in xs {
+                            expr(x, &mut work);
+                        }
+                    }
+                    ExprKind::List { items, rest } => {
+                        for x in items {
+                            expr(x, &mut work);
+                        }
+                        if let Some(x) = rest {
+                            expr(x, &mut work);
+                        }
+                    }
+                    ExprKind::BitArray(xs) => {
+                        for x in xs {
+                            expr(&mut x.value, &mut work);
+                            format(&mut x.format, &mut work);
+                        }
+                    }
+                    ExprKind::Block(b) => block(b, &mut work),
+                    ExprKind::Fn(f) => {
+                        for p in &mut f.params {
+                            match p {
+                                Param::Pattern(p) => pattern(p, &mut work),
+                                Param::Env { ty: t, .. } => ty(t, &mut work),
+                            }
+                        }
+                        if let Some(r) = &mut f.ret {
+                            ty(&mut r.value, &mut work);
+                            if let Some(t) = &mut r.err {
+                                ty(t, &mut work);
+                            }
+                            if let Some(t) = &mut r.env {
+                                ty(t, &mut work);
+                            }
+                        }
+                        block(&mut f.body, &mut work);
+                    }
+                    ExprKind::Case {
+                        subject,
+                        clauses: cs,
+                    } => {
+                        expr(subject, &mut work);
+                        clauses(cs, &mut work);
+                    }
+                    ExprKind::Clauses(cs) => clauses(cs, &mut work),
+                    ExprKind::Call { callee, args } => {
+                        expr(callee, &mut work);
+                        for a in args {
+                            expr(&mut a.value, &mut work);
+                        }
+                    }
+                    ExprKind::Field { target, .. }
+                    | ExprKind::TupleIndex { target, .. }
+                    | ExprKind::Unary { expr: target, .. } => expr(target, &mut work),
+                    ExprKind::RecordUpdate {
+                        constructor,
+                        base,
+                        fields,
+                    } => {
+                        expr(constructor, &mut work);
+                        expr(base, &mut work);
+                        for (_, e) in fields {
+                            expr(e, &mut work);
+                        }
+                    }
+                    ExprKind::Binary { lhs, rhs, .. } => {
+                        expr(lhs, &mut work);
+                        expr(rhs, &mut work);
+                    }
+                    ExprKind::Quote(_)
+                    | ExprKind::Int(_)
+                    | ExprKind::Float(_)
+                    | ExprKind::String(_)
+                    | ExprKind::Name { .. } => {}
+                },
+                Part::Pattern(mut kind) => match &mut kind {
+                    PatternKind::Typed { ty: t, .. } => ty(t, &mut work),
+                    PatternKind::Named { pattern: p, .. } => pattern(p, &mut work),
+                    PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
+                        for p in args {
+                            pattern(p, &mut work);
+                        }
+                    }
+                    PatternKind::List { items, .. } => {
+                        for p in items {
+                            pattern(p, &mut work);
+                        }
+                    }
+                    PatternKind::BitArray(xs) => {
+                        for x in xs {
+                            pattern(&mut x.value, &mut work);
+                            format(&mut x.format, &mut work);
+                        }
+                    }
+                    PatternKind::Quote(_)
+                    | PatternKind::Var(_)
+                    | PatternKind::Discard(_)
+                    | PatternKind::Int { .. }
+                    | PatternKind::Float { .. }
+                    | PatternKind::String(_)
+                    | PatternKind::Prefix { .. } => {}
+                },
+                Part::Type(mut kind) => match &mut kind {
+                    TypeKind::Named { args, .. }
+                    | TypeKind::Call { args, .. }
+                    | TypeKind::Tuple(args)
+                    | TypeKind::Union(args)
+                    | TypeKind::Inter(args)
+                    | TypeKind::Diff(args) => {
+                        for t in args {
+                            ty(t, &mut work);
+                        }
+                    }
+                    TypeKind::Fn {
+                        params,
+                        ret,
+                        err,
+                        env,
+                    } => {
+                        for p in params {
+                            ty(&mut p.ty, &mut work);
+                        }
+                        ty(ret, &mut work);
+                        if let Some(t) = err {
+                            ty(t, &mut work);
+                        }
+                        if let Some(t) = env {
+                            ty(t, &mut work);
+                        }
+                    }
+                    TypeKind::Lit(_) | TypeKind::ValueOf { .. } | TypeKind::Hole => {}
+                },
+            }
+        }
+    }
+    impl Drop for Expr {
+        fn drop(&mut self) {
+            if matches!(
+                &self.kind,
+                ExprKind::Int(_)
+                    | ExprKind::Float(_)
+                    | ExprKind::String(_)
+                    | ExprKind::Name { .. }
+                    | ExprKind::Quote(_)
+            ) || matches!(&self.kind, ExprKind::Tuple(xs) if xs.is_empty())
+            {
+                return;
+            }
+            let mut work = Vec::new();
+            expr(self, &mut work);
+            drain(work);
+        }
+    }
+    impl Drop for Pattern {
+        fn drop(&mut self) {
+            if matches!(
+                &self.kind,
+                PatternKind::Quote(_)
+                    | PatternKind::Var(_)
+                    | PatternKind::Discard(_)
+                    | PatternKind::Int { .. }
+                    | PatternKind::Float { .. }
+                    | PatternKind::String(_)
+                    | PatternKind::Prefix { .. }
+            ) {
+                return;
+            }
+            let mut work = Vec::new();
+            pattern(self, &mut work);
+            drain(work);
+        }
+    }
+    impl Drop for TypeExpr {
+        fn drop(&mut self) {
+            if matches!(
+                &self.kind,
+                TypeKind::Lit(_) | TypeKind::ValueOf { .. } | TypeKind::Hole
+            ) {
+                return;
+            }
+            let mut work = Vec::new();
+            ty(self, &mut work);
+            drain(work);
+        }
+    }
+}

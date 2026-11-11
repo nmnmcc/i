@@ -600,11 +600,13 @@ fn clause_head(p: &Datum) -> Result<String> {
             .unwrap_or_default(),
     ))
 }
-pub(super) fn ends_in_type_test(d: &Datum) -> bool {
-    match round(d) {
-        Some([h, _, _]) if symbol(h, ":") => true,
-        Some([h, _, p]) if symbol(h, "=") => ends_in_type_test(p),
-        _ => false,
+pub(super) fn ends_in_type_test(mut d: &Datum) -> bool {
+    loop {
+        match round(d) {
+            Some([h, _, _]) if symbol(h, ":") => return true,
+            Some([h, _, p]) if symbol(h, "=") => d = p,
+            _ => return false,
+        }
     }
 }
 fn pattern(d: &Datum) -> Result<String> {

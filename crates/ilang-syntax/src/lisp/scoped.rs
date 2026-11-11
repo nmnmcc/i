@@ -116,9 +116,9 @@ impl ScopedSource {
                 }
             }
             _ => {
-                let datum = syntax.to_datum();
+                let mut datum = syntax.to_datum();
                 self.text.push_str(&super::show(&datum));
-                datum.kind
+                std::mem::replace(&mut datum.kind, DatumKind::Symbol(String::new()))
             }
         };
         let span = Span::new(start, self.position());
