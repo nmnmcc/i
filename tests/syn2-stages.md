@@ -107,3 +107,13 @@ The Go `cmd/gofmt/rewrite.go` comment-map approach motivates retaining source
 between span edits, and Cargo `src/workspace/parser/targets.rs` and Gleam
 `compiler-cli/src/run.rs` distinguish conventional and explicitly selected
 entry modules.
+
+## Remaining verification issue
+
+The full spec suite's second run passed 400/402 cases. The old record
+reservation case now accepts a record and its expectation has been updated.
+The remaining `tests/spec/10.2/main_and_test.i` reproduces an entry/test
+collision with `@main\n@test\nboth = () { Nil }`: the single-file runner
+constructs `src/main.i`, and reports E0305 (test placement) instead of the
+expected E0321 (entry/test collision). Two attempts to reconcile this fixture
+with the new single-file runner have not restored its expected diagnostic.
