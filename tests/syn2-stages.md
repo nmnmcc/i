@@ -119,3 +119,18 @@ the module, avoiding capture. Empty expressions are accepted only when the
 package checker, including tests, succeeds and records an empty-record type
 at that span; otherwise they are reported for manual review. The old forms
 are listed in `scripts/old-syntax-check.json`.
+
+## Repository migration baseline
+
+On merged redesign 7e240a4e, the WAT_DUMP harness completed successfully and
+captured 1,460 spec and package variants in target/syn2-before. The separate
+manifest sweep examined 3,914 projects, saved WAT for 3,027 and recorded 19
+12-second timeouts; its complete statuses are in target/syn2-before/packages.
+Comparison with the migrated tree remains pending.
+
+The migration's reviewed data records exact source identities and diagnostics
+for deliberately malformed `.invalid` review inputs and negative spec cases;
+the one JavaScript string classified there is host text. The reviewed empty
+expressions in the record specs use `()` as an empty record; the negative
+`Unit = ()` spec intentionally tests the forbidden type. These decisions
+follow spec sections 3 and 6.4 and do not disable reporting for changed inputs.
