@@ -25,6 +25,15 @@ compiler's i host, independently of the target of the program being built.
 | Enter a synthesized callable wrapper | 0 | 0 | 1 plus parameters |
 | Compiler Syntax operation | 1 plus nodes and bytes traversed | wrapper plus output and traversal words | traversal depth |
 | Copy a boundary buffer | bytes copied | 4 plus bytes rounded up to words | 0 |
+| Expand Syntax into a scoped AST | 1 plus one per node and child | 1 plus 64 per node and 8 per child | 0 |
+| Render a source-name or text atom for scoped AST | 24 times its UTF-8 bytes plus 16 | 4 plus that bound rounded up to words | 0 |
+| Render an integer atom for scoped AST | square of its 32-bit limb count plus its bit count plus 1 | 4 plus its bit count plus 1 bytes, rounded up to words | 0 |
+| Render a float atom for scoped AST | 32 | 8 | 0 |
+| Copy a written or expanded definition answer | syntax nodes and bytes, as for a compiler Syntax operation | output and traversal words, as for a compiler Syntax operation | traversal depth |
+| Construct one of the five synthetic builtin definitions | 512 | 512 | 0 |
+
+An expanded definition answer with parameter identities is charged for both
+tree constructions: identity freshening and answer-provenance conversion.
 | Look up a host identity among `n` live or weak entries | `16 × (1 + bit_length(n + 1))` | 0 | 0 |
 | Install a host identity | the lookup cost again | `64 × (1 + bit_length(n + 1))` | 0 |
 | Sweep weak host identities | number of entries | 0 | 0 |
@@ -45,6 +54,20 @@ worst-case escaped output before traversing or building the result. The host
 and guest use the same invocation budget; cloning the handle does not reset it.
 Host identities use a per-instance balanced map, so a lookup and an insertion
 have a deterministic size-based charge before comparison, allocation or sweep.
+
+Each Syntax call starts with one work unit and eight wrapper words. A tree
+traversal charges one work unit and 16 words per node (80 words when a formatted
+output is built), plus one work unit and eight words per child edge. Atom text
+charges one work unit per byte. Formatting charges 12 work units per atom byte
+and four words plus the resulting upper-bound bytes rounded to words. Formatting
+an arbitrary precision integer also charges the square of its 32-bit limb count
+for decimal conversion before formatting. Creating
+a text atom charges 16 work units and 16 words per byte plus 16 words for the
+lexer and its tokens. Copying existing text or an integer charges its bytes and
+four words plus those bytes rounded to words. Building a list from linked nodes
+charges three work units and one word per element before the exact-sized vector
+is allocated. These charges cover the accounting traversal's own explicit
+stack and its geometric capacity growth.
 
 Tail calls leave the caller's frame before the callee enters. Error handlers
 restore the saved frame depth, and resumed continuations restore their own

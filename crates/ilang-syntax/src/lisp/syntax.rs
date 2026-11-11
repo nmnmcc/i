@@ -171,33 +171,44 @@ impl Syntax {
         }))
     }
     pub fn from_datum(d: &Datum, scope: &Scope) -> Self {
-        let children = |xs: &[Datum]| xs.iter().map(|x| Self::from_datum(x, scope)).collect();
-        let node = match &d.kind {
-            DatumKind::Name(s) => Node::Name(s.clone()),
-            DatumKind::Discard(s) => Node::Discard(s.clone()),
-            DatumKind::UpName(s) => Node::Up(s.clone()),
-            DatumKind::Symbol(s) => Node::Symbol(s.clone()),
-            DatumKind::Int(n) => Node::Int(n.clone()),
-            DatumKind::Float(n) => Node::Float(*n),
-            DatumKind::String(s) => Node::Text(s.clone()),
-            DatumKind::Round(xs) => Node::Round(children(xs)),
-            DatumKind::Square(xs) => Node::Square(children(xs)),
-            DatumKind::Curly(xs) => Node::Curly(children(xs)),
-            DatumKind::Bits(xs) => Node::Bits(children(xs)),
-            DatumKind::Quote(x) => Node::Quote(Self::from_datum(x, scope)),
-            DatumKind::Unquote(x) => Node::Unquote(Self::from_datum(x, scope)),
-            DatumKind::Splice(x) => Node::Splice(Self::from_datum(x, scope)),
-        };
-        Self(Arc::new(SyntaxData {
-            node,
-            scope: scope.clone(),
-            span: d.span,
-            provenance: Provenance::Written,
-            identity: None,
-            definition_head: None,
-            origin: Arc::new(()),
-            host_identity: Mutex::new(None),
-        }))
+        let mut tasks = vec![(d, false)];
+        let mut built = Vec::new();
+        while let Some((datum, finish)) = tasks.pop() {
+            let children: &[Datum] = match &datum.kind {
+                DatumKind::Round(xs)
+                | DatumKind::Square(xs)
+                | DatumKind::Curly(xs)
+                | DatumKind::Bits(xs) => xs,
+                DatumKind::Quote(x) | DatumKind::Unquote(x) | DatumKind::Splice(x) => {
+                    std::slice::from_ref(x.as_ref())
+                }
+                _ => &[],
+            };
+            if !finish && !children.is_empty() {
+                tasks.push((datum, true));
+                tasks.extend(children.iter().rev().map(|child| (child, false)));
+                continue;
+            }
+            let values = built.split_off(built.len() - children.len());
+            let node = match &datum.kind {
+                DatumKind::Name(s) => Node::Name(s.clone()),
+                DatumKind::Discard(s) => Node::Discard(s.clone()),
+                DatumKind::UpName(s) => Node::Up(s.clone()),
+                DatumKind::Symbol(s) => Node::Symbol(s.clone()),
+                DatumKind::Int(n) => Node::Int(n.clone()),
+                DatumKind::Float(n) => Node::Float(*n),
+                DatumKind::String(s) => Node::Text(s.clone()),
+                DatumKind::Round(_) => Node::Round(values),
+                DatumKind::Square(_) => Node::Square(values),
+                DatumKind::Curly(_) => Node::Curly(values),
+                DatumKind::Bits(_) => Node::Bits(values),
+                DatumKind::Quote(_) => Node::Quote(values.into_iter().next().unwrap()),
+                DatumKind::Unquote(_) => Node::Unquote(values.into_iter().next().unwrap()),
+                DatumKind::Splice(_) => Node::Splice(values.into_iter().next().unwrap()),
+            };
+            built.push(Self::written(node, scope, datum.span));
+        }
+        built.pop().expect("datum conversion produces one syntax")
     }
     pub fn node(&self) -> &Node {
         &self.0.node
@@ -326,27 +337,59 @@ impl Syntax {
 
     /// Mark a definition-query answer and all of its descendants as such.
     pub fn as_answer(&self) -> Self {
-        let map = |xs: &[Syntax]| xs.iter().map(Syntax::as_answer).collect();
-        let node = match self.node() {
-            Node::Round(xs) => Node::Round(map(xs)),
-            Node::Square(xs) => Node::Square(map(xs)),
-            Node::Curly(xs) => Node::Curly(map(xs)),
-            Node::Bits(xs) => Node::Bits(map(xs)),
-            Node::Quote(x) => Node::Quote(x.as_answer()),
-            Node::Unquote(x) => Node::Unquote(x.as_answer()),
-            Node::Splice(x) => Node::Splice(x.as_answer()),
-            leaf => leaf.clone(),
-        };
-        Self(Arc::new(SyntaxData {
-            node,
-            scope: self.scope().clone(),
-            span: self.span(),
-            provenance: Provenance::Answer,
-            identity: self.scope_identity().cloned(),
-            definition_head: self.definition_head(),
-            origin: Arc::new(()),
-            host_identity: Mutex::new(None),
-        }))
+        use std::collections::HashMap;
+        let mut seen = HashMap::<usize, Syntax>::new();
+        let mut pending = vec![(self, false)];
+        while let Some((syntax, finish)) = pending.pop() {
+            let key = Arc::as_ptr(&syntax.0) as usize;
+            if seen.contains_key(&key) {
+                continue;
+            }
+            if !finish {
+                pending.push((syntax, true));
+                match syntax.node() {
+                    Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                        for child in xs.iter().rev() {
+                            pending.push((child, false));
+                        }
+                    }
+                    Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => pending.push((x, false)),
+                    _ => {}
+                }
+                continue;
+            }
+            let mapped = |child: &Syntax| {
+                seen.get(&(Arc::as_ptr(&child.0) as usize))
+                    .expect("answer child was built first")
+                    .clone()
+            };
+            let children = |xs: &[Syntax]| xs.iter().map(mapped).collect();
+            let node = match syntax.node() {
+                Node::Round(xs) => Node::Round(children(xs)),
+                Node::Square(xs) => Node::Square(children(xs)),
+                Node::Curly(xs) => Node::Curly(children(xs)),
+                Node::Bits(xs) => Node::Bits(children(xs)),
+                Node::Quote(x) => Node::Quote(mapped(x)),
+                Node::Unquote(x) => Node::Unquote(mapped(x)),
+                Node::Splice(x) => Node::Splice(mapped(x)),
+                leaf => leaf.clone(),
+            };
+            seen.insert(
+                key,
+                Syntax(Arc::new(SyntaxData {
+                    node,
+                    scope: syntax.scope().clone(),
+                    span: syntax.span(),
+                    provenance: Provenance::Answer,
+                    identity: syntax.scope_identity().cloned(),
+                    definition_head: syntax.definition_head(),
+                    origin: Arc::new(()),
+                    host_identity: Mutex::new(None),
+                })),
+            );
+        }
+        seen.remove(&(Arc::as_ptr(&self.0) as usize))
+            .expect("answer root was built")
     }
     pub fn identical(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
@@ -394,31 +437,80 @@ impl Syntax {
     }
 
     pub fn to_datum(&self) -> Datum {
-        let children = |xs: &[Syntax]| xs.iter().map(Syntax::to_datum).collect();
-        let kind = match self.node() {
-            Node::Name(s) => DatumKind::Name(s.clone()),
-            Node::Discard(s) => DatumKind::Discard(s.clone()),
-            Node::Up(s) => DatumKind::UpName(s.clone()),
-            Node::Symbol(s) => DatumKind::Symbol(s.clone()),
-            Node::Int(n) => DatumKind::Int(n.clone()),
-            Node::Float(n) => DatumKind::Float(*n),
-            Node::Text(s) => DatumKind::String(s.clone()),
-            Node::Round(xs) => DatumKind::Round(children(xs)),
-            Node::Square(xs) => DatumKind::Square(children(xs)),
-            Node::Curly(xs) => DatumKind::Curly(children(xs)),
-            Node::Bits(xs) => DatumKind::Bits(children(xs)),
-            Node::Quote(x) => DatumKind::Quote(Box::new(x.to_datum())),
-            Node::Unquote(x) => DatumKind::Unquote(Box::new(x.to_datum())),
-            Node::Splice(x) => DatumKind::Splice(Box::new(x.to_datum())),
-        };
-        Datum {
-            kind,
-            span: self.span(),
-            docs: Vec::new(),
+        enum Task<'a> {
+            Visit(&'a Syntax),
+            Finish(&'a Syntax, usize),
         }
+        let mut tasks = vec![Task::Visit(self)];
+        let mut values = Vec::new();
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Visit(value) => {
+                    let children = match value.node() {
+                        Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                            Some(xs.as_slice())
+                        }
+                        Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => {
+                            Some(std::slice::from_ref(x))
+                        }
+                        _ => None,
+                    };
+                    if let Some(children) = children {
+                        tasks.push(Task::Finish(value, children.len()));
+                        tasks.extend(children.iter().rev().map(Task::Visit));
+                    } else {
+                        let kind = match value.node() {
+                            Node::Name(s) => DatumKind::Name(s.clone()),
+                            Node::Discard(s) => DatumKind::Discard(s.clone()),
+                            Node::Up(s) => DatumKind::UpName(s.clone()),
+                            Node::Symbol(s) => DatumKind::Symbol(s.clone()),
+                            Node::Int(n) => DatumKind::Int(n.clone()),
+                            Node::Float(n) => DatumKind::Float(*n),
+                            Node::Text(s) => DatumKind::String(s.clone()),
+                            _ => unreachable!("composite syntax has children"),
+                        };
+                        values.push(Datum {
+                            kind,
+                            span: value.span(),
+                            docs: Vec::new(),
+                        });
+                    }
+                }
+                Task::Finish(value, count) => {
+                    let at = values
+                        .len()
+                        .checked_sub(count)
+                        .expect("syntax child stack underflow");
+                    let mut children = values.split_off(at);
+                    let kind = match value.node() {
+                        Node::Round(_) => DatumKind::Round(children),
+                        Node::Square(_) => DatumKind::Square(children),
+                        Node::Curly(_) => DatumKind::Curly(children),
+                        Node::Bits(_) => DatumKind::Bits(children),
+                        Node::Quote(_) => {
+                            DatumKind::Quote(Box::new(children.pop().expect("quote child")))
+                        }
+                        Node::Unquote(_) => {
+                            DatumKind::Unquote(Box::new(children.pop().expect("unquote child")))
+                        }
+                        Node::Splice(_) => {
+                            DatumKind::Splice(Box::new(children.pop().expect("splice child")))
+                        }
+                        _ => unreachable!("leaf syntax has no finish task"),
+                    };
+                    values.push(Datum {
+                        kind,
+                        span: value.span(),
+                        docs: Vec::new(),
+                    });
+                }
+            }
+        }
+        assert_eq!(values.len(), 1, "syntax conversion has one result");
+        values.pop().expect("syntax conversion result")
     }
     pub fn show(&self) -> String {
-        super::show(&self.to_datum())
+        super::show_tree(self)
     }
     pub fn show_as(&self, position: Position) -> Result<String, SyntaxError> {
         super::to_source::show_as(&self.to_datum(), position).map_err(|e| SyntaxError {
@@ -503,26 +595,32 @@ impl Syntax {
     /// Compare datums, ignoring provenance, scopes, and value identity.
     pub fn same_code(&self, other: &Self) -> bool {
         use Node::*;
-        fn all(a: &[Syntax], b: &[Syntax]) -> bool {
-            a.len() == b.len() && a.iter().zip(b).all(|(a, b)| a.same_code(b))
-        }
-        match (self.node(), other.node()) {
-            (Name(a), Name(b))
-            | (Discard(a), Discard(b))
-            | (Up(a), Up(b))
-            | (Symbol(a), Symbol(b))
-            | (Text(a), Text(b)) => a == b,
-            (Int(a), Int(b)) => a == b,
-            (Float(a), Float(b)) => a == b,
-            (Round(a), Round(b))
-            | (Square(a), Square(b))
-            | (Curly(a), Curly(b))
-            | (Bits(a), Bits(b)) => all(a, b),
-            (Quote(a), Quote(b)) | (Unquote(a), Unquote(b)) | (Splice(a), Splice(b)) => {
-                a.same_code(b)
+        let mut pending = vec![(self, other)];
+        while let Some((left, right)) = pending.pop() {
+            match (left.node(), right.node()) {
+                (Name(a), Name(b))
+                | (Discard(a), Discard(b))
+                | (Up(a), Up(b))
+                | (Symbol(a), Symbol(b))
+                | (Text(a), Text(b))
+                    if a == b => {}
+                (Int(a), Int(b)) if a == b => {}
+                (Float(a), Float(b)) if a == b => {}
+                (Round(a), Round(b))
+                | (Square(a), Square(b))
+                | (Curly(a), Curly(b))
+                | (Bits(a), Bits(b))
+                    if a.len() == b.len() =>
+                {
+                    pending.extend(a.iter().zip(b));
+                }
+                (Quote(a), Quote(b)) | (Unquote(a), Unquote(b)) | (Splice(a), Splice(b)) => {
+                    pending.push((a, b));
+                }
+                _ => return false,
             }
-            _ => false,
         }
+        true
     }
 
     /// Evaluate a quoted template. The caller evaluates each embedded i
@@ -579,81 +677,75 @@ impl Syntax {
         let Node::Quote(pattern) = self.node() else {
             return Err(self.error("expected a quote pattern"));
         };
-        fn validate(pattern: &Syntax) -> Result<(), SyntaxError> {
-            match pattern.node() {
-                Node::Splice(_) => Err(pattern.error("a splice must be the last part of brackets")),
-                Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
-                    for (i, child) in xs.iter().enumerate() {
-                        if matches!(child.node(), Node::Splice(_)) {
-                            if i + 1 != xs.len() {
-                                return Err(
-                                    child.error("a splice must be the last part of brackets")
-                                );
-                            }
-                        } else {
-                            validate(child)?;
-                        }
-                    }
-                    Ok(())
+        let mut validate = vec![(pattern, false)];
+        while let Some((current, allowed_splice)) = validate.pop() {
+            match current.node() {
+                Node::Splice(_) if !allowed_splice => {
+                    return Err(current.error("a splice must be the last part of brackets"));
                 }
-                _ => Ok(()),
+                Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                    validate.extend(
+                        xs.iter()
+                            .enumerate()
+                            .rev()
+                            .map(|(i, child)| (child, i + 1 == xs.len())),
+                    );
+                }
+                _ => {}
             }
         }
-        validate(pattern)?;
-        fn pair(
-            pattern: &Syntax,
-            value: &Syntax,
-            captures: &mut Vec<Capture>,
-        ) -> Result<bool, SyntaxError> {
+        enum Task<'a> {
+            Pair(&'a Syntax, &'a Syntax),
+            Splice(&'a Syntax, &'a [Syntax]),
+        }
+        let mut tasks = vec![Task::Pair(pattern, value)];
+        let mut captures = Vec::new();
+        while let Some(task) = tasks.pop() {
+            let (pattern, value) = match task {
+                Task::Splice(p, values) => {
+                    captures.push(Capture {
+                        pattern: p.clone(),
+                        value: Substitution::Many(values.to_vec()),
+                    });
+                    continue;
+                }
+                Task::Pair(pattern, value) => (pattern, value),
+            };
             if let Node::Unquote(p) = pattern.node() {
                 captures.push(Capture {
                     pattern: p.clone(),
                     value: Substitution::One(value.clone()),
                 });
-                return Ok(true);
+                continue;
             }
-            if matches!(pattern.node(), Node::Splice(_)) {
-                return Err(pattern.error("a splice must be the last part of brackets"));
-            }
-            fn parts(
-                ps: &[Syntax],
-                vs: &[Syntax],
-                captures: &mut Vec<Capture>,
-            ) -> Result<bool, SyntaxError> {
-                let splice = ps.last().and_then(|p| {
-                    if let Node::Splice(x) = p.node() {
-                        Some((p, x))
-                    } else {
-                        None
-                    }
-                });
-                let fixed = ps.len() - usize::from(splice.is_some());
-                if vs.len() < fixed || (splice.is_none() && vs.len() != fixed) {
-                    return Ok(false);
-                }
-                for (p, v) in ps[..fixed].iter().zip(vs) {
-                    if !pair(p, v, captures)? {
-                        return Ok(false);
-                    }
-                }
-                if let Some((_, p)) = splice {
-                    captures.push(Capture {
-                        pattern: p.clone(),
-                        value: Substitution::Many(vs[fixed..].to_vec()),
-                    });
-                }
-                Ok(true)
-            }
-            match (pattern.node(), value.node()) {
+            let (ps, vs) = match (pattern.node(), value.node()) {
                 (Node::Round(p), Node::Round(v))
                 | (Node::Square(p), Node::Square(v))
                 | (Node::Curly(p), Node::Curly(v))
-                | (Node::Bits(p), Node::Bits(v)) => parts(p, v, captures),
-                _ => Ok(pattern.same_code(value)),
+                | (Node::Bits(p), Node::Bits(v)) => (p, v),
+                _ if pattern.same_code(value) => continue,
+                _ => return Ok(None),
+            };
+            let splice = ps.last().and_then(|p| match p.node() {
+                Node::Splice(x) => Some(x),
+                _ => None,
+            });
+            let fixed = ps.len() - usize::from(splice.is_some());
+            if vs.len() < fixed || (splice.is_none() && vs.len() != fixed) {
+                return Ok(None);
             }
+            if let Some(p) = splice {
+                tasks.push(Task::Splice(p, &vs[fixed..]));
+            }
+            tasks.extend(
+                ps[..fixed]
+                    .iter()
+                    .zip(vs)
+                    .rev()
+                    .map(|(p, v)| Task::Pair(p, v)),
+            );
         }
-        let mut captures = Vec::new();
-        Ok(pair(pattern, value, &mut captures)?.then_some(captures))
+        Ok(Some(captures))
     }
 
     fn error(&self, message: &str) -> SyntaxError {
