@@ -53,8 +53,8 @@ is_none(A) = (option: Option(A)) -> Bool {
 /// ```
 map(A, B, E, N) = (
 	over: Option(A)
-	with: (A) -> B ? E ! N
-) -> Option(B) ? E ! N {
+	with: (A) -> B ^ E ! N
+) -> Option(B) ^ E ! N {
 	over |> {
 		Some(value) -> Some(with(value))
 		None        -> None
@@ -69,8 +69,8 @@ map(A, B, E, N) = (
 /// ```
 then(A, B, E, N) = (
 	option: Option(A)
-	apply: (A) -> Option(B) ? E ! N
-) -> Option(B) ? E ! N {
+	apply: (A) -> Option(B) ^ E ! N
+) -> Option(B) ^ E ! N {
 	option |> {
 		Some(value) -> apply(value)
 		None        -> None
@@ -94,7 +94,7 @@ unwrap(A) = (option: Option(A), or: A) -> A {
 }
 
 /// The value in a `Some`, or the value of `default()` for `None`.
-lazy_unwrap(A, E, N) = (option: Option(A), or: () -> A ? E ! N) -> A ? E ! N {
+lazy_unwrap(A, E, N) = (option: Option(A), or: () -> A ^ E ! N) -> A ^ E ! N {
 	option |> {
 		Some(value) -> value
 		None        -> or()
@@ -112,8 +112,8 @@ or(A) = (first: Option(A), second: Option(A)) -> Option(A) {
 /// The first option when it is `Some`, and the value of `second()` when not.
 lazy_or(A, E, N) = (
 	first: Option(A)
-	second: () -> Option(A) ? E ! N
-) -> Option(A) ? E ! N {
+	second: () -> Option(A) ^ E ! N
+) -> Option(A) ^ E ! N {
 	first |> {
 		Some(_) -> first
 		None    -> second()
@@ -173,8 +173,8 @@ values(A) = (options: List(Option(A))) -> List(A) {
 /// Keeps a `Some` only when its value passes the test.
 filter(A, E, N) = (
 	option: Option(A)
-	keeping: (A) -> Bool ? E ! N
-) -> Option(A) ? E ! N {
+	keeping: (A) -> Bool ^ E ! N
+) -> Option(A) ^ E ! N {
 	option |> {
 		Some(value) -> keeping(value) |> {
 			True  -> option
@@ -188,8 +188,8 @@ filter(A, E, N) = (
 map2(A, B, C, E, N) = (
 	a: Option(A)
 	b: Option(B)
-	with: (A, B) -> C ? E ! N
-) -> Option(C) ? E ! N {
+	with: (A, B) -> C ^ E ! N
+) -> Option(C) ^ E ! N {
 	(a, b) |> {
 		(Some(x), Some(y)) -> Some(with(x, y))
 		_                  -> None

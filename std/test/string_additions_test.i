@@ -148,8 +148,8 @@ observe = (body: () -> Nil ! Calls | Assert) -> List(Int) ! Assert {
 callbacks_run_once_in_order_and_stop_on_error = () {
 	run = (
 		action: (
-			(UtfCodepoint) -> UtfCodepoint ? String ! Calls
-		) -> String ? String ! Calls
+			(UtfCodepoint) -> UtfCodepoint ^ String ! Calls
+		) -> String ^ String ! Calls
 	) -> Nil ! Assert {
 		seen = observe(() {
 			result = fail.catch(() {

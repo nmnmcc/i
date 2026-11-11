@@ -21,7 +21,7 @@ record = (event: Event, capture ! Capture) -> Nil ! Capture {
 }
 
 // std-2 §7: finite, closed instantiations retain service and error types.
-deliver: (log.Entry) -> Nil ? String ! Capture | log.Sink(
+deliver: (log.Entry) -> Nil ^ String ! Capture | log.Sink(
 	String
 	Capture
 ) = log.write
@@ -30,8 +30,8 @@ query: (log.Level) -> Bool ! log.Sink(String, Capture) = log.enabled
 
 defer_message: (
 	log.Level
-	() -> String ? String ! Capture
-) -> Nil ? String ! Capture | log.Sink(String, Capture) = log.lazy
+	() -> String ^ String ! Capture
+) -> Nil ^ String ! Capture | log.Sink(String, Capture) = log.lazy
 
 capture_sink = () -> log.Sink(String, Capture) {
 	log.make((_: log.Level) { True }, (entry) { record(Sent(entry)) })
@@ -185,7 +185,7 @@ DeliveryError {
 	DeliveryError(String)
 }
 
-broken_deliver: (log.Entry) -> Nil ? DeliveryError ! Capture | log.Sink(
+broken_deliver: (log.Entry) -> Nil ^ DeliveryError ! Capture | log.Sink(
 	DeliveryError
 	Capture
 ) = log.write

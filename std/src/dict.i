@@ -330,16 +330,16 @@ remove_entry(K, V) = (
 upsert(K, V, E, N) = (
 	dict: Dict(K, V)
 	in: K
-	with: (Option(V)) -> V ? E ! N
-) -> Dict(K, V) ? E ! N { insert(dict, in, with(get(dict, in))) }
+	with: (Option(V)) -> V ^ E ! N
+) -> Dict(K, V) ^ E ! N { insert(dict, in, with(get(dict, in))) }
 
 /// Changes the value for a key with a function, when the key is there. If
 /// not, the dict is the same.
 update(K, V, E, N) = (
 	dict: Dict(K, V)
 	in: K
-	with: (V) -> V ? E ! N
-) -> Dict(K, V) ? E ! N {
+	with: (V) -> V ^ E ! N
+) -> Dict(K, V) ^ E ! N {
 	get(dict, in) |> {
 		Some(value) -> insert(dict, in, with(value))
 		None        -> dict
@@ -367,8 +367,8 @@ from_list(K, V) = (list: List((K, V))) -> Dict(K, V) {
 fold(K, V, Acc, E, N) = (
 	over: Dict(K, V)
 	from: Acc
-	with: (Acc, K, V) -> Acc ? E ! N
-) -> Acc ? E ! N {
+	with: (Acc, K, V) -> Acc ^ E ! N
+) -> Acc ^ E ! N {
 	Dict(_, root) = over
 	fold_node(root, from, with)
 }
@@ -376,8 +376,8 @@ fold(K, V, Acc, E, N) = (
 fold_node(K, V, Acc, E, N) = (
 	node: Node(K, V)
 	acc: Acc
-	f: (Acc, K, V) -> Acc ? E ! N
-) -> Acc ? E ! N {
+	f: (Acc, K, V) -> Acc ^ E ! N
+) -> Acc ^ E ! N {
 	node |> {
 		Empty            -> acc
 		One(_, k, v)     -> f(acc, k, v)
@@ -393,8 +393,8 @@ fold_node(K, V, Acc, E, N) = (
 fold_entries(K, V, Acc, E, N) = (
 	entries: List((K, V))
 	acc: Acc
-	f: (Acc, K, V) -> Acc ? E ! N
-) -> Acc ? E ! N {
+	f: (Acc, K, V) -> Acc ^ E ! N
+) -> Acc ^ E ! N {
 	entries |> {
 		[]               -> acc
 		[(k, v), ..rest] -> fold_entries(rest, f(acc, k, v), f)
@@ -419,8 +419,8 @@ values(K, V) = (dict: Dict(K, V)) -> List(V) {
 /// Calls a function with every entry, in the order of `fold`.
 each(K, V, A, E, N) = (
 	dict: Dict(K, V)
-	with: (K, V) -> A ? E ! N
-) -> Nil ? E ! N {
+	with: (K, V) -> A ^ E ! N
+) -> Nil ^ E ! N {
 	fold(dict, Nil, (_, k, v) {
 		with(k, v)
 		Nil
@@ -434,16 +434,16 @@ each(K, V, A, E, N) = (
 /// ```
 map_values(K, V, W, E, N) = (
 	in: Dict(K, V)
-	with: (K, V) -> W ? E ! N
-) -> Dict(K, W) ? E ! N {
+	with: (K, V) -> W ^ E ! N
+) -> Dict(K, W) ^ E ! N {
 	Dict(n, root) = in
 	Dict(n, map_node(root, with))
 }
 
 map_node(K, V, W, E, N) = (
 	node: Node(K, V)
-	f: (K, V) -> W ? E ! N
-) -> Node(K, W) ? E ! N {
+	f: (K, V) -> W ^ E ! N
+) -> Node(K, W) ^ E ! N {
 	node |> {
 		Empty            -> Empty
 		One(h, k, v)     -> One(h, k, f(k, v))
@@ -460,9 +460,9 @@ map_node(K, V, W, E, N) = (
 
 map_entries(K, V, W, E, N) = (
 	entries: List((K, V))
-	f: (K, V) -> W ? E ! N
+	f: (K, V) -> W ^ E ! N
 	acc: List((K, W))
-) -> List((K, W)) ? E ! N {
+) -> List((K, W)) ^ E ! N {
 	entries |> {
 		[]               -> reverse_onto(acc, [])
 		[(k, v), ..rest] -> map_entries(rest, f, [(k, f(k, v)), ..acc])
@@ -472,8 +472,8 @@ map_entries(K, V, W, E, N) = (
 /// Keeps only the entries for which the function gives `True`.
 filter(K, V, E, N) = (
 	in: Dict(K, V)
-	keeping: (K, V) -> Bool ? E ! N
-) -> Dict(K, V) ? E ! N {
+	keeping: (K, V) -> Bool ^ E ! N
+) -> Dict(K, V) ^ E ! N {
 	fold(in, in, (acc, k, v) {
 		keeping(k, v) |> {
 			True  -> acc
@@ -524,8 +524,8 @@ merge(K, V) = (into: Dict(K, V), from: Dict(K, V)) -> Dict(K, V) {
 combine(K, V, E, N) = (
 	dict: Dict(K, V)
 	other: Dict(K, V)
-	with: (V, V) -> V ? E ! N
-) -> Dict(K, V) ? E ! N {
+	with: (V, V) -> V ^ E ! N
+) -> Dict(K, V) ^ E ! N {
 	fold(other, dict, (acc, k, v) {
 		get(acc, k) |> {
 			Some(old) -> insert(acc, k, with(old, v))
@@ -542,8 +542,8 @@ combine(K, V, E, N) = (
 /// ```
 group(V, K, E, N) = (
 	list: List(V)
-	by: (V) -> K ? E ! N
-) -> Dict(K, List(V)) ? E ! N {
+	by: (V) -> K ^ E ! N
+) -> Dict(K, List(V)) ^ E ! N {
 	go = (rest, acc) {
 		rest |> {
 			[] -> acc

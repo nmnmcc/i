@@ -176,8 +176,8 @@ reverse(A) = (sequence: Sequence(A)) -> Sequence(A) {
 /// Eagerly transforms every item, left to right, stopping on the first error.
 map(A, B, E, N) = (
 	over: Sequence(A)
-	with: (A) -> B ? E ! N
-) -> Sequence(B) ? E ! N {
+	with: (A) -> B ^ E ! N
+) -> Sequence(B) ^ E ! N {
 	Sequence(tree) = over
 	Sequence(map_tree(tree, with))
 }
@@ -186,14 +186,14 @@ map(A, B, E, N) = (
 fold(A, Acc, E, N) = (
 	over: Sequence(A)
 	from: Acc
-	with: (Acc, A) -> Acc ? E ! N
-) -> Acc ? E ! N {
+	with: (Acc, A) -> Acc ^ E ! N
+) -> Acc ^ E ! N {
 	Sequence(tree) = over
 	fold_tree(tree, from, with)
 }
 
 /// Calls a function on each item left to right and discards its result.
-each(A, B, E, N) = (over: Sequence(A), with: (A) -> B ? E ! N) -> Nil ? E ! N {
+each(A, B, E, N) = (over: Sequence(A), with: (A) -> B ^ E ! N) -> Nil ^ E ! N {
 	fold(over, Nil, (_, x) {
 		with(x)
 		Nil
@@ -611,7 +611,7 @@ reverse_tree(A) = (tree: Tree(A)) -> Tree(A) {
 	}
 }
 
-map_node(A, B, E, N) = (node: Node(A), f: (A) -> B ? E ! N) -> Node(B) ? E ! N {
+map_node(A, B, E, N) = (node: Node(A), f: (A) -> B ^ E ! N) -> Node(B) ^ E ! N {
 	node |> {
 		Leaf(x)          -> Leaf(f(x))
 		Branch2(n, a, b) -> Branch2(n, map_node(a, f), map_node(b, f))
@@ -624,7 +624,7 @@ map_node(A, B, E, N) = (node: Node(A), f: (A) -> B ? E ! N) -> Node(B) ? E ! N {
 	}
 }
 
-map_tree(A, B, E, N) = (tree: Tree(A), f: (A) -> B ? E ! N) -> Tree(B) ? E ! N {
+map_tree(A, B, E, N) = (tree: Tree(A), f: (A) -> B ^ E ! N) -> Tree(B) ^ E ! N {
 	tree |> {
 		EmptyTree -> EmptyTree
 		Single(x) -> Single(map_node(x, f))
@@ -640,8 +640,8 @@ map_tree(A, B, E, N) = (tree: Tree(A), f: (A) -> B ? E ! N) -> Tree(B) ? E ! N {
 fold_node(A, Acc, E, N) = (
 	node: Node(A)
 	acc: Acc
-	f: (Acc, A) -> Acc ? E ! N
-) -> Acc ? E ! N {
+	f: (Acc, A) -> Acc ^ E ! N
+) -> Acc ^ E ! N {
 	node |> {
 		Leaf(x)          -> f(acc, x)
 		Branch2(_, a, b) -> fold_node(b, fold_node(a, acc, f), f)
@@ -656,8 +656,8 @@ fold_node(A, Acc, E, N) = (
 fold_tree(A, Acc, E, N) = (
 	tree: Tree(A)
 	acc: Acc
-	f: (Acc, A) -> Acc ? E ! N
-) -> Acc ? E ! N {
+	f: (Acc, A) -> Acc ^ E ! N
+) -> Acc ^ E ! N {
 	tree |> {
 		EmptyTree -> acc
 		Single(x) -> fold_node(x, acc, f)

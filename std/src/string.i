@@ -696,13 +696,13 @@ replace_n = (in: String, each: String, with: String, up_to: Int) -> String {
 /// runs collapse and empty pieces are omitted. Errors stop traversal at once.
 split_when(E, N) = (
 	string: String
-	on: (UtfCodepoint) -> Bool ? E ! N
-) -> List(String) ? E ! N {
+	on: (UtfCodepoint) -> Bool ^ E ! N
+) -> List(String) ^ E ! N {
 	go = (
 		rest: List(UtfCodepoint)
 		piece: List(UtfCodepoint)
 		acc: List(String)
-	) -> List(String) ? E ! N {
+	) -> List(String) ^ E ! N {
 		rest |> {
 			[] -> piece |> {
 				[] -> list.reverse(acc)
@@ -726,16 +726,16 @@ words = (string: String) -> List(String) { split_when(string, is_space) }
 /// Calls with once per scalar in order, producing one scalar per input.
 map(E, N) = (
 	string: String
-	with: (UtfCodepoint) -> UtfCodepoint ? E ! N
-) -> String ? E ! N {
+	with: (UtfCodepoint) -> UtfCodepoint ^ E ! N
+) -> String ^ E ! N {
 	core.from_codepoints(list.map(core.codepoints(string), with))
 }
 
 /// Calls keeping once per scalar in order. Errors stop later calls.
 filter(E, N) = (
 	string: String
-	keeping: (UtfCodepoint) -> Bool ? E ! N
-) -> String ? E ! N {
+	keeping: (UtfCodepoint) -> Bool ^ E ! N
+) -> String ^ E ! N {
 	core.from_codepoints(list.filter(core.codepoints(string), keeping))
 }
 
@@ -743,5 +743,5 @@ filter(E, N) = (
 fold(A, E, N) = (
 	string: String
 	from: A
-	with: (A, UtfCodepoint) -> A ? E ! N
-) -> A ? E ! N { list.fold(core.codepoints(string), from, with) }
+	with: (A, UtfCodepoint) -> A ^ E ! N
+) -> A ^ E ! N { list.fold(core.codepoints(string), from, with) }

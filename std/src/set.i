@@ -95,14 +95,14 @@ from_list(A) = (members: List(A)) -> Set(A) {
 fold(A, Acc, E, N) = (
 	over: Set(A)
 	from: Acc
-	with: (Acc, A) -> Acc ? E ! N
-) -> Acc ? E ! N {
+	with: (Acc, A) -> Acc ^ E ! N
+) -> Acc ^ E ! N {
 	Set(d) = over
 	dict.fold(d, from, (acc, k, _) { with(acc, k) })
 }
 
 /// Calls a function with every member.
-each(A, B, E, N) = (set: Set(A), with: (A) -> B ? E ! N) -> Nil ? E ! N {
+each(A, B, E, N) = (set: Set(A), with: (A) -> B ^ E ! N) -> Nil ^ E ! N {
 	fold(set, Nil, (_, x) {
 		with(x)
 		Nil
@@ -110,12 +110,12 @@ each(A, B, E, N) = (set: Set(A), with: (A) -> B ? E ! N) -> Nil ? E ! N {
 }
 
 /// The set of the values of a function on every member.
-map(A, B, E, N) = (set: Set(A), with: (A) -> B ? E ! N) -> Set(B) ? E ! N {
+map(A, B, E, N) = (set: Set(A), with: (A) -> B ^ E ! N) -> Set(B) ^ E ! N {
 	fold(set, new(), (acc, x) { insert(acc, with(x)) })
 }
 
 /// Keeps the members for which the function gives `True`.
-filter(A, E, N) = (in: Set(A), keeping: (A) -> Bool ? E ! N) -> Set(A) ? E ! N {
+filter(A, E, N) = (in: Set(A), keeping: (A) -> Bool ^ E ! N) -> Set(A) ^ E ! N {
 	Set(d) = in
 	Set(dict.filter(d, (k, _) { keeping(k) }))
 }
