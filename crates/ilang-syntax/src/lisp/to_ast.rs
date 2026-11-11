@@ -42,48 +42,62 @@ fn qualified(d: &Datum) -> Result<(Option<Ident>, Ident)> {
         _ => Err(bad(d, "a qualified name")),
     }
 }
-fn types(ds: &[Datum]) -> Result<Vec<TypeExpr>> {
-    ds.iter().map(parse_type).collect()
-}
+use super::trampoline::{Scheduler, run};
 
+async fn types<'a>(s: &Scheduler<'a>, ds: &'a [Datum]) -> Result<Vec<TypeExpr>> {
+    let mut out = Vec::with_capacity(ds.len());
+    for d in ds {
+        out.push(type_child(s, d).await?);
+    }
+    Ok(out)
+}
+async fn type_child<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<TypeExpr> {
+    s.call(move |s| async move { type_inner(&s, d).await })
+        .await
+}
 /// Read a datum in a type position, retaining the original span at each node.
 pub fn parse_type(d: &Datum) -> Result<TypeExpr> {
+    run(|s| async move { type_inner(&s, d).await })
+}
+async fn type_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<TypeExpr> {
     let kind = match &d.kind {
-        K::Discard(s) if s == "_" => TypeKind::Hole,
+        K::Discard(x) if x == "_" => TypeKind::Hole,
         K::Int(n) => TypeKind::Lit(LitValue::Int(BigInt::from_biguint(Sign::Plus, n.clone()))),
-        K::String(s) => TypeKind::Lit(LitValue::Str(s.clone())),
-        K::Name(_) | K::UpName(_) => named_type(d, &[])?,
-        K::Curly(xs) if xs.len() == 1 => return parse_type(&xs[0]),
+        K::String(x) => TypeKind::Lit(LitValue::Str(x.clone())),
+        K::Name(_) | K::UpName(_) => named_type(s, d, &[]).await?,
+        K::Curly(xs) if xs.len() == 1 => return type_child(s, &xs[0]).await,
         K::Round(xs) => match xs.as_slice() {
             [h, n] if symbol(h, "-") && matches!(n.kind, K::Int(_)) => {
                 let K::Int(n) = &n.kind else { unreachable!() };
                 TypeKind::Lit(LitValue::Int(-BigInt::from_biguint(Sign::Plus, n.clone())))
             }
-            [h, ..] if symbol(h, ".") => named_type(d, &[])?,
-            [h, rest @ ..] if symbol(h, ",") && !rest.is_empty() => TypeKind::Tuple(types(rest)?),
-            [h, rest @ ..] if symbol(h, "|") && rest.len() >= 2 => TypeKind::Union(types(rest)?),
-            [h, rest @ ..] if symbol(h, "&") && rest.len() >= 2 => TypeKind::Inter(types(rest)?),
-            [h, rest @ ..] if symbol(h, "-") && rest.len() >= 2 => TypeKind::Diff(types(rest)?),
+            [h, ..] if symbol(h, ".") => named_type(s, d, &[]).await?,
+            [h, rest @ ..] if symbol(h, ",") && !rest.is_empty() => {
+                TypeKind::Tuple(types(s, rest).await?)
+            }
+            [h, rest @ ..] if symbol(h, "|") && rest.len() >= 2 => {
+                TypeKind::Union(types(s, rest).await?)
+            }
+            [h, rest @ ..] if symbol(h, "&") && rest.len() >= 2 => {
+                TypeKind::Inter(types(s, rest).await?)
+            }
+            [h, rest @ ..] if symbol(h, "-") && rest.len() >= 2 => {
+                TypeKind::Diff(types(s, rest).await?)
+            }
             [h, ps, ret] if symbol(h, "->") => {
                 let ps = round(ps).ok_or_else(|| bad(ps, "function type parameters"))?;
-                let params = ps
-                    .iter()
-                    .map(|p| {
-                        if let Some([h, n, t]) = round(p)
-                            && symbol(h, ":")
-                        {
-                            return Ok(FnParamType {
-                                label: Some(ident(n)?),
-                                ty: parse_type(t)?,
-                            });
-                        }
-                        Ok(FnParamType {
-                            label: None,
-                            ty: parse_type(p)?,
-                        })
-                    })
-                    .collect::<Result<Vec<_>>>()?;
-                let result = result_type(ret)?;
+                let mut params = Vec::with_capacity(ps.len());
+                for p in ps {
+                    let (label, ty) = if let Some([h, n, t]) = round(p)
+                        && symbol(h, ":")
+                    {
+                        (Some(ident(n)?), type_child(s, t).await?)
+                    } else {
+                        (None, type_child(s, p).await?)
+                    };
+                    params.push(FnParamType { label, ty });
+                }
+                let result = result_type_inner(s, ret).await?;
                 TypeKind::Fn {
                     params,
                     ret: Box::new(result.value),
@@ -102,20 +116,20 @@ pub fn parse_type(d: &Datum) -> Result<TypeExpr> {
                     args: Vec::new(),
                 }
             }
-            [head, args @ ..] if !args.is_empty() => named_type(head, args)?,
+            [head, args @ ..] if !args.is_empty() => named_type(s, head, args).await?,
             _ => return Err(bad(d, "a type")),
         },
         _ => return Err(bad(d, "a type")),
     };
     Ok(TypeExpr { kind, span: d.span })
 }
-fn named_type(head: &Datum, args: &[Datum]) -> Result<TypeKind> {
+async fn named_type<'a>(s: &Scheduler<'a>, head: &'a Datum, args: &'a [Datum]) -> Result<TypeKind> {
     let (module, name) = qualified(head)?;
     if name.name.starts_with(|c: char| c.is_ascii_uppercase()) {
         Ok(TypeKind::Named {
             module,
             name,
-            args: types(args)?,
+            args: types(s, args).await?,
         })
     } else if args.is_empty() {
         Ok(TypeKind::ValueOf { module, name })
@@ -123,36 +137,47 @@ fn named_type(head: &Datum, args: &[Datum]) -> Result<TypeKind> {
         Ok(TypeKind::Call {
             module,
             name,
-            args: types(args)?,
+            args: types(s, args).await?,
         })
     }
 }
-fn result_type(d: &Datum) -> Result<RetType> {
-    if let Some([h, r, e]) = round(d) {
-        if symbol(h, "!") {
-            let mut ret = result_type(r)?;
-            ret.env = Some(parse_type(e)?);
-            return Ok(ret);
+async fn result_type_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<RetType> {
+    // The outer environment wrapper is part of the result syntax. Walk it
+    // explicitly so nested wrappers do not recurse on the host stack.
+    let mut current = d;
+    let mut envs = Vec::new();
+    while let Some([h, r, e]) = round(current) {
+        if !symbol(h, "!") {
+            break;
         }
-        if symbol(h, "^") {
-            return Ok(RetType {
-                value: parse_type(r)?,
-                err: if matches!(&r.kind, K::Discard(s) if s == "_")
-                    && matches!(&e.kind, K::UpName(s) if s == "Never")
-                {
-                    None
-                } else {
-                    Some(parse_type(e)?)
-                },
-                env: None,
-            });
-        }
+        envs.push(e);
+        current = r;
     }
-    Ok(RetType {
-        value: parse_type(d)?,
-        err: None,
-        env: None,
-    })
+    let mut ret = if let Some([h, r, e]) = round(current)
+        && symbol(h, "^")
+    {
+        RetType {
+            value: type_child(s, r).await?,
+            err: if matches!(&r.kind, K::Discard(x) if x == "_")
+                && matches!(&e.kind, K::UpName(x) if x == "Never")
+            {
+                None
+            } else {
+                Some(type_child(s, e).await?)
+            },
+            env: None,
+        }
+    } else {
+        RetType {
+            value: type_child(s, current).await?,
+            err: None,
+            env: None,
+        }
+    };
+    for env in envs.into_iter().rev() {
+        ret.env = Some(type_child(s, env).await?);
+    }
+    Ok(ret)
 }
 
 fn binder(d: &Datum) -> Result<Binder> {
@@ -168,13 +193,27 @@ fn binder(d: &Datum) -> Result<Binder> {
 
 /// Read a datum in pattern position.
 pub fn parse_pattern(d: &Datum) -> Result<Pattern> {
+    run(|s| async move { pattern_inner(&s, d).await })
+}
+async fn pattern_child<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Pattern> {
+    s.call(move |s| async move { pattern_inner(&s, d).await })
+        .await
+}
+async fn patterns<'a>(s: &Scheduler<'a>, ds: &'a [Datum]) -> Result<Vec<Pattern>> {
+    let mut out = Vec::with_capacity(ds.len());
+    for d in ds {
+        out.push(pattern_child(s, d).await?);
+    }
+    Ok(out)
+}
+async fn pattern_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Pattern> {
     let kind = match &d.kind {
         K::Quote(_) => {
-            check_quote(d, true)?;
+            let captures = check_quote(s, d, true).await?;
             PatternKind::Quote {
                 datum: Box::new(d.clone()),
                 template: None,
-                captures: super::quote_lower::pattern_captures(d),
+                captures,
             }
         }
         K::Name(n) => PatternKind::Var(n.clone()),
@@ -196,7 +235,7 @@ pub fn parse_pattern(d: &Datum) -> Result<Pattern> {
             negative: false,
             value: *n,
         },
-        K::String(s) => PatternKind::String(s.clone()),
+        K::String(x) => PatternKind::String(x.clone()),
         K::Square(xs) => {
             let (items, rest) = match xs.iter().position(|x| symbol(x, "..")) {
                 Some(i) if xs.len() == i + 1 => (&xs[..i], Some(None)),
@@ -205,24 +244,26 @@ pub fn parse_pattern(d: &Datum) -> Result<Pattern> {
                 None => (xs.as_slice(), None),
             };
             PatternKind::List {
-                items: items.iter().map(parse_pattern).collect::<Result<_>>()?,
+                items: patterns(s, items).await?,
                 rest,
             }
         }
-        K::Bits(xs) => PatternKind::BitArray(
-            xs.iter()
-                .map(|x| segment(x, parse_pattern))
-                .collect::<Result<_>>()?,
-        ),
+        K::Bits(xs) => {
+            let mut out = Vec::with_capacity(xs.len());
+            for x in xs {
+                out.push(pattern_segment(s, x).await?);
+            }
+            PatternKind::BitArray(out)
+        }
         K::Round(xs) => match xs.as_slice() {
             [] => PatternKind::Tuple(Vec::new()),
             [h, b, t] if symbol(h, ":") => PatternKind::Typed {
                 binder: binder(b)?,
-                ty: parse_type(t)?,
+                ty: type_child(s, t).await?,
             },
             [h, n, p] if symbol(h, "=") => PatternKind::Named {
                 name: ident(n)?,
-                pattern: Box::new(parse_pattern(p)?),
+                pattern: Box::new(pattern_child(s, p).await?),
             },
             [h, n] if symbol(h, "-") => {
                 let K::Int(n) = &n.kind else {
@@ -242,17 +283,17 @@ pub fn parse_pattern(d: &Datum) -> Result<Pattern> {
                     value: n,
                 }
             }
-            [h, s, rest] if symbol(h, "<>") => {
-                let K::String(s) = &s.kind else {
+            [h, x, rest] if symbol(h, "<>") => {
+                let K::String(x) = &x.kind else {
                     return Err(bad(d, "a prefix pattern"));
                 };
                 PatternKind::Prefix {
-                    prefix: s.clone(),
+                    prefix: x.clone(),
                     rest: binder(rest)?,
                 }
             }
             [h, ps @ ..] if symbol(h, ",") && !ps.is_empty() => {
-                PatternKind::Tuple(ps.iter().map(parse_pattern).collect::<Result<_>>()?)
+                PatternKind::Tuple(patterns(s, ps).await?)
             }
             [h, ..] if symbol(h, ".") => {
                 let (module, name) = qualified(d)?;
@@ -273,7 +314,7 @@ pub fn parse_pattern(d: &Datum) -> Result<Pattern> {
                 PatternKind::Constructor {
                     module,
                     name,
-                    args: ps.iter().map(parse_pattern).collect::<Result<_>>()?,
+                    args: patterns(s, ps).await?,
                     spread,
                 }
             }
@@ -282,38 +323,55 @@ pub fn parse_pattern(d: &Datum) -> Result<Pattern> {
     };
     Ok(Pattern { kind, span: d.span })
 }
-
-fn segment<T>(d: &Datum, parse: fn(&Datum) -> Result<T>) -> Result<Segment<T>> {
-    let (value, format) = match round(d) {
+async fn segment_parts<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<(&'a Datum, Option<Format>)> {
+    match round(d) {
         Some([h, value, fmt]) if symbol(h, ":") => {
             let (name, arg) = match round(fmt) {
-                Some([name, arg]) => (ident(name)?, Some(Box::new(parse_expression(arg)?))),
+                Some([name, arg]) => (
+                    ident(name)?,
+                    Some(Box::new(expression_child(s, arg).await?)),
+                ),
                 _ => (ident(fmt)?, None),
             };
-            (parse(value)?, Some(Format { name, arg }))
+            Ok((value, Some(Format { name, arg })))
         }
-        _ => (parse(d)?, None),
-    };
+        _ => Ok((d, None)),
+    }
+}
+async fn pattern_segment<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Segment<Pattern>> {
+    let (value, format) = segment_parts(s, d).await?;
     Ok(Segment {
-        value,
+        value: pattern_child(s, value).await?,
         format,
         span: d.span,
     })
 }
-fn argument(d: &Datum) -> Result<Arg> {
+async fn expression_segment<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Segment<Expr>> {
+    let (value, format) = segment_parts(s, d).await?;
+    Ok(Segment {
+        value: expression_child(s, value).await?,
+        format,
+        span: d.span,
+    })
+}
+async fn argument_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Arg> {
     if let Some([h, n, e]) = round(d)
         && symbol(h, ":")
     {
         return Ok(Arg {
             label: Some(ident(n)?),
-            value: parse_expression(e)?,
+            value: expression_child(s, e).await?,
         });
     }
     Ok(Arg {
         label: None,
-        value: parse_expression(d)?,
+        value: expression_child(s, d).await?,
     })
 }
+fn argument(d: &Datum) -> Result<Arg> {
+    run(|s| async move { argument_inner(&s, d).await })
+}
+
 fn binary(d: &Datum) -> Option<BinOp> {
     Some(match &d.kind {
         K::Symbol(s) => match s.as_str() {
@@ -348,57 +406,74 @@ fn binary(d: &Datum) -> Option<BinOp> {
 
 /// Read a datum in expression position without first printing normal syntax.
 pub fn parse_expression(d: &Datum) -> Result<Expr> {
+    run(|s| async move { expression_inner(&s, d).await })
+}
+async fn expression_child<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Expr> {
+    s.call(move |s| async move { expression_inner(&s, d).await })
+        .await
+}
+async fn expressions<'a>(s: &Scheduler<'a>, ds: &'a [Datum]) -> Result<Vec<Expr>> {
+    let mut out = Vec::with_capacity(ds.len());
+    for d in ds {
+        out.push(expression_child(s, d).await?);
+    }
+    Ok(out)
+}
+async fn expression_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Expr> {
     let kind = match &d.kind {
         K::Quote(_) => {
-            check_quote(d, false)?;
+            check_quote(s, d, false).await?;
             ExprKind::Quote(Box::new(d.clone()))
         }
         K::Int(n) => ExprKind::Int(n.clone()),
         K::Float(n) => ExprKind::Float(*n),
-        K::String(s) => ExprKind::String(s.clone()),
+        K::String(x) => ExprKind::String(x.clone()),
         K::Name(_) | K::UpName(_) => {
             let (module, name) = qualified(d)?;
             ExprKind::Name { module, name }
         }
         K::Square(xs) => {
             let (items, rest) = match xs.iter().position(|x| symbol(x, "..")) {
-                Some(i) if i > 0 && xs.len() == i + 2 => {
-                    (&xs[..i], Some(Box::new(parse_expression(&xs[i + 1])?)))
-                }
+                Some(i) if i > 0 && xs.len() == i + 2 => (
+                    &xs[..i],
+                    Some(Box::new(expression_child(s, &xs[i + 1]).await?)),
+                ),
                 Some(_) => return Err(bad(d, "a list expression")),
                 None => (xs.as_slice(), None),
             };
             ExprKind::List {
-                items: items.iter().map(parse_expression).collect::<Result<_>>()?,
+                items: expressions(s, items).await?,
                 rest,
             }
         }
-        K::Bits(xs) => ExprKind::BitArray(
-            xs.iter()
-                .map(|x| segment(x, parse_expression))
-                .collect::<Result<_>>()?,
-        ),
-        K::Curly(xs) if xs.is_empty() || xs.first().is_some_and(is_clause) => {
-            ExprKind::Clauses(xs.iter().map(clause).collect::<Result<_>>()?)
+        K::Bits(xs) => {
+            let mut out = Vec::with_capacity(xs.len());
+            for x in xs {
+                out.push(expression_segment(s, x).await?);
+            }
+            ExprKind::BitArray(out)
         }
-        K::Curly(_) => ExprKind::Block(block(d)?),
+        K::Curly(xs) if xs.is_empty() || xs.first().is_some_and(is_clause) => {
+            ExprKind::Clauses(clauses(s, xs).await?)
+        }
+        K::Curly(_) => ExprKind::Block(block_inner(s, d).await?),
         K::Round(xs) => match xs.as_slice() {
             [] => ExprKind::Tuple(Vec::new()),
             [h, es @ ..] if symbol(h, ",") && !es.is_empty() => {
-                ExprKind::Tuple(es.iter().map(parse_expression).collect::<Result<_>>()?)
+                ExprKind::Tuple(expressions(s, es).await?)
             }
             [h, subject, cs] if symbol(h, ".") && matches!(cs.kind, K::Curly(_)) => {
                 let K::Curly(cs) = &cs.kind else {
                     unreachable!()
                 };
                 ExprKind::Case {
-                    subject: Box::new(parse_expression(subject)?),
-                    clauses: cs.iter().map(clause).collect::<Result<_>>()?,
+                    subject: Box::new(expression_child(s, subject).await?),
+                    clauses: clauses(s, cs).await?,
                 }
             }
             [h, target, field] if symbol(h, ".") => match &field.kind {
                 K::Int(n) => ExprKind::TupleIndex {
-                    target: Box::new(parse_expression(target)?),
+                    target: Box::new(expression_child(s, target).await?),
                     index: n.clone(),
                     index_span: field.span,
                 },
@@ -407,37 +482,36 @@ pub fn parse_expression(d: &Datum) -> Result<Expr> {
                     name: ident(field)?,
                 },
                 K::Name(_) | K::UpName(_) => ExprKind::Field {
-                    target: Box::new(parse_expression(target)?),
+                    target: Box::new(expression_child(s, target).await?),
                     name: ident(field)?,
                 },
                 _ => return Err(bad(field, "a field")),
             },
             [h, params, ret, body] if symbol(h, "->") => {
-                let params = round(params).ok_or_else(|| bad(params, "function parameters"))?;
-                let params = params
-                    .iter()
-                    .map(|p| {
-                        if let Some([h, n, ty]) = round(p)
-                            && symbol(h, "!")
-                        {
-                            return Ok(Param::Env {
-                                name: ident(n)?,
-                                ty: parse_type(ty)?,
-                            });
-                        }
-                        Ok(Param::Pattern(parse_pattern(p)?))
-                    })
-                    .collect::<Result<_>>()?;
-                let ret = if matches!(&ret.kind, K::Discard(s) if s == "_") {
+                let ps = round(params).ok_or_else(|| bad(params, "function parameters"))?;
+                let mut params = Vec::with_capacity(ps.len());
+                for p in ps {
+                    if let Some([h, n, ty]) = round(p)
+                        && symbol(h, "!")
+                    {
+                        params.push(Param::Env {
+                            name: ident(n)?,
+                            ty: type_child(s, ty).await?,
+                        });
+                    } else {
+                        params.push(Param::Pattern(pattern_child(s, p).await?));
+                    }
+                }
+                let ret = if matches!(&ret.kind, K::Discard(x) if x == "_") {
                     None
                 } else {
-                    Some(result_type(ret)?)
+                    Some(result_type_inner(s, ret).await?)
                 };
                 let body = if matches!(body.kind, K::Curly(_)) {
-                    block(body)?
+                    block_inner(s, body).await?
                 } else {
                     Block {
-                        stmts: vec![Stmt::Expr(parse_expression(body)?)],
+                        stmts: vec![Stmt::Expr(expression_child(s, body).await?)],
                         span: body.span,
                     }
                 };
@@ -449,35 +523,44 @@ pub fn parse_expression(d: &Datum) -> Result<Expr> {
                 } else {
                     UnOp::NegFloat
                 },
-                expr: Box::new(parse_expression(e)?),
+                expr: Box::new(expression_child(s, e).await?),
             },
             [h, a, b] if binary(h).is_some() => ExprKind::Binary {
                 op: binary(h).unwrap(),
-                lhs: Box::new(parse_expression(a)?),
-                rhs: Box::new(parse_expression(b)?),
+                lhs: Box::new(expression_child(s, a).await?),
+                rhs: Box::new(expression_child(s, b).await?),
             },
             [constructor, dots, base, fields @ ..] if symbol(dots, "..") => {
                 let (_, name) = qualified(constructor)?;
                 if !name.name.starts_with(|c: char| c.is_ascii_uppercase()) {
                     return Err(bad(constructor, "a record constructor"));
                 }
-                let fields = fields
-                    .iter()
-                    .map(|field| match round(field) {
-                        Some([h, n, e]) if symbol(h, ":") => Ok((ident(n)?, parse_expression(e)?)),
-                        _ => Err(bad(field, "an updated field")),
-                    })
-                    .collect::<Result<_>>()?;
+                let mut result = Vec::with_capacity(fields.len());
+                for field in fields {
+                    match round(field) {
+                        Some([h, n, e]) if symbol(h, ":") => {
+                            result.push((ident(n)?, expression_child(s, e).await?))
+                        }
+                        _ => return Err(bad(field, "an updated field")),
+                    }
+                }
                 ExprKind::RecordUpdate {
-                    constructor: Box::new(parse_expression(constructor)?),
-                    base: Box::new(parse_expression(base)?),
-                    fields,
+                    constructor: Box::new(expression_child(s, constructor).await?),
+                    base: Box::new(expression_child(s, base).await?),
+                    fields: result,
                 }
             }
-            [callee, args @ ..] if !matches!(callee.kind, K::Symbol(_)) => ExprKind::Call {
-                callee: Box::new(parse_expression(callee)?),
-                args: args.iter().map(argument).collect::<Result<_>>()?,
-            },
+            [callee, args @ ..] if !matches!(callee.kind, K::Symbol(_)) => {
+                let callee = Box::new(expression_child(s, callee).await?);
+                let mut result = Vec::with_capacity(args.len());
+                for arg in args {
+                    result.push(argument_inner(s, arg).await?);
+                }
+                ExprKind::Call {
+                    callee,
+                    args: result,
+                }
+            }
             _ => return Err(bad(d, "an expression")),
         },
         _ => return Err(bad(d, "an expression")),
@@ -488,17 +571,23 @@ fn is_clause(d: &Datum) -> bool {
     matches!(round(d), Some([h, _, _]) if symbol(h, "->"))
 }
 
-fn check_quote(d: &Datum, pattern: bool) -> Result<()> {
+async fn check_quote<'a>(
+    s: &Scheduler<'a>,
+    d: &'a Datum,
+    pattern: bool,
+) -> Result<Vec<(bool, Pattern)>> {
     let K::Quote(body) = &d.kind else {
         unreachable!("quote check requires a quote")
     };
-    fn part(d: &Datum, pattern: bool, in_sequence: bool, last: bool) -> Result<()> {
+    let mut work = vec![(&**body, false, true)];
+    let mut captures = Vec::new();
+    while let Some((d, in_sequence, last)) = work.pop() {
         match &d.kind {
             K::Unquote(inner) => {
                 if pattern {
-                    parse_pattern(inner)?;
+                    captures.push((false, pattern_child(s, inner).await?));
                 } else {
-                    parse_expression(inner)?;
+                    expression_child(s, inner).await?;
                 }
             }
             K::Splice(inner) => {
@@ -506,24 +595,33 @@ fn check_quote(d: &Datum, pattern: bool) -> Result<()> {
                     return Err(bad(d, "a splice in this position"));
                 }
                 if pattern {
-                    parse_pattern(inner)?;
+                    captures.push((true, pattern_child(s, inner).await?));
                 } else {
-                    parse_expression(inner)?;
+                    expression_child(s, inner).await?;
                 }
             }
             K::Round(xs) | K::Square(xs) | K::Curly(xs) | K::Bits(xs) => {
-                for (i, child) in xs.iter().enumerate() {
-                    part(child, pattern, true, i + 1 == xs.len())?;
-                }
+                work.extend(
+                    xs.iter()
+                        .enumerate()
+                        .rev()
+                        .map(|(i, child)| (child, true, i + 1 == xs.len())),
+                );
             }
             K::Quote(_) => return Err(bad(d, "a nested quote")),
             _ => {}
         }
-        Ok(())
     }
-    part(body, pattern, false, true)
+    Ok(captures)
 }
-fn clause(d: &Datum) -> Result<Clause> {
+async fn clauses<'a>(s: &Scheduler<'a>, ds: &'a [Datum]) -> Result<Vec<Clause>> {
+    let mut out = Vec::with_capacity(ds.len());
+    for d in ds {
+        out.push(clause_inner(s, d).await?);
+    }
+    Ok(out)
+}
+async fn clause_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Clause> {
     let Some([h, p, body]) = round(d) else {
         return Err(bad(d, "a clause"));
     };
@@ -531,7 +629,7 @@ fn clause(d: &Datum) -> Result<Clause> {
         return Err(bad(d, "a clause"));
     }
     let (p, guard) = match round(p) {
-        Some([h, p, g]) if symbol(h, "?") => (p, Some(parse_expression(g)?)),
+        Some([h, p, g]) if symbol(h, "?") => (p, Some(expression_child(s, g).await?)),
         _ => (p, None),
     };
     let patterns = match round(p) {
@@ -542,22 +640,25 @@ fn clause(d: &Datum) -> Result<Clause> {
             {
                 return Err(bad(p, "a clause choice ending in a type test"));
             }
-            ps.iter().map(parse_pattern).collect::<Result<_>>()?
+            patterns(s, ps).await?
         }
-        _ => vec![parse_pattern(p)?],
+        _ => vec![pattern_child(s, p).await?],
     };
     Ok(Clause {
         patterns,
         guard,
-        body: parse_expression(body)?,
+        body: expression_child(s, body).await?,
         span: d.span,
     })
 }
-fn block(d: &Datum) -> Result<Block> {
+async fn block_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Block> {
     let K::Curly(xs) = &d.kind else {
         return Err(bad(d, "a function body"));
     };
-    let stmts = xs.iter().map(statement).collect::<Result<Vec<_>>>()?;
+    let mut stmts = Vec::with_capacity(xs.len());
+    for x in xs {
+        stmts.push(statement_inner(s, x).await?);
+    }
     if !matches!(stmts.last(), Some(Stmt::Expr(_))) {
         return Err(Diagnostic::new(
             Code::BlockEnd,
@@ -570,22 +671,30 @@ fn block(d: &Datum) -> Result<Block> {
         span: d.span,
     })
 }
-fn statement(d: &Datum) -> Result<Stmt> {
+async fn statement_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Stmt> {
     if let Some([h, left, right]) = round(d) {
         if symbol(h, "!") {
             return Ok(Stmt::Env {
-                ty: parse_type(left)?,
-                value: parse_expression(right)?,
+                ty: type_child(s, left).await?,
+                value: expression_child(s, right).await?,
                 span: d.span,
             });
         }
         if symbol(h, "=") {
-            return Ok(Stmt::Bind(binding(d, left, right)?));
+            return Ok(Stmt::Bind(binding_inner(s, d, left, right).await?));
         }
     }
-    Ok(Stmt::Expr(parse_expression(d)?))
+    Ok(Stmt::Expr(expression_child(s, d).await?))
 }
-fn binding(d: &Datum, left: &Datum, right: &Datum) -> Result<Binding> {
+fn binding<'a>(d: &'a Datum, left: &'a Datum, right: &'a Datum) -> Result<Binding> {
+    run(|s| async move { binding_inner(&s, d, left, right).await })
+}
+async fn binding_inner<'a>(
+    s: &Scheduler<'a>,
+    d: &'a Datum,
+    left: &'a Datum,
+    right: &'a Datum,
+) -> Result<Binding> {
     let (left, annotation) = match round(left) {
         Some([h, n, t]) if symbol(h, ":") && round(n).is_some() => (n, Some(t)),
         _ => (left, None),
@@ -601,21 +710,21 @@ fn binding(d: &Datum, left: &Datum, right: &Datum) -> Result<Binding> {
                 Pattern {
                     kind: PatternKind::Typed {
                         binder: binder(n)?,
-                        ty: parse_type(ty)?,
+                        ty: type_child(s, ty).await?,
                     },
                     span: left.span.to(ty.span),
                 }
             } else {
-                parse_pattern(n)?
+                pattern_child(s, n).await?
             };
             (pattern, type_params)
         }
-        _ if annotation.is_none() => (parse_pattern(left)?, Vec::new()),
+        _ if annotation.is_none() => (pattern_child(s, left).await?, Vec::new()),
         _ => return Err(bad(left, "a binding head")),
     };
     Ok(Binding {
         pattern,
-        value: parse_expression(right)?,
+        value: expression_child(s, right).await?,
         span: d.span,
         type_params,
     })
@@ -669,7 +778,16 @@ pub fn parse_module(document: &Document) -> Result<Module> {
     Ok(module)
 }
 fn is_import(d: &Datum) -> bool {
-    round(d).is_some_and(|xs| xs.iter().any(|x| symbol(x, "/") || is_import(x)))
+    let mut work: Vec<_> = round(d).unwrap_or(&[]).iter().collect();
+    while let Some(d) = work.pop() {
+        if symbol(d, "/") {
+            return true;
+        }
+        if let Some(xs) = round(d) {
+            work.extend(xs);
+        }
+    }
+    false
 }
 fn import(d: &Datum) -> Result<ImportItem> {
     let mut alias = None;
@@ -829,7 +947,10 @@ fn upper_head(d: &Datum) -> bool {
 }
 fn type_def(head: &Datum, alias: Option<&Datum>, custom: Option<&Datum>) -> Result<TypeDef> {
     let (name, written) = match round(head) {
-        Some([n, args @ ..]) if !args.is_empty() => (ident(n)?, types(args)?),
+        Some([n, args @ ..]) if !args.is_empty() => (
+            ident(n)?,
+            args.iter().map(parse_type).collect::<Result<_>>()?,
+        ),
         Some(_) => return Err(bad(head, "a type head")),
         None => (ident(head)?, Vec::new()),
     };

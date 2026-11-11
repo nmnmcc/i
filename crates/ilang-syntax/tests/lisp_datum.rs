@@ -178,14 +178,46 @@ fn compiler_preparation_registers_nested_quote_pattern_templates() {
 fn quote_capture_collection_handles_deep_templates() {
     use ilang_syntax::lisp::{Datum, DatumKind, quote_lower::pattern_captures};
     use ilang_syntax::span::Span;
-    let datum = |kind| Datum { kind, span: Span::new(0, 0), docs: Vec::new() };
-    let mut body = datum(DatumKind::Unquote(Box::new(datum(DatumKind::Name("x".into())))));
+    let datum = |kind| Datum {
+        kind,
+        span: Span::new(0, 0),
+        docs: Vec::new(),
+    };
+    let mut body = datum(DatumKind::Unquote(Box::new(datum(DatumKind::Name(
+        "x".into(),
+    )))));
     for _ in 0..10_000 {
         body = datum(DatumKind::Round(vec![body]));
     }
     let quote = datum(DatumKind::Quote(Box::new(body)));
     assert_eq!(pattern_captures(&quote).len(), 1);
-    std::mem::forget(quote);
+}
+
+#[test]
+fn nested_quote_captures_use_the_parser_work_stack() {
+    use ilang_syntax::ast::PatternKind;
+    use ilang_syntax::lisp::{Datum, DatumKind, parse_pattern};
+    use ilang_syntax::span::Span;
+    let datum = |kind| Datum {
+        kind,
+        span: Span::new(0, 0),
+        docs: Vec::new(),
+    };
+    let mut nested = datum(DatumKind::Name("x".into()));
+    for _ in 0..256 {
+        nested = datum(DatumKind::Quote(Box::new(datum(DatumKind::Round(vec![
+            datum(DatumKind::Unquote(Box::new(nested))),
+        ])))));
+    }
+    let pattern = parse_pattern(&nested).unwrap();
+    let mut at = &pattern;
+    for _ in 0..256 {
+        let PatternKind::Quote { captures, .. } = &at.kind else {
+            panic!("nested quote");
+        };
+        at = &captures[0].1;
+    }
+    assert!(matches!(&at.kind, PatternKind::Var(name) if name == "x"));
 }
 
 #[test]

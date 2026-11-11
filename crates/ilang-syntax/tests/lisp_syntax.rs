@@ -961,7 +961,7 @@ fn scoped_conversion_separates_repeated_origins_and_keeps_sliceable_text() {
     let call = root("call");
     let mut source = ScopedSource::new("original source".into());
     let expr = source.expression(&result, &call).unwrap();
-    let ExprKind::Binary { lhs, rhs, .. } = expr.kind else {
+    let ExprKind::Binary { lhs, rhs, .. } = &expr.kind else {
         panic!("binary")
     };
     assert_ne!(lhs.span, rhs.span);
@@ -1034,7 +1034,7 @@ fn scoped_virtual_source_uses_utf8_byte_boundaries() {
     let syntax = root("(f \"你好\")");
     let mut source = ScopedSource::new("// 原文件".into());
     let expr = source.expression(&syntax, &call).unwrap();
-    let ExprKind::Call { args, .. } = expr.kind else {
+    let ExprKind::Call { args, .. } = &expr.kind else {
         panic!("call")
     };
     let span = args[0].value.span;
