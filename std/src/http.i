@@ -922,8 +922,8 @@ connection_loop = (stream, handler, buffer, continued) {
 				)
 			)
 			{
-				header(req.headers, "connection") == Some("close") ||
-					header(hs, "connection") == Some("close")
+				has_token(req.headers, "connection", "close") ||
+					has_token(hs, "connection", "close")
 			} |> {
 				True  -> Nil
 				False -> connection_loop(stream, handler, rest, False)
@@ -959,7 +959,7 @@ expect_continue = (buffer: BitArray) -> Bool {
 	fail.catch(() {
 		(_, after) = line(octets(buffer))
 		(hs, _) = read_headers(after, [])
-		header(hs, "expect") == Some("100-continue")
+		has_token(hs, "expect", "100-continue")
 	}) |> {
 		Ok(value) -> value
 		Error(_)  -> False
@@ -1182,10 +1182,13 @@ route = (
 ) -> Option(List((String, String))) {
 	{ method == req.method } |> {
 		False -> None
-		True -> match_segments(
-			string.split(pattern, "/")
-			string.split(req.target, "/")
-		)
+		True -> {
+			path = string.split(req.target, "?") |> {
+				[first, .._] -> first
+				[]           -> panic("http: split returned no segments")
+			}
+			match_segments(string.split(pattern, "/"), string.split(path, "/"))
+		}
 	}
 }
 
@@ -1240,5 +1243,13 @@ tls_transport = (stream) {
 			Ok(value)                          -> value
 			Error(tls.TlsError(stage, reason)) -> fail.raise(Tls(reason))
 		}
+	})
+}
+
+has_token = (hs: Headers, name: String, value: String) -> Bool {
+	list.any(headers(hs, name), (line) {
+		list.any(string.split(line, ","), (part) {
+			lowercase(text_unchecked(trim(octets(<<part:utf8>>)))) == value
+		})
 	})
 }
