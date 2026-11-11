@@ -263,6 +263,117 @@ fn pattern_vars(p: &Pattern, out: &mut HashSet<VarId>) {
     out.extend(w.bound);
 }
 
+/// A source-level bound on values simultaneously pending while evaluating
+/// an expression. Unlike Wasm locals this is independent of code generation
+/// and optimization. Earlier call arguments remain pending while later ones
+/// (including a recursive call) are evaluated.
+fn pending_values<'a>(values: impl IntoIterator<Item = &'a Expr>) -> usize {
+    let mut held = 0;
+    let mut peak = 1;
+    for value in values {
+        peak = peak.max(held + expression_values(value));
+        held += 1;
+    }
+    peak.max(held)
+}
+
+fn pattern_values(p: &Pattern) -> usize {
+    match &p.kind {
+        PatternKind::Quote { captures, .. } => {
+            1 + captures
+                .iter()
+                .map(|(_, p)| pattern_values(p))
+                .sum::<usize>()
+        }
+        PatternKind::Named { pattern, .. } => 1 + pattern_values(pattern),
+        PatternKind::Constructor { args, .. }
+        | PatternKind::Tuple(args)
+        | PatternKind::Error(args) => 1 + args.iter().map(pattern_values).sum::<usize>(),
+        PatternKind::List { items, .. } => 1 + items.iter().map(pattern_values).sum::<usize>(),
+        PatternKind::BitArray(segments) => {
+            1 + segments
+                .iter()
+                .map(|s| {
+                    pattern_values(&s.value)
+                        + s.format
+                            .as_ref()
+                            .and_then(|f| f.arg.as_deref())
+                            .map_or(0, expression_values)
+                })
+                .sum::<usize>()
+        }
+        PatternKind::Var(_)
+        | PatternKind::Discard
+        | PatternKind::Typed { .. }
+        | PatternKind::Int { .. }
+        | PatternKind::Float { .. }
+        | PatternKind::String(_)
+        | PatternKind::Prefix { .. } => 1,
+    }
+}
+
+fn block_values(block: &hir::Block) -> usize {
+    block
+        .stmts
+        .iter()
+        .map(|stmt| match stmt {
+            hir::Stmt::Bind(binding) => {
+                expression_values(&binding.value).max(pattern_values(&binding.pattern))
+            }
+            hir::Stmt::Env { value, .. } | hir::Stmt::Expr(value) => expression_values(value),
+        })
+        .max()
+        .unwrap_or(1)
+}
+
+fn expression_values(e: &Expr) -> usize {
+    match &e.kind {
+        ExprKind::Int(_)
+        | ExprKind::Float(_)
+        | ExprKind::String(_)
+        | ExprKind::Name(_)
+        | ExprKind::Error
+        | ExprKind::Fn(_) => 1,
+        ExprKind::Tuple(items) => pending_values(items),
+        ExprKind::Record { base, fields } => pending_values(
+            base.iter()
+                .map(Box::as_ref)
+                .chain(fields.iter().map(|(_, value)| value)),
+        ),
+        ExprKind::List { items, rest } => pending_values(items.iter().chain(rest.as_deref())),
+        ExprKind::BitArray(segments) => pending_values(segments.iter().flat_map(|s| {
+            std::iter::once(&s.value).chain(s.format.as_ref().and_then(|f| f.arg.as_deref()))
+        })),
+        ExprKind::Block(block) => block_values(block),
+        ExprKind::Case { subject, clauses } => expression_values(subject).max(
+            1 + clauses
+                .iter()
+                .map(|clause| {
+                    clause
+                        .patterns
+                        .iter()
+                        .map(pattern_values)
+                        .max()
+                        .unwrap_or(1)
+                        .max(clause.guard.as_ref().map_or(1, expression_values))
+                        .max(expression_values(&clause.body))
+                })
+                .max()
+                .unwrap_or(1),
+        ),
+        ExprKind::Call { callee, args } => {
+            pending_values(std::iter::once(callee.as_ref()).chain(args.iter().map(|a| &a.value)))
+        }
+        ExprKind::Field { target, .. }
+        | ExprKind::TupleIndex { target, .. }
+        | ExprKind::Unary { expr: target, .. } => expression_values(target),
+        ExprKind::RecordUpdate { base, fields, .. } => pending_values(
+            std::iter::once(base.as_ref()).chain(fields.iter().map(|(_, value)| value)),
+        ),
+        ExprKind::Binary { lhs, rhs, .. } => pending_values([lhs.as_ref(), rhs.as_ref()]),
+    }
+}
+
 /// Collects the names used and bound in a part of the program.
 #[derive(Default)]
 struct Walk {
@@ -362,6 +473,9 @@ impl Walk {
 
     fn pattern(&mut self, p: &Pattern) {
         match &p.kind {
+            PatternKind::Quote { captures, .. } => {
+                captures.iter().for_each(|(_, p)| self.pattern(p))
+            }
             PatternKind::Var(b) => self.binder(b),
             PatternKind::Typed { binder, .. } => binder.iter().for_each(|b| self.binder(b)),
             PatternKind::Named { binder, pattern } => {
@@ -510,7 +624,7 @@ pub fn lower_with_bindings(
     if !typed.coalescing_errors().is_empty() {
         return Err(typed.coalescing_errors().to_vec());
     }
-    let mut l = Lowerer::new(graph, program, typed, options);
+    let mut l = Lowerer::new(graph, program, typed, options, None);
     l.run();
     if l.diags.is_empty() {
         crate::control::split(&mut l.out);
@@ -520,11 +634,46 @@ pub fn lower_with_bindings(
     }
 }
 
+/// Lower one consumer-selected collection target as the sole tool root.
+/// The target remains separate from program entries, tests and host exports.
+pub fn lower_selected_with_bindings(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: Options,
+    target: DefId,
+    export: &str,
+) -> Result<(ir::Program, Vec<serde_json::Value>, bool), Vec<Diagnostic>> {
+    if !typed.coalescing_errors().is_empty() {
+        let mut diags = typed.coalescing_errors().to_vec();
+        ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut diags);
+        return Err(diags);
+    }
+    let mut l = Lowerer::new(
+        graph,
+        program,
+        typed,
+        options,
+        Some((target, export.to_owned())),
+    );
+    l.run();
+    let is_async = l.selected_async;
+    if l.diags.is_empty() {
+        crate::control::split(&mut l.out);
+        Ok((l.out, l.bindings, is_async))
+    } else {
+        ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut l.diags);
+        Err(l.diags)
+    }
+}
+
 struct Lowerer<'a> {
     graph: &'a PackageGraph,
     program: &'a hir::Program,
     typed: &'a Typed,
     options: Options,
+    selected: Option<(DefId, String)>,
+    selected_async: bool,
     packages: HashSet<PackageId>,
     ctors: HashMap<CtorRef, CtorInfo>,
     types: HashMap<TypeId, TypeRepr>,
@@ -559,12 +708,15 @@ impl<'a> Lowerer<'a> {
         program: &'a hir::Program,
         typed: &'a Typed,
         options: Options,
+        selected: Option<(DefId, String)>,
     ) -> Self {
         let mut l = Lowerer {
             graph,
             program,
             typed,
             options,
+            selected,
+            selected_async: false,
             packages: HashSet::new(),
             ctors: HashMap::new(),
             types: HashMap::new(),
@@ -775,19 +927,23 @@ impl<'a> Lowerer<'a> {
                 }
             }
         }
-        // §10.1, B.6: every external function of the compiled packages is
-        // an import.
+        // Tool builds retain only externals reachable from their selected root
+        // or from required initializers; ordinary builds retain §10.1 imports.
+        let reachable = self.selected.as_ref().map(|(d, _)| self.tool_reachable(*d));
         for (mi, m) in self.program.modules.iter().enumerate() {
             let mid = ModuleId(mi as u32);
             if !self.included(mid) || self.is_library(mid) {
                 continue;
             }
             for (di, d) in m.defs.iter().enumerate() {
-                if matches!(d.kind, DefKind::External { .. }) {
-                    self.external_func(DefId {
-                        module: mid,
-                        index: di as u32,
-                    });
+                let id = DefId {
+                    module: mid,
+                    index: di as u32,
+                };
+                if matches!(d.kind, DefKind::External { .. })
+                    && reachable.as_ref().is_none_or(|set| set.contains(&id))
+                {
+                    self.external_func(id);
                 }
             }
         }
@@ -810,10 +966,43 @@ impl<'a> Lowerer<'a> {
         self.out.constants = self.constants.iter().copied().collect();
     }
 
+    /// Dependency closure of a selected root plus the initializers that every
+    /// instance executes. An unused function does not create a host import.
+    fn tool_reachable(&self, target: DefId) -> HashSet<DefId> {
+        let mut seen = HashSet::new();
+        let mut work = vec![target];
+        for &binding in &self.program.order.init {
+            if !self.included(binding.module) {
+                continue;
+            }
+            let b = &self.program.binding(binding).binding;
+            work.extend(
+                ilang_check::order::references(&b.pattern, &b.value)
+                    .into_iter()
+                    .filter_map(|(d, inside)| (!b.direct || !inside).then_some(d)),
+            );
+        }
+        while let Some(id) = work.pop() {
+            if !seen.insert(id) {
+                continue;
+            }
+            if let DefKind::Binding { binding, .. } = self.program.def(id).kind {
+                let b = &self.program.module(id.module).bindings[binding as usize].binding;
+                work.extend(
+                    ilang_check::order::references(&b.pattern, &b.value)
+                        .into_iter()
+                        .map(|(d, _)| d),
+                );
+            }
+        }
+        seen
+    }
+
     /// `ilang_start`: the top-level values, in the order of §2.5.
     fn start(&mut self) {
         let mut fx = Fx::new(ModuleId(0), false);
         let mut out = Vec::new();
+        let mut pending = 1;
         for &b in &self.program.order.init {
             if !self.included(b.module) {
                 continue;
@@ -822,6 +1011,9 @@ impl<'a> Lowerer<'a> {
             if tb.defs.len() == 1 && self.known.contains_key(&tb.defs[0]) {
                 continue;
             }
+            pending = pending
+                .max(expression_values(&tb.binding.value))
+                .max(pattern_values(&tb.binding.pattern));
             fx.module = b.module;
             fx.library = self.is_library(b.module);
             let value = self.expr(&mut fx, &mut out, &tb.binding.value);
@@ -844,6 +1036,8 @@ impl<'a> Lowerer<'a> {
         self.out.start = Some(Func {
             name: "ilang_start".into(),
             arity: 0,
+            budget_frame: u32::try_from(1 + fx.vars.len() + pending)
+                .expect("source frame exceeds u32"),
             locals: fx.locals,
             body: out,
             frame: true,
@@ -867,6 +1061,30 @@ impl<'a> Lowerer<'a> {
         let mut entry = None;
         let mut tests = Vec::new();
         let mut needed: BTreeSet<TypeId> = BTreeSet::new();
+        if let Some((target, name)) = self.selected.clone() {
+            let def = program.def(target);
+            let callee = self.def_callee(target);
+            let fx = Fx::new(target.module, false);
+            let site = self.site(&fx, def.span.start);
+            let is_async = self.entry_async(target, &mut needed);
+            let async_body = is_async.then(|| self.async_body(&callee, 0));
+            self.selected_async = is_async;
+            if self.options.target == ir::Target::Wasi {
+                self.out.entry = Some(name.clone());
+            }
+            self.out.exports.push(Export {
+                name,
+                callee,
+                abi: None,
+                site,
+                async_body,
+            });
+            for service in needed {
+                self.host_service(service);
+            }
+            self.out.target = self.options.target;
+            return;
+        }
         for (mi, m) in program.modules.iter().enumerate() {
             let mid = ModuleId(mi as u32);
             if Some(m.package) != program.root || !self.included(mid) {
@@ -997,6 +1215,7 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[thunk.0 as usize] = FuncKind::Code(Func {
             name: format!("{module} entry body"),
             arity: 0,
+            budget_frame: n + 1,
             locals: vec![LocalType::Value; n as usize],
             body: thunk_body,
             frame: true,
@@ -1006,6 +1225,7 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[wrapper.0 as usize] = FuncKind::Code(Func {
             name: format!("{module} entry"),
             arity: n,
+            budget_frame: n + 2,
             locals: vec![LocalType::Value; n as usize + 1],
             body: vec![
                 Stmt::Let {
@@ -1076,6 +1296,7 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[f.0 as usize] = FuncKind::Code(Func {
             name: "async entry".into(),
             arity: 1,
+            budget_frame: 2,
             locals: vec![LocalType::Value; 1 + n as usize],
             body,
             frame: true,
@@ -1453,6 +1674,7 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[f.0 as usize] = FuncKind::Code(Func {
             name: format!("import {} {}", x.module, x.name),
             arity: n,
+            budget_frame: n + 1,
             locals,
             body,
             frame: true,
@@ -1565,9 +1787,19 @@ impl<'a> Lowerer<'a> {
             }
         }
         self.block(&mut fx, &mut out, &f.body, true);
+        let pending = f
+            .params
+            .iter()
+            .filter_map(|p| match p {
+                Param::Pattern { pattern, .. } => Some(pattern_values(pattern)),
+                Param::Env { .. } => None,
+            })
+            .fold(block_values(&f.body), usize::max);
         Func {
             name,
             arity,
+            budget_frame: u32::try_from(1 + arity as usize + fx.vars.len() + pending)
+                .expect("source frame exceeds u32"),
             locals: fx.locals,
             body: out,
             frame: true,
@@ -2513,6 +2745,34 @@ impl<'a> Lowerer<'a> {
     /// when it does not match (§7.2).
     fn pattern(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom, fail: Label) {
         match &p.kind {
+            PatternKind::Quote {
+                template,
+                functions,
+                captures,
+                ..
+            } => {
+                let template = self.pattern_call(
+                    fx,
+                    out,
+                    functions[0],
+                    p.span,
+                    vec![Atom::Int((*template).into())],
+                );
+                let result = self.pattern_call(fx, out, functions[1], p.span, vec![template, v]);
+                let success =
+                    self.pattern_call(fx, out, functions[2], p.span, vec![result.clone()]);
+                guard(out, Cond::True(success), fail);
+                for (index, (many, pattern)) in captures.iter().enumerate() {
+                    let value = self.pattern_call(
+                        fx,
+                        out,
+                        functions[if *many { 4 } else { 3 }],
+                        p.span,
+                        vec![result.clone(), Atom::Int(index.into())],
+                    );
+                    self.pattern(fx, out, pattern, value, fail);
+                }
+            }
             PatternKind::Var(b) => Self::bind_var(fx, out, b, v),
             PatternKind::Discard => {}
             PatternKind::Typed { binder, .. } => {
@@ -2594,6 +2854,32 @@ impl<'a> Lowerer<'a> {
             PatternKind::BitArray(segs) => self.bits_pattern(fx, out, v, segs, fail),
             PatternKind::Error(_) => out.push(Stmt::Unreachable),
         }
+    }
+
+    fn pattern_call(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        function: DefId,
+        span: Span,
+        args: Vec<Atom>,
+    ) -> Atom {
+        let callee = Expr {
+            kind: ExprKind::Name(ValueRef::Def(function)),
+            span,
+        };
+        let target = self.target(fx, out, &callee);
+        let value = match target {
+            Target::Callee(callee) => Value::Call {
+                callee,
+                args,
+                env: fx.env,
+            },
+            Target::Op(op) if op.needs_env() => Value::OpEnv(op, args, fx.env),
+            Target::Op(op) => Value::Op(op, args),
+            Target::Ctor(_) => unreachable!("quote service is a function"),
+        };
+        let_value(fx, out, value, self.site(fx, span.start))
     }
 
     /// The test of a type test `x: T` for one member of `T` (§7.1).

@@ -31,6 +31,7 @@ impl Clone for Cond {
                         todo.push(Work::Visit(b));
                         todo.push(Work::Visit(a));
                     }
+                    Cond::IsRec(a) => done.push(Cond::IsRec(a.clone())),
                     Cond::True(a) => done.push(Cond::True(a.clone())),
                     Cond::Tag(a, n) => done.push(Cond::Tag(a.clone(), *n)),
                     Cond::Bool(a, b) => done.push(Cond::Bool(a.clone(), *b)),
