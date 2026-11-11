@@ -33,7 +33,7 @@ fn brace_decisions_follow_the_ordered_tests() {
     // Accepted syntax.md §6.1 examples: tests 1-3 and 6 make blocks.
     for expr in [
         "{ go = (n) -> Int { n + 1 }  go(1) }",
-        "{ go = (n) -> Int ? String ! Log { step(n) }  go(1) }",
+        "{ go = (n) -> Int ^ String ! Log { step(n) }  go(1) }",
         "{ k: (Int) -> Int = f  k(1) }",
         "{ go(A) = (x: A) -> A { x }  go(1) }",
         "{ go = (n, log ! Log) -> Int { log.write(n)  n }  go(1) }",
