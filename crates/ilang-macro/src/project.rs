@@ -52,7 +52,13 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
             .iter()
             .position(|module| module.source == source)
             .expect("ordered module belongs to project");
-        let registry = Registry::new(graph, &parsed)?;
+        let registry = match Registry::new(graph, &parsed) {
+            Ok(registry) => registry,
+            Err(errors) => {
+                diagnostics.extend(errors);
+                return Err(diagnostics);
+            }
+        };
         let definitions = Arc::new(DefinitionWorld::new(graph, &parsed));
         let mut ast = parsed[index].ast.clone();
         let scoped = parsed[index]
@@ -74,7 +80,8 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
             match item_phase::expand_items(&mut engine, &mut ast, definitions.clone()) {
                 Ok(transactions) => transactions,
                 Err(error) => {
-                    return Err(map_failure(source, &engine.scoped, phase(source, error)));
+                    diagnostics.extend(map_failure(source, &engine.scoped, phase(source, error)));
+                    return Err(diagnostics);
                 }
             };
         let scoped = engine.scoped.clone();
@@ -83,7 +90,13 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         graph.sources.set_text(source, scoped.text().to_owned());
         parsed[index].ast = ast;
         parsed[index].scoped = Some(scoped);
-        let registry = Registry::new(graph, &parsed)?;
+        let registry = match Registry::new(graph, &parsed) {
+            Ok(registry) => registry,
+            Err(errors) => {
+                diagnostics.extend(errors);
+                return Err(diagnostics);
+            }
+        };
         let mut ast = parsed[index].ast.clone();
         let scoped = parsed[index]
             .scoped
@@ -103,11 +116,21 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         engine.type_replacements = replacements;
         engine.use_completed_definitions(definitions, &ast);
         if let Err(error) = body_walk::expressions(&mut ast, &mut engine) {
-            return Err(map_failure(
+            diagnostics.extend(map_failure(
+                source,
+                &engine.scoped,
+                notes(
+                    item_transactions
+                        .into_iter()
+                        .chain(std::mem::take(&mut engine.transactions)),
+                ),
+            ));
+            diagnostics.extend(map_failure(
                 source,
                 &engine.scoped,
                 diagnostics::body(source, error),
             ));
+            return Err(diagnostics);
         }
         let scoped = engine.scoped.clone();
         let body_transactions = std::mem::take(&mut engine.transactions);
@@ -118,7 +141,10 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         diagnostics.extend(notes(
             item_transactions.into_iter().chain(body_transactions),
         ));
-        validate::module(graph, &parsed, source)?;
+        if let Err(errors) = validate::module(graph, &parsed, source) {
+            diagnostics.extend(errors);
+            return Err(diagnostics);
+        }
     }
     Ok(Expanded {
         parsed,
