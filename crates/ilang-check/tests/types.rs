@@ -202,7 +202,7 @@ fn shown_names_skip_types_and_ignore_written_variable_names() {
     assert!(out.contains("keep : (v: B) -> B\n"), "{out}");
     assert!(out.contains("again : (v: B) -> B\n"), "{out}");
     assert!(
-        out.contains("effect : (f: () -> B ? E2 ! N2) -> B ? E2 ! N2\n"),
+        out.contains("effect : (f: () -> B ^ E2 ! N2) -> B ^ E2 ! N2\n"),
         "{out}"
     );
     assert!(!out.contains("error"), "{out}");

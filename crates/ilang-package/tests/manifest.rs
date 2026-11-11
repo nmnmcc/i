@@ -285,3 +285,14 @@ fn provider_empty_tables_are_valid() {
         );
     }
 }
+
+#[test]
+fn dotted_entry_paths_are_relative_modules() {
+    let (manifest, diagnostics) =
+        parse_manifest("name = \"app\"\n[entries]\nworker = \"tools.jobs.work\"\n");
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let entries = manifest.unwrap().entries;
+    assert_eq!(entries[0].1.module, "tools.jobs");
+    assert_eq!(entries[0].1.function, "work");
+    assert!(!codes("name = \"app\"\n[entries]\nworker = \"app/tools.work\"\n").is_empty());
+}

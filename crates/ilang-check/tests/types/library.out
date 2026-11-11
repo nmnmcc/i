@@ -1,17 +1,17 @@
 i/prelude.panic : (message: String) -> Never
 i/prelude.assert : (c: Bool) -> Nil ! Assert
-i/fail.raise : (error: A) -> Never ? A
-i/fail.catch : (body: () -> A ? E ! N) -> Result(A, E) ! N
-i/fail.from_result : (result: Result(A, B)) -> A ? B
-i/fail.map_error : (body: () -> A ? E ! N, with: (E) -> B ! N) -> A ? B ! N
-i/control.boundary : (body: (b: Boundary(A, B, C)) -> A ? B ! C) -> A ? B ! C
-i/control.suspend : (b: Boundary(A, B, C), f: (k: Continuation(D, A, B, C)) -> A ? B ! C) -> D
-i/control.resume : (k: Continuation(A, B, C, D), value: A) -> B ? C ! D
+i/fail.raise : (error: A) -> Never ^ A
+i/fail.catch : (body: () -> A ^ E ! N) -> Result(A, E) ! N
+i/fail.from_result : (result: Result(A, B)) -> A ^ B
+i/fail.map_error : (body: () -> A ^ E ! N, with: (E) -> B ! N) -> A ^ B ! N
+i/control.boundary : (body: (b: Boundary(A, B, C)) -> A ^ B ! C) -> A ^ B ! C
+i/control.suspend : (b: Boundary(A, B, C), f: (k: Continuation(D, A, B, C)) -> A ^ B ! C) -> D
+i/control.resume : (k: Continuation(A, B, C, D), value: A) -> B ^ C ! D
 i/control.cancel : (k: Continuation(A, B, C, D)) -> Nil ! D
-i/control.keep_env : (f: (x: A) -> B ? E ! N) -> { (x: A) -> B ? E } ! N
-i/resource.ensure : (body: () -> A ? E ! N, with: () -> Nil ! N) -> A ? E ! N
-i/resource.acquire : (open: () -> A ? E ! N, release: (A) -> Nil ! N, use: (A) -> B ? E ! N) -> B ? E ! N
-i/assertion.catch : (body: () -> A ? E ! N) -> Result(A, AssertionFailure) ? E ! N - Assert
+i/control.keep_env : (f: (x: A) -> B ^ E ! N) -> { (x: A) -> B ^ E } ! N
+i/resource.ensure : (body: () -> A ^ E ! N, with: () -> Nil ! N) -> A ^ E ! N
+i/resource.acquire : (open: () -> A ^ E ! N, release: (A) -> Nil ! N, use: (A) -> B ^ E ! N) -> B ^ E ! N
+i/assertion.catch : (body: () -> A ^ E ! N) -> Result(A, AssertionFailure) ^ E ! N - Assert
 i/request.new_root : (parent: Key(Nil)) -> Key(Nil)
 i/request.end_root : (root: Key(Nil)) -> Nil
 i/request.new_owner : (root: Key(Nil)) -> Key(Nil)
@@ -33,7 +33,7 @@ i/request.settled_root : (root: Root) -> Bool
 i/request.cancel_all : (owner: Owner) -> Nil
 i/request.cancel_all_root : (root: Root) -> Nil
 i/request.retain : (value: A) -> A
-i/request.within : (body: () -> A ? E ! N) -> A ? E ! N - Owner | Root
+i/request.within : (body: () -> A ^ E ! N) -> A ^ E ! N - Owner | Root
 i/request.wait_none : (owner: Owner) -> Nil ! Await
 i/request.wait_none_root : (root: Root) -> Nil ! Await
 i/request.ready : (value: A) -> Request(A)
@@ -49,7 +49,7 @@ i/request.wait_any : (rs: List(Ticket)) -> Nil
 i/request.poll : () -> Nil
 i/request.entry_root : () -> Key(Nil)
 i/request.entry_end : () -> Nil
-i/request._entry : (body: () -> A ? E ! N) -> A ? E ! N - Await - Owner - Root
+i/request._entry : (body: () -> A ^ E ! N) -> A ^ E ! N - Await - Owner - Root
 i/request._provider_root : (seeds: List(Root), key: Key(Nil)) -> Root
 i/request._provider_owner : (seeds: List(Owner)) -> Owner ! Root
 i/request._provider_await : (seeds: List(Await)) -> Await
@@ -148,7 +148,7 @@ i/task.set_task : (s: State, t: TaskState) -> State
 i/task.add_task : (s: State, t: TaskState) -> State
 i/task.set_scope : (s: State, scope: ScopeState) -> State
 i/task.guarded : (own: Scheduler, owner: Maybe(Address), body: () -> Completion) -> Completion
-i/task.make_start : (body: () -> A ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await }, result: Key(Result(A, E)), errors: Key(E), check: Bool) -> Start ! N - Scheduler - Runner - request.Await
+i/task.make_start : (body: () -> A ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await }, result: Key(Result(A, E)), errors: Key(E), check: Bool) -> Start ! N - Scheduler - Runner - request.Await
 i/task.path : () -> List(Int) ! Scheduler
 i/task.random : () -> rng.Generator ! Scheduler
 i/task.yield : () -> Nil ! Scheduler
@@ -238,20 +238,20 @@ i/task.script_rows : (s: State, ids: List(ActiveTask), wanted: List(Int)) -> May
 i/task.script_task : (s: State, wanted: List(Int)) -> Maybe(TaskState)
 i/task.choose_turn : (state: State) -> State
 i/task.loop : (state: State) -> RunReply
-i/task.scope_call_body : (body: (Scope(A)) -> B ? A ! N, witness: Witness, mode: Mode, own: Scheduler) -> ScopeResult(B) ? A ! N
-i/task.scope : (body: (s: Scope(A)) -> B ? A ! N) -> B ? A ! N | Scheduler | request.Root
-i/task.local_scope : (body: (s: Scope(A)) -> B ? A ! N) -> B ? A ! N | Scheduler | request.Root
-i/task.go_key : (s: Scope(A), body: () -> B ? A ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }, result: Key(Result(B, A))) -> Task(B, A) ! N - Scheduler - Runner - request.Await | Scheduler
-i/task.go : (s: Scope(A), body: () -> B ? A ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> Task(B, A) ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.scope_call_body : (body: (Scope(A)) -> B ^ A ! N, witness: Witness, mode: Mode, own: Scheduler) -> ScopeResult(B) ^ A ! N
+i/task.scope : (body: (s: Scope(A)) -> B ^ A ! N) -> B ^ A ! N | Scheduler | request.Root
+i/task.local_scope : (body: (s: Scope(A)) -> B ^ A ! N) -> B ^ A ! N | Scheduler | request.Root
+i/task.go_key : (s: Scope(A), body: () -> B ^ A ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }, result: Key(Result(B, A))) -> Task(B, A) ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.go : (s: Scope(A), body: () -> B ^ A ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> Task(B, A) ! N - Scheduler - Runner - request.Await | Scheduler
 i/task.branch_at : (branches: List(Branch(A, B, C)), index: Int) -> Branch(A, B, C)
-i/task.sync_body : (e: Event(A, B, C), own: Scheduler) -> A ? B ! C
+i/task.sync_body : (e: Event(A, B, C), own: Scheduler) -> A ^ B ! C
 i/task.always : (value: A) -> Event(A, Never, Never)
 i/task.never : () -> Event(Never, Never, Never)
 i/task.branches_of : (events: List(Event(A, B, C))) -> List(Branch(A, B, C))
 i/task.choose : (events: List(Event(A, B, C))) -> Event(A, B, C)
-i/task.map : (e: Event(A, B, C), f: (A) -> D ? E ! N) -> Event(D, B | E, C | N)
+i/task.map : (e: Event(A, B, C), f: (A) -> D ^ E ! N) -> Event(D, B | E, C | N)
 i/task.join_event : (t: Task(A, B)) -> Event(A, B, Never)
-i/task.join : (t: Task(A, B)) -> A ? B ! Scheduler
+i/task.join : (t: Task(A, B)) -> A ^ B ! Scheduler
 i/task.channel : () -> Channel(A) ! Scheduler
 i/task.local_channel : () -> Channel(A) ! Scheduler
 i/task.send_event : (c: Channel(A), value: A) -> Event(Nil, Never, Never)
@@ -260,19 +260,19 @@ i/task.send : (c: Channel(A), value: A) -> Nil ! Scheduler
 i/task.receive : (c: Channel(A)) -> A ! Scheduler
 i/task.share : (s: Scope(A), value: B) -> Shared(B) ! Scheduler
 i/task.get : (s: Shared(A)) -> A ! Scheduler
-i/task.keep : (f: (A) -> B ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await }) -> { (A) -> B ? E ! Scheduler } ! N - Scheduler - Runner - request.Await | Scheduler
-i/task.both : (left: () -> A ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }, right: () -> B ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> (A, B) ? E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
-i/task.race : (left: () -> A ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }, right: () -> A ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> A ? E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
-i/task.spawn_values : (s: Scope(A), xs: List(B), f: (B) -> C ? A ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> List(Task(C, A)) ! N - Scheduler - Runner - request.Await | Scheduler
-i/task.join_values : (tasks: List(Task(A, B))) -> List(A) ? B ! Scheduler
-i/task.map_concurrently : (xs: List(A), f: (A) -> B ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> List(B) ? E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
-i/task.execute_body : (body: () -> A ? E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }, runner: Runner, seed: rng.Generator, policy: Policy) -> Result(Result(A, E), ScheduleError) ! N - Scheduler - Runner - request.Await - request.Owner - request.Root
-i/task.run : (body: () -> A ? E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }) -> A ? E ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | Runner
-i/task.test : (seed: rng.Generator, choices: List(List(Int)), body: () -> A ? E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }) -> A ? E | ScheduleError ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | Runner
-i/task._entry : (body: () -> A ? E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }) -> A ? E ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | request.Root
-i/task.scope_call : (body: (Scope(A)) -> B ? A ! N, witness: Witness, mode: Mode, own: Scheduler) -> ScopeResult(B) ? A ! N | request.Root
-i/task.execute : (body: () -> A ? E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }, runner: Runner, seed: rng.Generator, policy: Policy) -> Result(Result(A, E), ScheduleError) ! N - Scheduler - Runner - request.Await - request.Owner - request.Root
-i/task.sync : (e: Event(A, B, C)) -> A ? B ! C | Scheduler
+i/task.keep : (f: (A) -> B ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await }) -> { (A) -> B ^ E ! Scheduler } ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.both : (left: () -> A ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }, right: () -> B ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> (A, B) ^ E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
+i/task.race : (left: () -> A ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }, right: () -> A ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> A ^ E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
+i/task.spawn_values : (s: Scope(A), xs: List(B), f: (B) -> C ^ A ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> List(Task(C, A)) ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.join_values : (tasks: List(Task(A, B))) -> List(A) ^ B ! Scheduler
+i/task.map_concurrently : (xs: List(A), f: (A) -> B ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> List(B) ^ E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
+i/task.execute_body : (body: () -> A ^ E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }, runner: Runner, seed: rng.Generator, policy: Policy) -> Result(Result(A, E), ScheduleError) ! N - Scheduler - Runner - request.Await - request.Owner - request.Root
+i/task.run : (body: () -> A ^ E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }) -> A ^ E ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | Runner
+i/task.test : (seed: rng.Generator, choices: List(List(Int)), body: () -> A ^ E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }) -> A ^ E | ScheduleError ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | Runner
+i/task._entry : (body: () -> A ^ E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }) -> A ^ E ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | request.Root
+i/task.scope_call : (body: (Scope(A)) -> B ^ A ! N, witness: Witness, mode: Mode, own: Scheduler) -> ScopeResult(B) ^ A ! N | request.Root
+i/task.execute : (body: () -> A ^ E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }, runner: Runner, seed: rng.Generator, policy: Policy) -> Result(Result(A, E), ScheduleError) ! N - Scheduler - Runner - request.Await - request.Owner - request.Root
+i/task.sync : (e: Event(A, B, C)) -> A ^ B ! C | Scheduler
 i/task.root_active : (_run: Key(Nil), _active: Active) -> RunControl
 i/task.cause_allowed : (s: State, t: TaskState, cause: Cause) -> Bool
 i/task.frame_abort : (frames: List(Frame)) -> Maybe(() -> Never)
@@ -312,9 +312,9 @@ i/task.relay_notice : (s: State, t: TaskState, k: Continuation(StepAnswer, Turn,
 i/task.notice_hops : (notice: ForeignNotice) -> List(Hop)
 i/task._provider_runner : (seeds: List(Runner)) -> Runner ! request.Root
 i/task._provider_scheduler : (seeds: List(Scheduler)) -> Scheduler
-i/clock.monotonic_ns : () -> Int ? ClockError ! Clock | request.Await | request.Owner
-i/clock.unix_ns : () -> Int ? ClockError ! Clock | request.Await | request.Owner
-i/clock.sleep_ns : (duration: Int) -> Nil ? ClockError ! Clock | request.Await | request.Owner
+i/clock.monotonic_ns : () -> Int ^ ClockError ! Clock | request.Await | request.Owner
+i/clock.unix_ns : () -> Int ^ ClockError ! Clock | request.Await | request.Owner
+i/clock.sleep_ns : (duration: Int) -> Nil ^ ClockError ! Clock | request.Await | request.Owner
 i/random.word_size : () -> Int
 i/random.mask : (x: Int) -> Int
 i/random.xor_shift : (x: Int, n: Int) -> Int
@@ -327,7 +327,7 @@ i/random.word : (g: Generator) -> (Int, Generator)
 i/random.space_for : (below: Int, space: Int) -> Int
 i/random.word_group : (g: Generator, space: Int, scale: Int, value: Int) -> (Int, Generator)
 i/random.bounded : (g: Generator, below: Int, space: Int, limit: Int) -> (Int, Generator)
-i/random.int : (g: Generator, below: Int) -> (Int, Generator) ? RandomError
+i/random.int : (g: Generator, below: Int) -> (Int, Generator) ^ RandomError
 i/random.float : (g: Generator) -> (Float, Generator)
 i/random.native_split : (h: State) -> (State, State)
 i/random.edge : (h: State, bit: Int) -> State
@@ -337,80 +337,80 @@ i/random.binary : (n: Int, bits: List(Int), length: Int) -> (List(Int), Int)
 i/random.zeros : (h: State, count: Int) -> State
 i/random.follow : (h: State, bits: List(Int)) -> State
 i/random.derive_path : (g: Generator, path: List(Int)) -> Generator
-i/random.at_path : (g: Generator, path: List(Int)) -> Generator ? RandomError
+i/random.at_path : (g: Generator, path: List(Int)) -> Generator ^ RandomError
 i/fs.mode_string : (OpenMode) -> "append" | "read" | "read_write" | "truncate"
-i/fs.open : (path: String, mode: OpenMode) -> File ? FsError ! Fs | request.Await | request.Owner
-i/fs.read : (File, max_bytes: Int) -> BitArray ? FsError ! Fs | request.Await | request.Owner
-i/fs.write : (File, bytes: BitArray) -> Nil ? FsError ! Fs | request.Await | request.Owner
-i/fs.flush : (File) -> Nil ? FsError ! Fs | request.Await | request.Owner
+i/fs.open : (path: String, mode: OpenMode) -> File ^ FsError ! Fs | request.Await | request.Owner
+i/fs.read : (File, max_bytes: Int) -> BitArray ^ FsError ! Fs | request.Await | request.Owner
+i/fs.write : (File, bytes: BitArray) -> Nil ^ FsError ! Fs | request.Await | request.Owner
+i/fs.flush : (File) -> Nil ^ FsError ! Fs | request.Await | request.Owner
 i/fs.close : (File) -> Nil ! Fs | request.Await | request.Owner
-i/fs.remove : (path: String) -> Nil ? FsError ! Fs | request.Await | request.Owner
-i/fs.rename : (from: String, to: String) -> Nil ? FsError ! Fs | request.Await | request.Owner
-i/fs.mkdir : (path: String) -> Nil ? FsError ! Fs | request.Await | request.Owner
+i/fs.remove : (path: String) -> Nil ^ FsError ! Fs | request.Await | request.Owner
+i/fs.rename : (from: String, to: String) -> Nil ^ FsError ! Fs | request.Await | request.Owner
+i/fs.mkdir : (path: String) -> Nil ^ FsError ! Fs | request.Await | request.Owner
 i/fs.slice : (text: String, start: Int, length: Int) -> String
 i/fs.list_parts : (text: String, start: Int) -> List(String)
-i/fs.list : (path: String) -> List(String) ? FsError ! Fs | request.Await | request.Owner
-i/fs.metadata : (path: String) -> Metadata ? FsError ! Fs | request.Await | request.Owner
-i/fs.temp_dir : () -> String ? FsError ! Fs | request.Await | request.Owner
-i/fs.read_chunks : (file: File) -> BitArray ? FsError ! Fs | request.Await | request.Owner
-i/fs.read_file : (path: String) -> BitArray ? FsError ! Fs | request.Await | request.Owner
-i/fs.write_file : (path: String, bytes: BitArray) -> Nil ? FsError ! Fs | request.Await | request.Owner
+i/fs.list : (path: String) -> List(String) ^ FsError ! Fs | request.Await | request.Owner
+i/fs.metadata : (path: String) -> Metadata ^ FsError ! Fs | request.Await | request.Owner
+i/fs.temp_dir : () -> String ^ FsError ! Fs | request.Await | request.Owner
+i/fs.read_chunks : (file: File) -> BitArray ^ FsError ! Fs | request.Await | request.Owner
+i/fs.read_file : (path: String) -> BitArray ^ FsError ! Fs | request.Await | request.Owner
+i/fs.write_file : (path: String, bytes: BitArray) -> Nil ^ FsError ! Fs | request.Await | request.Owner
 i/fs.line_parts : (text: String, start: Int) -> List(String)
-i/fs.read_lines : (path: String) -> List(String) ? FsError ! Fs | request.Await | request.Owner
+i/fs.read_lines : (path: String) -> List(String) ^ FsError ! Fs | request.Await | request.Owner
 i/process.length : (List(A)) -> Int
 i/process.u32 : (n: Int) -> BitArray
-i/process.encode_items : (List(String)) -> BitArray ? ProcessError
-i/process.encode_args : (values: List(String)) -> BitArray ? ProcessError
+i/process.encode_items : (List(String)) -> BitArray ^ ProcessError
+i/process.encode_args : (values: List(String)) -> BitArray ^ ProcessError
 i/process.decode_items : (bytes: A, count: Int) -> List(String)
 i/process.decode_args : (A) -> List(String)
-i/process.args : () -> List(String) ? ProcessError ! Arguments | request.Await | request.Owner
-i/process.env : (name: String) -> String ? ProcessError ! Environment | request.Await | request.Owner
-i/process.cwd : () -> String ? ProcessError ! WorkingDirectory | request.Await | request.Owner
-i/process.entropy : (bytes: Int) -> BitArray ? ProcessError ! Entropy | request.Await | request.Owner
-i/process.spawn : (program: String, values: List(String)) -> Child ? ProcessError ! Process | request.Await | request.Owner
-i/process.wait : (Child) -> Int ? ProcessError ! Process | request.Await | request.Owner
-i/process.terminate : (Child) -> Nil ? ProcessError ! Process | request.Await | request.Owner
+i/process.args : () -> List(String) ^ ProcessError ! Arguments | request.Await | request.Owner
+i/process.env : (name: String) -> String ^ ProcessError ! Environment | request.Await | request.Owner
+i/process.cwd : () -> String ^ ProcessError ! WorkingDirectory | request.Await | request.Owner
+i/process.entropy : (bytes: Int) -> BitArray ^ ProcessError ! Entropy | request.Await | request.Owner
+i/process.spawn : (program: String, values: List(String)) -> Child ^ ProcessError ! Process | request.Await | request.Owner
+i/process.wait : (Child) -> Int ^ ProcessError ! Process | request.Await | request.Owner
+i/process.terminate : (Child) -> Nil ^ ProcessError ! Process | request.Await | request.Owner
 i/process.close : (Child) -> Nil ! Process | request.Await | request.Owner
 i/process.stdio_mode : (Stdio) -> "inherit" | "null" | "piped"
-i/process.spawn_piped : (program: String, values: List(String), input: Stdio, output: Stdio, errors: Stdio) -> Child ? ProcessError ! Process | request.Await | request.Owner
-i/process.spawn_config : (program: String, values: List(String), input: Stdio, output: Stdio, errors: Stdio, environment: EnvironmentMode, directory: Directory) -> Child ? ProcessError ! Process | request.Await | request.Owner
-i/process.read_stdout : (Child, max: Int) -> BitArray ? ProcessError ! Process | request.Await | request.Owner
-i/process.read_stderr : (Child, max: Int) -> BitArray ? ProcessError ! Process | request.Await | request.Owner
-i/process.write_stdin : (Child, bytes: BitArray) -> Nil ? ProcessError ! Process | request.Await | request.Owner
-i/process.close_stdin : (Child) -> Nil ? ProcessError ! Process | request.Await | request.Owner
-i/net.listen : (address: String, port: Int) -> Listener ? NetError ! Net | request.Await | request.Owner
-i/net.connect : (address: String, port: Int) -> Stream ? NetError ! Net | request.Await | request.Owner
-i/net.accept : (Listener) -> Stream ? NetError ! Net | request.Await | request.Owner
-i/net.local_port : (Listener) -> Int ? NetError ! Net | request.Await | request.Owner
-i/net.read : (Stream, max_bytes: Int) -> BitArray ? NetError ! Net | request.Await | request.Owner
-i/net.write : (Stream, bytes: BitArray) -> Nil ? NetError ! Net | request.Await | request.Owner
-i/net.shutdown_write : (Stream) -> Nil ? NetError ! Net | request.Await | request.Owner
+i/process.spawn_piped : (program: String, values: List(String), input: Stdio, output: Stdio, errors: Stdio) -> Child ^ ProcessError ! Process | request.Await | request.Owner
+i/process.spawn_config : (program: String, values: List(String), input: Stdio, output: Stdio, errors: Stdio, environment: EnvironmentMode, directory: Directory) -> Child ^ ProcessError ! Process | request.Await | request.Owner
+i/process.read_stdout : (Child, max: Int) -> BitArray ^ ProcessError ! Process | request.Await | request.Owner
+i/process.read_stderr : (Child, max: Int) -> BitArray ^ ProcessError ! Process | request.Await | request.Owner
+i/process.write_stdin : (Child, bytes: BitArray) -> Nil ^ ProcessError ! Process | request.Await | request.Owner
+i/process.close_stdin : (Child) -> Nil ^ ProcessError ! Process | request.Await | request.Owner
+i/net.listen : (address: String, port: Int) -> Listener ^ NetError ! Net | request.Await | request.Owner
+i/net.connect : (address: String, port: Int) -> Stream ^ NetError ! Net | request.Await | request.Owner
+i/net.accept : (Listener) -> Stream ^ NetError ! Net | request.Await | request.Owner
+i/net.local_port : (Listener) -> Int ^ NetError ! Net | request.Await | request.Owner
+i/net.read : (Stream, max_bytes: Int) -> BitArray ^ NetError ! Net | request.Await | request.Owner
+i/net.write : (Stream, bytes: BitArray) -> Nil ^ NetError ! Net | request.Await | request.Owner
+i/net.shutdown_write : (Stream) -> Nil ^ NetError ! Net | request.Await | request.Owner
 i/net.close_stream : (Stream) -> Nil ! Net | request.Await | request.Owner
 i/net.close_listener : (Listener) -> Nil ! Net | request.Await | request.Owner
 i/net.slice : (text: String, start: Int, length: Int) -> String
 i/net.parts : (text: String, start: Int) -> List(String)
-i/net.resolve : (name: String) -> List(String) ? NetError ! Net | request.Await | request.Owner
+i/net.resolve : (name: String) -> List(String) ^ NetError ! Net | request.Await | request.Owner
 i/net.stream_number : (Stream) -> Int
-i/net.byte_stream : (stream: Stream) -> (close: () -> Nil ! { request.Owner | { Net | request.Await } }, read: (max: Int) -> BitArray ? NetError ! { request.Owner | { Net | request.Await } }, shutdown_write: () -> Nil ? NetError ! { request.Owner | { Net | request.Await } }, write: (bytes: BitArray) -> Nil ? NetError ! { request.Owner | { Net | request.Await } })
+i/net.byte_stream : (stream: Stream) -> (close: () -> Nil ! { request.Owner | { Net | request.Await } }, read: (max: Int) -> BitArray ^ NetError ! { request.Owner | { Net | request.Await } }, shutdown_write: () -> Nil ^ NetError ! { request.Owner | { Net | request.Await } }, write: (bytes: BitArray) -> Nil ^ NetError ! { request.Owner | { Net | request.Await } })
 i/tls.options : () -> (alpn: List(Never), cert: BitArray, key: BitArray, roots: BitArray)
 i/tls.identity : (cert: BitArray, key: BitArray) -> (cert: BitArray, key: BitArray)
 i/tls.join : (items: List(String)) -> String
 i/tls.slice : (text: String, start: Int, len: Int) -> String
-i/tls.raise : (message: String) -> Never ? TlsError
-i/tls.finish : (r: Request(Result(Int, String))) -> Stream ? TlsError ! Tls | request.Await | request.Owner
-i/tls.connect : (stream: net.Stream, name: String, opts: (alpn: List(String), cert: BitArray, key: BitArray, roots: BitArray)) -> Stream ? TlsError ! Tls | request.Await | request.Owner
-i/tls.accept : (stream: net.Stream, ident: (cert: BitArray, key: BitArray), opts: (alpn: List(String))) -> Stream ? TlsError ! Tls | request.Await | request.Owner
-i/tls.dial : (host: String, port: Int, opts: (alpn: List(String), cert: BitArray, key: BitArray, roots: BitArray)) -> Stream ? TlsError | net.NetError ! Tls | net.Net | request.Await | request.Owner
-i/tls.alpn : (Stream) -> String ? TlsError ! Tls | request.Await | request.Owner
-i/tls.read : (Stream, max: Int) -> BitArray ? TlsError ! Tls | request.Await | request.Owner
-i/tls.write : (Stream, bytes: BitArray) -> Nil ? TlsError ! Tls | request.Await | request.Owner
-i/tls.shutdown_write : (Stream) -> Nil ? TlsError ! Tls | request.Await | request.Owner
+i/tls.raise : (message: String) -> Never ^ TlsError
+i/tls.finish : (r: Request(Result(Int, String))) -> Stream ^ TlsError ! Tls | request.Await | request.Owner
+i/tls.connect : (stream: net.Stream, name: String, opts: (alpn: List(String), cert: BitArray, key: BitArray, roots: BitArray)) -> Stream ^ TlsError ! Tls | request.Await | request.Owner
+i/tls.accept : (stream: net.Stream, ident: (cert: BitArray, key: BitArray), opts: (alpn: List(String))) -> Stream ^ TlsError ! Tls | request.Await | request.Owner
+i/tls.dial : (host: String, port: Int, opts: (alpn: List(String), cert: BitArray, key: BitArray, roots: BitArray)) -> Stream ^ TlsError | net.NetError ! Tls | net.Net | request.Await | request.Owner
+i/tls.alpn : (Stream) -> String ^ TlsError ! Tls | request.Await | request.Owner
+i/tls.read : (Stream, max: Int) -> BitArray ^ TlsError ! Tls | request.Await | request.Owner
+i/tls.write : (Stream, bytes: BitArray) -> Nil ^ TlsError ! Tls | request.Await | request.Owner
+i/tls.shutdown_write : (Stream) -> Nil ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.close : (Stream) -> Nil ! Tls | request.Await | request.Owner
-i/tls.byte_stream : (stream: Stream) -> (close: () -> Nil ! { request.Owner | { request.Await | Tls } }, read: (max: Int) -> BitArray ? TlsError ! { request.Owner | { request.Await | Tls } }, shutdown_write: () -> Nil ? TlsError ! { request.Owner | { request.Await | Tls } }, write: (bytes: BitArray) -> Nil ? TlsError ! { request.Owner | { request.Await | Tls } })
-i/stdio.read : (max_bytes: Int) -> BitArray ? StdioError ! Stdio | request.Await | request.Owner
-i/stdio.write : (bytes: BitArray) -> Nil ? StdioError ! Stdio | request.Await | request.Owner
-i/stdio.write_error : (bytes: BitArray) -> Nil ? StdioError ! Stdio | request.Await | request.Owner
-i/stdio.flush : () -> Nil ? StdioError ! Stdio | request.Await | request.Owner
-i/stdio.flush_error : () -> Nil ? StdioError ! Stdio | request.Await | request.Owner
-i/stdio.print : (text: String) -> Nil ? StdioError ! Stdio | request.Await | request.Owner
-i/stdio.print_error : (text: String) -> Nil ? StdioError ! Stdio | request.Await | request.Owner
+i/tls.byte_stream : (stream: Stream) -> (close: () -> Nil ! { request.Owner | { request.Await | Tls } }, read: (max: Int) -> BitArray ^ TlsError ! { request.Owner | { request.Await | Tls } }, shutdown_write: () -> Nil ^ TlsError ! { request.Owner | { request.Await | Tls } }, write: (bytes: BitArray) -> Nil ^ TlsError ! { request.Owner | { request.Await | Tls } })
+i/stdio.read : (max_bytes: Int) -> BitArray ^ StdioError ! Stdio | request.Await | request.Owner
+i/stdio.write : (bytes: BitArray) -> Nil ^ StdioError ! Stdio | request.Await | request.Owner
+i/stdio.write_error : (bytes: BitArray) -> Nil ^ StdioError ! Stdio | request.Await | request.Owner
+i/stdio.flush : () -> Nil ^ StdioError ! Stdio | request.Await | request.Owner
+i/stdio.flush_error : () -> Nil ^ StdioError ! Stdio | request.Await | request.Owner
+i/stdio.print : (text: String) -> Nil ^ StdioError ! Stdio | request.Await | request.Owner
+i/stdio.print_error : (text: String) -> Nil ^ StdioError ! Stdio | request.Await | request.Owner

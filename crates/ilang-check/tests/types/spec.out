@@ -1,12 +1,12 @@
-retry : (times: Int, body: () -> A ? E ! N) -> A ? E ! N
-load_user : (id: String) -> String ? Int
-user : () -> String ? Int
+retry : (times: Int, body: () -> A ^ E ! N) -> A ^ E ! N
+load_user : (id: String) -> String ^ Int
+user : () -> String ^ Int
 elapsed : (start: Int) -> Int ! Clock
 fixed : () -> Int
 collect : (body: () -> Nil ! N | Yield(A)) -> List(A) ! N
 numbers : () -> List(Int)
 my_assert : (c: Bool) -> Nil ! Assert
-catch : (body: () -> A ? E ! N) -> Result(A, AssertionFailure) ? E ! N - Assert
+catch : (body: () -> A ^ E ! N) -> Result(A, AssertionFailure) ^ E ! N - Assert
 checked : () -> Result(1, AssertionFailure)
 checked_library : () -> Result("x", AssertionFailure)
 inc : (x: A & Int) -> A

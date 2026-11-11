@@ -61,6 +61,7 @@ pub(crate) fn add(graph: &mut PackageGraph) {
         wasm_exports: Vec::new(),
         wasm_synchronous: Vec::new(),
         provider_plan,
+        entries: Vec::new(),
         location: None,
     });
 }

@@ -4,7 +4,7 @@ ids : (x: 1 | "a") -> 1 | "a"
 use_ids : () -> (1 | "a", 1 | "a")
 local : () -> (1, "a")
 local_mono : () -> (1 | "a", 1 | "a")
-param : (f: (1 | "a") -> A & B ? E ! N) -> (A, B) ? E ! N
+param : (f: (1 | "a") -> A & B ^ E ! N) -> (A, B) ^ E ! N
 fact : (n: Int) -> Int
 loop : (x: A) -> Never
 even : (n: Int) -> Bool

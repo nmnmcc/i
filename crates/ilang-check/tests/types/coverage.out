@@ -20,7 +20,7 @@ tuples : (p: (Bool, Bool)) -> 1 | 2
 only_ok : (r: Result(Int, Never)) -> Int
 empty : 0
 any : (x: Int) -> 1
-unknown : (f: () -> Bool ? E ! N) -> 1 | 2 ? E ! N
+unknown : (f: () -> Bool ^ E ! N) -> 1 | 2 ^ E ! N
 no_error : () -> 1
 22:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Point`
 29:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Ok(False)`
