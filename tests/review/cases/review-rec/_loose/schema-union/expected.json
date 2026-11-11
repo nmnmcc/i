@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "efb6266cde3be7cf34c9771fc42fc2214c8570d0",
+  "binary_sha256": "d46121b363ffda062935e29391dcb8122612b597ad6ed942712ea78a8cc31f46",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -9,9 +9,29 @@
         "check",
         "--types"
       ],
-      "exit": 1,
-      "stdout": "",
-      "stderr": "src/main.i:5:34: error[E0101]: expected an expression, found `:`\nsrc/main.i:6:35: error[E0101]: expected an expression, found `:`\nsrc/main.i:14:23: error[E0101]: expected `}`, found `:`\n3 errors\n"
+      "exit": 0,
+      "stdout": "app/main.make : (c: Bool) -> Schema((a: 1) | (a: \"x\"))\napp/main.schema : Schema((a: 1) | (a: \"x\"))\napp/main.read : (r: (a: 1) | (a: \"x\")) -> 1 | \"x\"\napp/main.read_inferred : (r: (a: A)) -> A\napp/main.read_written : (r: (a: { 1 } | { \"x\" })) -> { 1 } | { \"x\" }\n",
+      "stderr": "src/main.i:12:1: warning[W0504]: top-level binding `read` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `read_inferred` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `read_written` is not used\n"
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": "src/main.i:12:1: warning[W0504]: top-level binding `read` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `read_inferred` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `read_written` is not used\n"
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": "src/main.i:12:1: warning[W0504]: top-level binding `read` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `read_inferred` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `read_written` is not used\n"
     }
   }
 }

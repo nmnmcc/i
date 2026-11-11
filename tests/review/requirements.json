@@ -737,12 +737,32 @@
       "fixed_by": "K4 P1: shared coalescing normalization and entry validation"
     },
     {
-      "pattern": "^review-rec/",
-      "known_failure": true,
-      "outcome": "held",
-      "finding": "T3 exact-record syntax and substitution tests are specified but not implemented",
-      "source": "docs/design/records.md; ledger 2026-11-11: T3 implementation is held until prior-art-types.md reports",
-      "origin": "review-rec plus committed lane/note-rec models"
+      "pattern": "^review-rec/_loose/growth$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "T3 preserves a compact exact 20-step record graph and normalizes the Never substitution",
+      "source": "docs/spec.md §4.9.3: keep unions and forgetting shared and exact; normalization commutes with closed substitution",
+      "origin": "review-rec/growth.i; original source fingerprint retained as a historical snapshot",
+      "types_contain": ["type-graph-v1"]
+    },
+    {
+      "pattern": "^review-rec/_loose/probes$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "T3 proves scalar and tuple record alternatives but rejects an unestablished open union obligation",
+      "source": "docs/spec.md §4.9.3 and docs/design/records.md §20.3: union inclusion does not choose alternative-specific bounds",
+      "origin": "review-rec/probes.i; original source fingerprint retained as a historical snapshot",
+      "diagnostic_codes": ["E0501"],
+      "types_contain": ["app/main.wrap_union :", "app/main.pair_annotated :", "app/main.choose :"]
+    },
+    {
+      "pattern": "^review-rec/_loose/schema-union$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "T2 completion preserves the exact record union through a user-defined schema",
+      "source": "docs/spec.md §4.9.3 and docs/design/records.md §20.3: common fields work across every record alternative",
+      "origin": "review-rec/schema-union.i; original source fingerprint retained as a historical snapshot",
+      "types_contain": ["app/main.read : (r: (a: 1) | (a: \"x\")) -> 1 | \"x\""]
     },
     {
       "pattern": "^review-k4d/(?:proj|_loose/p)/q24$",

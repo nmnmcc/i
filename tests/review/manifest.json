@@ -16001,42 +16001,33 @@
       "project": "tests/review/cases/review-rec/_loose/growth",
       "origin": "/tmp/review-rec/growth.i",
       "context": null,
-      "source": "docs/design/records.md; T3 is held in the ledger",
+      "source": "docs/spec.md §4.9 and docs/design/records.md §20.3; original source retained in .invalid",
       "finding": "growth",
       "files": [
         "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
+      ]
     },
     {
       "id": "review-rec/_loose/probes",
       "project": "tests/review/cases/review-rec/_loose/probes",
       "origin": "/tmp/review-rec/probes.i",
       "context": null,
-      "source": "docs/design/records.md; T3 is held in the ledger",
+      "source": "docs/spec.md §4.9 and docs/design/records.md §20.3; original source retained in .invalid",
       "finding": "probes",
       "files": [
         "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
+      ]
     },
     {
       "id": "review-rec/_loose/schema-union",
       "project": "tests/review/cases/review-rec/_loose/schema-union",
       "origin": "/tmp/review-rec/schema-union.i",
       "context": null,
-      "source": "docs/design/records.md; T3 is held in the ledger",
+      "source": "docs/spec.md §4.9 and docs/design/records.md §20.3; original source retained in .invalid",
       "finding": "schema-union",
       "files": [
         "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
+      ]
     },
     {
       "id": "review-runtime/echo-types",

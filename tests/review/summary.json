@@ -115,7 +115,10 @@
       "source_occurrences": 23,
       "preserved": 23,
       "projects": 14,
-      "rejected": 14
+      "rejected": 11,
+      "main_entries": 3,
+      "startup_entries_completed": 3,
+      "accepted": 3
     },
     "review-num": {
       "tools_and_evidence": 56,
@@ -133,7 +136,10 @@
       "source_occurrences": 3,
       "preserved": 3,
       "projects": 3,
-      "rejected": 3
+      "library_or_test_entries": 2,
+      "startup_entries_completed": 2,
+      "accepted": 2,
+      "rejected": 1
     },
     "review-runtime": {
       "tools_and_evidence": 6,
@@ -197,6 +203,16 @@
       "startup_entries_completed": 132,
       "accepted": 132
     },
+    "review-r2": {
+      "tools_and_evidence": 6,
+      "source_occurrences": 38,
+      "preserved": 38,
+      "projects": 38,
+      "main_entries": 37,
+      "startup_entries_completed": 37,
+      "accepted": 37,
+      "rejected": 1
+    },
     "review-k4-lane": {
       "projects": 80,
       "rejected": 20,
@@ -205,32 +221,32 @@
       "accepted": 60
     }
   },
-  "optimization_pairs": 1598,
+  "optimization_pairs": 1680,
   "optimization_mismatches": [],
   "incidents": [
     {
       "case": "review-k4d/_loose/fuzz/bad/run_44_188",
       "phase": "run0",
       "exit": "timeout",
-      "stderr": ""
+      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `askc` is not used\nsrc/main.i:8:1: warning[W0504]: top-level binding `call` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `twice` is not used\nsrc/main.i:22:1: warning[W0504]: top-level binding `with_cov` is not used\nsrc/main.i:26:1: warning[W0504]: top-level binding `pick` is not used\nsrc/main.i:28:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     {
       "case": "review-k4d/_loose/fuzz/bad/run_44_188",
       "phase": "run2",
       "exit": "timeout",
-      "stderr": ""
+      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `askc` is not used\nsrc/main.i:8:1: warning[W0504]: top-level binding `call` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `twice` is not used\nsrc/main.i:22:1: warning[W0504]: top-level binding `with_cov` is not used\nsrc/main.i:26:1: warning[W0504]: top-level binding `pick` is not used\nsrc/main.i:28:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     {
       "case": "review-k4d/_loose/fuzz/bad/run_44_361",
       "phase": "run0",
       "exit": "timeout",
-      "stderr": ""
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `ask` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `askc` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `twice` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `with_int` is not used\nsrc/main.i:18:1: warning[W0504]: top-level binding `with_dep` is not used\nsrc/main.i:22:1: warning[W0504]: top-level binding `with_cov` is not used\nsrc/main.i:26:1: warning[W0504]: top-level binding `pick` is not used\nsrc/main.i:28:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     {
       "case": "review-k4d/_loose/fuzz/bad/run_44_361",
       "phase": "run2",
       "exit": "timeout",
-      "stderr": ""
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `ask` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `askc` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `twice` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `with_int` is not used\nsrc/main.i:18:1: warning[W0504]: top-level binding `with_dep` is not used\nsrc/main.i:22:1: warning[W0504]: top-level binding `with_cov` is not used\nsrc/main.i:26:1: warning[W0504]: top-level binding `pick` is not used\nsrc/main.i:28:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     {
       "case": "review-k4s/std",
@@ -265,6 +281,18 @@
     {
       "case": "review-t1/stress-keys-5000",
       "phase": "test2",
+      "exit": "timeout",
+      "stderr": ""
+    },
+    {
+      "case": "review-r2/never_yields",
+      "phase": "run0",
+      "exit": "timeout",
+      "stderr": ""
+    },
+    {
+      "case": "review-r2/never_yields",
+      "phase": "run2",
       "exit": "timeout",
       "stderr": ""
     }
