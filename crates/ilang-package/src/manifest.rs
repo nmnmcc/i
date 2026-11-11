@@ -115,6 +115,11 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
     let mut entries = Vec::new();
     for (key, value) in doc.get_ref().iter() {
         match key.get_ref().as_ref() {
+            "providers" | "provider_adapters" => diags.push(err(
+                code::PROVIDERS_PENDING,
+                span(key.span()),
+                "target provider plans are not implemented yet (JP; §2.6.1)",
+            )),
             "name" => match value.get_ref() {
                 DeValue::String(s) => name = Some((s.to_string(), span(value.span()))),
                 _ => diags.push(err(

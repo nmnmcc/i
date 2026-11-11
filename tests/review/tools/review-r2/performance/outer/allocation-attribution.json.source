@@ -1,0 +1,492 @@
+[
+  {
+    "function": "$f187",
+    "source": "i/task.first_path",
+    "allocations": 545.265625
+  },
+  {
+    "function": "$f253",
+    "source": "i/task.update_task",
+    "allocations": 245.0625
+  },
+  {
+    "function": "$f186",
+    "source": "i/task.tree_find",
+    "allocations": 70.0
+  },
+  {
+    "function": "$f183",
+    "source": "i/task.record_task",
+    "allocations": 68.0
+  },
+  {
+    "function": "$capture_pack",
+    "source": "$capture_pack",
+    "allocations": 60.0
+  },
+  {
+    "function": "$f39",
+    "source": "i/task.read",
+    "allocations": 40.0
+  },
+  {
+    "function": "$f110",
+    "source": "i/task.effective_active",
+    "allocations": 40.0
+  },
+  {
+    "function": "$f192",
+    "source": "i/task.tree_node",
+    "allocations": 32.15625
+  },
+  {
+    "function": "$f126",
+    "source": "i/task.reply",
+    "allocations": 32.0
+  },
+  {
+    "function": "$f128",
+    "source": "i/task.do_command",
+    "allocations": 30.0
+  },
+  {
+    "function": "$f224",
+    "source": "i/task:fn224",
+    "allocations": 28.0
+  },
+  {
+    "function": "$f108",
+    "source": "i/task.choose_turn",
+    "allocations": 24.0
+  },
+  {
+    "function": "$f190",
+    "source": "i/task.tree_balance",
+    "allocations": 23.375
+  },
+  {
+    "function": "$tramp_run",
+    "source": "$tramp_run",
+    "allocations": 21.0
+  },
+  {
+    "function": "$f96",
+    "source": "i/task.loop",
+    "allocations": 16.0
+  },
+  {
+    "function": "$capture_rethrow",
+    "source": "$capture_rethrow",
+    "allocations": 15.015625
+  },
+  {
+    "function": "$f116",
+    "source": "i/task.on_command",
+    "allocations": 14.0
+  },
+  {
+    "function": "$f262",
+    "source": "i/task.recheck_events",
+    "allocations": 14.0
+  },
+  {
+    "function": "$control_keep_env",
+    "source": "$control_keep_env",
+    "allocations": 12.0
+  },
+  {
+    "function": "$f125",
+    "source": "i/task.register_driver",
+    "allocations": 12.0
+  },
+  {
+    "function": "$f139",
+    "source": "i/task.remove_registration",
+    "allocations": 12.0
+  },
+  {
+    "function": "$f226",
+    "source": "i/task:fn226",
+    "allocations": 12.0
+  },
+  {
+    "function": "$f36",
+    "source": "i/task.join_event",
+    "allocations": 10.0
+  },
+  {
+    "function": "$f54",
+    "source": "i/task.make_start",
+    "allocations": 10.0
+  },
+  {
+    "function": "$f57",
+    "source": "i/task:fn57",
+    "allocations": 10.0
+  },
+  {
+    "function": "$f62",
+    "source": "i/task:fn62",
+    "allocations": 10.0
+  },
+  {
+    "function": "$f140",
+    "source": "i/task.queue",
+    "allocations": 10.0
+  },
+  {
+    "function": "$f166",
+    "source": "i/task.select",
+    "allocations": 9.0
+  },
+  {
+    "function": "$f117",
+    "source": "i/task.observe_completion",
+    "allocations": 8.0
+  },
+  {
+    "function": "$f168",
+    "source": "i/task.check_leaves",
+    "allocations": 8.0
+  },
+  {
+    "function": "$core_portable",
+    "source": "$core_portable",
+    "allocations": 6.0
+  },
+  {
+    "function": "$boundary_core",
+    "source": "$boundary_core",
+    "allocations": 6.0
+  },
+  {
+    "function": "$f58",
+    "source": "i/task:fn58",
+    "allocations": 6.0
+  },
+  {
+    "function": "$f169",
+    "source": "i/task.probe",
+    "allocations": 6.0
+  },
+  {
+    "function": "$f188",
+    "source": "i/task.drop_task",
+    "allocations": 6.0
+  },
+  {
+    "function": "$f227",
+    "source": "i/task:fn227",
+    "allocations": 6.0
+  },
+  {
+    "function": "$f256",
+    "source": "i/task.frame_abort",
+    "allocations": 6.0
+  },
+  {
+    "function": "$f41",
+    "source": "i/task:fn41",
+    "allocations": 5.0
+  },
+  {
+    "function": "$f44",
+    "source": "i/task.list_map",
+    "allocations": 5.0
+  },
+  {
+    "function": "$f53",
+    "source": "i/task.go_key",
+    "allocations": 4.0
+  },
+  {
+    "function": "$f60",
+    "source": "i/task.guarded",
+    "allocations": 4.0
+  },
+  {
+    "function": "$f81",
+    "source": "r2perf/kernels.spawns",
+    "allocations": 4.0
+  },
+  {
+    "function": "$f103",
+    "source": "i/task.interests",
+    "allocations": 4.0
+  },
+  {
+    "function": "$f121",
+    "source": "i/task.set_scope",
+    "allocations": 4.0
+  },
+  {
+    "function": "$f176",
+    "source": "i/task:fn176",
+    "allocations": 4.0
+  },
+  {
+    "function": "$f265",
+    "source": "i/task.refresh_rows",
+    "allocations": 4.0
+  },
+  {
+    "function": "$r20",
+    "source": "$r20",
+    "allocations": 4.0
+  },
+  {
+    "function": "$keep_call",
+    "source": "$keep_call",
+    "allocations": 3.0
+  },
+  {
+    "function": "$f35",
+    "source": "i/task.sync",
+    "allocations": 3.0
+  },
+  {
+    "function": "$f46",
+    "source": "i/task.ask",
+    "allocations": 3.0
+  },
+  {
+    "function": "$f115",
+    "source": "i/task.turn",
+    "allocations": 3.0
+  },
+  {
+    "function": "$r21",
+    "source": "$r21",
+    "allocations": 3.0
+  },
+  {
+    "function": "$f123",
+    "source": "i/task.put_scope",
+    "allocations": 2.0
+  },
+  {
+    "function": "$f257",
+    "source": "i/task.reverse",
+    "allocations": 2.0
+  },
+  {
+    "function": "$r39",
+    "source": "$r39",
+    "allocations": 2.0
+  },
+  {
+    "function": "$r131",
+    "source": "$r131",
+    "allocations": 2.0
+  },
+  {
+    "function": "$fail_catch",
+    "source": "$fail_catch",
+    "allocations": 1.9921875
+  },
+  {
+    "function": "$f113",
+    "source": "i/task.set_task",
+    "allocations": 1.0
+  },
+  {
+    "function": "$f196",
+    "source": "i/task.tree_rows",
+    "allocations": 1.0
+  },
+  {
+    "function": "$r31",
+    "source": "$r31",
+    "allocations": 0.046875
+  },
+  {
+    "function": "$catch_reenter",
+    "source": "$catch_reenter",
+    "allocations": 0.015625
+  },
+  {
+    "function": "$int_limbs",
+    "source": "$int_limbs",
+    "allocations": 0.0
+  },
+  {
+    "function": "$int_pack",
+    "source": "$int_pack",
+    "allocations": 0.0
+  },
+  {
+    "function": "$mag_sub",
+    "source": "$mag_sub",
+    "allocations": 0.0
+  },
+  {
+    "function": "$int_mul",
+    "source": "$int_mul",
+    "allocations": 0.0
+  },
+  {
+    "function": "$int_twos",
+    "source": "$int_twos",
+    "allocations": 0.0
+  },
+  {
+    "function": "$int_shift_right_positive",
+    "source": "$int_shift_right_positive",
+    "allocations": 0.0
+  },
+  {
+    "function": "$abi_int_in",
+    "source": "$abi_int_in",
+    "allocations": 0.0
+  },
+  {
+    "function": "$resource_ensure",
+    "source": "$resource_ensure",
+    "allocations": 0.0
+  },
+  {
+    "function": "$ensure_final",
+    "source": "$ensure_final",
+    "allocations": 0.0
+  },
+  {
+    "function": "$async_run",
+    "source": "$async_run",
+    "allocations": 0.0
+  },
+  {
+    "function": "$request_open_owner",
+    "source": "$request_open_owner",
+    "allocations": 0.0
+  },
+  {
+    "function": "$request_close_owner",
+    "source": "$request_close_owner",
+    "allocations": 0.0
+  },
+  {
+    "function": "$request_close_root",
+    "source": "$request_close_root",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f4",
+    "source": "i/task.entry",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f7",
+    "source": "i/request.entry",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f10",
+    "source": "i/task entry body",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f12",
+    "source": "i/request entry body",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f14",
+    "source": "async entry",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f27",
+    "source": "i/task.scope",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f68",
+    "source": "i/task:fn68",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f72",
+    "source": "i/task:fn72",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f75",
+    "source": "i/task:fn75",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f83",
+    "source": "i/request:fn83",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f90",
+    "source": "i/task:fn90",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f92",
+    "source": "i/request.open_root",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f93",
+    "source": "i/request.open_owner",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f102",
+    "source": "i/task.run_reply",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f248",
+    "source": "i/random.mix",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f249",
+    "source": "i/random.mix_gamma",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f263",
+    "source": "i/task.retire_scopes",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f278",
+    "source": "i/task.scope_end_reply",
+    "allocations": 0.0
+  },
+  {
+    "function": "$r22",
+    "source": "$r22",
+    "allocations": 0.0
+  },
+  {
+    "function": "$r29",
+    "source": "$r29",
+    "allocations": 0.0
+  },
+  {
+    "function": "$r32",
+    "source": "$r32",
+    "allocations": 0.0
+  },
+  {
+    "function": "$s33",
+    "source": "$s33",
+    "allocations": 0.0
+  },
+  {
+    "function": "(;478;)",
+    "source": "(;478;)",
+    "allocations": 0.0
+  },
+  {
+    "function": "$f70",
+    "source": "i/task:fn70",
+    "allocations": -0.03125
+  }
+]
