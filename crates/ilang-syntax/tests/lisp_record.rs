@@ -97,7 +97,7 @@ fn invalid_records_do_not_become_blocks_or_patterns() {
     ));
     assert!(matches!(
         &parse_pattern(&one("`{ (: x ~p) }")).unwrap().kind,
-        ilang_syntax::ast::PatternKind::Quote(_)
+        ilang_syntax::ast::PatternKind::Quote { .. }
     ));
 }
 
