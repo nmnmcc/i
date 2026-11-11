@@ -1,0 +1,7 @@
+name = "macro_tests"
+
+[test]
+collection = "std/test.tests"
+
+[dev-dependencies]
+std = { path = "../../std" }

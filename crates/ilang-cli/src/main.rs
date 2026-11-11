@@ -433,7 +433,48 @@ fn cmd_test(
             }
         }
     }
-    println!("{} passed, {failed} failed", tests.len() - failed);
+    let mut passed = tests.len() - failed;
+    let mut skipped = 0;
+    let manifest_text = std::fs::read_to_string(project.join("i.toml"))?;
+    let manifest: toml_edit::DocumentMut = manifest_text.parse()?;
+    if let Some(collection) = manifest.get("test").and_then(|t| t.get("collection")).and_then(|v| v.as_str()) {
+        let entries = match ilang_cli::collections(project, true, offline) {
+            Ok(manifest) => manifest.entries.into_iter().filter(|e| e.collection == collection).collect::<Vec<_>>(),
+            Err(error) => { eprintln!("{error}"); return Ok(ExitCode::FAILURE); }
+        };
+        let focused = entries.iter().any(|e| e.data.iter().any(|(k, v)| k == "mode" && v == "only"));
+        for entry in entries {
+            let get = |key: &str| entry.data.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str());
+            let name = get("name").unwrap_or(&entry.target.path);
+            let mode = get("mode").unwrap_or("test");
+            if filter.is_some_and(|f| !name.contains(f)) { continue; }
+            if mode == "skip" || (focused && mode != "only") {
+                skipped += 1;
+                println!("skip {name}");
+                continue;
+            }
+            let selected = match ilang_cli::build_collection(project, options(opt, true, offline)?, &entry.handle, ilang_cli::CollectionResult::Nil) {
+                Ok(selected) => selected,
+                Err(error) => { eprintln!("{error}"); return Ok(ExitCode::FAILURE); }
+            };
+            let outcome = selected.run_with(selected.built.host_options());
+            let success = matches!(outcome, Ok(Outcome::Ok(_)));
+            if success != (mode == "fails") {
+                passed += 1;
+                println!("pass {name}");
+            } else {
+                failed += 1;
+                println!("FAIL {name}");
+                match outcome {
+                    Ok(Outcome::Stop(stop)) => println!("  {stop}"),
+                    Ok(Outcome::Err(error)) => println!("  error: {:?}", error.0),
+                    Err(error) => println!("  {error:#}"),
+                    Ok(Outcome::Ok(_)) => println!("  expected failure"),
+                }
+            }
+        }
+    }
+    println!("{passed} passed, {failed} failed, {skipped} skipped");
     Ok(if failed == 0 {
         ExitCode::SUCCESS
     } else {
