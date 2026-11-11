@@ -44,6 +44,31 @@ main = () {
 	assert(process.read_stdout(configured, 100) == <<"xyz\n":utf8>>)
 	assert(process.wait(configured) == 0)
 	process.close(configured)
+	replaced = process.spawn_config(
+		"/bin/sh"
+		[
+			"-c"
+			"test \"$I_TEST_VAR\" = xyz && test -z \"${HOME+x}\" && test \"$PWD\" = /"
+		]
+		process.Null
+		process.Null
+		process.Inherit
+		process.ReplaceEnvironment(["I_TEST_VAR=xyz"])
+		process.Directory("/")
+	)
+	assert(process.wait(replaced) == 0)
+	process.close(replaced)
+	removed = process.spawn_config(
+		"/bin/sh"
+		["-c", "test -z \"${HOME+x}\""]
+		process.Null
+		process.Null
+		process.Inherit
+		process.InheritEnvironment(["HOME"])
+		process.InheritDirectory
+	)
+	assert(process.wait(removed) == 0)
+	process.close(removed)
 	start = clock.monotonic_ns()
 	child = task.scope((_) {
 		ready = task.channel()
