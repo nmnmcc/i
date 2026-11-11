@@ -833,14 +833,14 @@ Replace the bullet "A `{` followed by a label `name :` … is kept for records" 
 
 **§6.13 Records (new).**
 
-> `{ f1: e1, …, fn: en }` makes a record (§4.9). A label may not be given twice, also not after `..e`; `a` and `"a"` are the same label. `{ ..e, f1: e1, … }` makes the record `e` with the given fields added or put in place of its fields; `e` must be a record. `Record` is the record with no fields; `{}` is the clause block with no clauses (§6.12).
+> `( f1: e1, …, fn: en )` makes a record (§4.9). A label may not be given twice, also not after `..e`; `a` and `"a"` are the same label. `( ..e, f1: e1, … )` makes the record `e` with the given fields added or put in place of its fields; `e` must be a record. `()` is the record with no fields and `Record` is the type of all records; `{}` is the clause block with no clauses (§6.12).
 >
 > `v.f` reads the field `f` (§4.8 rule 13). A field whose label is not a `name` is read with `record.get`. Fields are set and removed with `record.put` and `record.remove` (§14):
 >
 > ```i
-> ada = { name: "ada", age: 36 }
-> older = { ..ada, age: ada.age + 1 }
-> r = {..} |> record.put("name", "ada") |> record.put("age", 36)
+> ada = (name: "ada", age: 36)
+> older = (..ada, age: ada.age + 1)
+> r = () |> record.put("name", "ada") |> record.put("age", 36)
 > ```
 
 **§6.7.** Replace "If not, every member of the known type of `v` (§4.8) must be a custom type, and they are all the constructors of these types." by "If not, and every member of the known type of `v` (§4.8) is a custom type, they are all the constructors of these types. When `v` has no known type, or every member of it is a record type, `_` or a type variable, `v.f` reads a field of a record (§6.13). In every other case `v.f` is a compile error." Add at the end of the paragraph: "See §4.8 rule 13."
