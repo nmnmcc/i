@@ -12,6 +12,7 @@
 	i/task
 	i/request
 	i/resource
+	i/request
 	i/fail
 )
 

@@ -52,5 +52,5 @@ main = () {
 }
 
 Marker {
-	Marker(Boundary(Nil, Never, task.Scheduler | request.Root | Assert))
+	Marker(Boundary(Nil, Never, task.Scheduler | Assert | request.Root))
 }

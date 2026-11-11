@@ -5,14 +5,14 @@ This document is the definition of the i programming language. A compiler or a p
 This document is complete in itself. It defines:
 
 - the source language (§1 to §8);
-- effects, and the library modules `i/fail`, `i/control`, `i/resource`, `i/assertion`, `i/io`, `i/key`, `i/task`, `i/random`, and `i/request` (§9);
+- effects, and the library modules `i/fail`, `i/control`, `i/resource`, `i/assertion`, `i/io`, `i/key`, `i/task`, `i/random`, `i/request`, `i/clock`, `i/fs`, `i/process`, `i/net`, `i/tls`, and `i/stdio` (§9);
 - the library module `i/core`, which has the operations that are not written in i (§13);
 - the library module `i/record`, which reads and sets fields of records (§14);
 - packages, versions, and the files `i.toml` and `i.lock` (§2.1, §2.6 to §2.8);
 - what programs do when they run, and the text form of values (§11);
 - the binary interface between a compiled module and its host (§10 and Appendix B).
 
-Every compiler must give the library modules above. The target modules `i/target`, `i/js`, and `i/wasi` have the contracts of §9.7, §10.1 and §B.7.1. The paths `i/clock`, `i/fs`, `i/process`, `i/net`, `i/tls`, and `i/stdio` are kept for planned library modules: only the capability requirements stated in §9.7 are defined here until their operation APIs are installed. A program may not define a module with one of these paths. Other library modules, command-line behavior not specified in §2.6, and the way test results are shown are not part of the language.
+Every compiler must give the library modules above. The target modules `i/target`, `i/js`, and `i/wasi` have the contracts of §9.7, §10.1 and §B.7.1. A program may not define a module with any of these library paths. Other library modules, command-line behavior not specified in §2.6, and the way test results are shown are not part of the language.
 
 i is small, and every part of it is what it looks like. A thing that looks like a function is a normal function, and a clause block is a function too (§6.12). A binding is a binding wherever it is written, and a clause block with one clause and no guard binds its pattern as a parameter does. Where two forms look the same, they have the same rules, with these exceptions, where the place of a form decides its rules:
 
@@ -2105,6 +2105,102 @@ wrapper finishes unwinding, so a following read cannot see busy from that
 abandoned request. Already consumed bytes or committed effects are not rolled
 back. A cancelled Child wait releases its wait lease without closing the Child;
 a cancelled blocking File operation instead closes that File as §9.7 requires.
+
+
+### 9.12 IO library operations
+
+These ordinary functions use the services described in §9.7; their definitions and exported types are in their library modules.
+
+#### `i/clock`
+
+| Function | What it does |
+|---|---|
+| `monotonic_ns` | Read the monotonic clock in nanoseconds. |
+| `unix_ns` | Read Unix time in nanoseconds. |
+| `sleep_ns` | Wait for a duration in nanoseconds. |
+
+#### `i/stdio`
+
+| Function | What it does |
+|---|---|
+| `read` | Read bytes from standard input. |
+| `write` | Write bytes to standard output. |
+| `write_error` | Write bytes to standard error. |
+| `flush` | Flush standard output. |
+| `flush_error` | Flush standard error. |
+| `print` | Write text and a newline to standard output. |
+| `print_error` | Write text and a newline to standard error. |
+
+#### `i/fs`
+
+| Function | What it does |
+|---|---|
+| `open` | Open a file in the given mode. |
+| `read` | Read bytes from a file. |
+| `write` | Write bytes to a file. |
+| `flush` | Flush a file. |
+| `close` | Close a file. |
+| `remove` | Remove a path. |
+| `rename` | Rename a path. |
+| `mkdir` | Create a directory. |
+| `list` | List directory entries. |
+| `metadata` | Read file size and kind. |
+| `temp_dir` | Find the temporary directory. |
+| `read_file` | Read a whole file. |
+| `write_file` | Write a whole file. |
+| `read_lines` | Read a file as text lines. |
+
+#### `i/process`
+
+| Function | What it does |
+|---|---|
+| `args` | Read process arguments. |
+| `env` | Read an environment variable. |
+| `cwd` | Read the working directory. |
+| `entropy` | Obtain secure random bytes. |
+| `spawn` | Start a child process. |
+| `spawn_piped` | Start a child with selected standard streams. |
+| `spawn_config` | Start a child with stream, environment and directory settings. |
+| `read_stdout` | Read the child’s standard output. |
+| `read_stderr` | Read the child’s standard error. |
+| `write_stdin` | Write to the child’s standard input. |
+| `close_stdin` | Close the child’s standard input. |
+| `wait` | Wait for a child to exit. |
+| `terminate` | Terminate a child. |
+| `close` | Close a child handle. |
+
+#### `i/net`
+
+| Function | What it does |
+|---|---|
+| `listen` | Listen for TCP connections. |
+| `local_port` | Read the listener’s local port. |
+| `accept` | Accept a TCP connection. |
+| `connect` | Connect to a host and port. |
+| `resolve` | Resolve a host name to addresses. |
+| `read` | Read bytes from a stream. |
+| `write` | Write bytes to a stream. |
+| `shutdown_write` | Shut down the stream’s write side. |
+| `close_stream` | Close a stream. |
+| `close_listener` | Close a listener. |
+| `stream_number` | Return the underlying stream number. |
+| `byte_stream` | Make a byte stream interface for a connection. |
+
+#### `i/tls`
+
+| Function | What it does |
+|---|---|
+| `options` | Make default TLS options. |
+| `identity` | Make a certificate and key identity. |
+| `connect` | Establish client TLS on a connected stream. |
+| `accept` | Establish server TLS on a connected stream. |
+| `dial` | Connect to a host and establish client TLS. |
+| `alpn` | Read the negotiated ALPN protocol. |
+| `read` | Read bytes from a TLS stream. |
+| `write` | Write bytes to a TLS stream. |
+| `shutdown_write` | Shut down the TLS stream’s write side. |
+| `close` | Close a TLS stream. |
+| `byte_stream` | Make a byte stream interface for a TLS stream. |
 
 ## 10. The host boundary
 

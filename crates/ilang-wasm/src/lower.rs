@@ -594,7 +594,7 @@ impl<'a> Lowerer<'a> {
 
     /// One dense id for each service type constructor of the program:
     /// `Assert` first, then the types of the environment parameters and
-    /// statements (§9.2).
+    /// statements (§9.2), with ordinary types before host types.
     fn number_services(&mut self) {
         let prelude = self.program.prelude;
         let assert = self
@@ -605,8 +605,11 @@ impl<'a> Lowerer<'a> {
             .map(|i| TypeRef::Custom(TypeId(i as u32)));
         let mut all: Vec<TypeRef> = self.typed.services.values().copied().collect();
         let key = |t: &TypeRef| match t {
-            TypeRef::Custom(id) => (0, id.0),
-            TypeRef::Builtin(b) => (1, *b as u32),
+            TypeRef::Custom(id) => (
+                u8::from(self.program.types[id.0 as usize].host.is_some()),
+                id.0,
+            ),
+            TypeRef::Builtin(b) => (2, *b as u32),
         };
         all.sort_by_key(key);
         all.dedup();

@@ -529,6 +529,7 @@ fn standard_library_reverse_order_and_recovery_preserve_types() {
         "{:?}",
         g.sources.render_all(&c.diags)
     );
+    // std/time uses i/clock, so the standard library now has Of sites.
     let mut p = c.program.unwrap();
     let before = p.order.groups.clone();
     let init = p.order.init.clone();
