@@ -63,10 +63,45 @@ pub enum QueryResult<Key> {
     CompileError(QueryError),
 }
 
+/// The construction to charge before a query answer is allocated.
+pub enum DefinitionCost<'a> {
+    Syntax(&'a Syntax),
+    Builtin(&'a str),
+}
+
+const TEMPLATE_ANSWER: u64 = u64::MAX;
+struct Entry {
+    definition: Definition,
+    template: Option<Syntax>,
+}
+impl Entry {
+    fn new(definition: Definition) -> Self {
+        let template = match &definition {
+            Definition::Written {
+                item,
+                source,
+                scope,
+                ..
+            } => {
+                assert!(
+                    matches!(item.kind, ItemKind::TypeDef(_)),
+                    "definition table accepts type definitions only"
+                );
+                Some(source_definition(item, source, scope, TEMPLATE_ANSWER))
+            }
+            _ => None,
+        };
+        Self {
+            definition,
+            template,
+        }
+    }
+}
+
 /// Maps resolved identities to definitions. Lookup is injected by the
 /// compiler so the table does not invent a second name-resolution policy.
 pub struct DefinitionTable<Key> {
-    entries: HashMap<Key, Definition>,
+    entries: HashMap<Key, Entry>,
 }
 impl<Key> Default for DefinitionTable<Key> {
     fn default() -> Self {
@@ -77,14 +112,8 @@ impl<Key> Default for DefinitionTable<Key> {
 }
 impl<Key: Eq + Hash> DefinitionTable<Key> {
     pub fn insert(&mut self, key: Key, definition: Definition) {
-        if let Definition::Written { item, .. } = &definition {
-            assert!(
-                matches!(item.kind, ItemKind::TypeDef(_)),
-                "definition table accepts type definitions only"
-            );
-        }
         assert!(
-            self.entries.insert(key, definition).is_none(),
+            self.entries.insert(key, Entry::new(definition)).is_none(),
             "duplicate definition identity"
         );
     }
@@ -93,7 +122,7 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
             .entries
             .get_mut(key)
             .expect("definition identity must be registered");
-        match definition {
+        match &mut definition.definition {
             Definition::Written { ready: current, .. }
             | Definition::Expanded { ready: current, .. } => *current = ready,
             Definition::Builtin { .. } => panic!("builtin definitions are always ready"),
@@ -106,7 +135,7 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
             .get_mut(key)
             .expect("definition identity must be registered");
         assert!(
-            !matches!(entry, Definition::Builtin { .. }),
+            !matches!(entry.definition, Definition::Builtin { .. }),
             "cannot replace a builtin definition"
         );
         assert!(
@@ -116,7 +145,7 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
             ),
             "a finished definition must be ready"
         );
-        *entry = definition;
+        *entry = Entry::new(definition);
     }
     /// Query with a fresh answer identity. A successful answer carries the
     /// stable definition key used by the scheduler's end-of-phase audit.
@@ -127,21 +156,40 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
         answer: u64,
         lookup: impl FnOnce(&TypeQuery, Mode) -> Lookup<Key>,
     ) -> QueryResult<Key> {
+        self.query_metered(of, mode, answer, lookup, |_| Ok(()))
+            .expect("unmetered query cannot exhaust a budget")
+    }
+
+    /// Query while charging each answer template before freshening or copying.
+    /// The callback shares the current macro run's budget and returns its
+    /// resource error without converting it into a catchable SyntaxError.
+    pub fn query_metered(
+        &self,
+        of: &Syntax,
+        mode: Mode,
+        answer: u64,
+        lookup: impl FnOnce(&TypeQuery, Mode) -> Lookup<Key>,
+        mut preflight: impl FnMut(DefinitionCost<'_>) -> super::scoped::ChargeResult,
+    ) -> Result<QueryResult<Key>, Box<dyn std::error::Error + Send + Sync>> {
+        assert_ne!(
+            answer, TEMPLATE_ANSWER,
+            "answer identity is reserved for templates"
+        );
         let parsed = match type_query(of) {
             Ok(query) => query,
             Err(error) => {
-                return QueryResult::Error(QueryError {
+                return Ok(QueryResult::Error(QueryError {
                     message: error.message,
                     at: of.clone(),
-                });
+                }));
             }
         };
         for atom in parsed.module.iter().chain(std::iter::once(&parsed.name)) {
             if !atom.valid_scope_identity() {
-                return QueryResult::CompileError(QueryError {
+                return Ok(QueryResult::CompileError(QueryError {
                     message: "a made name cannot change a compiler-provided name identity".into(),
                     at: atom.clone(),
-                });
+                }));
             }
         }
         let error = |message: &str| QueryError {
@@ -151,57 +199,78 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
         let key = match lookup(&parsed, mode) {
             Lookup::Found(key) => key,
             Lookup::Deferred => {
-                return QueryResult::Deferred {
+                return Ok(QueryResult::Deferred {
                     at: parsed.name.clone(),
-                };
+                });
             }
             Lookup::TypeParameter => {
-                return QueryResult::Error(error("a type parameter has no type definition"));
+                return Ok(QueryResult::Error(error(
+                    "a type parameter has no type definition",
+                )));
             }
             Lookup::ConstructorsHidden => {
-                return QueryResult::Error(error("the type's constructors are not exported"));
+                return Ok(QueryResult::Error(error(
+                    "the type's constructors are not exported",
+                )));
             }
             Lookup::Missing => {
-                return QueryResult::CompileError(error("the type name has no definition"));
+                return Ok(QueryResult::CompileError(error(
+                    "the type name has no definition",
+                )));
             }
         };
         let definition = self
             .entries
             .get(&key)
             .expect("resolved definition identity must be registered");
-        let syntax = match definition {
+        let syntax = match &definition.definition {
             Definition::Written { ready: false, .. }
             | Definition::Expanded { ready: false, .. } => {
-                return QueryResult::Deferred {
+                return Ok(QueryResult::Deferred {
                     at: parsed.name.clone(),
-                };
+                });
             }
-            Definition::Written {
-                item,
-                source,
-                scope,
-                ready: true,
-            } => source_definition(item, source, scope, answer),
+            Definition::Written { ready: true, .. } => {
+                let template = definition
+                    .template
+                    .as_ref()
+                    .expect("written definition has a template");
+                preflight(DefinitionCost::Syntax(template))?;
+                freshen_parameters(template, TEMPLATE_ANSWER, answer)
+            }
             Definition::Expanded {
                 syntax,
                 parameter_answer,
                 ready: true,
-            } => match parameter_answer {
-                Some(old) => freshen_parameters(syntax, *old, answer),
-                None => syntax.clone(),
+            } => {
+                preflight(DefinitionCost::Syntax(syntax))?;
+                if parameter_answer.is_some() {
+                    // Freshening and answer-provenance conversion each build a tree.
+                    preflight(DefinitionCost::Syntax(syntax))?;
+                }
+                match parameter_answer {
+                    Some(old) => freshen_parameters(syntax, *old, answer),
+                    None => syntax.clone(),
+                }
+                .as_answer()
             }
-            .as_answer(),
             Definition::Builtin { name } => {
+                if matches!(
+                    name.as_str(),
+                    "Bool" | "Nil" | "Result" | "Assert" | "AssertionFailure"
+                ) {
+                    preflight(DefinitionCost::Builtin(name))?;
+                }
                 match builtin_definition(name, parsed.name.scope(), parsed.name.span(), answer) {
                     Some(syntax) => syntax,
                     None => {
-                        return QueryResult::Error(error(
+                        return Ok(QueryResult::Error(error(
                             "this built-in type has no written definition",
-                        ));
+                        )));
                     }
                 }
             }
         };
-        QueryResult::Answer { key, syntax }
+        Ok(QueryResult::Answer { key, syntax })
     }
 }
