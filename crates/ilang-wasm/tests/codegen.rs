@@ -222,17 +222,22 @@ fn environments() {
          f = (c ! Clock) { c.now() }\n\
          g = () {\n  ! Clock = Clock(() { 1 })\n  f()\n}\n\
          @main\nmain = () { g() }\n");
-    // An environment parameter reads its slot (§9.2); `Assert` is slot 0.
+    // A service's slot is chosen from all services in the compiled program;
+    // its read and the corresponding environment statement must agree.
     let f = function(&text, "app/main.f");
-    assert!(
-        f.contains("(array.get $env (local.get $env) (i32.const 1))"),
-        "{f}"
-    );
-    // An environment statement makes a new environment for the rest of
-    // the block, and the tail call passes it.
+    let slot: u32 = f
+        .split_once("(array.get $env (local.get $env) (i32.const ")
+        .expect("environment parameter reads a slot")
+        .1
+        .split_once(')')
+        .expect("slot constant closes")
+        .0
+        .parse()
+        .expect("environment slot is an integer");
+    assert_ne!(slot, 0, "Clock and Assert have different slots");
     let g = function(&text, "app/main.g");
     assert!(
-        g.contains("(call $env_with (local.get $env) (i32.const 1)"),
+        g.contains(&format!("(call $env_with (local.get $env) (i32.const {slot})")),
         "{g}"
     );
     assert!(g.contains("(return_call $f"), "{g}");
