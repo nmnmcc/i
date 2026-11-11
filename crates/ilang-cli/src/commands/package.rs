@@ -1585,54 +1585,140 @@ mod syntax_templates {
 /// Sort commutative alias members after formal identities have been assigned.
 fn canonical_alias_order(t: &ShownType, key: &dyn Fn(&ShownType) -> String) -> ShownType {
     use ilang_check::types::ShownFn;
-    match t {
-        ShownType::Union(ts) | ShownType::Inter(ts) => {
-            let union = matches!(t, ShownType::Union(_));
-            let mut parts = Vec::new();
-            for t in ts {
-                let mut t = canonical_alias_order(t, key);
-                match &mut t {
-                    ShownType::Union(inner) if union => parts.append(inner),
-                    ShownType::Inter(inner) if !union => parts.append(inner),
-                    _ => parts.push(t),
-                }
-            }
-            parts.sort_by_key(key);
-            if union {
-                ShownType::Union(parts)
-            } else {
-                ShownType::Inter(parts)
-            }
-        }
-        ShownType::Named(ty, ts) => ShownType::Named(
-            *ty,
-            ts.iter().map(|t| canonical_alias_order(t, key)).collect(),
-        ),
-        ShownType::Tuple(ts) => {
-            ShownType::Tuple(ts.iter().map(|t| canonical_alias_order(t, key)).collect())
-        }
-        ShownType::Fn(f) => ShownType::Fn(Box::new(ShownFn {
-            params: f
-                .params
-                .iter()
-                .map(|(n, t)| (n.clone(), canonical_alias_order(t, key)))
-                .collect(),
-            ret: canonical_alias_order(&f.ret, key),
-            err: f.err.as_ref().map(|t| canonical_alias_order(t, key)),
-            env: f.env.as_ref().map(|t| canonical_alias_order(t, key)),
-        })),
-        ShownType::Diff(t, ts) => ShownType::Diff(
-            Box::new(canonical_alias_order(t, key)),
-            ts.iter().map(|t| canonical_alias_order(t, key)).collect(),
-        ),
-        ShownType::Lit(_) | ShownType::Var(_) | ShownType::Hole | ShownType::Never => t.clone(),
+    enum Task<'a> {
+        Visit(&'a ShownType),
+        Union(usize, bool),
+        Named(TypeRef, usize),
+        Tuple(usize),
+        Fn(Vec<Option<String>>, bool, bool),
+        Diff(usize),
     }
+    let mut tasks = vec![Task::Visit(t)];
+    let mut results = Vec::new();
+    while let Some(task) = tasks.pop() {
+        match task {
+            Task::Visit(t) => match t {
+                ShownType::Union(xs) | ShownType::Inter(xs) => {
+                    tasks.push(Task::Union(xs.len(), matches!(t, ShownType::Union(_))));
+                    tasks.extend(xs.iter().rev().map(Task::Visit));
+                }
+                ShownType::Named(r, xs) => {
+                    tasks.push(Task::Named(*r, xs.len()));
+                    tasks.extend(xs.iter().rev().map(Task::Visit));
+                }
+                ShownType::Tuple(xs) => {
+                    tasks.push(Task::Tuple(xs.len()));
+                    tasks.extend(xs.iter().rev().map(Task::Visit));
+                }
+                ShownType::Fn(f) => {
+                    tasks.push(Task::Fn(
+                        f.params.iter().map(|(n, _)| n.clone()).collect(),
+                        f.err.is_some(),
+                        f.env.is_some(),
+                    ));
+                    if let Some(t) = &f.env {
+                        tasks.push(Task::Visit(t));
+                    }
+                    if let Some(t) = &f.err {
+                        tasks.push(Task::Visit(t));
+                    }
+                    tasks.push(Task::Visit(&f.ret));
+                    tasks.extend(f.params.iter().rev().map(|(_, t)| Task::Visit(t)));
+                }
+                ShownType::Diff(a, xs) => {
+                    tasks.push(Task::Diff(xs.len()));
+                    tasks.extend(xs.iter().rev().map(Task::Visit));
+                    tasks.push(Task::Visit(a));
+                }
+                ShownType::Lit(_) | ShownType::Var(_) | ShownType::Hole | ShownType::Never => {
+                    results.push(t.clone())
+                }
+            },
+            Task::Union(n, union) => {
+                let members = results.split_off(results.len() - n);
+                let mut parts = Vec::new();
+                for mut t in members {
+                    match &mut t {
+                        ShownType::Union(inner) if union => parts.append(inner),
+                        ShownType::Inter(inner) if !union => parts.append(inner),
+                        _ => parts.push(t),
+                    }
+                }
+                parts.sort_by_key(key);
+                results.push(if union {
+                    ShownType::Union(parts)
+                } else {
+                    ShownType::Inter(parts)
+                });
+            }
+            Task::Named(r, n) => {
+                let xs = results.split_off(results.len() - n);
+                results.push(ShownType::Named(r, xs));
+            }
+            Task::Tuple(n) => {
+                let xs = results.split_off(results.len() - n);
+                results.push(ShownType::Tuple(xs));
+            }
+            Task::Fn(names, err, env) => {
+                let mut xs = results
+                    .split_off(
+                        results.len() - names.len() - 1 - usize::from(err) - usize::from(env),
+                    )
+                    .into_iter();
+                let params = names
+                    .into_iter()
+                    .map(|n| (n, xs.next().expect("canonical parameter")))
+                    .collect();
+                let ret = xs.next().expect("canonical return");
+                let err = if err {
+                    Some(xs.next().expect("canonical error"))
+                } else {
+                    None
+                };
+                let env = if env {
+                    Some(xs.next().expect("canonical environment"))
+                } else {
+                    None
+                };
+                results.push(ShownType::Fn(Box::new(ShownFn {
+                    params,
+                    ret,
+                    err,
+                    env,
+                })));
+            }
+            Task::Diff(n) => {
+                let mut xs = results.split_off(results.len() - n - 1).into_iter();
+                let a = xs.next().expect("canonical difference subject");
+                results.push(ShownType::Diff(Box::new(a), xs.collect()));
+            }
+        }
+    }
+    assert_eq!(results.len(), 1, "canonical type result stack");
+    results.pop().unwrap()
 }
 
 #[cfg(test)]
 mod value_type_interfaces {
     use super::*;
     use std::fs;
+    #[test]
+    fn canonical_alias_order_handles_deep_types_on_small_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut t = ShownType::Var("A".into());
+                for _ in 0..10_000 {
+                    t = ShownType::Tuple(vec![t]);
+                }
+                let canonical = canonical_alias_order(&t, &|t| t.text(&[]));
+                assert_eq!(canonical, t);
+                assert!(canonical.text(&[]).contains('A'));
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
     fn canonical(source: &str) -> BTreeMap<String, String> {
         let dir = tempfile::tempdir().unwrap();
         fs::create_dir_all(dir.path().join("src")).unwrap();
