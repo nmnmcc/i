@@ -488,14 +488,6 @@ fn charge_call(budget: &MacroBudget, name: &str, args: &[Value]) -> Result<()> {
             budget.charge(bytes, 4 + bytes.div_ceil(8))?;
         }
         ("syntax_error", [value]) => {
-            let message = get::<SyntaxResult>(value)?
-                .0
-                .as_ref()
-                .expect_err("syntax result must be an error");
-            let bytes = message.len() as u64;
-            budget.charge(bytes, 4 + bytes.div_ceil(8))?;
-        }
-        ("syntax_error", [value]) => {
             if let Err(s) = &get::<SyntaxResult>(value)?.0 {
                 charge_text(budget, s)?;
             }

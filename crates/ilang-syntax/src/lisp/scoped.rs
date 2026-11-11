@@ -180,15 +180,12 @@ impl ScopedSource {
                             tasks.push(Task::Enter(child, child_owner));
                         }
                         _ => {
-                            let datum = current.to_datum();
+                            let mut datum = current.to_datum();
                             self.text.push_str(&super::show(&datum));
                             let span = Span::new(start, self.position());
                             self.record(span, current, call_site, owner);
-                            built.push(Datum {
-                                kind: datum.kind,
-                                span,
-                                docs: Vec::new(),
-                            });
+                            datum.span = span;
+                            built.push(datum);
                         }
                     }
                 }
