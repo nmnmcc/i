@@ -41,16 +41,14 @@ fn checked_expression(d: &Datum) -> Result<String> {
     if !errors.is_empty() {
         return Err(bad(d, "a normal-surface expression"));
     }
-    let mut wanted = parsed.clone();
     let Some(crate::ast::Item {
         kind: crate::ast::ItemKind::Binding(binding),
         ..
-    }) = wanted.items.first_mut()
+    }) = parsed.items.first()
     else {
         return Err(bad(d, "a normal-surface expression"));
     };
-    binding.value = expected;
-    if !crate::shape::equivalent(&wanted, &parsed) {
+    if !crate::shape::equivalent_expression(&expected, &binding.value) {
         return Err(bad(d, "a normal-surface expression"));
     }
     Ok(text)
