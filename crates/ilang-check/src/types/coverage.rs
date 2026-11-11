@@ -27,6 +27,9 @@ use crate::hir::*;
 /// some values of a head with no finite signature.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Lit {
+    /// A refutable predicate on an opaque value. Its overlap with another
+    /// predicate cannot be inferred by the coverage checker.
+    Opaque(TypeId),
     /// An integer, as its decimal text with its sign; `-0` is `0` (§11.4).
     Int(String),
     /// The bits of a float; `-0.0` is `0.0` (§11.4).
@@ -360,11 +363,13 @@ impl Ctor {
             Ctor::Custom(c) => Head::Named(TypeRef::Custom(c.ty)),
             Ctor::Tuple(n) => Head::Tuple(*n),
             Ctor::Nil | Ctor::Cons => Head::Named(TypeRef::Builtin(BuiltinType::List)),
+            Ctor::Lit(Lit::Opaque(ty)) => Head::Named(TypeRef::Custom(*ty)),
             Ctor::Lit(l) => Head::Named(TypeRef::Builtin(match l {
                 Lit::Int(_) => BuiltinType::Int,
                 Lit::Float(_) => BuiltinType::Float,
                 Lit::Str(_) | Lit::Prefix(_) => BuiltinType::String,
                 Lit::Bits => BuiltinType::BitArray,
+                Lit::Opaque(_) => unreachable!(),
             })),
         }
     }
@@ -384,7 +389,7 @@ impl Ctor {
     /// A row pattern `self` matches every value of `c`.
     fn covers(&self, c: &Ctor) -> bool {
         match (self, c) {
-            (Ctor::Lit(Lit::Bits), _) => false,
+            (Ctor::Lit(Lit::Bits | Lit::Opaque(_)), _) => false,
             (Ctor::Lit(Lit::Prefix(p)), Ctor::Lit(Lit::Str(s) | Lit::Prefix(s))) => {
                 s.starts_with(p.as_str())
             }
@@ -1005,6 +1010,7 @@ impl Checker<'_> {
                 Lit::Str(s) => ilang_syntax::print::string_literal(s),
                 Lit::Prefix(s) => format!("{} <> _", ilang_syntax::print::string_literal(s)),
                 Lit::Bits => "<<..>>".into(),
+                Lit::Opaque(_) => "a syntax pattern".into(),
             },
             Pat::Ctor(Ctor::Custom(c), args) => {
                 let TypeBody::Custom(cs) = &self.p.ty(c.ty).body else {
@@ -1090,6 +1096,7 @@ pub(crate) fn field_order<'p>(
 /// The literal of a pattern, when it is one.
 pub(crate) fn literal(q: &Pattern) -> Option<Lit> {
     Some(match &q.kind {
+        PatternKind::Quote { syntax, .. } => Lit::Opaque(*syntax),
         PatternKind::Int { negative, value } => Lit::Int(super::lits::int_text(*negative, value)),
         PatternKind::Float { negative, value } => {
             let v = if *negative { -*value } else { *value };

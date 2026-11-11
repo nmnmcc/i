@@ -275,7 +275,30 @@ fn eq(mut q: Vec<Pair<'_>>) -> bool {
                 }
                 use PatternKind as K;
                 let same = match (&a.kind, &b.kind) {
-                    (K::Quote(a), K::Quote(b)) => a == b,
+                    (
+                        K::Quote {
+                            datum: a,
+                            template: at,
+                            captures: ac,
+                        },
+                        K::Quote {
+                            datum: b,
+                            template: bt,
+                            captures: bc,
+                        },
+                    ) => {
+                        if ac.len() != bc.len()
+                            || ac.iter().zip(bc).any(|((as_, _), (bs, _))| as_ != bs)
+                        {
+                            return false;
+                        }
+                        q.extend(
+                            ac.iter()
+                                .zip(bc)
+                                .map(|((_, a), (_, b))| Pair::Pattern(a, b)),
+                        );
+                        a == b && at == bt
+                    }
                     (K::Var(a), K::Var(b))
                     | (K::Discard(a), K::Discard(b))
                     | (K::String(a), K::String(b)) => a == b,

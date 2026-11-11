@@ -1253,6 +1253,9 @@ impl Walk<'_> {
 
     fn pattern(&mut self, p: &Pattern) {
         match &p.kind {
+            PatternKind::Quote { captures, .. } => {
+                captures.iter().for_each(|(_, p)| self.pattern(p))
+            }
             PatternKind::Var(b) => self.binder(b),
             PatternKind::Discard
             | PatternKind::String(_)
@@ -1473,6 +1476,9 @@ fn contains(span: Span, offset: u32) -> bool {
 
 fn pattern_binders(p: &Pattern, out: &mut Vec<Binder>) {
     match &p.kind {
+        PatternKind::Quote { captures, .. } => {
+            captures.iter().for_each(|(_, p)| pattern_binders(p, out))
+        }
         PatternKind::Var(b) => out.push(b.clone()),
         PatternKind::Typed { binder, .. } => out.extend(binder.clone()),
         PatternKind::Named { binder, pattern } => {

@@ -201,7 +201,21 @@ async fn function<'a>(s: &Scheduler<'a>, f: &'a Function) -> Function {
 async fn cp<'a>(s: Scheduler<'a>, p: &'a Pattern) -> Pattern {
     use PatternKind as K;
     let kind = match &p.kind {
-        K::Quote(d) => K::Quote(d.clone()),
+        K::Quote {
+            datum,
+            template,
+            captures,
+        } => {
+            let mut out = Vec::with_capacity(captures.len());
+            for (splice, p) in captures {
+                out.push((*splice, s.call(|s| cp(s, p)).await));
+            }
+            K::Quote {
+                datum: datum.clone(),
+                template: *template,
+                captures: out,
+            }
+        }
         K::Var(x) => K::Var(x.clone()),
         K::Discard(x) => K::Discard(x.clone()),
         K::Typed { binder, ty } => K::Typed {

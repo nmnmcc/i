@@ -1471,7 +1471,7 @@ impl<'a> Formatter<'a> {
     fn pattern_raw(&mut self, p: &Pattern, clause: bool) -> Doc {
         let span = p.span;
         match &p.kind {
-            PatternKind::Quote(_) => panic!("quote pattern has no normal-surface spelling"),
+            PatternKind::Quote { .. } => panic!("quote pattern has no normal-surface spelling"),
             PatternKind::Var(n) | PatternKind::Discard(n) => text(n.as_str()),
             PatternKind::Typed { binder, ty } => {
                 let t = if clause && ends_with_tuple(ty) {

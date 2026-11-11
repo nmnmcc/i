@@ -3,6 +3,7 @@ use crate::{ast::*, span::Span};
 
 pub(crate) trait Visitor {
     fn expr(&mut self, _: &mut Expr, _: bool) {}
+    fn pattern(&mut self, _: &mut Pattern) {}
     fn span(&mut self, _: &mut Span) {}
     fn string(&mut self, _: &mut String) {}
     fn float(&mut self, _: &mut f64) {}
@@ -11,11 +12,12 @@ pub(crate) trait Visitor {
 // enqueued only once, and the visitor cannot access an ancestor while children
 // are queued. Expr exit is queued before its children and runs only after them;
 // thus a visitor may replace an expression on entry or exit without invalidating
-// any pending child pointers.
+// any pending child pointers. Pattern callbacks also run before children are queued.
 pub(crate) enum Action {
     Node(*mut (), unsafe fn(*mut (), &mut Vec<Action>)),
     ExprEnter(*mut Expr),
     ExprExit(*mut Expr),
+    PatternEnter(*mut Pattern),
     Span(*mut Span),
     String(*mut String),
     Float(*mut f64),
@@ -44,6 +46,12 @@ pub(crate) trait Walk {
                         work.push(Action::ExprExit(p));
                     }
                     Action::ExprExit(p) => v.expr(&mut *p, false),
+                    Action::PatternEnter(p) => {
+                        let p = &mut *p;
+                        v.pattern(p);
+                        push(&mut p.kind, &mut work);
+                        push(&mut p.span, &mut work);
+                    }
                     Action::Span(p) => v.span(&mut *p),
                     Action::String(p) => v.string(&mut *p),
                     Action::Float(p) => v.float(&mut *p),
@@ -129,7 +137,11 @@ fields!(Clause { patterns, guard, body, span } skip {});
 fields!(Function { params, ret, body } skip {});
 fields!(RetType { value, err, env } skip {});
 fields!(Format { name, arg } skip {});
-fields!(Pattern { kind, span } skip {});
+impl Walk for Pattern {
+    fn enqueue(&mut self, work: &mut Vec<Action>) {
+        work.push(Action::PatternEnter(self));
+    }
+}
 fields!(Binder { name, span } skip { discard });
 fields!(TypeExpr { kind, span } skip {});
 fields!(FnParamType { label, ty } skip {});
@@ -254,7 +266,14 @@ impl Walk for ExprKind {
 impl Walk for PatternKind {
     fn enqueue(&mut self, work: &mut Vec<Action>) {
         match self {
-            Self::Quote(d) => push(d, work),
+            Self::Quote {
+                datum, captures, ..
+            } => {
+                push(datum, work);
+                for (_, pattern) in captures {
+                    push(pattern, work);
+                }
+            }
             Self::Int { .. } => {}
             Self::Float { value, .. } => push(value, work),
             Self::Var(s) | Self::Discard(s) | Self::String(s) => push(s, work),
@@ -347,6 +366,49 @@ impl Walk for TypeKind {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deep_quote_captures_clone_compare_and_walk_without_recursion() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                use crate::lisp::{Datum, DatumKind};
+                let mut p = Pattern {
+                    kind: PatternKind::Var("leaf".into()),
+                    span: Span::new(0, 1),
+                };
+                for n in 1..=10_000 {
+                    let datum = Datum {
+                        kind: DatumKind::Name("x".into()),
+                        span: Span::new(n, n + 1),
+                        docs: vec![],
+                    };
+                    p = Pattern {
+                        kind: PatternKind::Quote {
+                            datum: Box::new(datum),
+                            template: Some(n),
+                            captures: vec![(n % 2 == 0, p)],
+                        },
+                        span: Span::new(n, n + 1),
+                    };
+                }
+                let mut copy = p.clone();
+                assert!(p == copy);
+                struct Count(usize);
+                impl Visitor for Count {
+                    fn pattern(&mut self, _: &mut Pattern) {
+                        self.0 += 1;
+                    }
+                }
+                let mut count = Count(0);
+                copy.walk(&mut count);
+                assert_eq!(count.0, 10_001);
+                drop((p, copy));
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
 
     #[test]
     fn deeply_nested_walk_keeps_order_and_exits_after_children() {

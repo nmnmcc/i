@@ -118,6 +118,22 @@ fn deep_alternating_pattern_and_format_expression() {
             }]),
             span,
         };
+        let pattern = if depth % 2 == 0 {
+            ast::Pattern {
+                kind: ast::PatternKind::Quote {
+                    datum: Box::new(ilang_syntax::lisp::Datum {
+                        kind: ilang_syntax::lisp::DatumKind::Name("capture".into()),
+                        span,
+                        docs: Vec::new(),
+                    }),
+                    template: None,
+                    captures: vec![(false, pattern)],
+                },
+                span,
+            }
+        } else {
+            pattern
+        };
         let literal = || Expr {
             kind: ExprKind::Int(0u32.into()),
             span,

@@ -209,6 +209,9 @@ fn ast_binders(root: &ast::Pattern, out: &mut Vec<(String, Span)>) {
                 }
             }
             Task::Pattern(p) => match &p.kind {
+                P::Quote { captures, .. } => {
+                    work.extend(captures.iter().rev().map(|(_, p)| Task::Pattern(p)))
+                }
                 P::Var(n) => out.push((n.clone(), p.span)),
                 P::Typed { binder, .. } if !binder.discard => {
                     out.push((binder.name.clone(), binder.span))
@@ -3214,6 +3217,11 @@ impl<'a> Resolver<'a> {
         use ast::ExprKind as E;
         enum PatternTask<'a> {
             Visit(&'a ast::Pattern),
+            Quote {
+                span: Span,
+                template: Option<u32>,
+                captures: &'a [(bool, ast::Pattern)],
+            },
             Named {
                 span: Span,
                 binder: Binder,
@@ -3463,13 +3471,21 @@ impl<'a> Resolver<'a> {
                         match task {
                             PatternTask::Visit(p) => {
                                 let kind = match &p.kind {
-                                    P::Quote(_) => {
-                                        self.error(
-                                            code::MACRO_RESERVED,
-                                            p.span,
-                                            "a quote pattern must be evaluated inside a macro",
+                                    P::Quote {
+                                        template, captures, ..
+                                    } => {
+                                        pattern_work.push(PatternTask::Quote {
+                                            span: p.span,
+                                            template: *template,
+                                            captures,
+                                        });
+                                        pattern_work.extend(
+                                            captures
+                                                .iter()
+                                                .rev()
+                                                .map(|(_, capture)| PatternTask::Visit(capture)),
                                         );
-                                        PatternKind::Error(Vec::new())
+                                        continue;
                                     }
                                     P::Var(n) => {
                                         PatternKind::Var(self.bind(n, p.span, binders, shared))
@@ -3556,6 +3572,74 @@ impl<'a> Resolver<'a> {
                                     }
                                 };
                                 pattern_values.push(Pattern { kind, span: p.span });
+                            }
+                            PatternTask::Quote {
+                                span,
+                                template,
+                                captures,
+                            } => {
+                                let children =
+                                    pattern_values.split_off(pattern_values.len() - captures.len());
+                                let captures: Vec<_> = captures
+                                    .iter()
+                                    .map(|(many, _)| *many)
+                                    .zip(children)
+                                    .collect();
+                                let kind = if let Some(template) = template {
+                                    let module = Ident {
+                                        name: "\0quote-syntax".into(),
+                                        span,
+                                    };
+                                    let name = Ident {
+                                        name: "Syntax".into(),
+                                        span,
+                                    };
+                                    let syntax = self.lookup_type(Some(&module), &name);
+                                    let functions: Option<Vec<_>> = [
+                                        "_template",
+                                        "_match",
+                                        "_match_ok",
+                                        "_match_one",
+                                        "_match_many",
+                                    ]
+                                    .into_iter()
+                                    .map(|name| {
+                                        let name = Ident {
+                                            name: name.into(),
+                                            span,
+                                        };
+                                        match self.name(Some(&module), &name) {
+                                            ExprKind::Name(ValueRef::Def(def)) => Some(def),
+                                            _ => None,
+                                        }
+                                    })
+                                    .collect();
+                                    match (syntax, functions) {
+                                        (Some(TypeRef::Custom(syntax)), Some(functions)) => {
+                                            PatternKind::Quote {
+                                                template,
+                                                syntax,
+                                                functions: functions
+                                                    .try_into()
+                                                    .expect("five quote services"),
+                                                captures,
+                                            }
+                                        }
+                                        _ => PatternKind::Error(
+                                            captures.into_iter().map(|(_, p)| p).collect(),
+                                        ),
+                                    }
+                                } else {
+                                    self.error(
+                                        code::MACRO_RESERVED,
+                                        span,
+                                        "a quote pattern must be evaluated inside a macro",
+                                    );
+                                    PatternKind::Error(
+                                        captures.into_iter().map(|(_, p)| p).collect(),
+                                    )
+                                };
+                                pattern_values.push(Pattern { kind, span });
                             }
                             PatternTask::Named { span, binder } => {
                                 let pattern =

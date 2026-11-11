@@ -174,3 +174,92 @@ pub fn import_closure(
         Err(errors)
     }
 }
+
+/// The position in which a macro is being expanded.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MacroPosition {
+    Item,
+    Expression,
+    Type,
+}
+
+/// Add a compiler-owned, host-compatible entry for a macro. The wrapper
+/// supplies compiler services, translates SyntaxError through the compiler
+/// context, and keeps all user code in its original module.
+pub fn add_wrapper(
+    graph: &mut PackageGraph,
+    parsed: &mut Vec<Parsed>,
+    binding: &MacroBinding,
+    position: MacroPosition,
+) -> (String, String) {
+    let definition = parsed
+        .iter()
+        .find(|module| module.path == binding.module)
+        .expect("macro definition belongs to its import closure");
+    let package = definition.package;
+    let package_name = &graph.packages[package].name;
+    let mut suffix = 0usize;
+    let path = loop {
+        let candidate = format!("{package_name}/_compiler_macro_{suffix}");
+        if !parsed
+            .iter()
+            .any(|module| module.package == package && module.path == candidate)
+        {
+            break candidate;
+        }
+        suffix += 1;
+    };
+    let args = (0..binding.parameters.len())
+        .map(|n| format!("arg{n}"))
+        .collect::<Vec<_>>();
+    let parameters = args
+        .iter()
+        .map(|name| format!("{name}: syntax.Syntax"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let arguments = args.join(", ");
+    let (item_service, item_row) = if position == MacroPosition::Item {
+        ("  ! syntax.Items = syntax._items()\n", " | syntax.Items")
+    } else {
+        ("", "")
+    };
+    let source = format!(
+        r#"(syntax = i/syntax, fail = i/fail, target = {})
+(_entry)
+_entry = ({parameters}) -> syntax.Syntax {{
+  ! Assert = Assert((failure: AssertionFailure) -> Never {{ panic(failure.message) }})
+  ! syntax.Definitions = syntax._definitions()
+{item_service}  ! syntax.Diagnostics = syntax._diagnostics()
+  body = () -> syntax.Syntax ^ syntax.SyntaxError ! Assert | syntax.Definitions{item_row} | syntax.Diagnostics {{ target.{}({arguments}) }}
+  fail.catch(body).{{
+    Ok(value) -> value
+    Error(syntax.SyntaxError(message, at)) -> syntax._report_error(message, at)
+  }}
+}}
+"#,
+        binding.module, binding.name
+    );
+    let (ast, diagnostics) = ilang_syntax::parse_module(&source);
+    assert!(
+        diagnostics.is_empty(),
+        "compiler macro wrapper must parse: {diagnostics:?}"
+    );
+    let source_id = graph.sources.add(format!("<compiler:{path}>"), source);
+    graph.packages[package]
+        .modules
+        .push(ilang_package::ModuleSource {
+            path: path.clone(),
+            source: source_id,
+            kind: ilang_package::ModuleKind::Src,
+        });
+    parsed.push(Parsed {
+        package,
+        path: path.clone(),
+        source: source_id,
+        kind: ilang_package::ModuleKind::Src,
+        ast,
+        scoped: None,
+        compiler_generated: true,
+    });
+    (path, "_entry".into())
+}

@@ -285,3 +285,66 @@ fn value_dependency_follows_deep_aliases_and_cycles_on_small_stack() {
         assert!(!value_dependent(&program, &first));
     });
 }
+
+#[test]
+fn quote_capture_clone_visitors_and_drop_on_small_stack() {
+    tiny_stack(|| {
+        let functions = [0, 1, 2, 3, 4].map(|index| DefId {
+            module: ModuleId(3),
+            index,
+        });
+        let mut pattern = p(
+            PatternKind::Typed {
+                binder: None,
+                ty: t(TypeKind::Hole, 42),
+            },
+            0,
+        );
+        for n in 1..=10_000 {
+            pattern = p(
+                PatternKind::Quote {
+                    template: n,
+                    syntax: TypeId(8),
+                    functions,
+                    captures: vec![(n % 2 == 0, pattern)],
+                },
+                n,
+            );
+        }
+        let cloned = pattern.clone();
+        let mut node = &cloned;
+        for n in (1..=10_000).rev() {
+            match &node.kind {
+                PatternKind::Quote {
+                    template,
+                    syntax,
+                    functions: fs,
+                    captures,
+                } => {
+                    assert_eq!((*template, *syntax, *fs), (n, TypeId(8), functions));
+                    assert_eq!(captures.len(), 1);
+                    assert_eq!(captures[0].0, n % 2 == 0);
+                    node = &captures[0].1;
+                }
+                _ => panic!("lost quote capture at {n}"),
+            }
+        }
+        let body = e(ExprKind::Error, 0);
+        let refs = ilang_check::order::references(&cloned, &body);
+        assert_eq!(refs.len(), 50_000);
+        for chunk in refs.as_chunks::<5>().0 {
+            assert_eq!(chunk, &functions.map(|f| (f, false)));
+        }
+        let binding = Binding {
+            pattern: cloned,
+            value: body,
+            direct: false,
+            ty_vars: vec![],
+            span: Span::default(),
+        };
+        let mut spans = Vec::new();
+        binding_types(&binding, &mut |ty| spans.push(ty.span.start));
+        assert_eq!(spans, [42]);
+        drop((pattern, binding));
+    });
+}
