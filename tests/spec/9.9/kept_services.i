@@ -4,6 +4,7 @@
 // callback uses its invoking task's Scheduler and keeps services on third resume.
 (
 	i/task
+	i/request
 	i/control
 	i/core
 )
@@ -51,5 +52,5 @@ main = () {
 }
 
 Marker {
-	Marker(Boundary(Nil, Never, task.Scheduler | Assert))
+	Marker(Boundary(Nil, Never, task.Scheduler | Assert | request.Root))
 }
