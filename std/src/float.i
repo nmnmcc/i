@@ -1550,11 +1550,17 @@ tan = (x: Float) -> Result(Float, Nil) {
 		}
 		False -> {
 			(n, hi, lo) = trig_reduce(a)
-			v = trig_tan(hi, lo, n % 2 == 1)
-			Ok({ sign_bit(x) } |> {
-				True  -> -.v
-				False -> v
-			})
+			odd = n % 2 == 1
+			{ odd && abs(hi +. lo) <=. 5.562684646268003e-309 } |> {
+				True -> Error(Nil)
+				False -> {
+					v = trig_tan(hi, lo, odd)
+					Ok({ sign_bit(x) } |> {
+						True  -> -.v
+						False -> v
+					})
+				}
+			}
 		}
 	}
 }
