@@ -40,6 +40,7 @@ pub enum Error {
     },
     SameModule(Span),
     Depth(Span),
+    InvalidItem(Span, String),
 }
 struct Compiled {
     program: MacroProgram,
@@ -58,6 +59,8 @@ pub struct BodyEngine<'a> {
     /// Successful type replacements, with unique virtual occurrence spans.
     pub type_replacements: Vec<(Span, Span, Syntax)>,
     cache: HashMap<(u32, String, u8), Compiled>,
+    pub(crate) item_locals: Vec<Local>,
+    pub(crate) run_mark: Arc<std::sync::atomic::AtomicU64>,
     session: &'a mut Session,
 }
 impl<'a> BodyEngine<'a> {
@@ -80,16 +83,18 @@ impl<'a> BodyEngine<'a> {
             transactions: Vec::new(),
             type_replacements: Vec::new(),
             cache: HashMap::new(),
+            item_locals: Vec::new(),
+            run_mark: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             session,
         }
     }
-    fn scope(&self) -> Scope {
+    pub(crate) fn scope(&self) -> Scope {
         Scope {
             module: self.source.0,
             marks: BTreeSet::new(),
         }
     }
-    fn atom(&self, id: &Ident) -> Syntax {
+    pub(crate) fn atom(&self, id: &Ident) -> Syntax {
         if let Some(origin) = self.scoped.origin(id.span) {
             return origin.syntax.clone();
         }
@@ -117,7 +122,7 @@ impl<'a> BodyEngine<'a> {
             })
             .collect()
     }
-    fn resolve(
+    pub(crate) fn resolve(
         &self,
         module: Option<&Ident>,
         name: &Ident,
@@ -132,26 +137,27 @@ impl<'a> BodyEngine<'a> {
             &self.locals(locals, depth),
         )
     }
-    fn expr_syntax(&self, e: &Expr) -> Syntax {
+    pub(crate) fn expr_syntax(&self, e: &Expr) -> Syntax {
         if let Some(origin) = self.scoped.origin(e.span) {
             return origin.syntax.clone();
         }
         let file = self.graph.sources.get(self.source);
         source_expression_syntax(e, &self.scope(), &file.text, file.display.ends_with(".is"))
     }
-    fn ty_syntax(&self, ty: &TypeExpr) -> Syntax {
+    pub(crate) fn ty_syntax(&self, ty: &TypeExpr) -> Syntax {
         if let Some(origin) = self.scoped.origin(ty.span) {
             return origin.syntax.clone();
         }
         let file = self.graph.sources.get(self.source);
         source_type_syntax(ty, &self.scope(), &file.text, file.display.ends_with(".is"))
     }
-    fn execute(
+    pub(crate) fn execute(
         &mut self,
         mac: &Macro,
         args: Vec<MacroArgument>,
         call: &Syntax,
         invocation_span: Span,
+        item: Option<Syntax>,
         position: MacroPosition,
     ) -> Result<
         (
@@ -221,13 +227,14 @@ impl<'a> BodyEngine<'a> {
             );
         }
         let compiled = &self.cache[&key];
+        self.run_mark.store(self.session.next_mark(), std::sync::atomic::Ordering::Relaxed);
         let mut output_budget = None;
         let result = self
             .session
             .run(
                 &mac.definition,
                 &args,
-                None,
+                item,
                 call,
                 position,
                 &compiled.program,
@@ -285,6 +292,7 @@ impl Hook for BodyEngine<'_> {
             args,
             &call,
             expression.span,
+            None,
             MacroPosition::Expression,
         )?;
         let expression = self
@@ -328,7 +336,7 @@ impl Hook for BodyEngine<'_> {
         let old_span = ty.span;
         let call = self.ty_syntax(ty);
         let (result, budget, transactions) =
-            self.execute(&mac, args, &call, ty.span, MacroPosition::Type)?;
+            self.execute(&mac, args, &call, ty.span, None, MacroPosition::Type)?;
         let ty = self
             .scoped
             .ty_metered(&result, &call, |work, words| {
@@ -403,7 +411,7 @@ impl Hook for BodyEngine<'_> {
     }
 }
 
-fn metered_error(
+pub(crate) fn metered_error(
     error: MeteredError,
     macro_name: &str,
     call: &Syntax,

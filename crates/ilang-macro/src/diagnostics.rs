@@ -13,6 +13,7 @@ pub fn body(source: SourceId, error: Error) -> Vec<Diagnostic> {
             span,
             "a macro cannot be used in the module that defines it",
         )],
+        Error::InvalidItem(span, message) => vec![Diagnostic::error(code, Some(source), span, message)],
         Error::Depth(span) => vec![Diagnostic::error(
             code,
             Some(source),

@@ -10,3 +10,5 @@ pub mod module_order;
 pub mod registry;
 pub mod validate;
 pub mod diagnostics;
+pub mod item_phase;
+pub mod definition_world;
