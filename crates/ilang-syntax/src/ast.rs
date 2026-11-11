@@ -139,7 +139,7 @@ pub struct Block {
     pub span: Span,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
@@ -336,7 +336,7 @@ pub struct Format {
     pub arg: Option<Box<Expr>>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Pattern {
     pub kind: PatternKind,
     pub span: Span,
@@ -396,7 +396,7 @@ pub enum PatternKind {
     BitArray(Vec<Segment<Pattern>>),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub struct TypeExpr {
     pub kind: TypeKind,
     pub span: Span,

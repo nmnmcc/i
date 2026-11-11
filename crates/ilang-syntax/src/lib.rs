@@ -3,6 +3,8 @@
 //! The only authority is `docs/spec.md`; section numbers in comments refer to it.
 
 pub mod ast;
+mod ast_clone;
+mod ast_eq;
 pub mod format;
 pub mod lexer;
 pub mod lisp;
