@@ -12,37 +12,6 @@ use super::{Datum, DatumKind};
 // shadowed by a written name. Its scope is local to the compiler program.
 const ALIAS: &str = "\0quote-syntax";
 
-/// Capture patterns in the order in which the syntax service returns them.
-/// A capture is itself an ordinary pattern; it is not traversed as part of
-/// the surrounding template. Splices capture a list rather than one node.
-pub fn pattern_captures(quote: &Datum) -> Vec<(bool, Pattern)> {
-    let DatumKind::Quote(body) = &quote.kind else {
-        unreachable!("quote pattern contains a quote datum");
-    };
-    let mut captures = Vec::new();
-    let mut stack = vec![body.as_ref()];
-    while let Some(datum) = stack.pop() {
-        match &datum.kind {
-            DatumKind::Unquote(inner) | DatumKind::Splice(inner) => {
-                captures.push((
-                    matches!(datum.kind, DatumKind::Splice(_)),
-                    super::parse_pattern(inner)
-                        .expect("the parser validates quote capture patterns"),
-                ));
-            }
-            DatumKind::Round(children)
-            | DatumKind::Square(children)
-            | DatumKind::Curly(children)
-            | DatumKind::Bits(children) => {
-                stack.extend(children.iter().rev());
-            }
-            DatumKind::Quote(_) => unreachable!("nested quote in a quote template"),
-            _ => {}
-        }
-    }
-    captures
-}
-
 fn ident(name: &str, span: Span) -> Ident {
     Ident {
         name: name.into(),

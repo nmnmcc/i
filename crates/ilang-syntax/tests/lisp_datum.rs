@@ -114,10 +114,13 @@ fn quote_splices_are_checked_in_their_written_position() {
 #[test]
 fn quote_pattern_captures_follow_the_syntax_matcher_order() {
     use ilang_syntax::ast::PatternKind;
-    use ilang_syntax::lisp::{parse_pattern, quote_lower::pattern_captures};
+    use ilang_syntax::lisp::parse_pattern;
 
     let quote = parse("`(f [~first {~second}] ~..rest)").unwrap();
-    let captures = pattern_captures(&quote[0]);
+    let pattern = parse_pattern(&quote[0]).unwrap();
+    let PatternKind::Quote { captures, .. } = &pattern.kind else {
+        panic!("quote pattern");
+    };
     assert_eq!(captures.len(), 3);
     for (capture, name) in captures.iter().zip(["first", "second", "rest"]) {
         assert!(matches!(&capture.1.kind, PatternKind::Var(n) if n == name));
@@ -128,12 +131,18 @@ fn quote_pattern_captures_follow_the_syntax_matcher_order() {
     );
 
     let outer = parse("`(f ~`(g ~inner))").unwrap();
-    let captures = pattern_captures(&outer[0]);
+    let pattern = parse_pattern(&outer[0]).unwrap();
+    let PatternKind::Quote { captures, .. } = &pattern.kind else {
+        panic!("quote pattern");
+    };
     assert_eq!(captures.len(), 1);
-    let PatternKind::Quote { datum: inner, .. } = &captures[0].1.kind else {
+    let PatternKind::Quote {
+        captures: inner, ..
+    } = &captures[0].1.kind
+    else {
         panic!("the capture must retain its nested quote pattern");
     };
-    assert!(matches!(&pattern_captures(inner)[0].1.kind, PatternKind::Var(n) if n == "inner"));
+    assert!(matches!(&inner[0].1.kind, PatternKind::Var(n) if n == "inner"));
     assert!(parse_pattern(&outer[0]).is_ok());
 }
 
@@ -176,7 +185,8 @@ fn compiler_preparation_registers_nested_quote_pattern_templates() {
 
 #[test]
 fn quote_capture_collection_handles_deep_templates() {
-    use ilang_syntax::lisp::{Datum, DatumKind, quote_lower::pattern_captures};
+    use ilang_syntax::ast::PatternKind;
+    use ilang_syntax::lisp::{Datum, DatumKind, parse_pattern};
     use ilang_syntax::span::Span;
     let datum = |kind| Datum {
         kind,
@@ -190,7 +200,8 @@ fn quote_capture_collection_handles_deep_templates() {
         body = datum(DatumKind::Round(vec![body]));
     }
     let quote = datum(DatumKind::Quote(Box::new(body)));
-    assert_eq!(pattern_captures(&quote).len(), 1);
+    let pattern = parse_pattern(&quote).unwrap();
+    assert!(matches!(&pattern.kind, PatternKind::Quote { captures, .. } if captures.len() == 1));
 }
 
 #[test]
