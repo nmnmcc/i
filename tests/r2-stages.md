@@ -1169,3 +1169,15 @@ lowerer calls those renamed definitions. No warning rule is specialized for a
 library. The 8 runtime tests, all 78 section 9.9 cases at O0/O2, and all 38
 review-r2 observations passed after this change. ABI fixtures regenerated with
 no diff; the library type inventory was regenerated for the renamed wrappers.
+
+The integrated review corpus exposed nine pre-R2 observations. Three E0320
+diagnostics now describe the request-aware host field rules; five native design
+examples now see the implemented task/request API, with the borrowed-request
+example still reporting its missing embedder host. The numeric async probe's
+explicit environment formerly omitted Await and Owner: runtime.md D3 and §5.4
+add both to an async host field, so its annotation now includes them while its
+floating-point computation is unchanged. Its original source is retained in
+the review inventory as a historical snapshot. All nine updated observations
+passed again, and the inventory fingerprint audit reported zero failures. The
+migrated numeric export also ran against an asynchronous JS host at O0, O2 and
+O3; each call made one host handoff and returned negative zero with its sign.

@@ -20587,7 +20587,7 @@
       "origin": "/tmp/review-num/async/src/main.i",
       "sha256": "c642ff6de81335dba70580cfc2f3e50a113aed4d57079151dfb94b43cf4ec12b",
       "source": "docs/spec.md §§10–11; review criteria preserved under tools/",
-      "case": "review-num/async"
+      "historical_snapshot": "tests/review/tools/review-num/async-original.i.source"
     },
     {
       "origin": "/tmp/review-num/probes/test/numeric.i",
