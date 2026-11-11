@@ -2153,6 +2153,22 @@ mod value_type_interfaces {
     }
 
     #[test]
+    fn open_alias_proofs_report_representation_without_claiming_a_counterexample() {
+        let old = interface("(T)\nT(A) = (..A, -x)");
+        let new = interface("(T)\nT(A) = (..A, -y)");
+        let same = Diff::new(&old, &old).unwrap();
+        assert!(same.changed.is_empty());
+        assert!(same.representation.is_empty());
+        let diff = Diff::new(&old, &new).unwrap();
+        assert!(diff.changed.is_empty());
+        assert_eq!(diff.representation.len(), 1);
+        assert_eq!(
+            diff.version_step(),
+            (Step::Major, "an interface representation changed")
+        );
+    }
+
+    #[test]
     fn function_labels_inside_record_aliases_are_part_of_the_call_interface() {
         let a = interface("(T)\nT = (run: (a: Int | String) -> Int)");
         let same = interface("(T)\nT = (run: (a: String | Int) -> Int)");
