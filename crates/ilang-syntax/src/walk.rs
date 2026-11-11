@@ -357,6 +357,12 @@ impl Walk for TypeKind {
     }
 }
 
+impl Walk for RecordLabel {
+    fn enqueue(&mut self, work: &mut Vec<Action>) {
+        push(&mut self.ident, work);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -438,11 +444,5 @@ mod tests {
         let mut v = Replace(Vec::new());
         e.walk(&mut v);
         assert_eq!(v.0, ["new"]);
-    }
-}
-
-impl Walk for RecordLabel {
-    fn enqueue(&mut self, work: &mut Vec<Action>) {
-        push(&mut self.ident, work);
     }
 }

@@ -755,16 +755,21 @@ mod record_tests {
         std::thread::Builder::new()
             .stack_size(256 * 1024)
             .spawn(|| {
-                let mut input = String::with_capacity(100_001);
+                let datum = |kind| Datum {
+                    kind,
+                    span: crate::span::Span::default(),
+                    docs: vec![],
+                };
+                let mut value = datum(K::Name("v".into()));
                 for _ in 0..10_000 {
-                    input.push_str("{ (: x ");
-                }
-                input.push('v');
-                for _ in 0..10_000 {
-                    input.push_str(") }");
+                    value = datum(K::Curly(vec![datum(K::Round(vec![
+                        datum(K::Symbol(":".into())),
+                        datum(K::Name("x".into())),
+                        value,
+                    ]))]));
                 }
                 let expected = format!("{}v{}", "(x: ".repeat(10_000), ")".repeat(10_000));
-                assert_eq!(render_one(&input, P::Expr).unwrap(), expected);
+                assert_eq!(render(&value, P::Expr).unwrap(), expected);
             })
             .unwrap()
             .join()
