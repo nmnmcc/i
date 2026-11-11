@@ -97,7 +97,9 @@ impl<'a> BodyEngine<'a> {
         }
     }
     /// Virtual origins produced by the most recent failed item phase.
-    pub fn failed_notes(&self) -> &[crate::item_phase::PhaseNote] { &self.phase_notes }
+    pub fn failed_notes(&self) -> &[crate::item_phase::PhaseNote] {
+        &self.phase_notes
+    }
     pub fn failure_scoped(&self) -> Option<&ScopedSource> {
         self.failure_scoped.as_ref()
     }

@@ -83,7 +83,10 @@ impl ScopedSource {
             })
     }
     pub fn child_span(&self, parent: Span, index: usize) -> Option<Span> {
-        self.children.get(&parent).and_then(|children| children.get(index)).copied()
+        self.children
+            .get(&parent)
+            .and_then(|children| children.get(index))
+            .copied()
     }
     pub fn is_generated(&self, span: Span) -> bool {
         span.start > self.original_len

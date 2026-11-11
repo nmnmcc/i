@@ -66,8 +66,17 @@ impl DefinitionWorld {
         Self::new_shared(graph, parsed, Arc::new(AtomicU64::new(0)))
     }
     /// All modules in one project share the same answer identity allocator.
-    pub fn new_shared(graph: &PackageGraph, parsed: &[Parsed], next_answer: Arc<AtomicU64>) -> Self {
-        Self { graph: graph.clone(), parsed: parsed.to_vec(), next_answer, current: Mutex::new(None) }
+    pub fn new_shared(
+        graph: &PackageGraph,
+        parsed: &[Parsed],
+        next_answer: Arc<AtomicU64>,
+    ) -> Self {
+        Self {
+            graph: graph.clone(),
+            parsed: parsed.to_vec(),
+            next_answer,
+            current: Mutex::new(None),
+        }
     }
     fn answer_id(&self) -> u64 {
         self.next_answer

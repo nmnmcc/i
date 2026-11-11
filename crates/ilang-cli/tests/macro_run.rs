@@ -1863,3 +1863,78 @@ fn checked_collection_validates_targets_and_duplicates() {
         assert!(collections::resolve(&parsed, program, typed, &[transaction(requests)]).is_err());
     }
 }
+
+#[test]
+fn cli_retries_definition_queries_after_later_item_macros() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, ask make)\n(@ macro (= ask (-> (x) _ { (= d ((. syntax definition) x)) `{}})))\n(@ macro (= make (-> (x) _ `(= ~x Int))))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nm.ask(T)\nm.make(T)\nmain = () { 1 }\n",
+    )
+    .unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn cli_macro_stop_reports_call_site_and_template() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, bomb)\n(@ macro (= bomb (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(panic \"boom\"))))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nmain = () { m.bomb(1) }\n",
+    )
+    .unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("boom")
+            && stderr.contains("app/main:2:13")
+            && stderr.contains("expanded from app/macros:3:"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn cli_nested_macro_stop_preserves_outer_call_and_templates() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, outer)\n(@ macro (= inner (-> (x) _ `(panic \"boom\"))))\n(@ macro (= outer (-> (x) _ `(inner ~x))))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nmain = () { m.outer(1) }\n",
+    )
+    .unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("panic: boom")
+            && stderr.contains("app/main:2:13")
+            && stderr.contains("app/macros:3:"),
+        "{stderr}"
+    );
+}

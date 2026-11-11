@@ -18,6 +18,7 @@ use std::sync::Arc;
 pub struct Expanded {
     pub parsed: Vec<Parsed>,
     pub diagnostics: Vec<Diagnostic>,
+    pub transactions: Vec<Transaction>,
 }
 
 /// Parse and expand each module after its dependencies. On failure the
@@ -37,6 +38,7 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         return Ok(Expanded {
             parsed,
             diagnostics,
+            transactions: Vec::new(),
         });
     }
     let order = match module_order::order(graph, &parsed) {
@@ -46,7 +48,9 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
             return Err(diagnostics);
         }
     };
+    let mut transactions = Vec::new();
     let mut session = Session::default();
+    let next_answer = Arc::new(std::sync::atomic::AtomicU64::new(0));
     for source in order {
         let index = parsed
             .iter()
@@ -59,7 +63,11 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
                 return Err(diagnostics);
             }
         };
-        let definitions = Arc::new(DefinitionWorld::new(graph, &parsed));
+        let definitions = Arc::new(DefinitionWorld::new_shared(
+            graph,
+            &parsed,
+            next_answer.clone(),
+        ));
         let mut ast = parsed[index].ast.clone();
         let scoped = parsed[index]
             .scoped
@@ -80,12 +88,29 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
             match item_phase::expand_items(&mut engine, &mut ast, definitions.clone()) {
                 Ok(transactions) => transactions,
                 Err(error) => {
-                    diagnostics.extend(map_failure(source, &engine.scoped, phase(source, error)));
+                    let scoped = engine.failure_scoped().unwrap_or(&engine.scoped);
+                    diagnostics.extend(map_failure(
+                        source,
+                        scoped,
+                        engine
+                            .failed_notes()
+                            .iter()
+                            .map(|note| {
+                                Diagnostic::note(
+                                    Some(SourceId(note.origin.source)),
+                                    note.origin.call,
+                                    note.message.clone(),
+                                )
+                            })
+                            .collect(),
+                    ));
+                    diagnostics.extend(map_failure(source, scoped, phase(source, error)));
                     return Err(diagnostics);
                 }
             };
         let scoped = engine.scoped.clone();
         let replacements = engine.type_replacements.clone();
+        let item_overrides = engine.item_overrides.clone();
         drop(engine);
         graph.sources.set_text(source, scoped.text().to_owned());
         parsed[index].ast = ast;
@@ -114,16 +139,13 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
             &mut session,
         );
         engine.type_replacements = replacements;
+        engine.item_overrides = item_overrides;
         engine.use_completed_definitions(definitions, &ast);
         if let Err(error) = body_walk::expressions(&mut ast, &mut engine) {
             diagnostics.extend(map_failure(
                 source,
                 &engine.scoped,
-                notes(
-                    item_transactions
-                        .into_iter()
-                        .chain(std::mem::take(&mut engine.transactions)),
-                ),
+                notes(item_transactions.iter().chain(engine.transactions.iter())),
             ));
             diagnostics.extend(map_failure(
                 source,
@@ -139,8 +161,10 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         parsed[index].ast = ast;
         parsed[index].scoped = Some(scoped);
         diagnostics.extend(notes(
-            item_transactions.into_iter().chain(body_transactions),
+            item_transactions.iter().chain(body_transactions.iter()),
         ));
+        transactions.extend(item_transactions);
+        transactions.extend(body_transactions);
         if let Err(errors) = validate::module(graph, &parsed, source) {
             diagnostics.extend(errors);
             return Err(diagnostics);
@@ -149,9 +173,10 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
     Ok(Expanded {
         parsed,
         diagnostics,
+        transactions,
     })
 }
-fn notes(transactions: impl IntoIterator<Item = Transaction>) -> Vec<Diagnostic> {
+fn notes<'a>(transactions: impl IntoIterator<Item = &'a Transaction>) -> Vec<Diagnostic> {
     transactions
         .into_iter()
         .flat_map(|transaction| {
@@ -160,8 +185,8 @@ fn notes(transactions: impl IntoIterator<Item = Transaction>) -> Vec<Diagnostic>
                 .expect("completed transaction has a call location");
             transaction
                 .notes
-                .into_iter()
-                .map(move |message| Diagnostic::note(Some(source), span, message))
+                .iter()
+                .map(move |message| Diagnostic::note(Some(source), span, message.clone()))
         })
         .collect()
 }
