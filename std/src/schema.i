@@ -122,9 +122,23 @@ null = Schema((x) {
 	}
 }, (_) { json.Null })
 
-literal_string = (value: String) { refine(string, (x) { x == value }, value) }
+literal_string(K) = (value: K) -> Schema(K, SchemaError) {
+	Schema((x) {
+		x |> {
+			json.Text(s) ? s == value -> Ok(value)
+			_                         -> Error(error(value))
+		}
+	}, (x) { json.Text(x) })
+}
 
-literal_int = (value: Int) { refine(int, (x) { x == value }, "literal int") }
+literal_int(K) = (value: K) -> Schema(K, SchemaError) {
+	Schema((x) {
+		x |> {
+			json.Integer(n) ? n == value -> Ok(value)
+			_                            -> Error(error("literal int"))
+		}
+	}, (x) { json.Integer(x) })
+}
 
 nullable(A) = (s: Schema(A, SchemaError)) -> Schema(Option(A), SchemaError) {
 	Schema((x) {

@@ -10,7 +10,11 @@ round(A) = (s: schema.Schema(A, schema.SchemaError), value: A) -> Bool {
 }
 
 User {
-	User(name: String, addresses: List(String), role: Role)
+	User(name: String, addresses: List(Address), role: Role)
+}
+
+Address {
+	Address(city: String)
 }
 
 Role {
@@ -34,6 +38,13 @@ user_schema = () {
 			}
 		}
 	)
+	address = schema.field(
+		schema.object(Address(""))
+		"city"
+		schema.string
+		(a) { a.city }
+		(_, city) { Address(city) }
+	)
 	start = schema.object(User("", [], Member))
 	names = schema.field(
 		start
@@ -45,7 +56,7 @@ user_schema = () {
 	addresses = schema.field(
 		names
 		"addresses"
-		schema.list(schema.string)
+		schema.list(address)
 		(u) { u.addresses }
 		(u, a) { User(u.name, a, u.role) }
 	)
@@ -300,7 +311,12 @@ object_empty = () { assert(round(schema.object(()), ())) }
 
 @test
 nested_round = () {
-	assert(round(user_schema(), User("Ada", ["HK", "Paris"], Admin)))
+	assert(
+		round(
+			user_schema()
+			User("Ada", [Address("HK"), Address("Paris")], Admin)
+		)
+	)
 }
 
 @test
@@ -310,13 +326,17 @@ nested_path = () {
 			user_schema()
 			json.Object([
 				("name", json.Text("Ada"))
-				("addresses", json.Array([json.Null]))
+				("addresses", json.Array([json.Object([("city", json.Null)])]))
 				("role", json.Object([("kind", json.Text("admin"))]))
 			])
 		) ==
 			Error(
 				schema.SchemaError(
-					[schema.Field("addresses"), schema.Index(0)]
+					[
+						schema.Field("addresses")
+						schema.Index(0)
+						schema.Field("city")
+					]
 					"string"
 				)
 			)
@@ -400,4 +420,32 @@ optional_field_path = () {
 		schema.decode(optional_schema(), json.Object([("value", json.Null)])) ==
 			Error(schema.SchemaError([schema.Field("value")], "int"))
 	)
+}
+
+@test
+literal_types = () {
+	s: Schema("yes", schema.SchemaError) = schema.literal_string("yes")
+	n: Schema(7, schema.SchemaError) = schema.literal_int(7)
+	assert(schema.decode(s, json.Text("yes")) == Ok("yes"))
+	assert(schema.decode(n, json.Integer(7)) == Ok(7))
+}
+
+@test
+structural_record_round = () {
+	base = schema.object((name: "", age: 0))
+	names = schema.field(
+		base
+		"name"
+		schema.string
+		(r) { r.name }
+		(r: (name: String, age: Int), name) { (..r, name: name) }
+	)
+	person = schema.field(
+		names
+		"age"
+		schema.int
+		(r) { r.age }
+		(r: (name: String, age: Int), age) { (..r, age: age) }
+	)
+	assert(round(person, (name: "Ada", age: 36)))
 }
