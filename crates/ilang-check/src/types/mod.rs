@@ -26,6 +26,7 @@ mod known;
 mod lits;
 mod pattern;
 mod shown;
+mod shown_tree;
 mod solve;
 mod tree;
 mod value_types;

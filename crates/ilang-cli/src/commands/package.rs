@@ -1590,10 +1590,10 @@ fn canonical_alias_order(t: &ShownType, key: &dyn Fn(&ShownType) -> String) -> S
             let union = matches!(t, ShownType::Union(_));
             let mut parts = Vec::new();
             for t in ts {
-                let t = canonical_alias_order(t, key);
-                match t {
-                    ShownType::Union(inner) if union => parts.extend(inner),
-                    ShownType::Inter(inner) if !union => parts.extend(inner),
+                let mut t = canonical_alias_order(t, key);
+                match &mut t {
+                    ShownType::Union(inner) if union => parts.append(inner),
+                    ShownType::Inter(inner) if !union => parts.append(inner),
                     _ => parts.push(t),
                 }
             }

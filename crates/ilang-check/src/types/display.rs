@@ -1554,71 +1554,147 @@ pub(crate) fn tree(t: &Ty, name: &mut dyn FnMut(V) -> String) -> ShownType {
 }
 
 pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownType {
-    let all = |xs: &[Ty], name: &mut dyn FnMut(V) -> ShownType| -> Vec<ShownType> {
-        xs.iter().map(|x| tree_with(x, name)).collect()
-    };
-    match t {
-        Ty::Var(v) => name(*v),
-        Ty::Never => ShownType::Never,
-        Ty::Top => ShownType::Hole,
-        Ty::Con(Head::Named(r), values, _) if !values.is_all() => {
-            let mut items: Vec<_> = values.items().map(|v| v.to_string()).collect();
-            if *r == crate::hir::TypeRef::Builtin(crate::hir::BuiltinType::Int) {
-                items.sort_by_cached_key(|v| {
-                    v.parse::<num_bigint::BigInt>().expect("canonical integer")
-                });
-            }
-            let items: Vec<_> = items
-                .into_iter()
-                .map(|v| {
-                    ShownType::Lit(
-                        if *r == crate::hir::TypeRef::Builtin(crate::hir::BuiltinType::String) {
-                            ilang_syntax::print::string_literal(&v)
+    enum Task<'a> {
+        Visit(&'a Ty),
+        Named(crate::hir::TypeRef, usize),
+        Tuple(usize),
+        Fn(Vec<Option<String>>, bool, bool),
+        Union(usize),
+        Inter(usize),
+        Diff(usize),
+    }
+    let mut tasks = vec![Task::Visit(t)];
+    let mut results = Vec::new();
+    while let Some(task) = tasks.pop() {
+        match task {
+            Task::Visit(t) => match t {
+                Ty::Var(v) => results.push(name(*v)),
+                Ty::Never => results.push(ShownType::Never),
+                Ty::Top => results.push(ShownType::Hole),
+                Ty::Con(Head::Named(r), values, _) if !values.is_all() => {
+                    let mut items: Vec<_> = values.items().map(|v| v.to_string()).collect();
+                    if *r == crate::hir::TypeRef::Builtin(crate::hir::BuiltinType::Int) {
+                        items.sort_by_cached_key(|v| {
+                            v.parse::<num_bigint::BigInt>().expect("canonical integer")
+                        });
+                    }
+                    let items: Vec<_> = items
+                        .into_iter()
+                        .map(|v| {
+                            ShownType::Lit(
+                                if *r
+                                    == crate::hir::TypeRef::Builtin(crate::hir::BuiltinType::String)
+                                {
+                                    ilang_syntax::print::string_literal(&v)
+                                } else {
+                                    v
+                                },
+                            )
+                        })
+                        .collect();
+                    results.push(if values.is_finite() {
+                        if items.len() == 1 {
+                            items.into_iter().next().unwrap()
                         } else {
-                            v
-                        },
-                    )
-                })
-                .collect();
-            if values.is_finite() {
-                if items.len() == 1 {
-                    items.into_iter().next().unwrap()
-                } else {
-                    ShownType::Union(items)
+                            ShownType::Union(items)
+                        }
+                    } else {
+                        ShownType::Diff(Box::new(ShownType::Named(*r, Vec::new())), items)
+                    });
                 }
-            } else {
-                ShownType::Diff(Box::new(ShownType::Named(*r, Vec::new())), items)
+                Ty::Con(Head::Named(r), _, xs) => {
+                    tasks.push(Task::Named(*r, xs.len()));
+                    tasks.extend(xs.iter().rev().map(Task::Visit));
+                }
+                Ty::Con(_, _, xs) => {
+                    tasks.push(Task::Tuple(xs.len()));
+                    tasks.extend(xs.iter().rev().map(Task::Visit));
+                }
+                Ty::Fn(f) => {
+                    let err = f.err != Ty::Never;
+                    let env = f.env != Ty::Never;
+                    tasks.push(Task::Fn(
+                        f.params.iter().map(|(n, _)| n.clone()).collect(),
+                        err,
+                        env,
+                    ));
+                    if env {
+                        tasks.push(Task::Visit(&f.env));
+                    }
+                    if err {
+                        tasks.push(Task::Visit(&f.err));
+                    }
+                    tasks.push(Task::Visit(&f.ret));
+                    tasks.extend(f.params.iter().rev().map(|(_, p)| Task::Visit(p)));
+                }
+                Ty::Union(xs) => {
+                    tasks.push(Task::Union(xs.len()));
+                    tasks.extend(xs.iter().rev().map(Task::Visit));
+                }
+                Ty::Inter(xs) => {
+                    tasks.push(Task::Inter(xs.len()));
+                    tasks.extend(xs.iter().rev().map(Task::Visit));
+                }
+                Ty::Diff(a, hs) => {
+                    tasks.push(Task::Diff(hs.len()));
+                    tasks.extend(hs.iter().rev().map(Task::Visit));
+                    tasks.push(Task::Visit(a));
+                }
+                Ty::Both(a, b) => tasks.push(Task::Visit(if **a == Ty::Never { b } else { a })),
+            },
+            Task::Named(r, n) => {
+                let xs = results.split_off(results.len() - n);
+                results.push(ShownType::Named(r, xs));
             }
-        }
-        Ty::Con(Head::Named(r), _, args) => ShownType::Named(*r, all(args, name)),
-        Ty::Con(_, _, parts) => ShownType::Tuple(all(parts, name)),
-        Ty::Fn(f) => {
-            let params = f
-                .params
-                .iter()
-                .map(|(l, p)| (l.clone(), tree_with(p, name)))
-                .collect();
-            let ret = tree_with(&f.ret, name);
-            let err = (f.err != Ty::Never).then(|| tree_with(&f.err, name));
-            let env = (f.env != Ty::Never).then(|| tree_with(&f.env, name));
-            ShownType::Fn(Box::new(ShownFn {
-                params,
-                ret,
-                err,
-                env,
-            }))
-        }
-        Ty::Union(ms) => ShownType::Union(flat_shown(all(ms, name))),
-        Ty::Inter(ms) => ShownType::Inter(all(ms, name)),
-        Ty::Diff(a, h) => ShownType::Diff(Box::new(tree_with(a, name)), flat_shown(all(h, name))),
-        Ty::Both(a, b) => {
-            if **a == Ty::Never {
-                tree_with(b, name)
-            } else {
-                tree_with(a, name)
+            Task::Tuple(n) => {
+                let xs = results.split_off(results.len() - n);
+                results.push(ShownType::Tuple(xs));
+            }
+            Task::Fn(names, err, env) => {
+                let mut xs = results
+                    .split_off(
+                        results.len() - names.len() - 1 - usize::from(err) - usize::from(env),
+                    )
+                    .into_iter();
+                let params = names
+                    .into_iter()
+                    .map(|n| (n, xs.next().expect("shown parameter")))
+                    .collect();
+                let ret = xs.next().expect("shown return");
+                let err = if err {
+                    Some(xs.next().expect("shown error"))
+                } else {
+                    None
+                };
+                let env = if env {
+                    Some(xs.next().expect("shown environment"))
+                } else {
+                    None
+                };
+                results.push(ShownType::Fn(Box::new(ShownFn {
+                    params,
+                    ret,
+                    err,
+                    env,
+                })));
+            }
+            Task::Union(n) => {
+                let xs = results.split_off(results.len() - n);
+                results.push(ShownType::Union(flat_shown(xs)));
+            }
+            Task::Inter(n) => {
+                let xs = results.split_off(results.len() - n);
+                results.push(ShownType::Inter(xs));
+            }
+            Task::Diff(n) => {
+                let mut xs = results.split_off(results.len() - n - 1).into_iter();
+                let a = xs.next().expect("shown difference subject");
+                results.push(ShownType::Diff(Box::new(a), flat_shown(xs.collect())));
             }
         }
     }
+    assert_eq!(results.len(), 1, "shown type tree result stack");
+    results.pop().unwrap()
 }
 
 /// The text of a type (§3), with the names of the custom types `tn`.
@@ -1873,9 +1949,9 @@ pub(crate) fn show_known(s: &Solver, t: &Ty) -> String {
 
 fn flat_shown(ts: Vec<ShownType>) -> Vec<ShownType> {
     ts.into_iter()
-        .flat_map(|t| match t {
-            ShownType::Union(ms) => ms,
-            t => vec![t],
+        .flat_map(|mut t| match &mut t {
+            ShownType::Union(ms) => std::mem::take(ms),
+            _ => vec![t],
         })
         .collect()
 }
@@ -1990,6 +2066,10 @@ mod deep_walk_tests {
                 }
                 let expected = nested.clone();
                 assert_eq!(norm.norm(nested), expected);
+                let shown = tree(&expected, &mut |v| format!("V{}", v.0));
+                assert!(shown.text(&[]).contains("V0"));
+                let copied = shown.clone();
+                assert_eq!(shown, copied);
             })
             .unwrap()
             .join()
