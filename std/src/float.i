@@ -44,6 +44,9 @@
 	min_positive
 	pi
 	tau
+	sin
+	cos
+	tan
 	sign_bit
 	copy_sign
 	asin
@@ -1314,6 +1317,236 @@ hypot = (x: Float, y: Float) -> Result(Float, Nil) {
 				True  -> Error(Nil)
 				False -> Ok(factor *. root)
 			}
+		}
+	}
+}
+
+// Payne–Hanek reduction using the 4/pi digits from Go math/trig_reduce.go.
+// The arbitrary precision product retains the bits needed at every Float exponent.
+trig_reduce = (x: Float) -> (Int, Float, Float) {
+	bits = core.float_to_bits(x)
+	exponent = bits / mantissa_unit - 1023 - 52
+	mantissa = bits % mantissa_unit + mantissa_unit
+	product = mantissa *
+		1436762042799249464599471190770549237238954220229867879941249734202507677396818572841661258712197472977584340426583215490169760957443689211057306349163373844600972405389011770843781920761928525465569652634283684085946426272060692158419916259561059652236058246048249386799806649121873585408072943491027126850699742857762370245662594349139533413873096177094268384892759
+	denominator = int_power(2, 1217 - exponent)
+	n = { product + denominator / 2 } / denominator
+	rem = product - n * denominator
+	negative = rem < 0
+	magnitude = { negative } |> {
+		True  -> -rem
+		False -> rem
+	}
+	fbits = ratio_bits(magnitude, denominator) |> {
+		Ok(b)    -> b
+		Error(_) -> panic("trig: fractional reduction overflow")
+	}
+	f = core.float_from_bits(fbits)
+	// Recover the signed tail of the fraction after rounding the leading word.
+	fb = core.float_to_bits(f)
+	fe = fb / mantissa_unit - 1023 - 52
+	fm = fb % mantissa_unit + mantissa_unit
+	shift = 1217 - exponent + fe
+	represented = { shift >= 0 } |> {
+		True  -> fm * int_power(2, shift)
+		False -> fm / int_power(2, -shift)
+	}
+	tail = magnitude - represented
+	tail_negative = tail < 0
+	tail_magnitude = { tail_negative } |> {
+		True  -> -tail
+		False -> tail
+	}
+	ft = { tail_magnitude == 0 } |> {
+		True -> 0.0
+		False -> {
+			tb = ratio_bits(tail_magnitude, denominator) |> {
+				Ok(b)    -> b
+				Error(_) -> panic("trig: tail overflow")
+			}
+			core.float_from_bits(tb)
+		}
+	}
+	ft = { tail_negative } |> {
+		True  -> -.ft
+		False -> ft
+	}
+	f = { negative } |> {
+		True  -> -.f
+		False -> f
+	}
+	ft = { negative } |> {
+		True  -> -.ft
+		False -> ft
+	}
+	hi = f *. 1.5707963267948966
+	fh = without_low(f)
+	fl = f -. fh
+	lo = { fh *. 1.5707963267341256 -. hi } +.
+		fl *. 1.5707963267341256 +.
+		f *. 6.077100506506192e-11 +.
+		ft *. 1.5707963267948966
+	(n % 4, hi, lo)
+}
+
+// SunPro fdlibm kernels, via musl __sin.c and __cos.c.
+trig_sin = (x: Float, y: Float) -> Float {
+	z = x *. x
+	w = z *. z
+	r = 8.33333333332248946124e-3 +.
+		z *. {
+			-.1.98412698298579493134e-4 +. z *. 2.75573137070700676789e-6
+		} +.
+		z *. w *. {
+			-.2.50507602534068634195e-8 +. z *. 1.58969099521155010221e-10
+		}
+	v = z *. x
+	x -. {
+		z *. { 0.5 *. y -. v *. r } -. y -. v *. -.1.66666666666666324348e-1
+	}
+}
+
+trig_cos = (x: Float, y: Float) -> Float {
+	z = x *. x
+	w = z *. z
+	r = z *. {
+		4.16666666666666019037e-2 +. z *. {
+			-.1.38888888888741095749e-3 +. z *. 2.48015872894767294178e-5
+		}
+	} +.
+		w *. w *. {
+			-.2.75573143513906633035e-7 +. z *. {
+				2.08757232129817482790e-9 +. z *. -.1.13596475577881948265e-11
+			}
+		}
+	hz = 0.5 *. z
+	a = 1.0 -. hz
+	a +. { { 1.0 -. a -. hz } +. { z *. r -. x *. y } }
+}
+
+/// Sine of an angle in radians.
+sin = (x: Float) -> Float {
+	a = abs(x)
+	{ a <. 0.7853981633974483 } |> {
+		True -> { a <. 1.4901161193847656e-8 } |> {
+			True  -> x
+			False -> trig_sin(x, 0.0)
+		}
+		False -> {
+			(n, hi, lo) = trig_reduce(a)
+			v = n |> {
+				0 -> trig_sin(hi, lo)
+				1 -> trig_cos(hi, lo)
+				2 -> -.trig_sin(hi, lo)
+				_ -> -.trig_cos(hi, lo)
+			}
+			{ sign_bit(x) } |> {
+				True  -> -.v
+				False -> v
+			}
+		}
+	}
+}
+
+/// Cosine of an angle in radians.
+cos = (x: Float) -> Float {
+	a = abs(x)
+	{ a <. 0.7853981633974483 } |> {
+		True -> trig_cos(a, 0.0)
+		False -> {
+			(n, hi, lo) = trig_reduce(a)
+			n |> {
+				0 -> trig_cos(hi, lo)
+				1 -> -.trig_sin(hi, lo)
+				2 -> -.trig_cos(hi, lo)
+				_ -> trig_sin(hi, lo)
+			}
+		}
+	}
+}
+
+// SunPro fdlibm tangent kernel, via musl __tan.c.
+trig_tan = (input: Float, tail: Float, odd: Bool) -> Float {
+	big = abs(input) >=. 0.6744
+	negative = sign_bit(input)
+	(x, y) = { big } |> {
+		True -> {
+			a = abs(input)
+			b = { negative } |> {
+				True  -> -.tail
+				False -> tail
+			}
+			(0.7853981633974483 -. a +. { 3.061616997868383e-17 -. b }, 0.0)
+		}
+		False -> (input, tail)
+	}
+	z = x *. x
+	w = z *. z
+	r = 1.33333333333201242699e-1 +. w *. {
+		2.18694882948595424599e-2 +. w *. {
+			3.59207910759131235356e-3 +. w *. {
+				5.88041240820264096874e-4 +. w *. {
+					7.81794442939557092300e-5 +.
+						w *. -.1.85586374855275456654e-5
+				}
+			}
+		}
+	}
+	v = z *. {
+		5.39682539762260521377e-2 +. w *. {
+			8.86323982359930005737e-3 +. w *. {
+				1.45620945432529025516e-3 +. w *. {
+					2.46463134818469906812e-4 +. w *. {
+						7.14072491382608190305e-5 +.
+							w *. 2.59073051863633712884e-5
+					}
+				}
+			}
+		}
+	}
+	s = z *. x
+	r = y +. z *. { s *. { r +. v } +. y } +. s *. 3.33333333333334091986e-1
+	w = x +. r
+	{ big } |> {
+		True -> {
+			s = { odd } |> {
+				True  -> -.1.0
+				False -> 1.0
+			}
+			v = s -. 2.0 *. { x +. { r -. w *. w /. { w +. s } } }
+			{ negative } |> {
+				True  -> -.v
+				False -> v
+			}
+		}
+		False -> { odd } |> {
+			False -> w
+			True -> {
+				w0 = without_low(w)
+				v = r -. { w0 -. x }
+				a = -.1.0 /. w
+				a0 = without_low(a)
+				a0 +. a *. { 1.0 +. a0 *. w0 +. a0 *. v }
+			}
+		}
+	}
+}
+
+/// Tangent of an angle in radians.
+tan = (x: Float) -> Result(Float, Nil) {
+	a = abs(x)
+	{ a <. 0.7853981633974483 } |> {
+		True -> { a <. 1.4901161193847656e-8 } |> {
+			True  -> Ok(x)
+			False -> Ok(trig_tan(x, 0.0, False))
+		}
+		False -> {
+			(n, hi, lo) = trig_reduce(a)
+			v = trig_tan(hi, lo, n % 2 == 1)
+			Ok({ sign_bit(x) } |> {
+				True  -> -.v
+				False -> v
+			})
 		}
 	}
 }

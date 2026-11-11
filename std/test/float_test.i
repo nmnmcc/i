@@ -2305,3 +2305,486 @@ copy_sign_reference_11_test = () {
 	)
 	Nil
 }
+
+@test
+sin_reference_0_test = () {
+	actual = float.sin(-.1000.0)
+	expected = -.0.8268795405320025
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_1_test = () {
+	actual = float.sin(-.10.0)
+	expected = 0.5440211108893698
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_2_test = () {
+	actual = float.sin(-.3.0)
+	expected = -.0.1411200080598672
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_3_test = () {
+	actual = float.sin(-.1.0)
+	expected = -.0.8414709848078965
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_4_test = () {
+	actual = float.sin(-.0.75)
+	expected = -.0.6816387600233341
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_5_test = () {
+	actual = float.sin(-.0.5)
+	expected = -.0.479425538604203
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_6_test = () {
+	actual = float.sin(-.0.1)
+	expected = -.0.09983341664682815
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_7_test = () {
+	actual = float.sin(0.0)
+	expected = 0.0
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_8_test = () {
+	actual = float.sin(0.1)
+	expected = 0.09983341664682815
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_9_test = () {
+	actual = float.sin(0.5)
+	expected = 0.479425538604203
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_10_test = () {
+	actual = float.sin(0.75)
+	expected = 0.6816387600233341
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_11_test = () {
+	actual = float.sin(1.0)
+	expected = 0.8414709848078965
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_12_test = () {
+	actual = float.sin(3.0)
+	expected = 0.1411200080598672
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_13_test = () {
+	actual = float.sin(10.0)
+	expected = -.0.5440211108893698
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_14_test = () {
+	actual = float.sin(1000.0)
+	expected = 0.8268795405320025
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_15_test = () {
+	actual = float.sin(1.0e22)
+	expected = -.0.8522008497671888
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+sin_reference_16_test = () {
+	actual = float.sin(1.0e300)
+	expected = -.0.8178819121159085
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_0_test = () {
+	actual = float.cos(-.1000.0)
+	expected = 0.5623790762907029
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_1_test = () {
+	actual = float.cos(-.10.0)
+	expected = -.0.8390715290764524
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_2_test = () {
+	actual = float.cos(-.3.0)
+	expected = -.0.9899924966004454
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_3_test = () {
+	actual = float.cos(-.1.0)
+	expected = 0.5403023058681398
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_4_test = () {
+	actual = float.cos(-.0.75)
+	expected = 0.7316888688738209
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_5_test = () {
+	actual = float.cos(-.0.5)
+	expected = 0.8775825618903728
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_6_test = () {
+	actual = float.cos(-.0.1)
+	expected = 0.9950041652780258
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_7_test = () {
+	actual = float.cos(0.0)
+	expected = 1.0
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_8_test = () {
+	actual = float.cos(0.1)
+	expected = 0.9950041652780258
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_9_test = () {
+	actual = float.cos(0.5)
+	expected = 0.8775825618903728
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_10_test = () {
+	actual = float.cos(0.75)
+	expected = 0.7316888688738209
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_11_test = () {
+	actual = float.cos(1.0)
+	expected = 0.5403023058681398
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_12_test = () {
+	actual = float.cos(3.0)
+	expected = -.0.9899924966004454
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_13_test = () {
+	actual = float.cos(10.0)
+	expected = -.0.8390715290764524
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_14_test = () {
+	actual = float.cos(1000.0)
+	expected = 0.5623790762907029
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_15_test = () {
+	actual = float.cos(1.0e22)
+	expected = 0.523214785395139
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+cos_reference_16_test = () {
+	actual = float.cos(1.0e300)
+	expected = -.0.5753861119575491
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_0_test = () {
+	Ok(actual) = float.tan(-.1000.0)
+	expected = -.1.4703241557027185
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_1_test = () {
+	Ok(actual) = float.tan(-.10.0)
+	expected = -.0.6483608274590866
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_2_test = () {
+	Ok(actual) = float.tan(-.3.0)
+	expected = 0.1425465430742778
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_3_test = () {
+	Ok(actual) = float.tan(-.1.0)
+	expected = -.1.5574077246549023
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_4_test = () {
+	Ok(actual) = float.tan(-.0.75)
+	expected = -.0.9315964599440725
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_5_test = () {
+	Ok(actual) = float.tan(-.0.5)
+	expected = -.0.5463024898437905
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_6_test = () {
+	Ok(actual) = float.tan(-.0.1)
+	expected = -.0.10033467208545055
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_7_test = () {
+	Ok(actual) = float.tan(0.0)
+	expected = 0.0
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_8_test = () {
+	Ok(actual) = float.tan(0.1)
+	expected = 0.10033467208545055
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_9_test = () {
+	Ok(actual) = float.tan(0.5)
+	expected = 0.5463024898437905
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_10_test = () {
+	Ok(actual) = float.tan(0.75)
+	expected = 0.9315964599440725
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_11_test = () {
+	Ok(actual) = float.tan(1.0)
+	expected = 1.5574077246549023
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_12_test = () {
+	Ok(actual) = float.tan(3.0)
+	expected = -.0.1425465430742778
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_13_test = () {
+	Ok(actual) = float.tan(10.0)
+	expected = 0.6483608274590866
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_14_test = () {
+	Ok(actual) = float.tan(1000.0)
+	expected = 1.4703241557027185
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_15_test = () {
+	Ok(actual) = float.tan(1.0e22)
+	expected = -.1.6287782256068988
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+tan_reference_16_test = () {
+	Ok(actual) = float.tan(1.0e300)
+	expected = 1.4214488238747245
+	a = core.float_to_bits(actual)
+	b = core.float_to_bits(expected)
+	assert(a >= b - 1 && a <= b + 1)
+}
+
+@test
+trig_special_values_test = () {
+	negative_zero = core.float_from_bits(9223372036854775808)
+	assert(core.float_to_bits(float.sin(negative_zero)) == 9223372036854775808)
+	assert(float.cos(negative_zero) == 1.0)
+	Ok(t) = float.tan(negative_zero)
+	assert(core.float_to_bits(t) == 9223372036854775808)
+	assert(float.sin(float.min_positive) == float.min_positive)
+	assert(float.tan(float.min_positive) == Ok(float.min_positive))
+	assert(float.cos(float.min_positive) == 1.0)
+}
+
+@test
+sin_odd_property = () {
+	Ok(gen) = property.int(1, 100000)
+	property.test(gen, property.Config(789, 100, 30, 0, 100), (value) {
+		x = core.to_float(value) /. 100.0
+		assert(
+			core.float_to_bits(float.sin(-.x)) ==
+				core.float_to_bits(-.float.sin(x))
+		)
+	}, core.inspect)
+}
