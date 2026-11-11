@@ -506,9 +506,9 @@ Value 7. Changing the body to `copy = key` then `record.get(r, copy)` is E0541. 
 **T-E: records do not acquire runtime field tests (J5).**
 
 ```i
-bad = (r: { a: Int | String }) {
+bad = (r: (a: Int | String)) {
   r |> {
-    x: { a: Int } -> x.a + 1
+    x: { (a: Int) } -> x.a + 1
     _ -> 0
   }
 }

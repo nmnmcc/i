@@ -7,7 +7,7 @@ Status: revised design for G2/G3, not an implemented feature. The coordinator ac
 A library should be able to build a value and let its caller name a part of its type:
 
 ```i
-user = object | field("name", string) | field("age", int)
+user = object |> field("name", string) |> field("age", int)
 Schema(User, _) = user
 ```
 
@@ -233,7 +233,7 @@ T3 must add closure, provenance and inferred-shape arms for records/Without, rer
 ((Schema, object, field, string, int) = json/schema)
 (User, user)
 
-user = object | field("name", string) | field("age", int)
+user = object |> field("name", string) |> field("age", int)
 Schema(User, _) = user
 ```
 
@@ -253,7 +253,7 @@ The accepted records.md §5.9 codec follows exactly the same placement, with Cod
 ((Codec, object, field, string, int) = json/codec)
 (User, user)
 
-user = object | field("name", string) | field("age", int)
+user = object |> field("name", string) |> field("age", int)
 Codec(User, _) = user
 ```
 

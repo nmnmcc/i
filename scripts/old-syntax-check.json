@@ -1065,12 +1065,6 @@
       "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
     ]
   },
-  "docs/performance.md:8e227b17f1c348e4": {
-    "reason": "Illustrative source fragment with an ellipsis, not a complete module",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `..`"
-    ]
-  },
   "crates/ilang-package/tests/manifest.rs:ad4393882ff472b2": {
     "not_source": "TOML dependency-name test template"
   },
@@ -1646,24 +1640,6 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "docs/design/value-types.md:cd793efc6bbea663": {
-    "track": "SYN2",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
-    ]
-  },
-  "docs/design/value-types.md:2a891253712a65e9": {
-    "track": "SYN2",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
-    ]
-  },
-  "docs/design/value-types.md:7a05cba0bf09561a": {
-    "track": "SYN2",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
     ]
   },
   "crates/ilang-package/tests/manifest.rs:ef830fe8a6451ed0": {
