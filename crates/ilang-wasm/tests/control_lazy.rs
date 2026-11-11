@@ -88,7 +88,7 @@ nested = () {
   })
 }
 
-@main
+
 main = () {
   ! Name = Name("main")
   ! Tag = Tag("main")
@@ -440,7 +440,7 @@ paused = () {
 const MAIN_OUT: &str = r#"
 // The resumed final function ends, and the `$cancel` of `k` goes out of
 // the resume, which nothing takes.
-@main
+
 main = () {
   // The computations need `Out`. This one is never called.
   ! Out = Out((k2) { Nil })
@@ -487,7 +487,7 @@ o1 = (b3, k2) { keep(resource.ensure(() { h(b3, k2) }, () { panic("final") })) }
 /// The entry of tests 13 and 15.
 const MAIN_THIRD: &str = r#"// k2 is resumed from frames that a resume of k3 entered, while the outer
 // frame of k3 waits.
-@main
+
 main = () {
   // The computations need `Out`. This one is never called.
   ! Out = Out((k2) { Nil })
@@ -523,7 +523,7 @@ h_tail = (b) {
   g(b)
 }
 
-@main
+
 main = () {
   ! Name = Name("start")
   k = { control.boundary((b) {
@@ -561,7 +561,7 @@ h_tail = (b) {
   g(b)
 }
 
-@main
+
 main = () {
   ! Name = Name("start")
   k = { control.boundary((b) {
@@ -604,7 +604,7 @@ body = (outer) {
   Done
 }
 
-@main
+
 main = (io ! Io) {
   k = { control.boundary((outer) { body(outer) }) } |> {
     Paused(k) -> k
@@ -650,7 +650,7 @@ with = (hold, k) {
   control.cancel(k)
 }
 
-@main
+
 main = (io ! Io) {
   k = paused()
   r = fail.catch(() {
@@ -837,9 +837,9 @@ fn bench_source(depth: u32, rounds: u32, capture_only: bool) -> String {
             &(u64::from(rounds) * u64::from(rounds + 1) / 2).to_string(),
         );
     let main = if capture_only {
-        "\n@main\nmain = () { control.boundary((b) { down(b, DEPTH) })  Nil }\n"
+        "\n\nmain = () { control.boundary((b) { down(b, DEPTH) })  Nil }\n"
     } else {
-        "\n@main\nmain = () { run(DEPTH) }\n"
+        "\n\nmain = () { run(DEPTH) }\n"
     }
     .replace("DEPTH", &depth.to_string());
     format!("{source}{main}")
@@ -1046,7 +1046,7 @@ drive = (step, count, sum, want) {
     More(v, k) -> { check(v == want)  drive(control.resume(k, Nil), count + 1, sum + v, next(want)) }
   }
 }
-@main
+
 main = () { drive(control.boundary((b) { walk(b, TreeDepth)  Done }), 0, 0, 0) }
 "#
     .replace("TreeCount", &(2 * depth + 1).to_string())
@@ -1093,11 +1093,11 @@ fn recursion_source(paused: bool) -> String {
     let recurse = "rec = (n, body) { n |> { 0 -> body()  _ -> rec(n - 1, body) + 1 } }";
     let main = if paused {
         "done = { Done(n) -> n  _ -> panic(\"not done\") }\n\
-         @main\nmain = () {\n\
+         \nmain = () {\n\
          k = control.boundary((b) { down(b, 50_000) }) |> { More(_, k) -> k  _ -> panic(\"not paused\") }\n\
          check(rec(50_000, () { done(control.resume(k, Nil)) }) == 100_000, \"recursion lost a frame\")\n}"
     } else {
-        "@main\nmain = () { check(rec(50_000, () { 0 }) == 50_000, \"recursion lost a frame\") }"
+        "\nmain = () { check(rec(50_000, () { 0 }) == 50_000, \"recursion lost a frame\") }"
     };
     format!("{source}\n{recurse}\n{main}\n")
 }
@@ -1138,7 +1138,7 @@ inside = (b) {
 }
 run = (b) { x = inside(b)  Done(x <> "/" <> name()) }
 check = (ok) { ok |> { True -> Nil  False -> panic("resume environment") } }
-@main
+
 main = () {
   ! Name = Name("start")
   k = control.boundary((b) { run(b) }) |> { More(_, k) -> k  _ -> panic("not paused") }
@@ -1176,7 +1176,7 @@ layer = (b, n) {
 next = (step, want) {
   step |> { More(s, k) -> { check(s == want)  k }  Done -> panic("not paused") }
 }
-@main
+
 main = () {
   text = control.boundary((log) {
     k = next(control.boundary((b) {
