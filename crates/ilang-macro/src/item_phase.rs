@@ -207,16 +207,13 @@ impl BodyEngine<'_> {
                     &mac.definition.name,
                 );
                 reject_macro_definitions(&items)?;
-                if !is_type && !item.doc.is_empty() {
-                    if let Some(first) = items.iter_mut().find(|out| {
-                        item_names(out)
-                            .iter()
-                            .any(|name| original_names.contains(name))
-                    }) {
-                        if first.doc.is_empty() {
-                            first.doc.clone_from(&item.doc);
-                        }
-                    }
+                if !is_type && !item.doc.is_empty()
+                    && let Some(first) = items.iter_mut().find(|out| {
+                        item_names(out).iter().any(|name| original_names.contains(name))
+                    })
+                    && first.doc.is_empty()
+                {
+                    first.doc.clone_from(&item.doc);
                 }
                 let retained = if is_type {
                     let root_span = self.item_root(&item).1;
@@ -419,8 +416,8 @@ pub enum PhaseError {
     Waiting(Vec<Syntax>),
     Changed {
         query: Syntax,
-        before: DefinitionIdentity,
-        after: Option<DefinitionIdentity>,
+        before: Box<DefinitionIdentity>,
+        after: Option<Box<DefinitionIdentity>>,
     },
 }
 
@@ -741,8 +738,8 @@ fn expand_items_inner(
             engine.phase_notes.retain(|note| note.mark != audit.mark);
             return Err(PhaseError::Changed {
                 query: audit.result,
-                before: audit.identity,
-                after,
+                before: Box::new(audit.identity),
+                after: after.map(Box::new),
             });
         }
     }
