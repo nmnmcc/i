@@ -529,7 +529,10 @@ impl Printer {
     /// more than that is needed.
     fn expr(&mut self, e: &Expr, min: u8) {
         let lvl = level(e);
-        if lvl < min || self.explicit && min > 0 && lvl < 10 {
+        if lvl < min
+            || self.explicit && min > 0 && lvl < 10
+            || matches!(e.kind, ExprKind::Case { .. }) && min > 6
+        {
             self.w("{ ");
             self.expr_raw(e);
             self.w(" }");

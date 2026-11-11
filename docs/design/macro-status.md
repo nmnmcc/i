@@ -29,3 +29,6 @@ step 2 exception for nesting and stack-limit tests:
 - `ilang-cli/tests/macro_run.rs::cli_checks_deep_syntax_constructed_by_a_macro` (10,000 nested macro-generated nodes)
 - `ilang-syntax/src/shape.rs::transparent_groups_compare_without_recursive_stack_or_quadratic_copying` (10,000 groups on a 256 KiB stack)
 - `ilang-syntax/tests/lisp_deep.rs::deep_structural_records_clone_compare_normalize_and_drop` (10,000 records on a 256 KiB stack)
+- `ilang-syntax/tests/lisp_encode_deep.rs::deeply_nested_records_encode_on_small_stack` (10,000 records on a 256 KiB stack)
+- `ilang-syntax/tests/lisp_syntax.rs::show_as_deep_expression_uses_bounded_host_stack` (10,000 calls on a 256 KiB stack)
+- `ilang-syntax/tests/lisp_syntax.rs::show_as_deep_mixed_blocks_use_bounded_host_stack` (10,000 nested blocks on a 256 KiB stack)

@@ -160,16 +160,24 @@ pub fn source_definition_from_syntax(
                 | TypeKind::Union(args)
                 | TypeKind::Inter(args)
                 | TypeKind::Diff(args) => pending.extend(args.iter().rev()),
-                TypeKind::Record { base, fields, removed } => {
+                TypeKind::Record {
+                    base,
+                    fields,
+                    removed,
+                } => {
                     pending.extend(base.iter().map(Box::as_ref));
                     for (label, ty) in fields {
-                        if label.parameter && let Some(&id) = parameters.get(label.name.as_str()) {
+                        if label.parameter
+                            && let Some(&id) = parameters.get(label.name.as_str())
+                        {
                             sites.insert((label.span, label.name.clone()), id);
                         }
                         pending.push(ty);
                     }
                     for label in removed {
-                        if label.parameter && let Some(&id) = parameters.get(label.name.as_str()) {
+                        if label.parameter
+                            && let Some(&id) = parameters.get(label.name.as_str())
+                        {
                             sites.insert((label.span, label.name.clone()), id);
                         }
                     }
@@ -488,7 +496,9 @@ pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
                     pending.push(Task::Finish(
                         node,
                         children.len(),
-                        matches!(node.node(), Node::Curly(xs) if xs.len() == 1),
+                        matches!(node.node(), Node::Curly(xs) if xs.len() == 1
+                            && !matches!(xs[0].node(), Node::Round(parts)
+                                if matches!(parts.first().map(|part| part.node()), Some(Node::Symbol(head)) if head == ":" || head == "-"))),
                     ));
                     pending.extend(children.iter().rev().map(Task::Enter));
                 }
