@@ -263,13 +263,19 @@ fn record_kinds() {
     for (reenter, kind) in [
         ("$catch_reenter", 4),
         ("$ensure_reenter", 2),
-        ("$final_reenter", 5),
+        // Bit 5 marks finalizer re-entry for cancellation shielding; Wasm's
+        // i32 shift uses the low five bits, so it dispatches like kind 5.
+        ("$final_reenter", 37),
+        ("$wait_requests_reenter", 5),
     ] {
         let made = all(&text, &format!("(struct.new $frame (ref.func {reenter})"));
         assert_eq!(made.len(), 1, "{reenter}");
         let r = items(made[0]);
         assert_eq!(r[4], "(i32.const -1)", "{r:?}");
         assert_eq!(r[5], format!("(i32.const {kind})"), "{r:?}");
+    }
+    for name in ["$sub_has_final", "$stamp_finalizing"] {
+        assert!(func(&text, name).contains("(i32.const 37)"));
     }
     let pack = func(&text, "$capture_pack");
     assert!(pack.contains("(i32.const -1) (i32.const 3)"), "{pack}");

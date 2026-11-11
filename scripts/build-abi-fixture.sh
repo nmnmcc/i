@@ -49,3 +49,20 @@ else
   cargo run --quiet -p ilang-cli -- build --project "$fixture_dir/compiled" --out "$fixture_dir/compiled.wasm"
 fi
 "$wasm_tools" validate "$fixture_dir/compiled.wasm"
+
+# Structured concurrency runs on the identical O0/O2 artifacts in both JS hosts.
+for level in 0 2; do
+  if [ -n "${I:-}" ]; then
+    "$I" build --project "$fixture_dir/r2" --opt "$level" --out "$fixture_dir/r2-o$level.wasm"
+  else
+    cargo run --quiet -p ilang-cli -- build --project "$fixture_dir/r2" --opt "$level" --out "$fixture_dir/r2-o$level.wasm"
+  fi
+  "$wasm_tools" validate "$fixture_dir/r2-o$level.wasm"
+done
+
+# Compile the hand-authored task/request runtime cases into shared O0/O2
+# conformance modules. Expectations are copied from their source headers.
+R2_FIXTURE_DUMP="$fixture_dir/r2-laws" cargo test --quiet -p ilang-cli --test r2_fixtures --locked -- generate_conformance_fixtures
+for level in 0 2; do
+  "$wasm_tools" validate "$fixture_dir/r2-laws/laws-o$level.wasm"
+done
