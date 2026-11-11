@@ -46,6 +46,13 @@
 	tau
 	sign_bit
 	copy_sign
+	asin
+	acos
+	atan
+	atan2
+	hypot
+	radians
+	degrees
 )
 
 /// The greatest finite Float, about `1.8e308`.
@@ -982,6 +989,330 @@ pow_exp2 = (
 				t1 = exp_polynomial(z)
 				r = z *. t1 /. { t1 -. 2.0 } -. { w +. z *. w }
 				Ok(direction *. scale(1.0 -. { r -. z }, n))
+			}
+		}
+	}
+}
+
+// The rational approximation and argument reduction are from FreeBSD msun
+// e_asin.c and e_acos.c, developed at SunPro, Sun Microsystems, Inc.
+// Copyright (C) 1993 Sun Microsystems, Inc. Permission to use, copy,
+// modify and distribute is freely granted provided this notice is preserved.
+asin_ratio = (z: Float) -> Float {
+	p = z *. {
+		0.166666666666666657415 +. z *. {
+			-.0.325565818622400915405 +. z *. {
+				0.201212532134862925881 +. z *. {
+					-.0.0400555345006794114027 +. z *. {
+						0.000791534994289814532176 +.
+							z *. 0.0000347933107596021167570
+					}
+				}
+			}
+		}
+	}
+	q = 1.0 +. z *. {
+		-.2.40339491173441421878 +. z *. {
+			2.02094576023350569471 +. z *. {
+				-.0.688283971605453293030 +. z *. 0.0770381505559019352791
+			}
+		}
+	}
+	p /. q
+}
+
+/// The arcsine in radians; inputs outside [-1, 1] give Error(Nil).
+asin = (x: Float) -> Result(Float, Nil) {
+	a = abs(x)
+	{ a >. 1.0 } |> {
+		True -> Error(Nil)
+		False -> {
+			{ a == 1.0 } |> {
+				True -> Ok(copy_sign(1.5707963267948966, x))
+				False -> {
+					{ a <. 0.5 } |> {
+						True -> {
+							{ a <. 1.4901161193847656e-8 } |> {
+								True  -> Ok(x)
+								False -> Ok(x +. x *. asin_ratio(x *. x))
+							}
+						}
+						False -> {
+							z = { 1.0 -. a } *. 0.5
+							s = core.sqrt(z)
+							r = asin_ratio(z)
+							value = { a >=. 0.975 } |> {
+								True -> 1.5707963267948966 -. {
+									2.0 *. { s +. s *. r } -.
+										6.123233995736766e-17
+								}
+								False -> {
+									f = core.float_from_bits(
+										core.float_to_bits(s) /
+											4294967296 *
+											4294967296
+									)
+									c = { z -. f *. f } /. { s +. f }
+									0.7853981633974483 -. {
+										2.0 *. s *. r -.
+											{
+												6.123233995736766e-17 -.
+													2.0 *. c
+											} -.
+											{ 0.7853981633974483 -. 2.0 *. f }
+									}
+								}
+							}
+							Ok(copy_sign(value, x))
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+/// The arccosine in radians; inputs outside [-1, 1] give Error(Nil).
+acos = (x: Float) -> Result(Float, Nil) {
+	a = abs(x)
+	{ a >. 1.0 } |> {
+		True -> Error(Nil)
+		False -> {
+			{ a == 1.0 } |> {
+				True -> {
+					{ x <. 0.0 } |> {
+						True  -> Ok(pi)
+						False -> Ok(0.0)
+					}
+				}
+				False -> {
+					{ a <. 0.5 } |> {
+						True -> {
+							{ a <. 6.938893903907228e-18 } |> {
+								True -> Ok(1.5707963267948966)
+								False -> Ok(1.5707963267948966 -. {
+									x -. {
+										6.123233995736766e-17 -.
+											x *. asin_ratio(x *. x)
+									}
+								})
+							}
+						}
+						False -> {
+							{ x <. 0.0 } |> {
+								True -> {
+									z = { 1.0 +. x } *. 0.5
+									s = core.sqrt(z)
+									Ok(2.0 *. {
+										1.5707963267948966 -. {
+											s +. {
+												asin_ratio(z) *. s -.
+													6.123233995736766e-17
+											}
+										}
+									})
+								}
+								False -> {
+									z = { 1.0 -. x } *. 0.5
+									s = core.sqrt(z)
+									f = core.float_from_bits(
+										core.float_to_bits(s) /
+											4294967296 *
+											4294967296
+									)
+									c = { z -. f *. f } /. { s +. f }
+									Ok(2.0 *. {
+										f +. { asin_ratio(z) *. s +. c }
+									})
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// FreeBSD msun s_atan.c and e_atan2.c, with the SunPro notice above.
+atan_kernel = (x: Float, hi: Float, lo: Float, reduced: Bool) -> Float {
+	z = x *. x
+	w = z *. z
+	s1 = z *. {
+		0.333333333333329318027 +. w *. {
+			0.142857142725034663711 +. w *. {
+				0.0909088713343650656196 +. w *. {
+					0.0666107313738753120669 +. w *. {
+						0.0497687799461593236017 +.
+							w *. 0.0162858201153657823623
+					}
+				}
+			}
+		}
+	}
+	s2 = w *. {
+		-.0.199999999998764832476 +. w *. {
+			-.0.111111104054623557880 +. w *. {
+				-.0.0769187620504482999495 +. w *. {
+					-.0.0583357013379057348645 +.
+						w *. -.0.0365315727442169155270
+				}
+			}
+		}
+	}
+	{ reduced } |> {
+		True  -> hi -. { x *. { s1 +. s2 } -. lo -. x }
+		False -> x -. x *. { s1 +. s2 }
+	}
+}
+
+/// Arctangent in radians.
+atan = (x: Float) -> Float {
+	a = abs(x)
+	{ a <. 7.450580596923828e-9 } |> {
+		True -> x
+		False -> {
+			{ a <. 0.4375 } |> {
+				True -> atan_kernel(x, 0.0, 0.0, False)
+				False -> {
+					value = { a <. 0.6875 } |> {
+						True -> atan_kernel(
+							{ 2.0 *. a -. 1.0 } /. { 2.0 +. a }
+							0.4636476090008061
+							2.2698777452961687e-17
+							True
+						)
+						False -> {
+							{ a <. 1.1875 } |> {
+								True -> atan_kernel(
+									{ a -. 1.0 } /. { a +. 1.0 }
+									0.7853981633974483
+									3.061616997868383e-17
+									True
+								)
+								False -> {
+									{ a <. 2.4375 } |> {
+										True -> atan_kernel(
+											{ a -. 1.5 } /. { 1.0 +. 1.5 *. a }
+											0.982793723247329
+											1.3903311031230998e-17
+											True
+										)
+										False -> {
+											{
+												a >=. 73786976294838206464.0
+											} |> {
+												True -> 1.5707963267948966
+												False -> atan_kernel(
+													-.1.0 /. a
+													1.5707963267948966
+													6.123233995736766e-17
+													True
+												)
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+					copy_sign(value, x)
+				}
+			}
+		}
+	}
+}
+
+/// The angle of (x, y), in radians, with the sign of y.
+atan2 = (y: Float, x: Float) -> Float {
+	{ y == 0.0 } |> {
+		True -> {
+			{ sign_bit(x) } |> {
+				True  -> copy_sign(pi, y)
+				False -> y
+			}
+		}
+		False -> {
+			{ x == 0.0 } |> {
+				True -> copy_sign(1.5707963267948966, y)
+				False -> {
+					ax = abs(x)
+					ay = abs(y)
+					ex = core.float_to_bits(ax) / 4503599627370496
+					ey = core.float_to_bits(ay) / 4503599627370496
+					z = { ey > ex + 64 } |> {
+						True -> 1.5707963267948966
+						False -> {
+							{ sign_bit(x) && ex > ey + 64 } |> {
+								True  -> 0.0
+								False -> atan(ay /. ax)
+							}
+						}
+					}
+					result = { sign_bit(x) } |> {
+						True  -> pi -. { z -. 1.2246467991473532e-16 }
+						False -> z
+					}
+					copy_sign(result, y)
+				}
+			}
+		}
+	}
+}
+
+/// Convert degrees to radians.
+radians = (degrees: Float) -> Float { degrees *. 0.017453292519943295 }
+
+/// Convert radians to degrees, returning an error if the result overflows.
+degrees = (radians: Float) -> Result(Float, Nil) {
+	{ abs(radians) >. 3.1375664143845866e306 } |> {
+		True  -> Error(Nil)
+		False -> Ok(radians *. 57.29577951308232)
+	}
+}
+
+// Compensated squares and scaling from FreeBSD msun hypot.c.
+hypot_square = (x: Float) -> (Float, Float) {
+	xc = x *. 134217729.0
+	xh = x -. xc +. xc
+	xl = x -. xh
+	hi = x *. x
+	lo = xh *. xh -. hi +. 2.0 *. xh *. xl +. xl *. xl
+	(hi, lo)
+}
+
+/// The Euclidean length of (x, y), returning an error on overflow.
+hypot = (x: Float, y: Float) -> Result(Float, Nil) {
+	a = max(abs(x), abs(y))
+	b = min(abs(x), abs(y))
+	ex = core.float_to_bits(a) / mantissa_unit
+	ey = core.float_to_bits(b) / mantissa_unit
+	{ b == 0.0 || ex - ey > 64 } |> {
+		True -> Ok(a)
+		False -> {
+			(sx, sy, factor) = { ex > 1533 } |> {
+				True -> (
+					a *. 1.90109156629516e-211
+					b *. 1.90109156629516e-211
+					5.260135901548374e210
+				)
+				False -> {
+					{ ey < 573 } |> {
+						True -> (
+							a *. 5.260135901548374e210
+							b *. 5.260135901548374e210
+							1.90109156629516e-211
+						)
+						False -> (a, b, 1.0)
+					}
+				}
+			}
+			(hx, lx) = hypot_square(sx)
+			(hy, ly) = hypot_square(sy)
+			root = core.sqrt(ly +. lx +. hy +. hx)
+			{ factor >. 1.0 && root >. max_finite /. factor } |> {
+				True  -> Error(Nil)
+				False -> Ok(factor *. root)
 			}
 		}
 	}
