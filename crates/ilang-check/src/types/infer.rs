@@ -39,6 +39,53 @@ pub(super) fn type_names(p: &Program, m: ModuleId) -> Vec<String> {
         .collect()
 }
 
+struct PendingCall<'a> {
+    callee: &'a Expr,
+    first: Option<&'a Expr>,
+    span: Span,
+    function: Ty,
+    known_function: Option<FnTy>,
+    bool_pipe: bool,
+    diagnostic_start: usize,
+    placement: Option<Vec<usize>>,
+    params: Option<Vec<Ty>>,
+    arguments: Vec<&'a Expr>,
+    typed: Vec<Option<(Ty, Ty)>>,
+    sigma: known::Sigma,
+    hidden: Vec<super::V>,
+    later: bool,
+    index: usize,
+}
+
+struct PendingUpdate<'a> {
+    ctor: CtorRef,
+    base: &'a Expr,
+    fields: &'a [(Ident, Expr)],
+    new: Vec<Ty>,
+    old_fields: Vec<(Option<String>, Ty)>,
+    new_fields: Vec<(Option<String>, Ty)>,
+    given: Vec<Option<Ty>>,
+    base_known: Ty,
+    index: usize,
+}
+
+struct PendingBinding<'a> {
+    binding: &'a Binding,
+    mark: (usize, usize),
+    direct: bool,
+    binders: Vec<VarId>,
+    holders: Vec<(VarId, Ty)>,
+}
+
+struct PendingFunction<'a> {
+    function: &'a Function,
+    expected: Vec<Ty>,
+    params: Vec<(Option<String>, Ty)>,
+    env_types: Vec<Ty>,
+    fails: bool,
+    written_return: Option<(Ty, Ty, Ty)>,
+}
+
 /// `∀ (variables deeper than level). ty`. A name that is not generalized
 /// has the level `u32::MAX`.
 #[derive(Clone, Debug)]
@@ -751,111 +798,104 @@ impl<'a> Checker<'a> {
             self.check_value_places(t, pol);
             return;
         }
-        if depth > 64 {
-            return;
-        }
-        match &t.kind {
-            TypeKind::Named { ty, args } => {
-                if let TypeRef::Custom(id) = ty
-                    && matches!(self.p.ty(*id).body, TypeBody::Alias(_))
-                {
-                    let e = self.expand(t);
-                    self.check_places(&e, pol, depth + 1);
-                    return;
-                }
-                let vs = match ty {
-                    TypeRef::Custom(id) => self.s.variance.get(id).cloned().unwrap_or_default(),
-                    TypeRef::Builtin(b) => builtin_variance(*b),
-                };
-                for (i, a) in args.iter().enumerate() {
-                    let v = vs.get(i).copied().unwrap_or(Variance::Inv);
-                    self.check_places(a, pol.by(v), depth);
-                }
+        let mut todo = vec![(t, pol, depth)];
+        while let Some((t, pol, depth)) = todo.pop() {
+            if depth > 64 {
+                continue;
             }
-            TypeKind::Tuple(ts) => {
-                for a in ts {
-                    self.check_places(a, pol, depth);
-                }
-            }
-            TypeKind::Fn {
-                params,
-                ret,
-                err,
-                env,
-            } => {
-                for p in params {
-                    self.check_places(&p.ty, pol.flip(), depth);
-                }
-                for x in [Some(&**ret), err.as_deref(), env.as_deref()]
-                    .into_iter()
-                    .flatten()
-                {
-                    self.check_places(x, pol, depth);
-                }
-            }
-            TypeKind::Union(ts) => {
-                let vars = ts
-                    .iter()
-                    .filter(|m| matches!(self.expand(m).kind, TypeKind::Var(_)))
-                    .count();
-                if vars >= 2 && pol != Pol::Pos {
-                    self.error(
-                        code::TYPE_PLACE,
-                        t.span,
-                        "a union with two or more type variables as members may only be in an output place (§4.4): inference could not choose the variable for a value that comes here",
-                    );
-                }
-                for a in ts {
-                    self.check_places(a, pol, depth);
-                }
-            }
-            TypeKind::Inter(ts) => {
-                if pol != Pol::Neg
-                    && ts
-                        .iter()
-                        .any(|m| matches!(self.expand(m).kind, TypeKind::Var(_)))
-                {
-                    self.error(
-                        code::TYPE_PLACE,
-                        t.span,
-                        "an intersection with a type variable may only be in an input place (§4.4): inference could not give a value that is in both",
-                    );
-                }
-                for a in ts {
-                    self.check_places(a, pol, depth);
-                }
-            }
-            TypeKind::Diff(ts) => {
-                if let Some((first, rest)) = ts.split_first() {
-                    self.check_places(first, pol, depth);
-                    for a in rest {
-                        self.check_places(a, Pol::Both, depth);
+            match &t.kind {
+                TypeKind::Named { ty, args } => {
+                    if let TypeRef::Custom(id) = ty
+                        && matches!(self.p.ty(*id).body, TypeBody::Alias(_))
+                    {
+                        let expanded = self.expand(t);
+                        self.check_places(&expanded, pol, depth + 1);
+                        continue;
+                    }
+                    let vs = match ty {
+                        TypeRef::Custom(id) => self.s.variance.get(id).cloned().unwrap_or_default(),
+                        TypeRef::Builtin(b) => builtin_variance(*b),
+                    };
+                    for (i, a) in args.iter().enumerate().rev() {
+                        let variance = vs.get(i).copied().unwrap_or(Variance::Inv);
+                        todo.push((a, pol.by(variance), depth));
                     }
                 }
+                TypeKind::Tuple(ts) => todo.extend(ts.iter().rev().map(|t| (t, pol, depth))),
+                TypeKind::Fn {
+                    params,
+                    ret,
+                    err,
+                    env,
+                } => {
+                    if let Some(env) = env {
+                        todo.push((env, pol, depth));
+                    }
+                    if let Some(err) = err {
+                        todo.push((err, pol, depth));
+                    }
+                    todo.push((ret, pol, depth));
+                    for param in params.iter().rev() {
+                        todo.push((&param.ty, pol.flip(), depth));
+                    }
+                }
+                TypeKind::Union(ts) => {
+                    let vars = ts.iter().filter(|m| self.written_var_head(m)).count();
+                    if vars >= 2 && pol != Pol::Pos {
+                        self.error(code::TYPE_PLACE, t.span,
+                            "a union with two or more type variables as members may only be in an output place (§4.4): inference could not choose the variable for a value that comes here");
+                    }
+                    todo.extend(ts.iter().rev().map(|t| (t, pol, depth)));
+                }
+                TypeKind::Inter(ts) => {
+                    if pol != Pol::Neg && ts.iter().any(|m| self.written_var_head(m)) {
+                        self.error(code::TYPE_PLACE, t.span,
+                            "an intersection with a type variable may only be in an input place (§4.4): inference could not give a value that is in both");
+                    }
+                    todo.extend(ts.iter().rev().map(|t| (t, pol, depth)));
+                }
+                TypeKind::Diff(ts) => {
+                    if let Some((first, rest)) = ts.split_first() {
+                        todo.extend(rest.iter().rev().map(|t| (t, Pol::Both, depth)));
+                        todo.push((first, pol, depth));
+                    }
+                }
+                TypeKind::Lit(_)
+                | TypeKind::Of { .. }
+                | TypeKind::Var(_)
+                | TypeKind::Hole
+                | TypeKind::Error => {}
             }
-            TypeKind::Lit(_)
-            | TypeKind::Of { .. }
-            | TypeKind::Var(_)
-            | TypeKind::Hole
-            | TypeKind::Error => {}
+        }
+    }
+
+    fn written_var_head(&self, ty: &Type) -> bool {
+        match &ty.kind {
+            TypeKind::Var(_) => true,
+            TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                ..
+            } if matches!(self.p.ty(*id).body, TypeBody::Alias(_)) => {
+                matches!(self.expand(ty).kind, TypeKind::Var(_))
+            }
+            _ => false,
         }
     }
 
     /// `check_places` for the types written in a pattern of a binding
     /// (`Pos`) or a parameter (`Neg`).
     fn check_pattern_places(&mut self, q: &Pattern, pol: Pol) {
-        match &q.kind {
-            PatternKind::Typed { ty, .. } => self.check_places(ty, pol, 0),
-            PatternKind::Named { pattern, .. } => self.check_pattern_places(pattern, pol),
-            PatternKind::Constructor { args: ps, .. }
-            | PatternKind::Tuple(ps)
-            | PatternKind::Error(ps)
-            | PatternKind::List { items: ps, .. } => {
-                for x in ps {
-                    self.check_pattern_places(x, pol);
-                }
+        let mut todo = vec![q];
+        while let Some(q) = todo.pop() {
+            match &q.kind {
+                PatternKind::Typed { ty, .. } => self.check_places(ty, pol, 0),
+                PatternKind::Named { pattern, .. } => todo.push(pattern),
+                PatternKind::Constructor { args: ps, .. }
+                | PatternKind::Tuple(ps)
+                | PatternKind::Error(ps)
+                | PatternKind::List { items: ps, .. } => todo.extend(ps.iter().rev()),
+                _ => {}
             }
-            _ => {}
         }
     }
 
@@ -1053,133 +1093,273 @@ impl<'a> Checker<'a> {
     }
 
     fn conv_mode(&mut self, t: &Type, local: &HashMap<TyVarId, Ty>, mode: Mode) -> Ty {
-        let result = match &t.kind {
-            TypeKind::Lit(v) => Ty::literal(v),
-            TypeKind::Named { ty, args } => {
-                if let TypeRef::Custom(id) = ty
-                    && let TypeBody::Alias(body) = &self.p.ty(*id).body
-                {
-                    if self.reads.templates.contains_key(id) || value_dependent(self.p, body) {
-                        let modes = self.s.rows(Head::Named(*ty), args.len());
-                        let args = args
+        use std::rc::Rc;
+
+        // Each task represents one suspended conversion, so arbitrarily deep
+        // written types do not consume the Rust call stack. Children are
+        // scheduled in source order: normalization and diagnostic emission
+        // are therefore performed at the same points as in the typing rules.
+        type Locals = Rc<HashMap<TyVarId, Ty>>;
+        enum Build<'a> {
+            Named(TypeRef, usize),
+            Alias(TypeId, &'a Type, Vec<TyVarId>, bool, u32),
+            Tuple(usize),
+            Fn(Vec<Option<String>>, bool, bool),
+            Union(usize, Span),
+            Inter(usize, Span),
+        }
+        enum Task<'a> {
+            Visit(&'a Type, Locals, Mode, u32),
+            Build(Build<'a>, Mode),
+            EndAlias,
+            DiffNext(&'a [Type], usize, Locals, Mode, u32, Span),
+            DiffCombine(&'a [Type], usize, Locals, Mode, u32, Span, Ty),
+        }
+        let p = self.p;
+        let mut todo = vec![Task::Visit(
+            t,
+            Rc::new(local.clone()),
+            mode,
+            self.alias_depth,
+        )];
+        let mut values: Vec<Ty> = Vec::new();
+        while let Some(task) = todo.pop() {
+            match task {
+                Task::Visit(t, local, mode, depth) => match &t.kind {
+                    TypeKind::Lit(v) => values.push(Ty::literal(v)),
+                    TypeKind::Var(tv) => {
+                        let v = if let Some(v) =
+                            local.get(tv).or_else(|| self.tyvars.get(tv)).cloned()
+                        {
+                            v
+                        } else {
+                            let v = self.s.fresh_input();
+                            if let Ty::Var(x) = v {
+                                self.s.vars[x.0 as usize].name =
+                                    p.ty_var_names.get(tv.0 as usize).cloned();
+                            }
+                            self.tyvars.insert(*tv, v.clone());
+                            v
+                        };
+                        if mode != Mode::Value {
+                            self.s.mark_mode(&v, mode);
+                        }
+                        values.push(v);
+                    }
+                    TypeKind::Of { value, site, .. } => {
+                        let v = self.read_annotation(*value, *site);
+                        if mode != Mode::Value {
+                            self.s.mark_mode(&v, mode);
+                        }
+                        values.push(v);
+                    }
+                    TypeKind::Hole | TypeKind::Error => {
+                        let v = self.s.fresh_input();
+                        if mode != Mode::Value {
+                            self.s.mark_mode(&v, mode);
+                        }
+                        values.push(v);
+                    }
+                    TypeKind::Named { ty, args } => {
+                        if *ty == TypeRef::Builtin(BuiltinType::Never) {
+                            values.push(Ty::Never);
+                            continue;
+                        }
+                        let modes: Vec<_> = self.s.rows(Head::Named(*ty), args.len()).collect();
+                        if let TypeRef::Custom(id) = ty
+                            && let TypeBody::Alias(body) = &p.ty(*id).body
+                        {
+                            let template =
+                                self.reads.templates.contains_key(id) || value_dependent(p, body);
+                            if !template && depth > 64 {
+                                values.push(self.s.fresh());
+                                continue;
+                            }
+                            let params = p.ty(*id).params.iter().map(|(_, v)| *v).collect();
+                            todo.push(Task::Build(
+                                Build::Alias(*id, body, params, template, depth),
+                                mode,
+                            ));
+                        } else {
+                            todo.push(Task::Build(Build::Named(*ty, args.len()), mode));
+                        }
+                        for (arg, row) in args.iter().zip(modes).rev() {
+                            todo.push(Task::Visit(arg, local.clone(), row, depth));
+                        }
+                    }
+                    TypeKind::Tuple(ts) => {
+                        todo.push(Task::Build(Build::Tuple(ts.len()), mode));
+                        for child in ts.iter().rev() {
+                            todo.push(Task::Visit(child, local.clone(), Mode::Value, depth));
+                        }
+                    }
+                    TypeKind::Fn {
+                        params,
+                        ret,
+                        err,
+                        env,
+                    } => {
+                        let labels = params
                             .iter()
-                            .zip(modes)
-                            .map(|(a, row)| self.conv_mode(a, local, row))
+                            .map(|p| p.label.as_ref().map(|l| l.name.clone()))
                             .collect();
-                        return self.instantiate_alias(*id, args, mode);
+                        todo.push(Task::Build(
+                            Build::Fn(labels, err.is_some(), env.is_some()),
+                            mode,
+                        ));
+                        if let Some(env) = env {
+                            todo.push(Task::Visit(env, local.clone(), Mode::Env, depth));
+                        }
+                        if let Some(err) = err {
+                            todo.push(Task::Visit(err, local.clone(), Mode::Row, depth));
+                        }
+                        todo.push(Task::Visit(ret, local.clone(), Mode::Value, depth));
+                        for p in params.iter().rev() {
+                            todo.push(Task::Visit(&p.ty, local.clone(), Mode::Value, depth));
+                        }
                     }
-                    if self.alias_depth > 64 {
-                        return self.s.fresh();
+                    TypeKind::Union(ts) | TypeKind::Inter(ts) => {
+                        let build = if matches!(&t.kind, TypeKind::Union(_)) {
+                            Build::Union(ts.len(), t.span)
+                        } else {
+                            Build::Inter(ts.len(), t.span)
+                        };
+                        todo.push(Task::Build(build, mode));
+                        for child in ts.iter().rev() {
+                            todo.push(Task::Visit(child, local.clone(), mode, depth));
+                        }
                     }
-                    let params = self.p.ty(*id).params.clone();
-                    let mut map = HashMap::new();
-                    let modes = self.s.rows(Head::Named(*ty), args.len());
-                    for (((_, tv), a), row) in params.iter().zip(args).zip(modes) {
-                        let a = self.conv_mode(a, local, row);
-                        map.insert(*tv, a);
+                    TypeKind::Diff(ts) => {
+                        todo.push(Task::DiffNext(ts, 1, local.clone(), mode, depth, t.span));
+                        todo.push(Task::Visit(&ts[0], local, mode, depth));
                     }
-                    self.alias_depth += 1;
-                    let r = self.conv_mode(body, &map, mode);
-                    self.alias_depth -= 1;
-                    return r;
-                }
-                if *ty == TypeRef::Builtin(BuiltinType::Never) {
-                    return Ty::Never;
-                }
-                let modes = self.s.rows(Head::Named(*ty), args.len());
-                let args = args
-                    .iter()
-                    .zip(modes)
-                    .map(|(a, row)| self.conv_mode(a, local, row))
-                    .collect();
-                Ty::named(*ty, args)
-            }
-            TypeKind::Var(tv) => {
-                if let Some(t) = local.get(tv).or_else(|| self.tyvars.get(tv)).cloned() {
+                },
+                Task::Build(build, mode) => {
+                    let result = match build {
+                        Build::Named(ty, n) => {
+                            let args = values.split_off(values.len() - n);
+                            Ty::named(ty, args)
+                        }
+                        Build::Alias(id, body, params, template, depth) => {
+                            let args = values.split_off(values.len() - params.len());
+                            if template {
+                                values.push(self.instantiate_alias(id, args, mode));
+                                continue;
+                            }
+                            let map = params.into_iter().zip(args).collect();
+                            self.alias_depth += 1;
+                            todo.push(Task::EndAlias);
+                            todo.push(Task::Visit(body, Rc::new(map), mode, depth + 1));
+                            continue;
+                        }
+                        Build::Tuple(n) => {
+                            let ts = values.split_off(values.len() - n);
+                            Ty::tuple(ts)
+                        }
+                        Build::Fn(labels, has_err, has_env) => {
+                            let n = labels.len();
+                            let mut parts = values
+                                .split_off(
+                                    values.len()
+                                        - n
+                                        - 1
+                                        - usize::from(has_err)
+                                        - usize::from(has_env),
+                                )
+                                .into_iter();
+                            let params = labels
+                                .into_iter()
+                                .map(|label| {
+                                    (label, parts.next().expect("function parameter type"))
+                                })
+                                .collect();
+                            let ret = parts.next().expect("function result type");
+                            let err = if has_err {
+                                parts.next().expect("function error type")
+                            } else {
+                                Ty::Never
+                            };
+                            let env = if has_env {
+                                parts.next().expect("function environment type")
+                            } else {
+                                Ty::Never
+                            };
+                            Ty::Fn(Box::new(FnTy {
+                                params,
+                                ret,
+                                err,
+                                env,
+                            }))
+                        }
+                        Build::Union(n, span) => {
+                            let ts = values.split_off(values.len() - n);
+                            let r = self.s.union_mode(ts, mode);
+                            self.flush(span, None);
+                            r
+                        }
+                        Build::Inter(n, span) => {
+                            let ts = values.split_off(values.len() - n);
+                            let r = self.s.normalize_mode(Ty::Inter(ts), mode);
+                            self.flush(span, None);
+                            r
+                        }
+                    };
                     if mode != Mode::Value {
-                        self.s.mark_mode(&t, mode);
+                        self.s.mark_mode(&result, mode);
                     }
-                    return t;
+                    values.push(result);
                 }
-                let v = self.s.fresh_input();
-                if let Ty::Var(x) = v {
-                    self.s.vars[x.0 as usize].name =
-                        self.p.ty_var_names.get(tv.0 as usize).cloned();
+                Task::EndAlias => self.alias_depth -= 1,
+                Task::DiffNext(parts, index, local, mode, depth, span) => {
+                    if index == parts.len() {
+                        let result = values.last().expect("difference result");
+                        if mode != Mode::Value {
+                            self.s.mark_mode(result, mode);
+                        }
+                    } else {
+                        let left = values.pop().expect("difference left operand");
+                        todo.push(Task::DiffCombine(
+                            parts,
+                            index,
+                            local.clone(),
+                            mode,
+                            depth,
+                            span,
+                            left,
+                        ));
+                        todo.push(Task::Visit(&parts[index], local, mode, depth));
+                    }
                 }
-                self.tyvars.insert(*tv, v.clone());
-                v
-            }
-            TypeKind::Of { value, site, .. } => self.read_annotation(*value, *site),
-            TypeKind::Hole | TypeKind::Error => self.s.fresh_input(),
-            TypeKind::Tuple(ts) => Ty::tuple(ts.iter().map(|a| self.conv(a, local)).collect()),
-            TypeKind::Fn {
-                params,
-                ret,
-                err,
-                env,
-            } => {
-                let params = params
-                    .iter()
-                    .map(|p| {
-                        (
-                            p.label.as_ref().map(|l| l.name.clone()),
-                            self.conv(&p.ty, local),
-                        )
-                    })
-                    .collect();
-                let ret = self.conv(ret, local);
-                let err = err
-                    .as_ref()
-                    .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Row));
-                let env = env
-                    .as_ref()
-                    .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Env));
-                Ty::Fn(Box::new(FnTy {
-                    params,
-                    ret,
-                    err,
-                    env,
-                }))
-            }
-            TypeKind::Union(ts) => {
-                let ms = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
-                let r = self.s.union_mode(ms, mode);
-                self.flush(t.span, None);
-                r
-            }
-            TypeKind::Inter(ts) => {
-                let ms = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
-                let r = self.s.normalize_mode(Ty::Inter(ms), mode);
-                self.flush(t.span, None);
-                r
-            }
-            TypeKind::Diff(ts) => {
-                let mut a = self.conv_mode(&ts[0], local, mode);
-                for part in &ts[1..] {
-                    let h = self.conv_mode(part, local, mode);
+                Task::DiffCombine(parts, index, local, mode, depth, span, left) => {
+                    let right = values.pop().expect("difference right operand");
                     let mut members = Vec::new();
-                    super::solve::flatten_union(std::slice::from_ref(&h), &mut members);
-                    if members
+                    super::solve::flatten_union(std::slice::from_ref(&right), &mut members);
+                    let result = if members
                         .iter()
                         .any(|m| m.head().is_none() && *m != Ty::Never)
                     {
-                        self.error(
-                            code::TYPE_DIFF_VAR,
-                            part.span,
-                            "the right side of `-` may only have members with a type constructor (§4.4)",
-                        );
-                        continue;
-                    }
-                    a = self.s.normalize_mode(Ty::Diff(Box::new(a), members), mode);
-                    self.flush(t.span, None);
+                        self.error(code::TYPE_DIFF_VAR, parts[index].span, "the right side of `-` may only have members with a type constructor (§4.4)");
+                        left
+                    } else {
+                        let result = self
+                            .s
+                            .normalize_mode(Ty::Diff(Box::new(left), members), mode);
+                        self.flush(span, None);
+                        result
+                    };
+                    values.push(result);
+                    todo.push(Task::DiffNext(parts, index + 1, local, mode, depth, span));
                 }
-                a
             }
-        };
-        if mode != Mode::Value {
-            self.s.mark_mode(&result, mode);
         }
-        result
+        assert_eq!(
+            values.len(),
+            1,
+            "written type conversion left multiple results"
+        );
+        values
+            .pop()
+            .expect("written type conversion produced no result")
     }
 
     /// `t` with the aliases at its top expanded (§4.3).
@@ -1311,6 +1491,441 @@ impl<'a> Checker<'a> {
     /// The type of `e`, and its known type (§4.8), `Top` when it has none.
     /// `expected` is the expected type of its place, `Top` for none.
     pub fn infer_k(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
+        self.infer_engine(e, expected)
+    }
+
+    fn infer_engine(&mut self, expression: &Expr, expected: &Ty) -> (Ty, Ty) {
+        struct BlockState<'a> {
+            stmts: &'a [Stmt],
+            index: usize,
+            expected: Ty,
+        }
+        struct BitState<'a> {
+            segments: &'a [Segment<Expr>],
+            index: usize,
+        }
+        struct ListState<'a> {
+            items: &'a [Expr],
+            rest: Option<&'a Expr>,
+            index: usize,
+            item_expected: Ty,
+            list_expected: Ty,
+            element: Ty,
+            known: Vec<Ty>,
+        }
+        enum Task<'a> {
+            Visit(&'a Expr, Ty),
+            BlockNext(BlockState<'a>),
+            BlockNonlast(BlockState<'a>, &'a Expr),
+            BlockBinding(BlockState<'a>, PendingBinding<'a>),
+            BlockEnvValue(BlockState<'a>, Ty, &'a Expr, Span, Span),
+            BlockEnvDone(Ty, Span),
+            FunctionDone(PendingFunction<'a>),
+            CallCallee(&'a Expr, Option<&'a Expr>, &'a [Arg], Span),
+            CallNext(PendingCall<'a>),
+            CallArgument(PendingCall<'a>, usize),
+            Field(&'a Expr, &'a Ident, Span),
+            TupleIndex(&'a Expr, u32, Span, Span),
+            UpdateBase(CtorRef, Span, &'a Expr, &'a [(Ident, Expr)]),
+            UpdateNext(PendingUpdate<'a>),
+            UpdateField(PendingUpdate<'a>),
+            BitNext(BitState<'a>),
+            BitFormat(BitState<'a>, &'a Expr, Ty),
+            BitValue(BitState<'a>, Ty),
+            Tuple(usize),
+            ListNext(ListState<'a>),
+            ListItem(ListState<'a>),
+            ListRest(ListState<'a>),
+            Unary(UnOp, &'a Expr),
+            Binary(BinOp, &'a Expr, &'a Expr, Span),
+        }
+        let mut todo = vec![Task::Visit(expression, expected.clone())];
+        let mut values: Vec<(Ty, Ty)> = Vec::new();
+        while let Some(task) = todo.pop() {
+            match task {
+                Task::Visit(e, expected) => match &e.kind {
+                    ExprKind::Block(block) => todo.push(Task::BlockNext(BlockState {
+                        stmts: &block.stmts,
+                        index: 0,
+                        expected,
+                    })),
+                    ExprKind::Fn(function) => {
+                        let (pending, body_expected) = self.function_start(function, &expected);
+                        self.effects.push(Effects::default());
+                        self.function_depth += 1;
+                        todo.push(Task::FunctionDone(pending));
+                        todo.push(Task::BlockNext(BlockState {
+                            stmts: &function.body.stmts,
+                            index: 0,
+                            expected: body_expected,
+                        }));
+                    }
+                    ExprKind::Tuple(items) => {
+                        let parts = match known::members(&expected).as_slice() {
+                            [Ty::Con(Head::Tuple(n), _, xs)] if *n as usize == items.len() => {
+                                xs.clone()
+                            }
+                            _ => vec![Ty::Top; items.len()],
+                        };
+                        todo.push(Task::Tuple(items.len()));
+                        for (child, expected) in items.iter().zip(parts).rev() {
+                            todo.push(Task::Visit(child, expected));
+                        }
+                    }
+                    ExprKind::List { items, rest } => {
+                        let head = Some(Head::Named(TypeRef::Builtin(BuiltinType::List)));
+                        let (item_expected, list_expected) =
+                            match known::members(&expected).as_slice() {
+                                [m @ Ty::Con(_, _, xs)] if m.head() == head && xs.len() == 1 => {
+                                    (xs[0].clone(), m.clone())
+                                }
+                                _ => (Ty::Top, Ty::Top),
+                            };
+                        todo.push(Task::ListNext(ListState {
+                            items,
+                            rest: rest.as_deref(),
+                            index: 0,
+                            item_expected,
+                            list_expected,
+                            element: self.s.fresh(),
+                            known: Vec::new(),
+                        }));
+                    }
+                    ExprKind::BitArray(segments) => {
+                        todo.push(Task::BitNext(BitState { segments, index: 0 }))
+                    }
+                    ExprKind::RecordUpdate {
+                        ctor,
+                        ctor_span,
+                        base,
+                        fields,
+                    } => {
+                        todo.push(Task::UpdateBase(*ctor, *ctor_span, base, fields));
+                        todo.push(Task::Visit(base, Ty::Top));
+                    }
+                    ExprKind::Field { target, name } => {
+                        todo.push(Task::Field(target, name, e.span));
+                        todo.push(Task::Visit(target, Ty::Top));
+                    }
+                    ExprKind::TupleIndex {
+                        target,
+                        index,
+                        index_span,
+                    } => {
+                        todo.push(Task::TupleIndex(
+                            target,
+                            index.to_u32().unwrap_or(u32::MAX),
+                            *index_span,
+                            e.span,
+                        ));
+                        todo.push(Task::Visit(target, Ty::Top));
+                    }
+                    ExprKind::Call { callee, args } => {
+                        todo.push(Task::CallCallee(callee, None, args, e.span));
+                        todo.push(Task::Visit(callee, Ty::Top));
+                    }
+                    ExprKind::Binary {
+                        op: BinOp::Pipe,
+                        lhs,
+                        rhs,
+                    } => {
+                        let (callee, args) = match &rhs.kind {
+                            ExprKind::Call { callee, args } => (&**callee, args.as_slice()),
+                            _ => (&**rhs, &[][..]),
+                        };
+                        todo.push(Task::CallCallee(callee, Some(lhs), args, e.span));
+                        todo.push(Task::Visit(callee, Ty::Top));
+                    }
+                    ExprKind::Unary { op, expr } => {
+                        todo.push(Task::Unary(*op, expr));
+                        todo.push(Task::Visit(expr, Ty::Top));
+                    }
+                    ExprKind::Binary { op, lhs, rhs } if *op != BinOp::Pipe => {
+                        todo.push(Task::Binary(*op, lhs, rhs, e.span));
+                        todo.push(Task::Visit(rhs, Ty::Top));
+                        todo.push(Task::Visit(lhs, Ty::Top));
+                    }
+                    _ => values.push(self.infer_k_inner(e, &expected)),
+                },
+                Task::BlockNext(mut state) => {
+                    let stmts = state.stmts;
+                    match stmts.get(state.index) {
+                        None => {
+                            // A missing final expression is already diagnosed by the parser.
+                            let nil = Ty::named(self.b.nil, Vec::new());
+                            values.push((nil.clone(), nil));
+                        }
+                        Some(Stmt::Bind(binding)) => {
+                            let (pending, expected) = self.local_binding_start(binding);
+                            state.index += 1;
+                            todo.push(Task::BlockBinding(state, pending));
+                            todo.push(Task::Visit(&binding.value, expected));
+                        }
+                        Some(Stmt::Expr(expr)) if state.index + 1 == stmts.len() => {
+                            todo.push(Task::Visit(expr, state.expected));
+                        }
+                        Some(Stmt::Expr(expr)) => {
+                            state.index += 1;
+                            todo.push(Task::BlockNonlast(state, expr));
+                            todo.push(Task::Visit(expr, Ty::Top));
+                        }
+                        Some(Stmt::Env { ty, value, span }) => {
+                            self.check_places(ty, Pol::Pos, 0);
+                            let service = self.conv_mode(ty, &HashMap::new(), Mode::Env);
+                            if let Some(super::Head::Named(r)) = service.head() {
+                                self.out.services.insert((self.module, *span), r);
+                            }
+                            state.index += 1;
+                            todo.push(Task::BlockEnvValue(state, service, value, ty.span, *span));
+                            todo.push(Task::Visit(value, Ty::Top));
+                        }
+                    }
+                }
+                Task::BlockBinding(state, pending) => {
+                    let typed = values.pop().expect("local binding value");
+                    self.local_binding_finish(pending, typed);
+                    todo.push(Task::BlockNext(state));
+                }
+                Task::BlockNonlast(state, expr) => {
+                    values.pop().expect("block statement result");
+                    if has_no_effect(expr) {
+                        self.warning(
+                            code::VALUE_NOT_USED,
+                            expr.span,
+                            "this value is not used, and working it out does nothing",
+                        );
+                    }
+                    todo.push(Task::BlockNext(state));
+                }
+                Task::BlockEnvValue(state, service, value, type_span, span) => {
+                    let (value_type, _) = values.pop().expect("environment statement value");
+                    self.sub2(&value_type, &service, value.span, type_span);
+                    self.effects.push(Effects::default());
+                    todo.push(Task::BlockEnvDone(service, span));
+                    todo.push(Task::BlockNext(state));
+                }
+                Task::BlockEnvDone(service, span) => {
+                    let (err, env) = self.pop_effects(span);
+                    self.add_err(err);
+                    let rest = self.s.env_diff(env, vec![service]);
+                    self.flush(span, None);
+                    self.add_env(rest);
+                }
+                Task::FunctionDone(pending) => {
+                    let body = values.pop().expect("function body result");
+                    self.function_depth -= 1;
+                    values.push(self.function_finish(pending, body));
+                }
+                Task::BitNext(state) => {
+                    let segments = state.segments;
+                    if let Some(segment) = segments.get(state.index) {
+                        let (want, argument) = self.format_start(segment.format.as_ref());
+                        if let Some(argument) = argument {
+                            todo.push(Task::BitFormat(state, argument, want));
+                            todo.push(Task::Visit(argument, Ty::Top));
+                        } else {
+                            todo.push(Task::BitValue(state, want));
+                            todo.push(Task::Visit(&segment.value, Ty::Top));
+                        }
+                    } else {
+                        let ty = self.prim(BuiltinType::BitArray);
+                        values.push((ty.clone(), ty));
+                    }
+                }
+                Task::BitFormat(state, argument, want) => {
+                    let (ty, _) = values.pop().expect("bit-array format argument");
+                    let int = self.prim(BuiltinType::Int);
+                    self.sub(&ty, &int, argument.span);
+                    let segments = state.segments;
+                    let value = &segments[state.index].value;
+                    todo.push(Task::BitValue(state, want));
+                    todo.push(Task::Visit(value, Ty::Top));
+                }
+                Task::BitValue(mut state, want) => {
+                    let (ty, _) = values.pop().expect("bit-array segment value");
+                    self.sub(&ty, &want, state.segments[state.index].value.span);
+                    state.index += 1;
+                    todo.push(Task::BitNext(state));
+                }
+                Task::UpdateBase(ctor, ctor_span, base, fields) => {
+                    let typed = values.pop().expect("record update base");
+                    match self.update_start(ctor, ctor_span, base, fields, typed) {
+                        Ok(state) => todo.push(Task::UpdateNext(state)),
+                        Err(result) => values.push(result),
+                    }
+                }
+                Task::UpdateNext(state) => {
+                    let fields = state.fields;
+                    if let Some((_, value)) = fields.get(state.index) {
+                        todo.push(Task::UpdateField(state));
+                        todo.push(Task::Visit(value, Ty::Top));
+                    } else {
+                        values.push(self.update_finish(state));
+                    }
+                }
+                Task::UpdateField(mut state) => {
+                    let (ty, known) = values.pop().expect("record update field");
+                    let (label, value) = &state.fields[state.index];
+                    match state
+                        .new_fields
+                        .iter()
+                        .position(|f| f.0.as_deref() == Some(&label.name))
+                    {
+                        Some(i) if state.given[i].is_none() => {
+                            state.given[i] = Some(known);
+                            self.sub(&ty, &state.new_fields[i].1, value.span);
+                        }
+                        Some(_) => self.error(
+                            code::CALL_LABELS,
+                            label.span,
+                            format!("the field `{}` is given more than once", label.name),
+                        ),
+                        None => self.error(
+                            code::NO_FIELD,
+                            label.span,
+                            format!(
+                                "the constructor has no field with the label `{}`",
+                                label.name
+                            ),
+                        ),
+                    }
+                    state.index += 1;
+                    todo.push(Task::UpdateNext(state));
+                }
+                Task::Field(target, name, span) => {
+                    let typed = values.pop().expect("field target");
+                    values.push(self.field_finish(target, name, span, typed));
+                }
+                Task::TupleIndex(target, index, index_span, span) => {
+                    let typed = values.pop().expect("tuple target");
+                    values.push(self.tuple_index_finish(target, index, index_span, span, typed));
+                }
+                Task::CallCallee(callee, first, args, span) => {
+                    let function = values.pop().expect("call callee");
+                    let state = self.call_start(callee, first, args, span, function);
+                    todo.push(Task::CallNext(state));
+                }
+                Task::CallNext(mut state) => {
+                    while state.index < state.arguments.len()
+                        && (state.params.is_some() && known::open_fn(state.arguments[state.index]))
+                            != state.later
+                    {
+                        state.index += 1;
+                    }
+                    if state.index == state.arguments.len() {
+                        if !state.later {
+                            state.later = true;
+                            state.index = 0;
+                            todo.push(Task::CallNext(state));
+                        } else {
+                            values.push(self.call_finish(state));
+                        }
+                    } else {
+                        let i = state.index;
+                        let argument = state.arguments[i];
+                        let expected = match &state.params {
+                            Some(ps) => self
+                                .ksubst(
+                                    &ps[i],
+                                    &self.whole_sigma(&state.sigma, &state.hidden),
+                                    true,
+                                )
+                                .unwrap_or(Ty::Top),
+                            None => Ty::Top,
+                        };
+                        todo.push(Task::CallArgument(state, i));
+                        todo.push(Task::Visit(argument, expected));
+                    }
+                }
+                Task::CallArgument(mut state, i) => {
+                    let (ty, known) = values.pop().expect("call argument");
+                    if let (Some(params), false) = (&state.params, state.later) {
+                        self.match_k(&params[i], &known, &mut state.sigma, 0);
+                    }
+                    state.typed[i] = Some((ty, known));
+                    state.index = i + 1;
+                    todo.push(Task::CallNext(state));
+                }
+                Task::Tuple(n) => {
+                    let parts = values.split_off(values.len() - n);
+                    let (ts, ks) = parts.into_iter().unzip();
+                    values.push((Ty::tuple(ts), Ty::tuple(ks)));
+                }
+                Task::ListNext(state) => {
+                    let items = state.items;
+                    if let Some(child) = items.get(state.index) {
+                        let expected = state.item_expected.clone();
+                        todo.push(Task::ListItem(state));
+                        todo.push(Task::Visit(child, expected));
+                    } else if let Some(rest) = state.rest {
+                        let expected = state.list_expected.clone();
+                        todo.push(Task::ListRest(state));
+                        todo.push(Task::Visit(rest, expected));
+                    } else {
+                        let list =
+                            Ty::named(TypeRef::Builtin(BuiltinType::List), vec![state.element]);
+                        let known = Ty::named(
+                            TypeRef::Builtin(BuiltinType::List),
+                            vec![self.kunion(state.known)],
+                        );
+                        values.push((list, known));
+                    }
+                }
+                Task::ListItem(mut state) => {
+                    let (ty, known) = values.pop().expect("list item");
+                    self.sub(&ty, &state.element, state.items[state.index].span);
+                    state.known.push(known);
+                    state.index += 1;
+                    todo.push(Task::ListNext(state));
+                }
+                Task::ListRest(mut state) => {
+                    let (ty, known) = values.pop().expect("list rest");
+                    let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![state.element]);
+                    self.sub(&ty, &list, state.rest.expect("list rest expression").span);
+                    let head = Some(Head::Named(TypeRef::Builtin(BuiltinType::List)));
+                    state.known.push(match known::member(&known, head) {
+                        Some(Ty::Con(_, _, xs)) if xs.len() == 1 => xs[0].clone(),
+                        _ => Ty::Top,
+                    });
+                    let known = Ty::named(
+                        TypeRef::Builtin(BuiltinType::List),
+                        vec![self.kunion(state.known)],
+                    );
+                    values.push((list, known));
+                }
+                Task::Unary(op, expr) => {
+                    let (t, _) = values.pop().expect("unary operand");
+                    let want = self.prim(match op {
+                        UnOp::Neg => BuiltinType::Int,
+                        UnOp::NegFloat => BuiltinType::Float,
+                    });
+                    self.sub(&t, &want, expr.span);
+                    let result = if op == UnOp::Neg {
+                        known::neg_literal(expr).map(|n| known::scalar_literal(BuiltinType::Int, n))
+                    } else {
+                        None
+                    }
+                    .unwrap_or(want);
+                    values.push((result.clone(), result));
+                }
+                Task::Binary(op, lhs, rhs, span) => {
+                    let right = values.pop().expect("binary right operand");
+                    let left = values.pop().expect("binary left operand");
+                    values.push(self.binary_values(op, lhs, rhs, span, left, right));
+                }
+            }
+        }
+        assert_eq!(
+            values.len(),
+            1,
+            "expression inference left multiple results"
+        );
+        values
+            .pop()
+            .expect("expression inference produced no result")
+    }
+
+    fn infer_k_inner(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
         let same = |t: Ty| (t.clone(), t);
         match &e.kind {
             ExprKind::Int(n) => same(known::scalar_literal(BuiltinType::Int, n.to_string())),
@@ -1355,107 +1970,38 @@ impl<'a> Checker<'a> {
                 let t = self.ctor_value(*c);
                 (t, self.ctor_known(*c))
             }
-            ExprKind::Tuple(items) => {
-                // A part has the matching part of the expected type (§4.8).
-                let parts = match known::members(expected).as_slice() {
-                    [Ty::Con(Head::Tuple(n), _, xs)] if *n as usize == items.len() => xs.clone(),
-                    _ => vec![Ty::Top; items.len()],
-                };
-                let (ts, ks) = items
-                    .iter()
-                    .zip(&parts)
-                    .map(|(x, p)| self.infer_k(x, p))
-                    .unzip();
-                (Ty::tuple(ts), Ty::tuple(ks))
+            ExprKind::Tuple(_) | ExprKind::List { .. } => {
+                unreachable!("composite expression must be scheduled")
             }
-            ExprKind::List { items, rest } => {
-                let head = Some(Head::Named(TypeRef::Builtin(BuiltinType::List)));
-                let (item_exp, list_exp) = match known::members(expected).as_slice() {
-                    [m @ Ty::Con(_, _, xs)] if m.head() == head && xs.len() == 1 => {
-                        (xs[0].clone(), m.clone())
-                    }
-                    _ => (Ty::Top, Ty::Top),
-                };
-                let t = self.s.fresh();
-                let mut ks = Vec::new();
-                for x in items {
-                    let (xt, xk) = self.infer_k(x, &item_exp);
-                    self.sub(&xt, &t, x.span);
-                    ks.push(xk);
-                }
-                let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![t]);
-                if let Some(r) = rest {
-                    let (rt, rk) = self.infer_k(r, &list_exp);
-                    self.sub(&rt, &list, r.span);
-                    ks.push(match known::member(&rk, head) {
-                        Some(Ty::Con(_, _, xs)) if xs.len() == 1 => xs[0].clone(),
-                        _ => Ty::Top,
-                    });
-                }
-                let k = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![self.kunion(ks)]);
-                (list, k)
-            }
-            ExprKind::BitArray(segs) => {
-                for s in segs {
-                    let want = self.format(s.format.as_ref(), s.span);
-                    let t = self.infer(&s.value);
-                    self.sub(&t, &want, s.value.span);
-                }
-                same(self.prim(BuiltinType::BitArray))
-            }
-            ExprKind::Block(b) => self.block(&b.stmts, b.span, expected),
-            ExprKind::Fn(f) => self.function(f, expected),
+            ExprKind::BitArray(_) => unreachable!("bit array must be scheduled"),
+            ExprKind::Block(_) => unreachable!("block expression must be scheduled"),
+            ExprKind::Fn(_) => unreachable!("function expression must be scheduled"),
             ExprKind::Case { subject, clauses } => self.case(subject, clauses, e.span, expected),
-            ExprKind::Call { callee, args } => self.call(callee, None, args, e.span),
-            ExprKind::Field { target, name } => self.field(target, name, e.span),
-            ExprKind::TupleIndex {
-                target,
-                index,
-                index_span,
-            } => self.tuple_index(
-                target,
-                index.to_u32().unwrap_or(u32::MAX),
-                *index_span,
-                e.span,
-            ),
-            ExprKind::RecordUpdate {
-                ctor,
-                ctor_span,
-                base,
-                fields,
-            } => self.record_update(*ctor, *ctor_span, base, fields),
-            ExprKind::Unary { op, expr } => {
-                let want = self.prim(match op {
-                    UnOp::Neg => BuiltinType::Int,
-                    UnOp::NegFloat => BuiltinType::Float,
-                });
-                let t = self.infer(expr);
-                self.sub(&t, &want, expr.span);
-                if *op == UnOp::Neg
-                    && let Some(n) = known::neg_literal(expr)
-                {
-                    same(known::scalar_literal(BuiltinType::Int, n))
-                } else {
-                    same(want)
-                }
+            ExprKind::Call { .. } => unreachable!("call expression must be scheduled"),
+            ExprKind::Field { .. } | ExprKind::TupleIndex { .. } => {
+                unreachable!("field access must be scheduled")
             }
-            ExprKind::Binary { op, lhs, rhs } => self.binary(*op, lhs, rhs, e.span),
+            ExprKind::RecordUpdate { .. } => unreachable!("record update must be scheduled"),
+            ExprKind::Unary { .. } => unreachable!("unary expression must be scheduled"),
+            ExprKind::Binary {
+                op: BinOp::Pipe, ..
+            } => unreachable!("pipe expression must be scheduled"),
+            ExprKind::Binary { .. } => unreachable!("binary expression must be scheduled"),
             ExprKind::Error => (self.s.fresh_input(), Ty::Top),
         }
     }
 
     /// Rule 8 and §6.9.
-    fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr, span: Span) -> (Ty, Ty) {
+    fn binary_values(
+        &mut self,
+        op: BinOp,
+        lhs: &Expr,
+        rhs: &Expr,
+        span: Span,
+        (lt, lk): (Ty, Ty),
+        (rt, rk): (Ty, Ty),
+    ) -> (Ty, Ty) {
         use BinOp::*;
-        if op == Pipe {
-            // `a |> f(b)` is `f(a, b)`, and `a |> f` is `f(a)`: `a` is the
-            // first argument, with its expected type (§4.8).
-            let first = Some(lhs);
-            return match &rhs.kind {
-                ExprKind::Call { callee, args } => self.call(callee, first, args, span),
-                _ => self.call(rhs, first, &[], span),
-            };
-        }
         let (operand, result) = match op {
             Or | And => (Some(self.bool_ty()), self.bool_ty()),
             Eq | NotEq => (None, self.bool_ty()),
@@ -1477,8 +2023,6 @@ impl<'a> Checker<'a> {
             ),
             Pipe => unreachable!(),
         };
-        let (lt, lk) = self.infer_k(lhs, &Ty::Top);
-        let (rt, rk) = self.infer_k(rhs, &Ty::Top);
         // §6.9: `==` on values of disjoint known types would always give the
         // same result.
         if matches!(op, Eq | NotEq) && lk != Ty::Top && rk != Ty::Top && known::disjoint(&lk, &rk) {
@@ -1526,8 +2070,14 @@ impl<'a> Checker<'a> {
 
     /// Rule 5: `f(a1, …)`. `first` is the left side of `|>`, the first
     /// argument.
-    fn call(&mut self, callee: &Expr, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
-        let (f, kf) = self.infer_k(callee, &Ty::Top);
+    fn call_start<'tree>(
+        &mut self,
+        callee: &'tree Expr,
+        first: Option<&'tree Expr>,
+        args: &'tree [Arg],
+        span: Span,
+        (f, kf): (Ty, Ty),
+    ) -> PendingCall<'tree> {
         let bool_pipe = first.is_some() && kf.head() == Some(Head::Named(self.b.bool_));
         let diagnostic_start = self.diags.len();
         let kfn = known::one_fn(&kf);
@@ -1574,29 +2124,45 @@ impl<'a> Checker<'a> {
             .into_iter()
             .chain(args.iter().map(|a| &a.value))
             .collect();
-        let mut typed: Vec<Option<(Ty, Ty)>> = vec![None; n];
-        let mut sigma = known::Sigma::new();
+        let typed: Vec<Option<(Ty, Ty)>> = vec![None; n];
+        let sigma = known::Sigma::new();
         let hidden = kfn
             .as_ref()
             .map_or_else(Vec::new, |k| self.hidden_inputs(k));
-        for later in [false, true] {
-            for (i, a) in values.iter().enumerate() {
-                if (params.is_some() && known::open_fn(a)) != later {
-                    continue;
-                }
-                let expected = match &params {
-                    Some(ps) => self
-                        .ksubst(&ps[i], &self.whole_sigma(&sigma, &hidden), true)
-                        .unwrap_or(Ty::Top),
-                    None => Ty::Top,
-                };
-                let (t, k) = self.infer_k(a, &expected);
-                if let (Some(ps), false) = (&params, later) {
-                    self.match_k(&ps[i], &k, &mut sigma, 0);
-                }
-                typed[i] = Some((t, k));
-            }
+        PendingCall {
+            callee,
+            first,
+            span,
+            function: f,
+            known_function: kfn,
+            bool_pipe,
+            diagnostic_start,
+            placement: to,
+            params,
+            arguments: values,
+            typed,
+            sigma,
+            hidden,
+            later: false,
+            index: 0,
         }
+    }
+
+    fn call_finish(&mut self, state: PendingCall<'_>) -> (Ty, Ty) {
+        let PendingCall {
+            callee,
+            first,
+            span,
+            function: f,
+            known_function: kfn,
+            bool_pipe,
+            diagnostic_start,
+            placement: to,
+            arguments: values,
+            typed,
+            ..
+        } = state;
+        let n = values.len();
         let typed: Vec<(Ty, Ty)> = typed.into_iter().flatten().collect();
         let spans: Vec<Span> = values.iter().map(|a| a.span).collect();
         let Some(to) = to else {
@@ -1837,8 +2403,13 @@ impl<'a> Checker<'a> {
     /// Rule 13 and §6.7 for `v.f`: every constructor that may have made `v`
     /// has a field with the label `f`, and `v.f` has the union of their
     /// types.
-    fn field(&mut self, target: &Expr, name: &Ident, span: Span) -> (Ty, Ty) {
-        let (t, kv) = self.infer_k(target, &Ty::Top);
+    fn field_finish(
+        &mut self,
+        target: &Expr,
+        name: &Ident,
+        span: Span,
+        (t, kv): (Ty, Ty),
+    ) -> (Ty, Ty) {
         // The constructors that may have made `v`, each with the arguments
         // of its type in the known type of `v`, when they are known.
         let mut ctors: Vec<(CtorRef, Option<Vec<Ty>>)> = Vec::new();
@@ -2003,8 +2574,14 @@ impl<'a> Checker<'a> {
 
     /// Rule 13 for `v.k`: every member of the known type of `v` is a tuple
     /// with more than k parts.
-    fn tuple_index(&mut self, target: &Expr, k: u32, index_span: Span, span: Span) -> (Ty, Ty) {
-        let (t, kv) = self.infer_k(target, &Ty::Top);
+    fn tuple_index_finish(
+        &mut self,
+        target: &Expr,
+        k: u32,
+        index_span: Span,
+        span: Span,
+        (t, kv): (Ty, Ty),
+    ) -> (Ty, Ty) {
         if kv == Ty::Top {
             self.error(
                 code::NEEDS_KNOWN_TYPE,
@@ -2062,16 +2639,16 @@ impl<'a> Checker<'a> {
     }
 
     /// §6.7: `C(..base, f: e)`.
-    fn record_update(
+    fn update_start<'tree>(
         &mut self,
         ctor: CtorRef,
         ctor_span: Span,
-        base: &Expr,
-        fields: &[(Ident, Expr)],
-    ) -> (Ty, Ty) {
-        let (bt, bk) = self.infer_k(base, &Ty::Top);
+        base: &'tree Expr,
+        fields: &'tree [(Ident, Expr)],
+        (bt, bk): (Ty, Ty),
+    ) -> Result<PendingUpdate<'tree>, (Ty, Ty)> {
         let TypeBody::Custom(ctors) = &self.p.ty(ctor.ty).body else {
-            return (self.s.fresh(), Ty::Top);
+            return Err((self.s.fresh(), Ty::Top));
         };
         if ctors.len() != 1 && self.known_ctor(base) != Some(ctor) {
             let cname = ctors[ctor.index as usize].name.clone();
@@ -2106,32 +2683,31 @@ impl<'a> Checker<'a> {
         };
         let old_fields = self.ctor_fields(ctor, &old);
         let new_fields = self.ctor_fields(ctor, &new);
-        let mut given: Vec<Option<Ty>> = vec![None; new_fields.len()];
-        for (label, e) in fields {
-            let (t, k) = self.infer_k(e, &Ty::Top);
-            match new_fields
-                .iter()
-                .position(|f| f.0.as_deref() == Some(&label.name))
-            {
-                Some(i) if given[i].is_none() => {
-                    given[i] = Some(k);
-                    self.sub(&t, &new_fields[i].1, e.span);
-                }
-                Some(_) => self.error(
-                    code::CALL_LABELS,
-                    label.span,
-                    format!("the field `{}` is given more than once", label.name),
-                ),
-                None => self.error(
-                    code::NO_FIELD,
-                    label.span,
-                    format!(
-                        "the constructor has no field with the label `{}`",
-                        label.name
-                    ),
-                ),
-            }
-        }
+        let given = vec![None; new_fields.len()];
+        Ok(PendingUpdate {
+            ctor,
+            base,
+            fields,
+            new,
+            old_fields,
+            new_fields,
+            given,
+            base_known: bk,
+            index: 0,
+        })
+    }
+
+    fn update_finish(&mut self, state: PendingUpdate<'_>) -> (Ty, Ty) {
+        let PendingUpdate {
+            ctor,
+            base,
+            new,
+            old_fields,
+            new_fields,
+            given,
+            base_known: bk,
+            ..
+        } = state;
         for (i, g) in given.iter().enumerate() {
             if g.is_none() {
                 self.sub(&old_fields[i].1, &new_fields[i].1, base.span);
@@ -2156,9 +2732,19 @@ impl<'a> Checker<'a> {
     }
 
     /// §8.2: the type of the value of a segment.
-    pub fn format(&mut self, f: Option<&Format>, span: Span) -> Ty {
+    pub fn format(&mut self, f: Option<&Format>, _span: Span) -> Ty {
+        let (ty, argument) = self.format_start(f);
+        if let Some(argument) = argument {
+            let actual = self.infer(argument);
+            let int = self.prim(BuiltinType::Int);
+            self.sub(&actual, &int, argument.span);
+        }
+        ty
+    }
+
+    fn format_start<'tree>(&mut self, f: Option<&'tree Format>) -> (Ty, Option<&'tree Expr>) {
         let Some(f) = f else {
-            return self.prim(BuiltinType::Int);
+            return (self.prim(BuiltinType::Int), None);
         };
         let name = f.name.name.as_str();
         let Some(ty) = known::format_prim(name) else {
@@ -2167,7 +2753,7 @@ impl<'a> Checker<'a> {
                 f.name.span,
                 format!("there is no bit array format `{name}` (§8.2)"),
             );
-            return self.s.fresh();
+            return (self.s.fresh(), None);
         };
         // Whether the format needs a length, has none, or may have one.
         let arg = match name {
@@ -2188,65 +2774,20 @@ impl<'a> Checker<'a> {
             ),
             _ => {}
         }
-        if let Some(a) = &f.arg {
-            let t = self.infer(a);
-            let int = self.prim(BuiltinType::Int);
-            self.sub(&t, &int, a.span);
-        }
-        let _ = span;
-        self.prim(ty)
+        (self.prim(ty), f.arg.as_deref())
     }
 
     // ---- Blocks, functions, and bindings ----
-
-    /// Rule 9: `{ s1 … sn e }`. The last expression has the expected type
-    /// of the block, and the block has its known type (§4.8).
-    pub fn block(&mut self, stmts: &[Stmt], span: Span, expected: &Ty) -> (Ty, Ty) {
-        for (i, s) in stmts.iter().enumerate() {
-            match s {
-                Stmt::Bind(b) => self.local_binding(b),
-                Stmt::Expr(e) if i + 1 == stmts.len() => return self.infer_k(e, expected),
-                Stmt::Expr(e) => {
-                    self.infer(e);
-                    if has_no_effect(e) {
-                        self.warning(
-                            code::VALUE_NOT_USED,
-                            e.span,
-                            "this value is not used, and working it out does nothing",
-                        );
-                    }
-                }
-                Stmt::Env { ty, value, span } => {
-                    // `! T = e1` and the rest `r`: `A ? E ! N1 | M - T`.
-                    self.check_places(ty, Pol::Pos, 0);
-                    let t = self.conv_mode(ty, &HashMap::new(), Mode::Env);
-                    if let Some(super::Head::Named(r)) = t.head() {
-                        self.out.services.insert((self.module, *span), r);
-                    }
-                    let v = self.infer(value);
-                    self.sub2(&v, &t, value.span, ty.span);
-                    self.effects.push(Effects::default());
-                    let a = self.block(&stmts[i + 1..], *span, expected);
-                    let (err, env) = self.pop_effects(*span);
-                    self.add_err(err);
-                    let rest = self.s.env_diff(env, vec![t]);
-                    self.flush(*span, None);
-                    self.add_env(rest);
-                    return a;
-                }
-            }
-        }
-        // The last statement is not an expression: reported by the parser.
-        let _ = span;
-        let nil = Ty::named(self.b.nil, Vec::new());
-        (nil.clone(), nil)
-    }
 
     /// Rule 4: a function expression, and its known type (§4.8). With an
     /// expected function type with as many parameters, a parameter with no
     /// type written at its top gets the known type of the matching
     /// parameter.
-    fn function(&mut self, f: &Function, expected: &Ty) -> (Ty, Ty) {
+    fn function_start<'tree>(
+        &mut self,
+        f: &'tree Function,
+        expected: &Ty,
+    ) -> (PendingFunction<'tree>, Ty) {
         let count = f
             .params
             .iter()
@@ -2320,10 +2861,32 @@ impl<'a> Checker<'a> {
             .ret
             .as_ref()
             .map_or(Ty::Top, |r| self.kconv(&r.value, &HashMap::new()));
-        self.effects.push(Effects::default());
-        self.function_depth += 1;
-        let (a, body_known) = self.block(&f.body.stmts, f.body.span, &body_expected);
-        self.function_depth -= 1;
+        (
+            PendingFunction {
+                function: f,
+                expected,
+                params,
+                env_types: env_tys,
+                fails,
+                written_return: ret,
+            },
+            body_expected,
+        )
+    }
+
+    fn function_finish(
+        &mut self,
+        pending: PendingFunction<'_>,
+        (a, body_known): (Ty, Ty),
+    ) -> (Ty, Ty) {
+        let PendingFunction {
+            function: f,
+            expected,
+            params,
+            env_types: env_tys,
+            fails,
+            written_return: ret,
+        } = pending;
         let known = self.fn_known(f, &expected, body_known);
         let (err, env) = self.pop_effects(f.span);
         let assert = Ty::named(self.b.assert, Vec::new());
@@ -2375,7 +2938,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Rule 10 for a binding in a block, and rule 14.
-    fn local_binding(&mut self, b: &Binding) {
+    fn local_binding_start<'tree>(&mut self, b: &'tree Binding) -> (PendingBinding<'tree>, Ty) {
         let mark = self.occurs_mark();
         let direct = b.direct;
         if direct {
@@ -2397,7 +2960,26 @@ impl<'a> Checker<'a> {
             self.own_known(b);
         }
         let expected = self.binding_expected(b);
-        let (a, k) = self.infer_k(&b.value, &expected);
+        (
+            PendingBinding {
+                binding: b,
+                mark,
+                direct,
+                binders,
+                holders,
+            },
+            expected,
+        )
+    }
+
+    fn local_binding_finish(&mut self, pending: PendingBinding<'_>, (a, k): (Ty, Ty)) {
+        let PendingBinding {
+            binding: b,
+            mark,
+            direct,
+            binders,
+            holders,
+        } = pending;
         self.fit(&b.pattern, &a);
         self.binding_failure(&b.pattern, &a);
         for (v, h) in holders {
@@ -2813,35 +3395,356 @@ fn walk_variance(
 /// in `assert 1 + 1 == 3`, which is the two statements `assert` and
 /// `1 + 1 == 3` (§1.7).
 fn has_no_effect(e: &Expr) -> bool {
-    match &e.kind {
-        ExprKind::Int(_)
-        | ExprKind::Float(_)
-        | ExprKind::String(_)
-        | ExprKind::Name(_)
-        | ExprKind::Fn(_) => true,
-        ExprKind::Tuple(items) => items.iter().all(has_no_effect),
-        ExprKind::List { items, rest } => {
-            items.iter().all(has_no_effect) && rest.as_deref().is_none_or(has_no_effect)
+    let mut todo = vec![e];
+    while let Some(e) = todo.pop() {
+        match &e.kind {
+            ExprKind::Int(_)
+            | ExprKind::Float(_)
+            | ExprKind::String(_)
+            | ExprKind::Name(_)
+            | ExprKind::Fn(_) => {}
+            ExprKind::Tuple(items) => todo.extend(items),
+            ExprKind::List { items, rest } => {
+                todo.extend(items);
+                if let Some(rest) = rest {
+                    todo.push(rest);
+                }
+            }
+            ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
+                todo.push(target)
+            }
+            ExprKind::Unary {
+                op: UnOp::Neg,
+                expr,
+            } => todo.push(expr),
+            ExprKind::Binary { op, lhs, rhs }
+                if !matches!(
+                    op,
+                    BinOp::Pipe
+                        | BinOp::AddFloat
+                        | BinOp::SubFloat
+                        | BinOp::MulFloat
+                        | BinOp::DivFloat
+                ) =>
+            {
+                todo.push(lhs);
+                todo.push(rhs);
+            }
+            ExprKind::Call { callee, args }
+                if matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_))) =>
+            {
+                todo.extend(args.iter().map(|a| &a.value));
+            }
+            _ => return false,
         }
-        ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
-            has_no_effect(target)
-        }
-        ExprKind::Unary { op, expr } => *op == UnOp::Neg && has_no_effect(expr),
-        ExprKind::Binary { op, lhs, rhs } => {
-            !matches!(
-                op,
-                BinOp::Pipe | BinOp::AddFloat | BinOp::SubFloat | BinOp::MulFloat | BinOp::DivFloat
-            ) && has_no_effect(lhs)
-                && has_no_effect(rhs)
-        }
-        ExprKind::Call { callee, args } => {
-            matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_)))
-                && args.iter().all(|a| has_no_effect(&a.value))
-        }
-        ExprKind::BitArray(_)
-        | ExprKind::Block(_)
-        | ExprKind::Case { .. }
-        | ExprKind::RecordUpdate { .. }
-        | ExprKind::Error => false,
+    }
+    true
+}
+
+#[cfg(test)]
+mod deep_written_type_tests {
+    use super::*;
+
+    #[test]
+    fn deeply_nested_written_types_use_an_explicit_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let program = Program::default();
+                let sources = Sources::default();
+                let mut checker = Checker::new(&program, &sources);
+                let mut written = Type {
+                    kind: TypeKind::Named {
+                        ty: TypeRef::Builtin(BuiltinType::Int),
+                        args: vec![],
+                    },
+                    span: Span::default(),
+                };
+                for _ in 0..10_000 {
+                    written = Type {
+                        kind: TypeKind::Tuple(vec![written]),
+                        span: Span::default(),
+                    };
+                }
+                checker.check_places(&written, Pol::Pos, 0);
+                let result = checker.conv(&written, &HashMap::new());
+                let mut cursor = &result;
+                for _ in 0..10_000 {
+                    match cursor {
+                        Ty::Con(Head::Tuple(1), _, parts) => cursor = &parts[0],
+                        _ => panic!("written tuple shape was not preserved"),
+                    }
+                }
+                assert!(matches!(
+                    cursor,
+                    Ty::Con(Head::Named(TypeRef::Builtin(BuiltinType::Int)), _, _)
+                ));
+                // HIR and solver value destructors are handled by their own
+                // deep-tree work; do not make this test depend on their order.
+                std::mem::forget(written);
+                std::mem::forget(result);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn deeply_nested_tuple_expressions_use_an_explicit_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let program = Program::default();
+                let sources = Sources::default();
+                let mut checker = Checker::new(&program, &sources);
+                let mut expr = Expr {
+                    kind: ExprKind::Int(1u8.into()),
+                    span: Span::default(),
+                };
+                for _ in 0..10_000 {
+                    expr = Expr {
+                        kind: ExprKind::Tuple(vec![expr]),
+                        span: Span::default(),
+                    };
+                }
+                let (ty, known) = checker.infer_k(&expr, &Ty::Top);
+                for root in [&ty, &known] {
+                    let mut cursor = root;
+                    for _ in 0..10_000 {
+                        match cursor {
+                            Ty::Con(Head::Tuple(1), _, parts) => cursor = &parts[0],
+                            _ => panic!("inferred tuple shape was not preserved"),
+                        }
+                    }
+                    assert!(matches!(
+                        cursor,
+                        Ty::Con(Head::Named(TypeRef::Builtin(BuiltinType::Int)), _, _)
+                    ));
+                }
+                std::mem::forget(expr);
+                std::mem::forget(ty);
+                std::mem::forget(known);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn deeply_nested_arithmetic_uses_an_explicit_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let program = Program::default();
+                let sources = Sources::default();
+                let mut checker = Checker::new(&program, &sources);
+                let literal = || Expr {
+                    kind: ExprKind::Int(1u8.into()),
+                    span: Span::default(),
+                };
+                let mut expr = literal();
+                for _ in 0..5_000 {
+                    expr = Expr {
+                        kind: ExprKind::Unary {
+                            op: UnOp::Neg,
+                            expr: Box::new(expr),
+                        },
+                        span: Span::default(),
+                    };
+                    expr = Expr {
+                        kind: ExprKind::Binary {
+                            op: BinOp::Add,
+                            lhs: Box::new(literal()),
+                            rhs: Box::new(expr),
+                        },
+                        span: Span::default(),
+                    };
+                }
+                let (ty, known) = checker.infer_k(&expr, &Ty::Top);
+                assert_eq!(
+                    ty.head(),
+                    Some(Head::Named(TypeRef::Builtin(BuiltinType::Int)))
+                );
+                assert_eq!(known.head(), ty.head());
+                assert!(checker.diags.is_empty());
+                std::mem::forget(expr);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn deeply_nested_blocks_use_an_explicit_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let program = Program::default();
+                let sources = Sources::default();
+                let mut checker = Checker::new(&program, &sources);
+                let mut expr = Expr {
+                    kind: ExprKind::Int(1u8.into()),
+                    span: Span::default(),
+                };
+                for _ in 0..10_000 {
+                    expr = Expr {
+                        kind: ExprKind::Block(Block {
+                            stmts: vec![Stmt::Expr(expr)],
+                            span: Span::default(),
+                        }),
+                        span: Span::default(),
+                    };
+                }
+                let (ty, _) = checker.infer_k(&expr, &Ty::Top);
+                assert_eq!(
+                    ty.head(),
+                    Some(Head::Named(TypeRef::Builtin(BuiltinType::Int)))
+                );
+                assert!(checker.diags.is_empty());
+                std::mem::forget(expr);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn deeply_nested_calls_use_an_explicit_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let program = Program::default();
+                let sources = Sources::default();
+                let mut checker = Checker::new(&program, &sources);
+                let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
+                let function = Ty::Fn(Box::new(FnTy {
+                    params: vec![(None, int.clone())],
+                    ret: int,
+                    err: Ty::Never,
+                    env: Ty::Never,
+                }));
+                let variable = VarId(0);
+                checker
+                    .locals
+                    .insert(variable, Scheme::mono(function.clone()));
+                checker.kvars.insert(variable, function);
+                let mut expr = Expr {
+                    kind: ExprKind::Int(1u8.into()),
+                    span: Span::default(),
+                };
+                for _ in 0..10_000 {
+                    let callee = Expr {
+                        kind: ExprKind::Name(ValueRef::Local(variable)),
+                        span: Span::default(),
+                    };
+                    expr = Expr {
+                        kind: ExprKind::Call {
+                            callee: Box::new(callee),
+                            args: vec![Arg {
+                                label: None,
+                                value: expr,
+                            }],
+                        },
+                        span: Span::default(),
+                    };
+                }
+                let (ty, _) = checker.infer_k(&expr, &Ty::Top);
+                assert_eq!(
+                    ty.head(),
+                    Some(Head::Named(TypeRef::Builtin(BuiltinType::Int)))
+                );
+                assert!(checker.diags.is_empty());
+                std::mem::forget(expr);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn deeply_nested_local_bindings_use_an_explicit_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let program = Program::default();
+                let sources = Sources::default();
+                let mut checker = Checker::new(&program, &sources);
+                let literal = || Expr {
+                    kind: ExprKind::Int(1u8.into()),
+                    span: Span::default(),
+                };
+                let mut expr = literal();
+                for _ in 0..10_000 {
+                    let binding = Binding {
+                        pattern: Pattern {
+                            kind: PatternKind::Discard,
+                            span: Span::default(),
+                        },
+                        value: expr,
+                        direct: false,
+                        ty_vars: vec![],
+                        span: Span::default(),
+                    };
+                    expr = Expr {
+                        kind: ExprKind::Block(Block {
+                            stmts: vec![Stmt::Bind(binding), Stmt::Expr(literal())],
+                            span: Span::default(),
+                        }),
+                        span: Span::default(),
+                    };
+                }
+                let (ty, _) = checker.infer_k(&expr, &Ty::Top);
+                assert_eq!(
+                    ty.head(),
+                    Some(Head::Named(TypeRef::Builtin(BuiltinType::Int)))
+                );
+                assert!(checker.diags.is_empty());
+                std::mem::forget(expr);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn deeply_nested_bit_arrays_use_an_explicit_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let program = Program::default();
+                let sources = Sources::default();
+                let mut checker = Checker::new(&program, &sources);
+                let mut expr = Expr {
+                    kind: ExprKind::BitArray(vec![]),
+                    span: Span::default(),
+                };
+                for _ in 0..10_000 {
+                    expr = Expr {
+                        kind: ExprKind::BitArray(vec![Segment {
+                            value: expr,
+                            format: Some(Format {
+                                name: Ident {
+                                    name: "bits".into(),
+                                    span: Span::default(),
+                                },
+                                arg: None,
+                            }),
+                            span: Span::default(),
+                        }]),
+                        span: Span::default(),
+                    };
+                }
+                let (ty, known) = checker.infer_k(&expr, &Ty::Top);
+                assert_eq!(
+                    ty.head(),
+                    Some(Head::Named(TypeRef::Builtin(BuiltinType::BitArray)))
+                );
+                assert_eq!(known.head(), ty.head());
+                assert!(checker.diags.is_empty());
+                std::mem::forget(expr);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 }
