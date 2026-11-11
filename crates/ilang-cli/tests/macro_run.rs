@@ -796,3 +796,53 @@ fn body_engine_expands_real_imported_macro_before_checking_arguments() {
     assert_eq!(value.to_string(), "123");
     assert!(engine.scoped.origin(expr.span).is_some());
 }
+
+#[test]
+fn body_engine_expands_type_arguments_without_evaluating_them() {
+    use ilang_host::syntax::DefinitionReply;
+    use ilang_macro::{body_engine::BodyEngine, body_walk, registry::Registry};
+    use ilang_syntax::lisp::scoped::ScopedSource;
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, use_int)\n(@ macro (= use_int (-> ((: x (. syntax Syntax))) (. syntax Syntax) `Int)))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nx: m.use_int(Undefined)\nx = 1\n",
+    )
+    .unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let registry = Registry::new(&graph, &parsed).unwrap();
+    let module = parsed.iter().find(|p| p.path == "app/main").unwrap();
+    let source = module.source;
+    let mut ast = module.ast.clone();
+    let scoped = ScopedSource::new(graph.sources.get(source).text.clone());
+    let resolver = Arc::new(|at: &Syntax, _: &ilang_host::macro_budget::MacroBudget| {
+        DefinitionReply::CompileError {
+            message: "unexpected definition".into(),
+            at: at.clone(),
+        }
+    });
+    let mut session = ilang_macro::session::Session::default();
+    let mut engine = BodyEngine::new(
+        &graph,
+        &parsed,
+        &registry,
+        source,
+        scoped,
+        resolver,
+        &mut session,
+    );
+    body_walk::expressions(&mut ast, &mut engine).unwrap();
+    let ilang_syntax::ast::ItemKind::Declaration { ty, .. } = &ast.items[0].kind else {
+        panic!("declaration expected")
+    };
+    assert!(
+        matches!(&ty.kind, ilang_syntax::ast::TypeKind::Named { name, .. } if name.name == "Int")
+    );
+    assert!(engine.scoped.origin(ty.span).is_some());
+}
