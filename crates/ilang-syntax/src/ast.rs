@@ -353,7 +353,13 @@ pub struct Binder {
 #[derive(Clone, Debug, PartialEq)]
 pub enum PatternKind {
     /// A Lisp quote pattern used by a compile-time macro.
-    Quote(Box<crate::lisp::Datum>),
+    Quote {
+        datum: Box<crate::lisp::Datum>,
+        /// Template table slot, populated when preparing a compiler program.
+        template: Option<u32>,
+        /// Capture patterns in matcher order; bool denotes a splice.
+        captures: Vec<(bool, Pattern)>,
+    },
     Var(String),
     Discard(String),
     /// `x: T` (§7.1).
@@ -600,6 +606,11 @@ mod iterative_drop {
                     | ExprKind::Name { .. } => {}
                 },
                 Part::Pattern(mut kind) => match &mut kind {
+                    PatternKind::Quote { captures, .. } => {
+                        for (_, p) in captures {
+                            pattern(p, &mut work);
+                        }
+                    }
                     PatternKind::Typed { ty: t, .. } => ty(t, &mut work),
                     PatternKind::Named { pattern: p, .. } => pattern(p, &mut work),
                     PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
@@ -618,8 +629,7 @@ mod iterative_drop {
                             format(&mut x.format, &mut work);
                         }
                     }
-                    PatternKind::Quote(_)
-                    | PatternKind::Var(_)
+                    PatternKind::Var(_)
                     | PatternKind::Discard(_)
                     | PatternKind::Int { .. }
                     | PatternKind::Float { .. }
@@ -681,8 +691,7 @@ mod iterative_drop {
         fn drop(&mut self) {
             if matches!(
                 &self.kind,
-                PatternKind::Quote(_)
-                    | PatternKind::Var(_)
+                PatternKind::Var(_)
                     | PatternKind::Discard(_)
                     | PatternKind::Int { .. }
                     | PatternKind::Float { .. }

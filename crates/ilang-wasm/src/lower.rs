@@ -375,6 +375,10 @@ fn measure(root: Measure<'_>) -> usize {
                 }
             },
             Measure::Pattern(p) => match &p.kind {
+                PatternKind::Quote { captures, .. } => {
+                    children.extend(captures.iter().map(|(_, p)| Measure::Pattern(p)));
+                    MeasureOp::SumPlusOne
+                }
                 PatternKind::Named { pattern, .. } => {
                     children.push(Measure::Pattern(pattern));
                     MeasureOp::SumPlusOne
@@ -551,6 +555,9 @@ impl Walk {
                     work.push(WalkNode::Block(&f.body));
                 }
                 WalkNode::Pattern(p) => match &p.kind {
+                    PatternKind::Quote { captures, .. } => {
+                        work.extend(captures.iter().map(|(_, p)| WalkNode::Pattern(p)));
+                    }
                     PatternKind::Var(b) => {
                         self.bound.insert(b.var);
                     }
@@ -2856,6 +2863,72 @@ impl<'a> Lowerer<'a> {
         __s: Scheduler,
     ) {
         match &p.kind {
+            PatternKind::Quote {
+                template,
+                functions,
+                captures,
+                ..
+            } => {
+                let template = unsafe {
+                    __s.call(|child| {
+                        self.pattern_call_task(
+                            fx,
+                            out,
+                            functions[0],
+                            p.span,
+                            vec![Atom::Int((*template).into())],
+                            child,
+                        )
+                    })
+                }
+                .await;
+                let result = unsafe {
+                    __s.call(|child| {
+                        self.pattern_call_task(
+                            fx,
+                            out,
+                            functions[1],
+                            p.span,
+                            vec![template, v],
+                            child,
+                        )
+                    })
+                }
+                .await;
+                let success = unsafe {
+                    __s.call(|child| {
+                        self.pattern_call_task(
+                            fx,
+                            out,
+                            functions[2],
+                            p.span,
+                            vec![result.clone()],
+                            child,
+                        )
+                    })
+                }
+                .await;
+                guard(out, Cond::True(success), fail);
+                for (index, (many, pattern)) in captures.iter().enumerate() {
+                    let value = unsafe {
+                        __s.call(|child| {
+                            self.pattern_call_task(
+                                fx,
+                                out,
+                                functions[if *many { 4 } else { 3 }],
+                                p.span,
+                                vec![result.clone(), Atom::Int(index.into())],
+                                child,
+                            )
+                        })
+                    }
+                    .await;
+                    unsafe {
+                        __s.call(|child| self.pattern_task(fx, out, pattern, value, fail, child))
+                    }
+                    .await;
+                }
+            }
             PatternKind::Var(b) => Self::bind_var(fx, out, b, v),
             PatternKind::Discard => {}
             PatternKind::Typed { binder, .. } => {
@@ -2954,6 +3027,33 @@ impl<'a> Lowerer<'a> {
             }
             PatternKind::Error(_) => out.push(Stmt::Unreachable),
         }
+    }
+
+    async fn pattern_call_task(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        function: DefId,
+        span: Span,
+        args: Vec<Atom>,
+        __s: Scheduler,
+    ) -> Atom {
+        let callee = Expr {
+            kind: ExprKind::Name(ValueRef::Def(function)),
+            span,
+        };
+        let target = unsafe { __s.call(|child| self.target_task(fx, out, &callee, child)) }.await;
+        let value = match target {
+            Target::Callee(callee) => Value::Call {
+                callee,
+                args,
+                env: fx.env,
+            },
+            Target::Op(op) if op.needs_env() => Value::OpEnv(op, args, fx.env),
+            Target::Op(op) => Value::Op(op, args),
+            Target::Ctor(_) => unreachable!("quote service is a function"),
+        };
+        let_value(fx, out, value, self.site(fx, span.start))
     }
 
     /// The test of a type test `x: T` for one member of `T` (§7.1).

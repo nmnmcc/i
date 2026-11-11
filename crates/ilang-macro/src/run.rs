@@ -12,6 +12,7 @@ pub struct MacroProgram {
     wasm: Vec<u8>,
     binding_plan: ilang_host::bindings::BindingPlan,
     trusted_package: String,
+    metered: bool,
 }
 
 impl MacroProgram {
@@ -24,6 +25,7 @@ impl MacroProgram {
             wasm,
             binding_plan,
             trusted_package,
+            metered: false,
         }
     }
     fn host_program(&self) -> Result<ilang_host::Program> {
@@ -82,7 +84,7 @@ pub fn compile(
     if diags.iter().any(ilang_package::Diagnostic::is_error) {
         return Err(CompileError::Program(diags));
     }
-    let (wasm, declarations) = match ilang_wasm::compile_with_bindings(
+    let (wasm, declarations) = match ilang_wasm::compile_macro(
         &graph,
         program,
         typed,
@@ -116,7 +118,9 @@ pub fn compile(
             bytes: graph.sources.get(m.source).text.as_bytes().to_vec(),
         })
         .collect::<Vec<_>>();
-    Ok(MacroProgram::new(wasm, binding_plan, hash(&files)))
+    let mut result = MacroProgram::new(wasm, binding_plan, hash(&files));
+    result.metered = true;
+    Ok(result)
 }
 
 /// Invoke a compiler-generated export whose ABI takes and returns Syntax.
@@ -139,8 +143,18 @@ pub fn invoke_with_templates(
 ) -> Result<Syntax> {
     let program = built.host_program().context("load macro program")?;
     let mut imports = ilang_host::HostImports::default();
-    ilang_host::syntax::install_with_templates(&mut imports, templates)
-        .context("install syntax service")?;
+    if built.metered {
+        ilang_host::syntax::install_with_budget(
+            &mut imports,
+            templates,
+            None,
+            None,
+            Default::default(),
+        )
+    } else {
+        ilang_host::syntax::install_with_templates(&mut imports, templates)
+    }
+    .context("install syntax service")?;
     imports.grant_package(&built.binding_plan, &built.trusted_package);
     let mut instance = program
         .instantiate(ilang_host::HostOptions::new(imports))
@@ -159,5 +173,94 @@ pub fn invoke_with_templates(
             .context("macro export returned a value other than Syntax"),
         ilang_host::Outcome::Err(error) => bail!("macro export returned an error: {error:?}"),
         ilang_host::Outcome::Stop(stop) => Err(stop.into()),
+    }
+}
+
+/// The observable completion of one fresh compiler instance. Definition
+/// deferral, compiler failures, and a macro's SyntaxError retain their Syntax
+/// positions and cannot be caught by the guest.
+#[derive(Debug)]
+pub enum RunOutcome {
+    Returned(Syntax),
+    Aborted(ilang_host::syntax::DefinitionAbort),
+    Stopped(ilang_host::Stop),
+}
+
+/// Execute a compiler entry with per-run definition state and templates.
+pub fn invoke_with_context(
+    built: &MacroProgram,
+    export: &str,
+    arguments: &[Syntax],
+    templates: std::sync::Arc<[Syntax]>,
+    context: std::sync::Arc<ilang_host::syntax::DefinitionContext>,
+) -> Result<RunOutcome> {
+    invoke_with_items(built, export, arguments, templates, context, None)
+}
+
+/// Execute with an item journal for an item-position run. The driver commits
+/// its requests and buffered notes only after the result has been validated.
+pub fn invoke_with_items(
+    built: &MacroProgram,
+    export: &str,
+    arguments: &[Syntax],
+    templates: std::sync::Arc<[Syntax]>,
+    context: std::sync::Arc<ilang_host::syntax::DefinitionContext>,
+    items: Option<std::sync::Arc<ilang_host::syntax::ItemContext>>,
+) -> Result<RunOutcome> {
+    invoke_with_items_budget(
+        built,
+        export,
+        arguments,
+        templates,
+        context,
+        items,
+        Default::default(),
+    )
+}
+
+/// Execute with a budget shared with the compiler-side definition resolver.
+pub fn invoke_with_items_budget(
+    built: &MacroProgram,
+    export: &str,
+    arguments: &[Syntax],
+    templates: std::sync::Arc<[Syntax]>,
+    context: std::sync::Arc<ilang_host::syntax::DefinitionContext>,
+    items: Option<std::sync::Arc<ilang_host::syntax::ItemContext>>,
+    budget: ilang_host::macro_budget::MacroBudget,
+) -> Result<RunOutcome> {
+    let program = built.host_program().context("load macro program")?;
+    let mut imports = ilang_host::HostImports::default();
+    ilang_host::syntax::install_with_budget(
+        &mut imports,
+        templates,
+        Some(context.clone()),
+        items,
+        budget.clone(),
+    )
+    .context("install compiler services")?;
+    imports.grant_package(&built.binding_plan, &built.trusted_package);
+    let result = (|| {
+        let mut instance = program.instantiate(ilang_host::HostOptions::new(imports))?;
+        let values = arguments
+            .iter()
+            .cloned()
+            .map(ilang_host::syntax::encode)
+            .collect::<Vec<_>>();
+        instance.call(export, &values)
+    })();
+    if let Some(limit) = budget.exceeded() {
+        return Err(ilang_host::macro_budget::Exceeded(limit).into());
+    }
+    if let Some(abort) = context.take_abort() {
+        return Ok(RunOutcome::Aborted(abort));
+    }
+    match result.context("run compiler export")? {
+        ilang_host::Outcome::Ok(value) => Ok(RunOutcome::Returned(
+            ilang_host::syntax::decode(&value)
+                .cloned()
+                .context("compiler export returned a value other than Syntax")?,
+        )),
+        ilang_host::Outcome::Err(error) => bail!("compiler wrapper leaked an error: {error:?}"),
+        ilang_host::Outcome::Stop(stop) => Ok(RunOutcome::Stopped(stop)),
     }
 }

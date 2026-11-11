@@ -856,6 +856,9 @@ impl<'a> Checker<'a> {
     /// (`Pos`) or a parameter (`Neg`).
     fn check_pattern_places(&mut self, q: &Pattern, pol: Pol) {
         match &q.kind {
+            PatternKind::Quote { captures, .. } => captures
+                .iter()
+                .for_each(|(_, p)| self.check_pattern_places(p, pol)),
             PatternKind::Typed { ty, .. } => self.check_places(ty, pol, 0),
             PatternKind::Named { pattern, .. } => self.check_pattern_places(pattern, pol),
             PatternKind::Constructor { args: ps, .. }

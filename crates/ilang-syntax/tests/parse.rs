@@ -360,7 +360,7 @@ fn core_printer_adds_only_required_groups() {
     let match_fn = core_value("a = v |> { (x) -> (y) { y } }");
     let text = print_core(match_fn.clone());
     assert!(text.contains("-> (y)"), "{text}");
-    let ExprKind::Case { ref clauses, .. } = match_fn.kind else {
+    let ExprKind::Case { clauses, .. } = &match_fn.kind else {
         unreachable!()
     };
     let e = Expr {
@@ -432,7 +432,7 @@ fn a_type_annotation_before_another_choice_has_no_same_code_text() {
     ] {
         let mut m = module(src);
         let next = core_value("a = { f: String -> f }");
-        let ExprKind::Clauses(ref next) = next.kind else {
+        let ExprKind::Clauses(next) = &next.kind else {
             unreachable!()
         };
         let ItemKind::Binding(b) = &mut m.items[0].kind else {

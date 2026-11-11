@@ -39,6 +39,96 @@ fn input() -> Syntax {
 }
 
 #[test]
+fn quote_pattern_selects_original_syntax_and_falls_through() {
+    use ilang_syntax::lisp::syntax::Node;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(@ macro (= choose (-> ((: x (. syntax Syntax))) (. syntax Syntax) (. x { (-> (? `(f ~item) False) item) (-> `(f ~`(g ~item)) item) (-> `(f ~item) item) (-> `(s ~..[first ..rest]) first) (-> (| `(h ~item) `(i ~item)) item) (-> _ x) }))))\n").unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let source = parsed.iter().find(|m| m.path == "app/main").unwrap().source;
+    let mut parsed = ilang_macro::prepare::import_closure(&graph, &parsed, source).unwrap();
+    let templates = ilang_macro::prepare::prepare(&graph, &mut parsed)
+        .unwrap()
+        .templates;
+    let built = ilang_macro::run::compile(&graph, &parsed, &[("app/main", "choose")]).unwrap();
+    let original = input();
+    let Node::Round(children) = original.node() else {
+        panic!("expected round syntax");
+    };
+    let got = ilang_macro::run::invoke_with_templates(
+        &built,
+        "app/main.choose",
+        &[original.clone()],
+        templates.clone().into(),
+    )
+    .unwrap();
+    assert!(got.identical(&children[1]));
+    for code in ["(h a)", "(i a)"] {
+        let choice = Syntax::from_datum(&parse(code).unwrap()[0], original.scope());
+        let Node::Round(children) = choice.node() else {
+            panic!("expected round syntax");
+        };
+        let got = ilang_macro::run::invoke_with_templates(
+            &built,
+            "app/main.choose",
+            &[choice.clone()],
+            templates.clone().into(),
+        )
+        .unwrap();
+        assert!(got.identical(&children[1]));
+    }
+    let empty = Syntax::from_datum(&parse("(s)").unwrap()[0], original.scope());
+    let got = ilang_macro::run::invoke_with_templates(
+        &built,
+        "app/main.choose",
+        &[empty.clone()],
+        templates.clone().into(),
+    )
+    .unwrap();
+    assert!(got.identical(&empty));
+    let nested = Syntax::from_datum(&parse("(f (g y))").unwrap()[0], original.scope());
+    let Node::Round(outer) = nested.node() else {
+        panic!("expected round syntax");
+    };
+    let Node::Round(inner) = outer[1].node() else {
+        panic!("expected nested syntax");
+    };
+    let got = ilang_macro::run::invoke_with_templates(
+        &built,
+        "app/main.choose",
+        &[nested.clone()],
+        templates.clone().into(),
+    )
+    .unwrap();
+    assert!(got.identical(&inner[1]));
+    let spliced = Syntax::from_datum(&parse("(s z q)").unwrap()[0], original.scope());
+    let Node::Round(children) = spliced.node() else {
+        panic!("expected round syntax");
+    };
+    let got = ilang_macro::run::invoke_with_templates(
+        &built,
+        "app/main.choose",
+        &[spliced.clone()],
+        templates.clone().into(),
+    )
+    .unwrap();
+    assert!(got.identical(&children[1]));
+    let other = Syntax::from_datum(&parse("(g x)").unwrap()[0], original.scope());
+    let got = ilang_macro::run::invoke_with_templates(
+        &built,
+        "app/main.choose",
+        &[other.clone()],
+        templates.into(),
+    )
+    .unwrap();
+    assert!(got.identical(&other));
+}
+
+#[test]
 fn syntax_crosses_the_compiler_export_without_losing_identity() {
     let built = build("(syntax = i/syntax)\n(identity)\nidentity = (x: syntax.Syntax) { x }\n");
     let original = input();
@@ -215,4 +305,457 @@ fn compiler_program_selects_only_the_macro_import_closure() {
     )
     .unwrap();
     assert!(result.identical(&original));
+}
+
+#[test]
+fn compiler_run_preserves_uncatchable_macro_error_position() {
+    use ilang_host::syntax::{DefinitionAbort, DefinitionContext, DefinitionReply};
+    use ilang_macro::run::RunOutcome;
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "(syntax = i/syntax)\nreport = (x: syntax.Syntax) -> syntax.Syntax { syntax._report_error(\"bad macro\", x) }\n").unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let (mut parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty());
+    parsed
+        .iter_mut()
+        .find(|m| m.path == "app/main")
+        .unwrap()
+        .compiler_generated = true;
+    let built = ilang_macro::run::compile(&graph, &parsed, &[("app/main", "report")]).unwrap();
+    let original = input();
+    let context = Arc::new(DefinitionContext::new(|at| DefinitionReply::CompileError {
+        message: "unexpected definition".into(),
+        at: at.clone(),
+    }));
+    let result = ilang_macro::run::invoke_with_context(
+        &built,
+        "app/main.report",
+        &[original.clone()],
+        Arc::from([]),
+        context,
+    )
+    .unwrap();
+    let RunOutcome::Aborted(DefinitionAbort::MacroError { message, at }) = result else {
+        panic!("wrong completion: {result:?}")
+    };
+    assert_eq!(message, "bad macro");
+    assert!(at.identical(&original));
+}
+
+#[test]
+fn compiler_wrapper_reports_a_macro_syntax_error_with_original_position() {
+    use ilang_host::syntax::{DefinitionAbort, DefinitionContext, DefinitionReply};
+    use ilang_macro::run::RunOutcome;
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)) (= fail (/ i fail)))\n(, bad)\n(@ macro (= bad (-> ((: x (. syntax Syntax))) (^ (. syntax Syntax) (. syntax SyntaxError)) ((. fail raise) ((. syntax SyntaxError) \"bad\" x)))))\n").unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let source = parsed
+        .iter()
+        .find(|m| m.path == "app/macros")
+        .unwrap()
+        .source;
+    let mut parsed = ilang_macro::prepare::import_closure(&graph, &parsed, source).unwrap();
+    let prepared = ilang_macro::prepare::prepare(&graph, &mut parsed).unwrap();
+    let (path, name) = ilang_macro::prepare::add_wrapper(
+        &mut graph,
+        &mut parsed,
+        &prepared.bindings[0],
+        ilang_macro::prepare::MacroPosition::Item,
+    );
+    let built = ilang_macro::run::compile(&graph, &parsed, &[(&path, &name)]).unwrap();
+    let input = input();
+    let context = Arc::new(DefinitionContext::new(|at| DefinitionReply::CompileError {
+        message: "unexpected query".into(),
+        at: at.clone(),
+    }));
+    let result = ilang_macro::run::invoke_with_context(
+        &built,
+        &format!("{path}.{name}"),
+        &[input.clone()],
+        prepared.templates.into(),
+        context,
+    )
+    .unwrap();
+    let RunOutcome::Aborted(DefinitionAbort::MacroError { message, at }) = result else {
+        panic!("wrong completion: {result:?}")
+    };
+    assert_eq!(message, "bad");
+    assert!(at.identical(&input));
+}
+
+#[test]
+fn compiler_wrapper_returns_a_successful_macro_value() {
+    use ilang_host::syntax::{DefinitionContext, DefinitionReply};
+    use ilang_macro::run::RunOutcome;
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, wrap)\n(@ macro (= wrap (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(wrapped ~x))))\n").unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty());
+    let source = parsed
+        .iter()
+        .find(|m| m.path == "app/macros")
+        .unwrap()
+        .source;
+    let mut parsed = ilang_macro::prepare::import_closure(&graph, &parsed, source).unwrap();
+    let prepared = ilang_macro::prepare::prepare(&graph, &mut parsed).unwrap();
+    let (path, name) = ilang_macro::prepare::add_wrapper(
+        &mut graph,
+        &mut parsed,
+        &prepared.bindings[0],
+        ilang_macro::prepare::MacroPosition::Item,
+    );
+    let built = ilang_macro::run::compile(&graph, &parsed, &[(&path, &name)]).unwrap();
+    let context = Arc::new(DefinitionContext::new(|at| DefinitionReply::CompileError {
+        message: "unexpected query".into(),
+        at: at.clone(),
+    }));
+    let result = ilang_macro::run::invoke_with_context(
+        &built,
+        &format!("{path}.{name}"),
+        &[input()],
+        prepared.templates.clone().into(),
+        context,
+    )
+    .unwrap();
+    let RunOutcome::Returned(value) = result else {
+        panic!("wrong completion: {result:?}")
+    };
+    assert_eq!(value.show(), "(wrapped (f x))");
+    let budget = ilang_host::macro_budget::MacroBudget::new(ilang_host::macro_budget::Limits {
+        work: 1,
+        allocation: u64::MAX,
+        frames: u64::MAX,
+    });
+    let context = Arc::new(DefinitionContext::new(|at| DefinitionReply::CompileError {
+        message: "unexpected query".into(),
+        at: at.clone(),
+    }));
+    let error = ilang_macro::run::invoke_with_items_budget(
+        &built,
+        &format!("{path}.{name}"),
+        &[input()],
+        prepared.templates.into(),
+        context,
+        None,
+        budget.clone(),
+    )
+    .unwrap_err();
+    assert_eq!(
+        budget.exceeded(),
+        Some(ilang_host::macro_budget::Limit::Work)
+    );
+    assert_eq!(
+        error.downcast_ref::<ilang_host::macro_budget::Exceeded>(),
+        Some(&ilang_host::macro_budget::Exceeded(
+            ilang_host::macro_budget::Limit::Work
+        ))
+    );
+}
+
+#[test]
+fn compiler_wrapper_rejects_a_macro_with_the_wrong_result_type() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/macros.is"),
+        "(, wrong)\n(@ macro (= wrong (-> (x) _ 1)))\n",
+    )
+    .unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty());
+    let source = parsed
+        .iter()
+        .find(|m| m.path == "app/macros")
+        .unwrap()
+        .source;
+    let mut parsed = ilang_macro::prepare::import_closure(&graph, &parsed, source).unwrap();
+    let prepared = ilang_macro::prepare::prepare(&graph, &mut parsed).unwrap();
+    let (path, name) = ilang_macro::prepare::add_wrapper(
+        &mut graph,
+        &mut parsed,
+        &prepared.bindings[0],
+        ilang_macro::prepare::MacroPosition::Item,
+    );
+    let error = match ilang_macro::run::compile(&graph, &parsed, &[(&path, &name)]) {
+        Ok(_) => panic!("wrong macro result accepted"),
+        Err(e) => e,
+    };
+    assert!(
+        matches!(error, ilang_macro::run::CompileError::Program(ref diags) if diags.iter().any(|d| d.is_error())),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn compiler_wrapper_buffers_items_and_notes_for_success() {
+    use ilang_host::syntax::{DefinitionContext, DefinitionReply, ItemContext, ItemRequest};
+    use ilang_macro::run::RunOutcome;
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, keep)\n(@ macro (= keep (-> (x (! it (. syntax Items)) (! d (. syntax Diagnostics))) _ { ((. d note) \"note\") ((. it expose) x) x })))\n").unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let source = parsed
+        .iter()
+        .find(|m| m.path == "app/macros")
+        .unwrap()
+        .source;
+    let mut parsed = ilang_macro::prepare::import_closure(&graph, &parsed, source).unwrap();
+    let prepared = ilang_macro::prepare::prepare(&graph, &mut parsed).unwrap();
+    let (path, name) = ilang_macro::prepare::add_wrapper(
+        &mut graph,
+        &mut parsed,
+        &prepared.bindings[0],
+        ilang_macro::prepare::MacroPosition::Item,
+    );
+    let built = ilang_macro::run::compile(&graph, &parsed, &[(&path, &name)]).unwrap();
+    let argument = Syntax::from_datum(
+        &parse("public").unwrap()[0],
+        &Scope {
+            module: 7,
+            marks: BTreeSet::new(),
+        },
+    );
+    let context = Arc::new(DefinitionContext::new(|at| DefinitionReply::CompileError {
+        message: "unexpected query".into(),
+        at: at.clone(),
+    }));
+    let items = Arc::new(ItemContext::new(
+        Arc::from([argument.clone()]),
+        argument.clone(),
+    ));
+    let outcome = ilang_macro::run::invoke_with_items(
+        &built,
+        &format!("{path}.{name}"),
+        &[argument.clone()],
+        prepared.templates.into(),
+        context.clone(),
+        Some(items.clone()),
+    )
+    .unwrap();
+    let RunOutcome::Returned(result) = outcome else {
+        panic!("wrong completion: {outcome:?}")
+    };
+    assert!(result.identical(&argument));
+    assert_eq!(context.take_notes(), ["note"]);
+    let requests = items.take_requests();
+    assert!(
+        matches!(requests.as_slice(), [ItemRequest::Expose { name }] if name.identical(&argument))
+    );
+}
+
+#[test]
+fn expression_macro_requiring_items_is_rejected_before_execution() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, keep)\n(@ macro (= keep (-> (x (! it (. syntax Items))) _ { ((. it expose) x) x })))\n").unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty());
+    let source = parsed
+        .iter()
+        .find(|m| m.path == "app/macros")
+        .unwrap()
+        .source;
+    let mut parsed = ilang_macro::prepare::import_closure(&graph, &parsed, source).unwrap();
+    let prepared = ilang_macro::prepare::prepare(&graph, &mut parsed).unwrap();
+    let (path, name) = ilang_macro::prepare::add_wrapper(
+        &mut graph,
+        &mut parsed,
+        &prepared.bindings[0],
+        ilang_macro::prepare::MacroPosition::Expression,
+    );
+    let error = match ilang_macro::run::compile(&graph, &parsed, &[(&path, &name)]) {
+        Ok(_) => panic!("Items was allowed in an expression macro"),
+        Err(e) => e,
+    };
+    assert!(
+        matches!(error, ilang_macro::run::CompileError::Program(ref diags) if diags.iter().any(|d| d.is_error())),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn expansion_preserves_sharing_between_output_and_item_request() {
+    use ilang_host::syntax::{DefinitionReply, ItemRequest};
+    use ilang_macro::session::{Expanded, Session};
+    use ilang_syntax::lisp::expansion::{MacroArgument, MacroDefinition};
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, keep)\n(@ macro (= keep (-> (x (! it (. syntax Items))) _ { ((. it expose) x) x })))\n").unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty());
+    let source = parsed
+        .iter()
+        .find(|m| m.path == "app/macros")
+        .unwrap()
+        .source;
+    let mut parsed = ilang_macro::prepare::import_closure(&graph, &parsed, source).unwrap();
+    let prepared = ilang_macro::prepare::prepare(&graph, &mut parsed).unwrap();
+    let (path, name) = ilang_macro::prepare::add_wrapper(
+        &mut graph,
+        &mut parsed,
+        &prepared.bindings[0],
+        ilang_macro::prepare::MacroPosition::Item,
+    );
+    let built = ilang_macro::run::compile(&graph, &parsed, &[(&path, &name)]).unwrap();
+    let argument = Syntax::from_datum(
+        &parse("public").unwrap()[0],
+        &Scope {
+            module: 7,
+            marks: BTreeSet::new(),
+        },
+    );
+    let definition = MacroDefinition {
+        item: 0,
+        name: "keep".into(),
+        parameters: vec!["x".into()],
+    };
+    let mut session = Session::default();
+    let expanded = session
+        .run(
+            &definition,
+            &[MacroArgument {
+                label: None,
+                syntax: argument.clone(),
+            }],
+            None,
+            &argument,
+            ilang_macro::prepare::MacroPosition::Item,
+            &built,
+            &format!("{path}.{name}"),
+            prepared.templates.into(),
+            Arc::new(|at, _budget| DefinitionReply::CompileError {
+                message: "unexpected query".into(),
+                at: at.clone(),
+            }),
+            |_, syntax| {
+                Ok(Expanded {
+                    syntax,
+                    transactions: Vec::new(),
+                })
+            },
+        )
+        .unwrap();
+    assert_eq!(expanded.syntax.scope(), argument.scope());
+    let [transaction] = expanded.transactions.as_slice() else {
+        panic!("missing transaction")
+    };
+    assert!(
+        matches!(transaction.requests.as_slice(), [ItemRequest::Expose { name }] if name.identical(&expanded.syntax))
+    );
+}
+
+#[test]
+fn separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged() {
+    use ilang_host::syntax::DefinitionReply;
+    use ilang_macro::session::{Expanded, Session};
+    use ilang_syntax::lisp::{
+        expansion::{MacroArgument, MacroDefinition},
+        syntax::Node,
+    };
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/macros.is"),
+        "(, (= syntax (/ i syntax)))\n(, wrap)\n(@ macro (= wrap (-> (x) _ `(wrapped ~x))))\n",
+    )
+    .unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty());
+    let source = parsed
+        .iter()
+        .find(|m| m.path == "app/macros")
+        .unwrap()
+        .source;
+    let mut parsed = ilang_macro::prepare::import_closure(&graph, &parsed, source).unwrap();
+    let prepared = ilang_macro::prepare::prepare(&graph, &mut parsed).unwrap();
+    let (path, name) = ilang_macro::prepare::add_wrapper(
+        &mut graph,
+        &mut parsed,
+        &prepared.bindings[0],
+        ilang_macro::prepare::MacroPosition::Expression,
+    );
+    let built = ilang_macro::run::compile(&graph, &parsed, &[(&path, &name)]).unwrap();
+    let definition = MacroDefinition {
+        item: 0,
+        name: "wrap".into(),
+        parameters: vec!["x".into()],
+    };
+    let argument = input();
+    let templates: Arc<[Syntax]> = prepared.templates.into();
+    let resolver: Arc<ilang_macro::session::DefinitionResolver> =
+        Arc::new(|at, _budget| DefinitionReply::CompileError {
+            message: "unexpected query".into(),
+            at: at.clone(),
+        });
+    let mut session = Session::default();
+    let mut run = || {
+        session
+            .run(
+                &definition,
+                &[MacroArgument {
+                    label: None,
+                    syntax: argument.clone(),
+                }],
+                None,
+                &argument,
+                ilang_macro::prepare::MacroPosition::Expression,
+                &built,
+                &format!("{path}.{name}"),
+                templates.clone(),
+                resolver.clone(),
+                |_, syntax| {
+                    Ok(Expanded {
+                        syntax,
+                        transactions: Vec::new(),
+                    })
+                },
+            )
+            .unwrap()
+            .syntax
+    };
+    let a = run();
+    let b = run();
+    assert!(a.same_code(&b));
+    assert_ne!(a.scope().marks, b.scope().marks);
+    let (Node::Round(a), Node::Round(b)) = (a.node(), b.node()) else {
+        panic!("macro must return a round datum")
+    };
+    assert_eq!(a[1].scope(), argument.scope());
+    assert_eq!(b[1].scope(), argument.scope());
+    assert_eq!(a[0].scope().marks.len(), 1);
+    assert_eq!(b[0].scope().marks.len(), 1);
 }

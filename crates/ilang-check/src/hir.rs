@@ -514,6 +514,13 @@ pub struct Binder {
 
 #[derive(Clone, Debug)]
 pub enum PatternKind {
+    /// Compiler-generated syntax matcher and its captures.
+    Quote {
+        template: u32,
+        syntax: TypeId,
+        functions: [DefId; 5],
+        captures: Vec<(bool, Pattern)>,
+    },
     Var(Binder),
     Discard,
     /// `x: T` or `_: T`.
@@ -769,6 +776,9 @@ pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
                 work.push(Node::Pattern(&b.pattern));
             }
             Node::Pattern(p) => match &p.kind {
+                PatternKind::Quote { captures, .. } => {
+                    work.extend(captures.iter().rev().map(|(_, p)| Node::Pattern(p)))
+                }
                 PatternKind::Typed { ty, .. } => work.push(Node::Type(ty)),
                 PatternKind::Named { pattern, .. } => work.push(Node::Pattern(pattern)),
                 PatternKind::Constructor { args, .. }

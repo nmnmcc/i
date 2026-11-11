@@ -112,6 +112,126 @@ fn quote_splices_are_checked_in_their_written_position() {
 }
 
 #[test]
+fn quote_pattern_captures_follow_the_syntax_matcher_order() {
+    use ilang_syntax::ast::PatternKind;
+    use ilang_syntax::lisp::parse_pattern;
+
+    let quote = parse("`(f [~first {~second}] ~..rest)").unwrap();
+    let pattern = parse_pattern(&quote[0]).unwrap();
+    let PatternKind::Quote { captures, .. } = &pattern.kind else {
+        panic!("quote pattern");
+    };
+    assert_eq!(captures.len(), 3);
+    for (capture, name) in captures.iter().zip(["first", "second", "rest"]) {
+        assert!(matches!(&capture.1.kind, PatternKind::Var(n) if n == name));
+    }
+    assert_eq!(
+        captures.iter().map(|c| c.0).collect::<Vec<_>>(),
+        [false, false, true]
+    );
+
+    let outer = parse("`(f ~`(g ~inner))").unwrap();
+    let pattern = parse_pattern(&outer[0]).unwrap();
+    let PatternKind::Quote { captures, .. } = &pattern.kind else {
+        panic!("quote pattern");
+    };
+    assert_eq!(captures.len(), 1);
+    let PatternKind::Quote {
+        captures: inner, ..
+    } = &captures[0].1.kind
+    else {
+        panic!("the capture must retain its nested quote pattern");
+    };
+    assert!(matches!(&inner[0].1.kind, PatternKind::Var(n) if n == "inner"));
+    assert!(parse_pattern(&outer[0]).is_ok());
+}
+
+#[test]
+fn compiler_preparation_registers_nested_quote_pattern_templates() {
+    use ilang_syntax::ast::{ExprKind, ItemKind, Param, PatternKind};
+    use ilang_syntax::lisp::quote_lower::lower_expression_quotes;
+    use ilang_syntax::lisp::syntax::Node;
+    let mut module =
+        ilang_syntax::lisp::parse_module(&parse("(= f (-> (`(f ~`(g ~x))) _ x))").unwrap())
+            .unwrap();
+    let mut templates = Vec::new();
+    lower_expression_quotes(&mut module, 7, &mut templates);
+    assert_eq!(templates.len(), 2);
+    assert!(templates.iter().all(|s| matches!(s.node(), Node::Quote(_))));
+    let ItemKind::Binding(binding) = &module.items[0].kind else {
+        panic!("binding");
+    };
+    let ExprKind::Fn(function) = &binding.value.kind else {
+        panic!("function");
+    };
+    let Param::Pattern(pattern) = &function.params[0] else {
+        panic!("pattern");
+    };
+    let PatternKind::Quote {
+        template, captures, ..
+    } = &pattern.kind
+    else {
+        panic!("quote");
+    };
+    assert_eq!(*template, Some(0));
+    assert!(matches!(
+        &captures[0].1.kind,
+        PatternKind::Quote {
+            template: Some(1),
+            ..
+        }
+    ));
+}
+
+#[test]
+fn quote_capture_collection_handles_deep_templates() {
+    use ilang_syntax::ast::PatternKind;
+    use ilang_syntax::lisp::{Datum, DatumKind, parse_pattern};
+    use ilang_syntax::span::Span;
+    let datum = |kind| Datum {
+        kind,
+        span: Span::new(0, 0),
+        docs: Vec::new(),
+    };
+    let mut body = datum(DatumKind::Unquote(Box::new(datum(DatumKind::Name(
+        "x".into(),
+    )))));
+    for _ in 0..10_000 {
+        body = datum(DatumKind::Round(vec![body]));
+    }
+    let quote = datum(DatumKind::Quote(Box::new(body)));
+    let pattern = parse_pattern(&quote).unwrap();
+    assert!(matches!(&pattern.kind, PatternKind::Quote { captures, .. } if captures.len() == 1));
+}
+
+#[test]
+fn nested_quote_captures_use_the_parser_work_stack() {
+    use ilang_syntax::ast::PatternKind;
+    use ilang_syntax::lisp::{Datum, DatumKind, parse_pattern};
+    use ilang_syntax::span::Span;
+    let datum = |kind| Datum {
+        kind,
+        span: Span::new(0, 0),
+        docs: Vec::new(),
+    };
+    let mut nested = datum(DatumKind::Name("x".into()));
+    for _ in 0..256 {
+        nested = datum(DatumKind::Quote(Box::new(datum(DatumKind::Round(vec![
+            datum(DatumKind::Unquote(Box::new(nested))),
+        ])))));
+    }
+    let pattern = parse_pattern(&nested).unwrap();
+    let mut at = &pattern;
+    for _ in 0..256 {
+        let PatternKind::Quote { captures, .. } = &at.kind else {
+            panic!("nested quote");
+        };
+        at = &captures[0].1;
+    }
+    assert!(matches!(&at.kind, PatternKind::Var(name) if name == "x"));
+}
+
+#[test]
 fn invalid_datums_do_not_make_core_items() {
     for source in ["(= x (1 .. 2))", "(= x [.. 1])"] {
         let document = parse(source).unwrap();

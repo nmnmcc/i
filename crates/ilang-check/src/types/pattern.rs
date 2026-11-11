@@ -26,6 +26,7 @@ pub(crate) fn catch_all(p: &Pattern) -> bool {
 /// The names a pattern binds.
 pub(crate) fn binders(p: &Pattern, out: &mut Vec<VarId>) {
     match &p.kind {
+        PatternKind::Quote { captures, .. } => captures.iter().for_each(|(_, p)| binders(p, out)),
         PatternKind::Var(b) => out.push(b.var),
         PatternKind::Typed { binder, .. } => out.extend(binder.as_ref().map(|b| b.var)),
         PatternKind::Named { binder, pattern } => {
@@ -153,10 +154,14 @@ impl Checker<'_> {
     /// Fits `q` to `b` (§4.8): a catch-all gives its names `b`; any other
     /// pattern needs `b <: Q`, with its parts fitted to the parts of `Q`.
     pub fn fit(&mut self, q: &Pattern, b: &Ty) {
+        self.fit_in(q, b, false);
+    }
+
+    fn fit_in(&mut self, q: &Pattern, b: &Ty, in_case: bool) {
         if catch_all(q) {
-            self.bind_catch_all(q, b, false);
+            self.bind_catch_all(q, b, in_case);
         } else {
-            let t = self.pat(q);
+            let t = self.pat(q, in_case);
             self.sub(b, &t, q.span);
         }
     }
@@ -164,23 +169,27 @@ impl Checker<'_> {
     /// The type of a parameter (rule 4): a new variable for a catch-all,
     /// and else the pattern type.
     pub fn param(&mut self, q: &Pattern) -> Ty {
+        self.param_in(q, false)
+    }
+
+    fn param_in(&mut self, q: &Pattern, in_case: bool) -> Ty {
         if catch_all(q) {
             let v = self.s.fresh();
-            self.bind_catch_all(q, &v, false);
+            self.bind_catch_all(q, &v, in_case);
             v
         } else {
-            self.pat(q)
+            self.pat(q, in_case)
         }
     }
 
     /// The pattern type `Q` of a pattern that is not a catch-all; its parts
     /// are fitted to the parts of `Q`.
-    fn pat(&mut self, q: &Pattern) -> Ty {
+    fn pat(&mut self, q: &Pattern, in_case: bool) -> Ty {
         match &q.kind {
-            PatternKind::Var(_) | PatternKind::Discard => self.param(q),
+            PatternKind::Var(_) | PatternKind::Discard => self.param_in(q, in_case),
             PatternKind::Named { binder, pattern } => {
-                let t = self.param(pattern);
-                self.bind(binder, t.clone(), false);
+                let t = self.param_in(pattern, in_case);
+                self.bind(binder, t.clone(), in_case);
                 self.note_known(binder, pattern);
                 t
             }
@@ -188,7 +197,7 @@ impl Checker<'_> {
                 let t = self.conv(ty, &HashMap::new());
                 if let Some(b) = binder {
                     self.written.insert(b.var, ty.clone());
-                    self.bind(b, t.clone(), false);
+                    self.bind(b, t.clone(), in_case);
                 }
                 t
             }
@@ -197,23 +206,25 @@ impl Checker<'_> {
                 let fields = self.ctor_fields(*ctor, &targs);
                 for (arg, i) in self.match_fields(q.span, &fields, args, *spread) {
                     let ft = fields[i].1.clone();
-                    self.fit(arg, &ft);
+                    self.fit_in(arg, &ft, in_case);
                 }
                 Ty::named(TypeRef::Custom(ctor.ty), targs)
             }
-            PatternKind::Tuple(ps) => Ty::tuple(ps.iter().map(|x| self.param(x)).collect()),
+            PatternKind::Tuple(ps) => {
+                Ty::tuple(ps.iter().map(|x| self.param_in(x, in_case)).collect())
+            }
             PatternKind::List { items, rest } => {
                 let e = self.s.fresh();
                 for x in items {
-                    self.fit(x, &e);
+                    self.fit_in(x, &e, in_case);
                 }
                 let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![e]);
                 if let Some(Some(b)) = rest {
-                    self.bind(b, list.clone(), false);
+                    self.bind(b, list.clone(), in_case);
                 }
                 list
             }
-            _ => self.leaf(q, false, false),
+            _ => self.leaf(q, in_case, false),
         }
     }
 
@@ -222,6 +233,25 @@ impl Checker<'_> {
     fn leaf(&mut self, q: &Pattern, in_case: bool, literal: bool) -> Ty {
         let prim = |b| Ty::named(TypeRef::Builtin(b), Vec::new());
         match &q.kind {
+            PatternKind::Quote {
+                syntax, captures, ..
+            } => {
+                let one = Ty::named(TypeRef::Custom(*syntax), Vec::new());
+                for (many, pattern) in captures {
+                    let ty = if *many {
+                        Ty::named(TypeRef::Builtin(BuiltinType::List), vec![one.clone()])
+                    } else {
+                        one.clone()
+                    };
+                    if catch_all(pattern) {
+                        self.bind_catch_all(pattern, &ty, in_case);
+                    } else {
+                        let actual = self.pat(pattern, in_case);
+                        self.sub(&ty, &actual, pattern.span);
+                    }
+                }
+                one
+            }
             PatternKind::Int { negative, value } if literal => super::known::scalar_literal(
                 BuiltinType::Int,
                 super::lits::int_text(*negative, value),
@@ -245,7 +275,7 @@ impl Checker<'_> {
                     if catch_all(&s.value) {
                         self.bind_catch_all(&s.value, &ft, in_case);
                     } else {
-                        let t = self.pat(&s.value);
+                        let t = self.pat(&s.value, in_case);
                         self.sub(&ft, &t, s.value.span);
                     }
                 }
@@ -1143,6 +1173,9 @@ fn top_ctor(p: &Pattern) -> Option<CtorRef> {
 /// bound through `x = C(…)` (§7.5).
 fn ctor_binders(p: &Pattern, out: &mut Vec<(VarId, Option<CtorRef>)>) {
     match &p.kind {
+        PatternKind::Quote { captures, .. } => {
+            captures.iter().for_each(|(_, p)| ctor_binders(p, out))
+        }
         PatternKind::Named { binder, pattern } => {
             out.push((binder.var, top_ctor(pattern)));
             ctor_binders(pattern, out);
