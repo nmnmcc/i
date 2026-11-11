@@ -167,3 +167,21 @@ baseline but the migrated build timed out at both 12 and 120 seconds. The
 baseline `review-k4/perf/wide_generic_2048` also timed out at both limits.
 Both use the same `i build --offline --opt 0 --wat --project <path> --out
 <file>` reproduction described above.
+
+Final manifest WAT comparison: 3,041 baseline WAT files and 3,043 migrated
+files; all 3,039 common files are byte-identical, with no differing common
+programs. Two baseline programs have no migrated WAT because their 120-second
+retries timed out: `review-k4/perf/wide_generic_1024` and
+`review-k4c/cases/stress_wide_open_1024`. Five other baseline stress programs
+(`wide_generic_2048` and `mutual100`, `mutual150`, `mutual200`, `mutual300`)
+timed out in both baseline attempts, so neither side was compared. Of 19
+initial timeouts, 12 paired retries completed byte-identically.
+
+Four migrated programs have newly generated WAT. The three
+`review-r2/deep_50`, `deep_200`, and `deep_1000` cases were rejected on the
+merged baseline because their annotations lacked `request.Root` and
+`request.Owner`; those services were added, and their required checks and runs
+now pass. `crates/ilang-check/tests/projects/entry_dependency` was rejected on
+the baseline by a legacy `@main` on a non-function in a dependency; that
+annotation has been removed, and dependency entries have no effect on the
+root package (§2.6).
