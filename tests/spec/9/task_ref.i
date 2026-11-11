@@ -6,7 +6,7 @@
 
 main = () {
 	task.run(() {
-		state = task.cell(0)
+		state = task.ref(0)
 		task.scope((s) {
 			left = task.go(s, () { task.update(state, (n) { (n + 1, Nil) }) })
 			right = task.go(s, () { task.update(state, (n) { (n + 1, Nil) }) })

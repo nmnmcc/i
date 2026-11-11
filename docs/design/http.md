@@ -43,7 +43,7 @@ trailers after the body ends. The reader is valid during the handler call.
 The server drains any unread body before parsing another request, preserving
 pipelined bytes. `serve` uses this reader to provide its buffered Request API.
 
-Pool and body-reader state use ordinary scope-owned `task.cell` values and
+Pool and body-reader state use ordinary scope-owned `task.ref` values and
 pure atomic `task.update` callbacks. No HTTP state is held in the compiler or
 host. The general service-row checker preserves arbitrary services when a
 network client is passed through `send_timeout`.
