@@ -13,6 +13,9 @@
 //// write(E,N): (entry: Entry)->Nil ? E ! N | Sink(E,N)
 //// lazy(E,F,N): (level: Level, message: ()->String ? F ! N)->Nil ? E | F ! N | Sink(E,N)
 //// format: (entry: Entry)->String
+//// stderr/stdout: () -> Sink for the corresponding stream
+//// file: (path: String) -> Sink appending formatted lines
+//// timestamped: (entry: Entry) -> Entry, reading the Unix clock
 ////
 //// Level order is Debug < Info < Warning < Failure. Entry strings are arbitrary;
 //// fields preserve order and duplicate keys. Timestamps are explicit Unix
@@ -43,10 +46,13 @@
 //// entries arrive in sequential call order; filter(s,always_true) preserves
 //// delivery; minimum(minimum(s,a),b) uses threshold max(a,b). No callback
 //// termination guarantee is added. Generic client use awaits the §7 compiler
-//// gate; closed service clients are supported. No IO adapter is exported yet.
+//// IO adapters are explicit and use the same sink service.
 
 (
 	i/core
+	i/stdio
+	i/fs
+	i/resource
 	std/list
 	std/int
 	std/time
@@ -65,6 +71,10 @@
 	write
 	lazy
 	format
+	stderr
+	stdout
+	file
+	timestamped
 )
 
 Level {
@@ -186,3 +196,31 @@ escape = (codepoint: UtfCodepoint) -> String {
 		_ -> core.from_codepoints([codepoint])
 	}
 }
+
+/// A sink that writes each formatted entry to standard error.
+stderr = () {
+	make((_: Level) { True }, (entry) { stdio.print_error(format(entry)) })
+}
+
+/// A sink that writes each formatted entry to standard output.
+stdout = () {
+	make((_: Level) { True }, (entry) { stdio.print(format(entry)) })
+}
+
+/// A sink that appends each formatted entry to a file.
+file = (path: String) {
+	make((_: Level) { True }, (entry) {
+		resource.acquire(
+			() { fs.open(path, fs.Append) }
+			(i) { fs.close(i) }
+			(i) {
+				text = format(entry) <> "\n"
+				fs.write(i, <<text:utf8>>)
+				fs.flush(i)
+			}
+		)
+	})
+}
+
+/// Adds the current Unix time to an entry.
+timestamped = (entry: Entry) { Entry(..entry, at: Some(time.now())) }
