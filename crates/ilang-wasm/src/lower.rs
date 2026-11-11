@@ -245,14 +245,14 @@ fn guard(out: &mut Vec<Stmt>, cond: Cond, fail: Label) {
 }
 
 /// `{ e }` with one expression is `e` (§6.10).
-fn ungroup(e: &Expr) -> &Expr {
-    match &e.kind {
-        ExprKind::Block(b) if b.stmts.len() == 1 => match &b.stmts[0] {
-            hir::Stmt::Expr(inner) => ungroup(inner),
-            _ => e,
-        },
-        _ => e,
+fn ungroup(mut e: &Expr) -> &Expr {
+    while let ExprKind::Block(b) = &e.kind {
+        let [hir::Stmt::Expr(inner)] = &b.stmts[..] else {
+            break;
+        };
+        e = inner;
     }
+    e
 }
 
 /// The names that a pattern binds.
@@ -266,100 +266,186 @@ fn pattern_vars(p: &Pattern, out: &mut HashSet<VarId>) {
 /// an expression. Unlike Wasm locals this is independent of code generation
 /// and optimization. Earlier call arguments remain pending while later ones
 /// (including a recursive call) are evaluated.
-fn pending_values<'a>(values: impl IntoIterator<Item = &'a Expr>) -> usize {
-    let mut held = 0;
-    let mut peak = 1;
-    for value in values {
-        peak = peak.max(held + expression_values(value));
-        held += 1;
-    }
-    peak.max(held)
+// Compute the source-level pending-value bound with a postorder worklist.
+// A macro may generate a tree much deeper than the compiler's host stack.
+enum Measure<'a> {
+    Expr(&'a Expr),
+    Pattern(&'a Pattern),
+    Block(&'a Block),
+    Clause(&'a Clause),
+    Binding(&'a Binding),
+    Finish(MeasureOp, usize),
 }
-
-fn pattern_values(p: &Pattern) -> usize {
-    match &p.kind {
-        PatternKind::Named { pattern, .. } => 1 + pattern_values(pattern),
-        PatternKind::Constructor { args, .. }
-        | PatternKind::Tuple(args)
-        | PatternKind::Error(args) => 1 + args.iter().map(pattern_values).sum::<usize>(),
-        PatternKind::List { items, .. } => 1 + items.iter().map(pattern_values).sum::<usize>(),
-        PatternKind::BitArray(segments) => {
-            1 + segments
-                .iter()
-                .map(|s| {
-                    pattern_values(&s.value)
-                        + s.format
-                            .as_ref()
-                            .and_then(|f| f.arg.as_deref())
-                            .map_or(0, expression_values)
-                })
-                .sum::<usize>()
-        }
-        PatternKind::Var(_)
-        | PatternKind::Discard
-        | PatternKind::Typed { .. }
-        | PatternKind::Int { .. }
-        | PatternKind::Float { .. }
-        | PatternKind::String(_)
-        | PatternKind::Prefix { .. } => 1,
-    }
+#[derive(Clone, Copy)]
+enum MeasureOp {
+    Max,
+    SumPlusOne,
+    Pending,
+    Case,
 }
-
-fn block_values(block: &hir::Block) -> usize {
-    block
-        .stmts
-        .iter()
-        .map(|stmt| match stmt {
-            hir::Stmt::Bind(binding) => {
-                expression_values(&binding.value).max(pattern_values(&binding.pattern))
-            }
-            hir::Stmt::Env { value, .. } | hir::Stmt::Expr(value) => expression_values(value),
-        })
-        .max()
-        .unwrap_or(1)
-}
-
-fn expression_values(e: &Expr) -> usize {
-    match &e.kind {
-        ExprKind::Int(_)
-        | ExprKind::Float(_)
-        | ExprKind::String(_)
-        | ExprKind::Name(_)
-        | ExprKind::Error
-        | ExprKind::Fn(_) => 1,
-        ExprKind::Tuple(items) => pending_values(items),
-        ExprKind::List { items, rest } => pending_values(items.iter().chain(rest.as_deref())),
-        ExprKind::BitArray(segments) => pending_values(segments.iter().flat_map(|s| {
-            std::iter::once(&s.value).chain(s.format.as_ref().and_then(|f| f.arg.as_deref()))
-        })),
-        ExprKind::Block(block) => block_values(block),
-        ExprKind::Case { subject, clauses } => expression_values(subject).max(
-            1 + clauses
-                .iter()
-                .map(|clause| {
-                    clause
-                        .patterns
+fn measure(root: Measure<'_>) -> usize {
+    let mut work = vec![root];
+    let mut values: Vec<usize> = Vec::new();
+    while let Some(node) = work.pop() {
+        let mut children = Vec::new();
+        let op = match node {
+            Measure::Finish(op, count) => {
+                let start = values
+                    .len()
+                    .checked_sub(count)
+                    .expect("measure child count");
+                let args = &values[start..];
+                let value = match op {
+                    MeasureOp::Max => args.iter().copied().max().unwrap_or(1),
+                    MeasureOp::SumPlusOne => 1 + args.iter().sum::<usize>(),
+                    MeasureOp::Pending => args
                         .iter()
-                        .map(pattern_values)
-                        .max()
-                        .unwrap_or(1)
-                        .max(clause.guard.as_ref().map_or(1, expression_values))
-                        .max(expression_values(&clause.body))
-                })
-                .max()
-                .unwrap_or(1),
-        ),
-        ExprKind::Call { callee, args } => {
-            pending_values(std::iter::once(callee.as_ref()).chain(args.iter().map(|a| &a.value)))
-        }
-        ExprKind::Field { target, .. }
-        | ExprKind::TupleIndex { target, .. }
-        | ExprKind::Unary { expr: target, .. } => expression_values(target),
-        ExprKind::RecordUpdate { base, fields, .. } => pending_values(
-            std::iter::once(base.as_ref()).chain(fields.iter().map(|(_, value)| value)),
-        ),
-        ExprKind::Binary { lhs, rhs, .. } => pending_values([lhs.as_ref(), rhs.as_ref()]),
+                        .enumerate()
+                        .fold(1usize.max(args.len()), |peak, (held, value)| {
+                            peak.max(held + value)
+                        }),
+                    MeasureOp::Case => {
+                        args[0].max(1 + args[1..].iter().copied().max().unwrap_or(1))
+                    }
+                };
+                values.truncate(start);
+                values.push(value);
+                continue;
+            }
+            Measure::Expr(e) => match &e.kind {
+                ExprKind::Int(_)
+                | ExprKind::Float(_)
+                | ExprKind::String(_)
+                | ExprKind::Name(_)
+                | ExprKind::Error
+                | ExprKind::Fn(_) => {
+                    values.push(1);
+                    continue;
+                }
+                ExprKind::Tuple(xs) => {
+                    children.extend(xs.iter().map(Measure::Expr));
+                    MeasureOp::Pending
+                }
+                ExprKind::List { items, rest } => {
+                    children.extend(items.iter().chain(rest.as_deref()).map(Measure::Expr));
+                    MeasureOp::Pending
+                }
+                ExprKind::BitArray(xs) => {
+                    children.extend(
+                        xs.iter()
+                            .flat_map(|x| {
+                                std::iter::once(&x.value)
+                                    .chain(x.format.as_ref().and_then(|f| f.arg.as_deref()))
+                            })
+                            .map(Measure::Expr),
+                    );
+                    MeasureOp::Pending
+                }
+                ExprKind::Block(b) => {
+                    children.push(Measure::Block(b));
+                    MeasureOp::Max
+                }
+                ExprKind::Case { subject, clauses } => {
+                    children.push(Measure::Expr(subject));
+                    children.extend(clauses.iter().map(Measure::Clause));
+                    MeasureOp::Case
+                }
+                ExprKind::Call { callee, args } => {
+                    children.push(Measure::Expr(callee));
+                    children.extend(args.iter().map(|a| Measure::Expr(&a.value)));
+                    MeasureOp::Pending
+                }
+                ExprKind::Field { target, .. }
+                | ExprKind::TupleIndex { target, .. }
+                | ExprKind::Unary { expr: target, .. } => {
+                    children.push(Measure::Expr(target));
+                    MeasureOp::Max
+                }
+                ExprKind::RecordUpdate { base, fields, .. } => {
+                    children.push(Measure::Expr(base));
+                    children.extend(fields.iter().map(|(_, x)| Measure::Expr(x)));
+                    MeasureOp::Pending
+                }
+                ExprKind::Binary { lhs, rhs, .. } => {
+                    children.push(Measure::Expr(lhs));
+                    children.push(Measure::Expr(rhs));
+                    MeasureOp::Pending
+                }
+            },
+            Measure::Pattern(p) => match &p.kind {
+                PatternKind::Named { pattern, .. } => {
+                    children.push(Measure::Pattern(pattern));
+                    MeasureOp::SumPlusOne
+                }
+                PatternKind::Constructor { args, .. }
+                | PatternKind::Tuple(args)
+                | PatternKind::Error(args) => {
+                    children.extend(args.iter().map(Measure::Pattern));
+                    MeasureOp::SumPlusOne
+                }
+                PatternKind::List { items, .. } => {
+                    children.extend(items.iter().map(Measure::Pattern));
+                    MeasureOp::SumPlusOne
+                }
+                PatternKind::BitArray(xs) => {
+                    for x in xs {
+                        children.push(Measure::Pattern(&x.value));
+                        if let Some(e) = x.format.as_ref().and_then(|f| f.arg.as_deref()) {
+                            children.push(Measure::Expr(e));
+                        }
+                    }
+                    MeasureOp::SumPlusOne
+                }
+                PatternKind::Var(_)
+                | PatternKind::Discard
+                | PatternKind::Typed { .. }
+                | PatternKind::Int { .. }
+                | PatternKind::Float { .. }
+                | PatternKind::String(_)
+                | PatternKind::Prefix { .. } => {
+                    values.push(1);
+                    continue;
+                }
+            },
+            Measure::Block(b) => {
+                for stmt in &b.stmts {
+                    children.push(match stmt {
+                        hir::Stmt::Bind(b) => Measure::Binding(b),
+                        hir::Stmt::Env { value, .. } | hir::Stmt::Expr(value) => {
+                            Measure::Expr(value)
+                        }
+                    });
+                }
+                MeasureOp::Max
+            }
+            Measure::Clause(c) => {
+                children.extend(c.patterns.iter().map(Measure::Pattern));
+                if let Some(g) = &c.guard {
+                    children.push(Measure::Expr(g));
+                }
+                children.push(Measure::Expr(&c.body));
+                MeasureOp::Max
+            }
+            Measure::Binding(b) => {
+                children.push(Measure::Expr(&b.value));
+                children.push(Measure::Pattern(&b.pattern));
+                MeasureOp::Max
+            }
+        };
+        work.push(Measure::Finish(op, children.len()));
+        work.extend(children.into_iter().rev());
     }
+    assert_eq!(values.len(), 1, "measure result count");
+    values[0]
+}
+fn pattern_values(p: &Pattern) -> usize {
+    measure(Measure::Pattern(p))
+}
+fn block_values(b: &Block) -> usize {
+    measure(Measure::Block(b))
+}
+fn expression_values(e: &Expr) -> usize {
+    measure(Measure::Expr(e))
 }
 
 /// Collects the names used and bound in a part of the program.
@@ -369,119 +455,136 @@ struct Walk {
     bound: HashSet<VarId>,
 }
 
+enum WalkNode<'a> {
+    Expr(&'a Expr),
+    Pattern(&'a Pattern),
+    Block(&'a Block),
+    Function(&'a Function),
+}
 impl Walk {
-    fn expr(&mut self, e: &Expr) {
-        match &e.kind {
-            ExprKind::Name(ValueRef::Local(v)) => {
-                self.used.insert(*v);
-            }
-            ExprKind::Int(_)
-            | ExprKind::Float(_)
-            | ExprKind::String(_)
-            | ExprKind::Name(_)
-            | ExprKind::Error => {}
-            ExprKind::Tuple(items) => items.iter().for_each(|x| self.expr(x)),
-            ExprKind::List { items, rest } => items
-                .iter()
-                .chain(rest.as_deref())
-                .for_each(|x| self.expr(x)),
-            ExprKind::BitArray(segs) => {
-                for s in segs {
-                    self.expr(&s.value);
-                    if let Some(a) = s.format.as_ref().and_then(|f| f.arg.as_deref()) {
-                        self.expr(a);
-                    }
-                }
-            }
-            ExprKind::Block(b) => self.block(b),
-            ExprKind::Fn(f) => self.function(f),
-            ExprKind::Case { subject, clauses } => {
-                self.expr(subject);
-                for c in clauses {
-                    c.patterns.iter().for_each(|p| self.pattern(p));
-                    c.guard.iter().for_each(|g| self.expr(g));
-                    self.expr(&c.body);
-                }
-            }
-            ExprKind::Call { callee, args } => {
-                self.expr(callee);
-                args.iter().for_each(|a| self.expr(&a.value));
-            }
-            ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
-                self.expr(target)
-            }
-            ExprKind::RecordUpdate { base, fields, .. } => {
-                self.expr(base);
-                fields.iter().for_each(|(_, x)| self.expr(x));
-            }
-            ExprKind::Unary { expr, .. } => self.expr(expr),
-            ExprKind::Binary { lhs, rhs, .. } => {
-                self.expr(lhs);
-                self.expr(rhs);
-            }
-        }
-    }
-
-    fn block(&mut self, b: &Block) {
-        for s in &b.stmts {
-            match s {
-                hir::Stmt::Bind(b) => {
-                    self.pattern(&b.pattern);
-                    self.expr(&b.value);
-                }
-                hir::Stmt::Env { value, .. } => self.expr(value),
-                hir::Stmt::Expr(e) => self.expr(e),
-            }
-        }
-    }
-
-    fn function(&mut self, f: &Function) {
-        for p in &f.params {
-            match p {
-                Param::Pattern { pattern, .. } => self.pattern(pattern),
-                Param::Env { var, .. } => {
-                    self.bound.insert(*var);
-                }
-            }
-        }
-        self.block(&f.body);
-    }
-
-    fn binder(&mut self, b: &Binder) {
-        self.bound.insert(b.var);
-    }
-
     fn pattern(&mut self, p: &Pattern) {
-        match &p.kind {
-            PatternKind::Var(b) => self.binder(b),
-            PatternKind::Typed { binder, .. } => binder.iter().for_each(|b| self.binder(b)),
-            PatternKind::Named { binder, pattern } => {
-                self.binder(binder);
-                self.pattern(pattern);
-            }
-            PatternKind::Prefix { rest, .. } => rest.iter().for_each(|b| self.binder(b)),
-            PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
-                args.iter().for_each(|a| self.pattern(a))
-            }
-            PatternKind::List { items, rest } => {
-                items.iter().for_each(|a| self.pattern(a));
-                if let Some(Some(b)) = rest {
-                    self.binder(b);
-                }
-            }
-            PatternKind::BitArray(segs) => {
-                for s in segs {
-                    self.pattern(&s.value);
-                    if let Some(a) = s.format.as_ref().and_then(|f| f.arg.as_deref()) {
-                        self.expr(a);
+        self.run(WalkNode::Pattern(p));
+    }
+    fn function(&mut self, f: &Function) {
+        self.run(WalkNode::Function(f));
+    }
+    fn run<'a>(&mut self, root: WalkNode<'a>) {
+        let mut work = vec![root];
+        while let Some(node) = work.pop() {
+            match node {
+                WalkNode::Expr(e) => match &e.kind {
+                    ExprKind::Name(ValueRef::Local(v)) => {
+                        self.used.insert(*v);
+                    }
+                    ExprKind::Int(_)
+                    | ExprKind::Float(_)
+                    | ExprKind::String(_)
+                    | ExprKind::Name(_)
+                    | ExprKind::Error => {}
+                    ExprKind::Tuple(xs) => work.extend(xs.iter().map(WalkNode::Expr)),
+                    ExprKind::List { items, rest } => {
+                        work.extend(items.iter().map(WalkNode::Expr));
+                        if let Some(r) = rest {
+                            work.push(WalkNode::Expr(r));
+                        }
+                    }
+                    ExprKind::BitArray(xs) => {
+                        for x in xs {
+                            work.push(WalkNode::Expr(&x.value));
+                            if let Some(a) = x.format.as_ref().and_then(|f| f.arg.as_deref()) {
+                                work.push(WalkNode::Expr(a));
+                            }
+                        }
+                    }
+                    ExprKind::Block(b) => work.push(WalkNode::Block(b)),
+                    ExprKind::Fn(f) => work.push(WalkNode::Function(f)),
+                    ExprKind::Case { subject, clauses } => {
+                        work.push(WalkNode::Expr(subject));
+                        for c in clauses {
+                            work.extend(c.patterns.iter().map(WalkNode::Pattern));
+                            if let Some(g) = &c.guard {
+                                work.push(WalkNode::Expr(g));
+                            }
+                            work.push(WalkNode::Expr(&c.body));
+                        }
+                    }
+                    ExprKind::Call { callee, args } => {
+                        work.push(WalkNode::Expr(callee));
+                        work.extend(args.iter().map(|a| WalkNode::Expr(&a.value)));
+                    }
+                    ExprKind::Field { target, .. }
+                    | ExprKind::TupleIndex { target, .. }
+                    | ExprKind::Unary { expr: target, .. } => work.push(WalkNode::Expr(target)),
+                    ExprKind::RecordUpdate { base, fields, .. } => {
+                        work.push(WalkNode::Expr(base));
+                        work.extend(fields.iter().map(|(_, e)| WalkNode::Expr(e)));
+                    }
+                    ExprKind::Binary { lhs, rhs, .. } => {
+                        work.push(WalkNode::Expr(lhs));
+                        work.push(WalkNode::Expr(rhs));
+                    }
+                },
+                WalkNode::Block(b) => {
+                    for s in &b.stmts {
+                        match s {
+                            hir::Stmt::Bind(b) => {
+                                work.push(WalkNode::Pattern(&b.pattern));
+                                work.push(WalkNode::Expr(&b.value));
+                            }
+                            hir::Stmt::Env { value, .. } | hir::Stmt::Expr(value) => {
+                                work.push(WalkNode::Expr(value))
+                            }
+                        }
                     }
                 }
+                WalkNode::Function(f) => {
+                    for p in &f.params {
+                        match p {
+                            Param::Pattern { pattern, .. } => work.push(WalkNode::Pattern(pattern)),
+                            Param::Env { var, .. } => {
+                                self.bound.insert(*var);
+                            }
+                        }
+                    }
+                    work.push(WalkNode::Block(&f.body));
+                }
+                WalkNode::Pattern(p) => match &p.kind {
+                    PatternKind::Var(b) => {
+                        self.bound.insert(b.var);
+                    }
+                    PatternKind::Typed { binder, .. } => {
+                        self.bound.extend(binder.iter().map(|b| b.var));
+                    }
+                    PatternKind::Named { binder, pattern } => {
+                        self.bound.insert(binder.var);
+                        work.push(WalkNode::Pattern(pattern));
+                    }
+                    PatternKind::Prefix { rest, .. } => {
+                        self.bound.extend(rest.iter().map(|b| b.var));
+                    }
+                    PatternKind::Constructor { args, .. }
+                    | PatternKind::Tuple(args)
+                    | PatternKind::Error(args) => work.extend(args.iter().map(WalkNode::Pattern)),
+                    PatternKind::List { items, rest } => {
+                        work.extend(items.iter().map(WalkNode::Pattern));
+                        if let Some(Some(b)) = rest {
+                            self.bound.insert(b.var);
+                        }
+                    }
+                    PatternKind::BitArray(xs) => {
+                        for x in xs {
+                            work.push(WalkNode::Pattern(&x.value));
+                            if let Some(a) = x.format.as_ref().and_then(|f| f.arg.as_deref()) {
+                                work.push(WalkNode::Expr(a));
+                            }
+                        }
+                    }
+                    PatternKind::Discard
+                    | PatternKind::Int { .. }
+                    | PatternKind::Float { .. }
+                    | PatternKind::String(_) => {}
+                },
             }
-            PatternKind::Error(parts) => parts.iter().for_each(|a| self.pattern(a)),
-            PatternKind::Discard
-            | PatternKind::Int { .. }
-            | PatternKind::Float { .. }
-            | PatternKind::String(_) => {}
         }
     }
 }
@@ -3481,5 +3584,186 @@ mod deep_lower_tests {
             .unwrap()
             .join()
             .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod deep_source_tests {
+    use super::*;
+
+    #[test]
+    fn source_measure_and_capture_walk_handle_deep_trees() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let span = Span::new(0, 1);
+                let mut e = Expr {
+                    kind: ExprKind::Name(ValueRef::Local(VarId(42))),
+                    span,
+                };
+                let mut p = Pattern {
+                    kind: PatternKind::Var(Binder {
+                        var: VarId(7),
+                        name: "x".into(),
+                        span,
+                    }),
+                    span,
+                };
+                for _ in 0..10_000 {
+                    e = Expr {
+                        kind: ExprKind::Tuple(vec![e]),
+                        span,
+                    };
+                    p = Pattern {
+                        kind: PatternKind::Tuple(vec![p]),
+                        span,
+                    };
+                }
+                assert_eq!(expression_values(&e), 1);
+                assert_eq!(pattern_values(&p), 10_001);
+                let mut w = Walk::default();
+                w.run(WalkNode::Expr(&e));
+                w.pattern(&p);
+                assert_eq!(w.used.into_iter().collect::<Vec<_>>(), [VarId(42)]);
+                assert_eq!(w.bound, HashSet::from([VarId(7)]));
+                // HIR destruction is handled in the checker lane; this test
+                // isolates the two lowering traversals until that change lands.
+                std::mem::forget(e);
+                std::mem::forget(p);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn iterative_source_measure_agrees_with_shallow_reference() {
+        fn pending(xs: &[&Expr]) -> usize {
+            xs.iter()
+                .enumerate()
+                .fold(xs.len().max(1), |peak, (i, e)| peak.max(i + reference(e)))
+        }
+        fn reference(e: &Expr) -> usize {
+            match &e.kind {
+                ExprKind::Int(_) => 1,
+                ExprKind::Tuple(xs) => pending(&xs.iter().collect::<Vec<_>>()),
+                ExprKind::List { items, rest } => {
+                    pending(&items.iter().chain(rest.as_deref()).collect::<Vec<_>>())
+                }
+                ExprKind::Binary { lhs, rhs, .. } => pending(&[lhs, rhs]),
+                ExprKind::Block(b) => b
+                    .stmts
+                    .iter()
+                    .map(|s| match s {
+                        hir::Stmt::Expr(e) => reference(e),
+                        _ => unreachable!(),
+                    })
+                    .max()
+                    .unwrap_or(1),
+                ExprKind::Case { subject, clauses } => reference(subject).max(
+                    1 + clauses
+                        .iter()
+                        .map(|c| {
+                            c.patterns
+                                .iter()
+                                .map(ref_pattern)
+                                .max()
+                                .unwrap_or(1)
+                                .max(c.guard.as_ref().map_or(1, reference))
+                                .max(reference(&c.body))
+                        })
+                        .max()
+                        .unwrap_or(1),
+                ),
+                _ => unreachable!(),
+            }
+        }
+        fn ref_pattern(p: &Pattern) -> usize {
+            match &p.kind {
+                PatternKind::Discard => 1,
+                PatternKind::Tuple(xs) => 1 + xs.iter().map(ref_pattern).sum::<usize>(),
+                _ => unreachable!(),
+            }
+        }
+        fn generate(seed: u32, depth: u32, span: Span) -> Expr {
+            if depth == 0 {
+                return Expr {
+                    kind: ExprKind::Int(seed.into()),
+                    span,
+                };
+            }
+            let child = |n| generate(seed.wrapping_mul(17).wrapping_add(n), depth - 1, span);
+            let kind = match seed % 5 {
+                0 => ExprKind::Tuple(vec![child(1), child(2), child(3)]),
+                1 => ExprKind::List {
+                    items: vec![child(1), child(2)],
+                    rest: Some(Box::new(child(3))),
+                },
+                2 => ExprKind::Binary {
+                    op: BinOp::Add,
+                    lhs: Box::new(child(1)),
+                    rhs: Box::new(child(2)),
+                },
+                3 => ExprKind::Block(Block {
+                    stmts: vec![hir::Stmt::Expr(child(1)), hir::Stmt::Expr(child(2))],
+                    span,
+                }),
+                _ => ExprKind::Case {
+                    subject: Box::new(child(1)),
+                    clauses: vec![Clause {
+                        patterns: vec![Pattern {
+                            kind: PatternKind::Tuple(vec![Pattern {
+                                kind: PatternKind::Discard,
+                                span,
+                            }]),
+                            span,
+                        }],
+                        guard: Some(child(2)),
+                        body: child(3),
+                        span,
+                    }],
+                },
+            };
+            Expr { kind, span }
+        }
+        for seed in 0..128 {
+            let e = generate(seed, 4, Span::new(0, 1));
+            assert_eq!(expression_values(&e), reference(&e), "seed {seed}");
+        }
+    }
+
+    #[test]
+    fn source_measure_counts_pending_arguments_and_alternatives() {
+        let span = Span::new(0, 1);
+        let int = || Expr {
+            kind: ExprKind::Int(0u32.into()),
+            span,
+        };
+        let nested = Expr {
+            kind: ExprKind::Tuple(vec![int(), int(), int()]),
+            span,
+        };
+        let e = Expr {
+            kind: ExprKind::Tuple(vec![int(), nested, int()]),
+            span,
+        };
+        assert_eq!(expression_values(&e), 4);
+        let p = Pattern {
+            kind: PatternKind::Tuple(vec![
+                Pattern {
+                    kind: PatternKind::Discard,
+                    span,
+                },
+                Pattern {
+                    kind: PatternKind::Tuple(vec![Pattern {
+                        kind: PatternKind::Discard,
+                        span,
+                    }]),
+                    span,
+                },
+            ]),
+            span,
+        };
+        assert_eq!(pattern_values(&p), 4);
     }
 }

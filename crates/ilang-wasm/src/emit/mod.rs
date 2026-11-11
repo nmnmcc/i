@@ -339,8 +339,39 @@ impl<'p> Emitter<'p> {
     }
 
     fn stmts(&mut self, out: &mut String, stmts: &[Stmt], frame: bool) {
-        for s in stmts {
-            self.stmt(out, s, frame);
+        enum Action<'a> {
+            Stmt(&'a Stmt),
+            Text(&'static str),
+        }
+        let mut work: Vec<_> = stmts.iter().rev().map(Action::Stmt).collect();
+        while let Some(action) = work.pop() {
+            match action {
+                Action::Text(text) => out.push_str(text),
+                Action::Stmt(Stmt::If {
+                    cond,
+                    then,
+                    otherwise,
+                }) => {
+                    if self.metered {
+                        out.push_str("(call $macro_charge (i64.const 1) (i64.const 0))\n");
+                    }
+                    let c = self.cond(cond);
+                    let _ = writeln!(out, "(if {c} (then");
+                    work.push(Action::Text("))\n"));
+                    work.extend(otherwise.iter().rev().map(Action::Stmt));
+                    work.push(Action::Text(") (else\n"));
+                    work.extend(then.iter().rev().map(Action::Stmt));
+                }
+                Action::Stmt(Stmt::Block { label, body }) => {
+                    if self.metered {
+                        out.push_str("(call $macro_charge (i64.const 1) (i64.const 0))\n");
+                    }
+                    let _ = writeln!(out, "(block $b{label}");
+                    work.push(Action::Text(")\n"));
+                    work.extend(body.iter().rev().map(Action::Stmt));
+                }
+                Action::Stmt(stmt) => self.stmt(out, stmt, frame),
+            }
         }
     }
 
@@ -389,22 +420,8 @@ impl<'p> Emitter<'p> {
                     *little as i32
                 );
             }
-            Stmt::If {
-                cond,
-                then,
-                otherwise,
-            } => {
-                let c = self.cond(cond);
-                let _ = writeln!(out, "(if {c} (then");
-                self.stmts(out, then, frame);
-                out.push_str(") (else\n");
-                self.stmts(out, otherwise, frame);
-                out.push_str("))\n");
-            }
-            Stmt::Block { label, body } => {
-                let _ = writeln!(out, "(block $b{label}");
-                self.stmts(out, body, frame);
-                out.push_str(")\n");
+            Stmt::If { .. } | Stmt::Block { .. } => {
+                unreachable!("structured statements are scheduled by stmts")
             }
             Stmt::Break(label) => {
                 let _ = writeln!(out, "(br $b{label})");
@@ -737,19 +754,46 @@ impl<'p> Emitter<'p> {
     }
 
     fn cond(&mut self, c: &Cond) -> String {
+        enum Action<'a> {
+            Cond(&'a Cond),
+            Text(&'static str),
+        }
+        let mut out = String::new();
+        let mut work = vec![Action::Cond(c)];
+        while let Some(action) = work.pop() {
+            match action {
+                Action::Text(text) => out.push_str(text),
+                Action::Cond(Cond::Not(c)) => {
+                    out.push_str("(i32.eqz ");
+                    work.push(Action::Text(")"));
+                    work.push(Action::Cond(c));
+                }
+                Action::Cond(Cond::And(a, b)) => {
+                    out.push_str("(if (result i32) ");
+                    work.push(Action::Text(") (else (i32.const 0)))"));
+                    work.push(Action::Cond(b));
+                    work.push(Action::Text(" (then "));
+                    work.push(Action::Cond(a));
+                }
+                Action::Cond(Cond::Or(a, b)) => {
+                    out.push_str("(if (result i32) ");
+                    work.push(Action::Text("))"));
+                    work.push(Action::Cond(b));
+                    work.push(Action::Text(" (then (i32.const 1)) (else "));
+                    work.push(Action::Cond(a));
+                }
+                Action::Cond(leaf) => out.push_str(&self.cond_leaf(leaf)),
+            }
+        }
+        out
+    }
+
+    fn cond_leaf(&mut self, c: &Cond) -> String {
         match c {
             Cond::True(a) => format!("(call $bool_get {})", self.atom(a)),
-            Cond::Not(c) => format!("(i32.eqz {})", self.cond(c)),
-            Cond::And(a, b) => format!(
-                "(if (result i32) {} (then {}) (else (i32.const 0)))",
-                self.cond(a),
-                self.cond(b)
-            ),
-            Cond::Or(a, b) => format!(
-                "(if (result i32) {} (then (i32.const 1)) (else {}))",
-                self.cond(a),
-                self.cond(b)
-            ),
+            Cond::Not(_) | Cond::And(_, _) | Cond::Or(_, _) => {
+                unreachable!("compound conditions are scheduled by cond")
+            }
             Cond::Tag(a, t) => format!(
                 "(i32.eq (call $value_tag {}) (i32.const {}))",
                 self.atom(a),
@@ -1184,4 +1228,31 @@ fn export_id(name: &str) -> String {
         }
     }
     id
+}
+
+#[cfg(test)]
+mod deep_emit_tests {
+    use super::*;
+
+    #[test]
+    fn nested_conditions_and_blocks_emit_on_a_small_stack() {
+        std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
+            let program = Program::default();
+            let mut emitter = Emitter { p:&program, metered:false, arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new() };
+            let leaf = Cond::I32(1);
+            let combined = Cond::And(Box::new(Cond::I32(1)), Box::new(Cond::Or(Box::new(Cond::I32(2)),Box::new(Cond::I32(3)))));
+            assert_eq!(emitter.cond(&combined), "(if (result i32) (local.get $l1) (then (if (result i32) (local.get $l2) (then (i32.const 1)) (else (local.get $l3)))) (else (i32.const 0)))");
+            let mut cond = leaf;
+            for _ in 0..10_000 { cond = Cond::Not(Box::new(cond)); }
+            let rendered = emitter.cond(&cond);
+            assert_eq!(rendered.matches("(i32.eqz ").count(), 10_000);
+            let mut stmt = Stmt::Return(Atom::Nil);
+            for n in 0..10_000 { stmt = Stmt::Block { label:n, body:vec![stmt] }; }
+            let mut rendered = String::new();
+            emitter.stmts(&mut rendered, std::slice::from_ref(&stmt), false);
+            assert_eq!(rendered.matches("(block $b").count(), 10_000);
+            drop(cond);
+            drop(stmt);
+        }).unwrap().join().unwrap();
+    }
 }
