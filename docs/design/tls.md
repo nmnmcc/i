@@ -1,5 +1,7 @@
 # TLS on the Rust host
 
+This is the intended contract; the TLS module and host service are not yet implemented.
+
 `i/tls` upgrades a connected `i/net` stream. `connect(stream, server_name,
 options)` performs a client handshake, validates the peer certificate and
 returns an encrypted byte stream. `accept(stream, identity, options)` performs
