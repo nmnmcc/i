@@ -597,22 +597,31 @@ impl Encoder<'_> {
                     nodes.push(self.operator("..", Span::new(t.span.start, base.span.start)));
                     nodes.push(self.ty(base));
                 }
-                for n in removed {
-                    let i = self.positions[n.span.start as usize];
-                    let minus = self.tokens[i - 1].span;
-                    nodes.push(self.call(
-                        self.symbol("-", minus),
-                        [self.record_label(&n.ident)],
-                        minus.to(n.span),
-                    ));
-                }
-                for (n, value) in fields {
-                    nodes.push(self.form_token(
-                        ":",
-                        Span::new(n.span.end, value.span.start),
-                        [self.record_label(&n.ident), self.ty(value)],
-                        n.span.to(value.span),
-                    ));
+                let mut fields = fields.iter().peekable();
+                let mut removed = removed.iter().peekable();
+                while fields.peek().is_some() || removed.peek().is_some() {
+                    if removed.peek().is_some_and(|n| {
+                        fields
+                            .peek()
+                            .is_none_or(|(field, _)| n.span.start < field.span.start)
+                    }) {
+                        let n = removed.next().unwrap();
+                        let i = self.positions[n.span.start as usize];
+                        let minus = self.tokens[i - 1].span;
+                        nodes.push(self.call(
+                            self.symbol("-", minus),
+                            [self.record_label(&n.ident)],
+                            minus.to(n.span),
+                        ));
+                    } else {
+                        let (n, value) = fields.next().unwrap();
+                        nodes.push(self.form_token(
+                            ":",
+                            Span::new(n.span.end, value.span.start),
+                            [self.record_label(&n.ident), self.ty(value)],
+                            n.span.to(value.span),
+                        ));
+                    }
                 }
                 self.node(Node::Curly(nodes), t.span)
             }

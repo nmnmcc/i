@@ -608,8 +608,20 @@ pub(super) fn item<E>(
                         &mut work,
                         fields.len() + removed.len() + usize::from(base.is_some()) * 2,
                     )?;
-                    work.extend(fields.iter().rev().map(|(n, v)| RecordTypeField(n, v)));
-                    work.extend(removed.iter().rev().map(RecordRemoved));
+                    let mut fields = fields.iter().rev().peekable();
+                    let mut removed = removed.iter().rev().peekable();
+                    while fields.peek().is_some() || removed.peek().is_some() {
+                        if removed.peek().is_some_and(|n| {
+                            fields
+                                .peek()
+                                .is_none_or(|(field, _)| n.span.start > field.span.start)
+                        }) {
+                            work.push(RecordRemoved(removed.next().unwrap()));
+                        } else {
+                            let (n, value) = fields.next().unwrap();
+                            work.push(RecordTypeField(n, value));
+                        }
+                    }
                     if let Some(base) = base {
                         work.push(Type(base));
                         work.push(Atom(".."));
