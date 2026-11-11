@@ -260,23 +260,40 @@ fn typ(t: &TypeExpr) -> String {
             base,
             fields,
             removed,
-        } => braced(
-            "{ ",
-            " }",
-            base.iter()
-                .flat_map(|b| ["..".into(), typ(b)])
-                .chain(
-                    removed
-                        .iter()
-                        .map(|n| form("-", [crate::print::record_label(&n.name, n.parameter)])),
-                )
-                .chain(fields.iter().map(|(n, t)| {
-                    form(
+        } => {
+            let mut parts = Vec::with_capacity(fields.len() + removed.len() + 2);
+            if let Some(base) = base {
+                parts.push("..".into());
+                parts.push(typ(base));
+            }
+            let mut fields = fields.iter().peekable();
+            let mut removed = removed.iter().peekable();
+            while fields.peek().is_some() || removed.peek().is_some() {
+                let take_field = match (fields.peek(), removed.peek()) {
+                    (Some((label, _)), Some(removed)) => label.span.start <= removed.span.start,
+                    (Some(_), None) => true,
+                    (None, Some(_)) => false,
+                    (None, None) => unreachable!(),
+                };
+                if take_field {
+                    let (label, ty) = fields.next().unwrap();
+                    parts.push(form(
                         ":",
-                        [crate::print::record_label(&n.name, n.parameter), typ(t)],
-                    )
-                })),
-        ),
+                        [
+                            crate::print::record_label(&label.name, label.parameter),
+                            typ(ty),
+                        ],
+                    ));
+                } else {
+                    let label = removed.next().unwrap();
+                    parts.push(form(
+                        "-",
+                        [crate::print::record_label(&label.name, label.parameter)],
+                    ));
+                }
+            }
+            braced("{", "}", parts)
+        }
         TypeKind::Fn {
             params,
             ret,
@@ -336,8 +353,8 @@ fn expr(e: &Expr) -> String {
         ExprKind::Name { module, name } => qualified(module, name),
         ExprKind::Record { base, fields } if base.is_none() && fields.is_empty() => "()".into(),
         ExprKind::Record { base, fields } => braced(
-            "{ ",
-            " }",
+            "{",
+            "}",
             base.iter().flat_map(|b| ["..".into(), expr(b)]).chain(
                 fields
                     .iter()

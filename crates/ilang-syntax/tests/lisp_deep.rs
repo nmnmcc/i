@@ -168,3 +168,189 @@ fn deep_quote_splice_error_preserves_its_origin() {
     let error = parse_pattern(&quoted).unwrap_err();
     assert_eq!(error.span, Span::new(77, 78));
 }
+
+#[test]
+fn deep_datum_equality_uses_no_recursive_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            use ilang_syntax::lisp::{Datum, DatumKind};
+            use ilang_syntax::span::Span;
+            let span = Span::new(0, 1);
+            let mut value = Datum {
+                kind: DatumKind::Name("x".into()),
+                span,
+                docs: vec![],
+            };
+            for _ in 0..10_000 {
+                value = Datum {
+                    kind: DatumKind::Quote(Box::new(value)),
+                    span,
+                    docs: vec![],
+                };
+            }
+            let same = value.clone();
+            assert!(value == same);
+            let different = Datum {
+                kind: DatumKind::Quote(Box::new(value.clone())),
+                span,
+                docs: vec![],
+            };
+            assert!(value != different);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn deep_ast_structural_equality_and_difference_are_stack_safe() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            use ilang_syntax::ast::{Expr, Pattern, TypeExpr};
+            let span = Span::new(0, 1);
+            let make_expr = |n: u32| {
+                let mut e = Expr {
+                    kind: ExprKind::Int(n.into()),
+                    span,
+                };
+                for _ in 0..10_000 {
+                    e = Expr {
+                        kind: ExprKind::Tuple(vec![e]),
+                        span,
+                    };
+                }
+                e
+            };
+            let make_pattern = |name: &str| {
+                let mut p = Pattern {
+                    kind: PatternKind::Var(name.into()),
+                    span,
+                };
+                for _ in 0..10_000 {
+                    p = Pattern {
+                        kind: PatternKind::Tuple(vec![p]),
+                        span,
+                    };
+                }
+                p
+            };
+            let make_type = |kind: TypeKind| {
+                let mut t = TypeExpr { kind, span };
+                for _ in 0..10_000 {
+                    t = TypeExpr {
+                        kind: TypeKind::Tuple(vec![t]),
+                        span,
+                    };
+                }
+                t
+            };
+            let e = make_expr(1);
+            assert!(e.clone() == e);
+            let p = make_pattern("a");
+            assert!(p.clone() == p);
+            let t = make_type(TypeKind::Hole);
+            assert!(t.clone() == t);
+            assert!(make_expr(1) == make_expr(1));
+            assert!(make_expr(1) != make_expr(2));
+            assert!(make_pattern("a") == make_pattern("a"));
+            assert!(make_pattern("a") != make_pattern("b"));
+            assert!(make_type(TypeKind::Hole) == make_type(TypeKind::Hole));
+            assert!(
+                make_type(TypeKind::Hole)
+                    != make_type(TypeKind::Lit(ilang_syntax::ast::LitValue::Int(1.into())))
+            );
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn deep_structural_records_clone_compare_normalize_and_drop() {
+    use ilang_syntax::ast::{Expr, Ident, RecordLabel, TypeExpr};
+    use ilang_syntax::shape::equivalent_expression;
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let span = Span::new(1, 2);
+            let label = || Ident {
+                name: "field".into(),
+                span,
+            };
+            let mut expr = Expr {
+                kind: ExprKind::Tuple(vec![]),
+                span,
+            };
+            let mut ty = TypeExpr {
+                kind: TypeKind::Hole,
+                span,
+            };
+            for i in 0..10_000 {
+                let (eb, ef) = if i % 2 == 0 {
+                    (Some(Box::new(expr)), vec![])
+                } else {
+                    (None, vec![(label(), expr)])
+                };
+                expr = Expr {
+                    kind: ExprKind::Record {
+                        base: eb,
+                        fields: ef,
+                    },
+                    span,
+                };
+                let (tb, tf) = if i % 2 == 0 {
+                    (Some(Box::new(ty)), vec![])
+                } else {
+                    (
+                        None,
+                        vec![(
+                            RecordLabel {
+                                ident: label(),
+                                parameter: true,
+                            },
+                            ty,
+                        )],
+                    )
+                };
+                ty = TypeExpr {
+                    kind: TypeKind::Record {
+                        base: tb,
+                        fields: tf,
+                        removed: vec![RecordLabel {
+                            ident: label(),
+                            parameter: false,
+                        }],
+                    },
+                    span,
+                };
+            }
+            let cloned_expr = expr.clone();
+            let cloned_ty = ty.clone();
+            assert!(expr == cloned_expr);
+            assert!(ty == cloned_ty);
+            assert!(equivalent_expression(&expr, &cloned_expr));
+            let mut different_expr = cloned_expr.clone();
+            let ExprKind::Record { fields, .. } = &mut different_expr.kind else {
+                unreachable!()
+            };
+            fields[0].0.span = Span::new(30, 31);
+            assert!(equivalent_expression(&expr, &different_expr));
+            let ExprKind::Record { fields, .. } = &mut different_expr.kind else {
+                unreachable!()
+            };
+            fields[0].0.name = "other".into();
+            assert!(!equivalent_expression(&expr, &different_expr));
+            let mut different = cloned_ty.clone();
+            let TypeKind::Record { removed, .. } = &mut different.kind else {
+                unreachable!()
+            };
+            removed[0].parameter = true;
+            assert!(ty != different);
+            drop((expr, cloned_expr, different_expr, ty, cloned_ty, different));
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}

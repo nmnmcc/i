@@ -17,11 +17,13 @@ fn binding(source: &str) -> Expr {
 #[test]
 fn match_suffix_binds_above_unary_and_every_binary_level() {
     // M1/M2: suffix is a Case node, and is stronger than unary and multiplication.
-    let ExprKind::Binary { ref lhs, .. } = binding("answer = n.{ 0 -> 1 _ -> 2 } * 10").kind else {
+    let binary = binding("answer = n.{ 0 -> 1 _ -> 2 } * 10");
+    let ExprKind::Binary { lhs, .. } = &binary.kind else {
         panic!()
     };
     assert!(matches!(lhs.kind, ExprKind::Case { .. }));
-    let ExprKind::Unary { ref expr, .. } = binding("answer = -n.{ 0 -> 1 _ -> 2 }").kind else {
+    let unary = binding("answer = -n.{ 0 -> 1 _ -> 2 }");
+    let ExprKind::Unary { expr, .. } = &unary.kind else {
         panic!()
     };
     assert!(matches!(expr.kind, ExprKind::Case { .. }));
@@ -37,7 +39,7 @@ fn match_suffix_binds_above_unary_and_every_binary_level() {
 fn bare_pipe_does_not_make_a_clause_head() {
     // Coordinator a / P3: a bar selects clauses only after a complete head.
     let value = binding("answer = { x | f }");
-    let ExprKind::Block(ref block) = value.kind else {
+    let ExprKind::Block(block) = &value.kind else {
         panic!()
     };
     assert!(matches!(
@@ -70,21 +72,17 @@ fn caret_and_guard_have_separate_slots() {
 }
 
 #[test]
-fn contexts_and_reserved_records_do_not_use_commas_to_choose() {
+fn contexts_and_records_do_not_use_commas_to_choose() {
     // D1–D4: function suffix wins; mixed calls/constructors stay valid.
     binding("answer = (a: Int) { a }");
     binding("answer = f(1, a: 2)");
     let (_, diagnostics) = parse_module("User { User(Int, age: Int) }");
     assert!(diagnostics.is_empty());
     for rhs in ["(a: 1)", "(..base, a: 1)", "(f: (x) -> Int { x })", "()"] {
-        let source = format!("answer = {rhs}");
-        let (_, diagnostics) = parse_module(&source);
-        assert!(
-            diagnostics
-                .iter()
-                .any(|d| d.code == ilang_syntax::Code::RecordReserved),
-            "{source}: {diagnostics:?}"
-        );
+        assert!(matches!(
+            binding(&format!("answer = {rhs}")).kind,
+            ExprKind::Record { .. }
+        ));
     }
     for rhs in ["(a: 1, 2)", "(1, a: 2)"] {
         let (_, diagnostics) = parse_module(&format!("answer = {rhs}"));

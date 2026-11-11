@@ -1362,3 +1362,179 @@ fn records_parse_from_lisp_with_fields_spread_and_removal() {
         matches!(&ty.kind, TypeKind::Record { base: Some(_), fields, removed } if fields[0].0.parameter && removed[0].ident.name == "old")
     );
 }
+
+#[test]
+fn show_as_groups_a_binary_operand_under_negation() {
+    assert_eq!(
+        root("(- (+ x y))").show_as(Position::Expression).unwrap(),
+        "-{ x + y }"
+    );
+}
+
+#[test]
+fn show_as_distinguishes_postfix_and_standalone_clauses() {
+    assert!(
+        root("{ (-> (= a (, x)) (-> (y) Int y)) }")
+            .show_as(Position::Expression)
+            .is_err()
+    );
+    assert_eq!(
+        root("(. s { (-> (= a (, x)) (-> (y) Int y)) })")
+            .show_as(Position::Expression)
+            .unwrap(),
+        "s.{ a = (x) -> (y) -> Int { y } }"
+    );
+}
+
+#[test]
+fn show_as_deep_type_and_pattern_use_bounded_host_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let like = root("x");
+            let head = Syntax::make(Node::Up("T".into()), &like).unwrap();
+            let mut tree = like.clone();
+            for _ in 0..10000 {
+                tree = Syntax::make(Node::Round(vec![head.clone(), tree]), &like).unwrap();
+            }
+            let expected = format!("{}x{}", "T(".repeat(10000), ")".repeat(10000));
+            assert_eq!(tree.show_as(Position::Type).unwrap(), expected);
+            assert_eq!(tree.show_as(Position::Pattern).unwrap(), expected);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn show_as_only_breaks_lines_at_ambiguous_statement_boundaries() {
+    let simple = root("(-> () _ { x y })");
+    assert_eq!(simple.show_as(Position::Expression).unwrap(), "() { x y }");
+    let negative = root("(-> () _ { x (- 1) })");
+    assert_eq!(
+        negative.show_as(Position::Expression).unwrap(),
+        "() { x\n-1 }"
+    );
+    let clauses = root("(. x { (-> 1 2) (-> 3 4) })");
+    assert_eq!(
+        clauses.show_as(Position::Expression).unwrap(),
+        "x.{ 1 -> 2 3 -> 4 }"
+    );
+}
+
+#[test]
+fn show_as_attribute_item_uses_only_required_line_breaks() {
+    let item = root("(@ test (= f (-> () _ { Nil })))");
+    assert_eq!(
+        item.show_as(Position::Item).unwrap(),
+        "@test f = () { Nil }"
+    );
+    let (module, errors) =
+        ilang_syntax::parse_module(&format!("{}\n", item.show_as(Position::Item).unwrap()));
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(module.items.len(), 1);
+    assert_eq!(module.items[0].attributes.len(), 1);
+
+    let tuple = root("(@ test (= (, x y) (, 1 2)))");
+    let text = tuple.show_as(Position::Item).unwrap();
+    assert_eq!(text, "@test\n(x, y) = (1, 2)");
+    let (module, errors) = ilang_syntax::parse_module(&format!("{text}\n"));
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(module.items[0].attributes.len(), 1);
+}
+
+#[test]
+fn show_as_accepts_expressions_already_written_in_normal_surface() {
+    let scope = Scope {
+        module: 0,
+        marks: BTreeSet::new(),
+    };
+    let leaves = [
+        "x",
+        "1",
+        "(1, 2)",
+        "[x, y]",
+        "f(x)",
+        "x + y",
+        "-{ x + y }",
+        "(x) { x }",
+        "x.{ 1 -> 2 _ -> 3 }",
+        "{ x y }",
+        "<<1, 2>>",
+    ];
+    let mut checked = 0;
+    for leaf in leaves {
+        for source in [
+            format!("value = {leaf}\n"),
+            format!("value = f({leaf})\n"),
+            format!("value = -{{ {leaf} }}\n"),
+            format!("value = [{leaf}]\n"),
+            format!("value = {{ {leaf} }} + z\n"),
+            format!("value = ({leaf}, z)\n"),
+            format!("value = () {{ {leaf} }}\n"),
+        ] {
+            let (module, errors) = ilang_syntax::parse_module(&source);
+            if !errors.is_empty() {
+                continue;
+            }
+            let ilang_syntax::ast::ItemKind::Binding(binding) = &module.items[0].kind else {
+                panic!("binding")
+            };
+            let syntax = expression_syntax(&binding.value, &scope, &source);
+            syntax
+                .show_as(Position::Expression)
+                .unwrap_or_else(|error| panic!("{source:?}: {error:?}"));
+            checked += 1;
+        }
+    }
+    assert!(checked >= 50, "only {checked} source expressions parsed");
+}
+
+#[test]
+fn show_as_deep_expression_uses_bounded_host_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let like = root("x");
+            let head = Syntax::make(Node::Name("f".into()), &like).unwrap();
+            for depth in [1000, 10000] {
+                let mut tree = like.clone();
+                for _ in 0..depth {
+                    tree = Syntax::make(Node::Round(vec![head.clone(), tree]), &like).unwrap();
+                }
+                let expected = format!("{}x{}", "f(".repeat(depth), ")".repeat(depth));
+                assert_eq!(tree.show_as(Position::Expression).unwrap(), expected);
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn show_as_deep_mixed_blocks_use_bounded_host_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let like = root("x");
+            let head = Syntax::make(Node::Name("f".into()), &like).unwrap();
+            let equals = Syntax::make(Node::Symbol("=".into()), &like).unwrap();
+            let name = Syntax::make(Node::Name("v".into()), &like).unwrap();
+            for depth in [1000, 10000] {
+                let mut tree = like.clone();
+                for _ in 0..depth {
+                    let binding =
+                        Syntax::make(Node::Round(vec![equals.clone(), name.clone(), tree]), &like)
+                            .unwrap();
+                    let block =
+                        Syntax::make(Node::Curly(vec![binding, name.clone()]), &like).unwrap();
+                    tree = Syntax::make(Node::Round(vec![head.clone(), block]), &like).unwrap();
+                }
+                let expected = format!("{}x{}", "f({ v = ".repeat(depth), " v })".repeat(depth));
+                assert_eq!(tree.show_as(Position::Expression).unwrap(), expected);
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}

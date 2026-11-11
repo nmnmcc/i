@@ -5,6 +5,8 @@
 //! inside `{ }` and at the top level it begins the next statement, clause,
 //! constructor, or item.
 
+mod trampoline;
+
 use crate::ast::*;
 use crate::lexer::{DocComment, lex};
 use crate::span::Span;
@@ -13,6 +15,7 @@ use crate::{Code, Diagnostic};
 use std::collections::HashMap;
 
 type PResult<X> = Result<X, Diagnostic>;
+type PFuture<'p, X> = std::pin::Pin<Box<dyn std::future::Future<Output = PResult<X>> + 'p>>;
 
 /// What a `{` that begins an expression begins (§6.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -67,9 +70,10 @@ fn run(source: &str, cache: bool, legacy: bool) -> (Module, Vec<Diagnostic>, Par
         docs: &lexed.docs,
         doc_pos: 0,
         pos: 0,
-        diags: Vec::new(),
+        diags: DiagnosticLog::default(),
         guard: false,
         decided: HashMap::new(),
+        probed_patterns: HashMap::new(),
         decisions: 0,
         tuple_type: false,
         cache,
@@ -82,13 +86,16 @@ fn run(source: &str, cache: bool, legacy: bool) -> (Module, Vec<Diagnostic>, Par
                 .windows(2)
                 .any(|ts| ts[0].kind == T::Dot && ts[1].kind == T::LBrace),
     };
-    let module = parser.module();
+    // SAFETY: parser continuations only directly await scheduler children;
+    // the returned Module and diagnostics own their data, and no scheduler
+    // or borrowed parser value escapes this invocation.
+    let module = unsafe { trampoline::run(|__s| parser.module(__s)) };
     let stats = ParseStats {
         decisions: parser.decisions,
         braces: parser.decided.len(),
     };
     let mut diags = lexed.diagnostics.clone();
-    diags.append(&mut parser.diags);
+    diags.extend(parser.diags.into_vec());
     diags.sort_by_key(|d| d.span.start);
     // Recovery may go on at the token that failed, and fail there again.
     diags.dedup();
@@ -108,6 +115,73 @@ const RECORD_RESERVED: &str =
 
 const TUPLE_NOTE: &str = "; a tuple type in a clause pattern is put in `{ }`";
 
+/// A persistent diagnostic log lets speculative parses restore a checkpoint
+/// and transfer a cached subparse without copying all diagnostics at every
+/// nesting level. Nodes are indices, so discarded branches drop iteratively.
+#[derive(Clone, Copy, Default)]
+struct DiagnosticSnapshot {
+    tail: Option<usize>,
+    len: usize,
+}
+struct DiagnosticNode {
+    previous: Option<usize>,
+    diagnostic: Diagnostic,
+}
+#[derive(Default)]
+struct DiagnosticLog {
+    nodes: Vec<DiagnosticNode>,
+    current: DiagnosticSnapshot,
+}
+impl DiagnosticLog {
+    fn len(&self) -> usize {
+        self.current.len
+    }
+    fn snapshot(&self) -> DiagnosticSnapshot {
+        self.current
+    }
+    fn restore(&mut self, snapshot: DiagnosticSnapshot) {
+        self.current = snapshot;
+    }
+    fn push(&mut self, diagnostic: Diagnostic) {
+        let at = self.nodes.len();
+        self.nodes.push(DiagnosticNode {
+            previous: self.current.tail,
+            diagnostic,
+        });
+        self.current = DiagnosticSnapshot {
+            tail: Some(at),
+            len: self.current.len + 1,
+        };
+    }
+    fn into_vec(self) -> Vec<Diagnostic> {
+        let mut nodes: Vec<_> = self.nodes.into_iter().map(Some).collect();
+        let mut out = Vec::with_capacity(self.current.len);
+        let mut current = self.current.tail;
+        while let Some(at) = current {
+            let node = nodes[at].take().expect("diagnostic log must be a chain");
+            current = node.previous;
+            out.push(node.diagnostic);
+        }
+        out.reverse();
+        out
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct PatternProbeKey {
+    pos: usize,
+    guard: bool,
+    tuple_type: bool,
+    diagnostics_tail: Option<usize>,
+}
+
+struct PatternProbe {
+    result: PResult<Pattern>,
+    end: usize,
+    diagnostics: DiagnosticSnapshot,
+    tuple_type: bool,
+}
+
 struct Parser<'a> {
     source: &'a str,
     toks: &'a [Token],
@@ -115,7 +189,7 @@ struct Parser<'a> {
     docs: &'a [DocComment],
     doc_pos: usize,
     pos: usize,
-    diags: Vec<Diagnostic>,
+    diags: DiagnosticLog,
     /// Set in a guard: a `->` ends the clause head, so it never makes a `( )`
     /// a function (§6.1). Cleared inside brackets.
     guard: bool,
@@ -123,6 +197,10 @@ struct Parser<'a> {
     /// its token. A decision depends only on the tokens, so it
     /// holds after a speculative parse goes back.
     decided: HashMap<usize, Brace>,
+    /// A compound pattern parsed by brace classification may be needed again
+    /// by the selected clause or binding. Transfer it rather than reparsing its
+    /// potentially deep format expressions.
+    probed_patterns: HashMap<PatternProbeKey, PatternProbe>,
     decisions: usize,
     /// Set when a pattern has `x: ( … )`, for the note on tuple types in a
     /// clause (§7.1).
@@ -317,43 +395,51 @@ impl Parser<'_> {
     }
 
     /// Runs `f` inside brackets, where the guard restriction does not hold.
-    fn nested<X>(&mut self, f: impl FnOnce(&mut Self) -> PResult<X>) -> PResult<X> {
+    async fn nested<X>(
+        &mut self,
+        f: impl for<'p> FnOnce(&'p mut Self, trampoline::Scheduler) -> PFuture<'p, X>,
+        __s: trampoline::Scheduler,
+    ) -> PResult<X> {
         let saved = self.guard;
         self.guard = false;
-        let result = f(self);
+        let result = f(self, __s).await;
         self.guard = saved;
         result
     }
 
-    /// The parts of a bracketed list, after the opening bracket, with `,` or a
-    /// break between them and maybe a `,` at the end. Consumes the closing
-    /// bracket.
-    fn seq<X>(
+    /// The parts of a bracketed list and the closing bracket.
+    async fn seq<X>(
         &mut self,
         close: T,
         empty: bool,
-        mut part: impl FnMut(&mut Self) -> PResult<X>,
+        mut part: impl for<'p> FnMut(&'p mut Self, trampoline::Scheduler) -> PFuture<'p, X>,
+        __s: trampoline::Scheduler,
     ) -> PResult<Vec<X>> {
-        self.nested(|p| {
+        let saved = self.guard;
+        self.guard = false;
+        let result = async {
             let mut parts = Vec::new();
             loop {
-                if p.at(&close) {
+                if self.at(&close) {
                     if parts.is_empty() && !empty {
-                        return p.error("a part");
+                        return self.error("a part");
                     }
                     break;
                 }
-                parts.push(part(p)?);
-                if p.at(&close) {
+                parts.push(part(self, __s.clone()).await?);
+                if self.at(&close) {
                     break;
                 }
-                if !p.eat(&T::Comma) && !p.tok().brk {
-                    return p.error(&format!("`,` or `{}`", close.text()));
+                if !self.eat(&T::Comma) && !self.tok().brk {
+                    return self.error(&format!("`,` or `{}`", close.text()));
                 }
             }
-            p.bump();
+            self.bump();
             Ok(parts)
-        })
+        }
+        .await;
+        self.guard = saved;
+        result
     }
 
     /// After an error in a part that began at `start`, skips to the next break
@@ -396,7 +482,7 @@ impl Parser<'_> {
 
     // ---- Module (§2.2 to §2.5) ----
 
-    fn module(&mut self) -> Module {
+    async fn module(&mut self, __s: trampoline::Scheduler) -> Module {
         let mut module = Module {
             doc: self
                 .docs
@@ -436,7 +522,7 @@ impl Parser<'_> {
             };
             if is_import {
                 imports = true;
-                match self.import() {
+                match self.import(__s.clone()).await {
                     Ok(items) => {
                         module.imports = items;
                         module.imports_span = Some(self.span_from(from));
@@ -448,7 +534,7 @@ impl Parser<'_> {
                 }
             } else {
                 exports = true;
-                match self.export() {
+                match self.export(__s.clone()).await {
                     Ok(items) => {
                         module.exports = items;
                         module.exports_span = Some(self.span_from(from));
@@ -462,7 +548,7 @@ impl Parser<'_> {
         }
         while !self.at(&T::Eof) {
             let start = self.pos;
-            match self.item() {
+            match self.item(__s.clone()).await {
                 Ok(item) => module.items.push(item),
                 Err(d) => {
                     self.diags.push(d);
@@ -496,78 +582,105 @@ impl Parser<'_> {
     }
 
     /// The imports group.
-    fn import(&mut self) -> PResult<Vec<ImportItem>> {
+    async fn import(&mut self, __s: trampoline::Scheduler) -> PResult<Vec<ImportItem>> {
         self.expect(&T::LParen)?;
-        self.seq(T::RParen, true, |p| {
-            let start = p.start();
-            let alias = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Eq {
-                let alias = p.name()?;
-                p.bump();
-                Some(alias)
-            } else {
-                None
-            };
-            let mut names = Vec::new();
-            if p.eat(&T::LParen) {
-                names = p.seq(T::RParen, false, |p| match p.kind() {
-                    T::UpName(_) => p.up_name(),
-                    _ => p.name(),
-                })?;
-                p.expect(&T::Eq)?;
-            }
-            let mut path = vec![p.name()?];
-            while p.eat(&T::Slash) {
-                path.push(p.name()?);
-            }
-            let span = p.span_from(start);
-            if path.len() < 2 {
-                let msg = "a module path has at least two parts, as in `i/fail`";
-                return Err(Diagnostic::new(Code::ShortModulePath, span, msg));
-            }
-            Ok(ImportItem {
-                alias,
-                names,
-                path,
-                span,
-            })
-        })
+        self.seq(
+            T::RParen,
+            true,
+            |p, __s| {
+                Box::pin(async move {
+                    let start = p.start();
+                    let alias = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Eq {
+                        let alias = p.name()?;
+                        p.bump();
+                        Some(alias)
+                    } else {
+                        None
+                    };
+                    let mut names = Vec::new();
+                    if p.eat(&T::LParen) {
+                        names = p
+                            .seq(
+                                T::RParen,
+                                false,
+                                |p, _| {
+                                    Box::pin(async move {
+                                        match p.kind() {
+                                            T::UpName(_) => p.up_name(),
+                                            _ => p.name(),
+                                        }
+                                    })
+                                },
+                                __s.clone(),
+                            )
+                            .await?;
+                        p.expect(&T::Eq)?;
+                    }
+                    let mut path = vec![p.name()?];
+                    while p.eat(&T::Slash) {
+                        path.push(p.name()?);
+                    }
+                    let span = p.span_from(start);
+                    if path.len() < 2 {
+                        let msg = "a module path has at least two parts, as in `i/fail`";
+                        return Err(Diagnostic::new(Code::ShortModulePath, span, msg));
+                    }
+                    Ok(ImportItem {
+                        alias,
+                        names,
+                        path,
+                        span,
+                    })
+                })
+            },
+            __s.clone(),
+        )
+        .await
     }
 
     /// The exports group.
-    fn export(&mut self) -> PResult<Vec<ExportItem>> {
+    async fn export(&mut self, __s: trampoline::Scheduler) -> PResult<Vec<ExportItem>> {
         self.expect(&T::LParen)?;
-        self.seq(T::RParen, true, |p| {
-            let start = p.start();
-            if matches!(p.kind(), T::Name(_)) {
-                let name = p.name()?;
-                let span = name.span;
-                return Ok(ExportItem {
-                    name,
-                    constructors: false,
-                    span,
-                });
-            }
-            let name = p.up_name()?;
-            let constructors = p.at_joined(&T::LParen);
-            if constructors {
-                p.bump();
-                p.expect(&T::DotDot)?;
-                p.expect(&T::RParen)?;
-            }
-            Ok(ExportItem {
-                name,
-                constructors,
-                span: p.span_from(start),
-            })
-        })
+        self.seq(
+            T::RParen,
+            true,
+            |p, __s| {
+                Box::pin(async move {
+                    let start = p.start();
+                    if matches!(p.kind(), T::Name(_)) {
+                        let name = p.name()?;
+                        let span = name.span;
+                        return Ok(ExportItem {
+                            name,
+                            constructors: false,
+                            span,
+                        });
+                    }
+                    let name = p.up_name()?;
+                    let constructors = p.at_joined(&T::LParen);
+                    if constructors {
+                        p.bump();
+                        p.expect(&T::DotDot)?;
+                        p.expect(&T::RParen)?;
+                    }
+                    Ok(ExportItem {
+                        name,
+                        constructors,
+                        span: p.span_from(start),
+                    })
+                })
+            },
+            __s.clone(),
+        )
+        .await
     }
 
-    fn item(&mut self) -> PResult<Item> {
+    async fn item(&mut self, __s: trampoline::Scheduler) -> PResult<Item> {
         let mut doc = self.take_docs();
         let start = self.start();
         let mut attributes = Vec::new();
         while self.at(&T::At) {
-            attributes.push(self.attribute()?);
+            attributes.push(self.attribute(__s.clone()).await?);
             // §1.2: a `///` after an attribute is still before the item.
             doc.extend(self.take_docs());
         }
@@ -583,10 +696,10 @@ impl Parser<'_> {
             return Err(Diagnostic::new(Code::HeaderGroup, span, msg));
         }
         let kind = if matches!(self.kind(), T::UpName(_)) {
-            ItemKind::TypeDef(self.type_def()?)
+            ItemKind::TypeDef(self.type_def(__s.clone()).await?)
         } else if self.at_type_params() {
             let bstart = self.start();
-            let (name, type_params, ty) = self.declared_head()?;
+            let (name, type_params, ty) = self.declared_head(__s.clone()).await?;
             match ty {
                 Some(ty) if !self.at(&T::Eq) => ItemKind::Declaration {
                     name,
@@ -596,7 +709,7 @@ impl Parser<'_> {
                 ty => {
                     let pattern = Self::declared_pattern(name, ty);
                     self.expect(&T::Eq)?;
-                    let value = self.expr()?;
+                    let value = unsafe { __s.call(|__child| self.expr(__child)) }.await?;
                     ItemKind::Binding(Binding {
                         pattern,
                         value,
@@ -615,17 +728,17 @@ impl Parser<'_> {
             };
             let name = self.name()?;
             self.bump();
-            let args = self.args()?;
+            let args = self.args(__s.clone()).await?;
             ItemKind::MacroItem { module, name, args }
         } else {
             let bstart = self.start();
-            let Some(pattern) = self.binding_head()? else {
+            let Some(pattern) = self.binding_head(__s.clone()).await? else {
                 // `name: Type` with no `=` is a declaration; the checker
                 // reports it when `@external` is missing (§2.5).
                 if matches!(self.kind(), T::Name(_)) && *self.nth(1) == T::Colon {
                     let name = self.name()?;
                     self.bump();
-                    let ty = self.ty()?;
+                    let ty = unsafe { __s.call(|__child| self.ty(__child)) }.await?;
                     return Ok(Item {
                         doc,
                         attributes,
@@ -639,7 +752,7 @@ impl Parser<'_> {
                 }
                 return self.error("an item: a type definition, or a binding `pattern = value`");
             };
-            let value = self.expr()?;
+            let value = unsafe { __s.call(|__child| self.expr(__child)) }.await?;
             ItemKind::Binding(Binding {
                 pattern,
                 value,
@@ -693,12 +806,22 @@ impl Parser<'_> {
 
     /// `name(A, …)` and then `: Type` if there is one.
     #[allow(clippy::type_complexity)]
-    fn declared_head(&mut self) -> PResult<(Ident, Vec<Ident>, Option<TypeExpr>)> {
+    async fn declared_head(
+        &mut self,
+        __s: trampoline::Scheduler,
+    ) -> PResult<(Ident, Vec<Ident>, Option<TypeExpr>)> {
         let name = self.name()?;
         self.bump();
-        let type_params = self.seq(T::RParen, false, Self::up_name)?;
+        let type_params = self
+            .seq(
+                T::RParen,
+                false,
+                |p, _| Box::pin(async move { p.up_name() }),
+                __s.clone(),
+            )
+            .await?;
         let ty = if self.eat(&T::Colon) {
-            Some(self.ty()?)
+            Some(unsafe { __s.call(|__child| self.ty(__child)) }.await?)
         } else {
             None
         };
@@ -742,7 +865,7 @@ impl Parser<'_> {
         self.close[i].is_some_and(|c| !matches!(self.toks[c as usize + 1].kind, T::Eq | T::Colon))
     }
 
-    fn attribute(&mut self) -> PResult<Attribute> {
+    async fn attribute(&mut self, __s: trampoline::Scheduler) -> PResult<Attribute> {
         let start = self.bump().start;
         let module = if matches!(self.kind(), T::Name(_))
             && *self.nth(1) == T::Dot
@@ -759,7 +882,7 @@ impl Parser<'_> {
         let mut call = None;
         if self.at_joined(&T::LParen) {
             let open = self.bump().start;
-            let list = self.args()?;
+            let list = self.args(__s.clone()).await?;
             let span = self.span_from(open);
             let strings: Option<Vec<(String, Span)>> = list
                 .iter()
@@ -783,20 +906,27 @@ impl Parser<'_> {
     }
 
     /// §4.3.
-    fn type_def(&mut self) -> PResult<TypeDef> {
+    async fn type_def(&mut self, __s: trampoline::Scheduler) -> PResult<TypeDef> {
         let name = self.up_name()?;
         let mut params = Vec::new();
         let mut head = Vec::new();
         if self.at_joined(&T::LParen) {
             self.bump();
-            let types = self.seq(T::RParen, false, Self::ty)?;
+            let types = self
+                .seq(
+                    T::RParen,
+                    false,
+                    |p, s| Box::pin(async move { unsafe { s.call(|c| p.ty(c)) }.await }),
+                    __s.clone(),
+                )
+                .await?;
             match head_params(&types) {
                 Some(names) => params = names,
                 None => head = types,
             }
         }
         if self.eat(&T::Eq) {
-            let source = self.ty()?;
+            let source = unsafe { __s.call(|__child| self.ty(__child)) }.await?;
             let alias_pattern = (!params.is_empty() || !head.is_empty())
                 && matches!(source.kind, TypeKind::ValueOf { .. });
             if alias_pattern && head.is_empty() {
@@ -825,39 +955,59 @@ impl Parser<'_> {
             return self.error("`{` or `=`");
         }
         self.bump();
-        let constructors = self.nested(|p| {
-            let mut constructors = Vec::new();
-            while !p.eat(&T::RBrace) {
-                let start = p.start();
-                let name = p.up_name()?;
-                let mut fields = Vec::new();
-                if p.at_joined(&T::LParen) {
-                    p.bump();
-                    fields = p.seq(T::RParen, false, |p| {
-                        let start = p.start();
-                        let label = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Colon {
-                            let label = p.name()?;
-                            p.bump();
-                            Some(label)
-                        } else {
-                            None
-                        };
-                        let ty = p.ty()?;
-                        Ok(Field {
-                            label,
-                            ty,
-                            span: p.span_from(start),
-                        })
-                    })?;
-                }
-                constructors.push(Constructor {
-                    name,
-                    fields,
-                    span: p.span_from(start),
-                });
-            }
-            Ok(constructors)
-        })?;
+        let constructors = self
+            .nested(
+                |p, __s| {
+                    Box::pin(async move {
+                        let mut constructors = Vec::new();
+                        while !p.eat(&T::RBrace) {
+                            let start = p.start();
+                            let name = p.up_name()?;
+                            let mut fields = Vec::new();
+                            if p.at_joined(&T::LParen) {
+                                p.bump();
+                                fields = p
+                                    .seq(
+                                        T::RParen,
+                                        false,
+                                        |p, __s| {
+                                            Box::pin(async move {
+                                                let start = p.start();
+                                                let label = if matches!(p.kind(), T::Name(_))
+                                                    && *p.nth(1) == T::Colon
+                                                {
+                                                    let label = p.name()?;
+                                                    p.bump();
+                                                    Some(label)
+                                                } else {
+                                                    None
+                                                };
+                                                let ty =
+                                                    unsafe { __s.call(|__child| p.ty(__child)) }
+                                                        .await?;
+                                                Ok(Field {
+                                                    label,
+                                                    ty,
+                                                    span: p.span_from(start),
+                                                })
+                                            })
+                                        },
+                                        __s.clone(),
+                                    )
+                                    .await?;
+                            }
+                            constructors.push(Constructor {
+                                name,
+                                fields,
+                                span: p.span_from(start),
+                            });
+                        }
+                        Ok(constructors)
+                    })
+                },
+                __s.clone(),
+            )
+            .await?;
         let body = TypeBody::Custom(constructors);
         Ok(TypeDef {
             alias_pattern: false,
@@ -870,14 +1020,72 @@ impl Parser<'_> {
 
     // ---- Statements (§6.10) ----
 
+    /// The end of a pattern atom whose outer delimiters determine its end.
+    /// This is only a lookahead: malformed contents are still diagnosed by the
+    /// normal parser whenever the following token can make the atom relevant.
+    fn closed_pattern_atom_end(&self, at: usize) -> Option<usize> {
+        let open = match &self.toks[at].kind {
+            T::LParen | T::LBracket | T::LtLt => at,
+            T::UpName(_)
+                if self
+                    .toks
+                    .get(at + 1)
+                    .is_some_and(|t| t.kind == T::LParen && !t.brk) =>
+            {
+                at + 1
+            }
+            T::Name(_)
+                if self.toks.get(at + 1).is_some_and(|t| t.kind == T::Dot)
+                    && self
+                        .toks
+                        .get(at + 2)
+                        .is_some_and(|t| matches!(t.kind, T::UpName(_)))
+                    && self
+                        .toks
+                        .get(at + 3)
+                        .is_some_and(|t| t.kind == T::LParen && !t.brk) =>
+            {
+                at + 3
+            }
+            _ => return None,
+        };
+        self.close[open].map(|end| end as usize + 1)
+    }
+
+    fn take_probed_pattern(&mut self) -> Option<PResult<Pattern>> {
+        let key = PatternProbeKey {
+            pos: self.pos,
+            guard: self.guard,
+            tuple_type: self.tuple_type,
+            diagnostics_tail: self.diags.snapshot().tail,
+        };
+        let cached = self.probed_patterns.remove(&key)?;
+        self.pos = cached.end;
+        self.tuple_type = cached.tuple_type;
+        self.diags.restore(cached.diagnostics);
+        Some(cached.result)
+    }
+
     /// The longest chain `p0 = p1 = … =` at the current position, as one
     /// pattern (§6.1). Only a name may have `=` after it inside a pattern.
     /// Returns `None`, and moves nothing, when there is no pattern and `=`.
-    fn binding_head(&mut self) -> PResult<Option<Pattern>> {
+    async fn binding_head(&mut self, __s: trampoline::Scheduler) -> PResult<Option<Pattern>> {
         let mut pats = Vec::new();
         loop {
-            let (save, ndiags) = (self.pos, self.diags.len());
-            match self.pattern_atom(false) {
+            // A closed compound atom can only bind if `=` follows its close.
+            // Avoid parsing its nested expressions just to discard the result.
+            if self
+                .closed_pattern_atom_end(self.pos)
+                .is_some_and(|end| self.toks[end].kind != T::Eq)
+            {
+                break;
+            }
+            let (save, ndiags, tuple_type) = (self.pos, self.diags.snapshot(), self.tuple_type);
+            let parsed = match self.take_probed_pattern() {
+                Some(result) => result,
+                None => self.pattern_atom(false, __s.clone()).await,
+            };
+            match parsed {
                 Ok(p) if self.at(&T::Eq) => {
                     self.bump();
                     let is_name = matches!(p.kind, PatternKind::Var(_));
@@ -888,7 +1096,8 @@ impl Parser<'_> {
                 }
                 _ => {
                     self.pos = save;
-                    self.diags.truncate(ndiags);
+                    self.diags.restore(ndiags);
+                    self.tuple_type = tuple_type;
                     break;
                 }
             }
@@ -916,20 +1125,20 @@ impl Parser<'_> {
         Ok(Some(pattern))
     }
 
-    fn stmt(&mut self) -> PResult<Stmt> {
+    async fn stmt(&mut self, __s: trampoline::Scheduler) -> PResult<Stmt> {
         let start = self.start();
         if self.eat(&T::Bang) {
-            let ty = self.named_type()?;
+            let ty = self.named_type(__s.clone()).await?;
             self.expect(&T::Eq)?;
-            let value = self.expr()?;
+            let value = unsafe { __s.call(|__child| self.expr(__child)) }.await?;
             let span = self.span_from(start);
             return Ok(Stmt::Env { ty, value, span });
         }
         if self.at_type_params() {
-            let (name, type_params, ty) = self.declared_head()?;
+            let (name, type_params, ty) = self.declared_head(__s.clone()).await?;
             let pattern = Self::declared_pattern(name, ty);
             self.expect(&T::Eq)?;
-            let value = self.expr()?;
+            let value = unsafe { __s.call(|__child| self.expr(__child)) }.await?;
             let span = self.span_from(start);
             return Ok(Stmt::Bind(Binding {
                 pattern,
@@ -938,8 +1147,8 @@ impl Parser<'_> {
                 type_params,
             }));
         }
-        if let Some(pattern) = self.binding_head()? {
-            let value = self.expr()?;
+        if let Some(pattern) = self.binding_head(__s.clone()).await? {
+            let value = unsafe { __s.call(|__child| self.expr(__child)) }.await?;
             let span = self.span_from(start);
             return Ok(Stmt::Bind(Binding {
                 pattern,
@@ -948,38 +1157,45 @@ impl Parser<'_> {
                 type_params: Vec::new(),
             }));
         }
-        Ok(Stmt::Expr(self.expr()?))
+        Ok(Stmt::Expr(
+            unsafe { __s.call(|__child| self.expr(__child)) }.await?,
+        ))
     }
 
     /// Parts inside `{ }` until the closing `}`, with recovery at breaks.
-    fn braced<X>(&mut self, mut part: impl FnMut(&mut Self) -> PResult<X>) -> PResult<Vec<X>> {
+    async fn braced<X>(
+        &mut self,
+        mut part: impl for<'p> FnMut(&'p mut Self, trampoline::Scheduler) -> PFuture<'p, X>,
+        __s: trampoline::Scheduler,
+    ) -> PResult<Vec<X>> {
         let Some(end) = self.close[self.pos] else {
             return self.error("a closed `{`");
         };
         let end = end as usize;
         self.bump();
-        self.nested(|p| {
-            let mut parts = Vec::new();
-            while p.pos < end {
-                let start = p.pos;
-                match part(p) {
-                    Ok(x) => parts.push(x),
-                    Err(d) => {
-                        p.diags.push(d);
-                        p.recover(start, end);
-                    }
+        let saved = self.guard;
+        self.guard = false;
+        let mut parts = Vec::new();
+        while self.pos < end {
+            let start = self.pos;
+            match part(self, __s.clone()).await {
+                Ok(x) => parts.push(x),
+                Err(d) => {
+                    self.diags.push(d);
+                    self.recover(start, end);
                 }
             }
-            p.pos = end;
-            p.bump();
-            Ok(parts)
-        })
+        }
+        self.pos = end;
+        self.bump();
+        self.guard = saved;
+        Ok(parts)
     }
 
-    fn block(&mut self) -> PResult<Block> {
+    async fn block(&mut self, __s: trampoline::Scheduler) -> PResult<Block> {
         let start = self.start();
         let errors = self.diags.len();
-        let stmts = self.braced(Self::stmt)?;
+        let stmts = self.braced(|p, s| Box::pin(p.stmt(s)), __s.clone()).await?;
         let span = self.span_from(start);
         if !matches!(stmts.last(), Some(Stmt::Expr(_))) && self.diags.len() == errors {
             let msg = "a block ends with an expression";
@@ -990,13 +1206,13 @@ impl Parser<'_> {
 
     // ---- Expressions (§6.1) ----
 
-    fn expr(&mut self) -> PResult<Expr> {
-        self.binary(0)
+    async fn expr(&mut self, __s: trampoline::Scheduler) -> PResult<Expr> {
+        self.binary(0, __s.clone()).await
     }
 
-    fn binary(&mut self, min: u8) -> PResult<Expr> {
+    async fn binary(&mut self, min: u8, __s: trampoline::Scheduler) -> PResult<Expr> {
         let start = self.start();
-        let mut lhs = self.unary()?;
+        let mut lhs = self.unary(__s.clone()).await?;
         while !self.tok().brk {
             if self.legacy && self.at(&T::Pipe) {
                 break;
@@ -1006,7 +1222,7 @@ impl Parser<'_> {
                 break;
             }
             self.bump();
-            let mut rhs = self.binary(op.level())?;
+            let mut rhs = Box::pin(self.binary(op.level(), __s.clone())).await?;
             if op == BinOp::Pipe
                 && let ExprKind::Clauses(_) = rhs.kind
             {
@@ -1043,24 +1259,24 @@ impl Parser<'_> {
         Ok(lhs)
     }
 
-    fn unary(&mut self) -> PResult<Expr> {
+    async fn unary(&mut self, __s: trampoline::Scheduler) -> PResult<Expr> {
         let start = self.start();
         let op = match self.kind() {
             T::Minus => UnOp::Neg,
             T::MinusDot => UnOp::NegFloat,
-            _ => return self.postfix(),
+            _ => return self.postfix(__s.clone()).await,
         };
         self.bump();
-        let expr = Box::new(self.postfix()?);
+        let expr = Box::new(self.postfix(__s.clone()).await?);
         Ok(Expr {
             kind: ExprKind::Unary { op, expr },
             span: self.span_from(start),
         })
     }
 
-    fn postfix(&mut self) -> PResult<Expr> {
+    async fn postfix(&mut self, __s: trampoline::Scheduler) -> PResult<Expr> {
         let start = self.start();
-        let mut e = self.primary()?;
+        let mut e = self.primary(__s.clone()).await?;
         loop {
             if !self.legacy
                 && self.at(&T::LBrace)
@@ -1075,12 +1291,12 @@ impl Parser<'_> {
                 ));
             }
             let kind = if self.at_joined(&T::LParen) {
-                self.call(e)?
+                self.call(e, __s.clone()).await?
             } else if self.eat(&T::Dot) {
                 match self.kind().clone() {
                     T::LBrace if !self.legacy => ExprKind::Case {
                         subject: Box::new(e),
-                        clauses: self.clauses()?,
+                        clauses: self.clauses(__s.clone()).await?,
                     },
                     T::Name(_) => ExprKind::Field {
                         target: Box::new(e),
@@ -1104,20 +1320,29 @@ impl Parser<'_> {
     }
 
     /// The arguments of a call, after its `(`, and the `)`.
-    fn args(&mut self) -> PResult<Vec<Arg>> {
-        let args = self.seq(T::RParen, true, |p| {
-            let label = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Colon {
-                let label = p.name()?;
-                p.bump();
-                Some(label)
-            } else {
-                None
-            };
-            Ok(Arg {
-                label,
-                value: p.expr()?,
-            })
-        })?;
+    async fn args(&mut self, __s: trampoline::Scheduler) -> PResult<Vec<Arg>> {
+        let args = self
+            .seq(
+                T::RParen,
+                true,
+                |p, __s| {
+                    Box::pin(async move {
+                        let label = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Colon {
+                            let label = p.name()?;
+                            p.bump();
+                            Some(label)
+                        } else {
+                            None
+                        };
+                        Ok(Arg {
+                            label,
+                            value: unsafe { __s.call(|__child| p.expr(__child)) }.await?,
+                        })
+                    })
+                },
+                __s.clone(),
+            )
+            .await?;
         // §6.6: arguments by position come before arguments by label.
         let mut labeled = false;
         for arg in &args {
@@ -1131,10 +1356,10 @@ impl Parser<'_> {
         Ok(args)
     }
 
-    fn call(&mut self, callee: Expr) -> PResult<ExprKind> {
+    async fn call(&mut self, callee: Expr, __s: trampoline::Scheduler) -> PResult<ExprKind> {
         self.bump();
         if !self.at(&T::DotDot) {
-            let args = self.args()?;
+            let args = self.args(__s.clone()).await?;
             let callee = Box::new(callee);
             return Ok(ExprKind::Call { callee, args });
         }
@@ -1143,30 +1368,36 @@ impl Parser<'_> {
             return Err(Diagnostic::new(Code::BadSpread, callee.span, msg));
         }
         self.bump();
-        self.nested(|p| {
-            let base = Box::new(p.expr()?);
-            let mut fields = Vec::new();
-            while !p.eat(&T::RParen) {
-                if !p.eat(&T::Comma) && !p.tok().brk {
-                    return p.error("`,` or `)`");
-                }
-                if p.eat(&T::RParen) {
-                    break;
-                }
-                let label = p.name()?;
-                p.expect(&T::Colon)?;
-                fields.push((label, p.expr()?));
-            }
-            let constructor = Box::new(callee);
-            Ok(ExprKind::RecordUpdate {
-                constructor,
-                base,
-                fields,
-            })
-        })
+        self.nested(
+            |p, __s| {
+                Box::pin(async move {
+                    let base = Box::new(unsafe { __s.call(|__child| p.expr(__child)) }.await?);
+                    let mut fields = Vec::new();
+                    while !p.eat(&T::RParen) {
+                        if !p.eat(&T::Comma) && !p.tok().brk {
+                            return p.error("`,` or `)`");
+                        }
+                        if p.eat(&T::RParen) {
+                            break;
+                        }
+                        let label = p.name()?;
+                        p.expect(&T::Colon)?;
+                        fields.push((label, unsafe { __s.call(|__child| p.expr(__child)) }.await?));
+                    }
+                    let constructor = Box::new(callee);
+                    Ok(ExprKind::RecordUpdate {
+                        constructor,
+                        base,
+                        fields,
+                    })
+                })
+            },
+            __s.clone(),
+        )
+        .await
     }
 
-    fn primary(&mut self) -> PResult<Expr> {
+    async fn primary(&mut self, __s: trampoline::Scheduler) -> PResult<Expr> {
         let start = self.start();
         let kind = match self.kind().clone() {
             T::Int(v) => {
@@ -1193,19 +1424,29 @@ impl Parser<'_> {
                 let msg = "a discard binds nothing, so it may not be used as a value";
                 return Err(Diagnostic::new(Code::DiscardValue, self.tok().span, msg));
             }
-            T::LParen => return self.paren(),
-            T::LBracket => self.list()?,
+            T::LParen => return self.paren(__s.clone()).await,
+            T::LBracket => self.list(__s.clone()).await?,
             T::LtLt => {
                 self.bump();
-                ExprKind::BitArray(self.seq(T::GtGt, true, |p| {
-                    let start = p.start();
-                    let value = p.expr()?;
-                    p.segment(value, start)
-                })?)
+                ExprKind::BitArray(
+                    self.seq(
+                        T::GtGt,
+                        true,
+                        |p, __s| {
+                            Box::pin(async move {
+                                let start = p.start();
+                                let value = unsafe { __s.call(|__child| p.expr(__child)) }.await?;
+                                p.segment(value, start, __s.clone()).await
+                            })
+                        },
+                        __s.clone(),
+                    )
+                    .await?,
+                )
             }
-            T::LBrace => match self.decide() {
-                Brace::Block => ExprKind::Block(self.block()?),
-                Brace::Clauses => ExprKind::Clauses(self.clauses()?),
+            T::LBrace => match self.decide(__s.clone()).await {
+                Brace::Block => ExprKind::Block(self.block(__s.clone()).await?),
+                Brace::Clauses => ExprKind::Clauses(self.clauses(__s.clone()).await?),
                 Brace::Record => {
                     let at = self.tok().span;
                     let (code, message) = if self.legacy {
@@ -1217,7 +1458,7 @@ impl Parser<'_> {
                         )
                     };
                     self.diags.push(Diagnostic::new(code, at, message));
-                    ExprKind::Clauses(self.clauses()?)
+                    ExprKind::Clauses(self.clauses(__s.clone()).await?)
                 }
             },
             _ => return self.error("an expression"),
@@ -1228,12 +1469,22 @@ impl Parser<'_> {
         })
     }
 
-    fn segment<X>(&mut self, value: X, start: u32) -> PResult<Segment<X>> {
+    async fn segment<X>(
+        &mut self,
+        value: X,
+        start: u32,
+        __s: trampoline::Scheduler,
+    ) -> PResult<Segment<X>> {
         let format = if self.eat(&T::Colon) {
             let name = self.name()?;
             let arg = if self.at_joined(&T::LParen) {
                 self.bump();
-                let arg = self.nested(Self::expr)?;
+                let arg = self
+                    .nested(
+                        |p, s| Box::pin(async move { unsafe { s.call(|c| p.expr(c)) }.await }),
+                        __s.clone(),
+                    )
+                    .await?;
                 self.expect(&T::RParen)?;
                 Some(Box::new(arg))
             } else {
@@ -1278,7 +1529,7 @@ impl Parser<'_> {
     }
 
     // T3 replaces these two reservation paths with the nodes of records §8.3.
-    fn datum(&mut self) -> PResult<ExprKind> {
+    async fn datum(&mut self, __s: trampoline::Scheduler) -> PResult<ExprKind> {
         if self.old_empty && self.at(&T::RParen) {
             self.bump();
             return Ok(ExprKind::Tuple(Vec::new()));
@@ -1294,16 +1545,24 @@ impl Parser<'_> {
             }
             let spread = self.eat(&T::DotDot);
             if spread {
-                self.expr()?;
+                unsafe { __s.call(|__child| self.expr(__child)) }.await?;
             }
             if !(spread && self.eat(&T::RParen)) {
                 if spread && !self.eat(&T::Comma) && !self.tok().brk {
                     return self.error("a record field separator");
                 }
-                self.seq(T::RParen, true, |p| {
-                    p.record_label(false)?;
-                    p.expr()
-                })?;
+                self.seq(
+                    T::RParen,
+                    true,
+                    |p, __s| {
+                        Box::pin(async move {
+                            p.record_label(false)?;
+                            unsafe { __s.call(|__child| p.expr(__child)) }.await
+                        })
+                    },
+                    __s.clone(),
+                )
+                .await?;
             }
             return Err(Diagnostic::new(
                 Code::RecordReserved,
@@ -1311,15 +1570,25 @@ impl Parser<'_> {
                 "parenthesised records are kept for T3",
             ));
         }
-        Ok(ExprKind::Tuple(self.seq(T::RParen, false, |p| {
-            if p.label_start() {
-                return Err(p.mixed());
-            }
-            p.expr()
-        })?))
+        Ok(ExprKind::Tuple(
+            self.seq(
+                T::RParen,
+                false,
+                |p, __s| {
+                    Box::pin(async move {
+                        if p.label_start() {
+                            return Err(p.mixed());
+                        }
+                        unsafe { __s.call(|__child| p.expr(__child)) }.await
+                    })
+                },
+                __s.clone(),
+            )
+            .await?,
+        ))
     }
 
-    fn type_datum(&mut self) -> PResult<TypeKind> {
+    async fn type_datum(&mut self, __s: trampoline::Scheduler) -> PResult<TypeKind> {
         if self.at(&T::RParen) {
             if self.old_empty {
                 self.bump();
@@ -1329,17 +1598,27 @@ impl Parser<'_> {
                 .error("`Record` for all records, or `Nil` for a unit type; `()` is not a type");
         }
         if self.at(&T::DotDot) || self.label_start() {
-            return self.record_type();
+            return self.record_type(__s.clone()).await;
         }
-        Ok(TypeKind::Tuple(self.seq(T::RParen, false, |p| {
-            if p.label_start() {
-                return Err(p.mixed());
-            }
-            p.ty()
-        })?))
+        Ok(TypeKind::Tuple(
+            self.seq(
+                T::RParen,
+                false,
+                |p, __s| {
+                    Box::pin(async move {
+                        if p.label_start() {
+                            return Err(p.mixed());
+                        }
+                        unsafe { __s.call(|__child| p.ty(__child)) }.await
+                    })
+                },
+                __s.clone(),
+            )
+            .await?,
+        ))
     }
 
-    fn paren(&mut self) -> PResult<Expr> {
+    async fn paren(&mut self, __s: trampoline::Scheduler) -> PResult<Expr> {
         let start = self.start();
         let is_fn = self.close[self.pos].is_some_and(|c| {
             let next = &self.toks[c as usize + 1];
@@ -1347,7 +1626,7 @@ impl Parser<'_> {
         });
         self.bump();
         let kind = if is_fn {
-            ExprKind::Fn(Box::new(self.function()?))
+            ExprKind::Fn(Box::new(self.function(__s.clone()).await?))
         } else if self.eat(&T::RParen) {
             if self.old_empty {
                 return Ok(Expr {
@@ -1362,9 +1641,9 @@ impl Parser<'_> {
         } else if self.at(&T::DotDot)
             || matches!(self.kind(), T::Name(_) | T::Str(_)) && *self.nth(1) == T::Colon
         {
-            self.record_expr()?
+            self.record_expr(__s.clone()).await?
         } else {
-            self.datum()?
+            self.datum(__s.clone()).await?
         };
         Ok(Expr {
             kind,
@@ -1372,48 +1651,69 @@ impl Parser<'_> {
         })
     }
 
-    fn record_expr(&mut self) -> PResult<ExprKind> {
-        self.nested(|p| {
-            let base = if p.eat(&T::DotDot) {
-                Some(Box::new(p.expr()?))
-            } else {
-                None
-            };
-            let mut fields = Vec::new();
-            while !p.eat(&T::RParen) {
-                if base.is_some() || !fields.is_empty() {
-                    if !p.eat(&T::Comma) && !p.tok().brk {
-                        return p.error("`,` or `)`");
+    async fn record_expr(&mut self, __s: trampoline::Scheduler) -> PResult<ExprKind> {
+        self.nested(
+            |p, __s| {
+                Box::pin(async move {
+                    let base = if p.eat(&T::DotDot) {
+                        Some(Box::new(unsafe { __s.call(|child| p.expr(child)) }.await?))
+                    } else {
+                        None
+                    };
+                    let mut fields = Vec::new();
+                    while !p.eat(&T::RParen) {
+                        if base.is_some() || !fields.is_empty() {
+                            if !p.eat(&T::Comma) && !p.tok().brk {
+                                return p.error("`,` or `)`");
+                            }
+                            if p.eat(&T::RParen) {
+                                break;
+                            }
+                        }
+                        if !matches!(p.kind(), T::Name(_) | T::Str(_)) {
+                            return Err(p.mixed());
+                        }
+                        let label = p.record_value_label()?;
+                        p.expect(&T::Colon)?;
+                        fields.push((label, unsafe { __s.call(|child| p.expr(child)) }.await?));
                     }
-                    if p.eat(&T::RParen) {
-                        break;
-                    }
-                }
-                let label = p.record_value_label()?;
-                p.expect(&T::Colon)?;
-                fields.push((label, p.expr()?));
-            }
-            Ok(ExprKind::Record { base, fields })
-        })
+                    Ok(ExprKind::Record { base, fields })
+                })
+            },
+            __s.clone(),
+        )
+        .await
     }
 
     /// After the `(` of a function (§6.8).
-    fn function(&mut self) -> PResult<Function> {
-        let params = self.seq(T::RParen, true, |p| {
-            let env =
-                matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Bang && !p.toks[p.pos + 1].brk;
-            if !env {
-                return Ok(Param::Pattern(p.pattern()?));
-            }
-            let name = p.name()?;
-            p.bump();
-            Ok(Param::Env {
-                name,
-                ty: p.named_type()?,
-            })
-        })?;
+    async fn function(&mut self, __s: trampoline::Scheduler) -> PResult<Function> {
+        let params = self
+            .seq(
+                T::RParen,
+                true,
+                |p, __s| {
+                    Box::pin(async move {
+                        let env = matches!(p.kind(), T::Name(_))
+                            && *p.nth(1) == T::Bang
+                            && !p.toks[p.pos + 1].brk;
+                        if !env {
+                            return Ok(Param::Pattern(
+                                unsafe { __s.call(|__child| p.pattern(__child)) }.await?,
+                            ));
+                        }
+                        let name = p.name()?;
+                        p.bump();
+                        Ok(Param::Env {
+                            name,
+                            ty: p.named_type(__s.clone()).await?,
+                        })
+                    })
+                },
+                __s.clone(),
+            )
+            .await?;
         let ret = if self.eat(&T::Arrow) {
-            let (value, err, env) = self.arrow_tail()?;
+            let (value, err, env) = self.arrow_tail(__s.clone()).await?;
             Some(RetType { value, err, env })
         } else {
             None
@@ -1425,52 +1725,62 @@ impl Parser<'_> {
             );
             return Err(Diagnostic::new(Code::MissingBody, self.tok().span, msg));
         }
-        let body = self.block()?;
+        let body = self.block(__s.clone()).await?;
         Ok(Function { params, ret, body })
     }
 
-    fn list(&mut self) -> PResult<ExprKind> {
+    async fn list(&mut self, __s: trampoline::Scheduler) -> PResult<ExprKind> {
         self.bump();
-        self.nested(|p| {
-            let mut items = Vec::new();
-            let mut rest = None;
-            while !p.eat(&T::RBracket) {
-                if !items.is_empty() {
-                    if !p.eat(&T::Comma) && !p.tok().brk {
-                        return p.error("`,` or `]`");
+        self.nested(
+            |p, __s| {
+                Box::pin(async move {
+                    let mut items = Vec::new();
+                    let mut rest = None;
+                    while !p.eat(&T::RBracket) {
+                        if !items.is_empty() {
+                            if !p.eat(&T::Comma) && !p.tok().brk {
+                                return p.error("`,` or `]`");
+                            }
+                            if p.eat(&T::RBracket) {
+                                break;
+                            }
+                        }
+                        if p.at(&T::DotDot) {
+                            if items.is_empty() {
+                                let msg = "`..rest` comes after the parts of a list";
+                                return Err(Diagnostic::new(Code::BadSpread, p.tok().span, msg));
+                            }
+                            p.bump();
+                            rest = Some(Box::new(
+                                unsafe { __s.call(|__child| p.expr(__child)) }.await?,
+                            ));
+                            p.eat(&T::Comma);
+                            p.expect(&T::RBracket)?;
+                            break;
+                        }
+                        items.push(unsafe { __s.call(|__child| p.expr(__child)) }.await?);
                     }
-                    if p.eat(&T::RBracket) {
-                        break;
-                    }
-                }
-                if p.at(&T::DotDot) {
-                    if items.is_empty() {
-                        let msg = "`..rest` comes after the parts of a list";
-                        return Err(Diagnostic::new(Code::BadSpread, p.tok().span, msg));
-                    }
-                    p.bump();
-                    rest = Some(Box::new(p.expr()?));
-                    p.eat(&T::Comma);
-                    p.expect(&T::RBracket)?;
-                    break;
-                }
-                items.push(p.expr()?);
-            }
-            Ok(ExprKind::List { items, rest })
-        })
+                    Ok(ExprKind::List { items, rest })
+                })
+            },
+            __s.clone(),
+        )
+        .await
     }
 
     /// The clauses of a clause block, from its `{` (§6.12).
-    fn clauses(&mut self) -> PResult<Vec<Clause>> {
-        self.braced(Self::clause)
+    async fn clauses(&mut self, __s: trampoline::Scheduler) -> PResult<Vec<Clause>> {
+        self.braced(|p, s| Box::pin(p.clause(s)), __s.clone()).await
     }
 
     /// `Pattern { "|" Pattern } [ "?" Expr ] "->" Expr`.
-    fn clause(&mut self) -> PResult<Clause> {
+    async fn clause(&mut self, __s: trampoline::Scheduler) -> PResult<Clause> {
         let start = self.start();
+        let outer_tuple_type = self.tuple_type;
         self.tuple_type = false;
-        let patterns = self.clause_patterns();
+        let patterns = self.clause_patterns(__s.clone()).await;
         let note = self.tuple_type;
+        self.tuple_type = outer_tuple_type;
         let noted = |mut d: Diagnostic| {
             if note {
                 d.message.push_str(TUPLE_NOTE);
@@ -1478,7 +1788,7 @@ impl Parser<'_> {
             d
         };
         let patterns = patterns.map_err(noted)?;
-        let (guard, body) = self.clause_tail().map_err(noted)?;
+        let (guard, body) = self.clause_tail(__s.clone()).await.map_err(noted)?;
         Ok(Clause {
             patterns,
             guard,
@@ -1487,25 +1797,25 @@ impl Parser<'_> {
         })
     }
 
-    fn clause_patterns(&mut self) -> PResult<Vec<Pattern>> {
-        let mut patterns = vec![self.pattern()?];
+    async fn clause_patterns(&mut self, __s: trampoline::Scheduler) -> PResult<Vec<Pattern>> {
+        let mut patterns = vec![unsafe { __s.call(|__child| self.pattern(__child)) }.await?];
         while self.eat(&T::Pipe) {
-            patterns.push(self.pattern()?);
+            patterns.push(unsafe { __s.call(|__child| self.pattern(__child)) }.await?);
         }
         Ok(patterns)
     }
 
-    fn clause_tail(&mut self) -> PResult<(Option<Expr>, Expr)> {
+    async fn clause_tail(&mut self, __s: trampoline::Scheduler) -> PResult<(Option<Expr>, Expr)> {
         let guard = if self.eat(&T::Question) {
             self.guard = true;
-            let guard = self.expr();
+            let guard = unsafe { __s.call(|__child| self.expr(__child)) }.await;
             self.guard = false;
             Some(guard?)
         } else {
             None
         };
         self.expect(&T::Arrow)?;
-        let body = self.expr()?;
+        let body = unsafe { __s.call(|__child| self.expr(__child)) }.await?;
         Ok((guard, body))
     }
 
@@ -1513,7 +1823,7 @@ impl Parser<'_> {
 
     /// Whether the `{` at the current token begins a block or a clause
     /// block. Each `{` is decided once; the answer is kept by its index.
-    fn decide(&mut self) -> Brace {
+    async fn decide(&mut self, __s: trampoline::Scheduler) -> Brace {
         let at = self.pos;
         if self.cache
             && let Some(&b) = self.decided.get(&at)
@@ -1521,17 +1831,25 @@ impl Parser<'_> {
             return b;
         }
         self.decisions += 1;
-        let ndiags = self.diags.len();
-        let b = self.nested(|p| Ok(p.probe(at))).unwrap_or(Brace::Block);
+        let ndiags = self.diags.snapshot();
+        let tuple_type = self.tuple_type;
+        let b = self
+            .nested(
+                |p, __s| Box::pin(async move { Ok(p.probe(at, __s.clone()).await) }),
+                __s.clone(),
+            )
+            .await
+            .unwrap_or(Brace::Block);
         self.pos = at;
-        self.diags.truncate(ndiags);
+        self.diags.restore(ndiags);
+        self.tuple_type = tuple_type;
         self.decided.insert(at, b);
         b
     }
 
     /// The tests of §6.1 on the first statement of the `{` at `at`. Moves
     /// `pos`, which `decide` puts back.
-    fn probe(&mut self, at: usize) -> Brace {
+    async fn probe(&mut self, at: usize, __s: trampoline::Scheduler) -> Brace {
         let Some(end) = self.close[at] else {
             return Brace::Block;
         };
@@ -1554,10 +1872,63 @@ impl Parser<'_> {
             chain += 1;
         }
         let last = self.pos;
-        let p_end = match self.pattern_in(false) {
-            Ok(_) => Some(self.pos),
-            Err(_) if chain > 0 => Some(last - 1),
-            Err(_) => None,
+        // If a compound atom is followed by no token that can classify a
+        // clause or binding, its contents cannot affect this decision. In
+        // particular, do not recursively parse an embedded format expression
+        // once for the probe and again for the actual statement.
+        let irrelevant = self.closed_pattern_atom_end(last).is_some_and(|after| {
+            match self.toks[after].kind {
+                T::Pipe if !self.legacy => {
+                    // A pipe cannot be a clause alternative if there is no
+                    // top-level guard or arrow anywhere in this brace.
+                    let mut i = after + 1;
+                    while i < end {
+                        if self.toks[i].brk {
+                            return true;
+                        }
+                        if matches!(self.toks[i].kind, T::Question | T::Arrow) {
+                            return false;
+                        }
+                        i = self.close[i].map_or(i + 1, |close| close as usize + 1);
+                    }
+                    true
+                }
+                T::Pipe | T::Question | T::Arrow | T::Eq => false,
+                _ => true,
+            }
+        });
+        let p_end = if irrelevant {
+            if chain > 0 { Some(last - 1) } else { None }
+        } else {
+            let key = PatternProbeKey {
+                pos: last,
+                guard: self.guard,
+                tuple_type: self.tuple_type,
+                diagnostics_tail: self.diags.snapshot().tail,
+            };
+            let parsed = unsafe { __s.call(|__child| self.pattern_in(false, __child)) }.await;
+            let succeeded = parsed.is_ok();
+            let result_end = self.pos;
+            let result_tuple_type = self.tuple_type;
+            if self.closed_pattern_atom_end(last).is_some() {
+                let diagnostics = self.diags.snapshot();
+                self.probed_patterns.insert(
+                    key,
+                    PatternProbe {
+                        result: parsed,
+                        end: result_end,
+                        diagnostics,
+                        tuple_type: result_tuple_type,
+                    },
+                );
+            }
+            if succeeded {
+                Some(result_end)
+            } else if chain > 0 {
+                Some(last - 1)
+            } else {
+                None
+            }
         };
         let last_is_tuple = p_end.is_some_and(|e| {
             e > last
@@ -1570,7 +1941,7 @@ impl Parser<'_> {
             if matches!(follows, T::Pipe | T::Question | T::Arrow) {
                 if chain > 0 && last_is_tuple && follows == T::Arrow {
                     self.bump();
-                    if self.arrow_tail().is_ok() && self.at_joined(&T::LBrace) {
+                    if self.arrow_tail(__s.clone()).await.is_ok() && self.at_joined(&T::LBrace) {
                         return Brace::Block;
                     }
                 }
@@ -1579,7 +1950,27 @@ impl Parser<'_> {
                 }
                 let head_end = self.pos;
                 while self.eat(&T::Pipe) {
-                    if self.pattern().is_err() {
+                    let key = PatternProbeKey {
+                        pos: self.pos,
+                        guard: self.guard,
+                        tuple_type: self.tuple_type,
+                        diagnostics_tail: self.diags.snapshot().tail,
+                    };
+                    let cache = self.closed_pattern_atom_end(self.pos).is_some();
+                    let parsed = unsafe { __s.call(|__child| self.pattern(__child)) }.await;
+                    let succeeded = parsed.is_ok();
+                    if cache {
+                        self.probed_patterns.insert(
+                            key,
+                            PatternProbe {
+                                result: parsed,
+                                end: self.pos,
+                                diagnostics: self.diags.snapshot(),
+                                tuple_type: self.tuple_type,
+                            },
+                        );
+                    }
+                    if !succeeded {
                         break;
                     }
                 }
@@ -1605,7 +1996,7 @@ impl Parser<'_> {
         // 5: a clause whose pattern is wrong.
         if self.arrow_before_break(s, end) {
             self.pos = s;
-            match self.expr() {
+            match unsafe { __s.call(|__child| self.expr(__child)) }.await {
                 Err(_) => return Brace::Clauses,
                 Ok(_) if self.at(&T::Arrow) => return Brace::Clauses,
                 Ok(_) => {}
@@ -1635,20 +2026,24 @@ impl Parser<'_> {
 
     // ---- Patterns (§7.1) ----
 
-    fn pattern(&mut self) -> PResult<Pattern> {
-        self.pattern_in(false)
+    async fn pattern(&mut self, __s: trampoline::Scheduler) -> PResult<Pattern> {
+        unsafe { __s.call(|__child| self.pattern_in(false, __child)) }.await
     }
 
     /// `segment` is set at the top of a bit array segment, where `:` begins a
     /// format and not a type (§8.1).
-    fn pattern_in(&mut self, segment: bool) -> PResult<Pattern> {
+    async fn pattern_in(&mut self, segment: bool, __s: trampoline::Scheduler) -> PResult<Pattern> {
+        if !segment && let Some(result) = self.take_probed_pattern() {
+            return result;
+        }
         if !(matches!(self.kind(), T::Name(_)) && *self.nth(1) == T::Eq) {
-            return self.pattern_atom(segment);
+            return self.pattern_atom(segment, __s.clone()).await;
         }
         let start = self.start();
         let name = self.name()?;
         self.bump();
-        let pattern = Box::new(self.pattern_in(segment)?);
+        let pattern =
+            Box::new(unsafe { __s.call(|__child| self.pattern_in(segment, __child)) }.await?);
         Ok(Pattern {
             kind: PatternKind::Named { name, pattern },
             span: self.span_from(start),
@@ -1669,17 +2064,21 @@ impl Parser<'_> {
     }
 
     /// `PrefixPat | Atom`.
-    fn pattern_atom(&mut self, segment: bool) -> PResult<Pattern> {
+    async fn pattern_atom(
+        &mut self,
+        segment: bool,
+        __s: trampoline::Scheduler,
+    ) -> PResult<Pattern> {
         let start = self.start();
         let kind = match self.kind().clone() {
-            T::Name(_) if self.at_qualified() => self.constructor_pattern()?,
+            T::Name(_) if self.at_qualified() => self.constructor_pattern(__s.clone()).await?,
             T::Name(_) | T::Discard(_) => {
                 let binder = self.binder()?;
                 if !segment && self.eat(&T::Colon) {
                     self.tuple_type |= self.at(&T::LParen);
                     PatternKind::Typed {
                         binder,
-                        ty: self.ty()?,
+                        ty: unsafe { __s.call(|__child| self.ty(__child)) }.await?,
                     }
                 } else if binder.discard {
                     PatternKind::Discard(binder.name)
@@ -1687,7 +2086,7 @@ impl Parser<'_> {
                     PatternKind::Var(binder.name)
                 }
             }
-            T::UpName(_) => self.constructor_pattern()?,
+            T::UpName(_) => self.constructor_pattern(__s.clone()).await?,
             T::Int(value) => {
                 self.bump();
                 PatternKind::Int {
@@ -1746,16 +2145,36 @@ impl Parser<'_> {
                         "the empty tuple pattern is removed; use `Nil` for a unit pattern, or a binder/discard for a record",
                     ));
                 }
-                PatternKind::Tuple(self.seq(T::RParen, self.old_empty, Self::pattern)?)
+                PatternKind::Tuple(
+                    self.seq(
+                        T::RParen,
+                        self.old_empty,
+                        |p, s| Box::pin(async move { unsafe { s.call(|c| p.pattern(c)) }.await }),
+                        __s.clone(),
+                    )
+                    .await?,
+                )
             }
-            T::LBracket => self.list_pattern()?,
+            T::LBracket => self.list_pattern(__s.clone()).await?,
             T::LtLt => {
                 self.bump();
-                PatternKind::BitArray(self.seq(T::GtGt, true, |p| {
-                    let start = p.start();
-                    let value = p.pattern_in(true)?;
-                    p.segment(value, start)
-                })?)
+                PatternKind::BitArray(
+                    self.seq(
+                        T::GtGt,
+                        true,
+                        |p, __s| {
+                            Box::pin(async move {
+                                let start = p.start();
+                                let value =
+                                    unsafe { __s.call(|__child| p.pattern_in(true, __child)) }
+                                        .await?;
+                                p.segment(value, start, __s.clone()).await
+                            })
+                        },
+                        __s.clone(),
+                    )
+                    .await?,
+                )
             }
             _ => return self.error("a pattern"),
         };
@@ -1766,33 +2185,38 @@ impl Parser<'_> {
     }
 
     /// `[m.]C[(p, …, ..)]`: the parts and `..` (§7.1).
-    fn constructor_pattern(&mut self) -> PResult<PatternKind> {
+    async fn constructor_pattern(&mut self, __s: trampoline::Scheduler) -> PResult<PatternKind> {
         let module = self.qualifier()?;
         let name = self.up_name()?;
         let mut args = Vec::new();
         let mut spread = false;
         if self.at_joined(&T::LParen) {
             self.bump();
-            self.nested(|p| {
-                if p.eat(&T::RParen) {
+            let saved = self.guard;
+            self.guard = false;
+            let result: PResult<()> = async {
+                if self.eat(&T::RParen) {
                     return Ok(());
                 }
                 loop {
-                    if p.eat(&T::DotDot) {
+                    if self.eat(&T::DotDot) {
                         spread = true;
-                        p.expect(&T::RParen)?;
+                        self.expect(&T::RParen)?;
                         return Ok(());
                     }
-                    args.push(p.pattern()?);
-                    if p.eat(&T::RParen) || p.eat(&T::Comma) && p.eat(&T::RParen) {
+                    args.push(unsafe { __s.call(|__child| self.pattern(__child)) }.await?);
+                    if self.eat(&T::RParen) || self.eat(&T::Comma) && self.eat(&T::RParen) {
                         return Ok(());
                     }
-                    let sep = p.toks[p.pos - 1].kind == T::Comma || p.tok().brk;
+                    let sep = self.toks[self.pos - 1].kind == T::Comma || self.tok().brk;
                     if !sep {
-                        return p.error("`,` or `)`");
+                        return self.error("`,` or `)`");
                     }
                 }
-            })?;
+            }
+            .await;
+            self.guard = saved;
+            result?;
         }
         Ok(PatternKind::Constructor {
             module,
@@ -1802,66 +2226,91 @@ impl Parser<'_> {
         })
     }
 
-    fn list_pattern(&mut self) -> PResult<PatternKind> {
+    async fn list_pattern(&mut self, __s: trampoline::Scheduler) -> PResult<PatternKind> {
         self.bump();
-        self.nested(|p| {
-            let mut items = Vec::new();
-            let mut rest = None;
-            if p.eat(&T::RBracket) {
-                return Ok(PatternKind::List { items, rest });
-            }
-            loop {
-                if p.eat(&T::DotDot) {
-                    let binder = match p.kind() {
-                        T::Name(_) | T::Discard(_) => Some(p.binder()?),
-                        _ => None,
-                    };
-                    rest = Some(binder);
-                    p.expect(&T::RBracket)?;
-                    break;
-                }
-                items.push(p.pattern()?);
-                if p.eat(&T::RBracket) || p.eat(&T::Comma) && p.eat(&T::RBracket) {
-                    break;
-                }
-                let sep = p.toks[p.pos - 1].kind == T::Comma || p.tok().brk;
-                if !sep {
-                    return p.error("`,` or `]`");
-                }
-            }
-            Ok(PatternKind::List { items, rest })
-        })
+        self.nested(
+            |p, __s| {
+                Box::pin(async move {
+                    let mut items = Vec::new();
+                    let mut rest = None;
+                    if p.eat(&T::RBracket) {
+                        return Ok(PatternKind::List { items, rest });
+                    }
+                    loop {
+                        if p.eat(&T::DotDot) {
+                            let binder = match p.kind() {
+                                T::Name(_) | T::Discard(_) => Some(p.binder()?),
+                                _ => None,
+                            };
+                            rest = Some(binder);
+                            p.expect(&T::RBracket)?;
+                            break;
+                        }
+                        items.push(unsafe { __s.call(|__child| p.pattern(__child)) }.await?);
+                        if p.eat(&T::RBracket) || p.eat(&T::Comma) && p.eat(&T::RBracket) {
+                            break;
+                        }
+                        let sep = p.toks[p.pos - 1].kind == T::Comma || p.tok().brk;
+                        if !sep {
+                            return p.error("`,` or `]`");
+                        }
+                    }
+                    Ok(PatternKind::List { items, rest })
+                })
+            },
+            __s.clone(),
+        )
+        .await
     }
 
     // ---- Types (§3) ----
 
-    fn ty(&mut self) -> PResult<TypeExpr> {
-        self.type_list(T::Pipe, Self::type_inter, TypeKind::Union)
+    async fn ty(&mut self, __s: trampoline::Scheduler) -> PResult<TypeExpr> {
+        self.type_list(
+            T::Pipe,
+            |p, s| Box::pin(p.type_inter(s)),
+            TypeKind::Union,
+            __s.clone(),
+        )
+        .await
     }
 
-    fn type_inter(&mut self) -> PResult<TypeExpr> {
-        self.type_list(T::Amp, Self::type_diff, TypeKind::Inter)
+    async fn type_inter(&mut self, __s: trampoline::Scheduler) -> PResult<TypeExpr> {
+        self.type_list(
+            T::Amp,
+            |p, s| Box::pin(p.type_diff(s)),
+            TypeKind::Inter,
+            __s.clone(),
+        )
+        .await
     }
 
-    fn type_diff(&mut self) -> PResult<TypeExpr> {
-        self.type_list(T::Minus, Self::type_prim, TypeKind::Diff)
+    async fn type_diff(&mut self, __s: trampoline::Scheduler) -> PResult<TypeExpr> {
+        self.type_list(
+            T::Minus,
+            |p, s| Box::pin(p.type_prim(s)),
+            TypeKind::Diff,
+            __s.clone(),
+        )
+        .await
     }
 
-    fn type_list(
+    async fn type_list(
         &mut self,
         op: T,
-        part: fn(&mut Self) -> PResult<TypeExpr>,
+        part: impl for<'p> Fn(&'p mut Self, trampoline::Scheduler) -> PFuture<'p, TypeExpr>,
         make: fn(Vec<TypeExpr>) -> TypeKind,
+        __s: trampoline::Scheduler,
     ) -> PResult<TypeExpr> {
         let start = self.start();
-        let first = part(self)?;
+        let first = part(self, __s.clone()).await?;
         if !self.at_joined(&op) {
             return Ok(first);
         }
         let mut parts = vec![first];
         while self.at_joined(&op) {
             self.bump();
-            parts.push(part(self)?);
+            parts.push(part(self, __s.clone()).await?);
         }
         Ok(TypeExpr {
             kind: make(parts),
@@ -1871,16 +2320,19 @@ impl Parser<'_> {
 
     /// The part of a function type or a function after `->` (§3, §6.8).
     #[allow(clippy::type_complexity)]
-    fn arrow_tail(&mut self) -> PResult<(TypeExpr, Option<TypeExpr>, Option<TypeExpr>)> {
-        let value = self.ty()?;
+    async fn arrow_tail(
+        &mut self,
+        __s: trampoline::Scheduler,
+    ) -> PResult<(TypeExpr, Option<TypeExpr>, Option<TypeExpr>)> {
+        let value = unsafe { __s.call(|__child| self.ty(__child)) }.await?;
         let err = if self.eat(&T::Caret) || (!self.surface2 && self.eat(&T::Question)) {
-            Some(self.ty()?)
+            Some(unsafe { __s.call(|__child| self.ty(__child)) }.await?)
         } else {
             None
         };
         let env = if self.at_joined(&T::Bang) {
             self.bump();
-            Some(self.ty()?)
+            Some(unsafe { __s.call(|__child| self.ty(__child)) }.await?)
         } else {
             None
         };
@@ -1898,7 +2350,7 @@ impl Parser<'_> {
         Ok((value, err, env))
     }
 
-    fn named_type(&mut self) -> PResult<TypeExpr> {
+    async fn named_type(&mut self, __s: trampoline::Scheduler) -> PResult<TypeExpr> {
         let start = self.start();
         if !(self.at_qualified() || matches!(self.kind(), T::UpName(_))) {
             return self.error("a named type");
@@ -1908,7 +2360,14 @@ impl Parser<'_> {
         let mut args = Vec::new();
         if self.at_joined(&T::LParen) {
             self.bump();
-            args = self.seq(T::RParen, false, Self::ty)?;
+            args = self
+                .seq(
+                    T::RParen,
+                    false,
+                    |p, s| Box::pin(async move { unsafe { s.call(|c| p.ty(c)) }.await }),
+                    __s.clone(),
+                )
+                .await?;
         }
         Ok(TypeExpr {
             kind: TypeKind::Named { module, name, args },
@@ -1917,7 +2376,7 @@ impl Parser<'_> {
     }
 
     /// Only integer atoms and brace groups can follow a literal type's minus.
-    fn type_int_part(&mut self) -> PResult<num_bigint::BigUint> {
+    async fn type_int_part(&mut self, __s: trampoline::Scheduler) -> PResult<num_bigint::BigUint> {
         match self.kind().clone() {
             T::Int(n) => {
                 self.bump();
@@ -1925,7 +2384,14 @@ impl Parser<'_> {
             }
             T::LBrace => {
                 self.bump();
-                let n = self.nested(Self::type_int_part)?;
+                let n = self
+                    .nested(
+                        |p, s| {
+                            Box::pin(async move { unsafe { s.call(|c| p.type_int_part(c)) }.await })
+                        },
+                        __s.clone(),
+                    )
+                    .await?;
                 if self.tok().brk {
                     return Err(Diagnostic::new(
                         Code::TypeGroupBreak,
@@ -1945,7 +2411,7 @@ impl Parser<'_> {
         }
     }
 
-    fn type_prim(&mut self) -> PResult<TypeExpr> {
+    async fn type_prim(&mut self, __s: trampoline::Scheduler) -> PResult<TypeExpr> {
         let start = self.start();
         let kind = match self.kind().clone() {
             T::Int(n) => {
@@ -1959,7 +2425,7 @@ impl Parser<'_> {
             T::Minus => {
                 self.bump();
                 TypeKind::Lit(LitValue::Int(-num_bigint::BigInt::from(
-                    self.type_int_part()?,
+                    unsafe { __s.call(|__child| self.type_int_part(__child)) }.await?,
                 )))
             }
             T::Float(_) => {
@@ -1974,20 +2440,34 @@ impl Parser<'_> {
                     .is_some_and(|c| self.toks[c as usize + 1].kind == T::Arrow);
                 self.bump();
                 if !is_fn {
-                    self.type_datum()?
+                    self.type_datum(__s.clone()).await?
                 } else {
-                    let params = self.seq(T::RParen, true, |p| {
-                        let label = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Colon {
-                            let label = p.name()?;
-                            p.bump();
-                            Some(label)
-                        } else {
-                            None
-                        };
-                        Ok(FnParamType { label, ty: p.ty()? })
-                    })?;
+                    let params = self
+                        .seq(
+                            T::RParen,
+                            true,
+                            |p, __s| {
+                                Box::pin(async move {
+                                    let label = if matches!(p.kind(), T::Name(_))
+                                        && *p.nth(1) == T::Colon
+                                    {
+                                        let label = p.name()?;
+                                        p.bump();
+                                        Some(label)
+                                    } else {
+                                        None
+                                    };
+                                    Ok(FnParamType {
+                                        label,
+                                        ty: unsafe { __s.call(|__child| p.ty(__child)) }.await?,
+                                    })
+                                })
+                            },
+                            __s.clone(),
+                        )
+                        .await?;
                     self.expect(&T::Arrow)?;
-                    let (ret, err, env) = self.arrow_tail()?;
+                    let (ret, err, env) = self.arrow_tail(__s.clone()).await?;
                     TypeKind::Fn {
                         params,
                         ret: Box::new(ret),
@@ -1998,7 +2478,12 @@ impl Parser<'_> {
             }
             T::LBrace => {
                 self.bump();
-                let inner = self.nested(Self::ty)?;
+                let inner = self
+                    .nested(
+                        |p, s| Box::pin(async move { unsafe { s.call(|c| p.ty(c)) }.await }),
+                        __s.clone(),
+                    )
+                    .await?;
                 if self.tok().brk {
                     let msg = "a line break directly inside a `{ }` that groups a type is a compile error";
                     return Err(Diagnostic::new(Code::TypeGroupBreak, self.tok().span, msg));
@@ -2006,8 +2491,8 @@ impl Parser<'_> {
                 self.expect(&T::RBrace)?;
                 return Ok(inner);
             }
-            T::Name(_) if self.at_qualified() => return self.named_type(),
-            T::UpName(_) => return self.named_type(),
+            T::Name(_) if self.at_qualified() => return self.named_type(__s.clone()).await,
+            T::UpName(_) => return self.named_type(__s.clone()).await,
             // gave an error here for `a.x`.
             T::Name(_)
                 if (*self.nth(1) == T::Dot && matches!(self.nth(2), T::Name(_))
@@ -2023,7 +2508,14 @@ impl Parser<'_> {
                 let name = self.name()?;
                 if self.at_joined(&T::LParen) {
                     self.bump();
-                    let args = self.seq(T::RParen, true, Self::ty)?;
+                    let args = self
+                        .seq(
+                            T::RParen,
+                            true,
+                            |p, s| Box::pin(async move { unsafe { s.call(|c| p.ty(c)) }.await }),
+                            __s.clone(),
+                        )
+                        .await?;
                     TypeKind::Call { module, name, args }
                 } else {
                     TypeKind::ValueOf { module, name }
@@ -2045,47 +2537,53 @@ impl Parser<'_> {
         })
     }
 
-    fn record_type(&mut self) -> PResult<TypeKind> {
-        self.nested(|p| {
-            let base = if p.eat(&T::DotDot) {
-                Some(Box::new(p.ty()?))
-            } else {
-                None
-            };
-            let mut fields = Vec::new();
-            let mut removed = Vec::new();
-            while !p.eat(&T::RParen) {
-                if base.is_some() || !fields.is_empty() || !removed.is_empty() {
-                    if !p.eat(&T::Comma) && !p.tok().brk {
-                        return p.error("`,` or `)`");
+    async fn record_type(&mut self, __s: trampoline::Scheduler) -> PResult<TypeKind> {
+        self.nested(
+            |p, __s| {
+                Box::pin(async move {
+                    let base = if p.eat(&T::DotDot) {
+                        Some(Box::new(unsafe { __s.call(|child| p.ty(child)) }.await?))
+                    } else {
+                        None
+                    };
+                    let mut fields = Vec::new();
+                    let mut removed = Vec::new();
+                    while !p.eat(&T::RParen) {
+                        if base.is_some() || !fields.is_empty() || !removed.is_empty() {
+                            if !p.eat(&T::Comma) && !p.tok().brk {
+                                return p.error("`,` or `)`");
+                            }
+                            if p.eat(&T::RParen) {
+                                break;
+                            }
+                        }
+                        let remove = p.eat(&T::Minus);
+                        if remove && base.is_none() {
+                            return p.error("a spread before a removed label");
+                        }
+                        let parameter = matches!(p.kind(), T::UpName(_));
+                        let ident = if parameter {
+                            p.up_name()?
+                        } else {
+                            p.record_value_label()?
+                        };
+                        let label = RecordLabel { ident, parameter };
+                        if remove {
+                            removed.push(label);
+                        } else {
+                            p.expect(&T::Colon)?;
+                            fields.push((label, unsafe { __s.call(|child| p.ty(child)) }.await?));
+                        }
                     }
-                    if p.eat(&T::RParen) {
-                        break;
-                    }
-                }
-                let remove = p.eat(&T::Minus);
-                if remove && base.is_none() {
-                    return p.error("a spread before a removed label");
-                }
-                let parameter = matches!(p.kind(), T::UpName(_));
-                let ident = if parameter {
-                    p.up_name()?
-                } else {
-                    p.record_value_label()?
-                };
-                let label = RecordLabel { ident, parameter };
-                if remove {
-                    removed.push(label);
-                } else {
-                    p.expect(&T::Colon)?;
-                    fields.push((label, p.ty()?));
-                }
-            }
-            Ok(TypeKind::Record {
-                base,
-                fields,
-                removed,
-            })
-        })
+                    Ok(TypeKind::Record {
+                        base,
+                        fields,
+                        removed,
+                    })
+                })
+            },
+            __s.clone(),
+        )
+        .await
     }
 }
