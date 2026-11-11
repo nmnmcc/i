@@ -513,6 +513,9 @@ fn standard_library_reverse_order_and_recovery_preserve_types() {
     // O2 and checklist 9.11 require measuring the ordinary, no-feature corpus.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
     let options = ilang_package::LoadOptions {
+        // The schema tests deliberately exercise value-derived types; this
+        // check measures the ordinary library without that feature.
+        tests: false,
         write_lock: false,
         offline: true,
         ..Default::default()
