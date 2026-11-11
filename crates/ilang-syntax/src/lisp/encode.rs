@@ -144,6 +144,12 @@ impl Encoder<'_> {
                         | ExprKind::String(_)
                         | ExprKind::Name { .. } => {}
                         ExprKind::Tuple(xs) => work.extend(xs.iter().map(|x| Work::Expr(x, false))),
+                        ExprKind::Record { base, fields } => {
+                            if let Some(base) = base {
+                                work.push(Work::Expr(base, false));
+                            }
+                            work.extend(fields.iter().map(|(_, x)| Work::Expr(x, false)));
+                        }
                         ExprKind::List { items, rest } => {
                             work.extend(items.iter().map(|x| Work::Expr(x, false)));
                             if let Some(x) = rest {
@@ -249,6 +255,12 @@ impl Encoder<'_> {
                         | TypeKind::Inter(args)
                         | TypeKind::Diff(args) => {
                             work.extend(args.iter().map(|t| Work::Type(t, false)));
+                        }
+                        TypeKind::Record { base, fields, .. } => {
+                            if let Some(base) = base {
+                                work.push(Work::Type(base, false));
+                            }
+                            work.extend(fields.iter().map(|(_, x)| Work::Type(x, false)));
                         }
                         TypeKind::Fn {
                             params,
@@ -363,6 +375,14 @@ impl Encoder<'_> {
             },
             n.span,
         )
+    }
+    fn record_label(&self, n: &Ident) -> Syntax {
+        let token = &self.tokens[self.positions[n.span.start as usize]];
+        if matches!(token.kind, TokenKind::Str(_)) {
+            self.node(Node::Text(n.name.clone()), n.span)
+        } else {
+            self.name(n)
+        }
     }
     fn binder(&self, b: &Binder) -> Syntax {
         self.node(
@@ -565,6 +585,46 @@ impl Encoder<'_> {
             ),
             TypeKind::Hole => self.node(Node::Discard("_".into()), t.span),
             TypeKind::Tuple(ts) => self.form(",", ts.iter().map(|x| self.ty(x)), t.span),
+            TypeKind::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let mut nodes = Vec::with_capacity(
+                    fields.len() + removed.len() + usize::from(base.is_some()) * 2,
+                );
+                if let Some(base) = base {
+                    nodes.push(self.operator("..", Span::new(t.span.start, base.span.start)));
+                    nodes.push(self.ty(base));
+                }
+                let mut fields = fields.iter().peekable();
+                let mut removed = removed.iter().peekable();
+                while fields.peek().is_some() || removed.peek().is_some() {
+                    if removed.peek().is_some_and(|n| {
+                        fields
+                            .peek()
+                            .is_none_or(|(field, _)| n.span.start < field.span.start)
+                    }) {
+                        let n = removed.next().unwrap();
+                        let i = self.positions[n.span.start as usize];
+                        let minus = self.tokens[i - 1].span;
+                        nodes.push(self.call(
+                            self.symbol("-", minus),
+                            [self.record_label(&n.ident)],
+                            minus.to(n.span),
+                        ));
+                    } else {
+                        let (n, value) = fields.next().unwrap();
+                        nodes.push(self.form_token(
+                            ":",
+                            Span::new(n.span.end, value.span.start),
+                            [self.record_label(&n.ident), self.ty(value)],
+                            n.span.to(value.span),
+                        ));
+                    }
+                }
+                self.node(Node::Curly(nodes), t.span)
+            }
             TypeKind::Fn {
                 params,
                 ret,
@@ -721,6 +781,25 @@ impl Encoder<'_> {
             ExprKind::Float(n) => self.node(Node::Float(*n), e.span),
             ExprKind::String(s) => self.node(Node::Text(s.clone()), e.span),
             ExprKind::Name { module, name } => self.qualified(module, name),
+            ExprKind::Record { base, fields } if base.is_none() && fields.is_empty() => {
+                self.node(Node::Round(Vec::new()), e.span)
+            }
+            ExprKind::Record { base, fields } => {
+                let mut nodes = Vec::with_capacity(fields.len() + usize::from(base.is_some()) * 2);
+                if let Some(base) = base {
+                    nodes.push(self.operator("..", Span::new(e.span.start, base.span.start)));
+                    nodes.push(self.expr(base));
+                }
+                for (n, value) in fields {
+                    nodes.push(self.form_token(
+                        ":",
+                        Span::new(n.span.end, value.span.start),
+                        [self.record_label(n), self.expr(value)],
+                        n.span.to(value.span),
+                    ));
+                }
+                self.node(Node::Curly(nodes), e.span)
+            }
             ExprKind::Tuple(xs) if xs.is_empty() => self.node(Node::Round(Vec::new()), e.span),
             ExprKind::Tuple(xs) => self.form(",", xs.iter().map(|x| self.expr(x)), e.span),
             ExprKind::List { items, rest } => {

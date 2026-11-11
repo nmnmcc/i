@@ -18,6 +18,7 @@ mod encode_charge;
 pub mod expansion;
 mod from_ast;
 pub mod quote_lower;
+mod render;
 pub mod scoped;
 pub mod source_syntax;
 pub mod syntax;
@@ -278,101 +279,166 @@ impl Parser<'_> {
         &self.tokens[self.at]
     }
 
-    fn datum(&mut self, quoted: bool) -> Result<Datum, Diagnostic> {
-        let token = self.current().clone();
-        self.at += 1;
-        let kind = match token.kind {
-            T::Name(s) => DatumKind::Name(s),
-            T::Discard(s) => DatumKind::Discard(s),
-            T::UpName(s) => DatumKind::UpName(s),
-            T::Int(n) => DatumKind::Int(n),
-            T::Float(n) => DatumKind::Float(n),
-            T::Str(s) => DatumKind::String(s),
-            T::LParen | T::LBracket | T::LBrace | T::LtLt => {
-                let end = match token.kind {
-                    T::LParen => T::RParen,
-                    T::LBracket => T::RBracket,
-                    T::LBrace => T::RBrace,
-                    T::LtLt => T::GtGt,
-                    _ => unreachable!(),
-                };
-                let mut parts = Vec::new();
-                while self.current().kind != end {
-                    if self.current().kind == T::Eof {
-                        return Err(Diagnostic::new(
-                            Code::UnclosedBracket,
-                            token.span,
-                            "unclosed datum",
-                        ));
-                    }
-                    parts.push(self.datum(quoted)?);
-                }
-                let close = self.current().span;
-                self.at += 1;
-                return Ok(Datum {
-                    span: token.span.to(close),
-                    docs: Vec::new(),
-                    kind: match token.kind {
+    fn datum(&mut self, mut quoted: bool) -> Result<Datum, Diagnostic> {
+        enum Frame {
+            Group {
+                token: Token,
+                end: T,
+                parts: Vec<Datum>,
+                quoted: bool,
+            },
+            Prefix {
+                token: Token,
+                splice: Option<bool>,
+            },
+        }
+        let mut frames = Vec::new();
+        loop {
+            if let Some(Frame::Group {
+                token, end, parts, ..
+            }) = frames.last_mut()
+            {
+                if self.current().kind == *end {
+                    let close = self.current().span;
+                    self.at += 1;
+                    let token = token.clone();
+                    let parts = std::mem::take(parts);
+                    frames.pop();
+                    let kind = match token.kind {
                         T::LParen => DatumKind::Round(parts),
                         T::LBracket => DatumKind::Square(parts),
                         T::LBrace => DatumKind::Curly(parts),
                         T::LtLt => DatumKind::Bits(parts),
                         _ => unreachable!(),
-                    },
-                });
+                    };
+                    let completed = Datum {
+                        span: token.span.to(close),
+                        docs: Vec::new(),
+                        kind,
+                    };
+                    if let Some(result) = complete(&mut frames, completed, &mut quoted) {
+                        return Ok(result);
+                    }
+                    continue;
+                }
+                if self.current().kind == T::Eof {
+                    return Err(Diagnostic::new(
+                        Code::UnclosedBracket,
+                        token.span,
+                        "unclosed datum",
+                    ));
+                }
             }
-            T::Quote => {
-                if quoted {
+            let token = self.current().clone();
+            self.at += 1;
+            let kind = match token.kind.clone() {
+                T::Name(s) => DatumKind::Name(s),
+                T::Discard(s) => DatumKind::Discard(s),
+                T::UpName(s) => DatumKind::UpName(s),
+                T::Int(n) => DatumKind::Int(n),
+                T::Float(n) => DatumKind::Float(n),
+                T::Str(s) => DatumKind::String(s),
+                T::LParen | T::LBracket | T::LBrace | T::LtLt => {
+                    let end = match token.kind {
+                        T::LParen => T::RParen,
+                        T::LBracket => T::RBracket,
+                        T::LBrace => T::RBrace,
+                        T::LtLt => T::GtGt,
+                        _ => unreachable!(),
+                    };
+                    frames.push(Frame::Group {
+                        token,
+                        end,
+                        parts: Vec::new(),
+                        quoted,
+                    });
+                    continue;
+                }
+                T::Quote => {
+                    if quoted {
+                        return Err(Diagnostic::new(
+                            Code::Unexpected,
+                            token.span,
+                            "a quote inside a quote must occur in an unquote or splice",
+                        ));
+                    }
+                    frames.push(Frame::Prefix {
+                        token,
+                        splice: None,
+                    });
+                    quoted = true;
+                    continue;
+                }
+                T::Tilde => {
+                    if !quoted {
+                        return Err(Diagnostic::new(
+                            Code::Unexpected,
+                            token.span,
+                            "unquote is only allowed inside a quote",
+                        ));
+                    }
+                    let splice = self.current().kind == T::DotDot;
+                    if splice {
+                        self.at += 1;
+                    }
+                    frames.push(Frame::Prefix {
+                        token,
+                        splice: Some(splice),
+                    });
+                    quoted = false;
+                    continue;
+                }
+                T::Eof | T::RParen | T::RBracket | T::RBrace | T::GtGt => {
                     return Err(Diagnostic::new(
                         Code::Unexpected,
                         token.span,
-                        "a quote inside a quote must occur in an unquote or splice",
+                        "expected a datum",
                     ));
                 }
-                let child = self.datum(true)?;
-                return Ok(Datum {
-                    span: token.span.to(child.span),
-                    docs: Vec::new(),
-                    kind: DatumKind::Quote(Box::new(child)),
-                });
+                symbol => DatumKind::Symbol(symbol.text().into()),
+            };
+            let completed = Datum {
+                kind,
+                span: token.span,
+                docs: Vec::new(),
+            };
+            if let Some(result) = complete(&mut frames, completed, &mut quoted) {
+                return Ok(result);
             }
-            T::Tilde => {
-                if !quoted {
-                    return Err(Diagnostic::new(
-                        Code::Unexpected,
-                        token.span,
-                        "unquote is only allowed inside a quote",
-                    ));
+        }
+
+        fn complete(frames: &mut Vec<Frame>, mut value: Datum, quoted: &mut bool) -> Option<Datum> {
+            loop {
+                match frames.last_mut() {
+                    Some(Frame::Group {
+                        parts,
+                        quoted: group_quoted,
+                        ..
+                    }) => {
+                        parts.push(value);
+                        *quoted = *group_quoted;
+                        return None;
+                    }
+                    Some(Frame::Prefix { .. }) => {
+                        let Frame::Prefix { token, splice } = frames.pop().unwrap() else {
+                            unreachable!()
+                        };
+                        let span = token.span.to(value.span);
+                        let kind = match splice {
+                            None => DatumKind::Quote(Box::new(value)),
+                            Some(false) => DatumKind::Unquote(Box::new(value)),
+                            Some(true) => DatumKind::Splice(Box::new(value)),
+                        };
+                        value = Datum {
+                            kind,
+                            span,
+                            docs: Vec::new(),
+                        };
+                    }
+                    None => return Some(value),
                 }
-                let splice = self.current().kind == T::DotDot;
-                if splice {
-                    self.at += 1;
-                }
-                let child = self.datum(false)?;
-                return Ok(Datum {
-                    span: token.span.to(child.span),
-                    docs: Vec::new(),
-                    kind: if splice {
-                        DatumKind::Splice(Box::new(child))
-                    } else {
-                        DatumKind::Unquote(Box::new(child))
-                    },
-                });
             }
-            T::Eof | T::RParen | T::RBracket | T::RBrace | T::GtGt => {
-                return Err(Diagnostic::new(
-                    Code::Unexpected,
-                    token.span,
-                    "expected a datum",
-                ));
-            }
-            symbol => DatumKind::Symbol(symbol.text().into()),
-        };
-        Ok(Datum {
-            kind,
-            span: token.span,
-            docs: Vec::new(),
-        })
+        }
     }
 }
 

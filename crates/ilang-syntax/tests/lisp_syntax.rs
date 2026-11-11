@@ -517,6 +517,31 @@ fn written_definition_answers_give_parameters_their_own_binder() {
 }
 
 #[test]
+fn definition_preserves_record_label_parameter_identity() {
+    use ilang_syntax::lisp::definitions::source_definition;
+    use ilang_syntax::lisp::syntax::Node;
+    let source = "Box(K) = (K: Int)";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let like = root("x");
+    let answer = source_definition(&module.items[0], source, like.scope(), 23);
+    let Node::Round(item) = answer.node() else {
+        panic!("alias");
+    };
+    let Node::Round(head) = item[1].node() else {
+        panic!("head");
+    };
+    let Node::Curly(fields) = item[2].node() else {
+        panic!("record");
+    };
+    let Node::Round(field) = fields[0].node() else {
+        panic!("field");
+    };
+    assert_eq!(head[1].scope_identity(), field[1].scope_identity());
+    assert!(head[1].scope_identity().is_some());
+}
+
+#[test]
 fn copied_definition_freshens_its_binders_and_uses_together() {
     use ilang_syntax::lisp::definitions::{builtin_definition, freshen_parameters};
     use ilang_syntax::lisp::syntax::{Node, ScopeIdentity};
@@ -946,6 +971,44 @@ fn expanded_definition_preserves_attributes_and_parameter_identities() {
 }
 
 #[test]
+fn deeply_nested_definition_answer_uses_bounded_host_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let prototype = root("(= (Box A) A)");
+            let Node::Round(parts) = prototype.node() else {
+                panic!("alias");
+            };
+            let mut ty = parts[2].clone();
+            for _ in 0..10_000 {
+                ty = Syntax::make(Node::Curly(vec![ty.clone()]), &ty).unwrap();
+            }
+            let item = prototype.replace_children(vec![parts[0].clone(), parts[1].clone(), ty]);
+            let answer = ilang_syntax::lisp::definitions::expanded_definition(&item, 77).unwrap();
+            assert_eq!(answer.show(), "(= (Box A) A)");
+            let wrapper = root("(@ deprecated x)");
+            let Node::Round(parts) = wrapper.node() else {
+                panic!("attribute");
+            };
+            let mut item = answer;
+            for _ in 0..10_000 {
+                item = wrapper.replace_children(vec![parts[0].clone(), parts[1].clone(), item]);
+            }
+            drop(ilang_syntax::lisp::definitions::expanded_definition(&item, 78).unwrap());
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn definition_answer_preserves_a_single_field_record_type() {
+    let definition = root("(= (Box A) { (: x A) })");
+    let answer = ilang_syntax::lisp::definitions::expanded_definition(&definition, 91).unwrap();
+    assert_eq!(answer.show(), "(= (Box A) {(: x A)})");
+}
+
+#[test]
 fn scoped_conversion_separates_repeated_origins_and_keeps_sliceable_text() {
     use ilang_syntax::ast::ExprKind;
     use ilang_syntax::lisp::scoped::ScopedSource;
@@ -1328,10 +1391,7 @@ fn definition_table_charges_before_freshening_written_and_expanded_answers() {
             10,
             |_, _| Lookup::Found(key),
             |cost| {
-                assert!(matches!(
-                    (key, cost),
-                    (1, DefinitionCost::Event(_)) | (2, DefinitionCost::Syntax(_))
-                ));
+                assert!(matches!(cost, DefinitionCost::Syntax(_)));
                 charged = true;
                 Err(Box::new(std::io::Error::other("allocation limit")))
             },
@@ -1341,131 +1401,61 @@ fn definition_table_charges_before_freshening_written_and_expanded_answers() {
     }
 }
 
-fn deep_definition_syntax(
-    scope: &ilang_syntax::lisp::syntax::Scope,
-    span: ilang_syntax::span::Span,
-) -> ilang_syntax::lisp::syntax::Syntax {
-    use ilang_syntax::lisp::{Datum, DatumKind, syntax::Syntax};
-    let node = |kind| Datum {
-        kind,
-        span,
-        docs: vec![],
-    };
-    let up = |name: &str| node(DatumKind::UpName(name.into()));
-    let mut body = up("A");
-    for _ in 0..10_000 {
-        body = node(DatumKind::Round(vec![up("Box"), body]));
-    }
-    let head = node(DatumKind::Round(vec![up("T"), up("A")]));
-    let root = node(DatumKind::Round(vec![
-        node(DatumKind::Symbol("=".into())),
-        head,
-        body,
-    ]));
-    Syntax::from_datum(&root, scope)
+#[test]
+fn records_parse_from_lisp_with_fields_spread_and_removal() {
+    use ilang_syntax::ast::{ExprKind, TypeKind};
+    let empty = ilang_syntax::lisp::parse("()").unwrap();
+    let empty = ilang_syntax::lisp::parse_expression(&empty[0]).unwrap();
+    assert!(matches!(&empty.kind, ExprKind::Record { base: None, fields } if fields.is_empty()));
+    let values = ilang_syntax::lisp::parse("{ .. r (: x 1) (: \"a b\" 2) }").unwrap();
+    let value = ilang_syntax::lisp::parse_expression(&values[0]).unwrap();
+    assert!(
+        matches!(&value.kind, ExprKind::Record { base: Some(_), fields } if fields.len() == 2 && fields[1].0.name == "a b")
+    );
+    let types = ilang_syntax::lisp::parse("{ .. R (- old) (: K { Int }) }").unwrap();
+    let ty = ilang_syntax::lisp::parse_type(&types[0]).unwrap();
+    assert!(
+        matches!(&ty.kind, TypeKind::Record { base: Some(_), fields, removed } if fields[0].0.parameter && removed[0].ident.name == "old")
+    );
 }
 
 #[test]
-fn deep_written_definition_query_preserves_parameter_identity() {
+fn show_as_groups_a_binary_operand_under_negation() {
+    assert_eq!(
+        root("(- (+ x y))").show_as(Position::Expression).unwrap(),
+        "-{ x + y }"
+    );
+}
+
+#[test]
+fn show_as_distinguishes_postfix_and_standalone_clauses() {
+    assert!(
+        root("{ (-> (= a (, x)) (-> (y) Int y)) }")
+            .show_as(Position::Expression)
+            .is_err()
+    );
+    assert_eq!(
+        root("(. s { (-> (= a (, x)) (-> (y) Int y)) })")
+            .show_as(Position::Expression)
+            .unwrap(),
+        "s.{ a = (x) -> (y) -> Int { y } }"
+    );
+}
+
+#[test]
+fn show_as_deep_type_and_pattern_use_bounded_host_stack() {
     std::thread::Builder::new()
         .stack_size(256 * 1024)
         .spawn(|| {
-            use ilang_syntax::{
-                ast::{Ident, Item, ItemKind, TypeBody, TypeDef, TypeExpr, TypeKind},
-                lisp::{
-                    definitions::source_definition_from_syntax,
-                    syntax::{Node, Scope, ScopeIdentity, Syntax},
-                },
-                span::Span,
-            };
-            use std::collections::BTreeSet;
-            let span = Span::new(1, 2);
-            let ident = |name: &str| Ident {
-                name: name.into(),
-                span,
-            };
-            let scope = Scope {
-                module: 1,
-                marks: BTreeSet::new(),
-            };
-            let atom = |name: &str| {
-                Syntax::from_datum(
-                    &ilang_syntax::lisp::Datum {
-                        kind: ilang_syntax::lisp::DatumKind::UpName(name.into()),
-                        span,
-                        docs: vec![],
-                    },
-                    &scope,
-                )
-            };
-            let mut ty = TypeExpr {
-                kind: TypeKind::Named {
-                    module: None,
-                    name: ident("A"),
-                    args: vec![],
-                },
-                span,
-            };
-            for _ in 0..10_000 {
-                ty = TypeExpr {
-                    kind: TypeKind::Named {
-                        module: None,
-                        name: ident("Box"),
-                        args: vec![ty],
-                    },
-                    span,
-                };
+            let like = root("x");
+            let head = Syntax::make(Node::Up("T".into()), &like).unwrap();
+            let mut tree = like.clone();
+            for _ in 0..10000 {
+                tree = Syntax::make(Node::Round(vec![head.clone(), tree]), &like).unwrap();
             }
-            let item = Item {
-                doc: vec![],
-                attributes: vec![],
-                kind: ItemKind::TypeDef(TypeDef {
-                    alias_pattern: false,
-                    name: ident("T"),
-                    params: vec![ident("A")],
-                    head: vec![],
-                    body: TypeBody::Alias(ty),
-                }),
-                span,
-            };
-            let syntax = deep_definition_syntax(&scope, span);
-            let answer = source_definition_from_syntax(&item, &syntax, 42);
-            use ilang_syntax::lisp::{
-                definition_schedule::Mode,
-                definition_table::{Definition, DefinitionTable, Lookup, QueryResult},
-            };
-            let mut table = DefinitionTable::default();
-            table.insert(
-                1,
-                Definition::Expanded {
-                    syntax: answer,
-                    parameter_answer: Some(42),
-                    ready: true,
-                },
-            );
-            let QueryResult::Answer { syntax: answer, .. } =
-                table.query(&atom("T"), Mode::Normal, 43, |_, _| Lookup::Found(1))
-            else {
-                panic!("query")
-            };
-            let Node::Round(parts) = answer.node() else {
-                panic!("definition")
-            };
-            let mut current = &parts[2];
-            for _ in 0..10_000 {
-                let Node::Round(children) = current.node() else {
-                    panic!("type")
-                };
-                current = &children[1];
-            }
-            assert!(matches!(
-                current.scope_identity(),
-                Some(ScopeIdentity::DefinitionParameter {
-                    answer: 43,
-                    parameter: 0,
-                    ..
-                })
-            ));
+            let expected = format!("{}x{}", "T(".repeat(10000), ")".repeat(10000));
+            assert_eq!(tree.show_as(Position::Type).unwrap(), expected);
+            assert_eq!(tree.show_as(Position::Pattern).unwrap(), expected);
         })
         .unwrap()
         .join()
@@ -1473,69 +1463,132 @@ fn deep_written_definition_query_preserves_parameter_identity() {
 }
 
 #[test]
-fn deep_expanded_definition_query_preserves_parameter_identity() {
+fn show_as_only_breaks_lines_at_ambiguous_statement_boundaries() {
+    let simple = root("(-> () _ { x y })");
+    assert_eq!(simple.show_as(Position::Expression).unwrap(), "() { x y }");
+    let negative = root("(-> () _ { x (- 1) })");
+    assert_eq!(
+        negative.show_as(Position::Expression).unwrap(),
+        "() { x\n-1 }"
+    );
+    let clauses = root("(. x { (-> 1 2) (-> 3 4) })");
+    assert_eq!(
+        clauses.show_as(Position::Expression).unwrap(),
+        "x.{ 1 -> 2 3 -> 4 }"
+    );
+}
+
+#[test]
+fn show_as_attribute_item_uses_only_required_line_breaks() {
+    let item = root("(@ test (= f (-> () _ { Nil })))");
+    assert_eq!(
+        item.show_as(Position::Item).unwrap(),
+        "@test f = () { Nil }"
+    );
+    let (module, errors) =
+        ilang_syntax::parse_module(&format!("{}\n", item.show_as(Position::Item).unwrap()));
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(module.items.len(), 1);
+    assert_eq!(module.items[0].attributes.len(), 1);
+
+    let tuple = root("(@ test (= (, x y) (, 1 2)))");
+    let text = tuple.show_as(Position::Item).unwrap();
+    assert_eq!(text, "@test\n(x, y) = (1, 2)");
+    let (module, errors) = ilang_syntax::parse_module(&format!("{text}\n"));
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(module.items[0].attributes.len(), 1);
+}
+
+#[test]
+fn show_as_accepts_expressions_already_written_in_normal_surface() {
+    let scope = Scope {
+        module: 0,
+        marks: BTreeSet::new(),
+    };
+    let leaves = [
+        "x",
+        "1",
+        "(1, 2)",
+        "[x, y]",
+        "f(x)",
+        "x + y",
+        "-{ x + y }",
+        "(x) { x }",
+        "x.{ 1 -> 2 _ -> 3 }",
+        "{ x y }",
+        "<<1, 2>>",
+    ];
+    let mut checked = 0;
+    for leaf in leaves {
+        for source in [
+            format!("value = {leaf}\n"),
+            format!("value = f({leaf})\n"),
+            format!("value = -{{ {leaf} }}\n"),
+            format!("value = [{leaf}]\n"),
+            format!("value = {{ {leaf} }} + z\n"),
+            format!("value = ({leaf}, z)\n"),
+            format!("value = () {{ {leaf} }}\n"),
+        ] {
+            let (module, errors) = ilang_syntax::parse_module(&source);
+            if !errors.is_empty() {
+                continue;
+            }
+            let ilang_syntax::ast::ItemKind::Binding(binding) = &module.items[0].kind else {
+                panic!("binding")
+            };
+            let syntax = expression_syntax(&binding.value, &scope, &source);
+            syntax
+                .show_as(Position::Expression)
+                .unwrap_or_else(|error| panic!("{source:?}: {error:?}"));
+            checked += 1;
+        }
+    }
+    assert!(checked >= 50, "only {checked} source expressions parsed");
+}
+
+#[test]
+fn show_as_deep_expression_uses_bounded_host_stack() {
     std::thread::Builder::new()
         .stack_size(256 * 1024)
         .spawn(|| {
-            use ilang_syntax::{
-                lisp::{
-                    definition_schedule::Mode,
-                    definition_table::{Definition, DefinitionTable, Lookup, QueryResult},
-                    definitions::expanded_definition,
-                    syntax::{Node, Scope, ScopeIdentity, Syntax},
-                },
-                span::Span,
-            };
-            use std::collections::BTreeSet;
-            let span = Span::new(1, 2);
-            let scope = Scope {
-                module: 1,
-                marks: BTreeSet::new(),
-            };
-            let atom = |name: &str| {
-                Syntax::from_datum(
-                    &ilang_syntax::lisp::Datum {
-                        kind: ilang_syntax::lisp::DatumKind::UpName(name.into()),
-                        span,
-                        docs: vec![],
-                    },
-                    &scope,
-                )
-            };
-            let syntax = deep_definition_syntax(&scope, span);
-            let expanded = expanded_definition(&syntax, 42).unwrap();
-            let mut table = DefinitionTable::default();
-            table.insert(
-                1,
-                Definition::Expanded {
-                    syntax: expanded,
-                    parameter_answer: Some(42),
-                    ready: true,
-                },
-            );
-            let QueryResult::Answer { syntax: answer, .. } =
-                table.query(&atom("T"), Mode::Normal, 43, |_, _| Lookup::Found(1))
-            else {
-                panic!("query")
-            };
-            let Node::Round(parts) = answer.node() else {
-                panic!("definition")
-            };
-            let mut current = &parts[2];
-            for _ in 0..10_000 {
-                let Node::Round(children) = current.node() else {
-                    panic!("type")
-                };
-                current = &children[1];
+            let like = root("x");
+            let head = Syntax::make(Node::Name("f".into()), &like).unwrap();
+            for depth in [1000, 10000] {
+                let mut tree = like.clone();
+                for _ in 0..depth {
+                    tree = Syntax::make(Node::Round(vec![head.clone(), tree]), &like).unwrap();
+                }
+                let expected = format!("{}x{}", "f(".repeat(depth), ")".repeat(depth));
+                assert_eq!(tree.show_as(Position::Expression).unwrap(), expected);
             }
-            assert!(matches!(
-                current.scope_identity(),
-                Some(ScopeIdentity::DefinitionParameter {
-                    answer: 43,
-                    parameter: 0,
-                    ..
-                })
-            ));
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn show_as_deep_mixed_blocks_use_bounded_host_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let like = root("x");
+            let head = Syntax::make(Node::Name("f".into()), &like).unwrap();
+            let equals = Syntax::make(Node::Symbol("=".into()), &like).unwrap();
+            let name = Syntax::make(Node::Name("v".into()), &like).unwrap();
+            for depth in [1000, 10000] {
+                let mut tree = like.clone();
+                for _ in 0..depth {
+                    let binding =
+                        Syntax::make(Node::Round(vec![equals.clone(), name.clone(), tree]), &like)
+                            .unwrap();
+                    let block =
+                        Syntax::make(Node::Curly(vec![binding, name.clone()]), &like).unwrap();
+                    tree = Syntax::make(Node::Round(vec![head.clone(), block]), &like).unwrap();
+                }
+                let expected = format!("{}x{}", "f({ v = ".repeat(depth), " v })".repeat(depth));
+                assert_eq!(tree.show_as(Position::Expression).unwrap(), expected);
+            }
         })
         .unwrap()
         .join()

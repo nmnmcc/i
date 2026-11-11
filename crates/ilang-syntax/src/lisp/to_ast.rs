@@ -44,6 +44,80 @@ fn qualified(d: &Datum) -> Result<(Option<Ident>, Ident)> {
 }
 use super::trampoline::{Scheduler, run};
 
+// Record labels are text, not ordinary value/type references. Only a type
+// record may use an uppercase atom as a scoped label parameter.
+fn record_label(d: &Datum, types: bool) -> Result<RecordLabel> {
+    let (name, parameter) = match &d.kind {
+        K::Name(name) | K::String(name) => (name.clone(), false),
+        K::UpName(name) if types => (name.clone(), true),
+        _ => return Err(bad(d, "a record label")),
+    };
+    Ok(RecordLabel {
+        ident: Ident { name, span: d.span },
+        parameter,
+    })
+}
+
+fn record_start(xs: &[Datum]) -> bool {
+    xs.first()
+        .is_some_and(|d| symbol(d, "..") || matches!(round(d), Some([h, _, _]) if symbol(h, ":")))
+}
+
+async fn record_type<'a>(s: &Scheduler<'a>, d: &'a Datum, xs: &'a [Datum]) -> Result<TypeKind> {
+    let (base, rest) = if xs.first().is_some_and(|d| symbol(d, "..")) {
+        let Some(base) = xs.get(1) else {
+            return Err(bad(d, "a record type spread"));
+        };
+        (Some(Box::new(type_child(s, base).await?)), &xs[2..])
+    } else {
+        (None, xs)
+    };
+    let mut fields = Vec::new();
+    let mut removed = Vec::new();
+    for field in rest {
+        match round(field) {
+            Some([h, label, value]) if symbol(h, ":") => {
+                fields.push((record_label(label, true)?, type_child(s, value).await?))
+            }
+            Some([h, label]) if symbol(h, "-") && base.is_some() => {
+                removed.push(record_label(label, true)?)
+            }
+            _ => return Err(bad(field, "a record type field")),
+        }
+    }
+    Ok(TypeKind::Record {
+        base,
+        fields,
+        removed,
+    })
+}
+
+async fn record_expression<'a>(
+    s: &Scheduler<'a>,
+    d: &'a Datum,
+    xs: &'a [Datum],
+) -> Result<ExprKind> {
+    let (base, rest) = if xs.first().is_some_and(|d| symbol(d, "..")) {
+        let Some(base) = xs.get(1) else {
+            return Err(bad(d, "a record spread"));
+        };
+        (Some(Box::new(expression_child(s, base).await?)), &xs[2..])
+    } else {
+        (None, xs)
+    };
+    let mut fields = Vec::new();
+    for field in rest {
+        match round(field) {
+            Some([h, label, value]) if symbol(h, ":") => fields.push((
+                record_label(label, false)?.ident,
+                expression_child(s, value).await?,
+            )),
+            _ => return Err(bad(field, "a record field")),
+        }
+    }
+    Ok(ExprKind::Record { base, fields })
+}
+
 async fn types<'a>(s: &Scheduler<'a>, ds: &'a [Datum]) -> Result<Vec<TypeExpr>> {
     let mut out = Vec::with_capacity(ds.len());
     for d in ds {
@@ -65,6 +139,7 @@ async fn type_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<TypeExpr> {
         K::Int(n) => TypeKind::Lit(LitValue::Int(BigInt::from_biguint(Sign::Plus, n.clone()))),
         K::String(x) => TypeKind::Lit(LitValue::Str(x.clone())),
         K::Name(_) | K::UpName(_) => named_type(s, d, &[]).await?,
+        K::Curly(xs) if record_start(xs) => record_type(s, d, xs).await?,
         K::Curly(xs) if xs.len() == 1 => return type_child(s, &xs[0]).await,
         K::Round(xs) => match xs.as_slice() {
             [h, n] if symbol(h, "-") && matches!(n.kind, K::Int(_)) => {
@@ -256,7 +331,7 @@ async fn pattern_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Pattern> {
             PatternKind::BitArray(out)
         }
         K::Round(xs) => match xs.as_slice() {
-            [] => PatternKind::Tuple(Vec::new()),
+            [] => return Err(bad(d, "a pattern")),
             [h, b, t] if symbol(h, ":") => PatternKind::Typed {
                 binder: binder(b)?,
                 ty: type_child(s, t).await?,
@@ -453,12 +528,16 @@ async fn expression_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Expr> {
             }
             ExprKind::BitArray(out)
         }
+        K::Curly(xs) if record_start(xs) => record_expression(s, d, xs).await?,
         K::Curly(xs) if xs.is_empty() || xs.first().is_some_and(is_clause) => {
             ExprKind::Clauses(clauses(s, xs).await?)
         }
         K::Curly(_) => ExprKind::Block(block_inner(s, d).await?),
         K::Round(xs) => match xs.as_slice() {
-            [] => ExprKind::Tuple(Vec::new()),
+            [] => ExprKind::Record {
+                base: None,
+                fields: Vec::new(),
+            },
             [h, es @ ..] if symbol(h, ",") && !es.is_empty() => {
                 ExprKind::Tuple(expressions(s, es).await?)
             }

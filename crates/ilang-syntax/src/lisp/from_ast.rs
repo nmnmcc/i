@@ -256,6 +256,44 @@ fn typ(t: &TypeExpr) -> String {
         TypeKind::ValueOf { module, name } => qualified(module, name),
         TypeKind::Hole => "_".into(),
         TypeKind::Tuple(ts) => form(",", ts.iter().map(typ)),
+        TypeKind::Record {
+            base,
+            fields,
+            removed,
+        } => {
+            let mut parts = Vec::with_capacity(fields.len() + removed.len() + 2);
+            if let Some(base) = base {
+                parts.push("..".into());
+                parts.push(typ(base));
+            }
+            let mut fields = fields.iter().peekable();
+            let mut removed = removed.iter().peekable();
+            while fields.peek().is_some() || removed.peek().is_some() {
+                let take_field = match (fields.peek(), removed.peek()) {
+                    (Some((label, _)), Some(removed)) => label.span.start <= removed.span.start,
+                    (Some(_), None) => true,
+                    (None, Some(_)) => false,
+                    (None, None) => unreachable!(),
+                };
+                if take_field {
+                    let (label, ty) = fields.next().unwrap();
+                    parts.push(form(
+                        ":",
+                        [
+                            crate::print::record_label(&label.name, label.parameter),
+                            typ(ty),
+                        ],
+                    ));
+                } else {
+                    let label = removed.next().unwrap();
+                    parts.push(form(
+                        "-",
+                        [crate::print::record_label(&label.name, label.parameter)],
+                    ));
+                }
+            }
+            braced("{", "}", parts)
+        }
         TypeKind::Fn {
             params,
             ret,
@@ -313,6 +351,16 @@ fn expr(e: &Expr) -> String {
         ExprKind::Float(n) => float(*n),
         ExprKind::String(s) => string_literal(s),
         ExprKind::Name { module, name } => qualified(module, name),
+        ExprKind::Record { base, fields } if base.is_none() && fields.is_empty() => "()".into(),
+        ExprKind::Record { base, fields } => braced(
+            "{",
+            "}",
+            base.iter().flat_map(|b| ["..".into(), expr(b)]).chain(
+                fields
+                    .iter()
+                    .map(|(n, e)| form(":", [crate::print::record_label(&n.name, false), expr(e)])),
+            ),
+        ),
         ExprKind::Tuple(es) if es.is_empty() => "()".into(),
         ExprKind::Tuple(es) => form(",", es.iter().map(expr)),
         ExprKind::List { items, rest } => braced(

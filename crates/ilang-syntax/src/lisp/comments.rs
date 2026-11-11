@@ -93,3 +93,61 @@ pub(super) fn transfer(
     }
     (output, lost)
 }
+
+/// Transfer Lisp comments using source and output offsets captured by the
+/// renderer. Both streams follow source order, so no subtree rendering or
+/// output searching is needed for a nested statement.
+pub(super) fn transfer_anchored(
+    source: &str,
+    output: String,
+    anchors: Vec<(Span, usize)>,
+) -> (String, Vec<Span>) {
+    let lexed = crate::lexer::lex_lisp(source);
+    let mut candidate = 0;
+    let mut token = 0;
+    let mut insertions = Vec::new();
+    let mut lost = Vec::new();
+    for comment in &lexed.comments {
+        if comment.text.starts_with("///") {
+            continue;
+        }
+        let line_start = source[..comment.span.start as usize]
+            .rfind(['\r', '\n'])
+            .map_or(0, |x| x + 1);
+        let standalone = source[line_start..comment.span.start as usize]
+            .trim()
+            .is_empty();
+        while candidate < anchors.len() && anchors[candidate].0.start < comment.span.end {
+            candidate += 1;
+        }
+        while token < lexed.tokens.len()
+            && (lexed.tokens[token].span.start < comment.span.end
+                || lexed.tokens[token].span.start == lexed.tokens[token].span.end)
+        {
+            token += 1;
+        }
+        let exact = anchors.get(candidate).filter(|(span, _)| {
+            token == lexed.tokens.len() || lexed.tokens[token].span.end > span.start
+        });
+        if let Some((_, at)) = exact.filter(|_| standalone) {
+            insertions.push((*at, comment.text.as_str()));
+        } else {
+            lost.push(comment.span);
+        }
+    }
+    let extra = insertions
+        .iter()
+        .map(|(_, text)| text.len() + 2)
+        .sum::<usize>();
+    let mut result = String::with_capacity(output.len() + extra);
+    let mut cursor = 0;
+    for (at, comment) in insertions {
+        result.push_str(&output[cursor..at]);
+        result.push('\n');
+        result.push_str(comment);
+        result.push('\n');
+        cursor = at;
+    }
+    result.push_str(&output[cursor..]);
+    (result, lost)
+}

@@ -20,33 +20,42 @@ pub fn shape(module: &Module) -> String {
     format!("{module:?}")
 }
 
+struct Canon;
+impl Visitor for Canon {
+    fn expr(&mut self, e: &mut Expr, enter: bool) {
+        if !enter
+            && let ExprKind::Block(b) = &mut e.kind
+            && let [Stmt::Expr(inner)] = &mut b.stmts[..]
+        {
+            // Children are already normalized. Move the child out rather
+            // than cloning it at every level of a nested group chain.
+            let child = std::mem::replace(
+                inner,
+                Expr {
+                    kind: ExprKind::Tuple(Vec::new()),
+                    span: Span::default(),
+                },
+            );
+            *e = child;
+        }
+    }
+}
+
 /// Remove transparent expression groups and normalize spans. All other
 /// data, including every string payload, participates in AST equality.
 pub(crate) fn canonical(module: &Module) -> Module {
-    struct Canon;
-    impl Visitor for Canon {
-        fn expr(&mut self, e: &mut Expr, enter: bool) {
-            if !enter
-                && let ExprKind::Block(b) = &mut e.kind
-                && let [Stmt::Expr(inner)] = &mut b.stmts[..]
-            {
-                // Children are already normalized. Move the child out rather
-                // than cloning it at every level of a nested group chain.
-                let child = std::mem::replace(
-                    inner,
-                    Expr {
-                        kind: ExprKind::Tuple(Vec::new()),
-                        span: Span::default(),
-                    },
-                );
-                *e = child;
-            }
-        }
-    }
     let mut module = module.clone();
     module.walk(&mut Canon);
     module.walk(&mut Unspan);
     module
+}
+
+struct Floats(Vec<String>);
+impl Visitor for Floats {
+    fn float(&mut self, value: &mut f64) {
+        self.0.push(format!("{value:?}"));
+        *value = 0.0;
+    }
 }
 
 /// Compare syntax after removing transparent groups and source spans.
@@ -55,15 +64,23 @@ pub fn equivalent(a: &Module, b: &Module) -> bool {
     // `canon` historically compares Debug text, which distinguishes signed
     // zero and prints all NaNs alike. Normalize floating fields separately to
     // retain exactly that contract while using stack-safe structural equality.
-    struct Floats(Vec<String>);
-    impl Visitor for Floats {
-        fn float(&mut self, value: &mut f64) {
-            self.0.push(format!("{value:?}"));
-            *value = 0.0;
-        }
-    }
     let mut a = canonical(a);
     let mut b = canonical(b);
+    let mut af = Floats(Vec::new());
+    let mut bf = Floats(Vec::new());
+    a.walk(&mut af);
+    b.walk(&mut bf);
+    af.0 == bf.0 && a == b
+}
+
+/// Compare expression structure with the same normalization as `equivalent`.
+pub fn equivalent_expression(a: &Expr, b: &Expr) -> bool {
+    let mut a = a.clone();
+    let mut b = b.clone();
+    a.walk(&mut Canon);
+    b.walk(&mut Canon);
+    a.walk(&mut Unspan);
+    b.walk(&mut Unspan);
     let mut af = Floats(Vec::new());
     let mut bf = Floats(Vec::new());
     a.walk(&mut af);
@@ -101,6 +118,16 @@ mod deep_tests {
         for a in &modules {
             for b in &modules {
                 assert_eq!(equivalent(a, b), canon(a) == canon(b));
+                let ItemKind::Binding(left) = &a.items[0].kind else {
+                    unreachable!()
+                };
+                let ItemKind::Binding(right) = &b.items[0].kind else {
+                    unreachable!()
+                };
+                assert_eq!(
+                    equivalent_expression(&left.value, &right.value),
+                    equivalent(a, b)
+                );
             }
         }
         let mut plus = modules[0].clone();
@@ -115,10 +142,24 @@ mod deep_tests {
         set(&mut minus, -0.0);
         assert_ne!(canon(&plus), canon(&minus));
         assert!(!equivalent(&plus, &minus));
+        let ItemKind::Binding(p) = &plus.items[0].kind else {
+            unreachable!()
+        };
+        let ItemKind::Binding(m) = &minus.items[0].kind else {
+            unreachable!()
+        };
+        assert!(!equivalent_expression(&p.value, &m.value));
         set(&mut plus, f64::NAN);
         set(&mut minus, f64::NAN);
         assert_eq!(canon(&plus), canon(&minus));
         assert!(equivalent(&plus, &minus));
+        let ItemKind::Binding(p) = &plus.items[0].kind else {
+            unreachable!()
+        };
+        let ItemKind::Binding(m) = &minus.items[0].kind else {
+            unreachable!()
+        };
+        assert!(equivalent_expression(&p.value, &m.value));
     }
 
     #[test]
@@ -150,6 +191,13 @@ mod deep_tests {
                 }
                 binding.value = e;
                 assert!(equivalent(&plain, &nested));
+                let ItemKind::Binding(a) = &plain.items[0].kind else {
+                    unreachable!()
+                };
+                let ItemKind::Binding(b) = &nested.items[0].kind else {
+                    unreachable!()
+                };
+                assert!(equivalent_expression(&a.value, &b.value));
             })
             .unwrap()
             .join()

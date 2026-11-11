@@ -268,41 +268,87 @@ fn deep_ast_structural_equality_and_difference_are_stack_safe() {
 }
 
 #[test]
-fn deeply_nested_functions_mix_expression_pattern_and_type_positions() {
-    let mut body = name("x");
-    for i in 0..1_000 {
-        let ty = wrapped(upper("Int"), || upper("List"), 4);
-        let param = datum(
-            K::Round(vec![datum(K::Symbol(":".into()), i), name("x"), ty]),
-            i,
-        );
-        body = datum(
-            K::Round(vec![
-                datum(K::Symbol("->".into()), i),
-                datum(K::Round(vec![param]), i),
-                datum(K::Discard("_".into()), i),
-                datum(K::Curly(vec![body]), i),
-            ]),
-            i,
-        );
-    }
+fn deep_structural_records_clone_compare_normalize_and_drop() {
+    use ilang_syntax::ast::{Expr, Ident, RecordLabel, TypeExpr};
+    use ilang_syntax::shape::equivalent_expression;
     std::thread::Builder::new()
         .stack_size(256 * 1024)
-        .spawn(move || {
-            let ast = parse_expression(&body).unwrap();
-            let mut current = &ast;
-            for _ in 0..1_000 {
-                let ExprKind::Fn(f) = &current.kind else {
-                    panic!("expected function")
+        .spawn(|| {
+            let span = Span::new(1, 2);
+            let label = || Ident {
+                name: "field".into(),
+                span,
+            };
+            let mut expr = Expr {
+                kind: ExprKind::Tuple(vec![]),
+                span,
+            };
+            let mut ty = TypeExpr {
+                kind: TypeKind::Hole,
+                span,
+            };
+            for i in 0..10_000 {
+                let (eb, ef) = if i % 2 == 0 {
+                    (Some(Box::new(expr)), vec![])
+                } else {
+                    (None, vec![(label(), expr)])
                 };
-                let ilang_syntax::ast::Stmt::Expr(next) = &f.body.stmts[0] else {
-                    panic!("expected body")
+                expr = Expr {
+                    kind: ExprKind::Record {
+                        base: eb,
+                        fields: ef,
+                    },
+                    span,
                 };
-                current = next;
+                let (tb, tf) = if i % 2 == 0 {
+                    (Some(Box::new(ty)), vec![])
+                } else {
+                    (
+                        None,
+                        vec![(
+                            RecordLabel {
+                                ident: label(),
+                                parameter: true,
+                            },
+                            ty,
+                        )],
+                    )
+                };
+                ty = TypeExpr {
+                    kind: TypeKind::Record {
+                        base: tb,
+                        fields: tf,
+                        removed: vec![RecordLabel {
+                            ident: label(),
+                            parameter: false,
+                        }],
+                    },
+                    span,
+                };
             }
-            assert!(matches!(&current.kind, ExprKind::Name { name, .. } if name.name == "x"));
-            drop(ast);
-            drop(body);
+            let cloned_expr = expr.clone();
+            let cloned_ty = ty.clone();
+            assert!(expr == cloned_expr);
+            assert!(ty == cloned_ty);
+            assert!(equivalent_expression(&expr, &cloned_expr));
+            let mut different_expr = cloned_expr.clone();
+            let ExprKind::Record { fields, .. } = &mut different_expr.kind else {
+                unreachable!()
+            };
+            fields[0].0.span = Span::new(30, 31);
+            assert!(equivalent_expression(&expr, &different_expr));
+            let ExprKind::Record { fields, .. } = &mut different_expr.kind else {
+                unreachable!()
+            };
+            fields[0].0.name = "other".into();
+            assert!(!equivalent_expression(&expr, &different_expr));
+            let mut different = cloned_ty.clone();
+            let TypeKind::Record { removed, .. } = &mut different.kind else {
+                unreachable!()
+            };
+            removed[0].parameter = true;
+            assert!(ty != different);
+            drop((expr, cloned_expr, different_expr, ty, cloned_ty, different));
         })
         .unwrap()
         .join()
@@ -310,13 +356,59 @@ fn deeply_nested_functions_mix_expression_pattern_and_type_positions() {
 }
 
 #[test]
-fn deep_quote_splice_error_preserves_its_origin() {
-    let splice = datum(K::Splice(Box::new(name("capture"))), 77);
-    let mut body = datum(K::Round(vec![splice, name("later")]), 0);
-    for _ in 0..10_000 {
-        body = datum(K::Square(vec![body]), 0);
-    }
-    let quoted = datum(K::Quote(Box::new(body)), 0);
-    let error = parse_pattern(&quoted).unwrap_err();
-    assert_eq!(error.span, Span::new(77, 78));
+fn deeply_nested_lisp_text_parses_on_small_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let n = 10_000;
+            let text = format!("{}x{}", "{ (: ".repeat(n), ") }".repeat(n));
+            let document = ilang_syntax::lisp::parse(&text).unwrap();
+            let mut node = &document.datums[0];
+            for _ in 0..n {
+                let K::Curly(items) = &node.kind else {
+                    panic!("curly")
+                };
+                let K::Round(items) = &items[0].kind else {
+                    panic!("round")
+                };
+                node = &items[1];
+            }
+            assert!(matches!(&node.kind, K::Name(name) if name == "x"));
+            drop(document);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn deep_quoted_lisp_text_restores_context_and_spans() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let n = 10_000;
+            let text = format!("{}x{}", "`(~ ".repeat(n), ")".repeat(n));
+            let document = ilang_syntax::lisp::parse(&text).unwrap();
+            let mut node = &document.datums[0];
+            for _ in 0..n {
+                let K::Quote(group) = &node.kind else {
+                    panic!("quote")
+                };
+                let K::Round(items) = &group.kind else {
+                    panic!("group")
+                };
+                let K::Unquote(next) = &items[0].kind else {
+                    panic!("unquote")
+                };
+                node = next;
+            }
+            assert!(matches!(&node.kind, K::Name(name) if name == "x"));
+            let bad = format!("{}~x{}", "(".repeat(n), ")".repeat(n));
+            let errors = ilang_syntax::lisp::parse(&bad).unwrap_err();
+            assert_eq!(errors[0].span.start as usize, n);
+            assert!(errors[0].message.contains("only allowed inside a quote"));
+        })
+        .unwrap()
+        .join()
+        .unwrap();
 }

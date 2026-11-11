@@ -1847,11 +1847,12 @@ impl<'a> Resolver<'a> {
 
     fn record_label(&mut self, label: &ast::RecordLabel) -> RecordLabel {
         let parameter = if label.parameter {
+            let key = self.name_key(&label.name, label.span);
             let var = self
                 .ty_frames
                 .iter()
                 .rev()
-                .find_map(|frame| frame.names.get(&label.name).copied());
+                .find_map(|frame| frame.names.get(&key).copied());
             if var.is_none() {
                 self.error(
                     code::INVALID_LABEL_PARAMETER,

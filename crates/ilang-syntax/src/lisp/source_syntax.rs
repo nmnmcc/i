@@ -40,6 +40,13 @@ fn children(s: &Syntax, f: impl Fn(&Syntax) -> Syntax) -> Syntax {
         _ => s.clone(),
     }
 }
+pub(super) fn record_parts(xs: &[Syntax]) -> bool {
+    xs.first().is_some_and(|first| {
+        symbol(first, "..")
+            || matches!(first.node(), Node::Round(parts) if parts.len() == 3 && symbol(&parts[0], ":"))
+    })
+}
+
 #[derive(Clone, Copy)]
 enum Mode {
     Expr,
@@ -104,7 +111,7 @@ fn normalize(root: &Syntax, mode: Mode) -> Syntax {
                 continue;
             }
             Mode::Type => {
-                if matches!(node.node(), Node::Curly(_)) && xs.len() == 1 {
+                if matches!(node.node(), Node::Curly(_)) && xs.len() == 1 && !record_parts(xs) {
                     unwrap = true;
                 }
                 modes.fill(Mode::Type);
@@ -184,16 +191,20 @@ fn normalize(root: &Syntax, mode: Mode) -> Syntax {
             Mode::Clauses => modes.fill(Mode::Clause),
             Mode::Expr => {
                 if matches!(node.node(), Node::Curly(_)) {
-                    let clause = xs.first().is_some_and(|x| matches!(x.node(), Node::Round(parts) if parts.len() == 3 && symbol(&parts[0], "->")));
-                    if xs.is_empty() || clause {
-                        modes.fill(Mode::Clause);
-                    } else if xs.len() == 1
-                        && !matches!(xs[0].node(), Node::Round(parts) if parts.len() == 3 && (symbol(&parts[0], "=") || symbol(&parts[0], "!")))
-                    {
-                        unwrap = true;
-                        modes[0] = Mode::Expr;
+                    if record_parts(xs) {
+                        modes.fill(Mode::Expr);
                     } else {
-                        modes.fill(Mode::Statement);
+                        let clause = xs.first().is_some_and(|x| matches!(x.node(), Node::Round(parts) if parts.len() == 3 && symbol(&parts[0], "->")));
+                        if xs.is_empty() || clause {
+                            modes.fill(Mode::Clause);
+                        } else if xs.len() == 1
+                            && !matches!(xs[0].node(), Node::Round(parts) if parts.len() == 3 && (symbol(&parts[0], "=") || symbol(&parts[0], "!")))
+                        {
+                            unwrap = true;
+                            modes[0] = Mode::Expr;
+                        } else {
+                            modes.fill(Mode::Statement);
+                        }
                     }
                 } else if matches!(node.node(), Node::Round(_))
                     && xs.len() == 4
@@ -346,6 +357,20 @@ pub fn source_pattern_syntax(
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+
+    #[test]
+    fn single_field_records_are_not_transparent_groups() {
+        let scope = Scope {
+            module: 0,
+            marks: BTreeSet::new(),
+        };
+        let datum = super::super::parse("{ (: x { T }) }").unwrap();
+        let syntax = Syntax::from_datum(&datum[0], &scope);
+        assert_eq!(ty(&syntax).show(), "{(: x T)}");
+        let datum = super::super::parse("{ (: x { y }) }").unwrap();
+        let syntax = Syntax::from_datum(&datum[0], &scope);
+        assert_eq!(expr(&syntax).show(), "{(: x y)}");
+    }
 
     #[test]
     fn deeply_nested_source_normalizes_on_a_small_stack() {

@@ -558,6 +558,14 @@ mod iterative_drop {
                             expr(x, &mut work);
                         }
                     }
+                    ExprKind::Record { base, fields } => {
+                        if let Some(base) = base {
+                            expr(base, &mut work);
+                        }
+                        for (_, value) in fields {
+                            expr(value, &mut work);
+                        }
+                    }
                     ExprKind::List { items, rest } => {
                         for x in items {
                             expr(x, &mut work);
@@ -669,6 +677,14 @@ mod iterative_drop {
                     | TypeKind::Diff(args) => {
                         for t in args {
                             ty(t, &mut work);
+                        }
+                    }
+                    TypeKind::Record { base, fields, .. } => {
+                        if let Some(base) = base {
+                            ty(base, &mut work);
+                        }
+                        for (_, value) in fields {
+                            ty(value, &mut work);
                         }
                     }
                     TypeKind::Fn {

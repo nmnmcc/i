@@ -2101,6 +2101,8 @@ impl<'a> Checker<'a> {
         self.label_callee = true;
         let (mut f, mut kf) = self.infer_k(callee, &Ty::Top);
         self.label_callee = was_callee;
+        let bool_pipe = first.is_some() && kf.head() == Some(Head::Named(self.b.bool_));
+        let diagnostic_start = self.diags.len();
         let mut kfn = known::one_fn(&kf);
         let skip = usize::from(first.is_some());
         let n = skip + args.len();

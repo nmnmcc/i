@@ -267,6 +267,50 @@ fn reusable_encoder_preserves_source_spans_and_scope_across_items() {
     assert_eq!(first.span(), module.items[0].span);
 }
 
+// Source AST stores record label text but does not retain whether the source
+// used quotes. The independent printer may choose the other spelling.
+fn same_code_with_record_label_spelling(
+    a: &ilang_syntax::lisp::syntax::Syntax,
+    b: &ilang_syntax::lisp::syntax::Syntax,
+) -> bool {
+    let mut work = vec![(a, b, false)];
+    while let Some((a, b, record_field)) = work.pop() {
+        if a.same_code(b) {
+            continue;
+        }
+        match (a.node(), b.node()) {
+            (Node::Curly(a), Node::Curly(b)) if a.len() == b.len() => {
+                work.extend(a.iter().zip(b).map(|(a, b)| (a, b, true)));
+            }
+            (Node::Round(a), Node::Round(b)) if a.len() == b.len() => {
+                let is_label = record_field
+                    && matches!(a.first().map(|x| x.node()), Some(Node::Symbol(x)) if x == ":" || x == "-");
+                for (i, (a, b)) in a.iter().zip(b).enumerate() {
+                    if is_label
+                        && i == 1
+                        && let (Node::Name(x), Node::Text(y)) | (Node::Text(x), Node::Name(y)) =
+                            (a.node(), b.node())
+                        && x == y
+                    {
+                        continue;
+                    }
+                    work.push((a, b, false));
+                }
+            }
+            (Node::Square(a), Node::Square(b)) | (Node::Bits(a), Node::Bits(b))
+                if a.len() == b.len() =>
+            {
+                work.extend(a.iter().zip(b).map(|(a, b)| (a, b, false)));
+            }
+            (Node::Quote(a), Node::Quote(b))
+            | (Node::Unquote(a), Node::Unquote(b))
+            | (Node::Splice(a), Node::Splice(b)) => work.push((a, b, false)),
+            _ => return false,
+        }
+    }
+    true
+}
+
 #[test]
 fn reusable_encoder_agrees_with_independent_lisp_printer_on_valid_corpus() {
     use ilang_syntax::lisp::SourceEncoder;
@@ -301,11 +345,17 @@ fn reusable_encoder_agrees_with_independent_lisp_printer_on_valid_corpus() {
                 let plan = planned(&encoder, item);
                 let encoded = encoder.item(item);
                 assert_eq!(plan, direct_charge_events(&encoded), "{}", path.display());
-                assert_eq!(
+                let printed = ilang_syntax::lisp::print_module(&expected);
+                let parsed = ilang_syntax::lisp::parse(&printed).unwrap();
+                assert_eq!(parsed.len(), 1, "{}", path.display());
+                let expected_syntax =
+                    ilang_syntax::lisp::syntax::Syntax::from_datum(&parsed[0], &scope);
+                assert!(
+                    same_code_with_record_label_spelling(&encoded, &expected_syntax),
+                    "{}: {} != {}",
+                    path.display(),
                     encoded.show(),
-                    ilang_syntax::lisp::print_module(&expected).trim_end(),
-                    "{}",
-                    path.display()
+                    printed
                 );
                 checked += 1;
             }
@@ -556,4 +606,99 @@ fn charge_events_count_unicode_zero_and_large_integer_exactly() {
         event,
         ilang_syntax::lisp::SyntaxCharge::Charge { work: 0, words: 0 }
     )));
+}
+
+#[test]
+fn records_preserve_labels_spreads_and_streamed_cost() {
+    use ilang_syntax::lisp::SourceEncoder;
+    let source = "f(R, K) = (r: (..R, -old, K: Int, -other, \"full name\": String)) { (..r, \"full name\": \"Ada\", x: 1) }\nempty = ()\n";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let scope = scope();
+    let encoder = SourceEncoder::new(&scope, source);
+    for item in &module.items {
+        let syntax = encoder.item(item);
+        assert_eq!(planned(&encoder, item), direct_charge_events(&syntax));
+        let mut nodes = vec![&syntax];
+        while let Some(node) = nodes.pop() {
+            assert_eq!(node.scope(), &scope);
+            match node.node() {
+                Node::Round(children) | Node::Curly(children) | Node::Square(children) => {
+                    nodes.extend(children)
+                }
+                Node::Symbol(symbol) if matches!(symbol.as_str(), ":" | ".." | "-") => {
+                    let span = node.span();
+                    assert_eq!(&source[span.start as usize..span.end as usize], symbol);
+                }
+                Node::Text(label) if label == "full name" => {
+                    let span = node.span();
+                    assert_eq!(
+                        &source[span.start as usize..span.end as usize],
+                        "\"full name\""
+                    );
+                }
+                _ => {}
+            }
+        }
+        let shown = syntax.show();
+        if shown.starts_with("(= (f ") {
+            assert!(shown.contains("(- old)"), "{shown}");
+            assert!(shown.contains("(: K Int)"), "{shown}");
+            assert!(shown.contains("(- old) (: K Int) (- other)"), "{shown}");
+            assert!(shown.contains("(: \"full name\" String)"), "{shown}");
+            assert!(shown.contains("(: \"full name\" \"Ada\")"), "{shown}");
+        } else {
+            assert_eq!(shown, "(= empty ())");
+        }
+    }
+}
+
+#[test]
+fn deeply_nested_records_encode_on_small_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let depth = 10_000;
+            let source = format!("{}0{}", "(x: ".repeat(depth), ")".repeat(depth));
+            let end = source.len();
+            let mut expr = Expr {
+                span: Span::new((depth * 4) as u32, (depth * 4 + 1) as u32),
+                kind: ExprKind::Int(0u32.into()),
+            };
+            for i in (0..depth).rev() {
+                expr = Expr {
+                    span: Span::new((i * 4) as u32, (end - i) as u32),
+                    kind: ExprKind::Record {
+                        base: None,
+                        fields: vec![(ident("x", i * 4 + 1), expr)],
+                    },
+                };
+            }
+            let scope = scope();
+            let syntax = expression_syntax(&expr, &scope, &source);
+            let mut node = &syntax;
+            for _ in 0..depth {
+                let Node::Curly(fields) = node.node() else {
+                    panic!("expected record")
+                };
+                let Node::Round(field) = fields[0].node() else {
+                    panic!("expected field")
+                };
+                assert!(matches!(field[1].node(), Node::Name(name) if name == "x"));
+                node = &field[2];
+            }
+            assert!(matches!(node.node(), Node::Int(_)));
+            drop(syntax);
+            drop(expr);
+            let item_source = format!("value = {source}\n");
+            let (module, diagnostics) = ilang_syntax::parse_module(&item_source);
+            assert!(diagnostics.is_empty(), "{diagnostics:?}");
+            let encoder = ilang_syntax::lisp::SourceEncoder::new(&scope, &item_source);
+            let item = &module.items[0];
+            let encoded = encoder.item(item);
+            assert_eq!(planned(&encoder, item), direct_charge_events(&encoded));
+        })
+        .unwrap()
+        .join()
+        .unwrap();
 }

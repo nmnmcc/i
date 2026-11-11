@@ -72,21 +72,17 @@ fn caret_and_guard_have_separate_slots() {
 }
 
 #[test]
-fn contexts_and_reserved_records_do_not_use_commas_to_choose() {
+fn contexts_and_records_do_not_use_commas_to_choose() {
     // D1–D4: function suffix wins; mixed calls/constructors stay valid.
     binding("answer = (a: Int) { a }");
     binding("answer = f(1, a: 2)");
     let (_, diagnostics) = parse_module("User { User(Int, age: Int) }");
     assert!(diagnostics.is_empty());
     for rhs in ["(a: 1)", "(..base, a: 1)", "(f: (x) -> Int { x })", "()"] {
-        let source = format!("answer = {rhs}");
-        let (_, diagnostics) = parse_module(&source);
-        assert!(
-            diagnostics
-                .iter()
-                .any(|d| d.code == ilang_syntax::Code::RecordReserved),
-            "{source}: {diagnostics:?}"
-        );
+        assert!(matches!(
+            binding(&format!("answer = {rhs}")).kind,
+            ExprKind::Record { .. }
+        ));
     }
     for rhs in ["(a: 1, 2)", "(1, a: 2)"] {
         let (_, diagnostics) = parse_module(&format!("answer = {rhs}"));
