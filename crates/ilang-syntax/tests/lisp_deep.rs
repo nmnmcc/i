@@ -354,3 +354,61 @@ fn deep_structural_records_clone_compare_normalize_and_drop() {
         .join()
         .unwrap();
 }
+
+#[test]
+fn deeply_nested_lisp_text_parses_on_small_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let n = 10_000;
+            let text = format!("{}x{}", "{ (: ".repeat(n), ") }".repeat(n));
+            let document = ilang_syntax::lisp::parse(&text).unwrap();
+            let mut node = &document.datums[0];
+            for _ in 0..n {
+                let K::Curly(items) = &node.kind else {
+                    panic!("curly")
+                };
+                let K::Round(items) = &items[0].kind else {
+                    panic!("round")
+                };
+                node = &items[1];
+            }
+            assert!(matches!(&node.kind, K::Name(name) if name == "x"));
+            drop(document);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn deep_quoted_lisp_text_restores_context_and_spans() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let n = 10_000;
+            let text = format!("{}x{}", "`(~ ".repeat(n), ")".repeat(n));
+            let document = ilang_syntax::lisp::parse(&text).unwrap();
+            let mut node = &document.datums[0];
+            for _ in 0..n {
+                let K::Quote(group) = &node.kind else {
+                    panic!("quote")
+                };
+                let K::Round(items) = &group.kind else {
+                    panic!("group")
+                };
+                let K::Unquote(next) = &items[0].kind else {
+                    panic!("unquote")
+                };
+                node = next;
+            }
+            assert!(matches!(&node.kind, K::Name(name) if name == "x"));
+            let bad = format!("{}~x{}", "(".repeat(n), ")".repeat(n));
+            let errors = ilang_syntax::lisp::parse(&bad).unwrap_err();
+            assert_eq!(errors[0].span.start as usize, n);
+            assert!(errors[0].message.contains("only allowed inside a quote"));
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
