@@ -14,9 +14,9 @@ f = (x) {
 	c = x + // before an operator
 		1
 	p = xs // before a pipe
-		|> g // before another pipe
-		|> h
-	q = x |> {
+		| g // before another pipe
+		| h
+	q = x.{
 		A -> // before an arrow
 			1
 		B ? // before a guard
@@ -30,11 +30,11 @@ f = (x) {
 }
 
 T = // after an equals sign in a type
-	(Int) -> Int ? // after a question mark
+	(Int) -> Int ^ // after a question mark
 		String
 
 g = (x) {
-	q = x |> {
+	q = x.{
 		A // after a bar
 			| B -> 1
 		_ -> 0
@@ -43,7 +43,7 @@ g = (x) {
 		a: // after a label
 			1
 	)
-	s = xs |> g == // after a pipeline
+	s = xs | g == // after a pipeline
 		ys
 	t = x // one
 		// two

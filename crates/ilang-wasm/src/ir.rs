@@ -500,6 +500,8 @@ pub struct Func {
     /// A name for reading the Wasm text.
     pub name: String,
     pub arity: u32,
+    /// Logical frame units (source parameters and local names), before optimization.
+    pub budget_frame: u32,
     /// The types of the locals; the first `arity` are the parameters.
     pub locals: Vec<LocalType>,
     pub body: Vec<Stmt>,

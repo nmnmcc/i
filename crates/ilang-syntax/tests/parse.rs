@@ -87,7 +87,7 @@ fn brace_decisions_follow_the_ordered_tests() {
     for (src, code) in [
         (
             /* old-syntax-check: E0114,E0101 */ "a = { p: (Int, Int) -> e }",
-            Code::RecordReserved,
+            Code::Unexpected,
         ),
         (
             /* old-syntax-check: E0108 */ "a = x |> { -y -> 1 }",
@@ -191,7 +191,7 @@ fn guards_and_pipe_binding_strength() {
             parse_module(src)
                 .1
                 .iter()
-                .any(|d| d.code == Code::PipeTarget && d.message.contains("level 6")),
+                .any(|d| d.code == Code::PipeTarget && d.message.contains("e.{ clauses }")),
             "{src}"
         );
     }
@@ -328,7 +328,7 @@ fn print_core(e: Expr) -> String {
 
 #[test]
 fn core_printer_adds_only_required_groups() {
-    // §3.13: a core match under * and as a callee needs its own group.
+    // SYN2 M2: a postfix match under * or as a callee needs no group.
     let match_e = core_value("a = n |> { 0 -> 1  _ -> 2 }");
     let e = Expr {
         kind: ExprKind::Binary {
@@ -338,7 +338,7 @@ fn core_printer_adds_only_required_groups() {
         },
         span: match_e.span,
     };
-    assert!(print_core(e).contains("{ n |>"));
+    assert!(print_core(e).contains("n.{"));
     let e = Expr {
         kind: ExprKind::Call {
             callee: Box::new(match_e.clone()),
@@ -347,7 +347,7 @@ fn core_printer_adds_only_required_groups() {
         span: match_e.span,
     };
     assert!(print_core(e).contains("}()"));
-    for (src, grouped) in [("a = a + b", false), ("a = a == b", true)] {
+    for (src, grouped) in [("a = a + b", true), ("a = a == b", true)] {
         let mut e = match_e.clone();
         let ExprKind::Case { subject, .. } = &mut e.kind else {
             unreachable!()
@@ -360,7 +360,7 @@ fn core_printer_adds_only_required_groups() {
     let match_fn = core_value("a = v |> { (x) -> (y) { y } }");
     let text = print_core(match_fn.clone());
     assert!(text.contains("-> (y)"), "{text}");
-    let ExprKind::Case { clauses, .. } = match_fn.kind else {
+    let ExprKind::Case { ref clauses, .. } = match_fn.kind else {
         unreachable!()
     };
     let e = Expr {
@@ -432,7 +432,7 @@ fn a_type_annotation_before_another_choice_has_no_same_code_text() {
     ] {
         let mut m = module(src);
         let next = core_value("a = { f: String -> f }");
-        let ExprKind::Clauses(next) = next.kind else {
+        let ExprKind::Clauses(ref next) = next.kind else {
             unreachable!()
         };
         let ItemKind::Binding(b) = &mut m.items[0].kind else {

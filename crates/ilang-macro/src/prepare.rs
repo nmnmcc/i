@@ -1,0 +1,176 @@
+//! Prepare a macro module's parsed import closure for compiler execution.
+use ilang_check::Parsed;
+use ilang_package::{Diagnostic, PackageGraph};
+use ilang_syntax::lisp::{expansion, quote_lower, syntax::Syntax};
+
+/// One source macro and its written argument names.
+#[derive(Clone, Debug)]
+pub struct MacroBinding {
+    pub module: String,
+    pub name: String,
+    pub parameters: Vec<String>,
+}
+
+/// Macro bindings and source-located template nodes for one compiler program.
+pub struct Prepared {
+    pub bindings: Vec<MacroBinding>,
+    pub templates: Vec<Syntax>,
+}
+
+/// Validate macro declarations, remove their phase markers for the compiler
+/// program, and lower quotes. `parsed` is the exact import closure selected by
+/// the caller; source identities remain stable when different closures are selected.
+pub fn prepare(graph: &PackageGraph, parsed: &mut [Parsed]) -> Result<Prepared, Vec<Diagnostic>> {
+    let mut found = Vec::new();
+    let mut errors = Vec::new();
+    // Validate the whole closure before mutating it, so an invalid declaration
+    // never leaves a partially transformed module in the caller's state.
+    for module in parsed.iter() {
+        let lisp = graph.sources.get(module.source).display.ends_with(".is");
+        match expansion::definitions(&module.ast, lisp) {
+            Ok(bindings) => found.push(bindings),
+            Err(problems) => {
+                errors.extend(problems.into_iter().map(|e| {
+                    Diagnostic::error(
+                        ilang_check::code::ATTRIBUTE_PLACE,
+                        Some(module.source),
+                        e.span,
+                        e.message,
+                    )
+                }));
+                found.push(Vec::new());
+            }
+        }
+    }
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+    let mut bindings = Vec::new();
+    let mut templates = Vec::new();
+    for (module, definitions) in parsed.iter_mut().zip(found) {
+        for definition in definitions {
+            let item = &mut module.ast.items[definition.item];
+            item.attributes
+                .retain(|a| !(a.module.is_none() && a.name.name == "macro"));
+            bindings.push(MacroBinding {
+                module: module.path.clone(),
+                name: definition.name,
+                parameters: definition.parameters,
+            });
+        }
+        quote_lower::lower_expression_quotes(&mut module.ast, module.source.0, &mut templates);
+    }
+    Ok(Prepared {
+        bindings,
+        templates,
+    })
+}
+
+/// Select exactly a macro module and the modules it imports, together with the
+/// implicit prelude and compiler syntax module. Preserve the original order so
+/// source and module positions are deterministic.
+pub fn import_closure(
+    graph: &PackageGraph,
+    parsed: &[Parsed],
+    source: ilang_package::SourceId,
+) -> Result<Vec<Parsed>, Vec<Diagnostic>> {
+    use std::collections::{BTreeSet, VecDeque};
+    let start = parsed
+        .iter()
+        .position(|m| m.source == source)
+        .expect("macro source belongs to parsed graph");
+    let prelude = parsed
+        .iter()
+        .position(|m| m.kind == ilang_package::ModuleKind::Prelude)
+        .expect("loaded graph includes the prelude");
+    let syntax = parsed
+        .iter()
+        .position(|m| m.package == graph.library && m.path == "i/syntax")
+        .expect("loaded graph includes compiler syntax module");
+    let mut queue = VecDeque::from([start, prelude, syntax]);
+    let mut selected = BTreeSet::new();
+    let mut errors = Vec::new();
+    while let Some(index) = queue.pop_front() {
+        if !selected.insert(index) {
+            continue;
+        }
+        let module = &parsed[index];
+        let package = &graph.packages[module.package];
+        for import in &module.ast.imports {
+            let first = import
+                .path
+                .first()
+                .expect("parser guarantees a nonempty import path");
+            let id = if first.name == "i" {
+                Some(graph.library)
+            } else if first.name == package.name {
+                Some(module.package)
+            } else {
+                package
+                    .dependencies
+                    .iter()
+                    .find(|(name, _)| *name == first.name)
+                    .and_then(|(_, id)| *id)
+                    .or_else(|| {
+                        (module.kind == ilang_package::ModuleKind::Test)
+                            .then(|| {
+                                package
+                                    .dev_dependencies
+                                    .iter()
+                                    .find(|(name, _)| *name == first.name)
+                                    .and_then(|(_, id)| *id)
+                            })
+                            .flatten()
+                    })
+            };
+            let Some(id) = id else {
+                errors.push(Diagnostic::error(
+                    ilang_check::code::UNKNOWN_PACKAGE,
+                    Some(module.source),
+                    first.span,
+                    format!("unknown package `{}`", first.name),
+                ));
+                continue;
+            };
+            let tail = import
+                .path
+                .iter()
+                .skip(1)
+                .map(|part| part.name.as_str())
+                .collect::<Vec<_>>()
+                .join("/");
+            let path = format!("{}/{tail}", graph.packages[id].name);
+            let Some(target) = parsed.iter().position(|p| {
+                p.package == id && p.path == path && p.kind != ilang_package::ModuleKind::Prelude
+            }) else {
+                errors.push(Diagnostic::error(
+                    ilang_check::code::NO_MODULE,
+                    Some(module.source),
+                    import.span,
+                    format!("there is no module `{path}`"),
+                ));
+                continue;
+            };
+            if parsed[target].kind == ilang_package::ModuleKind::Test
+                && module.kind != ilang_package::ModuleKind::Test
+            {
+                errors.push(Diagnostic::error(
+                    ilang_check::code::SRC_IMPORTS_TEST,
+                    Some(module.source),
+                    import.span,
+                    "a source module cannot import a test module",
+                ));
+                continue;
+            }
+            queue.push_back(target);
+        }
+    }
+    if errors.is_empty() {
+        Ok(selected
+            .into_iter()
+            .map(|index| parsed[index].clone())
+            .collect())
+    } else {
+        Err(errors)
+    }
+}
