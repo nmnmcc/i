@@ -46,6 +46,8 @@ enum Task<'a> {
     SegmentPattern(&'a Segment<Pattern>),
     Format(&'a Format),
     RecordField(&'a Ident, &'a Expr),
+    RecordTypeField(&'a RecordLabel, &'a TypeExpr),
+    RecordRemoved(&'a RecordLabel),
     Qualified(Option<&'a Ident>, &'a Ident),
     BracketParams(&'a [Param]),
     BracketTypeParams(&'a [FnParamType]),
@@ -284,12 +286,35 @@ pub(super) fn item<E>(
                 work.push(Atom(&name.name));
                 work.push(Atom(":"));
             }
+            RecordTypeField(name, value) => {
+                bracket(&mut f, &mut work, 3)?;
+                work.push(Type(value));
+                work.push(Atom(&name.name));
+                work.push(Atom(":"));
+            }
+            RecordRemoved(name) => {
+                bracket(&mut f, &mut work, 2)?;
+                work.push(Atom(&name.name));
+                work.push(Atom("-"));
+            }
             Expr(e) => match &e.kind {
                 ExprKind::Quote(d) => work.push(Datum(d)),
                 ExprKind::Int(n) => work.push(Int(n)),
                 ExprKind::Float(_) => work.push(Float),
                 ExprKind::String(s) => work.push(Atom(s)),
                 ExprKind::Name { module, name } => work.push(Qualified(module.as_ref(), name)),
+                ExprKind::Record { base, fields } => {
+                    bracket(
+                        &mut f,
+                        &mut work,
+                        fields.len() + usize::from(base.is_some()) * 2,
+                    )?;
+                    work.extend(fields.iter().rev().map(|(n, v)| RecordField(n, v)));
+                    if let Some(base) = base {
+                        work.push(Expr(base));
+                        work.push(Atom(".."));
+                    }
+                }
                 ExprKind::Tuple(xs) if xs.is_empty() => bracket(&mut f, &mut work, 0)?,
                 ExprKind::Tuple(xs) => {
                     bracket(&mut f, &mut work, 1 + xs.len())?;
@@ -573,6 +598,23 @@ pub(super) fn item<E>(
                     work.push(Qualified(module.as_ref(), name));
                 }
                 TypeKind::Hole => work.push(Atom("_")),
+                TypeKind::Record {
+                    base,
+                    fields,
+                    removed,
+                } => {
+                    bracket(
+                        &mut f,
+                        &mut work,
+                        fields.len() + removed.len() + usize::from(base.is_some()) * 2,
+                    )?;
+                    work.extend(fields.iter().rev().map(|(n, v)| RecordTypeField(n, v)));
+                    work.extend(removed.iter().rev().map(RecordRemoved));
+                    if let Some(base) = base {
+                        work.push(Type(base));
+                        work.push(Atom(".."));
+                    }
+                }
                 TypeKind::Tuple(ts)
                 | TypeKind::Union(ts)
                 | TypeKind::Inter(ts)
