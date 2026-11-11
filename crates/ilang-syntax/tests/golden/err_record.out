@@ -1,8 +1,3 @@
-a = {}
-
-b = {}
+a = (name: 1)
 --- errors ---
-E0101 @2:5 a clause needs `->` after its complete pattern type; a tuple or record type before the clause arrow is put in `{ }`
-E0101 @2:15 expected `->`, found `}`
-E0101 @3:5 a clause needs `->` after its complete pattern type; a tuple or record type before the clause arrow is put in `{ }`
-E0101 @3:26 expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`
+E0102 @3:26 expected the function body, a `{` on the same line, found `}`

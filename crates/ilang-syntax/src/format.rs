@@ -476,7 +476,7 @@ fn ends_with_fn(t: &TypeExpr) -> bool {
 /// type when `->` comes after it (§7.1).
 fn ends_with_tuple(t: &TypeExpr) -> bool {
     match &t.kind {
-        TypeKind::Tuple(_) => true,
+        TypeKind::Tuple(_) | TypeKind::Record { .. } => true,
         TypeKind::Union(v) | TypeKind::Inter(v) | TypeKind::Diff(v) => {
             let last = v.last().unwrap();
             !type_braced(last, type_prec(t) + 1) && ends_with_tuple(last)

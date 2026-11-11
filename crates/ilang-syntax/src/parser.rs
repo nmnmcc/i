@@ -1921,6 +1921,21 @@ impl Parser<'_> {
             }
             T::LBrace => {
                 self.bump();
+                if self.at(&T::DotDot) && *self.nth(1) == T::RBrace {
+                    self.bump();
+                    self.bump();
+                    return Ok(TypeExpr {
+                        kind: TypeKind::Named {
+                            module: None,
+                            name: Ident {
+                                name: "Record".into(),
+                                span: self.span_from(start),
+                            },
+                            args: Vec::new(),
+                        },
+                        span: self.span_from(start),
+                    });
+                }
                 if self.at(&T::DotDot)
                     || matches!(self.kind(), T::Name(_) | T::UpName(_) | T::Str(_))
                         && *self.nth(1) == T::Colon

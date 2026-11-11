@@ -1,6 +1,6 @@
 outer(E, N) = (xs: List(Int), f: (Int) -> Int ^ E ! N) -> List(Int) ^ E ! N {
 	helper = (rest, acc) {
-		rest.{
+		rest |> {
 			[]          -> list.reverse(acc)
 			[x, ..more] -> helper(more, [f(x), ..acc])
 		}

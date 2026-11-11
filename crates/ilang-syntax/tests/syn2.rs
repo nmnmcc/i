@@ -5,6 +5,7 @@ fn old_and_new_records_have_the_same_tree() {
     for (old, new) in [
         ("answer = { name: 1 }", "answer = (name: 1)"),
         ("T = { name: Int }", "T = (name: Int)"),
+        ("T = {..}", "T = Record"),
         (
             "answer = (x) -> Int ? String { x }",
             "answer = (x) -> Int ^ String { x }",

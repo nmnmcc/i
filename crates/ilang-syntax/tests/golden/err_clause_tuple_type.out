@@ -1,4 +1,2 @@
-f = p.{}
 --- errors ---
-E0101 @3:10 a clause needs `->` after its complete pattern type; a tuple or record type before the clause arrow is put in `{ }`
-E0101 @3:31 expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`
+E0102 @3:31 expected the function body, a `{` on the same line, found `}`

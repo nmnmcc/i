@@ -62,6 +62,25 @@ impl<'a> Migrator<'a> {
                     self.ty(x);
                 }
             }
+            TypeKind::Named { name, args, .. }
+                if name.name == "Record" && self.src.as_bytes()[t.span.start as usize] == b'{' =>
+            {
+                let source = &self.src[t.span.start as usize..t.span.end as usize];
+                let dots = lex(source)
+                    .tokens
+                    .into_iter()
+                    .find(|tok| tok.kind == T::DotDot)
+                    .expect("record type has dots");
+                self.edit(Span::new(t.span.start, t.span.start + 1), "");
+                self.edit(
+                    Span::new(t.span.start + dots.span.start, t.span.start + dots.span.end),
+                    "Record",
+                );
+                self.edit(Span::new(t.span.end - 1, t.span.end), "");
+                for x in args {
+                    self.ty(x);
+                }
+            }
             TypeKind::Named { args, .. }
             | TypeKind::Call { args, .. }
             | TypeKind::Union(args)
