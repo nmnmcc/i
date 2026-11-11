@@ -42,6 +42,20 @@
 	is_integer
 	max_finite
 	min_positive
+	pi
+	tau
+	sin
+	cos
+	tan
+	sign_bit
+	copy_sign
+	asin
+	acos
+	atan
+	atan2
+	hypot
+	radians
+	degrees
 )
 
 /// The greatest finite Float, about `1.8e308`.
@@ -50,7 +64,24 @@ max_finite = 1.7976931348623157e308
 /// The smallest Float greater than `0.0`: `5.0e-324`, a subnormal number.
 min_positive = 5.0e-324
 
-sign_bit = 9223372036854775808
+/// The nearest binary64 value to pi.
+pi = 3.141592653589793
+
+/// The nearest binary64 value to two pi.
+tau = 6.283185307179586
+
+sign_mask = 9223372036854775808
+
+/// Whether the sign bit is set, including for negative zero.
+sign_bit = (x: Float) -> Bool { core.float_to_bits(x) >= sign_mask }
+
+/// Copy the sign bit of `sign` to `magnitude`.
+copy_sign = (magnitude: Float, sign: Float) -> Float {
+	core.float_from_bits(
+		core.float_to_bits(magnitude) % sign_mask +
+			core.float_to_bits(sign) / sign_mask * sign_mask
+	)
+}
 
 fraction_unit = 4503599627370496
 
@@ -199,7 +230,7 @@ decimal = (
 	exponent: Int
 ) -> Result(Float, Nil) {
 	sign = negative |> {
-		True  -> sign_bit
+		True  -> sign_mask
 		False -> 0
 	}
 	magnitude = digits + exponent - 1
@@ -641,7 +672,7 @@ bits_of = (x: Float) -> Int { core.float_to_bits(x) }
 
 from_bits = (x: Int) -> Float { core.float_from_bits(x) }
 
-abs_bits = (x: Float) -> Float { from_bits(bits_of(x) % sign_bit) }
+abs_bits = (x: Float) -> Float { from_bits(bits_of(x) % sign_mask) }
 
 high = (x: Float) -> Int { bits_of(x) / word }
 
@@ -865,7 +896,7 @@ pow = (base: Float, exponent: Float) -> Result(Float, Nil) {
 		0.0 -> Ok(1.0)
 		1.0 -> Ok(base)
 		_ -> {
-			negative = bits_of(base) >= sign_bit
+			negative = bits_of(base) >= sign_mask
 			odd = negative && is_odd_whole(exponent)
 			direction = odd |> {
 				True  -> -.1.0
@@ -961,6 +992,574 @@ pow_exp2 = (
 				t1 = exp_polynomial(z)
 				r = z *. t1 /. { t1 -. 2.0 } -. { w +. z *. w }
 				Ok(direction *. scale(1.0 -. { r -. z }, n))
+			}
+		}
+	}
+}
+
+// The rational approximation and argument reduction are from FreeBSD msun
+// e_asin.c and e_acos.c, developed at SunPro, Sun Microsystems, Inc.
+// Copyright (C) 1993 Sun Microsystems, Inc. Permission to use, copy,
+// modify and distribute is freely granted provided this notice is preserved.
+asin_ratio = (z: Float) -> Float {
+	p = z *. {
+		0.166666666666666657415 +. z *. {
+			-.0.325565818622400915405 +. z *. {
+				0.201212532134862925881 +. z *. {
+					-.0.0400555345006794114027 +. z *. {
+						0.000791534994289814532176 +.
+							z *. 0.0000347933107596021167570
+					}
+				}
+			}
+		}
+	}
+	q = 1.0 +. z *. {
+		-.2.40339491173441421878 +. z *. {
+			2.02094576023350569471 +. z *. {
+				-.0.688283971605453293030 +. z *. 0.0770381505559019352791
+			}
+		}
+	}
+	p /. q
+}
+
+/// The arcsine in radians; inputs outside [-1, 1] give Error(Nil).
+asin = (x: Float) -> Result(Float, Nil) {
+	a = abs(x)
+	{ a >. 1.0 } |> {
+		True -> Error(Nil)
+		False -> {
+			{ a == 1.0 } |> {
+				True -> Ok(copy_sign(1.5707963267948966, x))
+				False -> {
+					{ a <. 0.5 } |> {
+						True -> {
+							{ a <. 1.4901161193847656e-8 } |> {
+								True  -> Ok(x)
+								False -> Ok(x +. x *. asin_ratio(x *. x))
+							}
+						}
+						False -> {
+							z = { 1.0 -. a } *. 0.5
+							s = core.sqrt(z)
+							r = asin_ratio(z)
+							value = { a >=. 0.975 } |> {
+								True -> 1.5707963267948966 -. {
+									2.0 *. { s +. s *. r } -.
+										6.123233995736766e-17
+								}
+								False -> {
+									f = core.float_from_bits(
+										core.float_to_bits(s) /
+											4294967296 *
+											4294967296
+									)
+									c = { z -. f *. f } /. { s +. f }
+									0.7853981633974483 -. {
+										2.0 *. s *. r -.
+											{
+												6.123233995736766e-17 -.
+													2.0 *. c
+											} -.
+											{ 0.7853981633974483 -. 2.0 *. f }
+									}
+								}
+							}
+							Ok(copy_sign(value, x))
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+/// The arccosine in radians; inputs outside [-1, 1] give Error(Nil).
+acos = (x: Float) -> Result(Float, Nil) {
+	a = abs(x)
+	{ a >. 1.0 } |> {
+		True -> Error(Nil)
+		False -> {
+			{ a == 1.0 } |> {
+				True -> {
+					{ x <. 0.0 } |> {
+						True  -> Ok(pi)
+						False -> Ok(0.0)
+					}
+				}
+				False -> {
+					{ a <. 0.5 } |> {
+						True -> {
+							{ a <. 6.938893903907228e-18 } |> {
+								True -> Ok(1.5707963267948966)
+								False -> Ok(1.5707963267948966 -. {
+									x -. {
+										6.123233995736766e-17 -.
+											x *. asin_ratio(x *. x)
+									}
+								})
+							}
+						}
+						False -> {
+							{ x <. 0.0 } |> {
+								True -> {
+									z = { 1.0 +. x } *. 0.5
+									s = core.sqrt(z)
+									Ok(2.0 *. {
+										1.5707963267948966 -. {
+											s +. {
+												asin_ratio(z) *. s -.
+													6.123233995736766e-17
+											}
+										}
+									})
+								}
+								False -> {
+									z = { 1.0 -. x } *. 0.5
+									s = core.sqrt(z)
+									f = core.float_from_bits(
+										core.float_to_bits(s) /
+											4294967296 *
+											4294967296
+									)
+									c = { z -. f *. f } /. { s +. f }
+									Ok(2.0 *. {
+										f +. { asin_ratio(z) *. s +. c }
+									})
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// FreeBSD msun s_atan.c and e_atan2.c, with the SunPro notice above.
+atan_kernel = (x: Float, hi: Float, lo: Float, reduced: Bool) -> Float {
+	z = x *. x
+	w = z *. z
+	s1 = z *. {
+		0.333333333333329318027 +. w *. {
+			0.142857142725034663711 +. w *. {
+				0.0909088713343650656196 +. w *. {
+					0.0666107313738753120669 +. w *. {
+						0.0497687799461593236017 +.
+							w *. 0.0162858201153657823623
+					}
+				}
+			}
+		}
+	}
+	s2 = w *. {
+		-.0.199999999998764832476 +. w *. {
+			-.0.111111104054623557880 +. w *. {
+				-.0.0769187620504482999495 +. w *. {
+					-.0.0583357013379057348645 +.
+						w *. -.0.0365315727442169155270
+				}
+			}
+		}
+	}
+	{ reduced } |> {
+		True  -> hi -. { x *. { s1 +. s2 } -. lo -. x }
+		False -> x -. x *. { s1 +. s2 }
+	}
+}
+
+/// Arctangent in radians.
+atan = (x: Float) -> Float {
+	a = abs(x)
+	{ a <. 7.450580596923828e-9 } |> {
+		True -> x
+		False -> {
+			{ a <. 0.4375 } |> {
+				True -> atan_kernel(x, 0.0, 0.0, False)
+				False -> {
+					value = { a <. 0.6875 } |> {
+						True -> atan_kernel(
+							{ 2.0 *. a -. 1.0 } /. { 2.0 +. a }
+							0.4636476090008061
+							2.2698777452961687e-17
+							True
+						)
+						False -> {
+							{ a <. 1.1875 } |> {
+								True -> atan_kernel(
+									{ a -. 1.0 } /. { a +. 1.0 }
+									0.7853981633974483
+									3.061616997868383e-17
+									True
+								)
+								False -> {
+									{ a <. 2.4375 } |> {
+										True -> atan_kernel(
+											{ a -. 1.5 } /. { 1.0 +. 1.5 *. a }
+											0.982793723247329
+											1.3903311031230998e-17
+											True
+										)
+										False -> {
+											{
+												a >=. 73786976294838206464.0
+											} |> {
+												True -> 1.5707963267948966
+												False -> atan_kernel(
+													-.1.0 /. a
+													1.5707963267948966
+													6.123233995736766e-17
+													True
+												)
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+					copy_sign(value, x)
+				}
+			}
+		}
+	}
+}
+
+/// The angle of (x, y), in radians, with the sign of y.
+atan2 = (y: Float, x: Float) -> Float {
+	{ y == 0.0 } |> {
+		True -> {
+			{ sign_bit(x) } |> {
+				True  -> copy_sign(pi, y)
+				False -> y
+			}
+		}
+		False -> {
+			{ x == 0.0 } |> {
+				True -> copy_sign(1.5707963267948966, y)
+				False -> {
+					ax = abs(x)
+					ay = abs(y)
+					ex = core.float_to_bits(ax) / 4503599627370496
+					ey = core.float_to_bits(ay) / 4503599627370496
+					z = { ey > ex + 64 } |> {
+						True -> 1.5707963267948966
+						False -> {
+							{ sign_bit(x) && ex > ey + 64 } |> {
+								True  -> 0.0
+								False -> atan(ay /. ax)
+							}
+						}
+					}
+					result = { sign_bit(x) } |> {
+						True  -> pi -. { z -. 1.2246467991473532e-16 }
+						False -> z
+					}
+					copy_sign(result, y)
+				}
+			}
+		}
+	}
+}
+
+/// Convert degrees to radians.
+radians = (degrees: Float) -> Float { degrees *. 0.017453292519943295 }
+
+/// Convert radians to degrees, returning an error if the result overflows.
+degrees = (radians: Float) -> Result(Float, Nil) {
+	{ abs(radians) >. 3.1375664143845866e306 } |> {
+		True  -> Error(Nil)
+		False -> Ok(radians *. 57.29577951308232)
+	}
+}
+
+// Compensated squares and scaling from FreeBSD msun hypot.c.
+hypot_square = (x: Float) -> (Float, Float) {
+	xc = x *. 134217729.0
+	xh = x -. xc +. xc
+	xl = x -. xh
+	hi = x *. x
+	lo = xh *. xh -. hi +. 2.0 *. xh *. xl +. xl *. xl
+	(hi, lo)
+}
+
+/// The Euclidean length of (x, y), returning an error on overflow.
+hypot = (x: Float, y: Float) -> Result(Float, Nil) {
+	a = max(abs(x), abs(y))
+	b = min(abs(x), abs(y))
+	ex = core.float_to_bits(a) / mantissa_unit
+	ey = core.float_to_bits(b) / mantissa_unit
+	{ b == 0.0 || ex - ey > 64 } |> {
+		True -> Ok(a)
+		False -> {
+			(sx, sy, factor) = { ex > 1533 } |> {
+				True -> (
+					a *. 1.90109156629516e-211
+					b *. 1.90109156629516e-211
+					5.260135901548374e210
+				)
+				False -> {
+					{ ey < 573 } |> {
+						True -> (
+							a *. 5.260135901548374e210
+							b *. 5.260135901548374e210
+							1.90109156629516e-211
+						)
+						False -> (a, b, 1.0)
+					}
+				}
+			}
+			(hx, lx) = hypot_square(sx)
+			(hy, ly) = hypot_square(sy)
+			root = core.sqrt(ly +. lx +. hy +. hx)
+			{ factor >. 1.0 && root >. max_finite /. factor } |> {
+				True  -> Error(Nil)
+				False -> Ok(factor *. root)
+			}
+		}
+	}
+}
+
+// Payne–Hanek reduction using the 4/pi digits from Go math/trig_reduce.go.
+// Copyright 2018 The Go Authors. All rights reserved. BSD-style license.
+// The arbitrary precision product retains the bits needed at every Float exponent.
+trig_reduce = (x: Float) -> (Int, Float, Float) {
+	bits = core.float_to_bits(x)
+	exponent = bits / mantissa_unit - 1023 - 52
+	mantissa = bits % mantissa_unit + mantissa_unit
+	product = mantissa *
+		1436762042799249464599471190770549237238954220229867879941249734202507677396818572841661258712197472977584340426583215490169760957443689211057306349163373844600972405389011770843781920761928525465569652634283684085946426272060692158419916259561059652236058246048249386799806649121873585408072943491027126850699742857762370245662594349139533413873096177094268384892759
+	denominator = int_power(2, 1217 - exponent)
+	n = { product + denominator / 2 } / denominator
+	rem = product - n * denominator
+	negative = rem < 0
+	magnitude = { negative } |> {
+		True  -> -rem
+		False -> rem
+	}
+	fbits = ratio_bits(magnitude, denominator) |> {
+		Ok(b)    -> b
+		Error(_) -> panic("trig: fractional reduction overflow")
+	}
+	f = core.float_from_bits(fbits)
+	// Recover the signed tail of the fraction after rounding the leading word.
+	fb = core.float_to_bits(f)
+	fe = fb / mantissa_unit - 1023 - 52
+	fm = fb % mantissa_unit + mantissa_unit
+	shift = 1217 - exponent + fe
+	represented = { shift >= 0 } |> {
+		True  -> fm * int_power(2, shift)
+		False -> fm / int_power(2, -shift)
+	}
+	tail = magnitude - represented
+	tail_negative = tail < 0
+	tail_magnitude = { tail_negative } |> {
+		True  -> -tail
+		False -> tail
+	}
+	ft = { tail_magnitude == 0 } |> {
+		True -> 0.0
+		False -> {
+			tb = ratio_bits(tail_magnitude, denominator) |> {
+				Ok(b)    -> b
+				Error(_) -> panic("trig: tail overflow")
+			}
+			core.float_from_bits(tb)
+		}
+	}
+	ft = { tail_negative } |> {
+		True  -> -.ft
+		False -> ft
+	}
+	f = { negative } |> {
+		True  -> -.f
+		False -> f
+	}
+	ft = { negative } |> {
+		True  -> -.ft
+		False -> ft
+	}
+	hi = f *. 1.5707963267948966
+	fh = without_low(f)
+	fl = f -. fh
+	lo = { fh *. 1.5707963267341256 -. hi } +.
+		fl *. 1.5707963267341256 +.
+		f *. 6.077100506506192e-11 +.
+		ft *. 1.5707963267948966
+	(n % 4, hi, lo)
+}
+
+// SunPro fdlibm kernels, via musl __sin.c and __cos.c.
+// Copyright (C) 1993 Sun Microsystems, Inc. All rights reserved.
+// Developed at SunSoft, a Sun Microsystems, Inc. business.
+// Permission to use, copy, modify, and distribute this software is freely
+// granted, provided that this notice is preserved.
+trig_sin = (x: Float, y: Float) -> Float {
+	z = x *. x
+	w = z *. z
+	r = 8.33333333332248946124e-3 +.
+		z *. {
+			-.1.98412698298579493134e-4 +. z *. 2.75573137070700676789e-6
+		} +.
+		z *. w *. {
+			-.2.50507602534068634195e-8 +. z *. 1.58969099521155010221e-10
+		}
+	v = z *. x
+	x -. {
+		z *. { 0.5 *. y -. v *. r } -. y -. v *. -.1.66666666666666324348e-1
+	}
+}
+
+trig_cos = (x: Float, y: Float) -> Float {
+	z = x *. x
+	w = z *. z
+	r = z *. {
+		4.16666666666666019037e-2 +. z *. {
+			-.1.38888888888741095749e-3 +. z *. 2.48015872894767294178e-5
+		}
+	} +.
+		w *. w *. {
+			-.2.75573143513906633035e-7 +. z *. {
+				2.08757232129817482790e-9 +. z *. -.1.13596475577881948265e-11
+			}
+		}
+	hz = 0.5 *. z
+	a = 1.0 -. hz
+	a +. { { 1.0 -. a -. hz } +. { z *. r -. x *. y } }
+}
+
+/// Sine of an angle in radians.
+sin = (x: Float) -> Float {
+	a = abs(x)
+	{ a <. 0.7853981633974483 } |> {
+		True -> { a <. 1.4901161193847656e-8 } |> {
+			True  -> x
+			False -> trig_sin(x, 0.0)
+		}
+		False -> {
+			(n, hi, lo) = trig_reduce(a)
+			v = n |> {
+				0 -> trig_sin(hi, lo)
+				1 -> trig_cos(hi, lo)
+				2 -> -.trig_sin(hi, lo)
+				_ -> -.trig_cos(hi, lo)
+			}
+			{ sign_bit(x) } |> {
+				True  -> -.v
+				False -> v
+			}
+		}
+	}
+}
+
+/// Cosine of an angle in radians.
+cos = (x: Float) -> Float {
+	a = abs(x)
+	{ a <. 0.7853981633974483 } |> {
+		True -> trig_cos(a, 0.0)
+		False -> {
+			(n, hi, lo) = trig_reduce(a)
+			n |> {
+				0 -> trig_cos(hi, lo)
+				1 -> -.trig_sin(hi, lo)
+				2 -> -.trig_cos(hi, lo)
+				_ -> trig_sin(hi, lo)
+			}
+		}
+	}
+}
+
+// SunPro fdlibm tangent kernel, via musl __tan.c.
+// Copyright 2004 Sun Microsystems, Inc. All rights reserved.
+// Permission to use, copy, modify, and distribute this software is freely
+// granted, provided that this notice is preserved.
+trig_tan = (input: Float, tail: Float, odd: Bool) -> Float {
+	big = abs(input) >=. 0.6744
+	negative = sign_bit(input)
+	(x, y) = { big } |> {
+		True -> {
+			a = abs(input)
+			b = { negative } |> {
+				True  -> -.tail
+				False -> tail
+			}
+			(0.7853981633974483 -. a +. { 3.061616997868383e-17 -. b }, 0.0)
+		}
+		False -> (input, tail)
+	}
+	z = x *. x
+	w = z *. z
+	r = 1.33333333333201242699e-1 +. w *. {
+		2.18694882948595424599e-2 +. w *. {
+			3.59207910759131235356e-3 +. w *. {
+				5.88041240820264096874e-4 +. w *. {
+					7.81794442939557092300e-5 +.
+						w *. -.1.85586374855275456654e-5
+				}
+			}
+		}
+	}
+	v = z *. {
+		5.39682539762260521377e-2 +. w *. {
+			8.86323982359930005737e-3 +. w *. {
+				1.45620945432529025516e-3 +. w *. {
+					2.46463134818469906812e-4 +. w *. {
+						7.14072491382608190305e-5 +.
+							w *. 2.59073051863633712884e-5
+					}
+				}
+			}
+		}
+	}
+	s = z *. x
+	r = y +. z *. { s *. { r +. v } +. y } +. s *. 3.33333333333334091986e-1
+	w = x +. r
+	{ big } |> {
+		True -> {
+			s = { odd } |> {
+				True  -> -.1.0
+				False -> 1.0
+			}
+			v = s -. 2.0 *. { x +. { r -. w *. w /. { w +. s } } }
+			{ negative } |> {
+				True  -> -.v
+				False -> v
+			}
+		}
+		False -> { odd } |> {
+			False -> w
+			True -> {
+				w0 = without_low(w)
+				v = r -. { w0 -. x }
+				a = -.1.0 /. w
+				a0 = without_low(a)
+				a0 +. a *. { 1.0 +. a0 *. w0 +. a0 *. v }
+			}
+		}
+	}
+}
+
+/// Tangent of an angle in radians.
+tan = (x: Float) -> Result(Float, Nil) {
+	a = abs(x)
+	{ a <. 0.7853981633974483 } |> {
+		True -> { a <. 1.4901161193847656e-8 } |> {
+			True  -> Ok(x)
+			False -> Ok(trig_tan(x, 0.0, False))
+		}
+		False -> {
+			(n, hi, lo) = trig_reduce(a)
+			odd = n % 2 == 1
+			{ odd && abs(hi +. lo) <=. 5.562684646268003e-309 } |> {
+				True -> Error(Nil)
+				False -> {
+					v = trig_tan(hi, lo, odd)
+					Ok({ sign_bit(x) } |> {
+						True  -> -.v
+						False -> v
+					})
+				}
 			}
 		}
 	}

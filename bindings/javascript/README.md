@@ -245,3 +245,18 @@ or unhandled rejections for these failures. Cancellation callbacks revoke work
 synchronously; register independent asynchronous cleanup with `cleanupJob()`.
 If a cancellation callback nevertheless returns a Promise, its rejection is
 observed and recorded when it settles, without delaying synchronous revocation.
+
+## Standard services on Node
+
+Pass `standardServices: true` to `instantiate` to supply the standard clock,
+stdio, filesystem, networking, process, TLS, arguments, environment, working
+ directory and entropy services. Individual `imports` or `contextImports`
+registrations override these defaults. Pass `{ args: [...] }` as the option to
+set the arguments exposed to an i program. Browser clock and console output are
+available; filesystem, networking, process and TLS report `unsupported`.
+
+Run a compiled entry on Node with:
+
+```sh
+node bindings/javascript/run.mjs path/to/program.wasm -- arg1 arg2
+```
