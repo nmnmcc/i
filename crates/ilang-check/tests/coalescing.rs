@@ -35,16 +35,16 @@ fn local_scheme_is_shown_without_an_entry() {
     // §4.7: the finite principal scheme may not disappear from --types.
     let source = "S(N) { S(() -> Nil ! N) }
 use(N) = (s ! S(N)) { S(f) = s f() }
-main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
+helper(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::query::check_for_queries(&graph);
-    common::expect_unused(&checked.diags, &["main"]);
+    common::expect_unused(&checked.diags, &["helper"]);
     let program = checked.program.unwrap();
     let types = checked.types.unwrap();
     assert!(
         types
             .lines(&program, common::module(&program, "app/main"))
-            .contains(&"app/main.main : () -> Nil ! N | S(N)".to_string())
+            .contains(&"app/main.helper : () -> Nil ! N | S(N)".to_string())
     );
     let query = ilang_check::query::Query::new(&graph, &program, Some(&types));
     let module = common::module(&program, "app/main");

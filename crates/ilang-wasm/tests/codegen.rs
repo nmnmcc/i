@@ -57,6 +57,22 @@ fn wasm(source: &str) -> Result<Vec<u8>, Error> {
     )
 }
 
+#[test]
+fn metered_macro_program_is_valid_wasm() {
+    let (graph, c, _dir) = checked(
+        "loop = (n) { n |> { 0 -> [\"x\"] _ -> [\"x\", ..loop(n - 1)] } }\n@main\nmain = () { loop(3) }\n",
+    );
+    let (wasm, _) = ilang_wasm::compile_macro(
+        &graph,
+        c.program.as_ref().unwrap(),
+        c.types.as_ref().unwrap(),
+        Options::default(),
+    )
+    .unwrap();
+    ilang_wasm::validate(&wasm).unwrap();
+    assert!(!wat("@main\nmain = () { Nil }\n").contains("ilang:macro/budget/v1"));
+}
+
 /// The text of the function with this comment line.
 fn function<'a>(wat: &'a str, name: &str) -> &'a str {
     let start = wat.find(&format!(";; {name}\n")).expect("the function");
