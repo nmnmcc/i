@@ -157,3 +157,539 @@ json_generated_strings = () {
 		assert(json.parse(json.pretty(value, 2)) == Ok(value))
 	}, core.inspect)
 }
+
+@test
+json_valid_0 = () {
+	Ok(v) = json.parse(" null ")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_1 = () {
+	Ok(v) = json.parse("true")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_2 = () {
+	Ok(v) = json.parse("false")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_3 = () {
+	Ok(v) = json.parse("-0")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_4 = () {
+	Ok(v) = json.parse("10")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_5 = () {
+	Ok(v) = json.parse("-12")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_6 = () {
+	Ok(v) = json.parse("0.0")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_7 = () {
+	Ok(v) = json.parse("-0.1")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_8 = () {
+	Ok(v) = json.parse("12.34")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_9 = () {
+	Ok(v) = json.parse("1E+2")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_10 = () {
+	Ok(v) = json.parse("1e-2")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_11 = () {
+	Ok(v) = json.parse("[ ]")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_12 = () {
+	Ok(v) = json.parse("{ }")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_13 = () {
+	Ok(v) = json.parse("[1,2,3]")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_14 = () {
+	Ok(v) = json.parse("[[],{}]")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_15 = () {
+	Ok(v) = json.parse("{\"x\":true}")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_16 = () {
+	Ok(v) = json.parse("{\"x\":1,\"x\":2}")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_17 = () {
+	Ok(v) = json.parse("\"\"")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_18 = () {
+	Ok(v) = json.parse("\"/\"")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_19 = () {
+	Ok(v) = json.parse("\"\\/\"")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_20 = () {
+	Ok(v) = json.parse("\"\\\\\"")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_21 = () {
+	Ok(v) = json.parse("\"\\\"\"")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_22 = () {
+	Ok(v) = json.parse("\"\\b\\f\\n\\r\\t\"")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_23 = () {
+	Ok(v) = json.parse("\"\\u0000\"")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_24 = () {
+	Ok(v) = json.parse("\"\\u00e9\"")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_25 = () {
+	Ok(v) = json.parse("\"\\uD834\\uDD1E\"")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_26 = () {
+	Ok(v) = json.parse("\"你好\"")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_27 = () {
+	Ok(v) = json.parse("[true,false,null]")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_28 = () {
+	Ok(v) = json.parse(" { \"a\" : [1] } ")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_29 = () {
+	Ok(v) = json.parse("[\"a\",\"b\"]")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_valid_30 = () {
+	Ok(v) = json.parse("{\"a\":{},\"b\":[]}")
+	assert(json.parse(json.print(v)) == Ok(v))
+}
+
+@test
+json_invalid_0 = () {
+	assert(json.parse("") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_1 = () {
+	assert(json.parse(" ") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_2 = () {
+	assert(json.parse("Null") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_3 = () {
+	assert(json.parse("TRUE") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_4 = () {
+	assert(json.parse("undefined") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_5 = () {
+	assert(json.parse("nan") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_6 = () {
+	assert(json.parse("-") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_7 = () {
+	assert(json.parse("+1") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_8 = () {
+	assert(json.parse("00") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_9 = () {
+	assert(json.parse("01") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_10 = () {
+	assert(json.parse("-01") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_11 = () {
+	assert(json.parse(".1") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_12 = () {
+	assert(json.parse("1.") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_13 = () {
+	assert(json.parse("1e") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_14 = () {
+	assert(json.parse("1e+") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_15 = () {
+	assert(json.parse("1e-") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_16 = () {
+	assert(json.parse("[") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_17 = () {
+	assert(json.parse("]") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_18 = () {
+	assert(json.parse("[1") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_19 = () {
+	assert(json.parse("[1,]") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_20 = () {
+	assert(json.parse("[,1]") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_21 = () {
+	assert(json.parse("[1 2]") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_22 = () {
+	assert(json.parse("{") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_23 = () {
+	assert(json.parse("}") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_24 = () {
+	assert(json.parse("{,}") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_25 = () {
+	assert(json.parse("{\"a\"}") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_26 = () {
+	assert(json.parse("{\"a\":}") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_27 = () {
+	assert(json.parse("{\"a\":1,}") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_28 = () {
+	assert(json.parse("{a:1}") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_29 = () {
+	assert(json.parse("{\"a\" 1}") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_30 = () {
+	assert(json.parse("\"") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_31 = () {
+	assert(json.parse("\"\\\"") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_32 = () {
+	assert(json.parse("\"\\x\"") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_33 = () {
+	assert(json.parse("\"\\u12\"") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_34 = () {
+	assert(json.parse("\"\\uZZZZ\"") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_35 = () {
+	assert(json.parse("\"\\uD800\"") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_36 = () {
+	assert(json.parse("\"\\uDC00\"") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_37 = () {
+	assert(json.parse("\"\\uD800\\u0041\"") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_38 = () {
+	assert(json.parse("true false") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_39 = () {
+	assert(json.parse("nullx") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_40 = () {
+	assert(json.parse("{}[]") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_invalid_41 = () {
+	assert(json.parse("\"a\n\"") |> {
+		Error(_) -> True
+		_        -> False
+	})
+}
+
+@test
+json_float_overflow = () {
+	assert(
+		json.parse("1e400") == Error(json.JsonError(0, "number out of range"))
+	)
+}
+
+@test
+json_arbitrary_integer = () {
+	text = "12345678901234567890123456789012345678901234567890"
+	Ok(value) = json.parse(text)
+	assert(json.print(value) == text)
+}

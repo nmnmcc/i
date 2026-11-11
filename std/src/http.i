@@ -21,7 +21,10 @@
 	response
 	feed_request
 	feed_response
+	feed_response_for
+	feed_request_limit
 	header
+	header_bytes
 	headers
 	add_header
 	serialize_request
@@ -56,6 +59,7 @@ Status {
 
 Headers {
 	Headers(List((String, String)))
+	RawHeaders(List((String, BitArray)))
 }
 
 Request {
@@ -99,30 +103,70 @@ response = (status: Status) -> Response {
 }
 
 header = (hs: Headers, name: String) -> Option(String) {
-	Headers(xs) = hs
-	list.find_map(xs, (pair) {
-		(k, v) = pair
-		{ lowercase(k) == lowercase(name) } |> {
-			True  -> Some(v)
-			False -> None
+	hs |> {
+		RawHeaders(_) -> header_bytes(hs, name) |> {
+			Some(value) -> bit_array.to_string(value) |> {
+				Ok(text) -> Some(text)
+				Error(_) -> None
+			}
+			None -> None
 		}
-	})
+		Headers(xs) -> list.find_map(xs, (pair) {
+			(k, v) = pair
+			{ lowercase(k) == lowercase(name) } |> {
+				True  -> Some(v)
+				False -> None
+			}
+		})
+	}
+}
+
+header_bytes = (hs: Headers, name: String) -> Option(BitArray) {
+	hs |> {
+		Headers(xs) -> list.find_map(xs, (pair) {
+			(k, v) = pair
+			{ lowercase(k) == lowercase(name) } |> {
+				True  -> Some(<<v:utf8>>)
+				False -> None
+			}
+		})
+		RawHeaders(xs) -> list.find_map(xs, (pair) {
+			(k, v) = pair
+			{ lowercase(k) == lowercase(name) } |> {
+				True  -> Some(v)
+				False -> None
+			}
+		})
+	}
 }
 
 headers = (hs: Headers, name: String) -> List(String) {
-	Headers(xs) = hs
-	list.map(list.filter(xs, (pair) {
-		(k, _) = pair
-		lowercase(k) == lowercase(name)
-	}), (pair) {
-		(_, v) = pair
-		v
-	})
+	hs |> {
+		RawHeaders(xs) -> list.filter_map(xs, (pair) {
+			(k, v) = pair
+			{ lowercase(k) == lowercase(name) } |> {
+				True -> bit_array.to_string(v) |> {
+					Ok(value) -> Some(value)
+					Error(_)  -> None
+				}
+				False -> None
+			}
+		})
+		Headers(xs) -> list.map(list.filter(xs, (pair) {
+			(k, _) = pair
+			lowercase(k) == lowercase(name)
+		}), (pair) {
+			(_, v) = pair
+			v
+		})
+	}
 }
 
 add_header = (hs: Headers, name: String, value: String) -> Headers {
-	Headers(xs) = hs
-	Headers(list.append(xs, [(name, value)]))
+	hs |> {
+		Headers(xs)    -> Headers(list.append(xs, [(name, value)]))
+		RawHeaders(xs) -> RawHeaders(list.append(xs, [(name, <<value:utf8>>)]))
+	}
 }
 
 parse_query = (
@@ -151,6 +195,58 @@ feed_response = (buffer: BitArray, bytes: BitArray) -> Progress(Response) {
 	}
 }
 
+/// Parse a response with its request method and whether the connection ended.
+feed_response_for = (
+	buffer: BitArray
+	bytes: BitArray
+	method: Method
+	eof: Bool
+	head_limit: Int
+) -> Progress(Response) {
+	input = bit_array.concat([buffer, bytes])
+	fail.catch(() {
+		check_head(octets(input), head_limit)
+		parse_response_for(octets(input), method, eof)
+	}) |> {
+		Ok((message, rest))    -> Complete(message, bits(rest))
+		Error(NeedMore)        -> More(input)
+		Error(BadMessage(why)) -> Invalid(why)
+	}
+}
+
+feed_request_limit = (
+	buffer: BitArray
+	bytes: BitArray
+	head_limit: Int
+) -> Progress(Request) {
+	input = bit_array.concat([buffer, bytes])
+	fail.catch(() {
+		check_head(octets(input), head_limit)
+		parse_request(octets(input))
+	}) |> {
+		Ok((message, rest))    -> Complete(message, bits(rest))
+		Error(NeedMore)        -> More(input)
+		Error(BadMessage(why)) -> Invalid(why)
+	}
+}
+
+check_head = (xs: List(Int), limit: Int) -> Nil ? HttpError {
+	go = (rest: List(Int), count: Int) -> Nil ? HttpError {
+		{ count > limit } |> {
+			True -> fail.raise(BadMessage("head too large"))
+			False -> rest |> {
+				[13, 10, 13, 10, .._] -> require(
+					count + 4 <= limit
+					"head too large"
+				)
+				[_, ..tail] -> go(tail, count + 1)
+				[]          -> Nil
+			}
+		}
+	}
+	go(xs, 0)
+}
+
 parse_request = (xs: List(Int)) -> (Request, List(Int)) ? HttpError {
 	(line, rest) = line(xs)
 	parts = string.split(text(line), " ")
@@ -175,6 +271,14 @@ parse_request = (xs: List(Int)) -> (Request, List(Int)) ? HttpError {
 }
 
 parse_response = (xs: List(Int)) -> (Response, List(Int)) ? HttpError {
+	parse_response_for(xs, Method("GET"), True)
+}
+
+parse_response_for = (
+	xs: List(Int)
+	method: Method
+	eof: Bool
+) -> (Response, List(Int)) ? HttpError {
 	(first, rest) = line(xs)
 	raw = first |> {
 		[72, 84, 84, 80, 47, 49, 46, 49, 32, a, b, c, 32, ..phrase] ? digit(
@@ -187,21 +291,38 @@ parse_response = (xs: List(Int)) -> (Response, List(Int)) ? HttpError {
 	(a, b, c, phrase) = raw
 	require(list.all(phrase, field_value), "invalid reason phrase")
 	(hs, after) = read_headers(rest, [])
+	validate_framing(hs)
 	code = { a - 48 } * 100 + { b - 48 } * 10 + c - 48
-	(body, trailers, tail) = { code < 200 || code == 204 || code == 304 } |> {
-		True  -> (<<>>, Headers([]), after)
-		False -> read_body(hs, after)
+	Method(verb) = method
+	(body, trailers, tail) = {
+		verb == "HEAD" ||
+			code < 200 ||
+			code == 204 ||
+			code == 304 ||
+			verb == "CONNECT" && code >= 200 && code < 300
+	} |> {
+		True -> (<<>>, Headers([]), after)
+		False -> {
+			headers(hs, "content-length") == [] &&
+				headers(hs, "transfer-encoding") == []
+		} |> {
+			True -> eof |> {
+				True  -> (bits(after), Headers([]), [])
+				False -> fail.raise(NeedMore)
+			}
+			False -> read_body(hs, after)
+		}
 	}
 	(Response(Status(code), text(phrase), hs, body, trailers), tail)
 }
 
 read_headers = (
 	xs: List(Int)
-	acc: List((String, String))
+	acc: List((String, BitArray))
 ) -> (Headers, List(Int)) ? HttpError {
 	(head, rest) = line(xs)
 	head |> {
-		[] -> (Headers(list.reverse(acc)), rest)
+		[] -> (make_headers(list.reverse(acc)), rest)
 		_ -> {
 			(name, value, found) = cut(head, 58)
 			require(
@@ -209,40 +330,74 @@ read_headers = (
 				"invalid header name"
 			)
 			require(list.all(value, field_value), "invalid header value")
-			read_headers(rest, [(text(name), text(trim(value))), ..acc])
+			read_headers(rest, [(text(name), bits(trim(value))), ..acc])
 		}
 	}
+}
+
+make_headers = (xs: List((String, BitArray))) -> Headers {
+	values = list.map(xs, (pair) {
+		(name, value) = pair
+		bit_array.to_string(value) |> {
+			Ok(text) -> Some((name, text))
+			Error(_) -> None
+		}
+	})
+	{ list.all(values, (x) { x != None }) } |> {
+		True  -> Headers(list.filter_map(values, (x) { x }))
+		False -> RawHeaders(xs)
+	}
+}
+
+text_unchecked = (xs: List(Int)) -> String {
+	bit_array.to_string(bits(xs)) |> {
+		Ok(value) -> value
+		Error(_)  -> panic("http: invalid internal text")
+	}
+}
+
+validate_framing = (hs: Headers) -> Nil ? HttpError {
+	length = header_bytes(hs, "content-length")
+	transfer = header_bytes(hs, "transfer-encoding")
+	require(
+		length == None || transfer == None
+		"both content-length and transfer-encoding"
+	)
+	require(
+		length == None || header(hs, "content-length") != None
+		"invalid content-length"
+	)
+	require(
+		transfer == None || header(hs, "transfer-encoding") != None
+		"invalid transfer-encoding"
+	)
 }
 
 read_body = (
 	hs: Headers
 	xs: List(Int)
 ) -> (BitArray, Headers, List(Int)) ? HttpError {
-	lengths = headers(hs, "content-length")
+	validate_framing(hs)
+	lengths = list.concat(list.map(headers(hs, "content-length"), (value) {
+		list.map(string.split(value, ","), (part) {
+			text_unchecked(trim(octets(<<part:utf8>>)))
+		})
+	}))
 	transfers = headers(hs, "transfer-encoding")
-	require(
-		lengths == [] || transfers == []
-		"both content-length and transfer-encoding"
-	)
 	transfers |> {
 		[] -> lengths |> {
 			[] -> (<<>>, Headers([]), xs)
-			[n] -> {
-				raw = octets(<<n:utf8>>)
-				require(
-					raw != [] && list.all(raw, digit)
-					"invalid content-length"
-				)
-				int.parse(n) |> {
-					Ok(size) -> {
-						require(size >= 0, "invalid content-length")
-						(part, rest) = take(xs, size, [])
-						(bits(part), Headers([]), rest)
-					}
-					Error(_) -> fail.raise(BadMessage("invalid content-length"))
-				}
+			[n, ..others] -> {
+				size = parse_length(n)
+				list.each(others, (value) {
+					require(
+						parse_length(value) == size
+						"differing content-length"
+					)
+				})
+				(part, rest) = take(xs, size, [])
+				(bits(part), Headers([]), rest)
 			}
-			_ -> fail.raise(BadMessage("repeated content-length"))
 		}
 		[encoding] -> {
 			require(
@@ -255,12 +410,26 @@ read_body = (
 	}
 }
 
+parse_length = (value: String) -> Int ? HttpError {
+	raw = octets(<<value:utf8>>)
+	require(raw != [] && list.all(raw, digit), "invalid content-length")
+	int.parse(value) |> {
+		Ok(size) -> size
+		Error(_) -> fail.raise(BadMessage("invalid content-length"))
+	}
+}
+
 chunks = (
 	xs: List(Int)
 	acc: List(BitArray)
 ) -> (BitArray, Headers, List(Int)) ? HttpError {
 	(size_line, rest) = line(xs)
-	(size_bytes, _, _) = cut(size_line, 59)
+	(size_raw, extension, has_extension) = cut(size_line, 59)
+	size_bytes = trim(size_raw)
+	{ has_extension } |> {
+		True  -> validate_extensions(extension)
+		False -> Nil
+	}
 	require(
 		size_bytes != [] && list.all(size_bytes, (x) { hex(x) >= 0 })
 		"invalid chunk size"
@@ -270,6 +439,12 @@ chunks = (
 	{ size == 0 } |> {
 		True -> {
 			(trailers, tail) = read_headers(rest, [])
+			require(
+				header_bytes(trailers, "content-length") == None &&
+					header_bytes(trailers, "transfer-encoding") == None &&
+					header_bytes(trailers, "host") == None
+				"invalid trailer field"
+			)
 			(bit_array.concat(list.reverse(acc)), trailers, tail)
 		}
 		False -> {
@@ -281,6 +456,49 @@ chunks = (
 				_                 -> fail.raise(BadMessage("invalid chunk terminator"))
 			}
 		}
+	}
+}
+
+token_prefix = (xs: List(Int), acc: List(Int)) -> (List(Int), List(Int)) {
+	xs |> {
+		[x, ..tail] ? token(x) -> token_prefix(tail, [x, ..acc])
+		_                      -> (list.reverse(acc), xs)
+	}
+}
+
+validate_extensions = (xs: List(Int)) -> Nil ? HttpError {
+	(name, after_name) = token_prefix(list.drop_while(xs, space), [])
+	rest = list.drop_while(after_name, space)
+	require(name != [], "invalid chunk extension")
+	rest |> {
+		[]           -> Nil
+		[59, ..tail] -> validate_extensions(tail)
+		[61, ..raw] -> {
+			tail = list.drop_while(raw, space)
+			after_value = tail |> {
+				[34, ..quoted] -> extension_quoted(quoted)
+				_ -> {
+					(value, remaining) = token_prefix(tail, [])
+					require(value != [], "invalid chunk extension")
+					remaining
+				}
+			}
+			list.drop_while(after_value, space) |> {
+				[]           -> Nil
+				[59, ..next] -> validate_extensions(next)
+				_            -> fail.raise(BadMessage("invalid chunk extension"))
+			}
+		}
+		_ -> fail.raise(BadMessage("invalid chunk extension"))
+	}
+}
+
+extension_quoted = (xs: List(Int)) -> List(Int) ? HttpError {
+	xs |> {
+		[34, ..tail]                            -> tail
+		[92, x, ..tail] ? field_value(x)        -> extension_quoted(tail)
+		[x, ..tail] ? field_value(x) && x != 92 -> extension_quoted(tail)
+		_                                       -> fail.raise(BadMessage("invalid chunk extension"))
 	}
 }
 
@@ -417,7 +635,7 @@ serialize = (
 	body: BitArray
 	trailers: Headers
 ) -> BitArray {
-	Headers(xs) = hs
+	xs = raw_pairs(hs)
 	chunked = header(hs, "transfer-encoding") |> {
 		Some(v) -> lowercase(v) == "chunked"
 		None    -> False
@@ -429,22 +647,20 @@ serialize = (
 	} |> {
 		True -> list.append(
 			xs
-			[("Content-Length", int.to_string(bit_array.bit_size(body) / 8))]
+			[
+				(
+					"Content-Length"
+					<<int.to_string(bit_array.bit_size(body) / 8):utf8>>
+				)
+			]
 		)
 		False -> xs
 	}
-	lines = string.concat(list.map(with_length, (pair) {
-		(k, v) = pair
-		string.concat([k, ": ", v, "\r\n"])
-	}))
+	lines = header_lines(with_length)
 	data = chunked |> {
 		False -> body
 		True -> {
-			Headers(ts) = trailers
-			end = string.concat(list.map(ts, (pair) {
-				(k, v) = pair
-				string.concat([k, ": ", v, "\r\n"])
-			}))
+			end = header_lines(raw_pairs(trailers))
 			prefix = { bit_array.bit_size(body) == 0 } |> {
 				True -> <<>>
 				False -> bit_array.concat([
@@ -454,15 +670,27 @@ serialize = (
 					<<"\r\n":utf8>>
 				])
 			}
-			bit_array.concat([
-				prefix
-				<<"0\r\n":utf8>>
-				<<end:utf8>>
-				<<"\r\n":utf8>>
-			])
+			bit_array.concat([prefix, <<"0\r\n":utf8>>, end, <<"\r\n":utf8>>])
 		}
 	}
-	bit_array.concat([<<first:utf8>>, <<lines:utf8>>, <<"\r\n":utf8>>, data])
+	bit_array.concat([<<first:utf8>>, lines, <<"\r\n":utf8>>, data])
+}
+
+raw_pairs = (hs: Headers) -> List((String, BitArray)) {
+	hs |> {
+		Headers(xs) -> list.map(xs, (pair) {
+			(k, v) = pair
+			(k, <<v:utf8>>)
+		})
+		RawHeaders(xs) -> xs
+	}
+}
+
+header_lines = (xs: List((String, BitArray))) -> BitArray {
+	bit_array.concat(list.map(xs, (pair) {
+		(k, v) = pair
+		bit_array.concat([<<k:utf8>>, <<": ":utf8>>, v, <<"\r\n":utf8>>])
+	}))
 }
 
 reason = (status: Int) -> String {
