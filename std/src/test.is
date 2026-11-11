@@ -2,15 +2,15 @@
 (, tests test skip only fails suite each)
 (= tests Nil)
 (= text (-> (x) _ (| ((. syntax node) x) { (-> ((. syntax Text) s) s) (-> _ (panic "test name must be a string literal")) })))
-(= entry (-> (name body mode (! items (. syntax Items))) _ {
+(= _entry (-> (name body mode (! items (. syntax Items))) _ {
   (= target `generated_test)
   ((. items add) `tests target [(, "name" (text name)) (, "mode" mode)] name)
   `(= ~target (-> () _ { (~body) }))
 }))
-(@ macro (= test (-> (name body (! items (. syntax Items))) _ (entry name body "test"))))
-(@ macro (= skip (-> (name body (! items (. syntax Items))) _ (entry name body "skip"))))
-(@ macro (= only (-> (name body (! items (. syntax Items))) _ (entry name body "only"))))
-(@ macro (= fails (-> (name body (! items (. syntax Items))) _ (entry name body "fails"))))
+(@ macro (= test (-> (name body (! items (. syntax Items))) _ (_entry name body "test"))))
+(@ macro (= skip (-> (name body (! items (. syntax Items))) _ (_entry name body "skip"))))
+(@ macro (= only (-> (name body (! items (. syntax Items))) _ (_entry name body "only"))))
+(@ macro (= fails (-> (name body (! items (. syntax Items))) _ (_entry name body "fails"))))
 
 (= append (-> (xs ys) _ (| xs { (-> [] ys) (-> [x ..rest] [x ..(append rest ys)]) })))
 (= suite_items (-> (prefix statements env) _

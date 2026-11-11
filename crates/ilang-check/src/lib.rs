@@ -175,9 +175,18 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
 /// when a module has a syntax error, so that one mistake is not reported
 /// many times.
 pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagnostic>) {
-    let (parsed, diags) = parse(graph);
+    let (mut parsed, diags) = parse(graph);
     if diags.iter().any(Diagnostic::is_error) {
         return (None, diags);
+    }
+    // Direct checking resolves quotes in the same form as the expansion driver.
+    let mut templates = Vec::new();
+    for module in &mut parsed {
+        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+            &mut module.ast,
+            module.source.0,
+            &mut templates,
+        );
     }
     let (program, more) = resolve_parsed(graph, &parsed);
     (program, diags.into_iter().chain(more).collect())
