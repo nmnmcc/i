@@ -1579,3 +1579,29 @@ fn cli_retries_definition_queries_after_later_item_macros() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+#[test]
+fn cli_macro_stop_reports_call_site_and_template() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, bomb)\n(@ macro (= bomb (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(panic \"boom\"))))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nmain = () { m.bomb(1) }\n",
+    )
+    .unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("boom")
+            && stderr.contains("app/main:2:13")
+            && stderr.contains("expanded from app/macros:3:"),
+        "{stderr}"
+    );
+}
