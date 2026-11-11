@@ -127,6 +127,8 @@ the checker must infer. These building blocks have unrelated uses:
 | sequence | Breadth-first work queue; editor history pieces; indexed query results with concatenation. |
 | path | Package paths; archive entry names; filesystem paths passed later to IO. |
 | uri | Document links; service endpoint configuration; HTTP request targets and redirects. |
+| json | Structured interchange; configuration; HTTP payloads. |
+| http | Message framing; request construction; response inspection. |
 
 ## 3. `std/stream`
 
