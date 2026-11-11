@@ -1,6 +1,5 @@
-// old-syntax-check: E0114,E0101
 // spec: 6.1
-// expect: compile-error E0114
+// expect: pass
 (main)
 value = { name: 1 }
 

@@ -27,7 +27,8 @@ fn render(src: &str) -> String {
     }
     if diags.is_empty() {
         assert_eq!(ilang_syntax::print::unprintable(&module), None);
-        let (again, diags2) = parse(&print_module(&module));
+        let printed = print_module(&module);
+        let (again, diags2) = parse(&printed);
         assert!(
             diags2.is_empty(),
             "the print does not parse: {diags2:?}\n{out}"

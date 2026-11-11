@@ -967,7 +967,7 @@ impl Printer {
     ) {
         self.ty_in(ret, 1, tail && err.is_none() && env.is_none());
         if let Some(err) = err {
-            self.w(" ? ");
+            self.w(" ^ ");
             self.ty_in(err, 1, tail && env.is_none());
         }
         if let Some(env) = env {

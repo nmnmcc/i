@@ -13,7 +13,7 @@ make : (n: Int) -> Cat
 from_call : () -> Int
 from_update : (c: Cat) -> Int
 local_call : (c: Cat | Dog) -> String
-apply : (f: (Cat | Dog) -> (name: A) ? E ! N, c: Cat | Dog) -> A ? E ! N
+apply : (f: (Cat | Dog) -> (name: A) ^ E ! N, c: Cat | Dog) -> A ^ E ! N
 each : (xs: List(A), f: (A) -> B) -> List(B)
 checked : (rocks: List(Rock)) -> List(Int)
 wrong : (rocks: List(Rock)) -> List(Int)

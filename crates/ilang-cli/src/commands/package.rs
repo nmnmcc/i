@@ -159,7 +159,6 @@ fn main_module(name: &str) -> String {
 /// The greeting for `who`.
 greeting = (who: String) -> String {{ "Hello, " <> who <> "!" }}
 
-@main
 main = (io ! Io) {{
   io.print(greeting("{name}"))
 }}

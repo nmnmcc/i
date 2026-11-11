@@ -130,7 +130,17 @@ pub fn load(project: &Path, tests: bool, offline: bool) -> (PackageGraph, Vec<Di
 
 /// Loads, checks, and compiles the package in `project`.
 pub fn build(project: &Path, options: BuildOptions) -> Result<Built, BuildError> {
-    let (graph, mut diags) = load(project, options.tests, options.offline);
+    build_entry(project, options, None)
+}
+
+/// Build one named manifest entry, or the default source entry.
+pub fn build_entry(
+    project: &Path,
+    options: BuildOptions,
+    entry: Option<&str>,
+) -> Result<Built, BuildError> {
+    let (mut graph, mut diags) = load(project, options.tests, options.offline);
+    graph.entry = entry.map(str::to_owned);
     let Some(root) = graph.root else {
         return Err(program_error(&graph, &diags));
     };

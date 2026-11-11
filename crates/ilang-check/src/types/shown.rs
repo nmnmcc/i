@@ -189,7 +189,7 @@ impl ShownType {
                     p.write(0, out, n);
                 }
                 out.push_str(") -> ");
-                // A function type followed by `?` or `!` is put in `{ }`.
+                // A function type followed by `^` or `!` is put in `{ }`.
                 let part = |x: &ShownType, followed: bool, out: &mut String, n: &mut Names| {
                     let braces = followed && matches!(x, ShownType::Fn(_));
                     if braces {
@@ -202,7 +202,7 @@ impl ShownType {
                 };
                 part(&f.ret, f.err.is_some() || f.env.is_some(), out, n);
                 if let Some(e) = &f.err {
-                    out.push_str(" ? ");
+                    out.push_str(" ^ ");
                     part(e, f.env.is_some(), out, n);
                 }
                 if let Some(e) = &f.env {
