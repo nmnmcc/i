@@ -1464,3 +1464,52 @@ fn show_as_accepts_expressions_already_written_in_normal_surface() {
     }
     assert!(checked >= 50, "only {checked} source expressions parsed");
 }
+
+#[test]
+fn show_as_deep_expression_uses_bounded_host_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let like = root("x");
+            let head = Syntax::make(Node::Name("f".into()), &like).unwrap();
+            for depth in [1000, 10000] {
+                let mut tree = like.clone();
+                for _ in 0..depth {
+                    tree = Syntax::make(Node::Round(vec![head.clone(), tree]), &like).unwrap();
+                }
+                let expected = format!("{}x{}", "f(".repeat(depth), ")".repeat(depth));
+                assert_eq!(tree.show_as(Position::Expression).unwrap(), expected);
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn show_as_deep_mixed_blocks_use_bounded_host_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let like = root("x");
+            let head = Syntax::make(Node::Name("f".into()), &like).unwrap();
+            let equals = Syntax::make(Node::Symbol("=".into()), &like).unwrap();
+            let name = Syntax::make(Node::Name("v".into()), &like).unwrap();
+            for depth in [1000, 10000] {
+                let mut tree = like.clone();
+                for _ in 0..depth {
+                    let binding =
+                        Syntax::make(Node::Round(vec![equals.clone(), name.clone(), tree]), &like)
+                            .unwrap();
+                    let block =
+                        Syntax::make(Node::Curly(vec![binding, name.clone()]), &like).unwrap();
+                    tree = Syntax::make(Node::Round(vec![head.clone(), block]), &like).unwrap();
+                }
+                let expected = format!("{}x{}", "f({ v = ".repeat(depth), " v })".repeat(depth));
+                assert_eq!(tree.show_as(Position::Expression).unwrap(), expected);
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
