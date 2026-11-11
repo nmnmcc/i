@@ -304,7 +304,6 @@ fn check_resolved(
     mut program: Option<hir::Program>,
     mut diags: Vec<Diagnostic>,
 ) -> Checked {
-
     let types = match &program {
         Some(p) if !diags.iter().any(Diagnostic::is_error) => {
             let (typed, more) = types::check(p, &graph.sources);
@@ -320,7 +319,6 @@ fn check_resolved(
     }
     if let Some(p) = &program {
         map_expansion_diagnostics(p, &graph.sources, &mut diags);
-
     }
     Checked {
         program,
@@ -330,38 +328,36 @@ fn check_resolved(
 }
 
 fn install_entry_dependencies(p: &mut hir::Program, t: &types::Typed, diags: &mut Vec<Diagnostic>) {
-
-        let mut changed = false;
-        for (entry, services) in &t.entry_services {
-            let tasks = services.iter().any(|id| {
+    let mut changed = false;
+    for (entry, services) in &t.entry_services {
+        let tasks = services.iter().any(|id| {
+            let service = p.ty(*id);
+            p.module(service.module).path == "i/task"
+                && matches!(service.name.as_str(), "Scheduler" | "Runner")
+        });
+        let requests = tasks
+            || services.iter().any(|id| {
                 let service = p.ty(*id);
-                p.module(service.module).path == "i/task"
-                    && matches!(service.name.as_str(), "Scheduler" | "Runner")
+                service
+                    .host
+                    .as_ref()
+                    .is_some_and(|h| h.is_async || h.is_request)
+                    || p.module(service.module).path == "i/request"
             });
-            let requests = tasks
-                || services.iter().any(|id| {
-                    let service = p.ty(*id);
-                    service
-                        .host
-                        .as_ref()
-                        .is_some_and(|h| h.is_async || h.is_request)
-                        || p.module(service.module).path == "i/request"
-                });
-            for (path, needed) in [("i/request", requests), ("i/task", tasks)] {
-                if needed && let Some(index) = p.modules.iter().position(|m| m.path == path) {
-                    let dep = hir::ModuleId(index as u32);
-                    if dep != entry.module
-                        && !p.modules[entry.module.0 as usize].imports.contains(&dep)
-                    {
-                        p.modules[entry.module.0 as usize].imports.push(dep);
-                        changed = true;
-                    }
+        for (path, needed) in [("i/request", requests), ("i/task", tasks)] {
+            if needed && let Some(index) = p.modules.iter().position(|m| m.path == path) {
+                let dep = hir::ModuleId(index as u32);
+                if dep != entry.module && !p.modules[entry.module.0 as usize].imports.contains(&dep)
+                {
+                    p.modules[entry.module.0 as usize].imports.push(dep);
+                    changed = true;
                 }
             }
         }
-        if changed {
-            order::order(p, diags);
-        }
+    }
+    if changed {
+        order::order(p, diags);
+    }
 }
 
 /// Validate a consumer-selected entry after the project has been checked.
@@ -375,7 +371,9 @@ pub fn check_selected(
     let (typed, mut diags) =
         types::check_selected(program, &graph.sources, &[(target, require_nil)]);
     capabilities::check_selected(program, graph, &[target], &mut diags);
-    if !diags.iter().any(Diagnostic::is_error) { install_entry_dependencies(program, &typed, &mut diags); }
+    if !diags.iter().any(Diagnostic::is_error) {
+        install_entry_dependencies(program, &typed, &mut diags);
+    }
     map_expansion_diagnostics(program, &graph.sources, &mut diags);
     (typed, diags)
 }

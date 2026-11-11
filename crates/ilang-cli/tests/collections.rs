@@ -15,7 +15,7 @@ fn project(path: &Path) {
     std::fs::write(path.join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(path.join("src")).unwrap();
     std::fs::write(path.join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (c x body (! it (. syntax Items))) _ { ((. it add) c x [] x) `(= ~x (-> () _ { ~body })) })))\n").unwrap();
-    std::fs::write(path.join("src/main.i"), "(m = app/macros)\n(syntax = i/syntax)\n(anchor)\n@external(\"test:unselected\", \"missing\")\nmissing: () -> Nil\nanchor = Nil\nm.emit(anchor, good, assert(True))\nm.emit(anchor, bad, assert(False))\nm.emit(anchor, number, 42)\nm.emit(anchor, compiler_only, syntax.show)\nm.emit(anchor, needs_foreign, missing())\n").unwrap();
+    std::fs::write(path.join("src/main.i"), "(m = app/macros)\n(syntax = i/syntax)\n(task = i/task)\n(anchor)\n@external(\"test:unselected\", \"missing\")\nmissing: () -> Nil\nanchor = Nil\nm.emit(anchor, good, assert(True))\nm.emit(anchor, bad, assert(False))\nm.emit(anchor, number, 42)\nm.emit(anchor, compiler_only, syntax.show)\nm.emit(anchor, needs_foreign, missing())\nm.emit(anchor, concurrent, assert(task.both(() { 1 }, () { 2 }) == (1, 2)))\n").unwrap();
 }
 
 #[test]
@@ -23,7 +23,7 @@ fn generated_contributions_are_selected_independently() {
     let dir = tempfile::tempdir().unwrap();
     project(dir.path());
     let manifest = ilang_cli::collections(dir.path(), false, true).unwrap();
-    assert_eq!(manifest.entries.len(), 5);
+    assert_eq!(manifest.entries.len(), 6);
     assert!(
         manifest
             .entries
@@ -52,7 +52,10 @@ fn generated_contributions_are_selected_independently() {
         assert!(program.abi().entry.is_none());
         assert!(program.abi().tests.is_empty());
         assert!(program.abi().exports.is_empty());
-        assert!(program.abi().externals.is_empty(), "an unselected target must not pull foreign imports");
+        assert!(
+            program.abi().externals.is_empty(),
+            "an unselected target must not pull foreign imports"
+        );
         assert!(matches!(
             good.run_with(good.built.host_options()).unwrap(),
             Outcome::Ok(_)
@@ -62,6 +65,20 @@ fn generated_contributions_are_selected_independently() {
             instance.run("i.tool.1").is_err(),
             "unselected target must not be exported"
         );
+        let concurrent = ilang_cli::build_collection(
+            dir.path(),
+            options(level),
+            &manifest.entries[5].handle,
+            CollectionResult::Nil,
+        )
+        .unwrap();
+        assert!(concurrent.is_async);
+        assert!(matches!(
+            concurrent
+                .run_with(concurrent.built.host_options())
+                .unwrap(),
+            Outcome::Ok(_)
+        ));
         let bad = ilang_cli::build_collection(
             dir.path(),
             options(level),
@@ -104,6 +121,32 @@ fn generated_contributions_are_selected_independently() {
         ),
         Err(ilang_cli::BuildError::Selection(_))
     ));
+    assert!(
+        ilang_cli::build_collection(
+            dir.path(),
+            options(Level::O0),
+            &manifest.entries[3].handle,
+            CollectionResult::Any,
+        )
+        .is_err(),
+        "a selected compiler capability must be rejected"
+    );
+    let foreign = ilang_cli::build_collection(
+        dir.path(),
+        options(Level::O0),
+        &manifest.entries[4].handle,
+        CollectionResult::Nil,
+    )
+    .unwrap();
+    assert!(
+        !foreign
+            .built
+            .host_program()
+            .unwrap()
+            .abi()
+            .externals
+            .is_empty()
+    );
     std::fs::write(dir.path().join("src/main.i"), "(anchor)\nanchor = Nil\n").unwrap();
     assert!(matches!(
         ilang_cli::build_collection(
