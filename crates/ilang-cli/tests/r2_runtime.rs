@@ -351,7 +351,7 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
     assert!(!source.contains("@external(\"ilang:request\""));
     let source = source
         + r#"
-@main
+
 main = () {
   k: Key(String) = key.new()
   extension = key.wrap(k, "extension")

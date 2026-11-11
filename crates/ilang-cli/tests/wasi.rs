@@ -207,17 +207,14 @@ fn hello_needs_only_wasi() {
 #[test]
 fn stops_write_the_message_and_exit_with_1() {
     let programs = [
-        ("", "@main\nmain = () { assert(1 + 1 == 3) }\n"),
+        ("", "\nmain = () { assert(1 + 1 == 3) }\n"),
         // An error at the entry (§9.3).
         (
             " (i/fail)\n",
-            "Bad { Bad(Int) }\n@main\nmain = () { fail.raise(Bad(7)) }\n",
+            "Bad { Bad(Int) }\n\nmain = () { fail.raise(Bad(7)) }\n",
         ),
         // A stop while the top-level values are worked out (§2.5).
-        (
-            "",
-            "early = panic(\"too early\")\n@main\nmain = () { early }\n",
-        ),
+        ("", "early = panic(\"too early\")\n\nmain = () { early }\n"),
     ];
     for (imports, source) in programs {
         let dir = package(&format!("{imports}{source}"));
@@ -342,12 +339,12 @@ fn host_references_keep_the_reference_id_import() {
     let dir = package(
         "Handle { }\n@host(\"app:files/v1\")\n\
          Files { Files(open: () -> Handle, same: (a: Handle, b: Handle) -> Bool) }\n\
-         @main\nmain = (f ! Files) { f.open() == f.open() }\n",
+         \nmain = (f ! Files) { f.open() == f.open() }\n",
     );
     let wasm = wasi(dir.path(), Level::O0);
     assert!(imports(&wasm).contains(&("ilang:host/v1".into(), "reference_id".into())));
     // Without host references, `reference_id` is defined in the module.
-    let dir = package("@main\nmain = () { Nil }\n");
+    let dir = package("\nmain = () { Nil }\n");
     let wasm = wasi(dir.path(), Level::O0);
     assert!(
         !imports(&wasm).iter().any(|(m, _)| m == "ilang:host/v1"),
@@ -376,14 +373,14 @@ fn needs_an_entry() {
 #[test]
 fn the_standard_service_is_the_one_of_i_io() {
     let twice = "@host(\"i:io/v1\")\nMine { Mine(print: (text: String) -> Nil) }\n\
-                 @main\nmain = (io ! Mine) { io.print(\"x\") }\n";
+                 \nmain = (io ! Mine) { io.print(\"x\") }\n";
     let e = build_error(twice);
     assert!(
         e.contains("E0311") && e.contains("the host service `Io` of `i/io`"),
         "{e}"
     );
     let other = "@host(\"i:io/v1\")\nInput { Input(read: () -> String) }\n\
-                 @main\nmain = (input ! Input) { input.read() }\n";
+                 \nmain = (input ! Input) { input.read() }\n";
     let dir = package(other);
     let wasm = wasi(dir.path(), Level::O0);
     assert!(imports(&wasm).contains(&("i:io/v1".into(), "read".into())));
@@ -394,7 +391,7 @@ fn the_standard_service_is_the_one_of_i_io() {
 /// declaration in the program, not in the library.
 #[test]
 fn an_import_that_does_not_agree_with_the_library_is_told_in_the_program() {
-    let source = " ((Io) = i/io)\n@external(\"i:io/v1\", \"print\") p: (text: String) -> Nil\n@main\nmain = (io ! Io) {\n\tio.print(\"a\")\n\tp(\"b\")\n}\n";
+    let source = " ((Io) = i/io)\n@external(\"i:io/v1\", \"print\") p: (text: String) -> Nil\n\nmain = (io ! Io) {\n\tio.print(\"a\")\n\tp(\"b\")\n}\n";
     for target in [Target::Wasi, Target::Ilang] {
         let dir = package(source);
         let e = match build(dir.path(), options(Level::O0, target)) {
@@ -415,7 +412,7 @@ fn the_wasi_imports_of_the_runtime_are_refused() {
     for name in ["fd_write", "proc_exit"] {
         let external = format!(
             "@external(\"{wasi_module}\", \"{name}\")\nf: (code: String) -> Nil\n\
-             @main\nmain = () {{ f(\"x\") }}\n"
+             \nmain = () {{ f(\"x\") }}\n"
         );
         let e = build_error(&external);
         assert!(e.contains("the runtime imports"), "{name}: {e}");
@@ -428,7 +425,7 @@ fn the_wasi_imports_of_the_runtime_are_refused() {
     }
     let other = format!(
         "@external(\"{wasi_module}\", \"sched_yield\")\nyield: () -> Int\n\
-         @main\nmain = () {{ yield() }}\n"
+         \nmain = () {{ yield() }}\n"
     );
     let dir = package(&other);
     let wasm = wasi(dir.path(), Level::O0);
@@ -436,14 +433,14 @@ fn the_wasi_imports_of_the_runtime_are_refused() {
     // On the target of the binary interface they are normal imports.
     let dir = package(&format!(
         "@external(\"{wasi_module}\", \"proc_exit\")\nexit: (code: Int) -> Nil\n\
-         @main\nmain = () {{ exit(0) }}\n"
+         \nmain = () {{ exit(0) }}\n"
     ));
     assert!(build(dir.path(), options(Level::O0, Target::Ilang)).is_ok());
 }
 
 #[test]
 fn only_wasi_modules_name_their_target() {
-    let dir = package("@main\nmain = () { Nil }\n");
+    let dir = package("\nmain = () { Nil }\n");
     let ilang = build(dir.path(), options(Level::O0, Target::Ilang))
         .unwrap()
         .wasm;
@@ -551,7 +548,7 @@ paused = () {
 const MAIN_OUT: &str = r#"
 // The resumed final function ends, and the `$cancel` of `k` goes out of
 // the resume, which nothing takes.
-@main
+
 main = () {
   // The computations need `Out`. This one is never called.
   ! Out = Out((k2) { Nil })
@@ -598,7 +595,7 @@ o1 = (b3, k2) { keep(resource.ensure(() { h(b3, k2) }, () { panic("final") })) }
 /// The entry of tests 13 and 15.
 const MAIN_THIRD: &str = r#"// k2 is resumed from frames that a resume of k3 entered, while the outer
 // frame of k3 waits.
-@main
+
 main = () {
   // The computations need `Out`. This one is never called.
   ! Out = Out((k2) { Nil })
@@ -634,7 +631,7 @@ h_tail = (b) {
   g(b)
 }
 
-@main
+
 main = () {
   ! Name = Name("start")
   k = { control.boundary((b) {
@@ -672,7 +669,7 @@ h_tail = (b) {
   g(b)
 }
 
-@main
+
 main = () {
   ! Name = Name("start")
   k = { control.boundary((b) {
@@ -715,7 +712,7 @@ body = (outer) {
   Done
 }
 
-@main
+
 main = (io ! Io) {
   k = { control.boundary((outer) { body(outer) }) } |> {
     Paused(k) -> k
@@ -761,7 +758,7 @@ with = (hold, k) {
   control.cancel(k)
 }
 
-@main
+
 main = (io ! Io) {
   k = paused()
   r = fail.catch(() {
