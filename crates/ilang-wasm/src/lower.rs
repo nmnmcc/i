@@ -3628,8 +3628,8 @@ mod deep_source_tests {
                 assert_eq!(w.bound, HashSet::from([VarId(7)]));
                 // HIR destruction is handled in the checker lane; this test
                 // isolates the two lowering traversals until that change lands.
-                std::mem::forget(e);
-                std::mem::forget(p);
+                drop(e);
+                drop(p);
             })
             .unwrap()
             .join()
