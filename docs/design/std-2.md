@@ -1196,5 +1196,5 @@ clock observation to an entry. The five positive generic sink probes are
 ordinary tests.
 
 The process service currently has no exit-status operation. Consequently
-`cli.run` stops with a panic after reporting bad arguments, giving a nonzero
+`cli.run` raises the parsing error after reporting bad arguments, giving a nonzero
 status rather than requesting an exit through that service. This remains open.

@@ -69,6 +69,7 @@
 	i/process
 	i/stdio
 	i/core
+	i/fail
 	std/list
 	std/string
 	std/int
@@ -693,7 +694,7 @@ run = (parser, program, body) {
 				Ok(usage)         -> stdio.print_error(usage)
 				Error(definition) -> stdio.print_error(core.inspect(definition))
 			}
-			panic("invalid command arguments")
+			fail.raise(error)
 		}
 	}
 }
