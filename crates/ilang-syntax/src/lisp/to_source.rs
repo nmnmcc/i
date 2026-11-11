@@ -343,7 +343,7 @@ mod deep_tests {
         let output = super::super::render::render(&d, super::super::render::P::Expr).unwrap();
         assert_eq!(
             output,
-            format!("{}x{}", "f({\nv = ".repeat(10000), "\n})".repeat(10000))
+            format!("{}x{}", "f({ v = ".repeat(10000), " })".repeat(10000))
         );
     }
     #[test]

@@ -37,15 +37,29 @@ pub(super) enum P {
 enum Step<'a> {
     Node(P, &'a Datum),
     Text(String),
+    Boundary,
 }
 
 pub(super) fn render(d: &Datum, pos: P) -> Result<String> {
     let mut out = String::new();
+    let mut boundary = false;
     let mut stack = vec![Step::Node(pos, d)];
     while let Some(step) = stack.pop() {
         let (p, d) = match step {
             Step::Text(s) => {
+                if boundary && !s.is_empty() {
+                    out.push(if matches!(s.chars().next(), Some('(' | '{' | '-')) {
+                        '\n'
+                    } else {
+                        ' '
+                    });
+                    boundary = false;
+                }
                 out.push_str(&s);
+                continue;
+            }
+            Step::Boundary => {
+                boundary = true;
                 continue;
             }
             Step::Node(p, d) => (p, d),
@@ -66,6 +80,16 @@ pub(super) fn render(d: &Datum, pos: P) -> Result<String> {
                 for (i, v) in $xs.iter().enumerate() {
                     if i != 0 {
                         text!($sep);
+                    }
+                    node!($p, v);
+                }
+            }};
+        }
+        macro_rules! lines {
+            ($xs:expr, $p:ident) => {{
+                for (i, v) in $xs.iter().enumerate() {
+                    if i != 0 {
+                        tasks.push(Step::Boundary);
                     }
                     node!($p, v);
                 }
@@ -360,9 +384,9 @@ pub(super) fn render(d: &Datum, pos: P) -> Result<String> {
                                 node!(Target, a);
                                 text!(".");
                                 if let K::Curly(cs) = &b.kind {
-                                    text!("{\n");
-                                    seq!(cs, Clause, "\n");
-                                    text!("\n}");
+                                    text!("{ ");
+                                    lines!(cs, Clause);
+                                    text!(" }");
                                 } else {
                                     text!(atom(b).ok_or_else(|| bad(b, "a field"))?);
                                 }
@@ -390,7 +414,10 @@ pub(super) fn render(d: &Datum, pos: P) -> Result<String> {
                                 text!(show(h));
                                 let negative = atom(a).is_some_and(|s| s.starts_with('-'))
                                     || matches!(round(a),Some([op,_]) if symbol(op,"-")||symbol(op,"-."));
-                                if negative || is_match(a) {
+                                if negative
+                                    || is_match(a)
+                                    || matches!(round(a), Some([op, _, _]) if is_binop(op))
+                                {
                                     text!("{ ");
                                     node!(Expr, a);
                                     text!(" }");
@@ -433,9 +460,9 @@ pub(super) fn render(d: &Datum, pos: P) -> Result<String> {
                             text!(">>");
                         }
                         K::Curly(xs) if xs.is_empty() || xs.first().is_some_and(is_clause) => {
-                            text!("{\n");
-                            seq!(xs, Clause, "\n");
-                            text!("\n}");
+                            text!("{ ");
+                            lines!(xs, Clause);
+                            text!(" }");
                         }
                         K::Curly(_) => node!(Block, d),
                         _ => return Err(bad(d, "an expression")),
@@ -500,9 +527,9 @@ pub(super) fn render(d: &Datum, pos: P) -> Result<String> {
                 let K::Curly(xs) = &d.kind else {
                     return Err(bad(d, "a block"));
                 };
-                text!("{\n");
-                seq!(xs, Statement, "\n");
-                text!("\n}");
+                text!("{ ");
+                lines!(xs, Statement);
+                text!(" }");
             }
             P::Statement => {
                 if let Some([h, a, b]) = round(d)

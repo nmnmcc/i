@@ -961,7 +961,7 @@ fn scoped_conversion_separates_repeated_origins_and_keeps_sliceable_text() {
     let call = root("call");
     let mut source = ScopedSource::new("original source".into());
     let expr = source.expression(&result, &call).unwrap();
-    let ExprKind::Binary { lhs, rhs, .. } = expr.kind else {
+    let ExprKind::Binary { lhs, rhs, .. } = &expr.kind else {
         panic!("binary")
     };
     assert_ne!(lhs.span, rhs.span);
@@ -1034,7 +1034,7 @@ fn scoped_virtual_source_uses_utf8_byte_boundaries() {
     let syntax = root("(f \"你好\")");
     let mut source = ScopedSource::new("// 原文件".into());
     let expr = source.expression(&syntax, &call).unwrap();
-    let ExprKind::Call { args, .. } = expr.kind else {
+    let ExprKind::Call { args, .. } = &expr.kind else {
         panic!("call")
     };
     let span = args[0].value.span;
@@ -1336,4 +1336,63 @@ fn definition_table_charges_before_freshening_written_and_expanded_answers() {
         assert!(charged);
         assert!(matches!(result, Err(error) if error.to_string() == "allocation limit"));
     }
+}
+
+#[test]
+fn show_as_groups_a_binary_operand_under_negation() {
+    assert_eq!(
+        root("(- (+ x y))").show_as(Position::Expression).unwrap(),
+        "-{ x + y }"
+    );
+}
+
+#[test]
+fn show_as_distinguishes_postfix_and_standalone_clauses() {
+    assert!(
+        root("{ (-> (= a (, x)) (-> (y) Int y)) }")
+            .show_as(Position::Expression)
+            .is_err()
+    );
+    assert_eq!(
+        root("(. s { (-> (= a (, x)) (-> (y) Int y)) })")
+            .show_as(Position::Expression)
+            .unwrap(),
+        "s.{ a = (x) -> (y) -> Int { y } }"
+    );
+}
+
+#[test]
+fn show_as_deep_type_and_pattern_use_bounded_host_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let like = root("x");
+            let head = Syntax::make(Node::Up("T".into()), &like).unwrap();
+            let mut tree = like.clone();
+            for _ in 0..10000 {
+                tree = Syntax::make(Node::Round(vec![head.clone(), tree]), &like).unwrap();
+            }
+            let expected = format!("{}x{}", "T(".repeat(10000), ")".repeat(10000));
+            assert_eq!(tree.show_as(Position::Type).unwrap(), expected);
+            assert_eq!(tree.show_as(Position::Pattern).unwrap(), expected);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn show_as_only_breaks_lines_at_ambiguous_statement_boundaries() {
+    let simple = root("(-> () _ { x y })");
+    assert_eq!(simple.show_as(Position::Expression).unwrap(), "() { x y }");
+    let negative = root("(-> () _ { x (- 1) })");
+    assert_eq!(
+        negative.show_as(Position::Expression).unwrap(),
+        "() { x\n-1 }"
+    );
+    let clauses = root("(. x { (-> 1 2) (-> 3 4) })");
+    assert_eq!(
+        clauses.show_as(Position::Expression).unwrap(),
+        "x.{ 1 -> 2 3 -> 4 }"
+    );
 }
