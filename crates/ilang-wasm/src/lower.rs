@@ -1081,7 +1081,7 @@ impl<'a> Lowerer<'a> {
         let mut needed: BTreeSet<TypeId> = BTreeSet::new();
         if let Some((target, name)) = self.selected.clone() {
             let def = program.def(target);
-            let callee = self.def_callee(target);
+            let callee = self.entry_callee(target, 0);
             let fx = Fx::new(target.module, false);
             let site = self.site(&fx, def.span.start);
             let is_async = self.entry_async(target, &mut needed);
@@ -1832,36 +1832,57 @@ impl<'a> Lowerer<'a> {
         if fx.library {
             return None;
         }
-        let program = self.program;
-        let graph = self.graph;
-        let module = program.module(fx.module);
-        let index = match self.module_index.get(&fx.module) {
-            Some(&i) => i,
-            None => {
-                let i = self.out.site_modules.len() as u32;
-                // A package with a location puts `location@major ` first
-                // (§11.7).
-                self.out.site_modules.push(format!(
-                    "{}{}",
-                    graph.packages[module.package].position_prefix(),
-                    module.path
-                ));
-                self.module_index.insert(fx.module, i);
-                i
-            }
-        };
+        let origin = self
+            .program
+            .origin(fx.module, Span::new(offset, offset + 1));
+        let (source, offset) = origin
+            .as_ref()
+            .map_or((self.program.module(fx.module).source, offset), |origin| {
+                (origin.source, origin.span.start)
+            });
+        let module_id = self
+            .program
+            .modules
+            .iter()
+            .position(|m| m.source == source)
+            .map(|index| ModuleId(index as u32))
+            .expect("site source belongs to a module");
+        let module = self.program.module(module_id);
+        let index = *self.module_index.entry(module_id).or_insert_with(|| {
+            let index = self.out.site_modules.len() as u32;
+            self.out.site_modules.push(format!(
+                "{}{}",
+                self.graph.packages[module.package].position_prefix(),
+                module.path
+            ));
+            index
+        });
         let lines = self
             .lines
-            .entry(fx.module)
-            .or_insert_with(|| LineIndex::new(&graph.sources.get(module.source).text));
+            .entry(module_id)
+            .or_insert_with(|| LineIndex::new(&self.graph.sources.get(source).text));
         let (line, column) = lines.line_col(offset);
         let pos = SitePos {
             module: index,
             line,
             column,
         };
+        let note = origin
+            .and_then(|origin| origin.template)
+            .map(|(source, span)| {
+                let module = self
+                    .program
+                    .modules
+                    .iter()
+                    .find(|m| m.source == source)
+                    .expect("template source belongs to a module");
+                let (line, column) =
+                    LineIndex::new(&self.graph.sources.get(source).text).line_col(span.start);
+                format!("\nexpanded from {}:{line}:{column}", module.path)
+            });
         Some(*self.site_map.entry(pos).or_insert_with(|| {
             self.out.sites.push(pos);
+            self.out.site_notes.push(note);
             self.out.sites.len() as Site - 1
         }))
     }

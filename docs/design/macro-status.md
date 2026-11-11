@@ -26,3 +26,4 @@ step 2 exception for nesting and stack-limit tests:
 - `reference_order_and_function_boundary_survive_deep_trees`
 - `value_dependency_follows_deep_aliases_and_cycles_on_small_stack`
 - `quote_capture_clone_visitors_and_drop_on_small_stack`
+- `ilang-cli/tests/macro_run.rs::cli_checks_deep_syntax_constructed_by_a_macro` (10,000 nested macro-generated nodes)

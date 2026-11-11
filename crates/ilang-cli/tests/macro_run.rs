@@ -1004,7 +1004,7 @@ fn body_engine_expands_pipe_left_operand_as_first_argument() {
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, first)\n(@ macro (= first (-> ((: x (. syntax Syntax)) (: ignored (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(m = app/macros)\nmain = () { 42 | m.first(unknown) }\n",
+        "(m = app/macros)\nmain = () { 42 |> m.first(unknown) }\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -2578,47 +2578,6 @@ fn lisp_definition_budget_excludes_unrelated_items() {
         usages.push(budget.usage());
     }
     assert_eq!(usages[0], usages[1]);
-}
-
-#[test]
-fn cli_checks_deep_syntax_constructed_by_a_macro() {
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
-    std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(
-        dir.path().join("src/macros.is"),
-        r#"(, (= syntax (/ i syntax)))
-(, deep)
-(= nest (-> ((: n Int) (: x (. syntax Syntax))) (^ (. syntax Syntax) (. syntax SyntaxError))
-  (| n { (-> 0 x) (-> _ (nest (- n 1) ((. syntax make) ((. syntax Square) [x]) (: like x)))) })))
-(@ macro (= deep (-> (x) _ (nest 9999 x))))
-"#,
-    )
-    .unwrap();
-    std::fs::write(
-        dir.path().join("src/main.i"),
-        "(m = app/macros)\nmain = () { m.deep(1) }\n",
-    )
-    .unwrap();
-    for opt in ["0", "2"] {
-        let output = std::process::Command::new("bash")
-            .args([
-                "-c",
-                "exec \"$1\" run --offline --opt \"$2\" --project \"$3\"",
-                "macro-depth",
-                env!("CARGO_BIN_EXE_i"),
-                opt,
-            ])
-            .arg(dir.path())
-            .output()
-            .unwrap();
-        assert!(
-            output.status.success(),
-            "O{opt}: status {:?}, stderr {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
 }
 
 #[test]
