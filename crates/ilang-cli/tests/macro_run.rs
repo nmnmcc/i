@@ -2275,3 +2275,109 @@ fn cli_runs_task_scope_inside_expanded_macro_argument() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+#[test]
+fn body_engine_expands_real_macro_under_deep_mixed_body() {
+    use ilang_host::syntax::DefinitionReply;
+    use ilang_macro::{body_engine::BodyEngine, body_walk, registry::Registry};
+    use ilang_syntax::{
+        ast::{Block, Expr, ExprKind, ItemKind, Stmt},
+        lisp::scoped::ScopedSource,
+        span::Span,
+    };
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, outer)\n(@ macro (= outer (-> ((: x (. syntax Syntax))) (. syntax Syntax) `123)))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nf = () { m.outer(unknown()) }\n",
+    )
+    .unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let registry = Registry::new(&graph, &parsed).unwrap();
+    let module = parsed.iter().find(|p| p.path == "app/main").unwrap();
+    let source = module.source;
+    let mut ast = module.ast.clone();
+    let ItemKind::Binding(binding) = &mut ast.items[0].kind else {
+        panic!()
+    };
+    let ExprKind::Fn(function) = &mut binding.value.kind else {
+        panic!()
+    };
+    let Stmt::Expr(value) = &mut function.body.stmts[0] else {
+        panic!()
+    };
+    let mut tree = std::mem::replace(
+        value,
+        Expr {
+            kind: ExprKind::Tuple(vec![]),
+            span: Span::default(),
+        },
+    );
+    for index in 0..10_000 {
+        let span = tree.span;
+        tree = Expr {
+            span,
+            kind: if index % 2 == 0 {
+                ExprKind::Tuple(vec![tree])
+            } else {
+                ExprKind::Block(Block {
+                    stmts: vec![Stmt::Expr(tree)],
+                    span,
+                })
+            },
+        };
+    }
+    *value = tree;
+    let scoped = ScopedSource::new(graph.sources.get(source).text.clone());
+    let resolver = Arc::new(|at: &Syntax, _: &ilang_host::macro_budget::MacroBudget| {
+        DefinitionReply::CompileError {
+            message: "unexpected definition".into(),
+            at: at.clone(),
+        }
+    });
+    let mut session = ilang_macro::session::Session::default();
+    let mut engine = BodyEngine::new(
+        &graph,
+        &parsed,
+        &registry,
+        source,
+        scoped,
+        resolver,
+        &mut session,
+    );
+    body_walk::expressions(&mut ast, &mut engine).unwrap();
+    let ItemKind::Binding(binding) = &ast.items[0].kind else {
+        panic!()
+    };
+    let ExprKind::Fn(function) = &binding.value.kind else {
+        panic!()
+    };
+    let mut value = match &function.body.stmts[0] {
+        Stmt::Expr(value) => value,
+        _ => panic!(),
+    };
+    for index in (0..10_000).rev() {
+        value = if index % 2 == 0 {
+            let ExprKind::Tuple(items) = &value.kind else {
+                panic!()
+            };
+            &items[0]
+        } else {
+            let ExprKind::Block(block) = &value.kind else {
+                panic!()
+            };
+            let Stmt::Expr(child) = &block.stmts[0] else {
+                panic!()
+            };
+            child
+        };
+    }
+    assert!(matches!(&value.kind, ExprKind::Int(n) if n.to_string() == "123"));
+    assert!(engine.scoped.origin(value.span).is_some());
+}
