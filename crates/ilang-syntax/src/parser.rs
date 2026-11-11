@@ -36,32 +36,25 @@ pub struct ParseStats {
 /// far as the source allows; the diagnostics say what was wrong, sorted by
 /// position.
 pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
-    let (module, diags, _) = run(source, true, false);
+    let (module, diags, _) = run(source, true);
     (module, diags)
 }
 
 #[doc(hidden)]
 pub fn parse_stats(source: &str) -> ParseStats {
-    run(source, true, false).2
+    run(source, true).2
 }
 
 /// Parses without reusing brace decisions, for the cache equivalence test.
 #[doc(hidden)]
 pub fn parse_module_uncached(source: &str) -> (Module, Vec<Diagnostic>) {
-    let (module, diags, _) = run(source, false, false);
+    let (module, diags, _) = run(source, false);
     (module, diags)
 }
 
-/// The frozen first-surface reader, used only for migration and comparison.
-pub fn parse_module_legacy(source: &str) -> (Module, Vec<Diagnostic>) {
-    let (module, diagnostics, _) = run(source, true, true);
-    (module, diagnostics)
-}
-
-fn run(source: &str, cache: bool, legacy: bool) -> (Module, Vec<Diagnostic>, ParseStats) {
+fn run(source: &str, cache: bool) -> (Module, Vec<Diagnostic>, ParseStats) {
     let lexed = lex(source);
     let mut parser = Parser {
-        source,
         toks: &lexed.tokens,
         close: &lexed.close,
         docs: &lexed.docs,
@@ -73,14 +66,6 @@ fn run(source: &str, cache: bool, legacy: bool) -> (Module, Vec<Diagnostic>, Par
         decisions: 0,
         tuple_type: false,
         cache,
-        legacy,
-        old_empty: legacy || source.lines().any(|l| l.trim() == "// syntax: syn1"),
-        surface2: source.lines().any(|l| l.trim() == "// syntax: syn2")
-            || lexed.tokens.iter().any(|t| t.kind == T::Caret)
-            || lexed
-                .tokens
-                .windows(2)
-                .any(|ts| ts[0].kind == T::Dot && ts[1].kind == T::LBrace),
     };
     let module = parser.module();
     let stats = ParseStats {
@@ -109,7 +94,6 @@ const RECORD_RESERVED: &str =
 const TUPLE_NOTE: &str = "; a tuple type in a clause pattern is put in `{ }`";
 
 struct Parser<'a> {
-    source: &'a str,
     toks: &'a [Token],
     close: &'a [Option<u32>],
     docs: &'a [DocComment],
@@ -128,9 +112,6 @@ struct Parser<'a> {
     /// clause (§7.1).
     tuple_type: bool,
     cache: bool,
-    legacy: bool,
-    old_empty: bool,
-    surface2: bool,
 }
 
 fn binop(kind: &T) -> Option<BinOp> {
@@ -149,7 +130,7 @@ fn binop(kind: &T) -> Option<BinOp> {
         T::GtDot => GtFloat,
         T::GtEqDot => GtEqFloat,
         T::LtGt => Concat,
-        T::PipeGt | T::Pipe => Pipe,
+        T::PipeGt => Pipe,
         T::Plus => Add,
         T::Minus => Sub,
         T::PlusDot => AddFloat,
@@ -170,6 +151,19 @@ fn is_name(e: &Expr) -> bool {
         ExprKind::Field { target, .. } => {
             matches!(target.kind, ExprKind::Name { module: None, .. })
         }
+        _ => false,
+    }
+}
+
+/// Whether the leftmost operand of `e`, through operators, calls, `.f`,
+/// and `.k`, is a clause block.
+fn starts_with_clauses(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Clauses(_) => true,
+        ExprKind::Binary { lhs: e, .. }
+        | ExprKind::Call { callee: e, .. }
+        | ExprKind::Field { target: e, .. }
+        | ExprKind::TupleIndex { target: e, .. } => starts_with_clauses(e),
         _ => false,
     }
 }
@@ -272,6 +266,18 @@ impl Parser<'_> {
                 })
             }
             _ => self.error("a name"),
+        }
+    }
+
+    fn record_value_label(&mut self) -> PResult<Ident> {
+        if let T::Str(value) = self.kind() {
+            let name = value.clone();
+            Ok(Ident {
+                name,
+                span: self.bump(),
+            })
+        } else {
+            self.name()
         }
     }
 
@@ -884,10 +890,8 @@ impl Parser<'_> {
         let Some(mut pattern) = pats.pop() else {
             return Ok(None);
         };
-        while let Some(mut outer) = pats.pop() {
-            let PatternKind::Var(name) =
-                std::mem::replace(&mut outer.kind, PatternKind::Discard(String::new()))
-            else {
+        while let Some(outer) = pats.pop() {
+            let PatternKind::Var(name) = outer.kind else {
                 unreachable!("only names are chained")
             };
             pattern = Pattern {
@@ -986,21 +990,16 @@ impl Parser<'_> {
         let start = self.start();
         let mut lhs = self.unary()?;
         while !self.tok().brk {
-            if self.legacy && self.at(&T::Pipe) {
-                break;
-            }
             let Some(op) = binop(self.kind()) else { break };
             if op.level() <= min {
                 break;
             }
             self.bump();
-            let mut rhs = self.binary(op.level())?;
+            let rhs = self.binary(op.level())?;
             if op == BinOp::Pipe
                 && let ExprKind::Clauses(_) = rhs.kind
             {
-                let ExprKind::Clauses(clauses) =
-                    std::mem::replace(&mut rhs.kind, ExprKind::Tuple(Vec::new()))
-                else {
+                let ExprKind::Clauses(clauses) = rhs.kind else {
                     unreachable!()
                 };
                 lhs = Expr {
@@ -1015,7 +1014,15 @@ impl Parser<'_> {
             if op == BinOp::Pipe
                 && !(is_name(&rhs) || matches!(rhs.kind, ExprKind::Call { .. } | ExprKind::Fn(_)))
             {
-                let msg = "the right side of `|` must be a name, a call, a function, or a clause block; use `e.{ clauses }` to match before applying another operator";
+                let msg = if matches!(
+                    rhs.kind,
+                    ExprKind::Binary { .. } | ExprKind::Field { .. } | ExprKind::TupleIndex { .. }
+                ) && starts_with_clauses(&rhs)
+                {
+                    "a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+                } else {
+                    "the right side of `|>` must be a name, a call, a function, or a clause block"
+                };
                 self.diags
                     .push(Diagnostic::new(Code::PipeTarget, rhs.span, msg));
             }
@@ -1050,26 +1057,10 @@ impl Parser<'_> {
         let start = self.start();
         let mut e = self.primary()?;
         loop {
-            if !self.legacy
-                && self.at(&T::LBrace)
-                && matches!(e.kind, ExprKind::Float(_))
-                && self.source[e.span.start as usize..e.span.end as usize].ends_with('.')
-                && self.toks[self.pos.saturating_sub(1)].span.end == self.tok().span.start
-            {
-                return Err(Diagnostic::new(
-                    Code::Unexpected,
-                    e.span,
-                    "a decimal integer followed by `.{` is lexed as a float; write `{ 1 }.{ ... }` or bind the integer to a name",
-                ));
-            }
             let kind = if self.at_joined(&T::LParen) {
                 self.call(e)?
             } else if self.eat(&T::Dot) {
                 match self.kind().clone() {
-                    T::LBrace if !self.legacy => ExprKind::Case {
-                        subject: Box::new(e),
-                        clauses: self.clauses()?,
-                    },
                     T::Name(_) => ExprKind::Field {
                         target: Box::new(e),
                         name: self.name()?,
@@ -1196,15 +1187,8 @@ impl Parser<'_> {
                 Brace::Clauses => ExprKind::Clauses(self.clauses()?),
                 Brace::Record => {
                     let at = self.tok().span;
-                    let (code, message) = if self.legacy {
-                        (Code::RecordReserved, RECORD_RESERVED)
-                    } else {
-                        (
-                            Code::Unexpected,
-                            "a clause needs `->` after its complete pattern type; a tuple or record type before the clause arrow is put in `{ }`",
-                        )
-                    };
-                    self.diags.push(Diagnostic::new(code, at, message));
+                    self.diags
+                        .push(Diagnostic::new(Code::RecordReserved, at, RECORD_RESERVED));
                     ExprKind::Clauses(self.clauses()?)
                 }
             },
@@ -1241,118 +1225,6 @@ impl Parser<'_> {
     /// `(` at a primary: a function when `->`, or a `{` on the same line, comes
     /// after its `)`; a tuple when not (§6.1, §1.7). In a guard, `->` does not
     /// count.
-    fn label_start(&self) -> bool {
-        matches!(self.kind(), T::Name(_) | T::UpName(_) | T::Str(_)) && *self.nth(1) == T::Colon
-    }
-
-    fn mixed(&self) -> Diagnostic {
-        Diagnostic::new(
-            Code::Unexpected,
-            self.tok().span,
-            "tuples have positional parts only and records have labelled fields only; positions and labels cannot mix",
-        )
-    }
-
-    fn record_label(&mut self, types: bool) -> PResult<()> {
-        if !self.label_start() {
-            return Err(self.mixed());
-        }
-        if !types && matches!(self.kind(), T::UpName(_)) {
-            return self.error("a name or string as a record value label");
-        }
-        self.bump();
-        self.expect(&T::Colon)?;
-        Ok(())
-    }
-
-    // T3 replaces these two reservation paths with the nodes of records §8.3.
-    fn datum(&mut self) -> PResult<ExprKind> {
-        if self.old_empty && self.at(&T::RParen) {
-            self.bump();
-            return Ok(ExprKind::Tuple(Vec::new()));
-        }
-        if self.at(&T::RParen) || self.at(&T::DotDot) || self.label_start() {
-            let at = self.tok().span;
-            if self.eat(&T::RParen) {
-                return Err(Diagnostic::new(
-                    Code::RecordReserved,
-                    at,
-                    "the empty tuple is removed; use `Nil` for a unit value; `()` is the empty record, kept for T3",
-                ));
-            }
-            let spread = self.eat(&T::DotDot);
-            if spread {
-                self.expr()?;
-            }
-            if !(spread && self.eat(&T::RParen)) {
-                if spread && !self.eat(&T::Comma) && !self.tok().brk {
-                    return self.error("a record field separator");
-                }
-                self.seq(T::RParen, true, |p| {
-                    p.record_label(false)?;
-                    p.expr()
-                })?;
-            }
-            return Err(Diagnostic::new(
-                Code::RecordReserved,
-                at,
-                "parenthesised records are kept for T3",
-            ));
-        }
-        Ok(ExprKind::Tuple(self.seq(T::RParen, false, |p| {
-            if p.label_start() {
-                return Err(p.mixed());
-            }
-            p.expr()
-        })?))
-    }
-
-    fn type_datum(&mut self) -> PResult<TypeKind> {
-        if self.at(&T::RParen) {
-            if self.old_empty {
-                self.bump();
-                return Ok(TypeKind::Tuple(Vec::new()));
-            }
-            return self
-                .error("`Record` for all records, or `Nil` for a unit type; `()` is not a type");
-        }
-        if self.at(&T::DotDot) || self.label_start() {
-            let at = self.tok().span;
-            let spread = self.eat(&T::DotDot);
-            if spread {
-                self.ty()?;
-            }
-            if !(spread && self.eat(&T::RParen)) {
-                if spread && !self.eat(&T::Comma) && !self.tok().brk {
-                    return self.error("a record type separator");
-                }
-                self.seq(T::RParen, true, |p| {
-                    if spread && p.eat(&T::Minus) {
-                        if matches!(p.kind(), T::Name(_) | T::UpName(_) | T::Str(_)) {
-                            p.bump();
-                            return Ok(());
-                        }
-                        return p.error("a forgotten record label");
-                    }
-                    p.record_label(true)?;
-                    p.ty()?;
-                    Ok(())
-                })?;
-            }
-            return Err(Diagnostic::new(
-                Code::RecordReserved,
-                at,
-                "parenthesised record types are kept for T3",
-            ));
-        }
-        Ok(TypeKind::Tuple(self.seq(T::RParen, false, |p| {
-            if p.label_start() {
-                return Err(p.mixed());
-            }
-            p.ty()
-        })?))
-    }
-
     fn paren(&mut self) -> PResult<Expr> {
         let start = self.start();
         let is_fn = self.close[self.pos].is_some_and(|c| {
@@ -1362,12 +1234,46 @@ impl Parser<'_> {
         self.bump();
         let kind = if is_fn {
             ExprKind::Fn(Box::new(self.function()?))
+        } else if self.eat(&T::RParen) {
+            ExprKind::Record {
+                base: None,
+                fields: Vec::new(),
+            }
+        } else if self.at(&T::DotDot)
+            || matches!(self.kind(), T::Name(_) | T::Str(_)) && *self.nth(1) == T::Colon
+        {
+            self.record_expr()?
         } else {
-            self.datum()?
+            ExprKind::Tuple(self.seq(T::RParen, true, Self::expr)?)
         };
         Ok(Expr {
             kind,
             span: self.span_from(start),
+        })
+    }
+
+    fn record_expr(&mut self) -> PResult<ExprKind> {
+        self.nested(|p| {
+            let base = if p.eat(&T::DotDot) {
+                Some(Box::new(p.expr()?))
+            } else {
+                None
+            };
+            let mut fields = Vec::new();
+            while !p.eat(&T::RParen) {
+                if base.is_some() || !fields.is_empty() {
+                    if !p.eat(&T::Comma) && !p.tok().brk {
+                        return p.error("`,` or `)`");
+                    }
+                    if p.eat(&T::RParen) {
+                        break;
+                    }
+                }
+                let label = p.record_value_label()?;
+                p.expect(&T::Colon)?;
+                fields.push((label, p.expr()?));
+            }
+            Ok(ExprKind::Record { base, fields })
         })
     }
 
@@ -1548,19 +1454,7 @@ impl Parser<'_> {
                         return Brace::Block;
                     }
                 }
-                if follows != T::Pipe || self.legacy {
-                    return Brace::Clauses;
-                }
-                let head_end = self.pos;
-                while self.eat(&T::Pipe) {
-                    if self.pattern().is_err() {
-                        break;
-                    }
-                }
-                if self.at(&T::Question) || self.at(&T::Arrow) {
-                    return Brace::Clauses;
-                }
-                self.pos = head_end;
+                return Brace::Clauses;
             }
             // 3: a binding.
             if chain > 0 || follows == T::Eq {
@@ -1713,14 +1607,14 @@ impl Parser<'_> {
             }
             T::LParen => {
                 self.bump();
-                if !self.old_empty && self.at(&T::RParen) {
+                if self.at(&T::RParen) {
                     return Err(Diagnostic::new(
-                        Code::BadPattern,
+                        Code::Unexpected,
                         self.tok().span,
-                        "the empty tuple pattern is removed; use `Nil` for a unit pattern, or a binder/discard for a record",
+                        "a tuple pattern has at least one part; use `Nil` for an empty value",
                     ));
                 }
-                PatternKind::Tuple(self.seq(T::RParen, self.old_empty, Self::pattern)?)
+                PatternKind::Tuple(self.seq(T::RParen, true, Self::pattern)?)
             }
             T::LBracket => self.list_pattern()?,
             T::LtLt => {
@@ -1847,7 +1741,7 @@ impl Parser<'_> {
     #[allow(clippy::type_complexity)]
     fn arrow_tail(&mut self) -> PResult<(TypeExpr, Option<TypeExpr>, Option<TypeExpr>)> {
         let value = self.ty()?;
-        let err = if self.eat(&T::Caret) || (!self.surface2 && self.eat(&T::Question)) {
+        let err = if self.eat(&T::Question) {
             Some(self.ty()?)
         } else {
             None
@@ -1859,10 +1753,7 @@ impl Parser<'_> {
             None
         };
         // §3: this `->` is the nearest one, and it has taken what it can.
-        if self.at(&T::Caret)
-            || (!self.surface2 && self.at(&T::Question))
-            || self.at_joined(&T::Bang)
-        {
+        if self.at(&T::Question) || self.at_joined(&T::Bang) {
             let msg = format!(
                 "the nearest `->` cannot take this {}: it already has one, or `!` came first; put the inner function type in `{{ }}`",
                 self.kind()
@@ -1948,7 +1839,21 @@ impl Parser<'_> {
                     .is_some_and(|c| self.toks[c as usize + 1].kind == T::Arrow);
                 self.bump();
                 if !is_fn {
-                    self.type_datum()?
+                    if self.at(&T::RParen) {
+                        return Err(Diagnostic::new(
+                            Code::Unexpected,
+                            self.tok().span,
+                            "a tuple type has at least one part; use `Record` for the type of all records",
+                        ));
+                    }
+                    if self.at(&T::DotDot)
+                        || matches!(self.kind(), T::Name(_) | T::UpName(_) | T::Str(_))
+                            && *self.nth(1) == T::Colon
+                    {
+                        self.record_type()?
+                    } else {
+                        TypeKind::Tuple(self.seq(T::RParen, true, Self::ty)?)
+                    }
                 } else {
                     let params = self.seq(T::RParen, true, |p| {
                         let label = if matches!(p.kind(), T::Name(_)) && *p.nth(1) == T::Colon {
@@ -2016,6 +1921,50 @@ impl Parser<'_> {
         Ok(TypeExpr {
             kind,
             span: self.span_from(start),
+        })
+    }
+
+    fn record_type(&mut self) -> PResult<TypeKind> {
+        self.nested(|p| {
+            let base = if p.eat(&T::DotDot) {
+                Some(Box::new(p.ty()?))
+            } else {
+                None
+            };
+            let mut fields = Vec::new();
+            let mut removed = Vec::new();
+            while !p.eat(&T::RParen) {
+                if base.is_some() || !fields.is_empty() || !removed.is_empty() {
+                    if !p.eat(&T::Comma) && !p.tok().brk {
+                        return p.error("`,` or `)`");
+                    }
+                    if p.eat(&T::RParen) {
+                        break;
+                    }
+                }
+                let remove = p.eat(&T::Minus);
+                if remove && base.is_none() {
+                    return p.error("a spread before a removed label");
+                }
+                let parameter = matches!(p.kind(), T::UpName(_));
+                let ident = if parameter {
+                    p.up_name()?
+                } else {
+                    p.record_value_label()?
+                };
+                let label = RecordLabel { ident, parameter };
+                if remove {
+                    removed.push(label);
+                } else {
+                    p.expect(&T::Colon)?;
+                    fields.push((label, p.ty()?));
+                }
+            }
+            Ok(TypeKind::Record {
+                base,
+                fields,
+                removed,
+            })
         })
     }
 }

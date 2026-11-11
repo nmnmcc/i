@@ -6,7 +6,6 @@
 //! `Effects`: a call adds the `E` and `N` of its callee, and a function or
 //! the rest of a block after an environment statement starts a new entry.
 
-use super::TyParts;
 use super::display;
 use super::known;
 use super::solve::{FailKind, Mode, Pol, Solver, builtin_variance};
@@ -40,59 +39,13 @@ pub(super) fn type_names(p: &Program, m: ModuleId) -> Vec<String> {
         .collect()
 }
 
-struct PendingCall<'a> {
-    callee: &'a Expr,
-    first: Option<&'a Expr>,
-    span: Span,
-    function: Ty,
-    known_function: Option<FnTy>,
-    bool_pipe: bool,
-    diagnostic_start: usize,
-    placement: Option<Vec<usize>>,
-    params: Option<Vec<Ty>>,
-    arguments: Vec<&'a Expr>,
-    typed: Vec<Option<(Ty, Ty)>>,
-    sigma: known::Sigma,
-    hidden: Vec<super::V>,
-    later: bool,
-    index: usize,
-}
-
-struct PendingUpdate<'a> {
-    ctor: CtorRef,
-    base: &'a Expr,
-    fields: &'a [(Ident, Expr)],
-    new: Vec<Ty>,
-    old_fields: Vec<(Option<String>, Ty)>,
-    new_fields: Vec<(Option<String>, Ty)>,
-    given: Vec<Option<Ty>>,
-    base_known: Ty,
-    index: usize,
-}
-
-struct PendingBinding<'a> {
-    binding: &'a Binding,
-    mark: (usize, usize),
-    direct: bool,
-    binders: Vec<VarId>,
-    holders: Vec<(VarId, Ty)>,
-}
-
-struct PendingFunction<'a> {
-    function: &'a Function,
-    expected: Vec<Ty>,
-    params: Vec<(Option<String>, Ty)>,
-    env_types: Vec<Ty>,
-    fails: bool,
-    written_return: Option<(Ty, Ty, Ty)>,
-}
-
 /// `∀ (variables deeper than level). ty`. A name that is not generalized
 /// has the level `u32::MAX`.
 #[derive(Clone, Debug)]
 pub(super) struct Scheme {
     pub level: u32,
     pub ty: Ty,
+    pub key_slots: Vec<(TyVarId, usize)>,
 }
 
 impl Scheme {
@@ -100,6 +53,7 @@ impl Scheme {
         Scheme {
             level: u32::MAX,
             ty,
+            key_slots: Vec::new(),
         }
     }
 }
@@ -108,6 +62,100 @@ impl Scheme {
 struct Effects {
     err: Vec<Ty>,
     env: Vec<Ty>,
+}
+
+fn key_binders(pattern: &Pattern) -> Option<(TyVarId, Vec<VarId>)> {
+    let mut binders = Vec::new();
+    let mut current = pattern;
+    while let PatternKind::Named { binder, pattern } = &current.kind {
+        binders.push(binder.var);
+        current = pattern;
+    }
+    match &current.kind {
+        PatternKind::Typed {
+            binder,
+            ty: Type {
+                kind: TypeKind::Var(var),
+                ..
+            },
+        } => {
+            binders.extend(binder.as_ref().map(|binder| binder.var));
+            Some((*var, binders))
+        }
+        _ => None,
+    }
+}
+
+fn binding_label_vars(binding: &Binding) -> HashSet<TyVarId> {
+    let mut labels = HashSet::new();
+    binding_types(binding, &mut |ty| {
+        walk_type(ty, &mut |part| {
+            if let TypeKind::Record {
+                fields, removed, ..
+            } = &part.kind
+            {
+                labels.extend(
+                    fields
+                        .iter()
+                        .map(|(label, _)| label)
+                        .chain(removed)
+                        .filter_map(|label| label.parameter),
+                );
+            }
+        })
+    });
+    labels.retain(|var| binding.ty_vars.contains(var));
+    labels
+}
+
+fn key_slots(binding: &Binding) -> Vec<(TyVarId, usize)> {
+    let ExprKind::Fn(function) = &binding.value.kind else {
+        return Vec::new();
+    };
+    let labels = binding_label_vars(binding);
+    function
+        .params
+        .iter()
+        .filter_map(|p| match p {
+            Param::Pattern { pattern, .. } => Some(pattern),
+            Param::Env { .. } => None,
+        })
+        .enumerate()
+        .filter_map(|(index, pattern)| {
+            key_binders(pattern)
+                .filter(|(var, _)| labels.contains(var))
+                .map(|(var, _)| (var, index))
+        })
+        .collect()
+}
+
+fn external_key_slots(ty: &Type) -> Vec<(TyVarId, usize)> {
+    let mut labels = HashSet::new();
+    walk_type(ty, &mut |part| {
+        if let TypeKind::Record {
+            fields, removed, ..
+        } = &part.kind
+        {
+            labels.extend(
+                fields
+                    .iter()
+                    .map(|(label, _)| label)
+                    .chain(removed)
+                    .filter_map(|label| label.parameter),
+            );
+        }
+    });
+    let TypeKind::Fn { params, .. } = &ty.kind else {
+        return Vec::new();
+    };
+    params
+        .iter()
+        .enumerate()
+        .filter_map(|(index, param)| match param.ty.kind {
+            TypeKind::Var(var) if labels.contains(&var) => Some((var, index)),
+            _ => None,
+        })
+        .collect()
 }
 
 /// The custom types of §4.2 and §9.6 that the rules use.
@@ -125,6 +173,14 @@ struct PendingFailure {
     span: Span,
 }
 
+struct PendingUnion {
+    failure: super::solve::Failure,
+    module: ModuleId,
+    span: Span,
+    other: Option<Span>,
+    fix_notes: Vec<super::V>,
+}
+
 pub(crate) struct Checker<'a> {
     pub p: &'a Program,
     sources: &'a Sources,
@@ -138,6 +194,12 @@ pub(crate) struct Checker<'a> {
     pub(super) recovery: bool,
     /// The solver variable of each type variable written in an annotation.
     pub tyvars: HashMap<TyVarId, Ty>,
+    label_key_slots: HashMap<VarId, Vec<(TyVarId, usize)>>,
+    label_declared_vars: HashSet<TyVarId>,
+    pub(super) label_key_values: HashMap<VarId, super::records::Label>,
+    label_callee: bool,
+    recursive_bindings: HashSet<VarId>,
+    active_key_parameters: Vec<HashMap<usize, (TyVarId, Vec<VarId>)>>,
     /// The type written at the top of the pattern that binds a name: its
     /// type is shown as written (§2.4).
     pub written: HashMap<VarId, Type>,
@@ -173,6 +235,7 @@ pub(crate) struct Checker<'a> {
     function_depth: usize,
     group_level: Option<u32>,
     pending_failures: Vec<PendingFailure>,
+    pending_unions: Vec<PendingUnion>,
     pub shared_fields: HashMap<CtorRef, Vec<bool>>,
 }
 
@@ -199,6 +262,12 @@ impl<'a> Checker<'a> {
             diags: Vec::new(),
             module: ModuleId(0),
             locals: HashMap::new(),
+            label_key_slots: HashMap::new(),
+            label_declared_vars: HashSet::new(),
+            label_key_values: HashMap::new(),
+            label_callee: false,
+            recursive_bindings: HashSet::new(),
+            active_key_parameters: Vec::new(),
             defs: HashMap::new(),
             reads: super::value_types::Reads::default(),
             recovery: false,
@@ -221,17 +290,14 @@ impl<'a> Checker<'a> {
             function_depth: 0,
             group_level: None,
             pending_failures: Vec::new(),
+            pending_unions: Vec::new(),
             shared_fields: HashMap::new(),
         }
     }
 
     // ---- The program ----
 
-    pub fn run(self) -> (Typed, Vec<Diagnostic>) {
-        self.run_selected(&[])
-    }
-
-    pub fn run_selected(mut self, selected: &[(DefId, bool)]) -> (Typed, Vec<Diagnostic>) {
+    pub fn run(mut self) -> (Typed, Vec<Diagnostic>) {
         let p = self.p;
         self.prepare_aliases();
         // Declarations have their written types (§10.1), generalized.
@@ -249,6 +315,20 @@ impl<'a> Checker<'a> {
             }
             for (di, d) in m.defs.iter().enumerate() {
                 if let DefKind::External { ty, ty_vars, .. } = &d.kind {
+                    walk_type(ty, &mut |part| {
+                        if let TypeKind::Record {
+                            fields, removed, ..
+                        } = &part.kind
+                        {
+                            self.label_declared_vars.extend(
+                                fields
+                                    .iter()
+                                    .map(|(label, _)| label)
+                                    .chain(removed)
+                                    .filter_map(|label| label.parameter),
+                            );
+                        }
+                    });
                     self.check_places(ty, Pol::Pos, 0);
                     self.s.level = 1;
                     self.new_tyvars(ty_vars);
@@ -258,7 +338,14 @@ impl<'a> Checker<'a> {
                         module: ModuleId(mi as u32),
                         index: di as u32,
                     };
-                    self.defs.insert(id, Scheme { level: 0, ty: t });
+                    self.defs.insert(
+                        id,
+                        Scheme {
+                            level: 0,
+                            ty: t,
+                            key_slots: external_key_slots(ty),
+                        },
+                    );
                 }
             }
             for b in &m.bindings {
@@ -281,9 +368,26 @@ impl<'a> Checker<'a> {
             self.complete_ready_reads();
         }
         self.report_coalescing(Span::default());
-        self.entry_points(selected);
+        self.entry_points();
         // The shown type schemes (§4.7).
         let mut typed = std::mem::take(&mut self.out);
+        let artifact_schemes = p
+            .modules
+            .iter()
+            .enumerate()
+            .flat_map(|(mi, module)| {
+                module.defs.iter().enumerate().filter_map(move |(di, def)| {
+                    (def.exported || matches!(def.kind, DefKind::External { .. })).then_some(
+                        DefId {
+                            module: ModuleId(mi as u32),
+                            index: di as u32,
+                        },
+                    )
+                })
+            })
+            .filter_map(|id| self.defs.get(&id).cloned())
+            .collect::<Vec<_>>();
+        let mut artifact_catalog = None;
         let mut test_shaped = HashSet::new();
         for (mi, m) in p.modules.iter().enumerate() {
             self.set_module(ModuleId(mi as u32));
@@ -315,6 +419,20 @@ impl<'a> Checker<'a> {
                         .insert(id, shown.text_limited(&self.s.type_names, 12));
                     typed.schemes.insert(id, shown.text(&self.s.type_names));
                     if d.exported || opts.written {
+                        let catalog = artifact_catalog.get_or_insert_with(|| {
+                            std::sync::Arc::new(super::scheme_wire::SchemeCatalog {
+                                solver: std::sync::Mutex::new(self.s.scheme_snapshot()),
+                                schemes: artifact_schemes.clone(),
+                                externals: std::sync::OnceLock::new(),
+                            })
+                        });
+                        typed.scheme_artifacts.insert(
+                            id,
+                            super::SchemeArtifact {
+                                catalog: catalog.clone(),
+                                scheme: scheme.clone(),
+                            },
+                        );
                         typed.scheme_types.insert(id, shown);
                     }
                 } else {
@@ -366,6 +484,38 @@ impl<'a> Checker<'a> {
     /// One group of top-level bindings (§4.7): typed together, then
     /// generalized together when every value is a direct value.
     fn group(&mut self, group: &[BindingRef]) {
+        if group.len() > 1 {
+            for reference in group {
+                let binding = &self.p.binding(*reference).binding;
+                let mut has_label_parameter = false;
+                binding_types(binding, &mut |ty| {
+                    walk_type(ty, &mut |part| {
+                        if let TypeKind::Record {
+                            fields, removed, ..
+                        } = &part.kind
+                        {
+                            has_label_parameter |= fields
+                                .iter()
+                                .map(|(label, _)| label)
+                                .chain(removed)
+                                .any(|label| {
+                                    label
+                                        .parameter
+                                        .is_some_and(|v| binding.ty_vars.contains(&v))
+                                });
+                        }
+                    })
+                });
+                if has_label_parameter {
+                    self.set_module(reference.module);
+                    self.error(
+                        code::INVALID_LABEL_PARAMETER,
+                        binding.span,
+                        "a binding with label parameters cannot belong to a mutual recursion group",
+                    );
+                }
+            }
+        }
         if group.iter().any(|b| self.p.failed_type_groups.contains(b)) {
             // O4: a dependency-cycle component is Failed before query inference.
             // Never is only recovery data; no fresh inferred alias is published.
@@ -400,6 +550,7 @@ impl<'a> Checker<'a> {
         for b in group {
             self.set_module(b.module);
             let binding = &p.binding(*b).binding;
+            self.label_declared_vars.extend(binding_label_vars(binding));
             self.new_tyvars(&binding.ty_vars);
             self.own_known(binding);
         }
@@ -483,6 +634,45 @@ impl<'a> Checker<'a> {
                 }
             }
         }
+        // A completion candidate is a read-only view of the principal type,
+        // not a generalized scheme. T2 can generate its ordinary batch
+        // constraints from this view before the U3 publication barrier.
+        let candidates = types
+            .iter()
+            .map(|(d, _, t, _)| {
+                let ty = if direct {
+                    let simple =
+                        display::simplify(&self.s, t, Some(0)).unwrap_or_else(|()| t.clone());
+                    if has_both(&simple) { t.clone() } else { simple }
+                } else {
+                    t.clone()
+                };
+                (
+                    *d,
+                    Scheme {
+                        level: if direct { 0 } else { u32::MAX },
+                        ty,
+                        key_slots: match p.def(*d).kind {
+                            DefKind::Binding { binding, .. } => key_slots(
+                                &p.binding(BindingRef {
+                                    module: d.module,
+                                    index: binding,
+                                })
+                                .binding,
+                            ),
+                            _ => Vec::new(),
+                        },
+                    },
+                )
+            })
+            .collect();
+        // Coverage can add ordinary constraints too. It precedes both T2's
+        // completion batch and the final discharge of union obligations.
+        for c in std::mem::take(&mut self.cases) {
+            self.check_case(c);
+        }
+        self.finish_reads(group, &candidates);
+        self.discharge_union_proofs();
         self.group_level = None;
         for (d, _, t, span) in types {
             self.set_module(d.module);
@@ -490,6 +680,16 @@ impl<'a> Checker<'a> {
                 Scheme {
                     level: 0,
                     ty: self.generalize(&t, 0, span),
+                    key_slots: match p.def(d).kind {
+                        DefKind::Binding { binding, .. } => key_slots(
+                            &p.binding(BindingRef {
+                                module: d.module,
+                                index: binding,
+                            })
+                            .binding,
+                        ),
+                        _ => Vec::new(),
+                    },
                 }
             } else {
                 Scheme::mono(t)
@@ -520,21 +720,16 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        // §7.4: coverage, with the types of the group.
-        for c in std::mem::take(&mut self.cases) {
-            self.check_case(c);
-        }
         if self.s.coalescing_failed.get() {
             let b = group[0];
             self.set_module(b.module);
             self.report_coalescing(p.binding(b).binding.span);
         }
-        self.finish_reads(group);
     }
 
     /// §10.2: the entry points of the compiled package: the program entry,
     /// the tests, and the host exports.
-    fn entry_points(&mut self, selected: &[(DefId, bool)]) {
+    fn entry_points(&mut self) {
         let p = self.p;
         let Some(root) = p.root else {
             return;
@@ -542,26 +737,33 @@ impl<'a> Checker<'a> {
         let mut entries = Vec::new();
         for m in p.modules.iter().filter(|m| m.package == root) {
             for b in m.bindings.iter().filter(|b| b.main || b.test) {
-                entries.extend(b.defs.first().map(|d| (*d, b.test, false, false)));
+                entries.extend(b.defs.first().map(|d| (*d, b.test, false)));
             }
         }
-        entries.extend(p.host_exports.iter().map(|d| (*d, false, true, false)));
-        entries.extend(selected.iter().map(|(d, nil)| (*d, *nil, false, true)));
-        for (d, test, export, tool) in entries {
-            self.entry_point(d, test, export, tool);
+        entries.extend(p.host_exports.iter().map(|d| (*d, false, true)));
+        for (d, test, export) in entries {
+            self.entry_point(d, test, export);
         }
     }
 
     /// §10.2 and §10.3 for one entry point, with its inferred type: a test
     /// gives `Nil`; a host export takes and gives types that the host can
     /// take; and the environment has only host services and `Assert`.
-    fn entry_point(&mut self, d: DefId, test: bool, export: bool, tool: bool) {
+    fn entry_point(&mut self, d: DefId, test: bool, export: bool) {
         self.set_module(d.module);
         let def = self.p.def(d);
         let (name, span) = (def.name.clone(), def.span);
         let Some(scheme) = self.defs.get(&d) else {
             return;
         };
+        if !self.label_slots_ref(ValueRef::Def(d)).is_empty() {
+            self.error(
+                code::HOST_TYPE,
+                span,
+                format!("`{name}` is an entry point, so it cannot have label parameters"),
+            );
+            return;
+        }
         let opts = display::Opts {
             mono: true,
             written: false,
@@ -571,7 +773,7 @@ impl<'a> Checker<'a> {
             return;
         };
         let show = |c: &Self, t: &Ty| display::show_known(&c.s, t);
-        let TyParts::Fn(f) = display::both(&t).into_parts() else {
+        let Ty::Fn(f) = display::both(&t) else {
             if export {
                 let t = show(self, &t);
                 self.error(
@@ -621,14 +823,11 @@ impl<'a> Checker<'a> {
         let nil = Ty::named(self.b.nil, Vec::new());
         if test && f.ret != nil && f.ret != Ty::Never {
             let r = show(self, &f.ret);
-            let message = if tool {
-                format!(
-                    "the selected entry `{name}` must give `Nil` for this consumer, but it gives `{r}`"
-                )
-            } else {
-                format!("`{name}` is a test, so it gives `Nil` (§10.2), but it gives `{r}`")
-            };
-            self.error(code::ENTRY_TYPE, span, message);
+            self.error(
+                code::ENTRY_TYPE,
+                span,
+                format!("`{name}` is a test, so it gives `Nil` (§10.2), but it gives `{r}`"),
+            );
         }
         if !export {
             return;
@@ -748,6 +947,9 @@ impl<'a> Checker<'a> {
             let v = self.s.fresh_at(self.s.level);
             self.s.vars[v.0 as usize].input = true;
             self.s.vars[v.0 as usize].name = self.p.ty_var_names.get(id.0 as usize).cloned();
+            if self.label_declared_vars.contains(id) {
+                self.s.vars[v.0 as usize].label_key = Some(*id);
+            }
             self.tyvars.insert(*id, Ty::Var(v));
         }
     }
@@ -790,21 +992,20 @@ impl<'a> Checker<'a> {
         };
         let mut found = Vec::new();
         uses_types(&shown, &mut found);
-        let mut names: Vec<(String, bool)> = Vec::new();
+        let mut names: Vec<String> = Vec::new();
         for id in found {
             let def = self.p.ty(id);
-            let name = (def.name.clone(), def.module != self.module);
-            if !def.exported && !names.contains(&name) {
-                names.push(name);
+            if def.module == self.module && !def.exported && !names.contains(&def.name) {
+                names.push(def.name.clone());
             }
         }
-        for (name, foreign) in names {
+        for name in names {
             self.error(
                 code::EXPORT_HIDDEN_TYPE,
                 d.span,
                 format!(
-                    "`{}` is exported, but its inferred type uses the type `{name}` {}, which is not exported (§2.4)",
-                    d.name, if foreign { "of its defining module" } else { "of this module" }
+                    "`{}` is exported, but its inferred type uses the type `{name}` of this module, which is not exported (§2.4)",
+                    d.name
                 ),
             );
         }
@@ -818,105 +1019,119 @@ impl<'a> Checker<'a> {
             self.check_value_places(t, pol);
             return;
         }
-        let mut todo = vec![(t, pol, depth)];
-        while let Some((t, pol, depth)) = todo.pop() {
-            if depth > 64 {
-                continue;
-            }
-            match &t.kind {
-                TypeKind::Named { ty, args } => {
-                    if let TypeRef::Custom(id) = ty
-                        && matches!(self.p.ty(*id).body, TypeBody::Alias(_))
-                    {
-                        let expanded = self.expand(t);
-                        self.check_places(&expanded, pol, depth + 1);
-                        continue;
-                    }
-                    let vs = match ty {
-                        TypeRef::Custom(id) => self.s.variance.get(id).cloned().unwrap_or_default(),
-                        TypeRef::Builtin(b) => builtin_variance(*b),
-                    };
-                    for (i, a) in args.iter().enumerate().rev() {
-                        let variance = vs.get(i).copied().unwrap_or(Variance::Inv);
-                        todo.push((a, pol.by(variance), depth));
-                    }
-                }
-                TypeKind::Tuple(ts) => todo.extend(ts.iter().rev().map(|t| (t, pol, depth))),
-                TypeKind::Fn {
-                    params,
-                    ret,
-                    err,
-                    env,
-                } => {
-                    if let Some(env) = env {
-                        todo.push((env, pol, depth));
-                    }
-                    if let Some(err) = err {
-                        todo.push((err, pol, depth));
-                    }
-                    todo.push((ret, pol, depth));
-                    for param in params.iter().rev() {
-                        todo.push((&param.ty, pol.flip(), depth));
-                    }
-                }
-                TypeKind::Union(ts) => {
-                    let vars = ts.iter().filter(|m| self.written_var_head(m)).count();
-                    if vars >= 2 && pol != Pol::Pos {
-                        self.error(code::TYPE_PLACE, t.span,
-                            "a union with two or more type variables as members may only be in an output place (§4.4): inference could not choose the variable for a value that comes here");
-                    }
-                    todo.extend(ts.iter().rev().map(|t| (t, pol, depth)));
-                }
-                TypeKind::Inter(ts) => {
-                    if pol != Pol::Neg && ts.iter().any(|m| self.written_var_head(m)) {
-                        self.error(code::TYPE_PLACE, t.span,
-                            "an intersection with a type variable may only be in an input place (§4.4): inference could not give a value that is in both");
-                    }
-                    todo.extend(ts.iter().rev().map(|t| (t, pol, depth)));
-                }
-                TypeKind::Diff(ts) => {
-                    if let Some((first, rest)) = ts.split_first() {
-                        todo.extend(rest.iter().rev().map(|t| (t, Pol::Both, depth)));
-                        todo.push((first, pol, depth));
-                    }
-                }
-                TypeKind::Lit(_)
-                | TypeKind::Of { .. }
-                | TypeKind::Var(_)
-                | TypeKind::Hole
-                | TypeKind::Error => {}
-            }
+        if depth > 64 {
+            return;
         }
-    }
-
-    fn written_var_head(&self, ty: &Type) -> bool {
-        match &ty.kind {
-            TypeKind::Var(_) => true,
-            TypeKind::Named {
-                ty: TypeRef::Custom(id),
-                ..
-            } if matches!(self.p.ty(*id).body, TypeBody::Alias(_)) => {
-                matches!(self.expand(ty).kind, TypeKind::Var(_))
+        match &t.kind {
+            TypeKind::Named { ty, args } => {
+                if let TypeRef::Custom(id) = ty
+                    && matches!(self.p.ty(*id).body, TypeBody::Alias(_))
+                {
+                    let e = self.expand(t);
+                    self.check_places(&e, pol, depth + 1);
+                    return;
+                }
+                let vs = match ty {
+                    TypeRef::Custom(id) => self.s.variance.get(id).cloned().unwrap_or_default(),
+                    TypeRef::Builtin(b) => builtin_variance(*b),
+                };
+                for (i, a) in args.iter().enumerate() {
+                    let v = vs.get(i).copied().unwrap_or(Variance::Inv);
+                    self.check_places(a, pol.by(v), depth);
+                }
             }
-            _ => false,
+            TypeKind::Tuple(ts) => {
+                for a in ts {
+                    self.check_places(a, pol, depth);
+                }
+            }
+            TypeKind::Record { base, fields, .. } => {
+                if let Some(base) = base {
+                    self.check_places(base, pol, depth);
+                }
+                for (_, field) in fields {
+                    self.check_places(field, pol, depth);
+                }
+            }
+            TypeKind::Fn {
+                params,
+                ret,
+                err,
+                env,
+            } => {
+                for p in params {
+                    self.check_places(&p.ty, pol.flip(), depth);
+                }
+                for x in [Some(&**ret), err.as_deref(), env.as_deref()]
+                    .into_iter()
+                    .flatten()
+                {
+                    self.check_places(x, pol, depth);
+                }
+            }
+            TypeKind::Union(ts) => {
+                let vars = ts
+                    .iter()
+                    .filter(|m| matches!(self.expand(m).kind, TypeKind::Var(_)))
+                    .count();
+                if vars >= 2 && pol != Pol::Pos {
+                    self.error(
+                        code::TYPE_PLACE,
+                        t.span,
+                        "a union with two or more type variables as members may only be in an output place (§4.4): inference could not choose the variable for a value that comes here",
+                    );
+                }
+                for a in ts {
+                    self.check_places(a, pol, depth);
+                }
+            }
+            TypeKind::Inter(ts) => {
+                if pol != Pol::Neg
+                    && ts
+                        .iter()
+                        .any(|m| matches!(self.expand(m).kind, TypeKind::Var(_)))
+                {
+                    self.error(
+                        code::TYPE_PLACE,
+                        t.span,
+                        "an intersection with a type variable may only be in an input place (§4.4): inference could not give a value that is in both",
+                    );
+                }
+                for a in ts {
+                    self.check_places(a, pol, depth);
+                }
+            }
+            TypeKind::Diff(ts) => {
+                if let Some((first, rest)) = ts.split_first() {
+                    self.check_places(first, pol, depth);
+                    for a in rest {
+                        self.check_places(a, Pol::Both, depth);
+                    }
+                }
+            }
+            TypeKind::Lit(_)
+            | TypeKind::Of { .. }
+            | TypeKind::Var(_)
+            | TypeKind::Hole
+            | TypeKind::Error => {}
         }
     }
 
     /// `check_places` for the types written in a pattern of a binding
     /// (`Pos`) or a parameter (`Neg`).
     fn check_pattern_places(&mut self, q: &Pattern, pol: Pol) {
-        let mut todo = vec![q];
-        while let Some(q) = todo.pop() {
-            match &q.kind {
-                PatternKind::Quote { captures, .. } => todo.extend(captures.iter().rev().map(|(_, p)| p)),
-                PatternKind::Typed { ty, .. } => self.check_places(ty, pol, 0),
-                PatternKind::Named { pattern, .. } => todo.push(pattern),
-                PatternKind::Constructor { args: ps, .. }
-                | PatternKind::Tuple(ps)
-                | PatternKind::Error(ps)
-                | PatternKind::List { items: ps, .. } => todo.extend(ps.iter().rev()),
-                _ => {}
+        match &q.kind {
+            PatternKind::Typed { ty, .. } => self.check_places(ty, pol, 0),
+            PatternKind::Named { pattern, .. } => self.check_pattern_places(pattern, pol),
+            PatternKind::Constructor { args: ps, .. }
+            | PatternKind::Tuple(ps)
+            | PatternKind::Error(ps)
+            | PatternKind::List { items: ps, .. } => {
+                for x in ps {
+                    self.check_pattern_places(x, pol);
+                }
             }
+            _ => {}
         }
     }
 
@@ -1002,6 +1217,22 @@ impl<'a> Checker<'a> {
 
     /// Reports the first problem the solver found since the last flush.
     pub fn flush(&mut self, span: Span, other: Option<Span>) {
+        if self.group_level.is_some() {
+            let failures = std::mem::take(&mut self.s.failures);
+            for failure in failures {
+                if failure.kind == FailKind::UnionProof {
+                    self.pending_unions.push(PendingUnion {
+                        failure,
+                        module: self.module,
+                        span,
+                        other,
+                        fix_notes: self.fix_notes.clone(),
+                    });
+                } else {
+                    self.s.failures.push(failure);
+                }
+            }
+        }
         if self.s.failures.is_empty() {
             self.fix_notes.clear();
             return;
@@ -1012,7 +1243,16 @@ impl<'a> Checker<'a> {
             display::show(&self.s, &f.lhs),
             display::show(&self.s, &f.rhs),
         );
-        let (code, mut message) = match f.kind {
+        let (code, mut message) = match (&f.kind, &f.record) {
+            (_, Some(super::solve::RecordFailure::Missing(label))) => (code::NO_FIELD, format!("the record has no field `{}`", label.text())),
+            (_, Some(super::solve::RecordFailure::Removed(label))) => (code::NO_FIELD, format!("the field `{}` may be missing here", label.text())),
+            (_, Some(super::solve::RecordFailure::MayBe { key, required })) => (code::LABEL_MAY_BE, format!("the key `{}` may be `{}`; it is not known here", key.text(), required.text())),
+            (kind, None) => match kind {
+            FailKind::NoField => (code::NO_FIELD, format!("the record `{l}` has no required field of `{r}`")),
+            FailKind::LabelMayBe => (code::LABEL_MAY_BE, format!("a key of `{l}` may be a required field of `{r}`; it is not known here")),
+            FailKind::LabelEscapes => (code::LABEL_ESCAPES, "a label parameter reaches a type variable outside its declaring binding".to_string()),
+            FailKind::UnionProof => (code::TYPE_MISMATCH, "cannot prove the result fits this union from the established bounds; annotate the updated value or omit the result annotation".to_string()),
+            FailKind::ResourceLimit => (code::TYPE_RESOURCE_LIMIT, "type too large to check here; write a local annotation for only the fields you need, or simplify the source".to_string()),
             FailKind::Mismatch | FailKind::Values => (
                 code::TYPE_MISMATCH,
                 format!("`{l}` is not a subtype of `{r}`"),
@@ -1037,6 +1277,7 @@ impl<'a> Checker<'a> {
                 code::TYPE_AMBIGUOUS,
                 format!("a value of `{l}` could go to more than one type variable of `{r}` (§4.4)"),
             ),
+            },
         };
         if let Some(o) = other {
             message.push_str(&format!(" (the type at {} needs it)", self.position(o)));
@@ -1052,6 +1293,41 @@ impl<'a> Checker<'a> {
         }
         self.fix_notes.clear();
         self.error(code, span, message);
+    }
+
+    /// U3 obligations never become exported qualified constraints. Each retry
+    /// reads a fresh, immutable snapshot after ordinary group/T2 propagation.
+    pub(super) fn discharge_union_proofs(&mut self) -> bool {
+        self.discharge_union_proofs_from(0)
+    }
+
+    fn discharge_union_proofs_from(&mut self, start: usize) -> bool {
+        let level = self.group_level.take();
+        let mut valid = true;
+        for pending in self.pending_unions.split_off(start) {
+            let mut demand = super::records::Demand::new(super::records::Demand::LIMIT, true);
+            let kind = match super::records::prove(
+                &self.s,
+                &pending.failure.lhs,
+                &pending.failure.rhs,
+                &mut demand,
+            ) {
+                super::records::Verdict::Proven => continue,
+                super::records::Verdict::Refuted => FailKind::Mismatch,
+                super::records::Verdict::Unknown => FailKind::UnionProof,
+                super::records::Verdict::ResourceLimit => FailKind::ResourceLimit,
+            };
+            valid = false;
+            self.set_module(pending.module);
+            self.fix_notes = pending.fix_notes;
+            self.s.failures.push(super::solve::Failure {
+                kind,
+                ..pending.failure
+            });
+            self.flush(pending.span, pending.other);
+        }
+        self.group_level = level;
+        valid
     }
 
     pub fn union(&mut self, ms: Vec<Ty>, span: Span) -> Ty {
@@ -1114,273 +1390,165 @@ impl<'a> Checker<'a> {
     }
 
     fn conv_mode(&mut self, t: &Type, local: &HashMap<TyVarId, Ty>, mode: Mode) -> Ty {
-        use std::rc::Rc;
-
-        // Each task represents one suspended conversion, so arbitrarily deep
-        // written types do not consume the Rust call stack. Children are
-        // scheduled in source order: normalization and diagnostic emission
-        // are therefore performed at the same points as in the typing rules.
-        type Locals = Rc<HashMap<TyVarId, Ty>>;
-        enum Build<'a> {
-            Named(TypeRef, usize),
-            Alias(TypeId, &'a Type, Vec<TyVarId>, bool, u32),
-            Tuple(usize),
-            Fn(Vec<Option<String>>, bool, bool),
-            Union(usize, Span),
-            Inter(usize, Span),
-        }
-        enum Task<'a> {
-            Visit(&'a Type, Locals, Mode, u32),
-            Build(Build<'a>, Mode),
-            EndAlias,
-            DiffNext(&'a [Type], usize, Locals, Mode, u32, Span),
-            DiffCombine(&'a [Type], usize, Locals, Mode, u32, Span, Ty),
-        }
-        let p = self.p;
-        let mut todo = vec![Task::Visit(
-            t,
-            Rc::new(local.clone()),
-            mode,
-            self.alias_depth,
-        )];
-        let mut values: Vec<Ty> = Vec::new();
-        while let Some(task) = todo.pop() {
-            match task {
-                Task::Visit(t, local, mode, depth) => match &t.kind {
-                    TypeKind::Lit(v) => values.push(Ty::literal(v)),
-                    TypeKind::Var(tv) => {
-                        let v = if let Some(v) =
-                            local.get(tv).or_else(|| self.tyvars.get(tv)).cloned()
-                        {
-                            v
-                        } else {
-                            let v = self.s.fresh_input();
-                            if let Ty::Var(x) = v {
-                                self.s.vars[x.0 as usize].name =
-                                    p.ty_var_names.get(tv.0 as usize).cloned();
-                            }
-                            self.tyvars.insert(*tv, v.clone());
-                            v
-                        };
-                        if mode != Mode::Value {
-                            self.s.mark_mode(&v, mode);
-                        }
-                        values.push(v);
-                    }
-                    TypeKind::Of { value, site, .. } => {
-                        let v = self.read_annotation(*value, *site);
-                        if mode != Mode::Value {
-                            self.s.mark_mode(&v, mode);
-                        }
-                        values.push(v);
-                    }
-                    TypeKind::Hole | TypeKind::Error => {
-                        let v = self.s.fresh_input();
-                        if mode != Mode::Value {
-                            self.s.mark_mode(&v, mode);
-                        }
-                        values.push(v);
-                    }
-                    TypeKind::Named { ty, args } => {
-                        if *ty == TypeRef::Builtin(BuiltinType::Never) {
-                            values.push(Ty::Never);
-                            continue;
-                        }
-                        let modes: Vec<_> = self.s.rows(Head::Named(*ty), args.len()).collect();
-                        if let TypeRef::Custom(id) = ty
-                            && let TypeBody::Alias(body) = &p.ty(*id).body
-                        {
-                            let template =
-                                self.reads.templates.contains_key(id) || value_dependent(p, body);
-                            if !template && depth > 64 {
-                                values.push(self.s.fresh());
-                                continue;
-                            }
-                            let params = p.ty(*id).params.iter().map(|(_, v)| *v).collect();
-                            todo.push(Task::Build(
-                                Build::Alias(*id, body, params, template, depth),
-                                mode,
-                            ));
-                        } else {
-                            todo.push(Task::Build(Build::Named(*ty, args.len()), mode));
-                        }
-                        for (arg, row) in args.iter().zip(modes).rev() {
-                            todo.push(Task::Visit(arg, local.clone(), row, depth));
-                        }
-                    }
-                    TypeKind::Tuple(ts) => {
-                        todo.push(Task::Build(Build::Tuple(ts.len()), mode));
-                        for child in ts.iter().rev() {
-                            todo.push(Task::Visit(child, local.clone(), Mode::Value, depth));
-                        }
-                    }
-                    TypeKind::Fn {
-                        params,
-                        ret,
-                        err,
-                        env,
-                    } => {
-                        let labels = params
+        let result = match &t.kind {
+            TypeKind::Lit(v) => Ty::literal(v),
+            TypeKind::Named { ty, args } => {
+                if let TypeRef::Custom(id) = ty
+                    && let TypeBody::Alias(body) = &self.p.ty(*id).body
+                {
+                    if self.reads.templates.contains_key(id) || value_dependent(self.p, body) {
+                        let modes = self.s.rows(Head::Named(*ty), args.len());
+                        let args = args
                             .iter()
-                            .map(|p| p.label.as_ref().map(|l| l.name.clone()))
+                            .zip(modes)
+                            .map(|(a, row)| self.conv_mode(a, local, row))
                             .collect();
-                        todo.push(Task::Build(
-                            Build::Fn(labels, err.is_some(), env.is_some()),
-                            mode,
-                        ));
-                        if let Some(env) = env {
-                            todo.push(Task::Visit(env, local.clone(), Mode::Env, depth));
-                        }
-                        if let Some(err) = err {
-                            todo.push(Task::Visit(err, local.clone(), Mode::Row, depth));
-                        }
-                        todo.push(Task::Visit(ret, local.clone(), Mode::Value, depth));
-                        for p in params.iter().rev() {
-                            todo.push(Task::Visit(&p.ty, local.clone(), Mode::Value, depth));
-                        }
+                        return self.instantiate_alias(*id, args, mode);
                     }
-                    TypeKind::Union(ts) | TypeKind::Inter(ts) => {
-                        let build = if matches!(&t.kind, TypeKind::Union(_)) {
-                            Build::Union(ts.len(), t.span)
-                        } else {
-                            Build::Inter(ts.len(), t.span)
-                        };
-                        todo.push(Task::Build(build, mode));
-                        for child in ts.iter().rev() {
-                            todo.push(Task::Visit(child, local.clone(), mode, depth));
-                        }
+                    if self.alias_depth > 64 {
+                        return self.s.fresh();
                     }
-                    TypeKind::Diff(ts) => {
-                        todo.push(Task::DiffNext(ts, 1, local.clone(), mode, depth, t.span));
-                        todo.push(Task::Visit(&ts[0], local, mode, depth));
+                    let params = self.p.ty(*id).params.clone();
+                    let mut map = HashMap::new();
+                    let modes = self.s.rows(Head::Named(*ty), args.len());
+                    for (((_, tv), a), row) in params.iter().zip(args).zip(modes) {
+                        let a = self.conv_mode(a, local, row);
+                        map.insert(*tv, a);
                     }
-                },
-                Task::Build(build, mode) => {
-                    let result = match build {
-                        Build::Named(ty, n) => {
-                            let args = values.split_off(values.len() - n);
-                            Ty::named(ty, args)
-                        }
-                        Build::Alias(id, body, params, template, depth) => {
-                            let args = values.split_off(values.len() - params.len());
-                            if template {
-                                values.push(self.instantiate_alias(id, args, mode));
-                                continue;
-                            }
-                            let map = params.into_iter().zip(args).collect();
-                            self.alias_depth += 1;
-                            todo.push(Task::EndAlias);
-                            todo.push(Task::Visit(body, Rc::new(map), mode, depth + 1));
-                            continue;
-                        }
-                        Build::Tuple(n) => {
-                            let ts = values.split_off(values.len() - n);
-                            Ty::tuple(ts)
-                        }
-                        Build::Fn(labels, has_err, has_env) => {
-                            let n = labels.len();
-                            let mut parts = values
-                                .split_off(
-                                    values.len()
-                                        - n
-                                        - 1
-                                        - usize::from(has_err)
-                                        - usize::from(has_env),
-                                )
-                                .into_iter();
-                            let params = labels
-                                .into_iter()
-                                .map(|label| {
-                                    (label, parts.next().expect("function parameter type"))
-                                })
-                                .collect();
-                            let ret = parts.next().expect("function result type");
-                            let err = if has_err {
-                                parts.next().expect("function error type")
-                            } else {
-                                Ty::Never
-                            };
-                            let env = if has_env {
-                                parts.next().expect("function environment type")
-                            } else {
-                                Ty::Never
-                            };
-                            Ty::Fn(Box::new(FnTy {
-                                params,
-                                ret,
-                                err,
-                                env,
-                            }))
-                        }
-                        Build::Union(n, span) => {
-                            let ts = values.split_off(values.len() - n);
-                            let r = self.s.union_mode(ts, mode);
-                            self.flush(span, None);
-                            r
-                        }
-                        Build::Inter(n, span) => {
-                            let ts = values.split_off(values.len() - n);
-                            let r = self.s.normalize_mode(Ty::Inter(ts), mode);
-                            self.flush(span, None);
-                            r
-                        }
-                    };
+                    self.alias_depth += 1;
+                    let r = self.conv_mode(body, &map, mode);
+                    self.alias_depth -= 1;
+                    return r;
+                }
+                if *ty == TypeRef::Builtin(BuiltinType::Never) {
+                    return Ty::Never;
+                }
+                let modes = self.s.rows(Head::Named(*ty), args.len());
+                let args = args
+                    .iter()
+                    .zip(modes)
+                    .map(|(a, row)| self.conv_mode(a, local, row))
+                    .collect();
+                Ty::named(*ty, args)
+            }
+            TypeKind::Var(tv) => {
+                if let Some(t) = local.get(tv).or_else(|| self.tyvars.get(tv)).cloned() {
                     if mode != Mode::Value {
-                        self.s.mark_mode(&result, mode);
+                        self.s.mark_mode(&t, mode);
                     }
-                    values.push(result);
+                    return t;
                 }
-                Task::EndAlias => self.alias_depth -= 1,
-                Task::DiffNext(parts, index, local, mode, depth, span) => {
-                    if index == parts.len() {
-                        let result = values.last().expect("difference result");
-                        if mode != Mode::Value {
-                            self.s.mark_mode(result, mode);
-                        }
-                    } else {
-                        let left = values.pop().expect("difference left operand");
-                        todo.push(Task::DiffCombine(
-                            parts,
-                            index,
-                            local.clone(),
-                            mode,
-                            depth,
-                            span,
-                            left,
-                        ));
-                        todo.push(Task::Visit(&parts[index], local, mode, depth));
-                    }
+                let v = self.s.fresh_input();
+                if let Ty::Var(x) = v {
+                    self.s.vars[x.0 as usize].name =
+                        self.p.ty_var_names.get(tv.0 as usize).cloned();
                 }
-                Task::DiffCombine(parts, index, local, mode, depth, span, left) => {
-                    let right = values.pop().expect("difference right operand");
+                self.tyvars.insert(*tv, v.clone());
+                v
+            }
+            TypeKind::Of { value, site, .. } => self.read_annotation(*value, *site),
+            TypeKind::Hole | TypeKind::Error => self.s.fresh_input(),
+            TypeKind::Tuple(ts) => Ty::tuple(ts.iter().map(|a| self.conv(a, local)).collect()),
+            TypeKind::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let labels: Vec<_> = fields
+                    .iter()
+                    .map(|(label, _)| super::records::written_label(label, self.s.level))
+                    .chain(
+                        removed
+                            .iter()
+                            .map(|label| super::records::written_label(label, self.s.level)),
+                    )
+                    .collect();
+                let fields = fields
+                    .iter()
+                    .map(|(label, ty)| {
+                        (
+                            super::records::written_label(label, self.s.level),
+                            self.conv(ty, local),
+                        )
+                    })
+                    .collect();
+                let result = self.s.record(fields);
+                if let Some(base) = base {
+                    let base = self.conv(base, local);
+                    let rest = self.s.without(&base, labels);
+                    self.s.inter(vec![rest, result])
+                } else {
+                    result
+                }
+            }
+            TypeKind::Fn {
+                params,
+                ret,
+                err,
+                env,
+            } => {
+                let params = params
+                    .iter()
+                    .map(|p| {
+                        (
+                            p.label.as_ref().map(|l| l.name.clone()),
+                            self.conv(&p.ty, local),
+                        )
+                    })
+                    .collect();
+                let ret = self.conv(ret, local);
+                let err = err
+                    .as_ref()
+                    .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Row));
+                let env = env
+                    .as_ref()
+                    .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Env));
+                Ty::Fn(Box::new(FnTy {
+                    params,
+                    ret,
+                    err,
+                    env,
+                }))
+            }
+            TypeKind::Union(ts) => {
+                let ms = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
+                let r = self.s.union_mode(ms, mode);
+                self.flush(t.span, None);
+                r
+            }
+            TypeKind::Inter(ts) => {
+                let ms = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
+                let r = self.s.normalize_mode(Ty::Inter(ms), mode);
+                self.flush(t.span, None);
+                r
+            }
+            TypeKind::Diff(ts) => {
+                let mut a = self.conv_mode(&ts[0], local, mode);
+                for part in &ts[1..] {
+                    let h = self.conv_mode(part, local, mode);
                     let mut members = Vec::new();
-                    super::solve::flatten_union(std::slice::from_ref(&right), &mut members);
-                    let result = if members
+                    super::solve::flatten_union(std::slice::from_ref(&h), &mut members);
+                    if members
                         .iter()
                         .any(|m| m.head().is_none() && *m != Ty::Never)
                     {
-                        self.error(code::TYPE_DIFF_VAR, parts[index].span, "the right side of `-` may only have members with a type constructor (§4.4)");
-                        left
-                    } else {
-                        let result = self
-                            .s
-                            .normalize_mode(Ty::Diff(Box::new(left), members), mode);
-                        self.flush(span, None);
-                        result
-                    };
-                    values.push(result);
-                    todo.push(Task::DiffNext(parts, index + 1, local, mode, depth, span));
+                        self.error(
+                            code::TYPE_DIFF_VAR,
+                            part.span,
+                            "the right side of `-` may only have members with a type constructor (§4.4)",
+                        );
+                        continue;
+                    }
+                    a = self.s.normalize_mode(Ty::Diff(Box::new(a), members), mode);
+                    self.flush(t.span, None);
                 }
+                a
             }
+        };
+        if mode != Mode::Value {
+            self.s.mark_mode(&result, mode);
         }
-        assert_eq!(
-            values.len(),
-            1,
-            "written type conversion left multiple results"
-        );
-        values
-            .pop()
-            .expect("written type conversion produced no result")
+        result
     }
 
     /// `t` with the aliases at its top expanded (§4.3).
@@ -1512,441 +1680,6 @@ impl<'a> Checker<'a> {
     /// The type of `e`, and its known type (§4.8), `Top` when it has none.
     /// `expected` is the expected type of its place, `Top` for none.
     pub fn infer_k(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
-        self.infer_engine(e, expected)
-    }
-
-    fn infer_engine(&mut self, expression: &Expr, expected: &Ty) -> (Ty, Ty) {
-        struct BlockState<'a> {
-            stmts: &'a [Stmt],
-            index: usize,
-            expected: Ty,
-        }
-        struct BitState<'a> {
-            segments: &'a [Segment<Expr>],
-            index: usize,
-        }
-        struct ListState<'a> {
-            items: &'a [Expr],
-            rest: Option<&'a Expr>,
-            index: usize,
-            item_expected: Ty,
-            list_expected: Ty,
-            element: Ty,
-            known: Vec<Ty>,
-        }
-        enum Task<'a> {
-            Visit(&'a Expr, Ty),
-            BlockNext(BlockState<'a>),
-            BlockNonlast(BlockState<'a>, &'a Expr),
-            BlockBinding(BlockState<'a>, PendingBinding<'a>),
-            BlockEnvValue(BlockState<'a>, Ty, &'a Expr, Span, Span),
-            BlockEnvDone(Ty, Span),
-            FunctionDone(PendingFunction<'a>),
-            CallCallee(&'a Expr, Option<&'a Expr>, &'a [Arg], Span),
-            CallNext(PendingCall<'a>),
-            CallArgument(PendingCall<'a>, usize),
-            Field(&'a Expr, &'a Ident, Span),
-            TupleIndex(&'a Expr, u32, Span, Span),
-            UpdateBase(CtorRef, Span, &'a Expr, &'a [(Ident, Expr)]),
-            UpdateNext(PendingUpdate<'a>),
-            UpdateField(PendingUpdate<'a>),
-            BitNext(BitState<'a>),
-            BitFormat(BitState<'a>, &'a Expr, Ty),
-            BitValue(BitState<'a>, Ty),
-            Tuple(usize),
-            ListNext(ListState<'a>),
-            ListItem(ListState<'a>),
-            ListRest(ListState<'a>),
-            Unary(UnOp, &'a Expr),
-            Binary(BinOp, &'a Expr, &'a Expr, Span),
-        }
-        let mut todo = vec![Task::Visit(expression, expected.clone())];
-        let mut values: Vec<(Ty, Ty)> = Vec::new();
-        while let Some(task) = todo.pop() {
-            match task {
-                Task::Visit(e, expected) => match &e.kind {
-                    ExprKind::Block(block) => todo.push(Task::BlockNext(BlockState {
-                        stmts: &block.stmts,
-                        index: 0,
-                        expected,
-                    })),
-                    ExprKind::Fn(function) => {
-                        let (pending, body_expected) = self.function_start(function, &expected);
-                        self.effects.push(Effects::default());
-                        self.function_depth += 1;
-                        todo.push(Task::FunctionDone(pending));
-                        todo.push(Task::BlockNext(BlockState {
-                            stmts: &function.body.stmts,
-                            index: 0,
-                            expected: body_expected,
-                        }));
-                    }
-                    ExprKind::Tuple(items) => {
-                        let parts = match known::members(&expected).as_slice() {
-                            [Ty::Con(Head::Tuple(n), _, xs)] if *n as usize == items.len() => {
-                                xs.clone()
-                            }
-                            _ => vec![Ty::Top; items.len()],
-                        };
-                        todo.push(Task::Tuple(items.len()));
-                        for (child, expected) in items.iter().zip(parts).rev() {
-                            todo.push(Task::Visit(child, expected));
-                        }
-                    }
-                    ExprKind::List { items, rest } => {
-                        let head = Some(Head::Named(TypeRef::Builtin(BuiltinType::List)));
-                        let (item_expected, list_expected) =
-                            match known::members(&expected).as_slice() {
-                                [m @ Ty::Con(_, _, xs)] if m.head() == head && xs.len() == 1 => {
-                                    (xs[0].clone(), m.clone())
-                                }
-                                _ => (Ty::Top, Ty::Top),
-                            };
-                        todo.push(Task::ListNext(ListState {
-                            items,
-                            rest: rest.as_deref(),
-                            index: 0,
-                            item_expected,
-                            list_expected,
-                            element: self.s.fresh(),
-                            known: Vec::new(),
-                        }));
-                    }
-                    ExprKind::BitArray(segments) => {
-                        todo.push(Task::BitNext(BitState { segments, index: 0 }))
-                    }
-                    ExprKind::RecordUpdate {
-                        ctor,
-                        ctor_span,
-                        base,
-                        fields,
-                    } => {
-                        todo.push(Task::UpdateBase(*ctor, *ctor_span, base, fields));
-                        todo.push(Task::Visit(base, Ty::Top));
-                    }
-                    ExprKind::Field { target, name } => {
-                        todo.push(Task::Field(target, name, e.span));
-                        todo.push(Task::Visit(target, Ty::Top));
-                    }
-                    ExprKind::TupleIndex {
-                        target,
-                        index,
-                        index_span,
-                    } => {
-                        todo.push(Task::TupleIndex(
-                            target,
-                            index.to_u32().unwrap_or(u32::MAX),
-                            *index_span,
-                            e.span,
-                        ));
-                        todo.push(Task::Visit(target, Ty::Top));
-                    }
-                    ExprKind::Call { callee, args } => {
-                        todo.push(Task::CallCallee(callee, None, args, e.span));
-                        todo.push(Task::Visit(callee, Ty::Top));
-                    }
-                    ExprKind::Binary {
-                        op: BinOp::Pipe,
-                        lhs,
-                        rhs,
-                    } => {
-                        let (callee, args) = match &rhs.kind {
-                            ExprKind::Call { callee, args } => (&**callee, args.as_slice()),
-                            _ => (&**rhs, &[][..]),
-                        };
-                        todo.push(Task::CallCallee(callee, Some(lhs), args, e.span));
-                        todo.push(Task::Visit(callee, Ty::Top));
-                    }
-                    ExprKind::Unary { op, expr } => {
-                        todo.push(Task::Unary(*op, expr));
-                        todo.push(Task::Visit(expr, Ty::Top));
-                    }
-                    ExprKind::Binary { op, lhs, rhs } if *op != BinOp::Pipe => {
-                        todo.push(Task::Binary(*op, lhs, rhs, e.span));
-                        todo.push(Task::Visit(rhs, Ty::Top));
-                        todo.push(Task::Visit(lhs, Ty::Top));
-                    }
-                    _ => values.push(self.infer_k_inner(e, &expected)),
-                },
-                Task::BlockNext(mut state) => {
-                    let stmts = state.stmts;
-                    match stmts.get(state.index) {
-                        None => {
-                            // A missing final expression is already diagnosed by the parser.
-                            let nil = Ty::named(self.b.nil, Vec::new());
-                            values.push((nil.clone(), nil));
-                        }
-                        Some(Stmt::Bind(binding)) => {
-                            let (pending, expected) = self.local_binding_start(binding);
-                            state.index += 1;
-                            todo.push(Task::BlockBinding(state, pending));
-                            todo.push(Task::Visit(&binding.value, expected));
-                        }
-                        Some(Stmt::Expr(expr)) if state.index + 1 == stmts.len() => {
-                            todo.push(Task::Visit(expr, state.expected));
-                        }
-                        Some(Stmt::Expr(expr)) => {
-                            state.index += 1;
-                            todo.push(Task::BlockNonlast(state, expr));
-                            todo.push(Task::Visit(expr, Ty::Top));
-                        }
-                        Some(Stmt::Env { ty, value, span }) => {
-                            self.check_places(ty, Pol::Pos, 0);
-                            let service = self.conv_mode(ty, &HashMap::new(), Mode::Env);
-                            if let Some(super::Head::Named(r)) = service.head() {
-                                self.out.services.insert((self.module, *span), r);
-                            }
-                            state.index += 1;
-                            todo.push(Task::BlockEnvValue(state, service, value, ty.span, *span));
-                            todo.push(Task::Visit(value, Ty::Top));
-                        }
-                    }
-                }
-                Task::BlockBinding(state, pending) => {
-                    let typed = values.pop().expect("local binding value");
-                    self.local_binding_finish(pending, typed);
-                    todo.push(Task::BlockNext(state));
-                }
-                Task::BlockNonlast(state, expr) => {
-                    values.pop().expect("block statement result");
-                    if has_no_effect(expr) {
-                        self.warning(
-                            code::VALUE_NOT_USED,
-                            expr.span,
-                            "this value is not used, and working it out does nothing",
-                        );
-                    }
-                    todo.push(Task::BlockNext(state));
-                }
-                Task::BlockEnvValue(state, service, value, type_span, span) => {
-                    let (value_type, _) = values.pop().expect("environment statement value");
-                    self.sub2(&value_type, &service, value.span, type_span);
-                    self.effects.push(Effects::default());
-                    todo.push(Task::BlockEnvDone(service, span));
-                    todo.push(Task::BlockNext(state));
-                }
-                Task::BlockEnvDone(service, span) => {
-                    let (err, env) = self.pop_effects(span);
-                    self.add_err(err);
-                    let rest = self.s.env_diff(env, vec![service]);
-                    self.flush(span, None);
-                    self.add_env(rest);
-                }
-                Task::FunctionDone(pending) => {
-                    let body = values.pop().expect("function body result");
-                    self.function_depth -= 1;
-                    values.push(self.function_finish(pending, body));
-                }
-                Task::BitNext(state) => {
-                    let segments = state.segments;
-                    if let Some(segment) = segments.get(state.index) {
-                        let (want, argument) = self.format_start(segment.format.as_ref());
-                        if let Some(argument) = argument {
-                            todo.push(Task::BitFormat(state, argument, want));
-                            todo.push(Task::Visit(argument, Ty::Top));
-                        } else {
-                            todo.push(Task::BitValue(state, want));
-                            todo.push(Task::Visit(&segment.value, Ty::Top));
-                        }
-                    } else {
-                        let ty = self.prim(BuiltinType::BitArray);
-                        values.push((ty.clone(), ty));
-                    }
-                }
-                Task::BitFormat(state, argument, want) => {
-                    let (ty, _) = values.pop().expect("bit-array format argument");
-                    let int = self.prim(BuiltinType::Int);
-                    self.sub(&ty, &int, argument.span);
-                    let segments = state.segments;
-                    let value = &segments[state.index].value;
-                    todo.push(Task::BitValue(state, want));
-                    todo.push(Task::Visit(value, Ty::Top));
-                }
-                Task::BitValue(mut state, want) => {
-                    let (ty, _) = values.pop().expect("bit-array segment value");
-                    self.sub(&ty, &want, state.segments[state.index].value.span);
-                    state.index += 1;
-                    todo.push(Task::BitNext(state));
-                }
-                Task::UpdateBase(ctor, ctor_span, base, fields) => {
-                    let typed = values.pop().expect("record update base");
-                    match self.update_start(ctor, ctor_span, base, fields, typed) {
-                        Ok(state) => todo.push(Task::UpdateNext(state)),
-                        Err(result) => values.push(result),
-                    }
-                }
-                Task::UpdateNext(state) => {
-                    let fields = state.fields;
-                    if let Some((_, value)) = fields.get(state.index) {
-                        todo.push(Task::UpdateField(state));
-                        todo.push(Task::Visit(value, Ty::Top));
-                    } else {
-                        values.push(self.update_finish(state));
-                    }
-                }
-                Task::UpdateField(mut state) => {
-                    let (ty, known) = values.pop().expect("record update field");
-                    let (label, value) = &state.fields[state.index];
-                    match state
-                        .new_fields
-                        .iter()
-                        .position(|f| f.0.as_deref() == Some(&label.name))
-                    {
-                        Some(i) if state.given[i].is_none() => {
-                            state.given[i] = Some(known);
-                            self.sub(&ty, &state.new_fields[i].1, value.span);
-                        }
-                        Some(_) => self.error(
-                            code::CALL_LABELS,
-                            label.span,
-                            format!("the field `{}` is given more than once", label.name),
-                        ),
-                        None => self.error(
-                            code::NO_FIELD,
-                            label.span,
-                            format!(
-                                "the constructor has no field with the label `{}`",
-                                label.name
-                            ),
-                        ),
-                    }
-                    state.index += 1;
-                    todo.push(Task::UpdateNext(state));
-                }
-                Task::Field(target, name, span) => {
-                    let typed = values.pop().expect("field target");
-                    values.push(self.field_finish(target, name, span, typed));
-                }
-                Task::TupleIndex(target, index, index_span, span) => {
-                    let typed = values.pop().expect("tuple target");
-                    values.push(self.tuple_index_finish(target, index, index_span, span, typed));
-                }
-                Task::CallCallee(callee, first, args, span) => {
-                    let function = values.pop().expect("call callee");
-                    let state = self.call_start(callee, first, args, span, function);
-                    todo.push(Task::CallNext(state));
-                }
-                Task::CallNext(mut state) => {
-                    while state.index < state.arguments.len()
-                        && (state.params.is_some() && known::open_fn(state.arguments[state.index]))
-                            != state.later
-                    {
-                        state.index += 1;
-                    }
-                    if state.index == state.arguments.len() {
-                        if !state.later {
-                            state.later = true;
-                            state.index = 0;
-                            todo.push(Task::CallNext(state));
-                        } else {
-                            values.push(self.call_finish(state));
-                        }
-                    } else {
-                        let i = state.index;
-                        let argument = state.arguments[i];
-                        let expected = match &state.params {
-                            Some(ps) => self
-                                .ksubst(
-                                    &ps[i],
-                                    &self.whole_sigma(&state.sigma, &state.hidden),
-                                    true,
-                                )
-                                .unwrap_or(Ty::Top),
-                            None => Ty::Top,
-                        };
-                        todo.push(Task::CallArgument(state, i));
-                        todo.push(Task::Visit(argument, expected));
-                    }
-                }
-                Task::CallArgument(mut state, i) => {
-                    let (ty, known) = values.pop().expect("call argument");
-                    if let (Some(params), false) = (&state.params, state.later) {
-                        self.match_k(&params[i], &known, &mut state.sigma, 0);
-                    }
-                    state.typed[i] = Some((ty, known));
-                    state.index = i + 1;
-                    todo.push(Task::CallNext(state));
-                }
-                Task::Tuple(n) => {
-                    let parts = values.split_off(values.len() - n);
-                    let (ts, ks) = parts.into_iter().unzip();
-                    values.push((Ty::tuple(ts), Ty::tuple(ks)));
-                }
-                Task::ListNext(state) => {
-                    let items = state.items;
-                    if let Some(child) = items.get(state.index) {
-                        let expected = state.item_expected.clone();
-                        todo.push(Task::ListItem(state));
-                        todo.push(Task::Visit(child, expected));
-                    } else if let Some(rest) = state.rest {
-                        let expected = state.list_expected.clone();
-                        todo.push(Task::ListRest(state));
-                        todo.push(Task::Visit(rest, expected));
-                    } else {
-                        let list =
-                            Ty::named(TypeRef::Builtin(BuiltinType::List), vec![state.element]);
-                        let known = Ty::named(
-                            TypeRef::Builtin(BuiltinType::List),
-                            vec![self.kunion(state.known)],
-                        );
-                        values.push((list, known));
-                    }
-                }
-                Task::ListItem(mut state) => {
-                    let (ty, known) = values.pop().expect("list item");
-                    self.sub(&ty, &state.element, state.items[state.index].span);
-                    state.known.push(known);
-                    state.index += 1;
-                    todo.push(Task::ListNext(state));
-                }
-                Task::ListRest(mut state) => {
-                    let (ty, known) = values.pop().expect("list rest");
-                    let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![state.element]);
-                    self.sub(&ty, &list, state.rest.expect("list rest expression").span);
-                    let head = Some(Head::Named(TypeRef::Builtin(BuiltinType::List)));
-                    state.known.push(match known::member(&known, head) {
-                        Some(Ty::Con(_, _, ref xs)) if xs.len() == 1 => xs[0].clone(),
-                        _ => Ty::Top,
-                    });
-                    let known = Ty::named(
-                        TypeRef::Builtin(BuiltinType::List),
-                        vec![self.kunion(state.known)],
-                    );
-                    values.push((list, known));
-                }
-                Task::Unary(op, expr) => {
-                    let (t, _) = values.pop().expect("unary operand");
-                    let want = self.prim(match op {
-                        UnOp::Neg => BuiltinType::Int,
-                        UnOp::NegFloat => BuiltinType::Float,
-                    });
-                    self.sub(&t, &want, expr.span);
-                    let result = if op == UnOp::Neg {
-                        known::neg_literal(expr).map(|n| known::scalar_literal(BuiltinType::Int, n))
-                    } else {
-                        None
-                    }
-                    .unwrap_or(want);
-                    values.push((result.clone(), result));
-                }
-                Task::Binary(op, lhs, rhs, span) => {
-                    let right = values.pop().expect("binary right operand");
-                    let left = values.pop().expect("binary left operand");
-                    values.push(self.binary_values(op, lhs, rhs, span, left, right));
-                }
-            }
-        }
-        assert_eq!(
-            values.len(),
-            1,
-            "expression inference left multiple results"
-        );
-        values
-            .pop()
-            .expect("expression inference produced no result")
-    }
-
-    fn infer_k_inner(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
         let same = |t: Ty| (t.clone(), t);
         match &e.kind {
             ExprKind::Int(n) => same(known::scalar_literal(BuiltinType::Int, n.to_string())),
@@ -1958,6 +1691,13 @@ impl<'a> Checker<'a> {
                     Some(s) => self.instantiate(&s),
                     None => self.s.fresh_input(),
                 };
+                if !self.label_callee && !self.label_slots(e).is_empty() {
+                    self.error(
+                        code::LABEL_PARAMETER_VALUE,
+                        e.span,
+                        "a binding with label parameters may only be used as the callee of a call",
+                    );
+                }
                 (t, self.kvars.get(v).cloned().unwrap_or(Ty::Top))
             }
             ExprKind::Name(ValueRef::Def(d)) => {
@@ -1985,44 +1725,163 @@ impl<'a> Checker<'a> {
                     Some(s) => self.instantiate(&s),
                     None => self.s.fresh_input(),
                 };
+                if !self.label_callee && !self.label_slots(e).is_empty() {
+                    self.error(
+                        code::LABEL_PARAMETER_VALUE,
+                        e.span,
+                        "a binding with label parameters may only be used as the callee of a call",
+                    );
+                }
                 (t, k)
             }
             ExprKind::Name(ValueRef::Ctor(c)) => {
                 let t = self.ctor_value(*c);
                 (t, self.ctor_known(*c))
             }
-            ExprKind::Tuple(_) | ExprKind::List { .. } => {
-                unreachable!("composite expression must be scheduled")
+            ExprKind::Tuple(items) => {
+                // A part has the matching part of the expected type (§4.8).
+                let parts = match known::members(expected).as_slice() {
+                    [Ty::Con(Head::Tuple(n), _, xs)] if *n as usize == items.len() => xs.clone(),
+                    _ => vec![Ty::Top; items.len()],
+                };
+                let (ts, ks) = items
+                    .iter()
+                    .zip(&parts)
+                    .map(|(x, p)| self.infer_k(x, p))
+                    .unzip();
+                (Ty::tuple(ts), Ty::tuple(ks))
             }
-            ExprKind::BitArray(_) => unreachable!("bit array must be scheduled"),
-            ExprKind::Block(_) => unreachable!("block expression must be scheduled"),
-            ExprKind::Fn(_) => unreachable!("function expression must be scheduled"),
+            ExprKind::Record { base, fields } => {
+                use super::records::Label;
+                let mut names = HashSet::new();
+                let mut labels = Vec::new();
+                let mut values = Vec::new();
+                let mut known_values = Vec::new();
+                let base_types = base.as_ref().map(|b| self.infer_k(b, &Ty::Top));
+                for (name, value) in fields {
+                    if !names.insert(name.name.clone()) {
+                        self.error(
+                            code::DUPLICATE_RECORD_LABEL,
+                            name.span,
+                            format!("the record label `{}` is repeated", name.name),
+                        );
+                    }
+                    let label = Label::name(name.name.as_str());
+                    let expected_field = match known::members(expected).as_slice() {
+                        [Ty::Graph(graph)] => match graph.field(&label) {
+                            super::records::Field::Found(ty) => ty,
+                            _ => Ty::Top,
+                        },
+                        _ => Ty::Top,
+                    };
+                    let (ty, known) = self.infer_k(value, &expected_field);
+                    labels.push(label.clone());
+                    values.push((label.clone(), ty));
+                    known_values.push((label, known));
+                }
+                let result = self.s.record(values);
+                let known = self.s.record(known_values);
+                if let Some((base_ty, base_known)) = base_types {
+                    let any_record = self.s.record(Vec::new());
+                    self.sub(&base_ty, &any_record, base.as_ref().unwrap().span);
+                    let remainder = self.s.without(&base_ty, labels.clone());
+                    let known_remainder = self.s.without(&base_known, labels);
+                    (
+                        self.s.inter(vec![remainder, result]),
+                        self.s.inter(vec![known_remainder, known]),
+                    )
+                } else {
+                    (result, known)
+                }
+            }
+            ExprKind::List { items, rest } => {
+                let head = Some(Head::Named(TypeRef::Builtin(BuiltinType::List)));
+                let (item_exp, list_exp) = match known::members(expected).as_slice() {
+                    [m @ Ty::Con(_, _, xs)] if m.head() == head && xs.len() == 1 => {
+                        (xs[0].clone(), m.clone())
+                    }
+                    _ => (Ty::Top, Ty::Top),
+                };
+                let t = self.s.fresh();
+                let mut ks = Vec::new();
+                for x in items {
+                    let (xt, xk) = self.infer_k(x, &item_exp);
+                    self.sub(&xt, &t, x.span);
+                    ks.push(xk);
+                }
+                let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![t]);
+                if let Some(r) = rest {
+                    let (rt, rk) = self.infer_k(r, &list_exp);
+                    self.sub(&rt, &list, r.span);
+                    ks.push(match known::member(&rk, head) {
+                        Some(Ty::Con(_, _, xs)) if xs.len() == 1 => xs[0].clone(),
+                        _ => Ty::Top,
+                    });
+                }
+                let k = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![self.kunion(ks)]);
+                (list, k)
+            }
+            ExprKind::BitArray(segs) => {
+                for s in segs {
+                    let want = self.format(s.format.as_ref(), s.span);
+                    let t = self.infer(&s.value);
+                    self.sub(&t, &want, s.value.span);
+                }
+                same(self.prim(BuiltinType::BitArray))
+            }
+            ExprKind::Block(b) => self.block(&b.stmts, b.span, expected),
+            ExprKind::Fn(f) => self.function(f, expected),
             ExprKind::Case { subject, clauses } => self.case(subject, clauses, e.span, expected),
-            ExprKind::Call { .. } => unreachable!("call expression must be scheduled"),
-            ExprKind::Field { .. } | ExprKind::TupleIndex { .. } => {
-                unreachable!("field access must be scheduled")
+            ExprKind::Call { callee, args } => self.call(callee, None, args, e.span),
+            ExprKind::Field { target, name } => self.field(target, name, e.span),
+            ExprKind::TupleIndex {
+                target,
+                index,
+                index_span,
+            } => self.tuple_index(
+                target,
+                index.to_u32().unwrap_or(u32::MAX),
+                *index_span,
+                e.span,
+            ),
+            ExprKind::RecordUpdate {
+                ctor,
+                ctor_span,
+                base,
+                fields,
+            } => self.record_update(*ctor, *ctor_span, base, fields),
+            ExprKind::Unary { op, expr } => {
+                let want = self.prim(match op {
+                    UnOp::Neg => BuiltinType::Int,
+                    UnOp::NegFloat => BuiltinType::Float,
+                });
+                let t = self.infer(expr);
+                self.sub(&t, &want, expr.span);
+                if *op == UnOp::Neg
+                    && let Some(n) = known::neg_literal(expr)
+                {
+                    same(known::scalar_literal(BuiltinType::Int, n))
+                } else {
+                    same(want)
+                }
             }
-            ExprKind::RecordUpdate { .. } => unreachable!("record update must be scheduled"),
-            ExprKind::Unary { .. } => unreachable!("unary expression must be scheduled"),
-            ExprKind::Binary {
-                op: BinOp::Pipe, ..
-            } => unreachable!("pipe expression must be scheduled"),
-            ExprKind::Binary { .. } => unreachable!("binary expression must be scheduled"),
+            ExprKind::Binary { op, lhs, rhs } => self.binary(*op, lhs, rhs, e.span),
             ExprKind::Error => (self.s.fresh_input(), Ty::Top),
         }
     }
 
     /// Rule 8 and §6.9.
-    fn binary_values(
-        &mut self,
-        op: BinOp,
-        lhs: &Expr,
-        rhs: &Expr,
-        span: Span,
-        (lt, lk): (Ty, Ty),
-        (rt, rk): (Ty, Ty),
-    ) -> (Ty, Ty) {
+    fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr, span: Span) -> (Ty, Ty) {
         use BinOp::*;
+        if op == Pipe {
+            // `a |> f(b)` is `f(a, b)`, and `a |> f` is `f(a)`: `a` is the
+            // first argument, with its expected type (§4.8).
+            let first = Some(lhs);
+            return match &rhs.kind {
+                ExprKind::Call { callee, args } => self.call(callee, first, args, span),
+                _ => self.call(rhs, first, &[], span),
+            };
+        }
         let (operand, result) = match op {
             Or | And => (Some(self.bool_ty()), self.bool_ty()),
             Eq | NotEq => (None, self.bool_ty()),
@@ -2044,6 +1903,8 @@ impl<'a> Checker<'a> {
             ),
             Pipe => unreachable!(),
         };
+        let (lt, lk) = self.infer_k(lhs, &Ty::Top);
+        let (rt, rk) = self.infer_k(rhs, &Ty::Top);
         // §6.9: `==` on values of disjoint known types would always give the
         // same result.
         if matches!(op, Eq | NotEq) && lk != Ty::Top && rk != Ty::Top && known::disjoint(&lk, &rk) {
@@ -2089,19 +1950,158 @@ impl<'a> Checker<'a> {
         (result.clone(), result)
     }
 
+    fn label_slots(&self, callee: &Expr) -> Vec<(TyVarId, usize)> {
+        match callee.kind {
+            ExprKind::Name(value) => self.label_slots_ref(value),
+            _ => Vec::new(),
+        }
+    }
+
+    pub(super) fn label_slots_ref(&self, value: ValueRef) -> Vec<(TyVarId, usize)> {
+        match value {
+            ValueRef::Local(var) => self
+                .locals
+                .get(&var)
+                .filter(|s| !s.key_slots.is_empty())
+                .map(|s| s.key_slots.clone())
+                .or_else(|| self.label_key_slots.get(&var).cloned())
+                .unwrap_or_default(),
+            ValueRef::Def(def) => {
+                if let Some(scheme) = self.defs.get(&def)
+                    && !scheme.key_slots.is_empty()
+                {
+                    return scheme.key_slots.clone();
+                }
+                match &self.p.def(def).kind {
+                    DefKind::Binding { binding, .. } => key_slots(
+                        &self
+                            .p
+                            .binding(BindingRef {
+                                module: def.module,
+                                index: *binding,
+                            })
+                            .binding,
+                    ),
+                    DefKind::External { ty, .. } => external_key_slots(ty),
+                }
+            }
+            ValueRef::Ctor(_) => Vec::new(),
+        }
+    }
+
     /// Rule 5: `f(a1, …)`. `first` is the left side of `|>`, the first
     /// argument.
-    fn call_start<'tree>(
+    fn call_label_substitutions(
         &mut self,
-        callee: &'tree Expr,
-        first: Option<&'tree Expr>,
-        args: &'tree [Arg],
-        span: Span,
-        (f, kf): (Ty, Ty),
-    ) -> PendingCall<'tree> {
-        let bool_pipe = first.is_some() && kf.head() == Some(Head::Named(self.b.bool_));
-        let diagnostic_start = self.diags.len();
-        let kfn = known::one_fn(&kf);
+        callee: &Expr,
+        f: &Ty,
+        to: &[usize],
+        values: &[&Expr],
+        typed: &[Option<(Ty, Ty)>],
+        spans: &[Span],
+    ) -> rustc_hash::FxHashMap<super::records::LabelParam, super::records::Label> {
+        let slots = self.label_slots(callee);
+        let recursive = match callee.kind {
+            ExprKind::Name(ValueRef::Def(def)) => self.group_defs.contains(&def),
+            ExprKind::Name(ValueRef::Local(var)) => self.recursive_bindings.contains(&var),
+            _ => false,
+        };
+        if recursive {
+            for (var, slot) in &slots {
+                let expected = self.active_key_parameters.iter().rev().find_map(|scope| {
+                    scope
+                        .get(slot)
+                        .filter(|(v, _)| v == var)
+                        .map(|(_, names)| names)
+                });
+                if let Some(expected) = expected {
+                    let argument = to.iter().position(|index| index == slot);
+                    if !argument.is_some_and(|i| matches!(values[i].kind, ExprKind::Name(ValueRef::Local(actual)) if expected.contains(&actual))) {
+                        self.error(code::INVALID_LABEL_PARAMETER, argument.map_or(callee.span, |i| spans[i]), "a recursive call must forward its own key parameter by name");
+                    }
+                }
+            }
+        }
+        let params = super::records::label_params(f);
+        let mut labels = rustc_hash::FxHashMap::default();
+        let mut handled = HashSet::new();
+        for (var, _) in &slots {
+            if !handled.insert(*var) {
+                continue;
+            }
+            let key_slots: Vec<_> = slots
+                .iter()
+                .filter_map(|(v, slot)| (v == var).then_some(*slot))
+                .collect();
+            let mut selected = None;
+            for slot in key_slots {
+                let argument = to.iter().position(|i| *i == slot);
+                let key = argument.and_then(|i| {
+                    let members = typed[i]
+                        .as_ref()
+                        .map(|(_, known)| known::members(known))
+                        .unwrap_or_default();
+                    match members.as_slice() {
+                        [
+                            Ty::Con(
+                                Head::Named(TypeRef::Builtin(BuiltinType::String)),
+                                values,
+                                args,
+                            ),
+                        ] if args.is_empty()
+                            && values.is_finite()
+                            && values.items().count() == 1 =>
+                        {
+                            values
+                                .items()
+                                .next()
+                                .cloned()
+                                .map(super::records::Label::name)
+                        }
+                        _ => match values[i].kind {
+                            ExprKind::Name(ValueRef::Local(var)) => {
+                                self.label_key_values.get(&var).cloned()
+                            }
+                            _ => None,
+                        },
+                    }
+                });
+                if let Some(key) = key {
+                    if selected.as_ref().is_some_and(|old| *old != key) {
+                        self.error(
+                            code::INVALID_RECORD_KEY,
+                            argument.map_or(callee.span, |i| spans[i]),
+                            "keys for one label parameter must be the same",
+                        );
+                    } else {
+                        selected = Some(key);
+                    }
+                } else {
+                    self.error(
+                        code::INVALID_RECORD_KEY,
+                        argument.map_or(callee.span, |i| spans[i]),
+                        "a label parameter needs one known string literal as its key",
+                    );
+                }
+            }
+            if let Some(key) = selected {
+                for param in params
+                    .iter()
+                    .filter(|p| super::records::label_var(p) == Some(*var))
+                {
+                    labels.insert(param.clone(), key.clone());
+                }
+            }
+        }
+        labels
+    }
+
+    fn call(&mut self, callee: &Expr, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
+        let was_callee = self.label_callee;
+        self.label_callee = true;
+        let (mut f, mut kf) = self.infer_k(callee, &Ty::Top);
+        self.label_callee = was_callee;
+        let mut kfn = known::one_fn(&kf);
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
         // §6.6: the parameter that each argument goes to.
@@ -2133,7 +2133,7 @@ impl<'a> Checker<'a> {
         // type variables that matching the other arguments fixes. Function
         // expressions with a parameter with no written type are typed after
         // the others, and are left out of that matching.
-        let params: Option<Vec<Ty>> = match (&kfn, &to) {
+        let mut params: Option<Vec<Ty>> = match (&kfn, &to) {
             (Some(k), Some(to)) => Some(
                 to.iter()
                     .map(|i| k.params.get(*i).map_or(Ty::Top, |p| p.1.clone()))
@@ -2145,47 +2145,57 @@ impl<'a> Checker<'a> {
             .into_iter()
             .chain(args.iter().map(|a| &a.value))
             .collect();
-        let typed: Vec<Option<(Ty, Ty)>> = vec![None; n];
-        let sigma = known::Sigma::new();
-        let hidden = kfn
+        let spans: Vec<Span> = values.iter().map(|a| a.span).collect();
+        let mut typed: Vec<Option<(Ty, Ty)>> = vec![None; n];
+        let mut sigma = known::Sigma::new();
+        let mut hidden = kfn
             .as_ref()
             .map_or_else(Vec::new, |k| self.hidden_inputs(k));
-        PendingCall {
-            callee,
-            first,
-            span,
-            function: f,
-            known_function: kfn,
-            bool_pipe,
-            diagnostic_start,
-            placement: to,
-            params,
-            arguments: values,
-            typed,
-            sigma,
-            hidden,
-            later: false,
-            index: 0,
+        for later in [false, true] {
+            for (i, a) in values.iter().enumerate() {
+                if (params.is_some() && known::open_fn(a)) != later {
+                    continue;
+                }
+                let expected = match &params {
+                    Some(ps) => self
+                        .ksubst(&ps[i], &self.whole_sigma(&sigma, &hidden), true)
+                        .unwrap_or(Ty::Top),
+                    None => Ty::Top,
+                };
+                let (t, k) = self.infer_k(a, &expected);
+                if let (Some(ps), false) = (&params, later) {
+                    self.match_k(&ps[i], &k, &mut sigma, 0);
+                }
+                typed[i] = Some((t, k));
+            }
+            if !later && let Some(to) = &to {
+                let labels = self.call_label_substitutions(callee, &f, to, &values, &typed, &spans);
+                if !labels.is_empty() {
+                    f = super::records::map_labels(&f, &labels);
+                    kf = super::records::map_labels(&kf, &labels);
+                    kfn = known::one_fn(&kf);
+                    params = kfn.as_ref().map(|k| {
+                        to.iter()
+                            .map(|i| k.params.get(*i).map_or(Ty::Top, |p| p.1.clone()))
+                            .collect()
+                    });
+                    hidden = kfn
+                        .as_ref()
+                        .map_or_else(Vec::new, |k| self.hidden_inputs(k));
+                    sigma.clear();
+                    if let Some(ps) = &params {
+                        for (i, known) in typed
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(i, t)| t.as_ref().map(|(_, k)| (i, k)))
+                        {
+                            self.match_k(&ps[i], known, &mut sigma, 0);
+                        }
+                    }
+                }
+            }
         }
-    }
-
-    fn call_finish(&mut self, state: PendingCall<'_>) -> (Ty, Ty) {
-        let PendingCall {
-            callee,
-            first,
-            span,
-            function: f,
-            known_function: kfn,
-            bool_pipe,
-            diagnostic_start,
-            placement: to,
-            arguments: values,
-            typed,
-            ..
-        } = state;
-        let n = values.len();
         let typed: Vec<(Ty, Ty)> = typed.into_iter().flatten().collect();
-        let spans: Vec<Span> = values.iter().map(|a| a.span).collect();
         let Some(to) = to else {
             return (self.s.fresh(), Ty::Top);
         };
@@ -2249,32 +2259,6 @@ impl<'a> Checker<'a> {
                 r
             }
         };
-        if bool_pipe {
-            let start = first.unwrap().span.end;
-            let end = callee.span.start.max(start);
-            let source = &self.sources.get(self.p.module(self.module).source).text;
-            let operator = ilang_syntax::lex(&source[start as usize..end as usize])
-                .tokens
-                .into_iter()
-                .find(|t| {
-                    matches!(
-                        t.kind,
-                        ilang_syntax::token::TokenKind::Pipe
-                            | ilang_syntax::token::TokenKind::PipeGt
-                    )
-                })
-                .map(|t| Span::new(start + t.span.start, start + t.span.end));
-            for diagnostic in &mut self.diags[diagnostic_start..] {
-                if diagnostic.code == code::TYPE_MISMATCH {
-                    diagnostic.message.push_str(
-                        "; the pipe target is Bool, which is not callable; use `||` for Boolean or",
-                    );
-                    if let Some(operator) = operator {
-                        diagnostic.span = operator;
-                    }
-                }
-            }
-        }
         (t, known)
     }
 
@@ -2424,25 +2408,49 @@ impl<'a> Checker<'a> {
     /// Rule 13 and §6.7 for `v.f`: every constructor that may have made `v`
     /// has a field with the label `f`, and `v.f` has the union of their
     /// types.
-    fn field_finish(
-        &mut self,
-        target: &Expr,
-        name: &Ident,
-        span: Span,
-        (t, kv): (Ty, Ty),
-    ) -> (Ty, Ty) {
+    fn field(&mut self, target: &Expr, name: &Ident, span: Span) -> (Ty, Ty) {
+        let (t, kv) = self.infer_k(target, &Ty::Top);
+        let members = known::members(&kv);
+        let known_ctor = self.known_ctor(target);
+        let record_access = known_ctor.is_none()
+            && (kv == Ty::Top
+                || !members.is_empty()
+                    && members.iter().all(|m| {
+                        matches!(m, Ty::Var(_) | Ty::Top) || m.value_head() == Some(Head::Record)
+                    }));
+        if record_access {
+            let value = self.s.fresh();
+            let label = super::records::Label::name(name.name.as_str());
+            let known_fields: Option<Vec<_>> = members
+                .iter()
+                .map(|member| match member {
+                    Ty::Graph(graph) => match graph.field(&label) {
+                        super::records::Field::Found(ty) => Some(ty),
+                        _ => None,
+                    },
+                    _ => None,
+                })
+                .collect();
+            let known = match known_fields {
+                Some(fields) if !fields.is_empty() => self.kunion(fields),
+                _ => Ty::Top,
+            };
+            let required = self.s.record(vec![(label, value.clone())]);
+            self.sub(&t, &required, name.span);
+            self.out
+                .access
+                .insert((self.module, span), super::Access::Label(name.name.clone()));
+            return (value, known);
+        }
         // The constructors that may have made `v`, each with the arguments
         // of its type in the known type of `v`, when they are known.
         let mut ctors: Vec<(CtorRef, Option<Vec<Ty>>)> = Vec::new();
-        let known_ctor = self.known_ctor(target);
         if self.keep_locals {
             self.note_field_ctors(known_ctor, &kv, span);
         }
         if let Some(c) = known_ctor {
-            let args = match known::member(&kv, Some(Head::Named(TypeRef::Custom(c.ty))))
-                .map(Ty::into_parts)
-            {
-                Some(TyParts::Con(_, _, xs)) => Some(xs),
+            let args = match known::member(&kv, Some(Head::Named(TypeRef::Custom(c.ty)))) {
+                Some(Ty::Con(_, _, xs)) => Some(xs),
                 _ => None,
             };
             ctors.push((c, args));
@@ -2558,12 +2566,20 @@ impl<'a> Checker<'a> {
         // is not changed, because outside the clause it may have values of
         // other types.
         let narrowed = known_ctor.and_then(|_| self.known_ctor_args(target));
+        let mut demand = super::records::Demand::new(super::records::Demand::LIMIT, true);
         let mut forms: Vec<Ty> = match kv {
             Ty::Top => Vec::new(),
-            _ => known::members(&kv)
+            _ => match known::members(&kv)
                 .iter()
-                .map(|m| self.known_bound(m))
-                .collect(),
+                .map(|m| self.known_bound(m, &mut demand))
+                .collect::<Result<_, _>>()
+            {
+                Ok(forms) => forms,
+                Err(_) => {
+                    self.type_resource_limit(name.span);
+                    return (self.s.fresh(), Ty::Top);
+                }
+            },
         };
         let mut parts = Vec::new();
         for (c, i) in &found {
@@ -2597,14 +2613,8 @@ impl<'a> Checker<'a> {
 
     /// Rule 13 for `v.k`: every member of the known type of `v` is a tuple
     /// with more than k parts.
-    fn tuple_index_finish(
-        &mut self,
-        target: &Expr,
-        k: u32,
-        index_span: Span,
-        span: Span,
-        (t, kv): (Ty, Ty),
-    ) -> (Ty, Ty) {
+    fn tuple_index(&mut self, target: &Expr, k: u32, index_span: Span, span: Span) -> (Ty, Ty) {
+        let (t, kv) = self.infer_k(target, &Ty::Top);
         if kv == Ty::Top {
             self.error(
                 code::NEEDS_KNOWN_TYPE,
@@ -2616,10 +2626,17 @@ impl<'a> Checker<'a> {
         let mut forms = Vec::new();
         let mut parts = Vec::new();
         let mut kparts = Vec::new();
+        let mut demand = super::records::Demand::new(super::records::Demand::LIMIT, true);
         for m in known::members(&kv) {
             match &m {
                 Ty::Con(Head::Tuple(n), _, xs) if k < *n => {
-                    let form = self.known_bound(&m);
+                    let form = match self.known_bound(&m, &mut demand) {
+                        Ok(form) => form,
+                        Err(_) => {
+                            self.type_resource_limit(index_span);
+                            return (self.s.fresh(), Ty::Top);
+                        }
+                    };
                     if let Ty::Con(_, _, ys) = &form {
                         parts.push(ys[k as usize].clone());
                     }
@@ -2662,16 +2679,16 @@ impl<'a> Checker<'a> {
     }
 
     /// §6.7: `C(..base, f: e)`.
-    fn update_start<'tree>(
+    fn record_update(
         &mut self,
         ctor: CtorRef,
         ctor_span: Span,
-        base: &'tree Expr,
-        fields: &'tree [(Ident, Expr)],
-        (bt, bk): (Ty, Ty),
-    ) -> Result<PendingUpdate<'tree>, (Ty, Ty)> {
+        base: &Expr,
+        fields: &[(Ident, Expr)],
+    ) -> (Ty, Ty) {
+        let (bt, bk) = self.infer_k(base, &Ty::Top);
         let TypeBody::Custom(ctors) = &self.p.ty(ctor.ty).body else {
-            return Err((self.s.fresh(), Ty::Top));
+            return (self.s.fresh(), Ty::Top);
         };
         if ctors.len() != 1 && self.known_ctor(base) != Some(ctor) {
             let cname = ctors[ctor.index as usize].name.clone();
@@ -2706,31 +2723,32 @@ impl<'a> Checker<'a> {
         };
         let old_fields = self.ctor_fields(ctor, &old);
         let new_fields = self.ctor_fields(ctor, &new);
-        let given = vec![None; new_fields.len()];
-        Ok(PendingUpdate {
-            ctor,
-            base,
-            fields,
-            new,
-            old_fields,
-            new_fields,
-            given,
-            base_known: bk,
-            index: 0,
-        })
-    }
-
-    fn update_finish(&mut self, state: PendingUpdate<'_>) -> (Ty, Ty) {
-        let PendingUpdate {
-            ctor,
-            base,
-            new,
-            old_fields,
-            new_fields,
-            given,
-            base_known: bk,
-            ..
-        } = state;
+        let mut given: Vec<Option<Ty>> = vec![None; new_fields.len()];
+        for (label, e) in fields {
+            let (t, k) = self.infer_k(e, &Ty::Top);
+            match new_fields
+                .iter()
+                .position(|f| f.0.as_deref() == Some(&label.name))
+            {
+                Some(i) if given[i].is_none() => {
+                    given[i] = Some(k);
+                    self.sub(&t, &new_fields[i].1, e.span);
+                }
+                Some(_) => self.error(
+                    code::CALL_LABELS,
+                    label.span,
+                    format!("the field `{}` is given more than once", label.name),
+                ),
+                None => self.error(
+                    code::NO_FIELD,
+                    label.span,
+                    format!(
+                        "the constructor has no field with the label `{}`",
+                        label.name
+                    ),
+                ),
+            }
+        }
         for (i, g) in given.iter().enumerate() {
             if g.is_none() {
                 self.sub(&old_fields[i].1, &new_fields[i].1, base.span);
@@ -2738,10 +2756,8 @@ impl<'a> Checker<'a> {
         }
         // §4.8: the known type of the call of `C` with the given fields and
         // the other fields of `v`.
-        let base_args = match known::member(&bk, Some(Head::Named(TypeRef::Custom(ctor.ty))))
-            .map(Ty::into_parts)
-        {
-            Some(TyParts::Con(_, _, xs)) => Some(xs),
+        let base_args = match known::member(&bk, Some(Head::Named(TypeRef::Custom(ctor.ty)))) {
+            Some(Ty::Con(_, _, xs)) => Some(xs),
             _ => None,
         };
         let ks: Vec<Ty> = given
@@ -2757,19 +2773,9 @@ impl<'a> Checker<'a> {
     }
 
     /// §8.2: the type of the value of a segment.
-    pub fn format(&mut self, f: Option<&Format>, _span: Span) -> Ty {
-        let (ty, argument) = self.format_start(f);
-        if let Some(argument) = argument {
-            let actual = self.infer(argument);
-            let int = self.prim(BuiltinType::Int);
-            self.sub(&actual, &int, argument.span);
-        }
-        ty
-    }
-
-    fn format_start<'tree>(&mut self, f: Option<&'tree Format>) -> (Ty, Option<&'tree Expr>) {
+    pub fn format(&mut self, f: Option<&Format>, span: Span) -> Ty {
         let Some(f) = f else {
-            return (self.prim(BuiltinType::Int), None);
+            return self.prim(BuiltinType::Int);
         };
         let name = f.name.name.as_str();
         let Some(ty) = known::format_prim(name) else {
@@ -2778,7 +2784,7 @@ impl<'a> Checker<'a> {
                 f.name.span,
                 format!("there is no bit array format `{name}` (§8.2)"),
             );
-            return (self.s.fresh(), None);
+            return self.s.fresh();
         };
         // Whether the format needs a length, has none, or may have one.
         let arg = match name {
@@ -2799,20 +2805,119 @@ impl<'a> Checker<'a> {
             ),
             _ => {}
         }
-        (self.prim(ty), f.arg.as_deref())
+        if let Some(a) = &f.arg {
+            let t = self.infer(a);
+            let int = self.prim(BuiltinType::Int);
+            self.sub(&t, &int, a.span);
+        }
+        let _ = span;
+        self.prim(ty)
     }
 
     // ---- Blocks, functions, and bindings ----
+
+    /// Rule 9: `{ s1 … sn e }`. The last expression has the expected type
+    /// of the block, and the block has its known type (§4.8).
+    pub fn block(&mut self, stmts: &[Stmt], span: Span, expected: &Ty) -> (Ty, Ty) {
+        for (i, s) in stmts.iter().enumerate() {
+            match s {
+                Stmt::Bind(b) => self.local_binding(b),
+                Stmt::Expr(e) if i + 1 == stmts.len() => return self.infer_k(e, expected),
+                Stmt::Expr(e) => {
+                    self.infer(e);
+                    if has_no_effect(e) {
+                        self.warning(
+                            code::VALUE_NOT_USED,
+                            e.span,
+                            "this value is not used, and working it out does nothing",
+                        );
+                    }
+                }
+                Stmt::Env { ty, value, span } => {
+                    // `! T = e1` and the rest `r`: `A ? E ! N1 | M - T`.
+                    self.check_places(ty, Pol::Pos, 0);
+                    let t = self.conv_mode(ty, &HashMap::new(), Mode::Env);
+                    if let Some(super::Head::Named(r)) = t.head() {
+                        self.out.services.insert((self.module, *span), r);
+                    }
+                    let v = self.infer(value);
+                    self.sub2(&v, &t, value.span, ty.span);
+                    self.effects.push(Effects::default());
+                    let a = self.block(&stmts[i + 1..], *span, expected);
+                    let (err, env) = self.pop_effects(*span);
+                    self.add_err(err);
+                    let rest = self.s.env_diff(env, vec![t]);
+                    self.flush(*span, None);
+                    self.add_env(rest);
+                    return a;
+                }
+            }
+        }
+        // The last statement is not an expression: reported by the parser.
+        let _ = span;
+        let nil = Ty::named(self.b.nil, Vec::new());
+        (nil.clone(), nil)
+    }
 
     /// Rule 4: a function expression, and its known type (§4.8). With an
     /// expected function type with as many parameters, a parameter with no
     /// type written at its top gets the known type of the matching
     /// parameter.
-    fn function_start<'tree>(
-        &mut self,
-        f: &'tree Function,
-        expected: &Ty,
-    ) -> (PendingFunction<'tree>, Ty) {
+    fn function(&mut self, f: &Function, expected: &Ty) -> (Ty, Ty) {
+        let mut declared_labels = HashSet::new();
+        let mut visit = |ty: &Type| {
+            walk_type(ty, &mut |part| {
+                if let TypeKind::Record {
+                    fields, removed, ..
+                } = &part.kind
+                {
+                    declared_labels.extend(
+                        fields
+                            .iter()
+                            .map(|(label, _)| label)
+                            .chain(removed)
+                            .filter_map(|label| label.parameter),
+                    );
+                }
+            })
+        };
+        for p in &f.params {
+            if let Param::Pattern { pattern, .. } = p
+                && let Some(ty) = known::top_written(pattern)
+            {
+                visit(ty);
+            }
+        }
+        if let Some(ret) = &f.ret {
+            for ty in [Some(&ret.value), ret.err.as_ref(), ret.env.as_ref()]
+                .into_iter()
+                .flatten()
+            {
+                visit(ty);
+            }
+        }
+        for param in &f.params {
+            if let Param::Pattern { pattern, .. } = param
+                && let Some((var, _)) = key_binders(pattern)
+                && self.label_declared_vars.contains(&var)
+            {
+                declared_labels.insert(var);
+            }
+        }
+        for p in &f.params {
+            if let Param::Pattern { pattern, .. } = p
+                && let Some((var, binders)) = key_binders(pattern)
+                && declared_labels.contains(&var)
+            {
+                let name = &self.p.ty_var_names[var.0 as usize];
+                for binder in binders {
+                    self.label_key_values.insert(
+                        binder,
+                        super::records::variable_label(var, name, self.s.level),
+                    );
+                }
+            }
+        }
         let count = f
             .params
             .iter()
@@ -2833,6 +2938,14 @@ impl<'a> Checker<'a> {
                     // The values of a parameter come from the calls.
                     let start = self.s.vars.len();
                     let t = self.param(pattern);
+                    if key_binders(pattern).is_some_and(|(_, binders)| {
+                        binders
+                            .iter()
+                            .any(|binder| self.label_key_values.contains_key(binder))
+                    }) {
+                        let string = self.prim(BuiltinType::String);
+                        self.sub(&t, &string, pattern.span);
+                    }
                     self.s.mark_inputs(start);
                     fails |= self.binding_may_fail(pattern, &t);
                     let k = match known::top_written(pattern) {
@@ -2886,32 +2999,26 @@ impl<'a> Checker<'a> {
             .ret
             .as_ref()
             .map_or(Ty::Top, |r| self.kconv(&r.value, &HashMap::new()));
-        (
-            PendingFunction {
-                function: f,
-                expected,
-                params,
-                env_types: env_tys,
-                fails,
-                written_return: ret,
-            },
-            body_expected,
-        )
-    }
-
-    fn function_finish(
-        &mut self,
-        pending: PendingFunction<'_>,
-        (a, body_known): (Ty, Ty),
-    ) -> (Ty, Ty) {
-        let PendingFunction {
-            function: f,
-            expected,
-            params,
-            env_types: env_tys,
-            fails,
-            written_return: ret,
-        } = pending;
+        let active_keys = f
+            .params
+            .iter()
+            .filter_map(|param| match param {
+                Param::Pattern { pattern, .. } => Some(pattern),
+                Param::Env { .. } => None,
+            })
+            .enumerate()
+            .filter_map(|(slot, pattern)| {
+                key_binders(pattern)
+                    .filter(|(var, _)| declared_labels.contains(var))
+                    .map(|key| (slot, key))
+            })
+            .collect();
+        self.active_key_parameters.push(active_keys);
+        self.effects.push(Effects::default());
+        self.function_depth += 1;
+        let (a, body_known) = self.block(&f.body.stmts, f.body.span, &body_expected);
+        self.function_depth -= 1;
+        self.active_key_parameters.pop();
         let known = self.fn_known(f, &expected, body_known);
         let (err, env) = self.pop_effects(f.span);
         let assert = Ty::named(self.b.assert, Vec::new());
@@ -2963,16 +3070,25 @@ impl<'a> Checker<'a> {
     }
 
     /// Rule 10 for a binding in a block, and rule 14.
-    fn local_binding_start<'tree>(&mut self, b: &'tree Binding) -> (PendingBinding<'tree>, Ty) {
+    fn local_binding(&mut self, b: &Binding) {
         let mark = self.occurs_mark();
+        let union_mark = self.pending_unions.len();
         let direct = b.direct;
         if direct {
             self.s.level += 1;
         }
         self.check_pattern_places(&b.pattern, Pol::Pos);
+        self.label_declared_vars.extend(binding_label_vars(b));
         self.new_tyvars(&b.ty_vars);
         let mut binders = Vec::new();
         super::pattern::binders(&b.pattern, &mut binders);
+        let key_slots = key_slots(b);
+        for binder in &binders {
+            self.label_key_slots.insert(*binder, key_slots.clone());
+        }
+        if direct {
+            self.recursive_bindings.extend(binders.iter().copied());
+        }
         let mut holders = Vec::new();
         if direct {
             // §6.10: inside its own value, a name is not general, and it is
@@ -2985,26 +3101,12 @@ impl<'a> Checker<'a> {
             self.own_known(b);
         }
         let expected = self.binding_expected(b);
-        (
-            PendingBinding {
-                binding: b,
-                mark,
-                direct,
-                binders,
-                holders,
-            },
-            expected,
-        )
-    }
-
-    fn local_binding_finish(&mut self, pending: PendingBinding<'_>, (a, k): (Ty, Ty)) {
-        let PendingBinding {
-            binding: b,
-            mark,
-            direct,
-            binders,
-            holders,
-        } = pending;
+        let (a, k) = self.infer_k(&b.value, &expected);
+        if direct {
+            for binder in &binders {
+                self.recursive_bindings.remove(binder);
+            }
+        }
         self.fit(&b.pattern, &a);
         self.binding_failure(&b.pattern, &a);
         for (v, h) in holders {
@@ -3015,6 +3117,7 @@ impl<'a> Checker<'a> {
         self.check_occurs(mark, b.pattern.span);
         self.fit_known(&b.pattern, &k, false);
         if direct {
+            self.discharge_union_proofs_from(union_mark);
             self.s.level -= 1;
             let level = self.s.level;
             for v in &binders {
@@ -3026,7 +3129,14 @@ impl<'a> Checker<'a> {
                     let value = self.kvars.get(v).cloned().unwrap_or(Ty::Top);
                     let known = self.scheme_known(&ty, level, &value);
                     self.kvars.insert(*v, known);
-                    self.locals.insert(*v, Scheme { level, ty });
+                    self.locals.insert(
+                        *v,
+                        Scheme {
+                            level,
+                            ty,
+                            key_slots: key_slots.clone(),
+                        },
+                    );
                 }
             }
         }
@@ -3078,6 +3188,10 @@ impl<'a> Checker<'a> {
     /// form (§4.7): the bounds of its variables are coalesced and simplified
     /// once, so that each use copies only the simplified type. Variables at
     /// `level` or below are not generalized and are kept as they are.
+    pub(super) fn type_resource_limit(&mut self, span: Span) {
+        self.error(code::TYPE_RESOURCE_LIMIT, span, "type too large to check here; write a local annotation for only the fields you need, or simplify the source");
+    }
+
     fn generalize(&mut self, t: &Ty, level: u32, span: Span) -> Ty {
         let simple = match display::simplify(&self.s, t, Some(level)) {
             Ok(simple) => simple,
@@ -3104,170 +3218,117 @@ impl<'a> Checker<'a> {
     /// generalized is a new variable with no bounds, and `Top` is a new
     /// variable.
     fn rebuild(&mut self, t: &Ty, level: u32, map: &mut HashMap<super::V, Ty>, in_h: bool) -> Ty {
-        enum Task<'a> {
-            Visit(&'a Ty, bool),
-            Con(Head, super::lits::ValueSet, usize),
-            Union(usize),
-            Inter(usize),
-            Fn(&'a FnTy),
-            Diff(usize),
-        }
-        let mut tasks = vec![Task::Visit(t, in_h)];
-        let mut values = Vec::new();
-        while let Some(task) = tasks.pop() {
-            match task {
-                Task::Visit(t, in_h) => match t {
-                    Ty::Var(v)
-                        if self
-                            .s
-                            .vars
-                            .get(v.0 as usize)
-                            .is_some_and(|x| x.level <= level) =>
-                    {
-                        values.push(t.clone());
-                    }
-                    Ty::Var(v) => {
-                        let n = if let Some(n) = map.get(v) {
-                            n.clone()
-                        } else {
-                            let n = self.s.fresh_at(level + 1);
-                            self.s.vars[n.0 as usize].name =
-                                self.s.vars.get(v.0 as usize).and_then(|x| x.name.clone());
-                            self.s.vars[n.0 as usize].row = self.s.vars[v.0 as usize].row;
-                            let n = Ty::Var(n);
-                            map.insert(*v, n.clone());
-                            n
-                        };
-                        values.push(n);
-                    }
-                    Ty::Top => values.push(if in_h {
-                        Ty::Top
-                    } else {
-                        Ty::Var(self.s.fresh_at(level + 1))
-                    }),
-                    Ty::Diff(a, h) => {
-                        tasks.push(Task::Diff(h.len()));
-                        for x in h.iter().rev() {
-                            tasks.push(Task::Visit(x, true));
-                        }
-                        tasks.push(Task::Visit(a, in_h));
-                    }
-                    Ty::Con(h, v, args) => {
-                        tasks.push(Task::Con(*h, v.clone(), args.len()));
-                        tasks.extend(args.iter().rev().map(|x| Task::Visit(x, in_h)));
-                    }
-                    Ty::Union(ms) => {
-                        tasks.push(Task::Union(ms.len()));
-                        tasks.extend(ms.iter().rev().map(|x| Task::Visit(x, in_h)));
-                    }
-                    Ty::Inter(ms) => {
-                        tasks.push(Task::Inter(ms.len()));
-                        tasks.extend(ms.iter().rev().map(|x| Task::Visit(x, in_h)));
-                    }
-                    Ty::Fn(f) => {
-                        tasks.push(Task::Fn(f));
-                        tasks.push(Task::Visit(&f.env, in_h));
-                        tasks.push(Task::Visit(&f.err, in_h));
-                        tasks.push(Task::Visit(&f.ret, in_h));
-                        tasks.extend(f.params.iter().rev().map(|(_, x)| Task::Visit(x, in_h)));
-                    }
-                    Ty::Never | Ty::Both(..) => values.push(t.clone()),
-                },
-                Task::Con(h, v, count) => {
-                    let args = values.split_off(values.len() - count);
-                    values.push(Ty::Con(h, v, args));
-                }
-                Task::Union(count) => {
-                    let parts = values.split_off(values.len() - count);
-                    values.push(Ty::Union(parts));
-                }
-                Task::Inter(count) => {
-                    let parts = values.split_off(values.len() - count);
-                    values.push(Ty::Inter(parts));
-                }
-                Task::Fn(f) => {
-                    let mut parts = values
-                        .split_off(values.len() - f.params.len() - 3)
-                        .into_iter();
-                    let params = f
-                        .params
-                        .iter()
-                        .map(|(label, _)| {
-                            (label.clone(), parts.next().expect("function parameter"))
-                        })
-                        .collect();
-                    values.push(Ty::Fn(Box::new(FnTy {
-                        params,
-                        ret: parts.next().expect("function return"),
-                        err: parts.next().expect("function error"),
-                        env: parts.next().expect("function environment"),
-                    })));
-                }
-                Task::Diff(count) => {
-                    let mut parts = values.split_off(values.len() - count - 1).into_iter();
-                    let a = parts.next().expect("difference left side");
-                    let h: Vec<_> = parts.collect();
-                    if let Ty::Var(v) = &a
-                        && self.s.vars[v.0 as usize].level > level
-                    {
-                        let hs: Vec<_> = h.iter().map(|x| self.s.no_top(x, level + 1)).collect();
-                        self.s.diff_bound(&a, &hs, false);
-                    }
-                    values.push(Ty::Diff(Box::new(a), h));
-                }
+        let mut go = |c: &mut Self, x: &Ty| c.rebuild(x, level, map, in_h);
+        match t {
+            Ty::Graph(g) => g.map_vars(&mut |v| self.rebuild(&Ty::Var(v), level, map, in_h)),
+            Ty::Var(v)
+                if self
+                    .s
+                    .vars
+                    .get(v.0 as usize)
+                    .is_some_and(|x| x.level <= level) =>
+            {
+                t.clone()
             }
+            Ty::Var(v) => {
+                if let Some(n) = map.get(v) {
+                    return n.clone();
+                }
+                let n = self.s.fresh_at(level + 1);
+                self.s.vars[n.0 as usize].name =
+                    self.s.vars.get(v.0 as usize).and_then(|x| x.name.clone());
+                self.s.vars[n.0 as usize].label_key = self.s.vars[v.0 as usize].label_key;
+                self.s.vars[n.0 as usize].row = self.s.vars[v.0 as usize].row;
+                map.insert(*v, Ty::Var(n));
+                Ty::Var(n)
+            }
+            // Only the type constructors of `H` matter in `A - H`, so a part
+            // of `H` with no effect stays `Top`.
+            Ty::Top if in_h => Ty::Top,
+            Ty::Top => Ty::Var(self.s.fresh_at(level + 1)),
+            Ty::Diff(a, h) => {
+                let a = go(self, a);
+                let h: Vec<Ty> = h
+                    .iter()
+                    .map(|x| self.rebuild(x, level, map, true))
+                    .collect();
+                // The scheme keeps the constraint of the difference (§4.4):
+                // a new variable has no bounds, so it is given again.
+                if let Ty::Var(v) = &a
+                    && self.s.vars[v.0 as usize].level > level
+                {
+                    let hs: Vec<Ty> = h.iter().map(|x| self.s.no_top(x, level + 1)).collect();
+                    self.s.diff_bound(&a, &hs, false);
+                }
+                Ty::Diff(Box::new(a), h)
+            }
+            Ty::Con(h, values, args) => Ty::Con(
+                *h,
+                values.clone(),
+                args.iter().map(|a| go(self, a)).collect(),
+            ),
+            Ty::Union(ms) => Ty::Union(ms.iter().map(|a| go(self, a)).collect()),
+            Ty::Inter(ms) => Ty::Inter(ms.iter().map(|a| go(self, a)).collect()),
+            Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+                params: f
+                    .params
+                    .iter()
+                    .map(|(l, p)| (l.clone(), go(self, p)))
+                    .collect(),
+                ret: go(self, &f.ret),
+                err: go(self, &f.err),
+                env: go(self, &f.env),
+            })),
+            Ty::Never | Ty::Both(..) => t.clone(),
         }
-        assert_eq!(values.len(), 1, "rebuilding type produced multiple results");
-        values.pop().expect("rebuilding type produced no result")
     }
 }
 
 /// The custom types that a type uses.
 fn uses_types(t: &Ty, out: &mut Vec<TypeId>) {
-    let mut pending = vec![t];
-    while let Some(t) = pending.pop() {
-        match t {
-            Ty::Con(h, _, xs) => {
-                if let super::Head::Named(TypeRef::Custom(id)) = h
-                    && !out.contains(id)
-                {
-                    out.push(*id);
-                }
-                pending.extend(xs.iter().rev());
+    match t {
+        Ty::Con(h, _, xs) => {
+            if let super::Head::Named(TypeRef::Custom(id)) = h
+                && !out.contains(id)
+            {
+                out.push(*id);
             }
-            Ty::Union(xs) | Ty::Inter(xs) => pending.extend(xs.iter().rev()),
-            Ty::Fn(f) => {
-                pending.extend([&f.env, &f.err, &f.ret]);
-                pending.extend(f.params.iter().rev().map(|p| &p.1));
-            }
-            Ty::Diff(a, h) => {
-                pending.extend(h.iter().rev());
-                pending.push(a);
-            }
-            Ty::Both(a, b) => {
-                pending.push(b);
-                pending.push(a);
-            }
-            _ => {}
+            xs.iter().for_each(|x| uses_types(x, out));
         }
+        Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| uses_types(x, out)),
+        Ty::Fn(f) => {
+            f.params.iter().for_each(|p| uses_types(&p.1, out));
+            [&f.ret, &f.err, &f.env]
+                .into_iter()
+                .for_each(|x| uses_types(x, out));
+        }
+        Ty::Diff(a, h) => {
+            uses_types(a, out);
+            h.iter().for_each(|x| uses_types(x, out));
+        }
+        Ty::Both(a, b) => {
+            uses_types(a, out);
+            uses_types(b, out);
+        }
+        _ => {}
     }
 }
 
 fn has_both(t: &Ty) -> bool {
-    let mut pending = vec![t];
-    while let Some(t) = pending.pop() {
-        match t {
-            Ty::Both(..) => return true,
-            Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => pending.extend(xs),
-            Ty::Fn(f) => {
-                pending.extend(f.params.iter().map(|p| &p.1));
-                pending.extend([&f.ret, &f.err, &f.env]);
-            }
-            Ty::Diff(a, _) => pending.push(a),
-            _ => {}
+    match t {
+        Ty::Graph(g) => g
+            .nodes()
+            .iter()
+            .any(|(_, node)| matches!(node, super::records::Node::Both(a, b) if a != b)),
+        Ty::Both(..) => true,
+        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().any(has_both),
+        Ty::Fn(f) => {
+            f.params.iter().any(|p| has_both(&p.1))
+                || [&f.ret, &f.err, &f.env].into_iter().any(has_both)
         }
+        Ty::Diff(a, _) => has_both(a),
+        _ => false,
     }
-    false
 }
 
 /// §10.3: the built-in types that the host can take.
@@ -3289,50 +3350,55 @@ fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
         acc: &mut [Mode],
         table: &HashMap<TypeId, Vec<Mode>>,
     ) {
-        let mut pending = vec![(t, row)];
-        while let Some((t, row)) = pending.pop() {
-            match &t.kind {
-                TypeKind::Var(v) if row != Mode::Value => {
-                    if let Some(i) = params.iter().position(|x| x.1 == *v) {
-                        acc[i] = acc[i].max(row);
-                    }
+        match &t.kind {
+            TypeKind::Var(v) if row != Mode::Value => {
+                if let Some(i) = params.iter().position(|x| x.1 == *v) {
+                    acc[i] = acc[i].max(row);
                 }
-                TypeKind::Named { ty, args } => {
-                    let modes = match ty {
-                        TypeRef::Custom(id) => table[id].clone(),
-                        TypeRef::Builtin(BuiltinType::Continuation) => {
-                            vec![Mode::Value, Mode::Value, Mode::Row, Mode::Env]
-                        }
-                        TypeRef::Builtin(BuiltinType::Boundary) => {
-                            vec![Mode::Value, Mode::Row, Mode::Env]
-                        }
-                        _ => vec![Mode::Value; args.len()],
-                    };
-                    pending.extend(args.iter().zip(modes).rev());
-                }
-                TypeKind::Fn {
-                    params: ps,
-                    ret,
-                    err,
-                    env,
-                } => {
-                    if let Some(x) = env {
-                        pending.push((x, Mode::Env));
-                    }
-                    if let Some(x) = err {
-                        pending.push((x, Mode::Row));
-                    }
-                    pending.push((ret, Mode::Value));
-                    pending.extend(ps.iter().rev().map(|x| (&x.ty, Mode::Value)));
-                }
-                TypeKind::Tuple(ts) => {
-                    pending.extend(ts.iter().rev().map(|x| (x, Mode::Value)));
-                }
-                TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
-                    pending.extend(ts.iter().rev().map(|x| (x, row)));
-                }
-                _ => {}
             }
+            TypeKind::Named { ty, args } => {
+                let modes = match ty {
+                    TypeRef::Custom(id) => table[id].clone(),
+                    TypeRef::Builtin(BuiltinType::Continuation) => {
+                        vec![Mode::Value, Mode::Value, Mode::Row, Mode::Env]
+                    }
+                    TypeRef::Builtin(BuiltinType::Boundary) => {
+                        vec![Mode::Value, Mode::Row, Mode::Env]
+                    }
+                    _ => vec![Mode::Value; args.len()],
+                };
+                for (a, mode) in args.iter().zip(modes) {
+                    walk(a, mode, params, acc, table);
+                }
+            }
+            TypeKind::Fn {
+                params: ps,
+                ret,
+                err,
+                env,
+            } => {
+                for x in ps {
+                    walk(&x.ty, Mode::Value, params, acc, table);
+                }
+                walk(ret, Mode::Value, params, acc, table);
+                if let Some(x) = err {
+                    walk(x, Mode::Row, params, acc, table);
+                }
+                if let Some(x) = env {
+                    walk(x, Mode::Env, params, acc, table);
+                }
+            }
+            TypeKind::Tuple(ts) => {
+                for x in ts {
+                    walk(x, Mode::Value, params, acc, table);
+                }
+            }
+            TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
+                for x in ts {
+                    walk(x, row, params, acc, table);
+                }
+            }
+            _ => {}
         }
     }
     let mut table: HashMap<_, _> = p
@@ -3411,65 +3477,68 @@ fn walk_variance(
     table: &HashMap<TypeId, Vec<Variance>>,
     depth: u32,
 ) {
-    let mut pending = vec![(t, v)];
-    while let Some((t, v)) = pending.pop() {
-        match &t.kind {
-            TypeKind::Var(tv) => {
-                if let Some(i) = params.iter().position(|x| x.1 == *tv) {
-                    acc[i] = acc[i].join(v);
-                }
+    let go = |t: &Type, v: Variance, acc: &mut [Variance]| {
+        walk_variance(p, t, v, params, acc, table, depth)
+    };
+    match &t.kind {
+        TypeKind::Var(tv) => {
+            if let Some(i) = params.iter().position(|x| x.1 == *tv) {
+                acc[i] = acc[i].join(v);
             }
-            TypeKind::Named { ty, args } => {
-                if let TypeRef::Custom(id) = ty
-                    && let TypeBody::Alias(body) = &p.ty(*id).body
-                {
-                    if depth < 64 {
-                        let def = p.ty(*id);
-                        let map: HashMap<TyVarId, &Type> =
-                            def.params.iter().map(|x| x.1).zip(args).collect();
-                        let expanded = subst(body, &map);
-                        walk_variance(p, &expanded, v, params, acc, table, depth + 1);
-                    }
-                    continue;
-                }
-                let vs = match ty {
-                    TypeRef::Custom(id) => table[id].clone(),
-                    TypeRef::Builtin(b) => builtin_variance(*b),
-                };
-                for (a, w) in args.iter().zip(vs).rev() {
-                    let pv = match w {
-                        Variance::Bi => continue,
-                        Variance::Co => v,
-                        Variance::Contra => v.flip(),
-                        Variance::Inv => Variance::Inv,
-                    };
-                    pending.push((a, pv));
-                }
-            }
-            TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) => {
-                pending.extend(ts.iter().rev().map(|a| (a, v)));
-            }
-            TypeKind::Diff(ts) => {
-                pending.extend(ts[1..].iter().rev().map(|a| (a, Variance::Inv)));
-                pending.push((&ts[0], v));
-            }
-            TypeKind::Fn {
-                params: ps,
-                ret,
-                err,
-                env,
-            } => {
-                if let Some(env) = env {
-                    pending.push((env, v));
-                }
-                if let Some(err) = err {
-                    pending.push((err, v));
-                }
-                pending.push((ret, v));
-                pending.extend(ps.iter().rev().map(|x| (&x.ty, v.flip())));
-            }
-            TypeKind::Lit(_) | TypeKind::Of { .. } | TypeKind::Hole | TypeKind::Error => {}
         }
+        TypeKind::Named { ty, args } => {
+            if let TypeRef::Custom(id) = ty
+                && let TypeBody::Alias(body) = &p.ty(*id).body
+            {
+                if depth < 64 {
+                    let def = p.ty(*id);
+                    let map: HashMap<TyVarId, &Type> =
+                        def.params.iter().map(|x| x.1).zip(args).collect();
+                    let expanded = subst(body, &map);
+                    walk_variance(p, &expanded, v, params, acc, table, depth + 1);
+                }
+                return;
+            }
+            let vs = match ty {
+                TypeRef::Custom(id) => table[id].clone(),
+                TypeRef::Builtin(b) => builtin_variance(*b),
+            };
+            for (a, w) in args.iter().zip(vs) {
+                let pv = match w {
+                    Variance::Bi => continue,
+                    Variance::Co => v,
+                    Variance::Contra => v.flip(),
+                    Variance::Inv => Variance::Inv,
+                };
+                go(a, pv, acc);
+            }
+        }
+        TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) => {
+            ts.iter().for_each(|a| go(a, v, acc))
+        }
+        TypeKind::Record { base, fields, .. } => {
+            if let Some(base) = base {
+                go(base, v, acc);
+            }
+            for (_, field) in fields {
+                go(field, v, acc);
+            }
+        }
+        TypeKind::Diff(ts) => {
+            go(&ts[0], v, acc);
+            ts[1..].iter().for_each(|a| go(a, Variance::Inv, acc));
+        }
+        TypeKind::Fn {
+            params: ps,
+            ret,
+            err,
+            env,
+        } => {
+            ps.iter().for_each(|x| go(&x.ty, v.flip(), acc));
+            go(ret, v, acc);
+            err.iter().chain(env).for_each(|x| go(x, v, acc));
+        }
+        TypeKind::Lit(_) | TypeKind::Of { .. } | TypeKind::Hole | TypeKind::Error => {}
     }
 }
 
@@ -3479,575 +3548,39 @@ fn walk_variance(
 /// in `assert 1 + 1 == 3`, which is the two statements `assert` and
 /// `1 + 1 == 3` (§1.7).
 fn has_no_effect(e: &Expr) -> bool {
-    let mut todo = vec![e];
-    while let Some(e) = todo.pop() {
-        match &e.kind {
-            ExprKind::Int(_)
-            | ExprKind::Float(_)
-            | ExprKind::String(_)
-            | ExprKind::Name(_)
-            | ExprKind::Fn(_) => {}
-            ExprKind::Tuple(items) => todo.extend(items),
-            ExprKind::List { items, rest } => {
-                todo.extend(items);
-                if let Some(rest) = rest {
-                    todo.push(rest);
-                }
-            }
-            ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
-                todo.push(target)
-            }
-            ExprKind::Unary {
-                op: UnOp::Neg,
-                expr,
-            } => todo.push(expr),
-            ExprKind::Binary { op, lhs, rhs }
-                if !matches!(
-                    op,
-                    BinOp::Pipe
-                        | BinOp::AddFloat
-                        | BinOp::SubFloat
-                        | BinOp::MulFloat
-                        | BinOp::DivFloat
-                ) =>
-            {
-                todo.push(lhs);
-                todo.push(rhs);
-            }
-            ExprKind::Call { callee, args }
-                if matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_))) =>
-            {
-                todo.extend(args.iter().map(|a| &a.value));
-            }
-            _ => return false,
+    match &e.kind {
+        ExprKind::Int(_)
+        | ExprKind::Float(_)
+        | ExprKind::String(_)
+        | ExprKind::Name(_)
+        | ExprKind::Fn(_) => true,
+        ExprKind::Tuple(items) => items.iter().all(has_no_effect),
+        ExprKind::Record { base, fields } => {
+            base.as_deref().is_none_or(has_no_effect)
+                && fields.iter().all(|(_, value)| has_no_effect(value))
         }
-    }
-    true
-}
-
-#[cfg(test)]
-mod deep_written_type_tests {
-    use super::*;
-
-    #[test]
-    fn deeply_nested_written_types_use_an_explicit_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let program = Program::default();
-                let sources = Sources::default();
-                let mut checker = Checker::new(&program, &sources);
-                let mut written = Type {
-                    kind: TypeKind::Named {
-                        ty: TypeRef::Builtin(BuiltinType::Int),
-                        args: vec![],
-                    },
-                    span: Span::default(),
-                };
-                for _ in 0..10_000 {
-                    written = Type {
-                        kind: TypeKind::Tuple(vec![written]),
-                        span: Span::default(),
-                    };
-                }
-                checker.check_places(&written, Pol::Pos, 0);
-                let result = checker.conv(&written, &HashMap::new());
-                let mut cursor = &result;
-                for _ in 0..10_000 {
-                    match cursor {
-                        Ty::Con(Head::Tuple(1), _, parts) => cursor = &parts[0],
-                        _ => panic!("written tuple shape was not preserved"),
-                    }
-                }
-                assert!(matches!(
-                    cursor,
-                    Ty::Con(Head::Named(TypeRef::Builtin(BuiltinType::Int)), _, _)
-                ));
-                // HIR and solver value destructors are handled by their own
-                // deep-tree work; do not make this test depend on their order.
-                std::mem::forget(written);
-                std::mem::forget(result);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deeply_nested_list_expressions_use_an_explicit_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let program = Program::default();
-                let sources = Sources::default();
-                let mut checker = Checker::new(&program, &sources);
-                let mut expr = Expr {
-                    kind: ExprKind::Int(1u8.into()),
-                    span: Span::default(),
-                };
-                for _ in 0..10_000 {
-                    expr = Expr {
-                        kind: ExprKind::List {
-                            items: vec![expr],
-                            rest: None,
-                        },
-                        span: Span::default(),
-                    };
-                }
-                let (ty, known) = checker.infer_k(&expr, &Ty::Top);
-                assert_eq!(
-                    ty.head(),
-                    Some(Head::Named(TypeRef::Builtin(BuiltinType::List)))
-                );
-                assert_eq!(known.head(), ty.head());
-                assert!(checker.diags.is_empty());
-                std::mem::forget(expr);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deeply_nested_tuple_expressions_use_an_explicit_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let program = Program::default();
-                let sources = Sources::default();
-                let mut checker = Checker::new(&program, &sources);
-                let mut expr = Expr {
-                    kind: ExprKind::Int(1u8.into()),
-                    span: Span::default(),
-                };
-                for _ in 0..10_000 {
-                    expr = Expr {
-                        kind: ExprKind::Tuple(vec![expr]),
-                        span: Span::default(),
-                    };
-                }
-                let (ty, known) = checker.infer_k(&expr, &Ty::Top);
-                for root in [&ty, &known] {
-                    let mut cursor = root;
-                    for _ in 0..10_000 {
-                        match cursor {
-                            Ty::Con(Head::Tuple(1), _, parts) => cursor = &parts[0],
-                            _ => panic!("inferred tuple shape was not preserved"),
-                        }
-                    }
-                    assert!(matches!(
-                        cursor,
-                        Ty::Con(Head::Named(TypeRef::Builtin(BuiltinType::Int)), _, _)
-                    ));
-                }
-                std::mem::forget(expr);
-                std::mem::forget(ty);
-                std::mem::forget(known);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deeply_nested_generalized_type_rebuild_uses_an_explicit_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let program = Program::default();
-                let sources = Sources::default();
-                let mut checker = Checker::new(&program, &sources);
-                let mut ty = Ty::Top;
-                for _ in 0..10_000 {
-                    ty = Ty::tuple(vec![ty]);
-                }
-                let rebuilt = checker.rebuild(&ty, 0, &mut HashMap::new(), false);
-                let mut cursor = &rebuilt;
-                for _ in 0..10_000 {
-                    match cursor {
-                        Ty::Con(Head::Tuple(1), _, args) => cursor = &args[0],
-                        _ => panic!("rebuilding did not preserve tuple shape"),
-                    }
-                }
-                assert!(matches!(cursor, Ty::Var(_)));
-                std::mem::forget(ty);
-                std::mem::forget(rebuilt);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deeply_nested_row_parameters_use_an_explicit_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let variable = TyVarId(0);
-                let mut written = Type {
-                    kind: TypeKind::Fn {
-                        params: vec![],
-                        ret: Box::new(Type {
-                            kind: TypeKind::Named {
-                                ty: TypeRef::Builtin(BuiltinType::Int),
-                                args: vec![],
-                            },
-                            span: Span::default(),
-                        }),
-                        err: None,
-                        env: Some(Box::new(Type {
-                            kind: TypeKind::Var(variable),
-                            span: Span::default(),
-                        })),
-                    },
-                    span: Span::default(),
-                };
-                for _ in 0..10_000 {
-                    written = Type {
-                        kind: TypeKind::Tuple(vec![written]),
-                        span: Span::default(),
-                    };
-                }
-                let mut program = Program::default();
-                program.types.push(TypeDef {
-                    name: "A".into(),
-                    span: Span::default(),
-                    module: ModuleId(0),
-                    params: vec![("x".into(), variable)],
-                    body: TypeBody::Alias(written),
-                    exported: false,
-                    constructors_exported: false,
-                    host: None,
-                    deprecated: None,
-                });
-                assert_eq!(row_parameters(&program)[&TypeId(0)], vec![Mode::Env]);
-                std::mem::forget(program);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deeply_nested_variance_walk_uses_an_explicit_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let program = Program::default();
-                let variable = TyVarId(0);
-                let mut written = Type {
-                    kind: TypeKind::Var(variable),
-                    span: Span::default(),
-                };
-                for _ in 0..10_000 {
-                    written = Type {
-                        kind: TypeKind::Tuple(vec![written]),
-                        span: Span::default(),
-                    };
-                }
-                let mut variance = [Variance::Bi];
-                walk_variance(
-                    &program,
-                    &written,
-                    Variance::Co,
-                    &[("x".into(), variable)],
-                    &mut variance,
-                    &HashMap::new(),
-                    0,
-                );
-                assert_eq!(variance, [Variance::Co]);
-                std::mem::forget(written);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deep_both_detection_uses_an_explicit_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let mut ty = Ty::Both(Box::new(Ty::Top), Box::new(Ty::Never));
-                for _ in 0..10_000 {
-                    ty = Ty::tuple(vec![ty]);
-                }
-                assert!(has_both(&ty));
-                let mut used = Vec::new();
-                uses_types(&ty, &mut used);
-                assert!(used.is_empty());
-                std::mem::forget(ty);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deeply_nested_functions_use_an_explicit_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let program = Program::default();
-                let sources = Sources::default();
-                let mut checker = Checker::new(&program, &sources);
-                let mut expr = Expr {
-                    kind: ExprKind::Int(1u8.into()),
-                    span: Span::default(),
-                };
-                for _ in 0..10_000 {
-                    expr = Expr {
-                        kind: ExprKind::Fn(Box::new(Function {
-                            params: vec![],
-                            ret: None,
-                            body: Block {
-                                stmts: vec![Stmt::Expr(expr)],
-                                span: Span::default(),
-                            },
-                            span: Span::default(),
-                        })),
-                        span: Span::default(),
-                    };
-                }
-                let (ty, known) = checker.infer_k(&expr, &Ty::Top);
-                for root in [&ty, &known] {
-                    let mut cursor = root;
-                    for _ in 0..10_000 {
-                        match cursor {
-                            Ty::Fn(f) if f.params.is_empty() => cursor = &f.ret,
-                            _ => panic!("inferred function shape was not preserved"),
-                        }
-                    }
-                    assert!(matches!(
-                        cursor,
-                        Ty::Con(Head::Named(TypeRef::Builtin(BuiltinType::Int)), _, _)
-                    ));
-                }
-                assert!(checker.diags.is_empty());
-                std::mem::forget(expr);
-                std::mem::forget(ty);
-                std::mem::forget(known);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deeply_nested_arithmetic_uses_an_explicit_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let program = Program::default();
-                let sources = Sources::default();
-                let mut checker = Checker::new(&program, &sources);
-                let literal = || Expr {
-                    kind: ExprKind::Int(1u8.into()),
-                    span: Span::default(),
-                };
-                let mut expr = literal();
-                for _ in 0..5_000 {
-                    expr = Expr {
-                        kind: ExprKind::Unary {
-                            op: UnOp::Neg,
-                            expr: Box::new(expr),
-                        },
-                        span: Span::default(),
-                    };
-                    expr = Expr {
-                        kind: ExprKind::Binary {
-                            op: BinOp::Add,
-                            lhs: Box::new(literal()),
-                            rhs: Box::new(expr),
-                        },
-                        span: Span::default(),
-                    };
-                }
-                let (ty, known) = checker.infer_k(&expr, &Ty::Top);
-                assert_eq!(
-                    ty.head(),
-                    Some(Head::Named(TypeRef::Builtin(BuiltinType::Int)))
-                );
-                assert_eq!(known.head(), ty.head());
-                assert!(checker.diags.is_empty());
-                std::mem::forget(expr);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deeply_nested_blocks_use_an_explicit_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let program = Program::default();
-                let sources = Sources::default();
-                let mut checker = Checker::new(&program, &sources);
-                let mut expr = Expr {
-                    kind: ExprKind::Int(1u8.into()),
-                    span: Span::default(),
-                };
-                for _ in 0..10_000 {
-                    expr = Expr {
-                        kind: ExprKind::Block(Block {
-                            stmts: vec![Stmt::Expr(expr)],
-                            span: Span::default(),
-                        }),
-                        span: Span::default(),
-                    };
-                }
-                let (ty, _) = checker.infer_k(&expr, &Ty::Top);
-                assert_eq!(
-                    ty.head(),
-                    Some(Head::Named(TypeRef::Builtin(BuiltinType::Int)))
-                );
-                assert!(checker.diags.is_empty());
-                std::mem::forget(expr);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deeply_nested_calls_use_an_explicit_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let program = Program::default();
-                let sources = Sources::default();
-                let mut checker = Checker::new(&program, &sources);
-                let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
-                let function = Ty::Fn(Box::new(FnTy {
-                    params: vec![(None, int.clone())],
-                    ret: int,
-                    err: Ty::Never,
-                    env: Ty::Never,
-                }));
-                let variable = VarId(0);
-                checker
-                    .locals
-                    .insert(variable, Scheme::mono(function.clone()));
-                checker.kvars.insert(variable, function);
-                let mut expr = Expr {
-                    kind: ExprKind::Int(1u8.into()),
-                    span: Span::default(),
-                };
-                for _ in 0..10_000 {
-                    let callee = Expr {
-                        kind: ExprKind::Name(ValueRef::Local(variable)),
-                        span: Span::default(),
-                    };
-                    expr = Expr {
-                        kind: ExprKind::Call {
-                            callee: Box::new(callee),
-                            args: vec![Arg {
-                                label: None,
-                                value: expr,
-                            }],
-                        },
-                        span: Span::default(),
-                    };
-                }
-                let (ty, _) = checker.infer_k(&expr, &Ty::Top);
-                assert_eq!(
-                    ty.head(),
-                    Some(Head::Named(TypeRef::Builtin(BuiltinType::Int)))
-                );
-                assert!(checker.diags.is_empty());
-                std::mem::forget(expr);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deeply_nested_local_bindings_use_an_explicit_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let program = Program::default();
-                let sources = Sources::default();
-                let mut checker = Checker::new(&program, &sources);
-                let literal = || Expr {
-                    kind: ExprKind::Int(1u8.into()),
-                    span: Span::default(),
-                };
-                let mut expr = literal();
-                for _ in 0..10_000 {
-                    let binding = Binding {
-                        pattern: Pattern {
-                            kind: PatternKind::Discard,
-                            span: Span::default(),
-                        },
-                        value: expr,
-                        direct: false,
-                        ty_vars: vec![],
-                        span: Span::default(),
-                    };
-                    expr = Expr {
-                        kind: ExprKind::Block(Block {
-                            stmts: vec![Stmt::Bind(binding), Stmt::Expr(literal())],
-                            span: Span::default(),
-                        }),
-                        span: Span::default(),
-                    };
-                }
-                let (ty, _) = checker.infer_k(&expr, &Ty::Top);
-                assert_eq!(
-                    ty.head(),
-                    Some(Head::Named(TypeRef::Builtin(BuiltinType::Int)))
-                );
-                assert!(checker.diags.is_empty());
-                std::mem::forget(expr);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deeply_nested_bit_arrays_use_an_explicit_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let program = Program::default();
-                let sources = Sources::default();
-                let mut checker = Checker::new(&program, &sources);
-                let mut expr = Expr {
-                    kind: ExprKind::BitArray(vec![]),
-                    span: Span::default(),
-                };
-                for _ in 0..10_000 {
-                    expr = Expr {
-                        kind: ExprKind::BitArray(vec![Segment {
-                            value: expr,
-                            format: Some(Format {
-                                name: Ident {
-                                    name: "bits".into(),
-                                    span: Span::default(),
-                                },
-                                arg: None,
-                            }),
-                            span: Span::default(),
-                        }]),
-                        span: Span::default(),
-                    };
-                }
-                let (ty, known) = checker.infer_k(&expr, &Ty::Top);
-                assert_eq!(
-                    ty.head(),
-                    Some(Head::Named(TypeRef::Builtin(BuiltinType::BitArray)))
-                );
-                assert_eq!(known.head(), ty.head());
-                assert!(checker.diags.is_empty());
-                std::mem::forget(expr);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
+        ExprKind::List { items, rest } => {
+            items.iter().all(has_no_effect) && rest.as_deref().is_none_or(has_no_effect)
+        }
+        ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
+            has_no_effect(target)
+        }
+        ExprKind::Unary { op, expr } => *op == UnOp::Neg && has_no_effect(expr),
+        ExprKind::Binary { op, lhs, rhs } => {
+            !matches!(
+                op,
+                BinOp::Pipe | BinOp::AddFloat | BinOp::SubFloat | BinOp::MulFloat | BinOp::DivFloat
+            ) && has_no_effect(lhs)
+                && has_no_effect(rhs)
+        }
+        ExprKind::Call { callee, args } => {
+            matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_)))
+                && args.iter().all(|a| has_no_effect(&a.value))
+        }
+        ExprKind::BitArray(_)
+        | ExprKind::Block(_)
+        | ExprKind::Case { .. }
+        | ExprKind::RecordUpdate { .. }
+        | ExprKind::Error => false,
     }
 }

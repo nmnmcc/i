@@ -685,6 +685,8 @@ impl Checker<'_> {
             }
         }
         if LITERAL_CANDIDATES {
+            // Graph keys hash their immutable pool identity and node ID.
+            #[allow(clippy::mutable_key_type)]
             let mut scalar_taken: HashSet<Ty> = HashSet::default();
             for (earlier_clause, unguarded, candidate, pat) in &place.scalar_seen {
                 if *earlier_clause >= ci || !unguarded || scalar_taken.contains(candidate) {
@@ -901,7 +903,7 @@ impl Checker<'_> {
                 super::solve::flatten_union(std::slice::from_ref(&t), &mut members);
                 let pat = if members
                     .iter()
-                    .any(|m| m.head().is_none() && *m != Ty::Never)
+                    .any(|m| m.value_head().is_none() && *m != Ty::Never)
                 {
                     self.error(
                         code::CASE_TYPE_VAR,
@@ -919,6 +921,7 @@ impl Checker<'_> {
                                 }
                                 Ty::Con(h, _, args) => Some(Pat::Head(*h, args.len())),
                                 Ty::Fn(f) => Some(Pat::Head(Head::Fn, f.params.len())),
+                                Ty::Graph(g) if g.record_only() => Some(Pat::Head(Head::Record, 0)),
                                 _ => None,
                             })
                             .collect(),
@@ -928,7 +931,7 @@ impl Checker<'_> {
                     let heads = members
                         .iter()
                         .filter_map(|m| {
-                            m.head().map(|head| super::TestMember {
+                            m.value_head().map(|head| super::TestMember {
                                 head,
                                 values: if m.values().is_all() {
                                     super::TestValues::All
@@ -964,7 +967,7 @@ impl Checker<'_> {
                                 m.clone(),
                                 coverage::scalar_pat(m),
                             ));
-                        } else if let Some(h) = m.head() {
+                        } else if let Some(h) = m.value_head() {
                             let n = match m {
                                 Ty::Con(_, _, xs) => xs.len(),
                                 Ty::Fn(f) => f.params.len(),

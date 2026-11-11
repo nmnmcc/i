@@ -13,27 +13,11 @@
 use crate::Parsed;
 use crate::code;
 use crate::hir::*;
-use crate::types::{Head, HostType, Ty, TyParts};
+use crate::types::{Head, HostType, Ty};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast;
-use ilang_syntax::ast::Ident;
-use ilang_syntax::lisp::syntax::{Provenance, Scope as SyntaxScope, ScopeIdentity};
 use ilang_syntax::span::Span;
-use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
-
-enum ResolutionRoot<'a> {
-    Expr(&'a ast::Expr),
-    Pattern(
-        &'a ast::Pattern,
-        Vec<Binder>,
-        Option<HashMap<NameKey, VarId>>,
-    ),
-}
-enum ResolutionResult {
-    Expr(Expr),
-    Pattern(Pattern, Vec<Binder>),
-}
 
 pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnostic>) {
     let mut r = Resolver {
@@ -41,10 +25,7 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
         parsed,
         p: Program::default(),
         diags: Vec::new(),
-        generated_values: Vec::new(),
-        generated_types: Vec::new(),
         defs_by_name: Vec::new(),
-        macros_by_name: Vec::new(),
         types_by_name: Vec::new(),
         ctors_by_name: Vec::new(),
         slots: Vec::new(),
@@ -70,7 +51,6 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
     for m in 0..parsed.len() {
         r.imports(ModuleId(m as u32));
     }
-    r.check_generated_collisions();
     r.import_circles();
     for m in 0..parsed.len() {
         r.type_defs(ModuleId(m as u32));
@@ -92,10 +72,6 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Entry {
     Def(DefId),
-    /// A compile-time macro occupies the value namespace but is not a value.
-    Macro {
-        exported: bool,
-    },
     Ctor(CtorRef),
     Module(ModuleId),
     /// A name from an import that failed; the problem has been reported,
@@ -124,31 +100,23 @@ enum Slot {
 }
 
 /// Local names bound by one binding, parameter list, or clause.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct NameKey {
-    text: String,
-    scope: SyntaxScope,
-    identity: Option<ScopeIdentity>,
-}
-
 struct Frame {
-    names: HashMap<NameKey, VarId>,
+    names: HashMap<String, VarId>,
     /// `Some(d)`: the names may only be used inside function bodies that
     /// are deeper than `d` (§6.10, the value of a direct binding).
     fn_only: Option<u32>,
 }
 
 struct TyFrame {
-    names: HashMap<NameKey, TyVarId>,
+    names: HashMap<String, TyVarId>,
 }
 
 struct TyDefMode {
-    params: HashMap<NameKey, TyVarId>,
+    params: HashMap<String, TyVarId>,
     used: HashSet<TyVarId>,
 }
 
 enum Found {
-    Private,
     Local(VarId),
     Entry(Entry),
 }
@@ -168,10 +136,7 @@ struct Resolver<'a> {
     parsed: &'a [Parsed],
     p: Program,
     diags: Vec<Diagnostic>,
-    generated_values: Vec<HashMap<NameKey, Entry>>,
-    generated_types: Vec<HashMap<NameKey, TypeId>>,
     defs_by_name: Vec<HashMap<String, u32>>,
-    macros_by_name: Vec<HashMap<String, bool>>,
     types_by_name: Vec<HashMap<String, TypeId>>,
     ctors_by_name: Vec<HashMap<String, CtorRef>>,
     slots: Vec<Vec<Slot>>,
@@ -191,8 +156,8 @@ struct Resolver<'a> {
     /// The aliases in a circle (§4.3); the circle has been reported, and
     /// they are not expanded.
     circular: HashSet<TypeId>,
-    pending: Vec<HashSet<NameKey>>,
-    reserved: Vec<(usize, HashSet<NameKey>)>,
+    pending: Vec<HashSet<String>>,
+    reserved: Vec<(usize, HashSet<String>)>,
 }
 
 fn is_upper(name: &str) -> bool {
@@ -200,79 +165,52 @@ fn is_upper(name: &str) -> bool {
 }
 
 /// The names a pattern binds, in order, with repeats (§7.2).
-fn ast_binders(root: &ast::Pattern, out: &mut Vec<(String, Span)>) {
+fn ast_binders(p: &ast::Pattern, out: &mut Vec<(String, Span)>) {
     use ast::PatternKind as P;
-    enum Task<'a> {
-        Pattern(&'a ast::Pattern),
-        Binder(&'a ast::Binder),
-    }
-    let mut work = vec![Task::Pattern(root)];
-    while let Some(task) = work.pop() {
-        match task {
-            Task::Binder(b) => {
-                if !b.discard {
-                    out.push((b.name.clone(), b.span));
-                }
-            }
-            Task::Pattern(p) => match &p.kind {
-                P::Quote { captures, .. } => {
-                    work.extend(captures.iter().rev().map(|(_, p)| Task::Pattern(p)))
-                }
-                P::Var(n) => out.push((n.clone(), p.span)),
-                P::Typed { binder, .. } if !binder.discard => {
-                    out.push((binder.name.clone(), binder.span))
-                }
-                P::Named { name, pattern } => {
-                    out.push((name.name.clone(), name.span));
-                    work.push(Task::Pattern(pattern));
-                }
-                P::Prefix { rest, .. } if !rest.discard => out.push((rest.name.clone(), rest.span)),
-                P::Constructor { args, .. } | P::Tuple(args) => {
-                    work.extend(args.iter().rev().map(Task::Pattern))
-                }
-                P::List { items, rest } => {
-                    if let Some(Some(b)) = rest {
-                        work.push(Task::Binder(b));
-                    }
-                    work.extend(items.iter().rev().map(Task::Pattern));
-                }
-                P::BitArray(segs) => {
-                    work.extend(segs.iter().rev().map(|s| Task::Pattern(&s.value)))
-                }
-                _ => {}
-            },
+    match &p.kind {
+        P::Var(n) => out.push((n.clone(), p.span)),
+        P::Typed { binder, .. } if !binder.discard => out.push((binder.name.clone(), binder.span)),
+        P::Named { name, pattern } => {
+            out.push((name.name.clone(), name.span));
+            ast_binders(pattern, out);
         }
+        P::Prefix { rest, .. } if !rest.discard => out.push((rest.name.clone(), rest.span)),
+        P::Constructor { args, .. } | P::Tuple(args) => {
+            args.iter().for_each(|a| ast_binders(a, out));
+        }
+        P::List { items, rest } => {
+            items.iter().for_each(|a| ast_binders(a, out));
+            if let Some(Some(b)) = rest
+                && !b.discard
+            {
+                out.push((b.name.clone(), b.span));
+            }
+        }
+        P::BitArray(segs) => segs.iter().for_each(|s| ast_binders(&s.value, out)),
+        _ => {}
     }
 }
 
 /// The label of a parameter (§6.11): the last name in the `=` chain at the
 /// top of its pattern.
-fn label_of(mut p: &ast::Pattern) -> Option<String> {
+fn label_of(p: &ast::Pattern) -> Option<String> {
     use ast::PatternKind as P;
-    let mut fallback = None;
-    loop {
-        match &p.kind {
-            P::Var(n) => return Some(n.clone()),
-            P::Typed { binder, .. } if !binder.discard => return Some(binder.name.clone()),
-            P::Named { name, pattern } => {
-                fallback = Some(name.name.clone());
-                p = pattern;
-            }
-            _ => return fallback,
-        }
+    match &p.kind {
+        P::Var(n) => Some(n.clone()),
+        P::Typed { binder, .. } if !binder.discard => Some(binder.name.clone()),
+        P::Named { name, pattern } => label_of(pattern).or_else(|| Some(name.name.clone())),
+        _ => None,
     }
 }
 
 /// `{ e }` with one expression is a group (§6.10): it is `e`.
-fn ungroup(mut e: &ast::Expr) -> &ast::Expr {
-    loop {
-        match &e.kind {
-            ast::ExprKind::Block(b) if b.stmts.len() == 1 => match &b.stmts[0] {
-                ast::Stmt::Expr(inner) => e = inner,
-                _ => return e,
-            },
-            _ => return e,
-        }
+fn ungroup(e: &ast::Expr) -> &ast::Expr {
+    match &e.kind {
+        ast::ExprKind::Block(b) if b.stmts.len() == 1 => match &b.stmts[0] {
+            ast::Stmt::Expr(inner) => ungroup(inner),
+            _ => e,
+        },
+        _ => e,
     }
 }
 
@@ -357,7 +295,6 @@ impl<'a> Resolver<'a> {
                 package: parsed.package,
                 source: parsed.source,
                 kind: parsed.kind,
-                scoped: parsed.scoped.clone(),
                 imports: Vec::new(),
                 import_names: Vec::new(),
                 imported_types: Vec::new(),
@@ -370,10 +307,7 @@ impl<'a> Resolver<'a> {
             }
             self.by_path
                 .insert((parsed.package, parsed.path.clone()), id);
-            self.generated_values.push(HashMap::new());
-            self.generated_types.push(HashMap::new());
             self.defs_by_name.push(HashMap::new());
-            self.macros_by_name.push(HashMap::new());
             self.types_by_name.push(HashMap::new());
             self.ctors_by_name.push(HashMap::new());
             self.slots.push(Vec::new());
@@ -381,70 +315,10 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// A marked top-level name must not shadow an ordinary name in its
-    /// definition module: otherwise the two branches of §5 rule 3 compete.
-    fn check_generated_collisions(&mut self) {
-        let mut conflicts = Vec::new();
-        for (m, values) in self.generated_values.iter().enumerate() {
-            for (key, entry) in values {
-                if let Some(owner) = self
-                    .parsed
-                    .iter()
-                    .position(|p| p.source.0 == key.scope.module)
-                    && (self.scopes[owner].values.contains_key(&key.text)
-                        || self.scopes[owner].types.contains_key(&key.text))
-                {
-                    let span = match entry {
-                        Entry::Def(d) => self.p.def(*d).span,
-                        Entry::Ctor(c) => match &self.p.ty(c.ty).body {
-                            TypeBody::Custom(cs) => cs[c.index as usize].span,
-                            _ => unreachable!(),
-                        },
-                        _ => unreachable!(),
-                    };
-                    conflicts.push((ModuleId(m as u32), key.text.clone(), span));
-                }
-            }
-        }
-        for (m, types) in self.generated_types.iter().enumerate() {
-            for (key, id) in types {
-                if let Some(owner) = self
-                    .parsed
-                    .iter()
-                    .position(|p| p.source.0 == key.scope.module)
-                    && (self.scopes[owner].values.contains_key(&key.text)
-                        || self.scopes[owner].types.contains_key(&key.text))
-                {
-                    conflicts.push((ModuleId(m as u32), key.text.clone(), self.p.ty(*id).span));
-                }
-            }
-        }
-        conflicts.sort_by(|a, b| {
-            (a.0.0, a.2.start, a.2.end, &a.1).cmp(&(b.0.0, b.2.start, b.2.end, &b.1))
-        });
-        for (m, name, span) in conflicts {
-            self.cur = m;
-            self.error(
-                code::DEFINED_TWICE,
-                span,
-                format!("marked `{name}` conflicts with a name in its scope module (§5)"),
-            );
-        }
-    }
-
     /// A value name of this module may be defined only once (§2.2).
     fn value_free(&mut self, m: ModuleId, name: &str, span: Span) -> bool {
         let mi = m.0 as usize;
-        let key = self.name_key(name, span);
-        self.check_binder(name, span, true, false);
-        let occupied = if key.scope.marks.is_empty() {
-            self.defs_by_name[mi].contains_key(name)
-                || self.macros_by_name[mi].contains_key(name)
-                || self.ctors_by_name[mi].contains_key(name)
-        } else {
-            self.generated_values[mi].contains_key(&key)
-        };
-        if occupied {
+        if self.defs_by_name[mi].contains_key(name) || self.ctors_by_name[mi].contains_key(name) {
             self.error(
                 code::DEFINED_TWICE,
                 span,
@@ -468,132 +342,16 @@ impl<'a> Resolver<'a> {
             exported: false,
             deprecated: attrs.deprecated.clone(),
         });
-        let key = self.name_key(name, span);
-        if key.scope.marks.is_empty() {
-            self.defs_by_name[m.0 as usize].insert(name.to_string(), index);
-        } else {
-            self.generated_values[m.0 as usize].insert(key, Entry::Def(DefId { module: m, index }));
-        }
+        self.defs_by_name[m.0 as usize].insert(name.to_string(), index);
     }
 
     fn collect(&mut self, m: ModuleId) {
         self.cur = m;
         let parsed = self.parsed;
         let ast = &parsed[m.0 as usize].ast;
-        let lisp = self
-            .graph
-            .sources
-            .get(parsed[m.0 as usize].source)
-            .display
-            .ends_with(".is");
-        if let Err(errors) = ilang_syntax::lisp::expansion::definitions(ast, lisp) {
-            for error in errors {
-                self.error(code::ATTRIBUTE_PLACE, error.span, error.message);
-            }
-        }
         let placeholder_var = VarId(u32::MAX);
         for item in &ast.items {
-            if item
-                .attributes
-                .iter()
-                .any(|a| a.module.is_none() && a.name.name == "macro")
-            {
-                let mut remaining = item.clone();
-                remaining.attributes.retain(|attribute| {
-                    !(attribute.module.is_none() && attribute.name.name == "macro")
-                });
-                for attribute in &remaining.attributes {
-                    if attribute.module.is_none()
-                        && matches!(attribute.name.name.as_str(), "main" | "test")
-                    {
-                        self.error(
-                            code::ATTRIBUTE_PLACE,
-                            attribute.span,
-                            format!("`@{}` cannot be put on a macro", attribute.name.name),
-                        );
-                    }
-                }
-                remaining.attributes.retain(|attribute| {
-                    attribute.module.is_some()
-                        || !matches!(attribute.name.name.as_str(), "main" | "test")
-                });
-                self.attributes(&remaining);
-                if let ast::ItemKind::Binding(binding) = &item.kind {
-                    let mut names = Vec::new();
-                    ast_binders(&binding.pattern, &mut names);
-                    for (name, span) in names {
-                        if self.value_free(m, &name, span) {
-                            self.macros_by_name[m.0 as usize].insert(name, false);
-                        }
-                    }
-                }
-                self.slots[m.0 as usize].push(Slot::None);
-                continue;
-            }
-            let mut attrs = self.attributes(item);
-            let here = self.p.module(m);
-            let root = self.graph.root == Some(here.package);
-            if root && let ast::ItemKind::Binding(b) = &item.kind {
-                // attributes() already reported the legacy @main/@test collision.
-                let entry_test_reported = attrs.main && attrs.test;
-                let mut names = Vec::new();
-                ast_binders(&b.pattern, &mut names);
-                let pkg = &self.graph.packages[here.package];
-                let default = here.kind == ModuleKind::Src
-                    && here.path == format!("{}/main", pkg.name)
-                    && names.iter().any(|(n, span)| {
-                        n == "main"
-                            && self.name_key(n, *span).scope.marks.is_empty()
-                            && self.name_key(n, *span).scope.module == parsed[m.0 as usize].source.0
-                    });
-                let declared = pkg
-                    .entries
-                    .iter()
-                    .filter(|(_, e)| {
-                        e.module == here.path
-                            && names.iter().any(|(n, span)| {
-                                *n == e.function
-                                    && self.name_key(n, *span).scope.marks.is_empty()
-                                    && self.name_key(n, *span).scope.module
-                                        == parsed[m.0 as usize].source.0
-                            })
-                    })
-                    .collect::<Vec<_>>();
-                let legacy = parsed
-                    .iter()
-                    .filter(|p| self.graph.root == Some(p.package))
-                    .any(|p| {
-                        p.ast.items.iter().any(|i| {
-                            i.attributes
-                                .iter()
-                                .any(|a| a.module.is_none() && a.name.name == "main")
-                        })
-                    });
-                let selected = match &self.graph.entry {
-                    Some(name) => declared.iter().any(|(n, _)| n == name),
-                    None => default && !legacy,
-                };
-                if (default || !declared.is_empty())
-                    && !item
-                        .attributes
-                        .iter()
-                        .any(|a| a.module.is_none() && a.name.name == "main")
-                {
-                    self.entry_form("entry", b.pattern.span, b, true);
-                }
-                if self.graph.entry.is_some() {
-                    attrs.main = selected;
-                } else if selected {
-                    attrs.main = true;
-                }
-                if attrs.main && attrs.test && !entry_test_reported {
-                    self.error(
-                        code::EXPORT_NAME_TWICE,
-                        b.pattern.span,
-                        "a function cannot be both the program entry and a test",
-                    );
-                }
-            }
+            let attrs = self.attributes(item);
             let slot = match &item.kind {
                 ast::ItemKind::TypeDef(def) if def.alias_pattern => {
                     let pid = ProjectionId(self.p.alias_patterns.len() as u32);
@@ -623,7 +381,7 @@ impl<'a> Resolver<'a> {
                     let mut seen = HashSet::new();
                     let mut defs = Vec::new();
                     for (name, span) in names {
-                        if !seen.insert(self.name_key(&name, span)) {
+                        if !seen.insert(name.clone()) {
                             continue; // reported when the pattern is resolved
                         }
                         let kind = DefKind::Binding {
@@ -702,49 +460,41 @@ impl<'a> Resolver<'a> {
     fn collect_pattern_binders(
         &mut self,
         m: ModuleId,
-        root: &ast::TypeExpr,
+        t: &ast::TypeExpr,
         attrs: &Attrs,
         out: &mut Vec<TypeId>,
     ) {
-        let mut work = vec![root];
-        while let Some(t) = work.pop() {
-            match &t.kind {
-                ast::TypeKind::Named {
-                    module: None,
-                    name,
-                    args,
-                } if args.is_empty() => {
-                    let def = ast::TypeDef {
-                        alias_pattern: false,
-                        name: name.clone(),
-                        params: Vec::new(),
-                        head: Vec::new(),
-                        body: ast::TypeBody::Alias(ast::TypeExpr {
-                            kind: ast::TypeKind::Hole,
-                            span: t.span,
-                        }),
-                    };
-                    out.push(self.collect_type(m, &def, attrs));
-                }
-                ast::TypeKind::Named { args, .. } | ast::TypeKind::Tuple(args) => {
-                    work.extend(args.iter().rev())
-                }
-                _ => {}
+        match &t.kind {
+            ast::TypeKind::Named {
+                module: None,
+                name,
+                args,
+            } if args.is_empty() => {
+                let def = ast::TypeDef {
+                    alias_pattern: false,
+                    name: name.clone(),
+                    params: Vec::new(),
+                    head: Vec::new(),
+                    body: ast::TypeBody::Alias(ast::TypeExpr {
+                        kind: ast::TypeKind::Hole,
+                        span: t.span,
+                    }),
+                };
+                out.push(self.collect_type(m, &def, attrs));
             }
+            ast::TypeKind::Named { args, .. } | ast::TypeKind::Tuple(args) => {
+                for t in args {
+                    self.collect_pattern_binders(m, t, attrs, out);
+                }
+            }
+            _ => {}
         }
     }
 
     fn collect_type(&mut self, m: ModuleId, def: &ast::TypeDef, attrs: &Attrs) -> TypeId {
         let id = TypeId(self.p.types.len() as u32);
         let mi = m.0 as usize;
-        let key = self.name_key(&def.name.name, def.name.span);
-        self.check_binder(&def.name.name, def.name.span, true, false);
-        let occupied = if key.scope.marks.is_empty() {
-            self.types_by_name[mi].contains_key(&def.name.name)
-        } else {
-            self.generated_types[mi].contains_key(&key)
-        };
-        if occupied {
+        if self.types_by_name[mi].contains_key(&def.name.name) {
             self.error(
                 code::DEFINED_TWICE,
                 def.name.span,
@@ -753,23 +503,15 @@ impl<'a> Resolver<'a> {
                     def.name.name
                 ),
             );
-        } else if key.scope.marks.is_empty() {
-            self.types_by_name[mi].insert(def.name.name.clone(), id);
         } else {
-            self.generated_types[mi].insert(key, id);
+            self.types_by_name[mi].insert(def.name.name.clone(), id);
         }
         // A repeated parameter is reported, but it keeps its place, so that
         // the parameters stay in line with the written ones and the number
         // of parameters is the written number. Its name refers to the first.
         let mut params: Vec<(String, TyVarId)> = Vec::new();
         for p in &def.params {
-            self.check_binder(&p.name, p.span, false, true);
-            if def
-                .params
-                .iter()
-                .take(params.len())
-                .any(|q| self.name_key(&q.name, q.span) == self.name_key(&p.name, p.span))
-            {
+            if params.iter().any(|(n, _)| n == &p.name) {
                 self.error(
                     code::TYPE_PARAM_TWICE,
                     p.span,
@@ -791,13 +533,7 @@ impl<'a> Resolver<'a> {
                         continue;
                     }
                     let index = out.len() as u32;
-                    let ctor = CtorRef { ty: id, index };
-                    let key = self.name_key(&c.name.name, c.name.span);
-                    if key.scope.marks.is_empty() {
-                        self.ctors_by_name[mi].insert(c.name.name.clone(), ctor);
-                    } else {
-                        self.generated_values[mi].insert(key, Entry::Ctor(ctor));
-                    }
+                    self.ctors_by_name[mi].insert(c.name.name.clone(), CtorRef { ty: id, index });
                     out.push(CtorDef {
                         name: c.name.name.clone(),
                         span: c.name.span,
@@ -905,17 +641,11 @@ impl<'a> Resolver<'a> {
             }
             match name {
                 "external" | "host" => {
-                    if (args[0].starts_with("ilang:") || args[0].starts_with("i:compiler/"))
-                        && !self.in_library()
-                    {
+                    if args[0].starts_with("ilang:") && !self.in_library() {
                         self.error(
                             code::RESERVED_ILANG,
                             a.args[0].1,
-                            if args[0].starts_with("ilang:") {
-                                "names that start with `ilang:` are kept for the runtime"
-                            } else {
-                                "names that start with `i:compiler/` are kept for the compiler"
-                            },
+                            "names that start with `ilang:` are kept for the runtime",
                         );
                     }
                     if name == "external" {
@@ -995,16 +725,11 @@ impl<'a> Resolver<'a> {
     fn entry_form(&mut self, name: &str, span: Span, b: &ast::Binding, compiled: bool) -> bool {
         let mut names = Vec::new();
         ast_binders(&b.pattern, &mut names);
-        let written = if name == "entry" {
-            "a program entry".to_string()
-        } else {
-            format!("`@{name}`")
-        };
         let ast::ExprKind::Fn(f) = &ungroup(&b.value).kind else {
             self.error(
                 code::ENTRY_FORM,
                 span,
-                format!("{written} is on a binding whose value is a function expression"),
+                format!("`@{name}` is on a binding whose value is a function expression"),
             );
             return false;
         };
@@ -1012,7 +737,7 @@ impl<'a> Resolver<'a> {
             self.error(
                 code::ENTRY_FORM,
                 span,
-                format!("{written} is on a binding whose pattern binds one name"),
+                format!("`@{name}` is on a binding whose pattern binds one name"),
             );
             return false;
         }
@@ -1020,7 +745,7 @@ impl<'a> Resolver<'a> {
             self.error(
                 code::ENTRY_PARAMS,
                 span,
-                format!("an entry point has no parameters but environment parameters, so {written} may not be on this function"),
+                format!("an entry point has no parameters but environment parameters, so `@{name}` may not be on this function"),
             );
             return false;
         }
@@ -1032,20 +757,7 @@ impl<'a> Resolver<'a> {
         let mi = m.0 as usize;
         for item in items {
             let name = &item.name.name;
-            let key = self.name_key(name, item.name.span);
-            if !key.scope.marks.is_empty() {
-                self.error(
-                    code::MACRO_BINDER,
-                    item.name.span,
-                    format!("marked `{name}` cannot be exported (§5)"),
-                );
-                continue;
-            }
             if !is_upper(name) {
-                if let Some(exported) = self.macros_by_name[mi].get_mut(name) {
-                    *exported = true;
-                    continue;
-                }
                 match self.defs_by_name[mi].get(name) {
                     Some(&d) => self.p.modules[mi].defs[d as usize].exported = true,
                     None => {
@@ -1134,11 +846,6 @@ impl<'a> Resolver<'a> {
                 index: d,
             });
             scope.values.insert(name.clone(), (entry, false));
-        }
-        for (name, &exported) in &self.macros_by_name[mi] {
-            scope
-                .values
-                .insert(name.clone(), (Entry::Macro { exported }, false));
         }
         for (name, &c) in &self.ctors_by_name[mi] {
             scope.values.insert(name.clone(), (Entry::Ctor(c), false));
@@ -1288,18 +995,6 @@ impl<'a> Resolver<'a> {
         let ti = target.0 as usize;
         let module = self.module_name(target).to_string();
         if !is_upper(&n.name) {
-            if let Some(&exported) = self.macros_by_name[ti].get(&n.name) {
-                if exported {
-                    self.put_value(scope, &n.name, n.span, Entry::Macro { exported });
-                } else {
-                    self.error(
-                        code::NOT_EXPORTED,
-                        n.span,
-                        format!("`{}` is not exported from `{module}`", n.name),
-                    );
-                }
-                return;
-            }
             match self.defs_by_name[ti].get(&n.name) {
                 Some(&d) if self.p.modules[ti].defs[d as usize].exported => {
                     let id = DefId {
@@ -1443,8 +1138,7 @@ impl<'a> Resolver<'a> {
             }
             let mut clashes = false;
             for param in &def.params {
-                let key = self.name_key(&param.name, param.span);
-                if is_upper(&param.name) && self.conflicts_with_type(&key) {
+                if is_upper(&param.name) && self.unqualified_type(&param.name).is_some() {
                     clashes = true;
                     self.error(
                         code::TYPE_VAR_IS_TYPE,
@@ -1458,8 +1152,8 @@ impl<'a> Resolver<'a> {
             }
             let params = self.p.ty(id).params.clone();
             let mut by_name = HashMap::new();
-            for ((n, v), ident) in params.iter().zip(&def.params) {
-                by_name.entry(self.name_key(n, ident.span)).or_insert(*v);
+            for (n, v) in &params {
+                by_name.entry(n.clone()).or_insert(*v);
             }
             self.ty_def = Some(TyDefMode {
                 params: by_name,
@@ -1490,9 +1184,7 @@ impl<'a> Resolver<'a> {
             }
             let mode = self.ty_def.take().unwrap();
             for (i, (p, ident)) in params.iter().zip(&def.params).enumerate() {
-                let repeated = def.params[..i].iter().any(|q| {
-                    self.name_key(&q.name, q.span) == self.name_key(&ident.name, ident.span)
-                });
+                let repeated = params[..i].iter().any(|q| q.0 == p.0);
                 if !repeated && !mode.used.contains(&p.1) {
                     self.error(
                         code::TYPE_PARAM_UNUSED,
@@ -1572,119 +1264,50 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn projectable_pattern(&self, root: &TypePattern, seen: &mut HashSet<TypeId>) -> bool {
-        enum Node<'a> {
-            Borrowed(&'a TypePattern),
-            Owned(TypePattern),
-        }
-        impl<'a> Node<'a> {
-            fn value(&self) -> &TypePattern {
-                match self {
-                    Self::Borrowed(p) => p,
-                    Self::Owned(p) => p,
+    fn projectable_pattern(&self, pattern: &TypePattern, seen: &mut HashSet<TypeId>) -> bool {
+        match pattern {
+            TypePattern::Bind(_) | TypePattern::Skip | TypePattern::Error => true,
+            TypePattern::Exact(t) => !value_dependent(&self.p, t),
+            TypePattern::Tuple(parts) => parts.iter().all(|p| self.projectable_pattern(p, seen)),
+            TypePattern::Named(TypeRef::Custom(id), parts)
+                if matches!(self.p.ty(*id).body, TypeBody::Alias(_)) =>
+            {
+                if self.circular.contains(id) {
+                    return true;
                 }
+                if !seen.insert(*id) {
+                    return false;
+                }
+                let def = self.p.ty(*id);
+                let TypeBody::Alias(body) = &def.body else {
+                    unreachable!()
+                };
+                if value_dependent(&self.p, body) {
+                    return false;
+                }
+                let map = def
+                    .params
+                    .iter()
+                    .map(|(_, v)| *v)
+                    .zip(parts.iter().cloned())
+                    .collect();
+                let expanded = projectable_body(body, &map, &mut HashSet::new());
+                let valid = expanded.is_some_and(|p| {
+                    let shape = match &p {
+                        TypePattern::Exact(t) => matches!(
+                            self.expand(t).kind,
+                            TypeKind::Named { .. } | TypeKind::Tuple(_)
+                        ),
+                        TypePattern::Named(..) | TypePattern::Tuple(_) => true,
+                        _ => false,
+                    };
+                    shape && self.projectable_pattern(&p, seen)
+                });
+                seen.remove(id);
+                valid
             }
-            fn children(self) -> Vec<Node<'a>> {
-                match self {
-                    Self::Borrowed(TypePattern::Named(_, parts) | TypePattern::Tuple(parts)) => {
-                        parts.iter().map(Node::Borrowed).collect()
-                    }
-                    Self::Owned(mut p) => {
-                        fn take_parts(p: &mut TypePattern) -> Vec<TypePattern> {
-                            match p {
-                                TypePattern::Named(_, parts) | TypePattern::Tuple(parts) => {
-                                    std::mem::take(parts)
-                                }
-                                _ => unreachable!("only structural patterns have children"),
-                            }
-                        }
-                        take_parts(&mut p).into_iter().map(Node::Owned).collect()
-                    }
-                    _ => unreachable!("only structural patterns have children"),
-                }
-            }
+            TypePattern::Named(_, parts) => parts.iter().all(|p| self.projectable_pattern(p, seen)),
         }
-        enum Task<'a> {
-            Visit(Node<'a>),
-            Exit(TypeId),
-        }
-        let mut work = vec![Task::Visit(Node::Borrowed(root))];
-        while let Some(task) = work.pop() {
-            match task {
-                Task::Exit(id) => {
-                    seen.remove(&id);
-                }
-                Task::Visit(node) => {
-                    let mut valid = true;
-                    let mut expanded = None;
-                    let mut alias = None;
-                    let mut children = false;
-                    match node.value() {
-                        TypePattern::Bind(_) | TypePattern::Skip | TypePattern::Error => {}
-                        TypePattern::Exact(t) => valid = !value_dependent(&self.p, t),
-                        TypePattern::Tuple(_) => children = true,
-                        TypePattern::Named(TypeRef::Custom(id), parts)
-                            if matches!(self.p.ty(*id).body, TypeBody::Alias(_)) =>
-                        {
-                            if !self.circular.contains(id) {
-                                if !seen.insert(*id) {
-                                    valid = false;
-                                } else {
-                                    let def = self.p.ty(*id);
-                                    let TypeBody::Alias(body) = &def.body else {
-                                        unreachable!()
-                                    };
-                                    if value_dependent(&self.p, body) {
-                                        valid = false;
-                                        seen.remove(id);
-                                    } else {
-                                        let map = def
-                                            .params
-                                            .iter()
-                                            .map(|(_, v)| *v)
-                                            .zip(parts.iter().cloned())
-                                            .collect();
-                                        expanded =
-                                            projectable_body(body, &map, &mut HashSet::new());
-                                        valid = expanded.as_ref().is_some_and(|p| match p {
-                                            TypePattern::Exact(t) => matches!(
-                                                self.expand(t).kind,
-                                                TypeKind::Named { .. } | TypeKind::Tuple(_)
-                                            ),
-                                            TypePattern::Named(..) | TypePattern::Tuple(_) => true,
-                                            _ => false,
-                                        });
-                                        if valid {
-                                            alias = Some(*id);
-                                        } else {
-                                            seen.remove(id);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        TypePattern::Named(_, _) => children = true,
-                    }
-                    if !valid {
-                        for task in work {
-                            if let Task::Exit(id) = task {
-                                seen.remove(&id);
-                            }
-                        }
-                        return false;
-                    }
-                    if let Some(id) = alias {
-                        work.push(Task::Exit(id));
-                        work.push(Task::Visit(Node::Owned(
-                            expanded.expect("valid alias expansion"),
-                        )));
-                    } else if children {
-                        work.extend(node.children().into_iter().rev().map(Task::Visit));
-                    }
-                }
-            }
-        }
-        true
     }
 
     fn environment_reads(&mut self) {
@@ -1794,7 +1417,7 @@ impl<'a> Resolver<'a> {
     fn lookup_type(&mut self, module: Option<&ast::Ident>, name: &ast::Ident) -> Option<TypeRef> {
         // §2.3: a local name may cover a module name, in types too.
         if let Some(m) = module
-            && let Some(Found::Local(_)) = self.find(&m.name, m.span)
+            && let Some(Found::Local(_)) = self.find(&m.name)
         {
             self.error(
                 code::NOT_A_MODULE,
@@ -1806,25 +1429,12 @@ impl<'a> Resolver<'a> {
             );
             return None;
         }
-        let key = self.name_key(&name.name, name.span);
+        let scope = &self.scopes[self.cur.0 as usize];
         let broken = match module {
-            Some(m) => matches!(
-                self.find(&m.name, m.span),
-                Some(Found::Entry(Entry::Broken))
-            ),
-            None if key.identity.is_some()
-                || self.generated_types[self.cur.0 as usize].contains_key(&key) =>
-            {
-                false
+            Some(m) => matches!(scope.values.get(&m.name), Some((Entry::Broken, _))),
+            None => {
+                scope.broken_types.contains(&name.name) && !scope.types.contains_key(&name.name)
             }
-            None => self
-                .parsed
-                .iter()
-                .position(|p| p.source.0 == key.scope.module)
-                .is_some_and(|owner| {
-                    self.scopes[owner].broken_types.contains(&name.name)
-                        && !self.scopes[owner].types.contains_key(&name.name)
-                }),
         };
         if broken {
             return None;
@@ -1834,7 +1444,7 @@ impl<'a> Resolver<'a> {
             let ti = target.0 as usize;
             let path = self.module_name(target).to_string();
             return match self.types_by_name[ti].get(&name.name).copied() {
-                Some(t) if self.p.ty(t).exported || self.compiler_reference(m) => {
+                Some(t) if self.p.ty(t).exported => {
                     self.used_type(t, name.span);
                     Some(TypeRef::Custom(t))
                 }
@@ -1856,58 +1466,12 @@ impl<'a> Resolver<'a> {
                 }
             };
         }
-        let origin = self.parsed[self.cur.0 as usize]
-            .scoped
-            .as_ref()
-            .and_then(|s| s.origin(name.span));
-        let provenance = origin.map(|o| o.syntax.provenance());
-        let from_answer = matches!(provenance, Some(Provenance::Made { from_answer: true }));
-        let generated = if !key.scope.marks.is_empty() && !from_answer {
-            self.generated_types[self.cur.0 as usize]
-                .get(&key)
-                .copied()
-                .map(TypeRef::Custom)
-        } else {
-            None
-        };
-        let found = if matches!(key.identity, Some(ScopeIdentity::Builtin { .. })) {
-            self.builtin_types.get(&name.name).copied()
-        } else if key.identity.is_some() {
-            None
-        } else if let Some(t) = generated {
-            Some(t)
-        } else {
-            let owner = self
-                .parsed
-                .iter()
-                .position(|p| p.source.0 == key.scope.module);
-            let found = owner.and_then(|owner| {
-                self.scopes[owner]
-                    .types
-                    .get(&name.name)
-                    .map(|(t, _)| (owner, *t))
-            });
-            if let Some((owner, TypeRef::Custom(id))) = found {
-                let made = matches!(provenance, Some(Provenance::Made { .. }));
-                if made
-                    && (!key.scope.marks.is_empty() || owner != self.cur.0 as usize)
-                    && !self.p.ty(id).exported
-                {
-                    self.error(
-                        code::NOT_EXPORTED,
-                        name.span,
-                        format!(
-                            "the type `{}` is not exported from its scope module",
-                            name.name
-                        ),
-                    );
-                    return None;
-                }
-            }
-            found
-                .map(|(_, t)| t)
-                .or_else(|| self.builtin_types.get(&name.name).copied())
-        };
+        let scope = &self.scopes[self.cur.0 as usize];
+        let found = scope
+            .types
+            .get(&name.name)
+            .map(|(t, _)| *t)
+            .or_else(|| self.builtin_types.get(&name.name).copied());
         match found {
             Some(t) => {
                 if let TypeRef::Custom(id) = t {
@@ -1916,16 +1480,11 @@ impl<'a> Resolver<'a> {
                 Some(t)
             }
             None => {
-                if name.name == "Record" {
-                    self.error(ilang_syntax::Code::RecordReserved.as_str(), name.span,
-                        "the built-in record type `Record` is kept for T3; it is an ordinary shadowable type name");
-                } else {
-                    self.error(
-                        code::UNKNOWN_TYPE,
-                        name.span,
-                        format!("the type `{}` is not defined", name.name),
-                    );
-                }
+                self.error(
+                    code::UNKNOWN_TYPE,
+                    name.span,
+                    format!("the type `{}` is not defined", name.name),
+                );
                 None
             }
         }
@@ -1934,16 +1493,8 @@ impl<'a> Resolver<'a> {
     /// The module named by the top-level name `m` in `m.T`. Local names
     /// that cover it are found by the caller.
     fn module_of(&mut self, m: &ast::Ident) -> Option<ModuleId> {
-        match self.find(&m.name, m.span) {
-            Some(Found::Entry(Entry::Module(t))) => Some(t),
-            Some(Found::Private) => {
-                self.error(
-                    code::NOT_EXPORTED,
-                    m.span,
-                    format!("`{}` is not exported from its scope module", m.name),
-                );
-                None
-            }
+        match self.scopes[self.cur.0 as usize].values.get(&m.name) {
+            Some((Entry::Module(t), _)) => Some(*t),
             Some(_) => {
                 self.error(
                     code::NOT_A_MODULE,
@@ -2008,21 +1559,16 @@ impl<'a> Resolver<'a> {
         name: &ast::Ident,
         span: Span,
     ) -> TypeKind {
-        let pending = |n: &str, span: Span| {
-            self.pending
-                .iter()
-                .rev()
-                .any(|p| p.contains(&self.name_key(n, span)))
-        };
+        let pending = |n: &str| self.pending.iter().rev().any(|p| p.contains(n));
         if let Some(m) = module {
-            if pending(&m.name, m.span)
+            if pending(&m.name)
                 || self.reserved.iter().rev().any(|(depth, names)| {
-                    names.contains(&self.name_key(&m.name, m.span))
+                    names.contains(&m.name)
                         && !self
                             .locals
                             .iter()
                             .skip(*depth)
-                            .any(|f| f.names.contains_key(&self.name_key(&m.name, m.span)))
+                            .any(|f| f.names.contains_key(&m.name))
                 })
             {
                 self.error(
@@ -2034,23 +1580,23 @@ impl<'a> Resolver<'a> {
             }
         } else {
             let reserved = self.reserved.iter().rev().any(|(depth, names)| {
-                names.contains(&self.name_key(&name.name, name.span))
+                names.contains(&name.name)
                     && !self
                         .locals
                         .iter()
                         .skip(*depth)
-                        .any(|f| f.names.contains_key(&self.name_key(&name.name, name.span)))
+                        .any(|f| f.names.contains_key(&name.name))
             });
-            if pending(&name.name, name.span) || reserved {
+            if pending(&name.name) || reserved {
                 self.error(code::VALUE_TYPE_OWN_SCOPE, span,
                     format!("the type of `{}` cannot be read in its own pattern, function header, or binding value, even if an outer name exists", name.name));
                 return TypeKind::Error;
             }
         }
         match self.name(module, name) {
-            ExprKind::Name(value @ (ValueRef::Local(_) | ValueRef::Def(_))) => self
-                .new_of(value, span, self.ty_def.is_some(), None)
-                .into_kind(),
+            ExprKind::Name(value @ (ValueRef::Local(_) | ValueRef::Def(_))) => {
+                self.new_of(value, span, self.ty_def.is_some(), None).kind
+            }
             _ => TypeKind::Error,
         }
     }
@@ -2116,303 +1662,211 @@ impl<'a> Resolver<'a> {
 
     fn type_pattern(
         &mut self,
-        root: &ast::TypeExpr,
+        t: &ast::TypeExpr,
         ids: &[TypeId],
         heads: &mut Vec<(Span, TypeRef)>,
     ) -> TypePattern {
-        enum Task<'a> {
-            Visit(&'a ast::TypeExpr),
-            Named {
-                span: Span,
-                module: Option<&'a Ident>,
-                name: &'a Ident,
-                count: usize,
-            },
-            Tuple(usize),
-        }
-        let mut work = vec![Task::Visit(root)];
-        let mut values: Vec<TypePattern> = Vec::new();
-        while let Some(task) = work.pop() {
-            match task {
-                Task::Visit(t) => match &t.kind {
-                    ast::TypeKind::Hole => values.push(TypePattern::Skip),
-                    ast::TypeKind::Named {
-                        module: None,
-                        name,
-                        args,
-                    } if args.is_empty() => {
-                        values.push(
-                            ids.iter()
-                                .copied()
-                                .find(|id| self.p.ty(*id).span == name.span)
-                                .map_or(TypePattern::Error, TypePattern::Bind),
-                        );
+        match &t.kind {
+            ast::TypeKind::Hole => TypePattern::Skip,
+            ast::TypeKind::Named {
+                module: None,
+                name,
+                args,
+            } if args.is_empty() => ids
+                .iter()
+                .copied()
+                .find(|id| self.p.ty(*id).span == name.span)
+                .map_or(TypePattern::Error, TypePattern::Bind),
+            ast::TypeKind::Named { module, name, args } => {
+                let parts = args
+                    .iter()
+                    .map(|t| self.type_pattern(t, ids, heads))
+                    .collect::<Vec<_>>();
+                match self.lookup_type(module.as_ref(), name) {
+                    Some(ty) if self.arity(ty) == parts.len() => {
+                        heads.push((name.span, ty));
+                        TypePattern::Named(ty, parts)
                     }
-                    ast::TypeKind::Named { module, name, args } => {
-                        work.push(Task::Named {
-                            span: t.span,
-                            module: module.as_ref(),
-                            name,
-                            count: args.len(),
-                        });
-                        work.extend(args.iter().rev().map(Task::Visit));
-                    }
-                    ast::TypeKind::Tuple(ts) => {
-                        work.push(Task::Tuple(ts.len()));
-                        work.extend(ts.iter().rev().map(Task::Visit));
-                    }
-                    _ => {
+                    Some(_) => {
                         self.error(
-                            code::TYPE_PATTERN_FORM,
+                            code::TYPE_ARITY,
                             t.span,
-                            "a type pattern is a binder, `_`, a named type, or a tuple",
+                            "alias pattern has the wrong number of arguments",
                         );
-                        values.push(TypePattern::Error);
+                        TypePattern::Error
                     }
-                },
-                Task::Named {
-                    span,
-                    module,
-                    name,
-                    count,
-                } => {
-                    let parts = values.split_off(values.len() - count);
-                    let pattern = match self.lookup_type(module, name) {
-                        Some(ty) if self.arity(ty) == parts.len() => {
-                            heads.push((name.span, ty));
-                            TypePattern::Named(ty, parts)
-                        }
-                        Some(_) => {
-                            self.error(
-                                code::TYPE_ARITY,
-                                span,
-                                "alias pattern has the wrong number of arguments",
-                            );
-                            TypePattern::Error
-                        }
-                        None => TypePattern::Error,
-                    };
-                    values.push(pattern);
-                }
-                Task::Tuple(count) => {
-                    let parts = values.split_off(values.len() - count);
-                    values.push(TypePattern::Tuple(parts));
+                    None => TypePattern::Error,
                 }
             }
+            ast::TypeKind::Tuple(ts) => TypePattern::Tuple(
+                ts.iter()
+                    .map(|t| self.type_pattern(t, ids, heads))
+                    .collect(),
+            ),
+            _ => {
+                self.error(
+                    code::TYPE_PATTERN_FORM,
+                    t.span,
+                    "a type pattern is a binder, `_`, a named type, or a tuple",
+                );
+                TypePattern::Error
+            }
         }
-        assert_eq!(
-            values.len(),
-            1,
-            "type pattern resolution must return one value"
-        );
-        values.pop().unwrap()
     }
 
-    fn ty(&mut self, root: &ast::TypeExpr) -> Type {
+    fn ty(&mut self, t: &ast::TypeExpr) -> Type {
         use ast::TypeKind as T;
-        enum ListKind {
-            Tuple,
-            Union,
-            Inter,
-            Diff,
-        }
-        enum Task<'a> {
-            Visit(&'a ast::TypeExpr),
-            Named {
-                span: Span,
-                found: Option<TypeRef>,
-                count: usize,
-            },
-            List {
-                span: Span,
-                kind: ListKind,
-                count: usize,
-            },
-            Function {
-                span: Span,
-                labels: Vec<Option<Ident>>,
-                err: bool,
-                env: bool,
-            },
-        }
-        let mut work = vec![Task::Visit(root)];
-        let mut values: Vec<Type> = Vec::new();
-        while let Some(task) = work.pop() {
-            match task {
-                Task::Visit(t) => {
-                    let kind = match &t.kind {
-                        T::Lit(v) => TypeKind::Lit(v.clone()),
-                        T::Named { module, name, args } => {
-                            let key = self.name_key(&name.name, name.span);
-                            let variable = if module.is_none() {
-                                self.ty_frames
-                                    .iter()
-                                    .rev()
-                                    .find_map(|f| f.names.get(&key).copied())
-                                    .or_else(|| {
-                                        self.ty_def.as_mut().and_then(|mode| {
-                                            let var = mode.params.get(&key).copied()?;
-                                            mode.used.insert(var);
-                                            Some(var)
-                                        })
-                                    })
-                            } else {
-                                None
-                            };
-                            if let Some(var) = variable {
-                                let kind = if args.is_empty() {
-                                    TypeKind::Var(var)
-                                } else {
-                                    self.error(
-                                        code::TYPE_VAR_ARGS,
-                                        t.span,
-                                        "a type variable takes no arguments",
-                                    );
-                                    TypeKind::Error
-                                };
-                                values.push(Type { kind, span: t.span });
-                                continue;
-                            }
-                            let before = self.diags.len();
-                            let found = self.lookup_type(module.as_ref(), name);
-                            if found.is_none() && module.is_none() && args.is_empty() {
-                                let hint = if self.ty_def.is_some() {
-                                    "to use a type parameter, declare it in the head, as in `Box(A) { … }`"
-                                } else {
-                                    "to use a type variable, declare it after the name of the binding, as in `f(A) = …`"
-                                };
-                                for d in &mut self.diags[before..] {
-                                    if d.code == code::UNKNOWN_TYPE {
-                                        d.message.push_str("; ");
-                                        d.message.push_str(hint);
-                                    }
-                                }
-                            }
-                            work.push(Task::Named {
-                                span: t.span,
-                                found,
-                                count: args.len(),
-                            });
-                            work.extend(args.iter().rev().map(Task::Visit));
-                            continue;
-                        }
-                        T::ValueOf { module, name } => {
-                            self.value_type(module.as_ref(), name, t.span)
-                        }
-                        T::Call { .. } => {
-                            self.error(
-                                code::MACRO_RESERVED,
-                                t.span,
-                                "a call in a type is kept for macros",
-                            );
-                            TypeKind::Error
-                        }
-                        T::Hole => TypeKind::Hole,
-                        T::Tuple(ts) | T::Union(ts) | T::Inter(ts) | T::Diff(ts) => {
-                            let kind = match &t.kind {
-                                T::Tuple(_) => ListKind::Tuple,
-                                T::Union(_) => ListKind::Union,
-                                T::Inter(_) => ListKind::Inter,
-                                T::Diff(_) => ListKind::Diff,
-                                _ => unreachable!(),
-                            };
-                            work.push(Task::List {
-                                span: t.span,
-                                kind,
-                                count: ts.len(),
-                            });
-                            work.extend(ts.iter().rev().map(Task::Visit));
-                            continue;
-                        }
-                        T::Fn {
-                            params,
-                            ret,
-                            err,
-                            env,
-                        } => {
-                            work.push(Task::Function {
-                                span: t.span,
-                                labels: params.iter().map(|p| p.label.clone()).collect(),
-                                err: err.is_some(),
-                                env: env.is_some(),
-                            });
-                            if let Some(env) = env {
-                                work.push(Task::Visit(env));
-                            }
-                            if let Some(err) = err {
-                                work.push(Task::Visit(err));
-                            }
-                            work.push(Task::Visit(ret));
-                            work.extend(params.iter().rev().map(|p| Task::Visit(&p.ty)));
-                            continue;
-                        }
-                    };
-                    values.push(Type { kind, span: t.span });
-                }
-                Task::Named { span, found, count } => {
-                    let args = values.split_off(values.len() - count);
-                    let kind = match found {
-                        Some(ty) if self.arity(ty) != args.len() => {
-                            let want = self.arity(ty);
-                            let tname = self.type_name(ty);
-                            self.error(code::TYPE_ARITY, span, format!("the type `{tname}` has {want} type parameter{}, but {} {} given", if want == 1 { "" } else { "s" }, args.len(), if args.len() == 1 { "is" } else { "are" }));
-                            TypeKind::Error
-                        }
-                        Some(ty) => TypeKind::Named { ty, args },
-                        None => TypeKind::Error,
-                    };
-                    values.push(Type { kind, span });
-                }
-                Task::List { span, kind, count } => {
-                    let items = values.split_off(values.len() - count);
-                    let kind = match kind {
-                        ListKind::Tuple => TypeKind::Tuple(items),
-                        ListKind::Union => TypeKind::Union(items),
-                        ListKind::Inter => TypeKind::Inter(items),
-                        ListKind::Diff => TypeKind::Diff(items),
-                    };
-                    values.push(Type { kind, span });
-                }
-                Task::Function {
-                    span,
-                    labels,
-                    err,
-                    env,
-                } => {
-                    let count = labels.len() + 1 + usize::from(err) + usize::from(env);
-                    let mut parts = values.split_off(values.len() - count).into_iter();
-                    let params = labels
-                        .into_iter()
-                        .map(|label| FnParamType {
-                            label,
-                            ty: parts.next().expect("function parameter"),
+        let kind = match &t.kind {
+            T::Lit(v) => TypeKind::Lit(v.clone()),
+            T::Named { module, name, args } => {
+                let variable = if module.is_none() {
+                    self.ty_frames
+                        .iter()
+                        .rev()
+                        .find_map(|f| f.names.get(&name.name).copied())
+                        .or_else(|| {
+                            self.ty_def.as_mut().and_then(|mode| {
+                                let var = mode.params.get(&name.name).copied()?;
+                                mode.used.insert(var);
+                                Some(var)
+                            })
                         })
-                        .collect();
-                    let ret = Box::new(parts.next().expect("function return"));
-                    let err = err.then(|| Box::new(parts.next().expect("function error")));
-                    let env = env.then(|| Box::new(parts.next().expect("function environment")));
-                    assert!(
-                        parts.next().is_none(),
-                        "function type work stack has extra values"
-                    );
-                    values.push(Type {
-                        kind: TypeKind::Fn {
-                            params,
-                            ret,
-                            err,
-                            env,
-                        },
-                        span,
-                    });
+                } else {
+                    None
+                };
+                if let Some(var) = variable {
+                    let kind = if args.is_empty() {
+                        TypeKind::Var(var)
+                    } else {
+                        self.error(
+                            code::TYPE_VAR_ARGS,
+                            t.span,
+                            "a type variable takes no arguments",
+                        );
+                        TypeKind::Error
+                    };
+                    return Type { kind, span: t.span };
+                }
+                let before = self.diags.len();
+                let found = self.lookup_type(module.as_ref(), name);
+                if found.is_none() && module.is_none() && args.is_empty() {
+                    let hint = if self.ty_def.is_some() {
+                        "to use a type parameter, declare it in the head, as in `Box(A) { … }`"
+                    } else {
+                        "to use a type variable, declare it after the name of the binding, as in `f(A) = …`"
+                    };
+                    for d in &mut self.diags[before..] {
+                        if d.code == code::UNKNOWN_TYPE {
+                            d.message.push_str("; ");
+                            d.message.push_str(hint);
+                        }
+                    }
+                }
+                let args: Vec<Type> = args.iter().map(|a| self.ty(a)).collect();
+                match found {
+                    Some(ty) if self.arity(ty) != args.len() => {
+                        let want = self.arity(ty);
+                        let tname = self.type_name(ty);
+                        self.error(
+                            code::TYPE_ARITY,
+                            t.span,
+                            format!(
+                                "the type `{tname}` has {want} type parameter{}, but {} {} given",
+                                if want == 1 { "" } else { "s" },
+                                args.len(),
+                                if args.len() == 1 { "is" } else { "are" }
+                            ),
+                        );
+                        TypeKind::Error
+                    }
+                    Some(ty) => TypeKind::Named { ty, args },
+                    None => TypeKind::Error,
                 }
             }
+            T::ValueOf { module, name } => self.value_type(module.as_ref(), name, t.span),
+            T::Call { .. } => {
+                self.error(
+                    code::MACRO_RESERVED,
+                    t.span,
+                    "a call in a type is kept for macros",
+                );
+                TypeKind::Error
+            }
+            T::Hole => TypeKind::Hole,
+            T::Tuple(ts) => TypeKind::Tuple(ts.iter().map(|x| self.ty(x)).collect()),
+            T::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let mut labels = HashSet::new();
+                for label in fields.iter().map(|(label, _)| label).chain(removed.iter()) {
+                    if !labels.insert((label.parameter, &label.name)) {
+                        self.error(
+                            code::DUPLICATE_RECORD_LABEL,
+                            label.span,
+                            format!("the record label `{}` is repeated", label.name),
+                        );
+                    }
+                }
+                TypeKind::Record {
+                    base: base.as_ref().map(|b| Box::new(self.ty(b))),
+                    fields: fields
+                        .iter()
+                        .map(|(label, ty)| (self.record_label(label), self.ty(ty)))
+                        .collect(),
+                    removed: removed
+                        .iter()
+                        .map(|label| self.record_label(label))
+                        .collect(),
+                }
+            }
+            T::Union(ts) => TypeKind::Union(ts.iter().map(|x| self.ty(x)).collect()),
+            T::Inter(ts) => TypeKind::Inter(ts.iter().map(|x| self.ty(x)).collect()),
+            T::Diff(ts) => TypeKind::Diff(ts.iter().map(|x| self.ty(x)).collect()),
+            T::Fn {
+                params,
+                ret,
+                err,
+                env,
+            } => TypeKind::Fn {
+                params: params
+                    .iter()
+                    .map(|p| FnParamType {
+                        label: p.label.clone(),
+                        ty: self.ty(&p.ty),
+                    })
+                    .collect(),
+                ret: Box::new(self.ty(ret)),
+                err: err.as_ref().map(|e| Box::new(self.ty(e))),
+                env: env.as_ref().map(|e| Box::new(self.ty(e))),
+            },
+        };
+        Type { kind, span: t.span }
+    }
+
+    fn record_label(&mut self, label: &ast::RecordLabel) -> RecordLabel {
+        let parameter = if label.parameter {
+            let var = self
+                .ty_frames
+                .iter()
+                .rev()
+                .find_map(|frame| frame.names.get(&label.name).copied());
+            if var.is_none() {
+                self.error(
+                    code::INVALID_LABEL_PARAMETER,
+                    label.span,
+                    format!("`{}` is not a declared label parameter", label.name),
+                );
+            }
+            var
+        } else {
+            None
+        };
+        RecordLabel {
+            ident: label.ident.clone(),
+            parameter,
         }
-        assert_eq!(
-            values.len(),
-            1,
-            "type resolution work stack must return one value"
-        );
-        values.pop().unwrap()
     }
 
     /// The type that the alias `t` stands for, with its arguments put in
@@ -2542,7 +1996,7 @@ impl<'a> Resolver<'a> {
                     if let TypeKind::Named {
                         ty: TypeRef::Builtin(BuiltinType::Request),
                         args,
-                    } = &expanded.kind
+                    } = expanded.kind
                         && args.len() == 1
                     {
                         let answer = self.expand(&args[0]);
@@ -2659,10 +2113,10 @@ impl<'a> Resolver<'a> {
                 return None;
             }
             let err = self.boundary_type(err)?;
-            let parts = match err.into_parts() {
-                TyParts::Union(ms) => ms,
-                TyParts::Never => Vec::new(),
-                t => vec![t.into()],
+            let parts = match err {
+                Ty::Union(ms) => ms,
+                Ty::Never => Vec::new(),
+                t => vec![t],
             };
             for m in parts {
                 let h = self.host_member(&m, false)?;
@@ -2863,14 +2317,9 @@ impl<'a> Resolver<'a> {
                     let vars = self.push_declared_frame(type_params);
                     let t = self.ty(ty);
                     self.ty_frames.pop();
-                    // Reserved `ilang:` library operations lower inside the
-                    // runtime; other externals use the ordinary host ABI.
-                    let runtime_operation = self.in_library()
-                        && matches!(
-                            &self.p.modules[m.0 as usize].defs[d as usize].kind,
-                            DefKind::External { module, .. } if module.starts_with("ilang:")
-                        );
-                    if !runtime_operation {
+                    // The operations of the library are not host imports
+                    // (§2.1), so their types are not limited.
+                    if !self.in_library() {
                         let before = self.diags.len();
                         self.external_type(&t);
                         if self.diags.len() == before
@@ -2899,12 +2348,7 @@ impl<'a> Resolver<'a> {
                     let (binding, binders) = self.binding(b, true);
                     let mi = m.0 as usize;
                     for binder in binders {
-                        let def = self.p.modules[mi].bindings[index as usize]
-                            .defs
-                            .iter()
-                            .find(|d| self.p.def(**d).span == binder.span)
-                            .map(|d| d.index);
-                        if let Some(d) = def
+                        if let Some(&d) = self.defs_by_name[mi].get(&binder.name)
                             && let DefKind::Binding { binding: bi, var } =
                                 &mut self.p.modules[mi].defs[d as usize].kind
                             && *bi == index
@@ -2928,22 +2372,11 @@ impl<'a> Resolver<'a> {
             .or_else(|| self.builtin_types.get(name).copied())
     }
 
-    fn conflicts_with_type(&self, key: &NameKey) -> bool {
-        key.identity.is_none()
-            && if key.scope.marks.is_empty() {
-                self.unqualified_type(&key.text).is_some()
-            } else {
-                self.generated_types[self.cur.0 as usize].contains_key(key)
-            }
-    }
-
     fn push_declared_frame(&mut self, params: &[ast::Ident]) -> Vec<TyVarId> {
         let mut names = HashMap::new();
         let mut vars = Vec::new();
         for param in params {
-            let key = self.name_key(&param.name, param.span);
-            self.check_binder(&param.name, param.span, false, false);
-            if names.contains_key(&key) {
+            if names.contains_key(&param.name) {
                 self.error(
                     code::TYPE_PARAM_TWICE,
                     param.span,
@@ -2954,7 +2387,7 @@ impl<'a> Resolver<'a> {
                 );
                 continue;
             }
-            if self.conflicts_with_type(&key) {
+            if self.unqualified_type(&param.name).is_some() {
                 self.error(
                     code::TYPE_VAR_IS_TYPE,
                     param.span,
@@ -2962,7 +2395,7 @@ impl<'a> Resolver<'a> {
                 );
             }
             let var = self.new_ty_var(&param.name);
-            names.insert(key, var);
+            names.insert(param.name.clone(), var);
             vars.push(var);
         }
         self.ty_frames.push(TyFrame { names });
@@ -2972,279 +2405,200 @@ impl<'a> Resolver<'a> {
     /// A binding, at the top level or in a block. Gives back the binders of
     /// its pattern; in a block, the caller makes them visible from the next
     /// statement (§6.10).
-    fn enter_binding(
-        &mut self,
-        b: &ast::Binding,
-        top: bool,
-    ) -> (Pattern, Vec<Binder>, Vec<TyVarId>, bool) {
+    fn binding(&mut self, b: &ast::Binding, top: bool) -> (Binding, Vec<Binder>) {
         let ty_vars = self.push_declared_frame(&b.type_params);
         let direct = self.is_direct(&b.value);
         let mut binders = Vec::new();
         let mut names = Vec::new();
         ast_binders(&b.pattern, &mut names);
-        let names: HashSet<NameKey> = names
-            .into_iter()
-            .map(|(n, span)| self.name_key(&n, span))
-            .collect();
+        let names: HashSet<String> = names.into_iter().map(|(n, _)| n).collect();
         self.pending.push(names.clone());
         let pattern = self.pattern(&b.pattern, &mut binders, None);
         self.pending.pop();
-        if direct && !top {
+        let value = if direct && !top {
+            // §6.10: the names may be used inside the function bodies of a
+            // direct value.
             self.locals.push(Frame {
-                names: binders
-                    .iter()
-                    .map(|b| (self.name_key(&b.name, b.span), b.var))
-                    .collect(),
+                names: binders.iter().map(|b| (b.name.clone(), b.var)).collect(),
                 fn_only: Some(self.fn_depth),
             });
-        }
-        self.reserved.push((self.locals.len(), names));
-        (pattern, binders, ty_vars, direct)
-    }
-
-    fn leave_binding(
-        &mut self,
-        b: &ast::Binding,
-        top: bool,
-        resolved_pattern: (Pattern, Vec<Binder>),
-        ty_vars: Vec<TyVarId>,
-        direct: bool,
-        value: Expr,
-    ) -> (Binding, Vec<Binder>) {
-        let (pattern, binders) = resolved_pattern;
-        self.reserved.pop();
-        if direct && !top {
+            self.reserved.push((self.locals.len(), names.clone()));
+            let v = self.expr(&b.value);
+            self.reserved.pop();
             self.locals.pop();
-        }
+            v
+        } else {
+            self.reserved.push((self.locals.len(), names));
+            let value = self.expr(&b.value);
+            self.reserved.pop();
+            value
+        };
         self.ty_frames.pop();
-        (
-            Binding {
-                pattern,
-                value,
-                direct,
-                ty_vars,
-                span: b.span,
-            },
-            binders,
-        )
+        let binding = Binding {
+            pattern,
+            value,
+            direct,
+            ty_vars,
+            span: b.span,
+        };
+        self.check_label_binding(&binding);
+        (binding, binders)
     }
 
-    fn binding(&mut self, b: &ast::Binding, top: bool) -> (Binding, Vec<Binder>) {
-        let (pattern, binders, ty_vars, direct) = self.enter_binding(b, top);
-        let value = self.expr(&b.value);
-        self.leave_binding(b, top, (pattern, binders), ty_vars, direct, value)
-    }
-
-    /// §6.10: a direct value is made without running code.
-    fn is_direct(&self, root: &ast::Expr) -> bool {
-        use ast::ExprKind as E;
-        let mut work = vec![root];
-        while let Some(e) = work.pop() {
-            match &ungroup(e).kind {
-                E::Fn(_)
-                | E::Clauses(_)
-                | E::Int(_)
-                | E::Float(_)
-                | E::String(_)
-                | E::Name { .. } => {}
-                E::Unary { expr, .. } => {
-                    if !matches!(ungroup(expr).kind, E::Int(_) | E::Float(_) | E::String(_)) {
-                        return false;
-                    }
-                }
-                E::Field { target, .. } => match &target.kind {
-                    E::Name { module: None, name }
-                        if matches!(
-                            self.find(&name.name, name.span),
-                            Some(Found::Entry(Entry::Module(_)))
-                        ) => {}
-                    _ => return false,
-                },
-                E::Tuple(items) => work.extend(items.iter().rev()),
-                E::List { items, rest } => {
-                    if let Some(rest) = rest {
-                        work.push(rest);
-                    }
-                    work.extend(items.iter().rev());
-                }
-                E::Call { callee, args } => {
-                    if !is_constructor(callee) {
-                        return false;
-                    }
-                    work.extend(args.iter().rev().map(|a| &a.value));
-                }
-                E::Binary {
-                    op: ast::BinOp::Pipe,
-                    lhs,
-                    rhs,
-                } => {
-                    match &rhs.kind {
-                        E::Name { .. } if is_constructor(rhs) => {}
-                        E::Call { callee, args } if is_constructor(callee) => {
-                            work.extend(args.iter().rev().map(|a| &a.value))
-                        }
-                        _ => return false,
-                    }
-                    work.push(lhs);
-                }
-                _ => return false,
-            }
-        }
-        true
-    }
-
-    fn check_binder(&mut self, name: &str, span: Span, top: bool, type_parameter: bool) {
-        let parsed = &self.parsed[self.cur.0 as usize];
-        let Some(origin) = parsed.scoped.as_ref().and_then(|s| s.origin(span)) else {
+    /// Label parameters may occur as ordinary types only on their own key parameter.
+    fn check_label_binding(&mut self, binding: &Binding) {
+        let ExprKind::Fn(function) = &binding.value.kind else {
             return;
         };
-        let syntax = &origin.syntax;
-        let answer = matches!(
-            syntax.provenance(),
-            Provenance::Answer | Provenance::Made { from_answer: true }
-        );
-        let allowed_parameter = type_parameter
-            && matches!(syntax.scope_identity(),
-                Some(ScopeIdentity::DefinitionParameter { answer, .. })
-                    if origin.definition_head == Some(*answer));
-        let bad_answer = answer && !allowed_parameter;
-        let forbidden_identity = matches!(
-            syntax.scope_identity(),
-            Some(ScopeIdentity::Builtin { .. } | ScopeIdentity::TypeVariable { .. })
-        );
-        let foreign_unmarked =
-            top && syntax.scope().marks.is_empty() && syntax.scope().module != parsed.source.0;
-        if bad_answer || forbidden_identity || foreign_unmarked || !syntax.valid_scope_identity() {
+        let mut labels = HashSet::new();
+        let mut gather = |ty: &Type| {
+            walk_type(ty, &mut |part| {
+                if let TypeKind::Record {
+                    fields, removed, ..
+                } = &part.kind
+                {
+                    labels.extend(
+                        fields
+                            .iter()
+                            .map(|(label, _)| label)
+                            .chain(removed)
+                            .filter_map(|label| label.parameter),
+                    );
+                }
+            })
+        };
+        binding_types(binding, &mut gather);
+        labels.retain(|var| binding.ty_vars.contains(var));
+        let mut allowed = HashMap::new();
+        for param in &function.params {
+            if let Param::Pattern { pattern, .. } = param {
+                let mut pattern = pattern;
+                let mut named = false;
+                while let PatternKind::Named { pattern: inner, .. } = &pattern.kind {
+                    named = true;
+                    pattern = inner;
+                }
+                if let PatternKind::Typed {
+                    binder,
+                    ty:
+                        Type {
+                            kind: TypeKind::Var(var),
+                            span,
+                        },
+                } = &pattern.kind
+                    && (named || binder.is_some())
+                    && labels.contains(var)
+                {
+                    allowed.entry(*var).or_insert_with(Vec::new).push(*span);
+                }
+            }
+        }
+        for var in &labels {
+            if allowed.get(var).is_none_or(Vec::is_empty) {
+                self.error(
+                    code::INVALID_LABEL_PARAMETER,
+                    binding.span,
+                    format!(
+                        "label parameter `{}` needs a named key parameter",
+                        self.p.ty_var_names[var.0 as usize]
+                    ),
+                );
+            }
+        }
+        let mut invalid = Vec::new();
+        binding_types(binding, &mut |ty| {
+            walk_type(ty, &mut |part| {
+                if let TypeKind::Var(var) = part.kind
+                    && labels.contains(&var)
+                    && !allowed
+                        .get(&var)
+                        .is_some_and(|spans| spans.contains(&part.span))
+                {
+                    invalid.push(part.span);
+                }
+            })
+        });
+        for span in invalid {
             self.error(
-                code::MACRO_BINDER,
+                code::INVALID_LABEL_PARAMETER,
                 span,
-                format!("`{name}` cannot bind a name with this macro origin (§5)"),
+                "a label parameter may only be the type of its own key parameter",
             );
         }
     }
 
-    /// Exact lexical identity of an occurrence. Written code has its source
-    /// module and no marks; expanded atoms retain their syntax object identity.
-    fn name_key(&self, text: &str, span: Span) -> NameKey {
-        let parsed = &self.parsed[self.cur.0 as usize];
-        let syntax = parsed.scoped.as_ref().and_then(|s| s.origin(span));
-        let (scope, identity) = match syntax {
-            Some(origin) => (
-                origin.syntax.scope().clone(),
-                origin.syntax.scope_identity().cloned(),
-            ),
-            None => (
-                SyntaxScope {
-                    module: parsed.source.0,
-                    marks: BTreeSet::new(),
-                },
-                None,
-            ),
-        };
-        let scope = if identity.is_some() {
-            SyntaxScope {
-                module: 0,
-                marks: BTreeSet::new(),
+    /// §6.10: a direct value is made without running code.
+    fn is_direct(&self, e: &ast::Expr) -> bool {
+        use ast::ExprKind as E;
+        match &ungroup(e).kind {
+            E::Fn(_) | E::Clauses(_) | E::Int(_) | E::Float(_) | E::String(_) | E::Name { .. } => {
+                true
             }
-        } else {
-            scope
-        };
-        NameKey {
-            text: text.to_owned(),
-            scope,
-            identity,
+            E::Unary { expr, .. } => {
+                matches!(ungroup(expr).kind, E::Int(_) | E::Float(_) | E::String(_))
+            }
+            E::Field { target, .. } => match &target.kind {
+                // `m.x` is a name when `m` is a module.
+                E::Name { module: None, name } => {
+                    matches!(self.find(&name.name), Some(Found::Entry(Entry::Module(_))))
+                }
+                _ => false,
+            },
+            E::Tuple(items) => items.iter().all(|x| self.is_direct(x)),
+            E::Record { base, fields } => {
+                base.as_deref().is_none_or(|b| self.is_direct(b))
+                    && fields.iter().all(|(_, value)| self.is_direct(value))
+            }
+            E::List { items, rest } => items
+                .iter()
+                .chain(rest.as_deref())
+                .all(|x| self.is_direct(x)),
+            // Constructors are the only values with an `UpName`.
+            E::Call { callee, args } => {
+                is_constructor(callee) && args.iter().all(|a| self.is_direct(&a.value))
+            }
+            // §6.9: `a |> C` is `C(a)`, and `a |> C(b)` is `C(a, b)`.
+            E::Binary {
+                op: ast::BinOp::Pipe,
+                lhs,
+                rhs,
+            } => {
+                self.is_direct(lhs)
+                    && match &rhs.kind {
+                        E::Name { .. } => is_constructor(rhs),
+                        E::Call { callee, args } => {
+                            is_constructor(callee) && args.iter().all(|a| self.is_direct(&a.value))
+                        }
+                        _ => false,
+                    }
+            }
+            _ => false,
         }
     }
 
     /// Looks up a value name with no module before it (§5).
-    fn find(&self, name: &str, span: Span) -> Option<Found> {
-        if name.starts_with('\0') {
-            return self.scopes[self.cur.0 as usize]
-                .values
-                .get(name)
-                .map(|(e, _)| Found::Entry(*e));
-        }
-        let key = self.name_key(name, span);
+    fn find(&self, name: &str) -> Option<Found> {
         if !is_upper(name) {
             for f in self.locals.iter().rev() {
                 if f.fn_only.is_some_and(|d| self.fn_depth <= d) {
                     continue;
                 }
-                if let Some(v) = f.names.get(&key) {
+                if let Some(v) = f.names.get(name) {
                     return Some(Found::Local(*v));
                 }
             }
         }
-        if matches!(key.identity, Some(ScopeIdentity::Builtin { .. })) {
-            return self.builtin_values.get(name).map(|e| Found::Entry(*e));
-        }
-        if key.identity.is_some() {
-            return None;
-        }
-        let origin = self.parsed[self.cur.0 as usize]
-            .scoped
-            .as_ref()
-            .and_then(|s| s.origin(span));
-        let provenance = origin.map(|o| o.syntax.provenance());
-        let from_answer = matches!(provenance, Some(Provenance::Made { from_answer: true }));
-        if !key.scope.marks.is_empty()
-            && !from_answer
-            && let Some(e) = self.generated_values[self.cur.0 as usize].get(&key)
-        {
-            return Some(Found::Entry(*e));
-        }
-        let module = self
-            .parsed
-            .iter()
-            .position(|p| p.source.0 == key.scope.module)?;
-        let scope = &self.scopes[module];
-        if let Some((e, imported)) = scope.values.get(name) {
-            let needs_export = matches!(provenance, Some(Provenance::Made { .. }))
-                && (!key.scope.marks.is_empty() || module != self.cur.0 as usize);
-            let exported = match e {
-                Entry::Def(d) => self.p.def(*d).exported,
-                Entry::Macro { exported } => *exported,
-                Entry::Ctor(c) => self.p.ty(c.ty).constructors_exported,
-                Entry::Module(_) => *imported,
-                Entry::Broken => true,
-            };
-            if needs_export && !exported {
-                return Some(Found::Private);
-            }
+        let scope = &self.scopes[self.cur.0 as usize];
+        if let Some((e, _)) = scope.values.get(name) {
             return Some(Found::Entry(*e));
         }
         self.builtin_values.get(name).map(|e| Found::Entry(*e))
     }
 
-    /// Only compiler-created modules and unspellable compiler aliases may
-    /// refer directly to private implementation members.
-    fn compiler_reference(&self, module: &ast::Ident) -> bool {
-        self.parsed[self.cur.0 as usize].compiler_generated || module.name.starts_with('\0')
-    }
-
     /// A member `m.x` or `m.C` of another module.
-    fn member(&mut self, target: ModuleId, name: &ast::Ident, trusted: bool) -> ExprKind {
+    fn member(&mut self, target: ModuleId, name: &ast::Ident) -> ExprKind {
         let ti = target.0 as usize;
         let path = self.module_name(target).to_string();
-        if let Some(&exported) = self.macros_by_name[ti].get(&name.name) {
-            if !exported && !trusted {
-                self.error(
-                    code::NOT_EXPORTED,
-                    name.span,
-                    format!("`{}` is not exported from `{path}`", name.name),
-                );
-            } else {
-                self.error(
-                    code::MACRO_RESERVED,
-                    name.span,
-                    format!(
-                        "macro `{}` can only be used as a macro call (§4.1)",
-                        name.name
-                    ),
-                );
-            }
-            return ExprKind::Error;
-        }
         let (found, exported) = if is_upper(&name.name) {
             match self.ctors_by_name[ti].get(&name.name) {
                 Some(&c) => (
@@ -3266,7 +2620,7 @@ impl<'a> Resolver<'a> {
             }
         };
         match found {
-            Some(v) if exported || trusted => {
+            Some(v) if exported => {
                 match v {
                     ValueRef::Def(d) => self.used_def(d, name.span),
                     ValueRef::Ctor(c) => self.used_ctor(c, name.span),
@@ -3295,18 +2649,8 @@ impl<'a> Resolver<'a> {
 
     fn name(&mut self, module: Option<&ast::Ident>, name: &ast::Ident) -> ExprKind {
         if let Some(m) = module {
-            return match self.find(&m.name, m.span) {
-                Some(Found::Private) => {
-                    self.error(
-                        code::NOT_EXPORTED,
-                        m.span,
-                        format!("`{}` is not exported from its scope module", m.name),
-                    );
-                    ExprKind::Error
-                }
-                Some(Found::Entry(Entry::Module(t))) => {
-                    self.member(t, name, self.compiler_reference(m))
-                }
+            return match self.find(&m.name) {
+                Some(Found::Entry(Entry::Module(t))) => self.member(t, name),
                 Some(Found::Entry(Entry::Broken)) => ExprKind::Error,
                 Some(_) => {
                     self.error(
@@ -3326,30 +2670,11 @@ impl<'a> Resolver<'a> {
                 }
             };
         }
-        match self.find(&name.name, name.span) {
-            Some(Found::Private) => {
-                self.error(
-                    code::NOT_EXPORTED,
-                    name.span,
-                    format!("`{}` is not exported from its scope module", name.name),
-                );
-                ExprKind::Error
-            }
+        match self.find(&name.name) {
             Some(Found::Local(v)) => ExprKind::Name(ValueRef::Local(v)),
             Some(Found::Entry(Entry::Def(d))) => {
                 self.used_def(d, name.span);
                 ExprKind::Name(ValueRef::Def(d))
-            }
-            Some(Found::Entry(Entry::Macro { .. })) => {
-                self.error(
-                    code::MACRO_RESERVED,
-                    name.span,
-                    format!(
-                        "macro `{}` can only be used as a macro call (§4.1)",
-                        name.name
-                    ),
-                );
-                ExprKind::Error
             }
             Some(Found::Entry(Entry::Ctor(c))) => {
                 self.used_ctor(c, name.span);
@@ -3402,620 +2727,267 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn expr(&mut self, root: &ast::Expr) -> Expr {
-        let ResolutionResult::Expr(expr) = self.resolve_tree(ResolutionRoot::Expr(root)) else {
-            unreachable!("expression root")
-        };
-        expr
-    }
-
-    fn pattern(
-        &mut self,
-        root: &ast::Pattern,
-        binders: &mut Vec<Binder>,
-        shared: Option<&HashMap<NameKey, VarId>>,
-    ) -> Pattern {
-        let ResolutionResult::Pattern(pattern, result) = self.resolve_tree(
-            ResolutionRoot::Pattern(root, std::mem::take(binders), shared.cloned()),
-        ) else {
-            unreachable!("pattern root")
-        };
-        *binders = result;
-        pattern
-    }
-
-    fn resolve_tree(&mut self, root: ResolutionRoot<'_>) -> ResolutionResult {
+    fn expr(&mut self, e: &ast::Expr) -> Expr {
         use ast::ExprKind as E;
-        enum PatternTask<'a> {
-            Visit(&'a ast::Pattern),
-            Quote {
-                span: Span,
-                template: Option<u32>,
-                captures: &'a [(bool, ast::Pattern)],
+        let kind = match &e.kind {
+            E::Int(n) => ExprKind::Int(n.clone()),
+            E::Float(f) => ExprKind::Float(*f),
+            E::String(s) => ExprKind::String(s.clone()),
+            E::Name { module, name } => self.name(module.as_ref(), name),
+            E::Tuple(items) => ExprKind::Tuple(items.iter().map(|x| self.expr(x)).collect()),
+            E::Record { base, fields } => ExprKind::Record {
+                base: base.as_ref().map(|b| Box::new(self.expr(b))),
+                fields: fields
+                    .iter()
+                    .map(|(label, value)| (label.clone(), self.expr(value)))
+                    .collect(),
             },
-            Named {
-                span: Span,
-                binder: Binder,
+            E::List { items, rest } => ExprKind::List {
+                items: items.iter().map(|x| self.expr(x)).collect(),
+                rest: rest.as_ref().map(|r| Box::new(self.expr(r))),
             },
-            Constructor {
-                span: Span,
-                ctor: Option<CtorRef>,
-                spread: bool,
-                count: usize,
-            },
-            Tuple {
-                span: Span,
-                count: usize,
-            },
-            List {
-                span: Span,
-                count: usize,
-                rest: &'a Option<Option<ast::Binder>>,
-            },
-            BitNext {
-                span: Span,
-                segments: &'a [ast::Segment<ast::Pattern>],
-                index: usize,
-                out: Vec<Segment<Pattern>>,
-            },
-            BitFinish {
-                span: Span,
-                segments: &'a [ast::Segment<ast::Pattern>],
-                index: usize,
-                out: Vec<Segment<Pattern>>,
-            },
-        }
-        struct PatternMachine<'a> {
-            work: Vec<PatternTask<'a>>,
-            values: Vec<Pattern>,
-            binders: Vec<Binder>,
-            shared: Option<HashMap<NameKey, VarId>>,
-        }
-        enum Build<'a> {
-            Tuple(usize),
-            List(usize, bool),
-            Call(&'a [ast::Arg]),
-            Field(&'a Ident),
-            Index(&'a num_bigint::BigUint, Span),
-            Unary(ast::UnOp),
-            Binary(ast::BinOp),
-            Update(Option<CtorRef>, Span, &'a [(Ident, ast::Expr)]),
-        }
-        enum Task<'a> {
-            PatternPoll(usize),
-            PatternAfterFormat {
-                context: usize,
-                span: Span,
-                segments: &'a [ast::Segment<ast::Pattern>],
-                index: usize,
-                out: Vec<Segment<Pattern>>,
-                value: Pattern,
-            },
-            FunctionAfterPattern {
-                span: Span,
-                function: &'a ast::Function,
-                index: usize,
-                params: Vec<Param>,
-                all: Vec<Binder>,
-                labels: Vec<String>,
-                env_heads: Vec<TypeRef>,
-            },
-            Visit(&'a ast::Expr),
-            Finish(Span, Build<'a>),
-            BitNext {
-                span: Span,
-                segs: &'a [ast::Segment<ast::Expr>],
-                index: usize,
-                out: Vec<Segment<Expr>>,
-            },
-            BitValue {
-                span: Span,
-                segs: &'a [ast::Segment<ast::Expr>],
-                index: usize,
-                out: Vec<Segment<Expr>>,
-            },
-            BitFormat {
-                span: Span,
-                segs: &'a [ast::Segment<ast::Expr>],
-                index: usize,
-                out: Vec<Segment<Expr>>,
-                value: Expr,
-            },
-            BlockStart(&'a ast::Block),
-            BlockNext {
-                block: &'a ast::Block,
-                index: usize,
-                mark: usize,
-                stmts: Vec<Stmt>,
-            },
-            BlockExpr {
-                span: Span,
-            },
-            BlockAfterExpr {
-                block: &'a ast::Block,
-                index: usize,
-                mark: usize,
-                stmts: Vec<Stmt>,
-            },
-            BlockAfterEnv {
-                block: &'a ast::Block,
-                index: usize,
-                mark: usize,
-                stmts: Vec<Stmt>,
-                ty: Type,
-                span: Span,
-            },
-            BlockAfterBindingPattern {
-                block: &'a ast::Block,
-                index: usize,
-                mark: usize,
-                stmts: Vec<Stmt>,
-                binding: &'a ast::Binding,
-                ty_vars: Vec<TyVarId>,
-                direct: bool,
-                names: HashSet<NameKey>,
-            },
-            BlockAfterBinding {
-                block: &'a ast::Block,
-                index: usize,
-                mark: usize,
-                stmts: Vec<Stmt>,
-                binding: &'a ast::Binding,
-                pattern: Pattern,
-                binders: Vec<Binder>,
-                ty_vars: Vec<TyVarId>,
-                direct: bool,
-            },
-            FunctionParams {
-                span: Span,
-                function: &'a ast::Function,
-                index: usize,
-                params: Vec<Param>,
-                all: Vec<Binder>,
-                labels: Vec<String>,
-                env_heads: Vec<TypeRef>,
-            },
-            FunctionFinish {
-                span: Span,
-                params: Vec<Param>,
-                ret: Option<RetType>,
-            },
-            ClauseFunctionAfterPattern {
-                span: Span,
-                clauses: &'a [ast::Clause],
-            },
-            ClauseFunctionFinish {
-                span: Span,
-                params: Vec<Param>,
-                ret: Option<RetType>,
-            },
-            CaseAfterSubject {
-                span: Span,
-                clauses: &'a [ast::Clause],
-            },
-            CaseNext {
-                span: Span,
-                subject: Expr,
-                clauses: &'a [ast::Clause],
-                index: usize,
-                out: Vec<Clause>,
-            },
-            CasePatterns {
-                span: Span,
-                subject: Expr,
-                clauses: &'a [ast::Clause],
-                index: usize,
-                out: Vec<Clause>,
-                pattern_index: usize,
-                patterns: Vec<Pattern>,
-                first: Vec<Binder>,
-            },
-            CaseAfterPattern {
-                span: Span,
-                subject: Expr,
-                clauses: &'a [ast::Clause],
-                index: usize,
-                out: Vec<Clause>,
-                pattern_index: usize,
-                patterns: Vec<Pattern>,
-                first: Vec<Binder>,
-            },
-            CaseAfterGuard {
-                span: Span,
-                subject: Expr,
-                clauses: &'a [ast::Clause],
-                index: usize,
-                out: Vec<Clause>,
-                patterns: Vec<Pattern>,
-                has_guard: bool,
-            },
-            CaseAfterBody {
-                span: Span,
-                subject: Expr,
-                clauses: &'a [ast::Clause],
-                index: usize,
-                out: Vec<Clause>,
-                patterns: Vec<Pattern>,
-                guard: Option<Expr>,
-            },
-            SingleAfterSubject {
-                span: Span,
-                clause: &'a ast::Clause,
-            },
-            SingleAfterPattern {
-                span: Span,
-                clause: &'a ast::Clause,
-                value: Expr,
-            },
-            SingleAfterBody {
-                span: Span,
-                pattern: Pattern,
-                value: Expr,
-            },
-        }
-        let mut contexts: Vec<Option<PatternMachine<'_>>> = Vec::new();
-        let (mut work, is_pattern) = match root {
-            ResolutionRoot::Expr(expr) => (vec![Task::Visit(expr)], false),
-            ResolutionRoot::Pattern(pattern, binders, shared) => {
-                contexts.push(Some(PatternMachine {
-                    work: vec![PatternTask::Visit(pattern)],
-                    values: Vec::new(),
-                    binders,
-                    shared,
-                }));
-                (vec![Task::PatternPoll(0)], true)
-            }
-        };
-        let mut values: Vec<Expr> = Vec::new();
-        let mut blocks: Vec<Block> = Vec::new();
-        let mut pattern_results: Vec<(Pattern, Vec<Binder>)> = Vec::new();
-        'dispatch: while let Some(task) = work.pop() {
-            match task {
-                Task::PatternPoll(context) => {
-                    let mut machine = contexts[context].take().expect("active pattern machine");
-                    let binders = &mut machine.binders;
-                    let shared = machine.shared.as_ref();
-                    let pattern_work = &mut machine.work;
-                    let pattern_values = &mut machine.values;
-                    use ast::PatternKind as P;
-                    while let Some(task) = pattern_work.pop() {
-                        match task {
-                            PatternTask::Visit(p) => {
-                                let kind = match &p.kind {
-                                    P::Quote {
-                                        template, captures, ..
-                                    } => {
-                                        pattern_work.push(PatternTask::Quote {
-                                            span: p.span,
-                                            template: *template,
-                                            captures,
-                                        });
-                                        pattern_work.extend(
-                                            captures
-                                                .iter()
-                                                .rev()
-                                                .map(|(_, capture)| PatternTask::Visit(capture)),
-                                        );
-                                        continue;
-                                    }
-                                    P::Var(n) => {
-                                        PatternKind::Var(self.bind(n, p.span, binders, shared))
-                                    }
-                                    P::Discard(_) => PatternKind::Discard,
-                                    P::Typed { binder, ty } => {
-                                        let binder = (!binder.discard).then(|| {
-                                            self.bind(&binder.name, binder.span, binders, shared)
-                                        });
-                                        PatternKind::Typed {
-                                            binder,
-                                            ty: self.ty(ty),
-                                        }
-                                    }
-                                    P::Named { name, pattern } => {
-                                        let binder =
-                                            self.bind(&name.name, name.span, binders, shared);
-                                        pattern_work.push(PatternTask::Named {
-                                            span: p.span,
-                                            binder,
-                                        });
-                                        pattern_work.push(PatternTask::Visit(pattern));
-                                        continue;
-                                    }
-                                    P::Int { negative, value } => PatternKind::Int {
-                                        negative: *negative,
-                                        value: value.clone(),
-                                    },
-                                    P::Float { negative, value } => PatternKind::Float {
-                                        negative: *negative,
-                                        value: *value,
-                                    },
-                                    P::String(x) => PatternKind::String(x.clone()),
-                                    P::Prefix { prefix, rest } => PatternKind::Prefix {
-                                        prefix: prefix.clone(),
-                                        rest: (!rest.discard).then(|| {
-                                            self.bind(&rest.name, rest.span, binders, shared)
-                                        }),
-                                    },
-                                    P::Constructor {
-                                        module,
-                                        name,
-                                        args,
-                                        spread,
-                                    } => {
-                                        let ctor = self.ctor(module.as_ref(), name);
-                                        pattern_work.push(PatternTask::Constructor {
-                                            span: p.span,
-                                            ctor,
-                                            spread: *spread,
-                                            count: args.len(),
-                                        });
-                                        pattern_work
-                                            .extend(args.iter().rev().map(PatternTask::Visit));
-                                        continue;
-                                    }
-                                    P::Tuple(items) => {
-                                        pattern_work.push(PatternTask::Tuple {
-                                            span: p.span,
-                                            count: items.len(),
-                                        });
-                                        pattern_work
-                                            .extend(items.iter().rev().map(PatternTask::Visit));
-                                        continue;
-                                    }
-                                    P::List { items, rest } => {
-                                        pattern_work.push(PatternTask::List {
-                                            span: p.span,
-                                            count: items.len(),
-                                            rest,
-                                        });
-                                        pattern_work
-                                            .extend(items.iter().rev().map(PatternTask::Visit));
-                                        continue;
-                                    }
-                                    P::BitArray(segments) => {
-                                        pattern_work.push(PatternTask::BitNext {
-                                            span: p.span,
-                                            segments,
-                                            index: 0,
-                                            out: Vec::with_capacity(segments.len()),
-                                        });
-                                        continue;
-                                    }
-                                };
-                                pattern_values.push(Pattern { kind, span: p.span });
-                            }
-                            PatternTask::Quote {
-                                span,
-                                template,
-                                captures,
-                            } => {
-                                let children =
-                                    pattern_values.split_off(pattern_values.len() - captures.len());
-                                let captures: Vec<_> = captures
-                                    .iter()
-                                    .map(|(many, _)| *many)
-                                    .zip(children)
-                                    .collect();
-                                let kind = if let Some(template) = template {
-                                    let module = Ident {
-                                        name: "\0quote-syntax".into(),
-                                        span,
-                                    };
-                                    let name = Ident {
-                                        name: "Syntax".into(),
-                                        span,
-                                    };
-                                    let syntax = self.lookup_type(Some(&module), &name);
-                                    let functions: Option<Vec<_>> = [
-                                        "_template",
-                                        "_match",
-                                        "_match_ok",
-                                        "_match_one",
-                                        "_match_many",
-                                    ]
-                                    .into_iter()
-                                    .map(|name| {
-                                        let name = Ident {
-                                            name: name.into(),
-                                            span,
-                                        };
-                                        match self.name(Some(&module), &name) {
-                                            ExprKind::Name(ValueRef::Def(def)) => Some(def),
-                                            _ => None,
-                                        }
-                                    })
-                                    .collect();
-                                    match (syntax, functions) {
-                                        (Some(TypeRef::Custom(syntax)), Some(functions)) => {
-                                            PatternKind::Quote {
-                                                template,
-                                                syntax,
-                                                functions: functions
-                                                    .try_into()
-                                                    .expect("five quote services"),
-                                                captures,
-                                            }
-                                        }
-                                        _ => PatternKind::Error(
-                                            captures.into_iter().map(|(_, p)| p).collect(),
-                                        ),
-                                    }
-                                } else {
-                                    self.error(
-                                        code::MACRO_RESERVED,
-                                        span,
-                                        "a quote pattern must be evaluated inside a macro",
-                                    );
-                                    PatternKind::Error(
-                                        captures.into_iter().map(|(_, p)| p).collect(),
-                                    )
-                                };
-                                pattern_values.push(Pattern { kind, span });
-                            }
-                            PatternTask::Named { span, binder } => {
-                                let pattern =
-                                    Box::new(pattern_values.pop().expect("named pattern child"));
-                                pattern_values.push(Pattern {
-                                    kind: PatternKind::Named { binder, pattern },
-                                    span,
-                                });
-                            }
-                            PatternTask::Constructor {
-                                span,
-                                ctor,
-                                spread,
-                                count,
-                            } => {
-                                let args = pattern_values.split_off(pattern_values.len() - count);
-                                let kind = match ctor {
-                                    Some(ctor) => PatternKind::Constructor { ctor, args, spread },
-                                    None => PatternKind::Error(args),
-                                };
-                                pattern_values.push(Pattern { kind, span });
-                            }
-                            PatternTask::Tuple { span, count } => {
-                                let items = pattern_values.split_off(pattern_values.len() - count);
-                                pattern_values.push(Pattern {
-                                    kind: PatternKind::Tuple(items),
-                                    span,
-                                });
-                            }
-                            PatternTask::List { span, count, rest } => {
-                                let items = pattern_values.split_off(pattern_values.len() - count);
-                                let rest = rest.as_ref().map(|r| {
-                                    r.as_ref()
-                                        .filter(|b| !b.discard)
-                                        .map(|b| self.bind(&b.name, b.span, binders, shared))
-                                });
-                                pattern_values.push(Pattern {
-                                    kind: PatternKind::List { items, rest },
-                                    span,
-                                });
-                            }
-                            PatternTask::BitNext {
-                                span,
-                                segments,
-                                index,
-                                out,
-                            } => {
-                                if index == segments.len() {
-                                    pattern_values.push(Pattern {
-                                        kind: PatternKind::BitArray(out),
-                                        span,
-                                    });
-                                } else {
-                                    pattern_work.push(PatternTask::BitFinish {
-                                        span,
-                                        segments,
-                                        index,
-                                        out,
-                                    });
-                                    pattern_work.push(PatternTask::Visit(&segments[index].value));
-                                }
-                            }
-                            PatternTask::BitFinish {
-                                span,
-                                segments,
-                                index,
-                                mut out,
-                            } => {
-                                let segment = &segments[index];
-                                let value = pattern_values.pop().expect("bit pattern segment");
-                                // Earlier segments' binders are visible to a format expression.
-                                self.locals.push(Frame {
-                                    names: binders
-                                        .iter()
-                                        .map(|b| (self.name_key(&b.name, b.span), b.var))
-                                        .collect(),
-                                    fn_only: None,
-                                });
-                                if let Some(arg) =
-                                    segment.format.as_ref().and_then(|f| f.arg.as_deref())
-                                {
-                                    contexts[context] = Some(machine);
-                                    work.push(Task::PatternAfterFormat {
-                                        context,
-                                        span,
-                                        segments,
-                                        index,
-                                        out,
-                                        value,
-                                    });
-                                    work.push(Task::Visit(arg));
-                                    continue 'dispatch;
-                                }
-                                self.locals.pop();
-                                let format = segment.format.as_ref().map(|f| Format {
-                                    name: f.name.clone(),
-                                    arg: None,
-                                });
-                                out.push(Segment {
-                                    value,
-                                    format,
-                                    span: segment.span,
-                                });
-                                pattern_work.push(PatternTask::BitNext {
-                                    span,
-                                    segments,
-                                    index: index + 1,
-                                    out,
-                                });
-                            }
-                        }
-                    }
-                    assert_eq!(
-                        machine.values.len(),
-                        1,
-                        "pattern resolution must return one value"
-                    );
-                    pattern_results.push((machine.values.pop().unwrap(), machine.binders));
-                }
-                Task::PatternAfterFormat {
-                    context,
-                    span,
-                    segments,
-                    index,
-                    mut out,
-                    value,
-                } => {
-                    let arg = values.pop().expect("bit pattern format argument");
-                    self.locals.pop();
-                    let segment = &segments[index];
-                    let format = Some(Format {
-                        name: segment.format.as_ref().expect("format").name.clone(),
-                        arg: Some(Box::new(arg)),
-                    });
-                    out.push(Segment {
-                        value,
-                        format,
-                        span: segment.span,
-                    });
-                    contexts[context]
-                        .as_mut()
-                        .expect("pattern machine")
-                        .work
-                        .push(PatternTask::BitNext {
+            E::BitArray(segs) => ExprKind::BitArray(
+                segs.iter()
+                    .map(|s| Segment {
+                        value: self.expr(&s.value),
+                        format: self.format(s.format.as_ref()),
+                        span: s.span,
+                    })
+                    .collect(),
+            ),
+            E::Block(b) => ExprKind::Block(self.block(b)),
+            E::Fn(f) => ExprKind::Fn(Box::new(self.function(f, e.span))),
+            E::Clauses(clauses) => self.clause_function(clauses, e.span),
+            E::Case { subject, clauses }
+                if clauses.len() == 1
+                    && clauses[0].guard.is_none()
+                    && clauses[0].patterns.len() == 1 =>
+            {
+                let clause = &clauses[0];
+                // §3.9: the subject precedes the new scope; no type frame,
+                // no generalization, and the binding stops at the pattern.
+                let value = self.expr(subject);
+                let mut binders = Vec::new();
+                let pattern = self.pattern(&clause.patterns[0], &mut binders, None);
+                self.locals.push(Frame {
+                    names: binders.into_iter().map(|b| (b.name, b.var)).collect(),
+                    fn_only: None,
+                });
+                let body = self.expr(&clause.body);
+                self.locals.pop();
+                let span = pattern.span;
+                ExprKind::Block(Block {
+                    stmts: vec![
+                        Stmt::Bind(Binding {
+                            pattern,
+                            value,
+                            direct: false,
+                            ty_vars: vec![],
                             span,
-                            segments,
-                            index: index + 1,
-                            out,
-                        });
-                    work.push(Task::PatternPoll(context));
+                        }),
+                        Stmt::Expr(body),
+                    ],
+                    span: e.span,
+                })
+            }
+            E::Case {
+                subject, clauses, ..
+            } => ExprKind::Case {
+                subject: Box::new(self.expr(subject)),
+                clauses: clauses.iter().map(|c| self.clause(c)).collect(),
+            },
+            E::Call { callee, args } => ExprKind::Call {
+                callee: Box::new(self.expr(callee)),
+                args: args
+                    .iter()
+                    .map(|a| Arg {
+                        label: a.label.clone(),
+                        value: self.expr(&a.value),
+                    })
+                    .collect(),
+            },
+            E::Field { target, name } => {
+                let module = match &target.kind {
+                    E::Name { module: None, name } => match self.find(&name.name) {
+                        Some(Found::Entry(Entry::Module(t))) => Some(Some(t)),
+                        Some(Found::Entry(Entry::Broken)) => Some(None),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                match module {
+                    Some(Some(t)) => self.member(t, name),
+                    Some(None) => ExprKind::Error,
+                    None => ExprKind::Field {
+                        target: Box::new(self.expr(target)),
+                        name: name.clone(),
+                    },
                 }
-                Task::FunctionAfterPattern {
+            }
+            E::TupleIndex {
+                target,
+                index,
+                index_span,
+            } => ExprKind::TupleIndex {
+                target: Box::new(self.expr(target)),
+                index: index.clone(),
+                index_span: *index_span,
+            },
+            E::RecordUpdate {
+                constructor,
+                base,
+                fields,
+            } => {
+                let ctor = match &constructor.kind {
+                    E::Name { module, name } => self.ctor(module.as_ref(), name),
+                    _ => {
+                        self.error(
+                            code::NOT_A_CONSTRUCTOR,
+                            constructor.span,
+                            "a record update starts with a constructor",
+                        );
+                        None
+                    }
+                };
+                let base = Box::new(self.expr(base));
+                let fields = fields
+                    .iter()
+                    .map(|(n, x)| (n.clone(), self.expr(x)))
+                    .collect();
+                match ctor {
+                    Some(ctor) => ExprKind::RecordUpdate {
+                        ctor,
+                        ctor_span: constructor.span,
+                        base,
+                        fields,
+                    },
+                    None => ExprKind::Error,
+                }
+            }
+            E::Unary { op, expr } => ExprKind::Unary {
+                op: *op,
+                expr: Box::new(self.expr(expr)),
+            },
+            E::Binary { op, lhs, rhs } => ExprKind::Binary {
+                op: *op,
+                lhs: Box::new(self.expr(lhs)),
+                rhs: Box::new(self.expr(rhs)),
+            },
+        };
+        Expr { kind, span: e.span }
+    }
+
+    fn clause_function(&mut self, clauses: &[ast::Clause], span: Span) -> ExprKind {
+        let single =
+            clauses.len() == 1 && clauses[0].guard.is_none() && clauses[0].patterns.len() == 1;
+        let synthetic = Span::new(span.start, span.start);
+        let (param, body) = if single {
+            (clauses[0].patterns[0].clone(), clauses[0].body.clone())
+        } else {
+            let case_span = match (clauses.first(), clauses.last()) {
+                (Some(first), Some(last)) => first.span.to(last.span),
+                _ => Span::new(span.start + 1, span.start + 1),
+            };
+            (
+                ast::Pattern {
+                    kind: ast::PatternKind::Var("%arg".into()),
+                    span: synthetic,
+                },
+                ast::Expr {
+                    kind: ast::ExprKind::Case {
+                        subject: Box::new(ast::Expr {
+                            kind: ast::ExprKind::Name {
+                                module: None,
+                                name: ast::Ident {
+                                    name: "%arg".into(),
+                                    span: synthetic,
+                                },
+                            },
+                            span: synthetic,
+                        }),
+                        clauses: clauses.to_vec(),
+                    },
+                    span: case_span,
+                },
+            )
+        };
+        let mut function = self.function(
+            &ast::Function {
+                params: vec![ast::Param::Pattern(param)],
+                ret: None,
+                body: ast::Block {
+                    stmts: vec![ast::Stmt::Expr(body)],
                     span,
-                    function,
-                    index,
-                    mut params,
-                    mut all,
-                    mut labels,
-                    env_heads,
-                } => {
-                    let (pattern, binders) =
-                        pattern_results.pop().expect("function parameter pattern");
-                    let ast::Param::Pattern(pat) = &function.params[index] else {
-                        unreachable!("parameter must be a pattern")
-                    };
+                },
+            },
+            span,
+        );
+        if !single && let Param::Pattern { label, .. } = &mut function.params[0] {
+            *label = None;
+        }
+        ExprKind::Fn(Box::new(function))
+    }
+
+    fn format(&mut self, f: Option<&ast::Format>) -> Option<Format> {
+        f.map(|f| Format {
+            name: f.name.clone(),
+            arg: f.arg.as_ref().map(|a| Box::new(self.expr(a))),
+        })
+    }
+
+    fn block(&mut self, b: &ast::Block) -> Block {
+        let mark = self.locals.len();
+        let mut stmts = Vec::new();
+        for s in &b.stmts {
+            stmts.push(match s {
+                ast::Stmt::Bind(binding) => {
+                    let (binding, binders) = self.binding(binding, false);
+                    self.locals.push(Frame {
+                        names: binders.into_iter().map(|b| (b.name, b.var)).collect(),
+                        fn_only: None,
+                    });
+                    Stmt::Bind(binding)
+                }
+                ast::Stmt::Env { ty, value, span } => {
+                    let ty = self.ty(ty);
+                    self.env_type(&ty);
+                    let value = self.expr(value);
+                    Stmt::Env {
+                        ty,
+                        value,
+                        span: *span,
+                    }
+                }
+                ast::Stmt::Expr(e) => Stmt::Expr(self.expr(e)),
+            });
+        }
+        self.locals.truncate(mark);
+        Block {
+            stmts,
+            span: b.span,
+        }
+    }
+
+    /// §6.8 and §6.11.
+    fn function(&mut self, f: &ast::Function, span: Span) -> Function {
+        let mut params = Vec::new();
+        let mut env_heads: Vec<TypeRef> = Vec::new();
+        let mut all: Vec<Binder> = Vec::new();
+        let mut labels: Vec<String> = Vec::new();
+        let mut pending = Vec::new();
+        for p in &f.params {
+            match p {
+                ast::Param::Pattern(p) => ast_binders(p, &mut pending),
+                ast::Param::Env { name, .. } => pending.push((name.name.clone(), name.span)),
+            }
+        }
+        self.pending
+            .push(pending.into_iter().map(|(n, _)| n).collect());
+        for p in &f.params {
+            match p {
+                ast::Param::Pattern(pat) => {
+                    let mut binders = Vec::new();
+                    let pattern = self.pattern(pat, &mut binders, None);
                     for b in binders {
                         self.param_name(&all, &b.name, b.span);
                         all.push(b);
@@ -4032,1005 +3004,59 @@ impl<'a> Resolver<'a> {
                         labels.push(l.clone());
                     }
                     params.push(Param::Pattern { pattern, label });
-                    work.push(Task::FunctionParams {
-                        span,
-                        function,
-                        index: index + 1,
-                        params,
-                        all,
-                        labels,
-                        env_heads,
-                    });
                 }
-                Task::Visit(e) => {
-                    let kind = match &e.kind {
-                        E::Quote(_) => {
+                ast::Param::Env { name, ty } => {
+                    let ty = self.ty(ty);
+                    // §9.2: two environment parameters of one function may
+                    // not have the same type constructor.
+                    if let Some(head) = self.env_type(&ty) {
+                        if env_heads.contains(&head) {
+                            let tname = self.type_name(head);
                             self.error(
-                                code::MACRO_RESERVED,
-                                e.span,
-                                "a quote must be evaluated inside a macro",
-                            );
-                            ExprKind::Error
-                        }
-                        E::Int(n) => ExprKind::Int(n.clone()),
-                        E::Float(f) => ExprKind::Float(*f),
-                        E::String(x) => ExprKind::String(x.clone()),
-                        E::Name { module, name } => self.name(module.as_ref(), name),
-                        E::Tuple(items) => {
-                            work.push(Task::Finish(e.span, Build::Tuple(items.len())));
-                            work.extend(items.iter().rev().map(Task::Visit));
-                            continue;
-                        }
-                        E::List { items, rest } => {
-                            work.push(Task::Finish(
-                                e.span,
-                                Build::List(items.len(), rest.is_some()),
-                            ));
-                            if let Some(rest) = rest {
-                                work.push(Task::Visit(rest));
-                            }
-                            work.extend(items.iter().rev().map(Task::Visit));
-                            continue;
-                        }
-                        E::BitArray(segs) => {
-                            work.push(Task::BitNext {
-                                span: e.span,
-                                segs,
-                                index: 0,
-                                out: Vec::with_capacity(segs.len()),
-                            });
-                            continue;
-                        }
-                        E::Call { callee, args } => {
-                            work.push(Task::Finish(e.span, Build::Call(args)));
-                            work.extend(args.iter().rev().map(|a| Task::Visit(&a.value)));
-                            work.push(Task::Visit(callee));
-                            continue;
-                        }
-                        E::Field { target, name } => {
-                            let module = match &target.kind {
-                                E::Name { module: None, name } => {
-                                    match self.find(&name.name, name.span) {
-                                        Some(Found::Entry(Entry::Module(t))) => {
-                                            Some(Some((t, self.compiler_reference(name))))
-                                        }
-                                        Some(Found::Entry(Entry::Broken)) => Some(None),
-                                        _ => None,
-                                    }
-                                }
-                                _ => None,
-                            };
-                            match module {
-                                Some(Some((t, trusted))) => self.member(t, name, trusted),
-                                Some(None) => ExprKind::Error,
-                                None => {
-                                    work.push(Task::Finish(e.span, Build::Field(name)));
-                                    work.push(Task::Visit(target));
-                                    continue;
-                                }
-                            }
-                        }
-                        E::TupleIndex {
-                            target,
-                            index,
-                            index_span,
-                        } => {
-                            work.push(Task::Finish(e.span, Build::Index(index, *index_span)));
-                            work.push(Task::Visit(target));
-                            continue;
-                        }
-                        E::RecordUpdate {
-                            constructor,
-                            base,
-                            fields,
-                        } => {
-                            let ctor = match &constructor.kind {
-                                E::Name { module, name } => self.ctor(module.as_ref(), name),
-                                _ => {
-                                    self.error(
-                                        code::NOT_A_CONSTRUCTOR,
-                                        constructor.span,
-                                        "a record update starts with a constructor",
-                                    );
-                                    None
-                                }
-                            };
-                            work.push(Task::Finish(
-                                e.span,
-                                Build::Update(ctor, constructor.span, fields),
-                            ));
-                            work.extend(fields.iter().rev().map(|(_, x)| Task::Visit(x)));
-                            work.push(Task::Visit(base));
-                            continue;
-                        }
-                        E::Unary { op, expr } => {
-                            work.push(Task::Finish(e.span, Build::Unary(*op)));
-                            work.push(Task::Visit(expr));
-                            continue;
-                        }
-                        E::Binary { op, lhs, rhs } => {
-                            work.push(Task::Finish(e.span, Build::Binary(*op)));
-                            work.push(Task::Visit(rhs));
-                            work.push(Task::Visit(lhs));
-                            continue;
-                        }
-                        E::Block(block) => {
-                            work.push(Task::BlockExpr { span: e.span });
-                            work.push(Task::BlockStart(block));
-                            continue;
-                        }
-                        E::Fn(f) => {
-                            let mut pending = Vec::new();
-                            for p in &f.params {
-                                match p {
-                                    ast::Param::Pattern(p) => ast_binders(p, &mut pending),
-                                    ast::Param::Env { name, .. } => {
-                                        pending.push((name.name.clone(), name.span))
-                                    }
-                                }
-                            }
-                            self.pending.push(
-                                pending
-                                    .into_iter()
-                                    .map(|(n, span)| self.name_key(&n, span))
-                                    .collect(),
-                            );
-                            work.push(Task::FunctionParams {
-                                span: e.span,
-                                function: f,
-                                index: 0,
-                                params: Vec::new(),
-                                all: Vec::new(),
-                                labels: Vec::new(),
-                                env_heads: Vec::new(),
-                            });
-                            continue;
-                        }
-                        E::Case { subject, clauses }
-                            if clauses.len() == 1
-                                && clauses[0].guard.is_none()
-                                && clauses[0].patterns.len() == 1 =>
-                        {
-                            work.push(Task::SingleAfterSubject {
-                                span: e.span,
-                                clause: &clauses[0],
-                            });
-                            work.push(Task::Visit(subject));
-                            continue;
-                        }
-                        E::Case { subject, clauses } => {
-                            work.push(Task::CaseAfterSubject {
-                                span: e.span,
-                                clauses,
-                            });
-                            work.push(Task::Visit(subject));
-                            continue;
-                        }
-                        E::Clauses(clauses) => {
-                            let single = clauses.len() == 1
-                                && clauses[0].guard.is_none()
-                                && clauses[0].patterns.len() == 1;
-                            if single {
-                                let pat = &clauses[0].patterns[0];
-                                let mut pending = Vec::new();
-                                ast_binders(pat, &mut pending);
-                                self.pending.push(
-                                    pending
-                                        .into_iter()
-                                        .map(|(n, span)| self.name_key(&n, span))
-                                        .collect(),
-                                );
-                                let context = contexts.len();
-                                contexts.push(Some(PatternMachine {
-                                    work: vec![PatternTask::Visit(pat)],
-                                    values: Vec::new(),
-                                    binders: Vec::new(),
-                                    shared: None,
-                                }));
-                                work.push(Task::ClauseFunctionAfterPattern {
-                                    span: e.span,
-                                    clauses,
-                                });
-                                work.push(Task::PatternPoll(context));
-                            } else {
-                                let synthetic = Span::new(e.span.start, e.span.start);
-                                self.pending
-                                    .push([self.name_key("%arg", synthetic)].into_iter().collect());
-                                let mut binders = Vec::new();
-                                let binder = self.bind("%arg", synthetic, &mut binders, None);
-                                self.pending.pop();
-                                self.fn_depth += 1;
-                                self.locals.push(Frame {
-                                    names: binders
-                                        .into_iter()
-                                        .map(|b| (self.name_key(&b.name, b.span), b.var))
-                                        .collect(),
-                                    fn_only: None,
-                                });
-                                let params = vec![Param::Pattern {
-                                    pattern: Pattern {
-                                        kind: PatternKind::Var(binder),
-                                        span: synthetic,
-                                    },
-                                    label: None,
-                                }];
-                                work.push(Task::ClauseFunctionFinish {
-                                    span: e.span,
-                                    params,
-                                    ret: None,
-                                });
-                                let case_span = match (clauses.first(), clauses.last()) {
-                                    (Some(first), Some(last)) => first.span.to(last.span),
-                                    _ => Span::new(e.span.start + 1, e.span.start + 1),
-                                };
-                                let name = Ident {
-                                    name: "%arg".into(),
-                                    span: synthetic,
-                                };
-                                let subject = Expr {
-                                    kind: self.name(None, &name),
-                                    span: synthetic,
-                                };
-                                work.push(Task::CaseNext {
-                                    span: case_span,
-                                    subject,
-                                    clauses,
-                                    index: 0,
-                                    out: Vec::with_capacity(clauses.len()),
-                                });
-                            }
-                            continue;
-                        }
-                    };
-                    values.push(Expr { kind, span: e.span });
-                }
-                Task::Finish(span, build) => {
-                    let kind = match build {
-                        Build::Tuple(count) => {
-                            ExprKind::Tuple(values.split_off(values.len() - count))
-                        }
-                        Build::List(count, rest) => {
-                            let mut parts =
-                                values.split_off(values.len() - count - usize::from(rest));
-                            let rest = rest.then(|| Box::new(parts.pop().expect("list rest")));
-                            ExprKind::List { items: parts, rest }
-                        }
-                        Build::Call(args) => {
-                            let mut parts =
-                                values.split_off(values.len() - args.len() - 1).into_iter();
-                            let callee = Box::new(parts.next().expect("call callee"));
-                            let args = args
-                                .iter()
-                                .map(|a| Arg {
-                                    label: a.label.clone(),
-                                    value: parts.next().expect("call argument"),
-                                })
-                                .collect();
-                            ExprKind::Call { callee, args }
-                        }
-                        Build::Field(name) => ExprKind::Field {
-                            target: Box::new(values.pop().expect("field target")),
-                            name: name.clone(),
-                        },
-                        Build::Index(index, index_span) => ExprKind::TupleIndex {
-                            target: Box::new(values.pop().expect("index target")),
-                            index: index.clone(),
-                            index_span,
-                        },
-                        Build::Unary(op) => ExprKind::Unary {
-                            op,
-                            expr: Box::new(values.pop().expect("unary operand")),
-                        },
-                        Build::Binary(op) => {
-                            let rhs = Box::new(values.pop().expect("binary rhs"));
-                            let lhs = Box::new(values.pop().expect("binary lhs"));
-                            ExprKind::Binary { op, lhs, rhs }
-                        }
-                        Build::Update(ctor, ctor_span, fields) => {
-                            let mut parts = values
-                                .split_off(values.len() - fields.len() - 1)
-                                .into_iter();
-                            let base = Box::new(parts.next().expect("record update base"));
-                            let fields = fields
-                                .iter()
-                                .map(|(n, _)| (n.clone(), parts.next().expect("record field")))
-                                .collect();
-                            match ctor {
-                                Some(ctor) => ExprKind::RecordUpdate {
-                                    ctor,
-                                    ctor_span,
-                                    base,
-                                    fields,
-                                },
-                                None => ExprKind::Error,
-                            }
-                        }
-                    };
-                    values.push(Expr { kind, span });
-                }
-                Task::BitNext {
-                    span,
-                    segs,
-                    index,
-                    out,
-                } => {
-                    if index == segs.len() {
-                        values.push(Expr {
-                            kind: ExprKind::BitArray(out),
-                            span,
-                        });
-                    } else {
-                        work.push(Task::BitValue {
-                            span,
-                            segs,
-                            index,
-                            out,
-                        });
-                        work.push(Task::Visit(&segs[index].value));
-                    }
-                }
-                Task::BitValue {
-                    span,
-                    segs,
-                    index,
-                    mut out,
-                } => {
-                    let segment = &segs[index];
-                    let value = values.pop().expect("bit expression segment");
-                    if let Some(arg) = segment.format.as_ref().and_then(|f| f.arg.as_ref()) {
-                        work.push(Task::BitFormat {
-                            span,
-                            segs,
-                            index,
-                            out,
-                            value,
-                        });
-                        work.push(Task::Visit(arg));
-                    } else {
-                        let format = segment.format.as_ref().map(|f| Format {
-                            name: f.name.clone(),
-                            arg: None,
-                        });
-                        out.push(Segment {
-                            value,
-                            format,
-                            span: segment.span,
-                        });
-                        work.push(Task::BitNext {
-                            span,
-                            segs,
-                            index: index + 1,
-                            out,
-                        });
-                    }
-                }
-                Task::BitFormat {
-                    span,
-                    segs,
-                    index,
-                    mut out,
-                    value,
-                } => {
-                    let segment = &segs[index];
-                    let f = segment.format.as_ref().expect("format with argument");
-                    let format = Some(Format {
-                        name: f.name.clone(),
-                        arg: Some(Box::new(values.pop().expect("format argument"))),
-                    });
-                    out.push(Segment {
-                        value,
-                        format,
-                        span: segment.span,
-                    });
-                    work.push(Task::BitNext {
-                        span,
-                        segs,
-                        index: index + 1,
-                        out,
-                    });
-                }
-                Task::BlockStart(block) => {
-                    work.push(Task::BlockNext {
-                        block,
-                        index: 0,
-                        mark: self.locals.len(),
-                        stmts: Vec::with_capacity(block.stmts.len()),
-                    });
-                }
-                Task::BlockNext {
-                    block,
-                    index,
-                    mark,
-                    stmts,
-                } => {
-                    if index == block.stmts.len() {
-                        self.locals.truncate(mark);
-                        blocks.push(Block {
-                            stmts,
-                            span: block.span,
-                        });
-                    } else {
-                        match &block.stmts[index] {
-                            ast::Stmt::Bind(binding) => {
-                                let ty_vars = self.push_declared_frame(&binding.type_params);
-                                let direct = self.is_direct(&binding.value);
-                                let mut names = Vec::new();
-                                ast_binders(&binding.pattern, &mut names);
-                                let names: HashSet<NameKey> = names
-                                    .into_iter()
-                                    .map(|(n, span)| self.name_key(&n, span))
-                                    .collect();
-                                self.pending.push(names.clone());
-                                let context = contexts.len();
-                                contexts.push(Some(PatternMachine {
-                                    work: vec![PatternTask::Visit(&binding.pattern)],
-                                    values: Vec::new(),
-                                    binders: Vec::new(),
-                                    shared: None,
-                                }));
-                                work.push(Task::BlockAfterBindingPattern {
-                                    block,
-                                    index,
-                                    mark,
-                                    stmts,
-                                    binding,
-                                    ty_vars,
-                                    direct,
-                                    names,
-                                });
-                                work.push(Task::PatternPoll(context));
-                            }
-                            ast::Stmt::Env { ty, value, span } => {
-                                let ty = self.ty(ty);
-                                self.env_type(&ty);
-                                work.push(Task::BlockAfterEnv {
-                                    block,
-                                    index,
-                                    mark,
-                                    stmts,
-                                    ty,
-                                    span: *span,
-                                });
-                                work.push(Task::Visit(value));
-                            }
-                            ast::Stmt::Expr(expr) => {
-                                work.push(Task::BlockAfterExpr {
-                                    block,
-                                    index,
-                                    mark,
-                                    stmts,
-                                });
-                                work.push(Task::Visit(expr));
-                            }
-                        }
-                    }
-                }
-                Task::BlockAfterExpr {
-                    block,
-                    index,
-                    mark,
-                    mut stmts,
-                } => {
-                    stmts.push(Stmt::Expr(values.pop().expect("block expression")));
-                    work.push(Task::BlockNext {
-                        block,
-                        index: index + 1,
-                        mark,
-                        stmts,
-                    });
-                }
-                Task::BlockAfterEnv {
-                    block,
-                    index,
-                    mark,
-                    mut stmts,
-                    ty,
-                    span,
-                } => {
-                    let value = values.pop().expect("environment value");
-                    stmts.push(Stmt::Env { ty, value, span });
-                    work.push(Task::BlockNext {
-                        block,
-                        index: index + 1,
-                        mark,
-                        stmts,
-                    });
-                }
-                Task::BlockAfterBindingPattern {
-                    block,
-                    index,
-                    mark,
-                    stmts,
-                    binding,
-                    ty_vars,
-                    direct,
-                    names,
-                } => {
-                    let (pattern, binders) = pattern_results.pop().expect("binding pattern");
-                    self.pending.pop();
-                    if direct {
-                        self.locals.push(Frame {
-                            names: binders
-                                .iter()
-                                .map(|b| (self.name_key(&b.name, b.span), b.var))
-                                .collect(),
-                            fn_only: Some(self.fn_depth),
-                        });
-                    }
-                    self.reserved.push((self.locals.len(), names));
-                    work.push(Task::BlockAfterBinding {
-                        block,
-                        index,
-                        mark,
-                        stmts,
-                        binding,
-                        pattern,
-                        binders,
-                        ty_vars,
-                        direct,
-                    });
-                    work.push(Task::Visit(&binding.value));
-                }
-                Task::BlockAfterBinding {
-                    block,
-                    index,
-                    mark,
-                    mut stmts,
-                    binding,
-                    pattern,
-                    binders,
-                    ty_vars,
-                    direct,
-                } => {
-                    let value = values.pop().expect("binding value");
-                    let (binding, binders) = self.leave_binding(
-                        binding,
-                        false,
-                        (pattern, binders),
-                        ty_vars,
-                        direct,
-                        value,
-                    );
-                    self.locals.push(Frame {
-                        names: binders
-                            .into_iter()
-                            .map(|b| (self.name_key(&b.name, b.span), b.var))
-                            .collect(),
-                        fn_only: None,
-                    });
-                    stmts.push(Stmt::Bind(binding));
-                    work.push(Task::BlockNext {
-                        block,
-                        index: index + 1,
-                        mark,
-                        stmts,
-                    });
-                }
-                Task::BlockExpr { span } => {
-                    values.push(Expr {
-                        kind: ExprKind::Block(blocks.pop().expect("resolved block")),
-                        span,
-                    });
-                }
-                Task::FunctionParams {
-                    span,
-                    function,
-                    index,
-                    mut params,
-                    mut all,
-                    labels,
-                    mut env_heads,
-                } => {
-                    if let Some(p) = function.params.get(index) {
-                        match p {
-                            ast::Param::Pattern(pat) => {
-                                let context = contexts.len();
-                                contexts.push(Some(PatternMachine {
-                                    work: vec![PatternTask::Visit(pat)],
-                                    values: Vec::new(),
-                                    binders: Vec::new(),
-                                    shared: None,
-                                }));
-                                work.push(Task::FunctionAfterPattern {
-                                    span,
-                                    function,
-                                    index,
-                                    params,
-                                    all,
-                                    labels,
-                                    env_heads,
-                                });
-                                work.push(Task::PatternPoll(context));
-                                continue;
-                            }
-                            ast::Param::Env { name, ty } => {
-                                let ty = self.ty(ty);
-                                if let Some(head) = self.env_type(&ty) {
-                                    if env_heads.contains(&head) {
-                                        let tname = self.type_name(head);
-                                        self.error(code::ENV_PARAMS_SAME, ty.span,
-                                            format!("two environment parameters of this function have the type constructor `{tname}` (§9.2)"));
-                                    }
-                                    env_heads.push(head);
-                                }
-                                let var = self.new_var();
-                                self.check_binder(&name.name, name.span, false, false);
-                                self.param_name(&all, &name.name, name.span);
-                                all.push(Binder {
-                                    var,
-                                    name: name.name.clone(),
-                                    span: name.span,
-                                });
-                                params.push(Param::Env {
-                                    var,
-                                    name: name.clone(),
-                                    ty,
-                                });
-                            }
-                        }
-                        work.push(Task::FunctionParams {
-                            span,
-                            function,
-                            index: index + 1,
-                            params,
-                            all,
-                            labels,
-                            env_heads,
-                        });
-                    } else {
-                        let ret = function.ret.as_ref().map(|r| RetType {
-                            value: self.ty(&r.value),
-                            err: r.err.as_ref().map(|t| self.ty(t)),
-                            env: r.env.as_ref().map(|t| self.ty(t)),
-                        });
-                        if let Some(ret) = &ret
-                            && let Some(env) = &ret.env
-                            && value_dependent(&self.p, env)
-                        {
-                            self.error(
-                                code::VALUE_TYPE_PLACE,
-                                env.span,
-                                "a value-dependent type is not allowed inside an environment type",
+                                code::ENV_PARAMS_SAME,
+                                ty.span,
+                                format!("two environment parameters of this function have the type constructor `{tname}` (§9.2)"),
                             );
                         }
-                        self.pending.pop();
-                        self.fn_depth += 1;
-                        self.locals.push(Frame {
-                            names: all
-                                .into_iter()
-                                .map(|b| (self.name_key(&b.name, b.span), b.var))
-                                .collect(),
-                            fn_only: None,
-                        });
-                        work.push(Task::FunctionFinish { span, params, ret });
-                        work.push(Task::BlockStart(&function.body));
+                        env_heads.push(head);
                     }
-                }
-                Task::FunctionFinish { span, params, ret } => {
-                    let body = blocks.pop().expect("resolved function body");
-                    let function = self.leave_function(params, ret, body, span);
-                    values.push(Expr {
-                        kind: ExprKind::Fn(Box::new(function)),
-                        span,
+                    let var = self.new_var();
+                    self.param_name(&all, &name.name, name.span);
+                    all.push(Binder {
+                        var,
+                        name: name.name.clone(),
+                        span: name.span,
                     });
-                }
-                Task::ClauseFunctionAfterPattern { span, clauses } => {
-                    let (pattern, binders) =
-                        pattern_results.pop().expect("clause function parameter");
-                    let label = label_of(&clauses[0].patterns[0]);
-                    let mut all = Vec::new();
-                    for b in binders {
-                        self.param_name(&all, &b.name, b.span);
-                        all.push(b);
-                    }
-                    self.pending.pop();
-                    self.fn_depth += 1;
-                    self.locals.push(Frame {
-                        names: all
-                            .into_iter()
-                            .map(|b| (self.name_key(&b.name, b.span), b.var))
-                            .collect(),
-                        fn_only: None,
-                    });
-                    work.push(Task::ClauseFunctionFinish {
-                        span,
-                        params: vec![Param::Pattern { pattern, label }],
-                        ret: None,
-                    });
-                    work.push(Task::Visit(&clauses[0].body));
-                }
-                Task::ClauseFunctionFinish { span, params, ret } => {
-                    let body = Block {
-                        stmts: vec![Stmt::Expr(values.pop().expect("clause function body"))],
-                        span,
-                    };
-                    let function = self.leave_function(params, ret, body, span);
-                    values.push(Expr {
-                        kind: ExprKind::Fn(Box::new(function)),
-                        span,
-                    });
-                }
-                Task::CaseAfterSubject { span, clauses } => {
-                    let subject = values.pop().expect("case subject");
-                    work.push(Task::CaseNext {
-                        span,
-                        subject,
-                        clauses,
-                        index: 0,
-                        out: Vec::with_capacity(clauses.len()),
-                    });
-                }
-                Task::CaseNext {
-                    span,
-                    subject,
-                    clauses,
-                    index,
-                    out,
-                } => {
-                    if index == clauses.len() {
-                        values.push(Expr {
-                            kind: ExprKind::Case {
-                                subject: Box::new(subject),
-                                clauses: out,
-                            },
-                            span,
-                        });
-                    } else {
-                        let clause = &clauses[index];
-                        let mut pending = Vec::new();
-                        for p in &clause.patterns {
-                            ast_binders(p, &mut pending);
-                        }
-                        self.pending.push(
-                            pending
-                                .into_iter()
-                                .map(|(n, span)| self.name_key(&n, span))
-                                .collect(),
-                        );
-                        work.push(Task::CasePatterns {
-                            span,
-                            subject,
-                            clauses,
-                            index,
-                            out,
-                            pattern_index: 0,
-                            patterns: Vec::new(),
-                            first: Vec::new(),
-                        });
-                    }
-                }
-                Task::CasePatterns {
-                    span,
-                    subject,
-                    clauses,
-                    index,
-                    out,
-                    pattern_index,
-                    patterns,
-                    first,
-                } => {
-                    let clause = &clauses[index];
-                    if let Some(pat) = clause.patterns.get(pattern_index) {
-                        let shared = (pattern_index != 0).then(|| {
-                            first
-                                .iter()
-                                .map(|b| (self.name_key(&b.name, b.span), b.var))
-                                .collect()
-                        });
-                        let context = contexts.len();
-                        contexts.push(Some(PatternMachine {
-                            work: vec![PatternTask::Visit(pat)],
-                            values: Vec::new(),
-                            binders: Vec::new(),
-                            shared,
-                        }));
-                        work.push(Task::CaseAfterPattern {
-                            span,
-                            subject,
-                            clauses,
-                            index,
-                            out,
-                            pattern_index,
-                            patterns,
-                            first,
-                        });
-                        work.push(Task::PatternPoll(context));
-                    } else {
-                        self.pending.pop();
-                        self.locals.push(Frame {
-                            names: first
-                                .into_iter()
-                                .map(|b| (self.name_key(&b.name, b.span), b.var))
-                                .collect(),
-                            fn_only: None,
-                        });
-                        work.push(Task::CaseAfterGuard {
-                            span,
-                            subject,
-                            clauses,
-                            index,
-                            out,
-                            patterns,
-                            has_guard: clause.guard.is_some(),
-                        });
-                        if let Some(guard) = &clause.guard {
-                            work.push(Task::Visit(guard));
-                        }
-                    }
-                }
-                Task::CaseAfterPattern {
-                    span,
-                    subject,
-                    clauses,
-                    index,
-                    out,
-                    pattern_index,
-                    mut patterns,
-                    mut first,
-                } => {
-                    let (pattern, binders) = pattern_results.pop().expect("clause pattern");
-                    patterns.push(pattern);
-                    if pattern_index == 0 {
-                        first = binders;
-                    } else {
-                        let a: HashSet<NameKey> = first
-                            .iter()
-                            .map(|b| self.name_key(&b.name, b.span))
-                            .collect();
-                        let b: HashSet<NameKey> = binders
-                            .iter()
-                            .map(|b| self.name_key(&b.name, b.span))
-                            .collect();
-                        if a != b {
-                            let mut diff: Vec<&str> = a
-                                .symmetric_difference(&b)
-                                .map(|k| k.text.as_str())
-                                .collect();
-                            diff.sort();
-                            self.error(code::CHOICES_DIFFER, clauses[index].patterns[pattern_index].span,
-                                format!("every choice of a clause binds the same names, but not all bind {}", diff.iter().map(|n| format!("`{n}`")).collect::<Vec<_>>().join(", ")));
-                        }
-                    }
-                    work.push(Task::CasePatterns {
-                        span,
-                        subject,
-                        clauses,
-                        index,
-                        out,
-                        pattern_index: pattern_index + 1,
-                        patterns,
-                        first,
-                    });
-                }
-                Task::CaseAfterGuard {
-                    span,
-                    subject,
-                    clauses,
-                    index,
-                    out,
-                    patterns,
-                    has_guard,
-                } => {
-                    let guard = has_guard.then(|| values.pop().expect("clause guard"));
-                    work.push(Task::CaseAfterBody {
-                        span,
-                        subject,
-                        clauses,
-                        index,
-                        out,
-                        patterns,
-                        guard,
-                    });
-                    work.push(Task::Visit(&clauses[index].body));
-                }
-                Task::CaseAfterBody {
-                    span,
-                    subject,
-                    clauses,
-                    index,
-                    mut out,
-                    patterns,
-                    guard,
-                } => {
-                    let body = values.pop().expect("clause body");
-                    out.push(self.leave_clause(&clauses[index], patterns, guard, body));
-                    work.push(Task::CaseNext {
-                        span,
-                        subject,
-                        clauses,
-                        index: index + 1,
-                        out,
-                    });
-                }
-                Task::SingleAfterSubject { span, clause } => {
-                    let value = values.pop().expect("single case subject");
-                    let context = contexts.len();
-                    contexts.push(Some(PatternMachine {
-                        work: vec![PatternTask::Visit(&clause.patterns[0])],
-                        values: Vec::new(),
-                        binders: Vec::new(),
-                        shared: None,
-                    }));
-                    work.push(Task::SingleAfterPattern {
-                        span,
-                        clause,
-                        value,
-                    });
-                    work.push(Task::PatternPoll(context));
-                }
-                Task::SingleAfterPattern {
-                    span,
-                    clause,
-                    value,
-                } => {
-                    let (pattern, binders) = pattern_results.pop().expect("single case pattern");
-                    self.locals.push(Frame {
-                        names: binders
-                            .into_iter()
-                            .map(|b| (self.name_key(&b.name, b.span), b.var))
-                            .collect(),
-                        fn_only: None,
-                    });
-                    work.push(Task::SingleAfterBody {
-                        span,
-                        pattern,
-                        value,
-                    });
-                    work.push(Task::Visit(&clause.body));
-                }
-                Task::SingleAfterBody {
-                    span,
-                    pattern,
-                    value,
-                } => {
-                    let body = values.pop().expect("single case body");
-                    self.locals.pop();
-                    let pattern_span = pattern.span;
-                    let block = Block {
-                        stmts: vec![
-                            Stmt::Bind(Binding {
-                                pattern,
-                                value,
-                                direct: false,
-                                ty_vars: vec![],
-                                span: pattern_span,
-                            }),
-                            Stmt::Expr(body),
-                        ],
-                        span,
-                    };
-                    values.push(Expr {
-                        kind: ExprKind::Block(block),
-                        span,
+                    params.push(Param::Env {
+                        var,
+                        name: name.clone(),
+                        ty,
                     });
                 }
             }
         }
-        if is_pattern {
-            assert_eq!(
-                pattern_results.len(),
-                1,
-                "pattern resolution must return one value"
+        let ret = f.ret.as_ref().map(|r| RetType {
+            value: self.ty(&r.value),
+            err: r.err.as_ref().map(|t| self.ty(t)),
+            env: r.env.as_ref().map(|t| self.ty(t)),
+        });
+        if let Some(ret) = &ret
+            && let Some(env) = &ret.env
+            && value_dependent(&self.p, env)
+        {
+            self.error(
+                code::VALUE_TYPE_PLACE,
+                env.span,
+                "a value-dependent type is not allowed inside an environment type",
             );
-            let (pattern, binders) = pattern_results.pop().unwrap();
-            ResolutionResult::Pattern(pattern, binders)
-        } else {
-            assert_eq!(
-                values.len(),
-                1,
-                "expression resolution must return one value"
-            );
-            ResolutionResult::Expr(values.pop().unwrap())
         }
-    }
-
-    fn leave_function(
-        &mut self,
-        params: Vec<Param>,
-        ret: Option<RetType>,
-        body: Block,
-        span: Span,
-    ) -> Function {
+        self.pending.pop();
+        self.fn_depth += 1;
+        self.locals.push(Frame {
+            names: all.into_iter().map(|b| (b.name, b.var)).collect(),
+            fn_only: None,
+        });
+        let body = self.block(&f.body);
         self.locals.pop();
         self.fn_depth -= 1;
         Function {
@@ -5042,10 +3068,7 @@ impl<'a> Resolver<'a> {
     }
 
     fn param_name(&mut self, all: &[Binder], name: &str, span: Span) {
-        if all
-            .iter()
-            .any(|b| self.name_key(&b.name, b.span) == self.name_key(name, span))
-        {
+        if all.iter().any(|b| b.name == name) {
             self.error(
                 code::PARAMS_BIND_TWICE,
                 span,
@@ -5054,13 +3077,49 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn leave_clause(
-        &mut self,
-        c: &ast::Clause,
-        patterns: Vec<Pattern>,
-        guard: Option<Expr>,
-        body: Expr,
-    ) -> Clause {
+    fn clause(&mut self, c: &ast::Clause) -> Clause {
+        let mut first: Vec<Binder> = Vec::new();
+        let mut patterns = Vec::new();
+        let mut pending = Vec::new();
+        for p in &c.patterns {
+            ast_binders(p, &mut pending);
+        }
+        self.pending
+            .push(pending.into_iter().map(|(n, _)| n).collect());
+        for (i, p) in c.patterns.iter().enumerate() {
+            if i == 0 {
+                patterns.push(self.pattern(p, &mut first, None));
+                continue;
+            }
+            let shared: HashMap<String, VarId> =
+                first.iter().map(|b| (b.name.clone(), b.var)).collect();
+            let mut binders = Vec::new();
+            patterns.push(self.pattern(p, &mut binders, Some(&shared)));
+            let a: HashSet<&str> = first.iter().map(|b| b.name.as_str()).collect();
+            let b: HashSet<&str> = binders.iter().map(|b| b.name.as_str()).collect();
+            if a != b {
+                let mut diff: Vec<&str> = a.symmetric_difference(&b).copied().collect();
+                diff.sort();
+                self.error(
+                    code::CHOICES_DIFFER,
+                    p.span,
+                    format!(
+                        "every choice of a clause binds the same names, but not all bind {}",
+                        diff.iter()
+                            .map(|n| format!("`{n}`"))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                );
+            }
+        }
+        self.pending.pop();
+        self.locals.push(Frame {
+            names: first.into_iter().map(|b| (b.name, b.var)).collect(),
+            fn_only: None,
+        });
+        let guard = c.guard.as_ref().map(|g| self.expr(g));
+        let body = self.expr(&c.body);
         self.locals.pop();
         Clause {
             patterns,
@@ -5075,21 +3134,16 @@ impl<'a> Resolver<'a> {
         name: &str,
         span: Span,
         binders: &mut Vec<Binder>,
-        shared: Option<&HashMap<NameKey, VarId>>,
+        shared: Option<&HashMap<String, VarId>>,
     ) -> Binder {
-        let key = self.name_key(name, span);
-        self.check_binder(name, span, false, false);
-        if binders
-            .iter()
-            .any(|b| self.name_key(&b.name, b.span) == key)
-        {
+        if binders.iter().any(|b| b.name == name) {
             self.error(
                 code::PATTERN_BINDS_TWICE,
                 span,
                 format!("this pattern binds `{name}` more than once"),
             );
         }
-        let var = match shared.and_then(|s| s.get(&key)) {
+        let var = match shared.and_then(|s| s.get(name)) {
             Some(v) => *v,
             None => self.new_var(),
         };
@@ -5100,6 +3154,105 @@ impl<'a> Resolver<'a> {
         };
         binders.push(b.clone());
         b
+    }
+
+    fn pattern(
+        &mut self,
+        p: &ast::Pattern,
+        binders: &mut Vec<Binder>,
+        shared: Option<&HashMap<String, VarId>>,
+    ) -> Pattern {
+        use ast::PatternKind as P;
+        let kind = match &p.kind {
+            P::Var(n) => PatternKind::Var(self.bind(n, p.span, binders, shared)),
+            P::Discard(_) => PatternKind::Discard,
+            P::Typed { binder, ty } => {
+                let binder = (!binder.discard)
+                    .then(|| self.bind(&binder.name, binder.span, binders, shared));
+                PatternKind::Typed {
+                    binder,
+                    ty: self.ty(ty),
+                }
+            }
+            P::Named { name, pattern } => {
+                let binder = self.bind(&name.name, name.span, binders, shared);
+                PatternKind::Named {
+                    binder,
+                    pattern: Box::new(self.pattern(pattern, binders, shared)),
+                }
+            }
+            P::Int { negative, value } => PatternKind::Int {
+                negative: *negative,
+                value: value.clone(),
+            },
+            P::Float { negative, value } => PatternKind::Float {
+                negative: *negative,
+                value: *value,
+            },
+            P::String(s) => PatternKind::String(s.clone()),
+            P::Prefix { prefix, rest } => PatternKind::Prefix {
+                prefix: prefix.clone(),
+                rest: (!rest.discard).then(|| self.bind(&rest.name, rest.span, binders, shared)),
+            },
+            P::Constructor {
+                module,
+                name,
+                args,
+                spread,
+            } => {
+                let ctor = self.ctor(module.as_ref(), name);
+                let args: Vec<Pattern> = args
+                    .iter()
+                    .map(|a| self.pattern(a, binders, shared))
+                    .collect();
+                match ctor {
+                    Some(ctor) => PatternKind::Constructor {
+                        ctor,
+                        args,
+                        spread: *spread,
+                    },
+                    None => PatternKind::Error(args),
+                }
+            }
+            P::Tuple(items) => PatternKind::Tuple(
+                items
+                    .iter()
+                    .map(|a| self.pattern(a, binders, shared))
+                    .collect(),
+            ),
+            P::List { items, rest } => {
+                let items = items
+                    .iter()
+                    .map(|a| self.pattern(a, binders, shared))
+                    .collect();
+                let rest = rest.as_ref().map(|r| {
+                    r.as_ref()
+                        .filter(|b| !b.discard)
+                        .map(|b| self.bind(&b.name, b.span, binders, shared))
+                });
+                PatternKind::List { items, rest }
+            }
+            P::BitArray(segs) => {
+                let mut out = Vec::new();
+                for s in segs {
+                    let value = self.pattern(&s.value, binders, shared);
+                    // §8.4: a length may use names of earlier segments.
+                    self.locals.push(Frame {
+                        names: binders.iter().map(|b| (b.name.clone(), b.var)).collect(),
+                        fn_only: None,
+                    });
+                    let format = self.format(s.format.as_ref());
+                    self.locals.pop();
+                    out.push(Segment {
+                        value,
+                        format,
+                        span: s.span,
+                    });
+                }
+                PatternKind::BitArray(out)
+            }
+        };
+        Pattern { kind, span: p.span }
     }
 
     // ---- Phase 5: exported types (§2.4) ----
@@ -5158,12 +3311,12 @@ impl<'a> Resolver<'a> {
             }
             let mut found = Vec::new();
             self.hidden_types(m, &t, None, &mut HashSet::new(), &mut found);
-            for (span, name, foreign) in found {
+            for (span, name) in found {
                 self.error(
                     code::EXPORT_HIDDEN_TYPE,
                     span,
                     format!(
-                        "{what} is exported, but its type uses the type `{name}` {}, which is not exported (§2.4)", if foreign { "of its defining module" } else { "of this module" }
+                        "{what} is exported, but its type uses the type `{name}` of this module, which is not exported (§2.4)"
                     ),
                 );
             }
@@ -5176,50 +3329,30 @@ impl<'a> Resolver<'a> {
     fn hidden_types(
         &self,
         m: ModuleId,
-        root: &Type,
+        t: &Type,
         at: Option<Span>,
         seen: &mut HashSet<TypeId>,
-        out: &mut Vec<(Span, String, bool)>,
+        out: &mut Vec<(Span, String)>,
     ) {
-        enum Task<'a> {
-            Visit(&'a Type, Option<Span>),
-            Exit(TypeId),
-        }
-        let mut work = vec![Task::Visit(root, at)];
-        while let Some(task) = work.pop() {
-            match task {
-                Task::Exit(id) => {
-                    seen.remove(&id);
-                }
-                Task::Visit(t, at) => {
-                    let mut children = Vec::new();
-                    for_each_child(t, &mut |c| children.push(c));
-                    work.extend(children.into_iter().rev().map(|c| Task::Visit(c, at)));
-                    if let TypeKind::Named {
-                        ty: TypeRef::Custom(id),
-                        ..
-                    } = &t.kind
-                    {
-                        let def = self.p.ty(*id);
-                        if !def.exported {
-                            match &def.body {
-                                TypeBody::Alias(body) => {
-                                    if !self.circular.contains(id) && seen.insert(*id) {
-                                        work.push(Task::Exit(*id));
-                                        work.push(Task::Visit(body, Some(at.unwrap_or(t.span))));
-                                    }
-                                }
-                                TypeBody::Custom(_) => out.push((
-                                    at.unwrap_or(t.span),
-                                    def.name.clone(),
-                                    def.module != m,
-                                )),
-                            }
+        if let TypeKind::Named {
+            ty: TypeRef::Custom(id),
+            ..
+        } = &t.kind
+        {
+            let def = self.p.ty(*id);
+            if def.module == m && !def.exported {
+                match &def.body {
+                    TypeBody::Alias(body) => {
+                        if !self.circular.contains(id) && seen.insert(*id) {
+                            self.hidden_types(m, body, Some(at.unwrap_or(t.span)), seen, out);
+                            seen.remove(id);
                         }
                     }
+                    TypeBody::Custom(_) => out.push((at.unwrap_or(t.span), def.name.clone())),
                 }
             }
         }
+        for_each_child(t, &mut |c| self.hidden_types(m, c, at, seen, out));
     }
 
     // ---- Phase 6: rules about the whole program ----
@@ -5233,47 +3366,6 @@ impl<'a> Resolver<'a> {
                 span,
                 "the compiled package has more than one `@main`",
             );
-        }
-        if let Some(root) = self.graph.root {
-            let pkg = &self.graph.packages[root];
-            let mut bad = Vec::new();
-            for (name, e) in &pkg.entries {
-                let valid = self
-                    .by_path
-                    .get(&(root, e.module.clone()))
-                    .is_some_and(|m| {
-                        self.defs_by_name[m.0 as usize]
-                            .get(&e.function)
-                            .is_some_and(|i| {
-                                matches!(
-                                    self.p.module(*m).defs[*i as usize].kind,
-                                    DefKind::Binding { .. }
-                                )
-                            })
-                    });
-                if !valid {
-                    bad.push((
-                        e.span,
-                        format!("entry `{name}` must name a top-level function of this package"),
-                    ));
-                }
-            }
-            if let Some(name) = &self.graph.entry
-                && !pkg.entries.iter().any(|(n, _)| n == name)
-            {
-                bad.push((
-                    Span::default(),
-                    format!("unknown entry `{name}`; declare it in `[entries]`"),
-                ));
-            }
-            for (span, message) in bad {
-                self.diags.push(Diagnostic::error(
-                    code::ENTRY_FORM,
-                    pkg.manifest_source,
-                    span,
-                    message,
-                ));
-            }
         }
         self.host_fns();
         // §9.7: two host services may not have the same namespace and a
@@ -5405,15 +3497,40 @@ impl<'a> Resolver<'a> {
 
 /// The custom types and aliases named in a type.
 fn named_types(t: &Type, out: &mut Vec<TypeId>) {
-    walk_type(t, &mut |t| {
-        if let TypeKind::Named {
-            ty: TypeRef::Custom(id),
-            ..
-        } = &t.kind
-        {
-            out.push(*id);
+    match &t.kind {
+        TypeKind::Named { ty, args } => {
+            if let TypeRef::Custom(id) = ty {
+                out.push(*id);
+            }
+            args.iter().for_each(|a| named_types(a, out));
         }
-    });
+        TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
+            ts.iter().for_each(|a| named_types(a, out))
+        }
+        TypeKind::Record { base, fields, .. } => {
+            if let Some(base) = base {
+                named_types(base, out);
+            }
+            for (_, field) in fields {
+                named_types(field, out);
+            }
+        }
+        TypeKind::Fn {
+            params,
+            ret,
+            err,
+            env,
+        } => {
+            params.iter().for_each(|p| named_types(&p.ty, out));
+            named_types(ret, out);
+            err.iter().chain(env).for_each(|a| named_types(a, out));
+        }
+        TypeKind::Lit(_)
+        | TypeKind::Of { .. }
+        | TypeKind::Var(_)
+        | TypeKind::Hole
+        | TypeKind::Error => {}
+    }
 }
 
 /// `C` or `m.C`: constructors are the only values with an `UpName`.
@@ -5422,9 +3539,17 @@ fn is_constructor(e: &ast::Expr) -> bool {
 }
 
 /// Calls `f` on each type directly inside `t`.
-fn for_each_child<'a>(t: &'a Type, f: &mut dyn FnMut(&'a Type)) {
+fn for_each_child(t: &Type, f: &mut dyn FnMut(&Type)) {
     match &t.kind {
         TypeKind::Named { args, .. } => args.iter().for_each(f),
+        TypeKind::Record { base, fields, .. } => {
+            if let Some(base) = base {
+                f(base);
+            }
+            for (_, field) in fields {
+                f(field);
+            }
+        }
         TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
             ts.iter().for_each(f)
         }
@@ -5449,307 +3574,179 @@ fn for_each_child<'a>(t: &'a Type, f: &mut dyn FnMut(&'a Type)) {
 /// The place of the first part of `t`, `t` itself included, whose kind
 /// `is` says yes to.
 fn find_in_type(t: &Type, is: &dyn Fn(&TypeKind) -> bool) -> Option<Span> {
-    let mut work = vec![t];
-    while let Some(t) = work.pop() {
-        if is(&t.kind) {
-            return Some(t.span);
-        }
-        let mut children = Vec::new();
-        for_each_child(t, &mut |c| children.push(c));
-        work.extend(children.into_iter().rev());
+    if is(&t.kind) {
+        return Some(t.span);
     }
-    None
+    let mut found = None;
+    for_each_child(t, &mut |c| {
+        if found.is_none() {
+            found = find_in_type(c, is);
+        }
+    });
+    found
 }
 
 /// `t` with the type variables in `map` replaced.
-pub(crate) fn subst(root: &Type, map: &HashMap<TyVarId, &Type>) -> Type {
-    enum ListKind {
-        Named(TypeRef),
-        Tuple,
-        Union,
-        Inter,
-        Diff,
-    }
-    enum Task<'a> {
-        Visit(&'a Type),
-        List {
-            span: Span,
-            kind: ListKind,
-            count: usize,
+pub(crate) fn subst(t: &Type, map: &HashMap<TyVarId, &Type>) -> Type {
+    let kind = match &t.kind {
+        TypeKind::Lit(v) => TypeKind::Lit(v.clone()),
+        TypeKind::Var(v) => match map.get(v) {
+            Some(r) => return (*r).clone(),
+            None => TypeKind::Var(*v),
         },
-        Function {
-            span: Span,
-            labels: Vec<Option<Ident>>,
-            err: bool,
-            env: bool,
+        TypeKind::Named { ty, args } => TypeKind::Named {
+            ty: *ty,
+            args: args.iter().map(|a| subst(a, map)).collect(),
         },
-    }
-    let mut work = vec![Task::Visit(root)];
-    let mut values: Vec<Type> = Vec::new();
-    while let Some(task) = work.pop() {
-        match task {
-            Task::Visit(t) => {
-                let kind = match &t.kind {
-                    TypeKind::Lit(v) => TypeKind::Lit(v.clone()),
-                    TypeKind::Var(v) => match map.get(v) {
-                        Some(r) => {
-                            values.push((*r).clone());
-                            continue;
-                        }
-                        None => TypeKind::Var(*v),
-                    },
-                    TypeKind::Named { ty, args } => {
-                        work.push(Task::List {
-                            span: t.span,
-                            kind: ListKind::Named(*ty),
-                            count: args.len(),
-                        });
-                        work.extend(args.iter().rev().map(Task::Visit));
-                        continue;
-                    }
-                    TypeKind::Tuple(ts)
-                    | TypeKind::Union(ts)
-                    | TypeKind::Inter(ts)
-                    | TypeKind::Diff(ts) => {
-                        let kind = match &t.kind {
-                            TypeKind::Tuple(_) => ListKind::Tuple,
-                            TypeKind::Union(_) => ListKind::Union,
-                            TypeKind::Inter(_) => ListKind::Inter,
-                            TypeKind::Diff(_) => ListKind::Diff,
-                            _ => unreachable!(),
-                        };
-                        work.push(Task::List {
-                            span: t.span,
-                            kind,
-                            count: ts.len(),
-                        });
-                        work.extend(ts.iter().rev().map(Task::Visit));
-                        continue;
-                    }
-                    TypeKind::Fn {
-                        params,
-                        ret,
-                        err,
-                        env,
-                    } => {
-                        work.push(Task::Function {
-                            span: t.span,
-                            labels: params.iter().map(|p| p.label.clone()).collect(),
-                            err: err.is_some(),
-                            env: env.is_some(),
-                        });
-                        if let Some(env) = env {
-                            work.push(Task::Visit(env));
-                        }
-                        if let Some(err) = err {
-                            work.push(Task::Visit(err));
-                        }
-                        work.push(Task::Visit(ret));
-                        work.extend(params.iter().rev().map(|p| Task::Visit(&p.ty)));
-                        continue;
-                    }
-                    TypeKind::Of {
-                        value,
-                        site,
-                        projection,
-                    } => TypeKind::Of {
-                        value: *value,
-                        site: *site,
-                        projection: *projection,
-                    },
-                    TypeKind::Hole => TypeKind::Hole,
-                    TypeKind::Error => TypeKind::Error,
-                };
-                values.push(Type { kind, span: t.span });
-            }
-            Task::List { span, kind, count } => {
-                let items = values.split_off(values.len() - count);
-                let kind = match kind {
-                    ListKind::Named(ty) => TypeKind::Named { ty, args: items },
-                    ListKind::Tuple => TypeKind::Tuple(items),
-                    ListKind::Union => TypeKind::Union(items),
-                    ListKind::Inter => TypeKind::Inter(items),
-                    ListKind::Diff => TypeKind::Diff(items),
-                };
-                values.push(Type { kind, span });
-            }
-            Task::Function {
-                span,
-                labels,
-                err,
-                env,
-            } => {
-                let count = labels.len() + 1 + usize::from(err) + usize::from(env);
-                let mut parts = values.split_off(values.len() - count).into_iter();
-                let params = labels
-                    .into_iter()
-                    .map(|label| FnParamType {
-                        label,
-                        ty: parts.next().expect("function parameter"),
-                    })
-                    .collect();
-                let ret = Box::new(parts.next().expect("function return"));
-                let err = err.then(|| Box::new(parts.next().expect("function error")));
-                let env = env.then(|| Box::new(parts.next().expect("function environment")));
-                assert!(parts.next().is_none(), "substitution has extra values");
-                values.push(Type {
-                    kind: TypeKind::Fn {
-                        params,
-                        ret,
-                        err,
-                        env,
-                    },
-                    span,
-                });
-            }
-        }
-    }
-    assert_eq!(values.len(), 1, "substitution must return one type");
-    values.pop().unwrap()
+        TypeKind::Tuple(ts) => TypeKind::Tuple(ts.iter().map(|a| subst(a, map)).collect()),
+        TypeKind::Record {
+            base,
+            fields,
+            removed,
+        } => TypeKind::Record {
+            base: base.as_ref().map(|base| Box::new(subst(base, map))),
+            fields: fields
+                .iter()
+                .map(|(label, field)| (label.clone(), subst(field, map)))
+                .collect(),
+            removed: removed.clone(),
+        },
+        TypeKind::Union(ts) => TypeKind::Union(ts.iter().map(|a| subst(a, map)).collect()),
+        TypeKind::Inter(ts) => TypeKind::Inter(ts.iter().map(|a| subst(a, map)).collect()),
+        TypeKind::Diff(ts) => TypeKind::Diff(ts.iter().map(|a| subst(a, map)).collect()),
+        TypeKind::Fn {
+            params,
+            ret,
+            err,
+            env,
+        } => TypeKind::Fn {
+            params: params
+                .iter()
+                .map(|p| FnParamType {
+                    label: p.label.clone(),
+                    ty: subst(&p.ty, map),
+                })
+                .collect(),
+            ret: Box::new(subst(ret, map)),
+            err: err.as_ref().map(|e| Box::new(subst(e, map))),
+            env: env.as_ref().map(|e| Box::new(subst(e, map))),
+        },
+        TypeKind::Of {
+            value,
+            site,
+            projection,
+        } => TypeKind::Of {
+            value: *value,
+            site: *site,
+            projection: *projection,
+        },
+        TypeKind::Hole => TypeKind::Hole,
+        TypeKind::Error => TypeKind::Error,
+    };
+    Type { kind, span: t.span }
 }
 
 /// §2.4: the annotations at the top of the pattern of a top-level binding
 /// that give the type of an exported name: `x: T`, and `x = y: T`.
-fn top_annotations(
-    root: &Pattern,
-    exported: &HashMap<VarId, String>,
-    out: &mut Vec<(String, Type)>,
-) {
-    fn top_type(mut p: &Pattern) -> Option<&Type> {
-        loop {
-            match &p.kind {
-                PatternKind::Typed { ty, .. } => return Some(ty),
-                PatternKind::Named { pattern, .. } => p = pattern,
-                _ => return None,
-            }
+fn top_annotations(p: &Pattern, exported: &HashMap<VarId, String>, out: &mut Vec<(String, Type)>) {
+    fn top_type(p: &Pattern) -> Option<&Type> {
+        match &p.kind {
+            PatternKind::Typed { ty, .. } => Some(ty),
+            PatternKind::Named { pattern, .. } => top_type(pattern),
+            _ => None,
         }
     }
-    let mut work = vec![root];
-    while let Some(p) = work.pop() {
-        match &p.kind {
-            PatternKind::Typed {
-                binder: Some(b),
-                ty,
-            } => {
-                if let Some(name) = exported.get(&b.var) {
-                    out.push((format!("`{name}`"), ty.clone()));
-                }
-            }
-            PatternKind::Named { binder, pattern } => {
-                if let (Some(name), Some(ty)) = (exported.get(&binder.var), top_type(pattern)) {
-                    out.push((format!("`{name}`"), ty.clone()));
-                }
-                work.push(pattern);
-            }
-            PatternKind::Constructor { args: ps, .. }
-            | PatternKind::Tuple(ps)
-            | PatternKind::Error(ps)
-            | PatternKind::List { items: ps, .. } => work.extend(ps.iter().rev()),
-            PatternKind::BitArray(segs) => work.extend(segs.iter().rev().map(|s| &s.value)),
-            _ => {}
+    let mut check = |b: &Binder, ty: Option<&Type>| {
+        if let (Some(name), Some(ty)) = (exported.get(&b.var), ty) {
+            out.push((format!("`{name}`"), ty.clone()));
         }
+    };
+    match &p.kind {
+        PatternKind::Typed {
+            binder: Some(b),
+            ty,
+        } => check(b, Some(ty)),
+        PatternKind::Named { binder, pattern } => {
+            check(binder, top_type(pattern));
+            top_annotations(pattern, exported, out);
+        }
+        PatternKind::Constructor { args: ps, .. }
+        | PatternKind::Tuple(ps)
+        | PatternKind::Error(ps)
+        | PatternKind::List { items: ps, .. } => {
+            ps.iter().for_each(|a| top_annotations(a, exported, out))
+        }
+        PatternKind::BitArray(segs) => segs
+            .iter()
+            .for_each(|s| top_annotations(&s.value, exported, out)),
+        _ => {}
     }
 }
 
-fn pattern_type_ids(root: &TypePattern, out: &mut Vec<TypeId>) {
-    let mut work = vec![root];
-    while let Some(p) = work.pop() {
-        match p {
-            TypePattern::Named(ty, parts) => {
-                if let TypeRef::Custom(id) = ty {
-                    out.push(*id);
-                }
-                work.extend(parts.iter().rev());
+fn pattern_type_ids(p: &TypePattern, out: &mut Vec<TypeId>) {
+    match p {
+        TypePattern::Named(ty, parts) => {
+            if let TypeRef::Custom(id) = ty {
+                out.push(*id);
             }
-            TypePattern::Tuple(parts) => work.extend(parts.iter().rev()),
-            TypePattern::Exact(t) => named_types(t, out),
-            TypePattern::Bind(_) | TypePattern::Skip | TypePattern::Error => {}
+            for p in parts {
+                pattern_type_ids(p, out);
+            }
         }
+        TypePattern::Tuple(parts) => {
+            for p in parts {
+                pattern_type_ids(p, out);
+            }
+        }
+        TypePattern::Exact(t) => named_types(t, out),
+        TypePattern::Bind(_) | TypePattern::Skip | TypePattern::Error => {}
     }
 }
 
 fn projectable_body(
-    root: &Type,
+    t: &Type,
     map: &HashMap<TyVarId, TypePattern>,
     used: &mut HashSet<TyVarId>,
 ) -> Option<TypePattern> {
-    // Compute subtree facts once, then build projections in source order. The
-    // former repeated recursive scan was quadratic on nested aliases.
-    enum Scan<'a> {
-        Visit(&'a Type),
-        Finish(&'a Type),
+    let mut variable = false;
+    let mut invalid = false;
+    walk_type(t, &mut |t| match t.kind {
+        TypeKind::Var(_) => variable = true,
+        TypeKind::Hole | TypeKind::Error | TypeKind::Of { .. } => invalid = true,
+        _ => {}
+    });
+    if invalid {
+        return None;
     }
-    let mut facts: HashMap<*const Type, (bool, bool)> = HashMap::new();
-    let mut scan = vec![Scan::Visit(root)];
-    while let Some(task) = scan.pop() {
-        match task {
-            Scan::Visit(t) => {
-                scan.push(Scan::Finish(t));
-                let mut children = Vec::new();
-                for_each_child(t, &mut |c| children.push(c));
-                scan.extend(children.into_iter().rev().map(Scan::Visit));
+    if !variable {
+        return Some(TypePattern::Exact(t.clone()));
+    }
+    match &t.kind {
+        TypeKind::Var(v) => {
+            if !used.insert(*v) {
+                return None;
             }
-            Scan::Finish(t) => {
-                let mut variable = matches!(t.kind, TypeKind::Var(_));
-                let mut invalid = matches!(
-                    t.kind,
-                    TypeKind::Hole | TypeKind::Error | TypeKind::Of { .. }
-                );
-                for_each_child(t, &mut |c| {
-                    let (v, i) = facts[&(c as *const Type)];
-                    variable |= v;
-                    invalid |= i;
-                });
-                facts.insert(t as *const Type, (variable, invalid));
-            }
+            map.get(v).cloned()
         }
+        TypeKind::Named { ty, args } => Some(TypePattern::Named(
+            *ty,
+            args.iter()
+                .map(|t| projectable_body(t, map, used))
+                .collect::<Option<_>>()?,
+        )),
+        TypeKind::Tuple(ts) => Some(TypePattern::Tuple(
+            ts.iter()
+                .map(|t| projectable_body(t, map, used))
+                .collect::<Option<_>>()?,
+        )),
+        TypeKind::Lit(_)
+        | TypeKind::Record { .. }
+        | TypeKind::Fn { .. }
+        | TypeKind::Union(_)
+        | TypeKind::Inter(_)
+        | TypeKind::Diff(_)
+        | TypeKind::Hole
+        | TypeKind::Error
+        | TypeKind::Of { .. } => None,
     }
-    enum Build<'a> {
-        Visit(&'a Type),
-        Named(TypeRef, usize),
-        Tuple(usize),
-    }
-    let mut work = vec![Build::Visit(root)];
-    let mut values: Vec<TypePattern> = Vec::new();
-    while let Some(task) = work.pop() {
-        match task {
-            Build::Visit(t) => {
-                let (variable, invalid) = facts[&(t as *const Type)];
-                if invalid {
-                    return None;
-                }
-                if !variable {
-                    values.push(TypePattern::Exact(t.clone()));
-                    continue;
-                }
-                match &t.kind {
-                    TypeKind::Var(v) => {
-                        if !used.insert(*v) {
-                            return None;
-                        }
-                        values.push(map.get(v)?.clone());
-                    }
-                    TypeKind::Named { ty, args } => {
-                        work.push(Build::Named(*ty, args.len()));
-                        work.extend(args.iter().rev().map(Build::Visit));
-                    }
-                    TypeKind::Tuple(ts) => {
-                        work.push(Build::Tuple(ts.len()));
-                        work.extend(ts.iter().rev().map(Build::Visit));
-                    }
-                    _ => return None,
-                }
-            }
-            Build::Named(ty, count) => {
-                let args = values.split_off(values.len() - count);
-                values.push(TypePattern::Named(ty, args));
-            }
-            Build::Tuple(count) => {
-                let args = values.split_off(values.len() - count);
-                values.push(TypePattern::Tuple(args));
-            }
-        }
-    }
-    assert_eq!(values.len(), 1, "type projection must return one pattern");
-    values.pop()
 }

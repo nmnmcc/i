@@ -279,6 +279,16 @@ impl Vals {
 /// value (§7.3).
 fn values(s: &Solver, t: &Ty, mode: Mode, seen: &mut Vec<(V, Mode)>) -> Vals {
     match t {
+        Ty::Graph(g) => {
+            if g.record_only() {
+                Vals {
+                    heads: vec![(Head::Record, ValueSet::ALL, Vec::new(), mode)],
+                    other: false,
+                }
+            } else {
+                values(s, &g.view().expect("non-record graph step"), mode, seen)
+            }
+        }
         Ty::Var(v) => {
             if seen.contains(&(*v, mode)) {
                 return match mode {
@@ -1040,6 +1050,7 @@ impl Checker<'_> {
     fn show_head(&self, h: Head, n: usize) -> String {
         let holes = |n: usize| vec!["_"; n].join(", ");
         match h {
+            Head::Record => "{..}".to_string(),
             Head::Named(TypeRef::Builtin(b)) if n == 0 => b.name().to_string(),
             Head::Named(TypeRef::Builtin(b)) => format!("{}({})", b.name(), holes(n)),
             Head::Named(TypeRef::Custom(id)) => {

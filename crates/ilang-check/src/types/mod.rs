@@ -25,13 +25,17 @@ mod infer;
 mod known;
 mod lits;
 mod pattern;
+mod records;
+mod scheme_wire;
 mod shown;
-mod shown_tree;
 mod solve;
-mod tree;
 mod value_types;
 
 pub use lits::{LitValue, TestValues};
+pub use records::ShownGraph;
+pub use scheme_wire::{
+    AliasArtifact, SchemeArtifact, SchemeComparison, SchemeEnvironment, compare_scheme_group,
+};
 pub use shown::{ShownFn, ShownType};
 
 use crate::hir::{BindingRef, CtorRef, DefId, ModuleId, Program, TypeRef};
@@ -50,6 +54,7 @@ pub enum Head {
     Named(TypeRef),
     Tuple(u32),
     Fn,
+    Record,
 }
 
 /// A runtime type test, including the values of an Int or String member.
@@ -61,7 +66,10 @@ pub struct TestMember {
 
 /// A type in inference. `Top` is only made when a type is shown: it is a
 /// type variable that has no effect, in an input place.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Ty {
+    /// Shared exact graph, including every record field and suspended operation.
+    Graph(records::Graph),
     Var(V),
     /// A named type or a tuple, with its arguments or parts.
     Con(Head, lits::ValueSet, Vec<Ty>),
@@ -75,36 +83,6 @@ pub(crate) enum Ty {
     /// Only in a shown type: an argument that does not change, coalesced
     /// as an output and as an input.
     Both(Box<Ty>, Box<Ty>),
-}
-
-/// An owned type's fields, separated so callers can consume them without
-/// bypassing `Ty`'s iterative destructor.
-pub(crate) enum TyParts {
-    Var(V),
-    Con(Head, lits::ValueSet, Vec<Ty>),
-    Fn(Box<FnTy>),
-    Union(Vec<Ty>),
-    Inter(Vec<Ty>),
-    Diff(Box<Ty>, Vec<Ty>),
-    Never,
-    Top,
-    Both(Box<Ty>, Box<Ty>),
-}
-
-impl From<TyParts> for Ty {
-    fn from(t: TyParts) -> Ty {
-        match t {
-            TyParts::Var(v) => Ty::Var(v),
-            TyParts::Con(h, v, xs) => Ty::Con(h, v, xs),
-            TyParts::Fn(f) => Ty::Fn(f),
-            TyParts::Union(xs) => Ty::Union(xs),
-            TyParts::Inter(xs) => Ty::Inter(xs),
-            TyParts::Diff(a, xs) => Ty::Diff(a, xs),
-            TyParts::Never => Ty::Never,
-            TyParts::Top => Ty::Top,
-            TyParts::Both(a, b) => Ty::Both(a, b),
-        }
-    }
 }
 
 // The baseline Ty is 40 bytes on 64-bit targets. The set adds at most 8.
@@ -121,37 +99,6 @@ pub(crate) struct FnTy {
 }
 
 impl Ty {
-    pub(crate) fn into_parts(mut self) -> TyParts {
-        match &mut self {
-            Ty::Var(v) => TyParts::Var(*v),
-            Ty::Con(h, values, args) => TyParts::Con(
-                *h,
-                std::mem::replace(values, lits::ValueSet::ALL),
-                std::mem::take(args),
-            ),
-            Ty::Fn(f) => TyParts::Fn(std::mem::replace(
-                f,
-                Box::new(FnTy {
-                    params: Vec::new(),
-                    ret: Ty::Never,
-                    err: Ty::Never,
-                    env: Ty::Never,
-                }),
-            )),
-            Ty::Union(xs) => TyParts::Union(std::mem::take(xs)),
-            Ty::Inter(xs) => TyParts::Inter(std::mem::take(xs)),
-            Ty::Diff(a, xs) => TyParts::Diff(
-                std::mem::replace(a, Box::new(Ty::Never)),
-                std::mem::take(xs),
-            ),
-            Ty::Never => TyParts::Never,
-            Ty::Top => TyParts::Top,
-            Ty::Both(a, b) => TyParts::Both(
-                std::mem::replace(a, Box::new(Ty::Never)),
-                std::mem::replace(b, Box::new(Ty::Never)),
-            ),
-        }
-    }
     pub fn literal(v: &LitValue) -> Ty {
         let (b, text) = match v {
             LitValue::Int(n) => (crate::hir::BuiltinType::Int, n.to_string()),
@@ -198,6 +145,7 @@ impl Ty {
     }
     pub fn head(&self) -> Option<Head> {
         match self {
+            Ty::Graph(g) => g.head(),
             Ty::Con(h, _, _) => Some(*h),
             Ty::Fn(_) => Some(Head::Fn),
             _ => None,
@@ -205,6 +153,10 @@ impl Ty {
     }
 
     pub fn named(t: TypeRef, args: Vec<Ty>) -> Ty {
+        if t == TypeRef::Builtin(crate::hir::BuiltinType::Record) {
+            assert!(args.is_empty(), "Record takes no type arguments");
+            return records::Pool::default().record(Vec::new());
+        }
         Ty::Con(Head::Named(t), lits::ValueSet::ALL, args)
     }
 
@@ -215,14 +167,23 @@ impl Ty {
     /// A type variable, or a difference of one: a member that a value of
     /// any type constructor may go to.
     pub fn is_varlike(&self) -> bool {
-        let mut t = self;
-        loop {
-            match t {
-                Ty::Var(_) => return true,
-                Ty::Diff(a, _) => t = a,
-                _ => return false,
-            }
+        match self {
+            Ty::Graph(g) => matches!(g.node(), records::Node::Without(..)),
+            Ty::Var(_) => true,
+            Ty::Diff(a, _) => a.is_varlike(),
+            _ => false,
         }
+    }
+
+    pub fn value_head(&self) -> Option<Head> {
+        match self {
+            Ty::Graph(g) if g.record_only() => Some(Head::Record),
+            _ => self.head(),
+        }
+    }
+
+    pub fn is_headed(&self) -> bool {
+        self.head().is_some()
     }
 }
 
@@ -265,6 +226,33 @@ pub(crate) fn boundary_type(
                     .map(|t| convert(s, t, p, expand))
                     .collect::<Option<_>>()?,
             ),
+            TypeKind::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let mut labels = Vec::new();
+                let mut resolved = Vec::new();
+                for (name, ty) in fields {
+                    let label = records::written_label(name, s.level);
+                    labels.push(label.clone());
+                    resolved.push((label, convert(s, ty, p, expand)?));
+                }
+                labels.extend(
+                    removed
+                        .iter()
+                        .map(|name| records::written_label(name, s.level)),
+                );
+                let record = s.record(resolved);
+                match base {
+                    Some(base) => {
+                        let base = convert(s, base, p, expand)?;
+                        let rest = s.without(&base, labels);
+                        s.inter(vec![rest, record])
+                    }
+                    None => record,
+                }
+            }
             TypeKind::Fn {
                 params,
                 ret,
@@ -397,6 +385,8 @@ impl Variance {
 /// How `v.f` or `v.k` reads a part of its value (§4.8 rule 13).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Access {
+    /// A structural record field selected by its label.
+    Label(String),
     /// `v.f`: each constructor that may have made `v` (§6.7), with the
     /// index of its field with the label `f`. At run time, the constructor
     /// of the value picks one.
@@ -417,6 +407,8 @@ pub struct Typed {
     pub(crate) diagnosed: bool,
     /// Full completed value-dependent alias bodies, with written formal names.
     pub alias_types: HashMap<crate::hir::TypeId, ShownType>,
+    /// Exact alias graphs for semantic interface comparison.
+    pub alias_artifacts: HashMap<crate::hir::TypeId, AliasArtifact>,
     /// The type scheme of each top-level name, simplified and shown in the
     /// syntax of §3 (§4.7).
     pub schemes: HashMap<DefId, String>,
@@ -429,6 +421,8 @@ pub struct Typed {
     /// a module gives them. `schemes[d]` is
     /// `scheme_types[d].text(&type_names(program, d.module))`.
     pub scheme_types: HashMap<DefId, ShownType>,
+    /// Full graph schemes, including their retained bounds and obligations.
+    pub scheme_artifacts: HashMap<DefId, SchemeArtifact>,
     /// §7.5: each use of a name that is known to be made by a constructor,
     /// by the span of the `Name` expression.
     pub known_ctors: HashMap<(ModuleId, Span), CtorRef>,
@@ -653,17 +647,6 @@ pub fn type_names(program: &Program, module: ModuleId) -> Vec<String> {
 /// errors.
 pub fn check(program: &Program, sources: &Sources) -> (Typed, Vec<Diagnostic>) {
     infer::Checker::new(program, sources).run()
-}
-
-/// Re-infer with consumer-selected entries, applying the normal entry checks.
-/// The boolean requests the Nil result contract; consumers may instead accept
-/// any result. Each call validates one independently selected provider plan.
-pub fn check_selected(
-    program: &Program,
-    sources: &Sources,
-    selected: &[(DefId, bool)],
-) -> (Typed, Vec<Diagnostic>) {
-    infer::Checker::new(program, sources).run_selected(selected)
 }
 
 /// `check`, keeping the types of the local names in `Typed::locals`.

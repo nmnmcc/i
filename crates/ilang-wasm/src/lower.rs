@@ -38,7 +38,6 @@
 
 use crate::ir::Stmt;
 use crate::ir::{self, *};
-use crate::lowering_stack::{self, Scheduler};
 use ilang_check::hir::{self, *};
 use ilang_check::types::{Access, Head, HostType, LitValue, TestMember, TestValues, Typed};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
@@ -247,14 +246,14 @@ fn guard(out: &mut Vec<Stmt>, cond: Cond, fail: Label) {
 }
 
 /// `{ e }` with one expression is `e` (§6.10).
-fn ungroup(mut e: &Expr) -> &Expr {
-    while let ExprKind::Block(b) = &e.kind {
-        let [hir::Stmt::Expr(inner)] = &b.stmts[..] else {
-            break;
-        };
-        e = inner;
+fn ungroup(e: &Expr) -> &Expr {
+    match &e.kind {
+        ExprKind::Block(b) if b.stmts.len() == 1 => match &b.stmts[0] {
+            hir::Stmt::Expr(inner) => ungroup(inner),
+            _ => e,
+        },
+        _ => e,
     }
-    e
 }
 
 /// The names that a pattern binds.
@@ -264,196 +263,6 @@ fn pattern_vars(p: &Pattern, out: &mut HashSet<VarId>) {
     out.extend(w.bound);
 }
 
-/// A source-level bound on values simultaneously pending while evaluating
-/// an expression. Unlike Wasm locals this is independent of code generation
-/// and optimization. Earlier call arguments remain pending while later ones
-/// (including a recursive call) are evaluated.
-// Compute the source-level pending-value bound with a postorder worklist.
-// A macro may generate a tree much deeper than the compiler's host stack.
-enum Measure<'a> {
-    Expr(&'a Expr),
-    Pattern(&'a Pattern),
-    Block(&'a Block),
-    Clause(&'a Clause),
-    Binding(&'a Binding),
-    Finish(MeasureOp, usize),
-}
-#[derive(Clone, Copy)]
-enum MeasureOp {
-    Max,
-    SumPlusOne,
-    Pending,
-    Case,
-}
-fn measure(root: Measure<'_>) -> usize {
-    let mut work = vec![root];
-    let mut values: Vec<usize> = Vec::new();
-    while let Some(node) = work.pop() {
-        let mut children = Vec::new();
-        let op = match node {
-            Measure::Finish(op, count) => {
-                let start = values
-                    .len()
-                    .checked_sub(count)
-                    .expect("measure child count");
-                let args = &values[start..];
-                let value = match op {
-                    MeasureOp::Max => args.iter().copied().max().unwrap_or(1),
-                    MeasureOp::SumPlusOne => 1 + args.iter().sum::<usize>(),
-                    MeasureOp::Pending => args
-                        .iter()
-                        .enumerate()
-                        .fold(1usize.max(args.len()), |peak, (held, value)| {
-                            peak.max(held + value)
-                        }),
-                    MeasureOp::Case => {
-                        args[0].max(1 + args[1..].iter().copied().max().unwrap_or(1))
-                    }
-                };
-                values.truncate(start);
-                values.push(value);
-                continue;
-            }
-            Measure::Expr(e) => match &e.kind {
-                ExprKind::Int(_)
-                | ExprKind::Float(_)
-                | ExprKind::String(_)
-                | ExprKind::Name(_)
-                | ExprKind::Error
-                | ExprKind::Fn(_) => {
-                    values.push(1);
-                    continue;
-                }
-                ExprKind::Tuple(xs) => {
-                    children.extend(xs.iter().map(Measure::Expr));
-                    MeasureOp::Pending
-                }
-                ExprKind::List { items, rest } => {
-                    children.extend(items.iter().chain(rest.as_deref()).map(Measure::Expr));
-                    MeasureOp::Pending
-                }
-                ExprKind::BitArray(xs) => {
-                    children.extend(
-                        xs.iter()
-                            .flat_map(|x| {
-                                std::iter::once(&x.value)
-                                    .chain(x.format.as_ref().and_then(|f| f.arg.as_deref()))
-                            })
-                            .map(Measure::Expr),
-                    );
-                    MeasureOp::Pending
-                }
-                ExprKind::Block(b) => {
-                    children.push(Measure::Block(b));
-                    MeasureOp::Max
-                }
-                ExprKind::Case { subject, clauses } => {
-                    children.push(Measure::Expr(subject));
-                    children.extend(clauses.iter().map(Measure::Clause));
-                    MeasureOp::Case
-                }
-                ExprKind::Call { callee, args } => {
-                    children.push(Measure::Expr(callee));
-                    children.extend(args.iter().map(|a| Measure::Expr(&a.value)));
-                    MeasureOp::Pending
-                }
-                ExprKind::Field { target, .. }
-                | ExprKind::TupleIndex { target, .. }
-                | ExprKind::Unary { expr: target, .. } => {
-                    children.push(Measure::Expr(target));
-                    MeasureOp::Max
-                }
-                ExprKind::RecordUpdate { base, fields, .. } => {
-                    children.push(Measure::Expr(base));
-                    children.extend(fields.iter().map(|(_, x)| Measure::Expr(x)));
-                    MeasureOp::Pending
-                }
-                ExprKind::Binary { lhs, rhs, .. } => {
-                    children.push(Measure::Expr(lhs));
-                    children.push(Measure::Expr(rhs));
-                    MeasureOp::Pending
-                }
-            },
-            Measure::Pattern(p) => match &p.kind {
-                PatternKind::Quote { captures, .. } => {
-                    children.extend(captures.iter().map(|(_, p)| Measure::Pattern(p)));
-                    MeasureOp::SumPlusOne
-                }
-                PatternKind::Named { pattern, .. } => {
-                    children.push(Measure::Pattern(pattern));
-                    MeasureOp::SumPlusOne
-                }
-                PatternKind::Constructor { args, .. }
-                | PatternKind::Tuple(args)
-                | PatternKind::Error(args) => {
-                    children.extend(args.iter().map(Measure::Pattern));
-                    MeasureOp::SumPlusOne
-                }
-                PatternKind::List { items, .. } => {
-                    children.extend(items.iter().map(Measure::Pattern));
-                    MeasureOp::SumPlusOne
-                }
-                PatternKind::BitArray(xs) => {
-                    for x in xs {
-                        children.push(Measure::Pattern(&x.value));
-                        if let Some(e) = x.format.as_ref().and_then(|f| f.arg.as_deref()) {
-                            children.push(Measure::Expr(e));
-                        }
-                    }
-                    MeasureOp::SumPlusOne
-                }
-                PatternKind::Var(_)
-                | PatternKind::Discard
-                | PatternKind::Typed { .. }
-                | PatternKind::Int { .. }
-                | PatternKind::Float { .. }
-                | PatternKind::String(_)
-                | PatternKind::Prefix { .. } => {
-                    values.push(1);
-                    continue;
-                }
-            },
-            Measure::Block(b) => {
-                for stmt in &b.stmts {
-                    children.push(match stmt {
-                        hir::Stmt::Bind(b) => Measure::Binding(b),
-                        hir::Stmt::Env { value, .. } | hir::Stmt::Expr(value) => {
-                            Measure::Expr(value)
-                        }
-                    });
-                }
-                MeasureOp::Max
-            }
-            Measure::Clause(c) => {
-                children.extend(c.patterns.iter().map(Measure::Pattern));
-                if let Some(g) = &c.guard {
-                    children.push(Measure::Expr(g));
-                }
-                children.push(Measure::Expr(&c.body));
-                MeasureOp::Max
-            }
-            Measure::Binding(b) => {
-                children.push(Measure::Expr(&b.value));
-                children.push(Measure::Pattern(&b.pattern));
-                MeasureOp::Max
-            }
-        };
-        work.push(Measure::Finish(op, children.len()));
-        work.extend(children.into_iter().rev());
-    }
-    assert_eq!(values.len(), 1, "measure result count");
-    values[0]
-}
-fn pattern_values(p: &Pattern) -> usize {
-    measure(Measure::Pattern(p))
-}
-fn block_values(b: &Block) -> usize {
-    measure(Measure::Block(b))
-}
-fn expression_values(e: &Expr) -> usize {
-    measure(Measure::Expr(e))
-}
-
 /// Collects the names used and bound in a part of the program.
 #[derive(Default)]
 struct Walk {
@@ -461,139 +270,127 @@ struct Walk {
     bound: HashSet<VarId>,
 }
 
-enum WalkNode<'a> {
-    Expr(&'a Expr),
-    Pattern(&'a Pattern),
-    Block(&'a Block),
-    Function(&'a Function),
-}
 impl Walk {
-    fn pattern(&mut self, p: &Pattern) {
-        self.run(WalkNode::Pattern(p));
-    }
-    fn function(&mut self, f: &Function) {
-        self.run(WalkNode::Function(f));
-    }
-    fn run<'a>(&mut self, root: WalkNode<'a>) {
-        let mut work = vec![root];
-        while let Some(node) = work.pop() {
-            match node {
-                WalkNode::Expr(e) => match &e.kind {
-                    ExprKind::Name(ValueRef::Local(v)) => {
-                        self.used.insert(*v);
-                    }
-                    ExprKind::Int(_)
-                    | ExprKind::Float(_)
-                    | ExprKind::String(_)
-                    | ExprKind::Name(_)
-                    | ExprKind::Error => {}
-                    ExprKind::Tuple(xs) => work.extend(xs.iter().map(WalkNode::Expr)),
-                    ExprKind::List { items, rest } => {
-                        work.extend(items.iter().map(WalkNode::Expr));
-                        if let Some(r) = rest {
-                            work.push(WalkNode::Expr(r));
-                        }
-                    }
-                    ExprKind::BitArray(xs) => {
-                        for x in xs {
-                            work.push(WalkNode::Expr(&x.value));
-                            if let Some(a) = x.format.as_ref().and_then(|f| f.arg.as_deref()) {
-                                work.push(WalkNode::Expr(a));
-                            }
-                        }
-                    }
-                    ExprKind::Block(b) => work.push(WalkNode::Block(b)),
-                    ExprKind::Fn(f) => work.push(WalkNode::Function(f)),
-                    ExprKind::Case { subject, clauses } => {
-                        work.push(WalkNode::Expr(subject));
-                        for c in clauses {
-                            work.extend(c.patterns.iter().map(WalkNode::Pattern));
-                            if let Some(g) = &c.guard {
-                                work.push(WalkNode::Expr(g));
-                            }
-                            work.push(WalkNode::Expr(&c.body));
-                        }
-                    }
-                    ExprKind::Call { callee, args } => {
-                        work.push(WalkNode::Expr(callee));
-                        work.extend(args.iter().map(|a| WalkNode::Expr(&a.value)));
-                    }
-                    ExprKind::Field { target, .. }
-                    | ExprKind::TupleIndex { target, .. }
-                    | ExprKind::Unary { expr: target, .. } => work.push(WalkNode::Expr(target)),
-                    ExprKind::RecordUpdate { base, fields, .. } => {
-                        work.push(WalkNode::Expr(base));
-                        work.extend(fields.iter().map(|(_, e)| WalkNode::Expr(e)));
-                    }
-                    ExprKind::Binary { lhs, rhs, .. } => {
-                        work.push(WalkNode::Expr(lhs));
-                        work.push(WalkNode::Expr(rhs));
-                    }
-                },
-                WalkNode::Block(b) => {
-                    for s in &b.stmts {
-                        match s {
-                            hir::Stmt::Bind(b) => {
-                                work.push(WalkNode::Pattern(&b.pattern));
-                                work.push(WalkNode::Expr(&b.value));
-                            }
-                            hir::Stmt::Env { value, .. } | hir::Stmt::Expr(value) => {
-                                work.push(WalkNode::Expr(value))
-                            }
-                        }
-                    }
-                }
-                WalkNode::Function(f) => {
-                    for p in &f.params {
-                        match p {
-                            Param::Pattern { pattern, .. } => work.push(WalkNode::Pattern(pattern)),
-                            Param::Env { var, .. } => {
-                                self.bound.insert(*var);
-                            }
-                        }
-                    }
-                    work.push(WalkNode::Block(&f.body));
-                }
-                WalkNode::Pattern(p) => match &p.kind {
-                    PatternKind::Quote { captures, .. } => {
-                        work.extend(captures.iter().map(|(_, p)| WalkNode::Pattern(p)));
-                    }
-                    PatternKind::Var(b) => {
-                        self.bound.insert(b.var);
-                    }
-                    PatternKind::Typed { binder, .. } => {
-                        self.bound.extend(binder.iter().map(|b| b.var));
-                    }
-                    PatternKind::Named { binder, pattern } => {
-                        self.bound.insert(binder.var);
-                        work.push(WalkNode::Pattern(pattern));
-                    }
-                    PatternKind::Prefix { rest, .. } => {
-                        self.bound.extend(rest.iter().map(|b| b.var));
-                    }
-                    PatternKind::Constructor { args, .. }
-                    | PatternKind::Tuple(args)
-                    | PatternKind::Error(args) => work.extend(args.iter().map(WalkNode::Pattern)),
-                    PatternKind::List { items, rest } => {
-                        work.extend(items.iter().map(WalkNode::Pattern));
-                        if let Some(Some(b)) = rest {
-                            self.bound.insert(b.var);
-                        }
-                    }
-                    PatternKind::BitArray(xs) => {
-                        for x in xs {
-                            work.push(WalkNode::Pattern(&x.value));
-                            if let Some(a) = x.format.as_ref().and_then(|f| f.arg.as_deref()) {
-                                work.push(WalkNode::Expr(a));
-                            }
-                        }
-                    }
-                    PatternKind::Discard
-                    | PatternKind::Int { .. }
-                    | PatternKind::Float { .. }
-                    | PatternKind::String(_) => {}
-                },
+    fn expr(&mut self, e: &Expr) {
+        match &e.kind {
+            ExprKind::Name(ValueRef::Local(v)) => {
+                self.used.insert(*v);
             }
+            ExprKind::Int(_)
+            | ExprKind::Float(_)
+            | ExprKind::String(_)
+            | ExprKind::Name(_)
+            | ExprKind::Error => {}
+            ExprKind::Tuple(items) => items.iter().for_each(|x| self.expr(x)),
+            ExprKind::Record { base, fields } => {
+                if let Some(base) = base {
+                    self.expr(base);
+                }
+                for (_, value) in fields {
+                    self.expr(value);
+                }
+            }
+            ExprKind::List { items, rest } => items
+                .iter()
+                .chain(rest.as_deref())
+                .for_each(|x| self.expr(x)),
+            ExprKind::BitArray(segs) => {
+                for s in segs {
+                    self.expr(&s.value);
+                    if let Some(a) = s.format.as_ref().and_then(|f| f.arg.as_deref()) {
+                        self.expr(a);
+                    }
+                }
+            }
+            ExprKind::Block(b) => self.block(b),
+            ExprKind::Fn(f) => self.function(f),
+            ExprKind::Case { subject, clauses } => {
+                self.expr(subject);
+                for c in clauses {
+                    c.patterns.iter().for_each(|p| self.pattern(p));
+                    c.guard.iter().for_each(|g| self.expr(g));
+                    self.expr(&c.body);
+                }
+            }
+            ExprKind::Call { callee, args } => {
+                self.expr(callee);
+                args.iter().for_each(|a| self.expr(&a.value));
+            }
+            ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
+                self.expr(target)
+            }
+            ExprKind::RecordUpdate { base, fields, .. } => {
+                self.expr(base);
+                fields.iter().for_each(|(_, x)| self.expr(x));
+            }
+            ExprKind::Unary { expr, .. } => self.expr(expr),
+            ExprKind::Binary { lhs, rhs, .. } => {
+                self.expr(lhs);
+                self.expr(rhs);
+            }
+        }
+    }
+
+    fn block(&mut self, b: &Block) {
+        for s in &b.stmts {
+            match s {
+                hir::Stmt::Bind(b) => {
+                    self.pattern(&b.pattern);
+                    self.expr(&b.value);
+                }
+                hir::Stmt::Env { value, .. } => self.expr(value),
+                hir::Stmt::Expr(e) => self.expr(e),
+            }
+        }
+    }
+
+    fn function(&mut self, f: &Function) {
+        for p in &f.params {
+            match p {
+                Param::Pattern { pattern, .. } => self.pattern(pattern),
+                Param::Env { var, .. } => {
+                    self.bound.insert(*var);
+                }
+            }
+        }
+        self.block(&f.body);
+    }
+
+    fn binder(&mut self, b: &Binder) {
+        self.bound.insert(b.var);
+    }
+
+    fn pattern(&mut self, p: &Pattern) {
+        match &p.kind {
+            PatternKind::Var(b) => self.binder(b),
+            PatternKind::Typed { binder, .. } => binder.iter().for_each(|b| self.binder(b)),
+            PatternKind::Named { binder, pattern } => {
+                self.binder(binder);
+                self.pattern(pattern);
+            }
+            PatternKind::Prefix { rest, .. } => rest.iter().for_each(|b| self.binder(b)),
+            PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
+                args.iter().for_each(|a| self.pattern(a))
+            }
+            PatternKind::List { items, rest } => {
+                items.iter().for_each(|a| self.pattern(a));
+                if let Some(Some(b)) = rest {
+                    self.binder(b);
+                }
+            }
+            PatternKind::BitArray(segs) => {
+                for s in segs {
+                    self.pattern(&s.value);
+                    if let Some(a) = s.format.as_ref().and_then(|f| f.arg.as_deref()) {
+                        self.expr(a);
+                    }
+                }
+            }
+            PatternKind::Error(parts) => parts.iter().for_each(|a| self.pattern(a)),
+            PatternKind::Discard
+            | PatternKind::Int { .. }
+            | PatternKind::Float { .. }
+            | PatternKind::String(_) => {}
         }
     }
 }
@@ -711,65 +508,23 @@ pub fn lower_with_bindings(
     options: Options,
 ) -> Result<(ir::Program, Vec<serde_json::Value>), Vec<Diagnostic>> {
     if !typed.coalescing_errors().is_empty() {
-        let mut diags = typed.coalescing_errors().to_vec();
-        ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut diags);
-        return Err(diags);
+        return Err(typed.coalescing_errors().to_vec());
     }
-    let mut l = Lowerer::new(graph, program, typed, options, None);
+    let mut l = Lowerer::new(graph, program, typed, options);
     l.run();
     if l.diags.is_empty() {
         crate::control::split(&mut l.out);
         Ok((l.out, l.bindings))
     } else {
-        ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut l.diags);
         Err(l.diags)
     }
 }
-
-/// Lower one consumer-selected collection target as the sole tool root.
-/// The target remains separate from program entries, tests and host exports.
-pub fn lower_selected_with_bindings(
-    graph: &PackageGraph,
-    program: &hir::Program,
-    typed: &Typed,
-    options: Options,
-    target: DefId,
-    export: &str,
-) -> Result<(ir::Program, Vec<serde_json::Value>, bool), Vec<Diagnostic>> {
-    if !typed.coalescing_errors().is_empty() {
-        let mut diags = typed.coalescing_errors().to_vec();
-        ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut diags);
-        return Err(diags);
-    }
-    let mut l = Lowerer::new(
-        graph,
-        program,
-        typed,
-        options,
-        Some((target, export.to_owned())),
-    );
-    l.run();
-    let is_async = l.selected_async;
-    if l.diags.is_empty() {
-        crate::control::split(&mut l.out);
-        Ok((l.out, l.bindings, is_async))
-    } else {
-        ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut l.diags);
-        Err(l.diags)
-    }
-}
-
-type Entry = (String, bool);
-type HostExport = (String, ExportAbi, bool);
-type Entries = (Option<Entry>, Vec<Entry>, Vec<HostExport>);
 
 struct Lowerer<'a> {
     graph: &'a PackageGraph,
     program: &'a hir::Program,
     typed: &'a Typed,
     options: Options,
-    selected: Option<(DefId, String)>,
-    selected_async: bool,
     packages: HashSet<PackageId>,
     ctors: HashMap<CtorRef, CtorInfo>,
     types: HashMap<TypeId, TypeRepr>,
@@ -781,7 +536,7 @@ struct Lowerer<'a> {
     op_funcs: HashMap<String, FuncId>,
     work: Vec<(FuncId, DefId)>,
     constants: BTreeSet<FuncId>,
-    site_map: HashMap<(SitePos, Option<String>), Site>,
+    site_map: HashMap<SitePos, Site>,
     module_index: HashMap<ModuleId, u32>,
     lines: HashMap<ModuleId, LineIndex<'a>>,
     /// The service id of each service type constructor (§9.2).
@@ -798,26 +553,18 @@ struct Lowerer<'a> {
     diags: Vec<Diagnostic>,
 }
 
-// Every `Scheduler::call` below is awaited directly. Its child returns an
-// owned result, and `lowering_stack::run` is the sole executor: a suspended
-// parent is retained until that child has completed or has been dropped on
-// unwind. This permits a child to reborrow the lowering state without keeping
-// its parent's native stack frame alive.
 impl<'a> Lowerer<'a> {
     fn new(
         graph: &'a PackageGraph,
         program: &'a hir::Program,
         typed: &'a Typed,
         options: Options,
-        selected: Option<(DefId, String)>,
     ) -> Self {
         let mut l = Lowerer {
             graph,
             program,
             typed,
             options,
-            selected,
-            selected_async: false,
             packages: HashSet::new(),
             ctors: HashMap::new(),
             types: HashMap::new(),
@@ -1028,28 +775,24 @@ impl<'a> Lowerer<'a> {
                 }
             }
         }
-        // Tool builds retain only externals reachable from their selected root
-        // or from required initializers; ordinary builds retain §10.1 imports.
-        let reachable = self.selected.as_ref().map(|(d, _)| self.tool_reachable(*d));
+        // §10.1, B.6: every external function of the compiled packages is
+        // an import.
         for (mi, m) in self.program.modules.iter().enumerate() {
             let mid = ModuleId(mi as u32);
             if !self.included(mid) || self.is_library(mid) {
                 continue;
             }
             for (di, d) in m.defs.iter().enumerate() {
-                let id = DefId {
-                    module: mid,
-                    index: di as u32,
-                };
-                if matches!(d.kind, DefKind::External { .. })
-                    && reachable.as_ref().is_none_or(|set| set.contains(&id))
-                {
-                    self.external_func(id);
+                if matches!(d.kind, DefKind::External { .. }) {
+                    self.external_func(DefId {
+                        module: mid,
+                        index: di as u32,
+                    });
                 }
             }
         }
         self.start();
-        let (entry, tests, exports) = self.entries();
+        self.entries();
         while let Some((id, d)) = self.work.pop() {
             let b = self.known[&d];
             let tb = self.program.binding(b);
@@ -1064,53 +807,13 @@ impl<'a> Lowerer<'a> {
             let func = self.function(b.module, f, &[], name);
             self.out.funcs[id.0 as usize] = FuncKind::Code(func);
         }
-        self.out.abi_json = abi_json(
-            self.options.target,
-            entry,
-            &tests,
-            &exports,
-            &self.out.imports,
-        );
         self.out.constants = self.constants.iter().copied().collect();
-    }
-
-    /// Dependency closure of a selected root plus the initializers that every
-    /// instance executes. An unused function does not create a host import.
-    fn tool_reachable(&self, target: DefId) -> HashSet<DefId> {
-        let mut seen = HashSet::new();
-        let mut work = vec![target];
-        for &binding in &self.program.order.init {
-            if !self.included(binding.module) {
-                continue;
-            }
-            let b = &self.program.binding(binding).binding;
-            work.extend(
-                ilang_check::order::references(&b.pattern, &b.value)
-                    .into_iter()
-                    .filter_map(|(d, inside)| (!b.direct || !inside).then_some(d)),
-            );
-        }
-        while let Some(id) = work.pop() {
-            if !seen.insert(id) {
-                continue;
-            }
-            if let DefKind::Binding { binding, .. } = self.program.def(id).kind {
-                let b = &self.program.module(id.module).bindings[binding as usize].binding;
-                work.extend(
-                    ilang_check::order::references(&b.pattern, &b.value)
-                        .into_iter()
-                        .map(|(d, _)| d),
-                );
-            }
-        }
-        seen
     }
 
     /// `ilang_start`: the top-level values, in the order of §2.5.
     fn start(&mut self) {
         let mut fx = Fx::new(ModuleId(0), false);
         let mut out = Vec::new();
-        let mut pending = 1;
         for &b in &self.program.order.init {
             if !self.included(b.module) {
                 continue;
@@ -1119,9 +822,6 @@ impl<'a> Lowerer<'a> {
             if tb.defs.len() == 1 && self.known.contains_key(&tb.defs[0]) {
                 continue;
             }
-            pending = pending
-                .max(expression_values(&tb.binding.value))
-                .max(pattern_values(&tb.binding.pattern));
             fx.module = b.module;
             fx.library = self.is_library(b.module);
             let value = self.expr(&mut fx, &mut out, &tb.binding.value);
@@ -1144,8 +844,6 @@ impl<'a> Lowerer<'a> {
         self.out.start = Some(Func {
             name: "ilang_start".into(),
             arity: 0,
-            budget_frame: u32::try_from(1 + fx.vars.len() + pending)
-                .expect("source frame exceeds u32"),
             locals: fx.locals,
             body: out,
             frame: true,
@@ -1164,35 +862,11 @@ impl<'a> Lowerer<'a> {
 
     /// The program entry, the tests, and the host exports (§10.2, B.5),
     /// and the host services that they need (§9.7).
-    fn entries(&mut self) -> Entries {
+    fn entries(&mut self) {
         let program = self.program;
         let mut entry = None;
         let mut tests = Vec::new();
         let mut needed: BTreeSet<TypeId> = BTreeSet::new();
-        if let Some((target, name)) = self.selected.clone() {
-            let def = program.def(target);
-            let callee = self.entry_callee(target, 0);
-            let fx = Fx::new(target.module, false);
-            let site = self.site(&fx, def.span.start);
-            let is_async = self.entry_async(target, &mut needed);
-            let async_body = is_async.then(|| self.async_body(&callee, 0));
-            self.selected_async = is_async;
-            if self.options.target == ir::Target::Wasi {
-                self.out.entry = Some(name.clone());
-            }
-            self.out.exports.push(Export {
-                name,
-                callee,
-                abi: None,
-                site,
-                async_body,
-            });
-            for service in needed {
-                self.host_service(service);
-            }
-            self.out.target = self.options.target;
-            return (None, tests, Vec::new());
-        }
         for (mi, m) in program.modules.iter().enumerate() {
             let mid = ModuleId(mi as u32);
             if Some(m.package) != program.root || !self.included(mid) {
@@ -1262,12 +936,18 @@ impl<'a> Lowerer<'a> {
                     code::NOT_SUPPORTED,
                     None,
                     Span::default(),
-                    "the WASI target needs a program entry: `main` in `src/main.i`, or select `[entries]` with `--entry` (B.7)",
+                    "the WASI target needs a program entry, a `@main` (B.7)",
                 )),
             }
         }
         self.out.target = self.options.target;
-        (entry, tests, exports)
+        self.out.abi_json = abi_json(
+            self.options.target,
+            entry,
+            &tests,
+            &exports,
+            &self.out.imports,
+        );
     }
 
     fn entry_callee(&mut self, d: DefId, n: u32) -> Callee {
@@ -1317,7 +997,6 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[thunk.0 as usize] = FuncKind::Code(Func {
             name: format!("{module} entry body"),
             arity: 0,
-            budget_frame: 1,
             locals: vec![LocalType::Value; n as usize],
             body: thunk_body,
             frame: true,
@@ -1327,7 +1006,6 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[wrapper.0 as usize] = FuncKind::Code(Func {
             name: format!("{module} entry"),
             arity: n,
-            budget_frame: n + 1,
             locals: vec![LocalType::Value; n as usize + 1],
             body: vec![
                 Stmt::Let {
@@ -1398,7 +1076,6 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[f.0 as usize] = FuncKind::Code(Func {
             name: "async entry".into(),
             arity: 1,
-            budget_frame: 2,
             locals: vec![LocalType::Value; 1 + n as usize],
             body,
             frame: true,
@@ -1776,7 +1453,6 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[f.0 as usize] = FuncKind::Code(Func {
             name: format!("import {} {}", x.module, x.name),
             arity: n,
-            budget_frame: n + 1,
             locals,
             body,
             frame: true,
@@ -1842,13 +1518,12 @@ impl<'a> Lowerer<'a> {
 
     /// A function expression with its captures, as a function of the
     /// intermediate form.
-    async fn function_task(
+    fn function(
         &mut self,
         module: ModuleId,
         f: &Function,
         captures: &[VarId],
         name: String,
-        __s: Scheduler,
     ) -> Func {
         let mut fx = Fx::new(module, self.is_library(module));
         let mut out = Vec::new();
@@ -1876,19 +1551,7 @@ impl<'a> Lowerer<'a> {
                 Param::Pattern { pattern, .. } => {
                     let v = Atom::Local(next);
                     next += 1;
-                    unsafe {
-                        __s.call(|__child| {
-                            self.bind_checked_task(
-                                &mut fx,
-                                &mut out,
-                                pattern,
-                                v,
-                                pattern.span.start,
-                                __child,
-                            )
-                        })
-                    }
-                    .await;
+                    self.bind_checked(&mut fx, &mut out, pattern, v, pattern.span.start);
                 }
                 Param::Env { var, name, .. } => {
                     let service = self.service(module, name.span);
@@ -1901,21 +1564,10 @@ impl<'a> Lowerer<'a> {
                 }
             }
         }
-        unsafe { __s.call(|__child| self.block_task(&mut fx, &mut out, &f.body, true, __child)) }
-            .await;
-        let pending = f
-            .params
-            .iter()
-            .filter_map(|p| match p {
-                Param::Pattern { pattern, .. } => Some(pattern_values(pattern)),
-                Param::Env { .. } => None,
-            })
-            .fold(block_values(&f.body), usize::max);
+        self.block(&mut fx, &mut out, &f.body, true);
         Func {
             name,
             arity,
-            budget_frame: u32::try_from(1 + arity as usize + fx.vars.len() + pending)
-                .expect("source frame exceeds u32"),
             locals: fx.locals,
             body: out,
             frame: true,
@@ -1932,94 +1584,39 @@ impl<'a> Lowerer<'a> {
         }
         let program = self.program;
         let graph = self.graph;
-        let mapped = program.origin(fx.module, Span::new(offset, offset));
-        let source = mapped
-            .as_ref()
-            .map_or(program.module(fx.module).source, |o| o.source);
-        let actual = mapped.as_ref().map_or(offset, |o| o.span.start);
-        let module_id = if mapped.is_some() {
-            program
-                .modules
-                .iter()
-                .position(|m| m.source == source)
-                .map(|i| ModuleId(i as u32))
-                .expect("site source has a module")
-        } else {
-            fx.module
-        };
-        let module = program.module(module_id);
-        let base_path = format!(
-            "{}{}",
-            graph.packages[module.package].position_prefix(),
-            module.path
-        );
-        let note = mapped.as_ref().and_then(|o| {
-            o.template.map(|(source, span)| {
-                let template_module = program
-                    .modules
-                    .iter()
-                    .find(|m| m.source == source)
-                    .expect("template source has a module");
-                let (line, column) =
-                    LineIndex::new(&graph.sources.get(source).text).line_col(span.start);
-                let mut note = format!(
-                    "\n  expanded from {}{}:{line}:{column}",
-                    graph.packages[template_module.package].position_prefix(),
-                    template_module.path
-                );
-                for call in o.expansion.call_chain.iter().skip(1).rev() {
-                    let source = ilang_package::SourceId(call.syntax.scope().module);
-                    let m = program
-                        .modules
-                        .iter()
-                        .find(|m| m.source == source)
-                        .expect("macro call source has a module");
-                    let (line, column) = LineIndex::new(&graph.sources.get(source).text)
-                        .line_col(call.syntax.span().start);
-                    note.push_str(&format!(
-                        "\n  in expansion of `{}` at {}{}:{line}:{column}",
-                        call.macro_name,
-                        graph.packages[m.package].position_prefix(),
-                        m.path
-                    ));
-                }
-                note
-            })
-        });
-        let index = match self.module_index.get(&module_id) {
+        let module = program.module(fx.module);
+        let index = match self.module_index.get(&fx.module) {
             Some(&i) => i,
             None => {
                 let i = self.out.site_modules.len() as u32;
-                self.out.site_modules.push(base_path);
-                self.module_index.insert(module_id, i);
+                // A package with a location puts `location@major ` first
+                // (§11.7).
+                self.out.site_modules.push(format!(
+                    "{}{}",
+                    graph.packages[module.package].position_prefix(),
+                    module.path
+                ));
+                self.module_index.insert(fx.module, i);
                 i
             }
         };
         let lines = self
             .lines
-            .entry(module_id)
+            .entry(fx.module)
             .or_insert_with(|| LineIndex::new(&graph.sources.get(module.source).text));
-        let (line, column) = lines.line_col(actual);
+        let (line, column) = lines.line_col(offset);
         let pos = SitePos {
             module: index,
             line,
             column,
         };
-        Some(
-            *self.site_map.entry((pos, note.clone())).or_insert_with(|| {
-                self.out.sites.push(pos);
-                self.out.site_notes.push(note);
-                self.out.sites.len() as Site - 1
-            }),
-        )
+        Some(*self.site_map.entry(pos).or_insert_with(|| {
+            self.out.sites.push(pos);
+            self.out.sites.len() as Site - 1
+        }))
     }
 
     // ---- Names ----
-
-    fn runtime_external(&self, d: DefId) -> bool {
-        self.is_library(d.module)
-            && matches!(&self.program.def(d).kind, DefKind::External { module, .. } if module.starts_with("ilang:"))
-    }
 
     /// The operation of an external function of the library.
     fn external_op(&self, d: DefId) -> Result<(Op, u32), String> {
@@ -2105,6 +1702,19 @@ impl<'a> Lowerer<'a> {
                 )),
                 _ => Err(format!("`key.{function}` is not known")),
             },
+            "ilang:record" => {
+                let name = match function.as_str() {
+                    "get" => "record_get",
+                    "put" => "record_put",
+                    "remove" => "record_remove",
+                    "has" => "record_has",
+                    "keys" => "record_keys",
+                    "size" => "record_size",
+                    "texts" => "record_texts",
+                    _ => return Err(format!("`record.{function}` is not known")),
+                };
+                Ok((Op::Runtime { name, arity }, arity))
+            }
             "ilang:fail" if function == "raise" => Ok((Op::Raise, arity)),
             "ilang:fail" if function == "catch" => Ok((Op::Catch, arity)),
             "ilang:resource" if function == "ensure" => Ok((Op::Ensure, arity)),
@@ -2141,7 +1751,7 @@ impl<'a> Lowerer<'a> {
                 }
             },
             ValueRef::Def(d) => match self.program.def(d).kind {
-                DefKind::External { .. } if !self.runtime_external(d) => {
+                DefKind::External { .. } if !self.is_library(d.module) => {
                     match self.external_func(d) {
                         Some(f) => {
                             self.constants.insert(f);
@@ -2183,53 +1793,48 @@ impl<'a> Lowerer<'a> {
 
     // ---- Expressions ----
 
-    async fn expr_task(
-        &mut self,
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-        e: &Expr,
-        __s: Scheduler,
-    ) -> Atom {
-        unsafe { __s.call(|__child| self.lower_task(fx, out, e, false, __child)) }
-            .await
+    fn expr(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, e: &Expr) -> Atom {
+        self.lower(fx, out, e, false)
             .expect("a value that is not in tail position")
     }
 
     /// Lowers `e`. In tail position, the statements end the function and
     /// there is no value.
-    async fn lower_task(
-        &mut self,
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-        e: &Expr,
-        tail: bool,
-        __s: Scheduler,
-    ) -> Option<Atom> {
+    fn lower(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, e: &Expr, tail: bool) -> Option<Atom> {
         let a = match &e.kind {
             ExprKind::Int(n) => Atom::Int(BigInt::from(n.clone())),
             ExprKind::Float(x) => Atom::Float(*x),
             ExprKind::String(s) => Atom::String(s.clone()),
             ExprKind::Name(r) => self.name(fx, e, *r),
             ExprKind::Tuple(items) => {
-                let mut parts = Vec::with_capacity(items.len());
-                for x in items {
-                    parts.push(
-                        unsafe { __s.call(|__child| self.expr_task(fx, out, x, __child)) }.await,
-                    );
-                }
+                let parts = items.iter().map(|x| self.expr(fx, out, x)).collect();
                 let_value(fx, out, Value::Tuple(parts), None)
             }
+            ExprKind::Record { base, fields } => {
+                let base = base.as_ref().map(|b| self.expr(fx, out, b));
+                let fields = fields
+                    .iter()
+                    .map(|(label, value)| {
+                        let index = match self.out.labels.iter().position(|x| x == &label.name) {
+                            Some(index) => index,
+                            None => {
+                                self.out.labels.push(label.name.clone());
+                                self.out.labels.len() - 1
+                            }
+                        };
+                        (LabelConst(index as u32), self.expr(fx, out, value))
+                    })
+                    .collect();
+                let value = match base {
+                    Some(base) => Value::RecWith(base, fields),
+                    None => Value::RecNew(fields),
+                };
+                let_value(fx, out, value, None)
+            }
             ExprKind::List { items, rest } => {
-                let mut parts = Vec::with_capacity(items.len());
-                for x in items {
-                    parts.push(
-                        unsafe { __s.call(|__child| self.expr_task(fx, out, x, __child)) }.await,
-                    );
-                }
+                let parts: Vec<Atom> = items.iter().map(|x| self.expr(fx, out, x)).collect();
                 let mut list = match rest {
-                    Some(r) => {
-                        unsafe { __s.call(|__child| self.expr_task(fx, out, r, __child)) }.await
-                    }
+                    Some(r) => self.expr(fx, out, r),
                     None => Atom::EmptyList,
                 };
                 for p in parts.into_iter().rev() {
@@ -2237,45 +1842,37 @@ impl<'a> Lowerer<'a> {
                 }
                 list
             }
-            ExprKind::BitArray(segs) => {
-                unsafe { __s.call(|__child| self.bit_array_task(fx, out, e, segs, __child)) }.await
-            }
-            ExprKind::Block(b) => {
-                return unsafe { __s.call(|__child| self.block_task(fx, out, b, tail, __child)) }
-                    .await;
-            }
-            ExprKind::Fn(f) => {
-                unsafe { __s.call(|__child| self.closure_task(fx, out, f, __child)) }.await
-            }
+            ExprKind::BitArray(segs) => self.bit_array(fx, out, e, segs),
+            ExprKind::Block(b) => return self.block(fx, out, b, tail),
+            ExprKind::Fn(f) => self.closure(fx, out, f),
             ExprKind::Case { subject, clauses } => {
-                let s =
-                    unsafe { __s.call(|__child| self.expr_task(fx, out, subject, __child)) }.await;
-                return unsafe {
-                    __s.call(|__child| self.case_task(fx, out, s, clauses, tail, __child))
-                }
-                .await;
+                let s = self.expr(fx, out, subject);
+                return self.case(fx, out, s, clauses, tail);
             }
             ExprKind::Call { callee, args } => {
                 let args: Vec<&Expr> = args.iter().map(|a| &a.value).collect();
-                return unsafe {
-                    __s.call(|__child| {
-                        self.call_task(fx, out, e.span, callee, None, &args, tail, __child)
-                    })
-                }
-                .await;
+                return self.call(fx, out, e.span, callee, None, &args, tail);
             }
             ExprKind::Field { target, .. } => {
-                let t =
-                    unsafe { __s.call(|__child| self.expr_task(fx, out, target, __child)) }.await;
+                let t = self.expr(fx, out, target);
                 match self.typed.access.get(&(fx.module, e.span)) {
                     Some(Access::Field(list)) => self.field(fx, out, t, list),
                     Some(Access::Part(k)) => let_value(fx, out, Value::Field(t, *k), None),
+                    Some(Access::Label(label)) => {
+                        let index = match self.out.labels.iter().position(|x| x == label) {
+                            Some(index) => index,
+                            None => {
+                                self.out.labels.push(label.clone());
+                                self.out.labels.len() - 1
+                            }
+                        };
+                        let_value(fx, out, Value::RecGet(t, LabelConst(index as u32)), None)
+                    }
                     None => unreachable!("a checked field has an access"),
                 }
             }
             ExprKind::TupleIndex { target, index, .. } => {
-                let t =
-                    unsafe { __s.call(|__child| self.expr_task(fx, out, target, __child)) }.await;
+                let t = self.expr(fx, out, target);
                 let k = match self.typed.access.get(&(fx.module, e.span)) {
                     Some(Access::Part(k)) => *k,
                     _ => u32::try_from(index).unwrap_or(0),
@@ -2285,14 +1882,11 @@ impl<'a> Lowerer<'a> {
             ExprKind::RecordUpdate {
                 ctor, base, fields, ..
             } => {
-                let b = unsafe { __s.call(|__child| self.expr_task(fx, out, base, __child)) }.await;
-                let mut given = Vec::with_capacity(fields.len());
-                for (name, x) in fields {
-                    given.push((
-                        name.name.clone(),
-                        unsafe { __s.call(|__child| self.expr_task(fx, out, x, __child)) }.await,
-                    ));
-                }
+                let b = self.expr(fx, out, base);
+                let given: Vec<(String, Atom)> = fields
+                    .iter()
+                    .map(|(name, x)| (name.name.clone(), self.expr(fx, out, x)))
+                    .collect();
                 let info = self.ctors[ctor].clone();
                 let CtorRepr::Record { ctor, ty } = info.repr else {
                     unreachable!("only records have fields")
@@ -2323,21 +1917,16 @@ impl<'a> Lowerer<'a> {
                 (UnOp::Neg, ExprKind::Int(n)) => Atom::Int(-BigInt::from(n.clone())),
                 (UnOp::NegFloat, ExprKind::Float(x)) => Atom::Float(-*x),
                 (UnOp::Neg, _) => {
-                    let a =
-                        unsafe { __s.call(|__child| self.expr_task(fx, out, expr, __child)) }.await;
+                    let a = self.expr(fx, out, expr);
                     let_value(fx, out, Value::Op(Op::IntNeg, vec![a]), None)
                 }
                 (UnOp::NegFloat, _) => {
-                    let a =
-                        unsafe { __s.call(|__child| self.expr_task(fx, out, expr, __child)) }.await;
+                    let a = self.expr(fx, out, expr);
                     let_value(fx, out, Value::Op(Op::FloatNeg, vec![a]), None)
                 }
             },
             ExprKind::Binary { op, lhs, rhs } => {
-                return unsafe {
-                    __s.call(|__child| self.binary_task(fx, out, e, *op, lhs, rhs, tail, __child))
-                }
-                .await;
+                return self.binary(fx, out, e, *op, lhs, rhs, tail);
             }
             ExprKind::Error => {
                 out.push(Stmt::Unreachable);
@@ -2349,50 +1938,32 @@ impl<'a> Lowerer<'a> {
 
     /// A block (§6.10). An environment statement changes the environment
     /// for the rest of its block only (§9.2).
-    async fn block_task(
-        &mut self,
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-        b: &Block,
-        tail: bool,
-        __s: Scheduler,
-    ) -> Option<Atom> {
+    fn block(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, b: &Block, tail: bool) -> Option<Atom> {
         let outer = fx.env;
-        let a =
-            unsafe { __s.call(|__child| self.statements_task(fx, out, b, tail, __child)) }.await;
+        let a = self.statements(fx, out, b, tail);
         fx.env = outer;
         a
     }
 
-    async fn statements_task(
+    fn statements(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
         b: &Block,
         tail: bool,
-        __s: Scheduler,
     ) -> Option<Atom> {
         let last = b.stmts.len().saturating_sub(1);
         for (i, s) in b.stmts.iter().enumerate() {
             match s {
-                hir::Stmt::Expr(e) if i == last => {
-                    return unsafe {
-                        __s.call(|__child| self.lower_task(fx, out, e, tail, __child))
-                    }
-                    .await;
-                }
+                hir::Stmt::Expr(e) if i == last => return self.lower(fx, out, e, tail),
                 hir::Stmt::Expr(e) => {
-                    unsafe { __s.call(|__child| self.expr_task(fx, out, e, __child)) }.await;
+                    self.expr(fx, out, e);
                 }
-                hir::Stmt::Bind(binding) => {
-                    unsafe { __s.call(|__child| self.binding_task(fx, out, binding, __child)) }
-                        .await
-                }
+                hir::Stmt::Bind(binding) => self.binding(fx, out, binding),
                 hir::Stmt::Env { value, span, .. } => {
                     // The value uses the environment from outside the
                     // statement (§4.8 rule 9).
-                    let v = unsafe { __s.call(|__child| self.expr_task(fx, out, value, __child)) }
-                        .await;
+                    let v = self.expr(fx, out, value);
                     let service = self.service(fx.module, *span);
                     let dst = fx.local(LocalType::Env);
                     out.push(Stmt::LetEnv {
@@ -2412,36 +1983,20 @@ impl<'a> Lowerer<'a> {
     /// A binding in a block (§6.10). The names of a direct value may be used
     /// in the function bodies of the value: those closures are made first and
     /// their captures are filled when the names are bound.
-    async fn binding_task(
-        &mut self,
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-        b: &Binding,
-        __s: Scheduler,
-    ) {
+    fn binding(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, b: &Binding) {
         if !b.direct {
-            let v = unsafe { __s.call(|__child| self.expr_task(fx, out, &b.value, __child)) }.await;
-            unsafe {
-                __s.call(|__child| {
-                    self.bind_checked_task(fx, out, &b.pattern, v, b.span.start, __child)
-                })
-            }
-            .await;
+            let v = self.expr(fx, out, &b.value);
+            self.bind_checked(fx, out, &b.pattern, v, b.span.start);
             return;
         }
         let mut vars = HashSet::new();
         pattern_vars(&b.pattern, &mut vars);
         let saved = fx.pending.replace(vars);
         let saved_patches = std::mem::take(&mut fx.patches);
-        let v = unsafe { __s.call(|__child| self.expr_task(fx, out, &b.value, __child)) }.await;
+        let v = self.expr(fx, out, &b.value);
         fx.pending = saved;
         let patches = std::mem::replace(&mut fx.patches, saved_patches);
-        unsafe {
-            __s.call(|__child| {
-                self.bind_checked_task(fx, out, &b.pattern, v, b.span.start, __child)
-            })
-        }
-        .await;
+        self.bind_checked(fx, out, &b.pattern, v, b.span.start);
         for (closure, index, var) in patches {
             let value = Atom::Local(fx.var(var));
             out.push(Stmt::SetCapture {
@@ -2452,20 +2007,11 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    async fn closure_task(
-        &mut self,
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-        f: &Function,
-        __s: Scheduler,
-    ) -> Atom {
+    fn closure(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, f: &Function) -> Atom {
         let captures = captures_of(f);
         let id = self.new_func();
         let name = format!("{}:fn{}", self.program.module(fx.module).path, id.0);
-        let func = unsafe {
-            __s.call(|__child| self.function_task(fx.module, f, &captures, name, __child))
-        }
-        .await;
+        let func = self.function(fx.module, f, &captures, name);
         self.out.funcs[id.0 as usize] = FuncKind::Code(func);
         let mut atoms = Vec::new();
         let mut later = Vec::new();
@@ -2501,6 +2047,10 @@ impl<'a> Lowerer<'a> {
         t: Atom,
         list: &[(CtorRef, u32)],
     ) -> Atom {
+        if list.is_empty() {
+            out.push(Stmt::Unreachable);
+            return t;
+        }
         let first = list[0].1;
         if list.iter().all(|(_, i)| *i == first) {
             return let_value(fx, out, Value::Field(t, first), None);
@@ -2532,7 +2082,7 @@ impl<'a> Lowerer<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn binary_task(
+    fn binary(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
@@ -2541,36 +2091,22 @@ impl<'a> Lowerer<'a> {
         lhs: &Expr,
         rhs: &Expr,
         tail: bool,
-        __s: Scheduler,
     ) -> Option<Atom> {
         if op == BinOp::Pipe {
             // `a |> f` is `f(a)`, and `a |> f(b)` is `f(a, b)` (§6.9).
             return match &rhs.kind {
                 ExprKind::Call { callee, args } => {
                     let args: Vec<&Expr> = args.iter().map(|a| &a.value).collect();
-                    unsafe {
-                        __s.call(|__child| {
-                            self.call_task(fx, out, e.span, callee, Some(lhs), &args, tail, __child)
-                        })
-                    }
-                    .await
+                    self.call(fx, out, e.span, callee, Some(lhs), &args, tail)
                 }
-                _ => {
-                    unsafe {
-                        __s.call(|__child| {
-                            self.call_task(fx, out, e.span, rhs, Some(lhs), &[], tail, __child)
-                        })
-                    }
-                    .await
-                }
+                _ => self.call(fx, out, e.span, rhs, Some(lhs), &[], tail),
             };
         }
         if matches!(op, BinOp::And | BinOp::Or) && tail {
             // The right side is in tail position (§11.6).
-            let a = unsafe { __s.call(|__child| self.expr_task(fx, out, lhs, __child)) }.await;
+            let a = self.expr(fx, out, lhs);
             let mut right = Vec::new();
-            unsafe { __s.call(|__child| self.lower_task(fx, &mut right, rhs, true, __child)) }
-                .await;
+            self.lower(fx, &mut right, rhs, true);
             let short = vec![Stmt::Return(Atom::Bool(op == BinOp::Or))];
             let (then, otherwise) = if op == BinOp::And {
                 (right, short)
@@ -2586,11 +2122,10 @@ impl<'a> Lowerer<'a> {
         }
         if matches!(op, BinOp::And | BinOp::Or) {
             // The right side is only worked out when the left is not enough.
-            let a = unsafe { __s.call(|__child| self.expr_task(fx, out, lhs, __child)) }.await;
+            let a = self.expr(fx, out, lhs);
             let dst = fx.local(LocalType::Value);
             let mut right = Vec::new();
-            let b =
-                unsafe { __s.call(|__child| self.expr_task(fx, &mut right, rhs, __child)) }.await;
+            let b = self.expr(fx, &mut right, rhs);
             right.push(Stmt::Let {
                 dst,
                 value: Value::Atom(b),
@@ -2613,8 +2148,8 @@ impl<'a> Lowerer<'a> {
             });
             return finish(out, tail, Atom::Local(dst));
         }
-        let a = unsafe { __s.call(|__child| self.expr_task(fx, out, lhs, __child)) }.await;
-        let b = unsafe { __s.call(|__child| self.expr_task(fx, out, rhs, __child)) }.await;
+        let a = self.expr(fx, out, lhs);
+        let b = self.expr(fx, out, rhs);
         let o = match op {
             BinOp::Eq => Op::Equal,
             BinOp::NotEq => Op::NotEqual,
@@ -2648,18 +2183,12 @@ impl<'a> Lowerer<'a> {
     }
 
     /// What a callee is, worked out when it is a value.
-    async fn target_task(
-        &mut self,
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-        callee: &Expr,
-        __s: Scheduler,
-    ) -> Target {
+    fn target(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, callee: &Expr) -> Target {
         match &callee.kind {
             ExprKind::Name(ValueRef::Def(d)) => match self.program.def(*d).kind {
                 // §10.1: a call of an external function is done when it is
                 // reached, like all calls.
-                DefKind::External { .. } if !self.runtime_external(*d) => {
+                DefKind::External { .. } if !self.is_library(d.module) => {
                     match self.external_func(*d) {
                         Some(f) => Target::Callee(Callee::Direct(f)),
                         None => Target::Op(Op::Panic),
@@ -2680,9 +2209,7 @@ impl<'a> Lowerer<'a> {
                 }
             },
             ExprKind::Name(ValueRef::Ctor(c)) => Target::Ctor(*c),
-            _ => Target::Callee(Callee::Value(
-                unsafe { __s.call(|__child| self.expr_task(fx, out, callee, __child)) }.await,
-            )),
+            _ => Target::Callee(Callee::Value(self.expr(fx, out, callee))),
         }
     }
 
@@ -2690,7 +2217,7 @@ impl<'a> Lowerer<'a> {
     /// worked out first, then the arguments as they are written (§6.2); for
     /// `|>`, `a` comes before both.
     #[allow(clippy::too_many_arguments)]
-    async fn call_task(
+    fn call(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
@@ -2699,16 +2226,14 @@ impl<'a> Lowerer<'a> {
         first: Option<&Expr>,
         args: &[&Expr],
         tail: bool,
-        __s: Scheduler,
     ) -> Option<Atom> {
         let mut written = Vec::new();
         if let Some(a) = first {
-            written.push(unsafe { __s.call(|__child| self.expr_task(fx, out, a, __child)) }.await);
+            written.push(self.expr(fx, out, a));
         }
-        let target =
-            unsafe { __s.call(|__child| self.target_task(fx, out, callee, __child)) }.await;
+        let target = self.target(fx, out, callee);
         for a in args {
-            written.push(unsafe { __s.call(|__child| self.expr_task(fx, out, a, __child)) }.await);
+            written.push(self.expr(fx, out, a));
         }
         let args: Vec<Atom> = match self.typed.args.get(&(fx.module, span)) {
             Some(order) if order.len() == written.len() => {
@@ -2777,17 +2302,16 @@ impl<'a> Lowerer<'a> {
 
     // ---- Bit arrays (§8.3) ----
 
-    async fn bit_array_task(
+    fn bit_array(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
         e: &Expr,
         segs: &[Segment<Expr>],
-        __s: Scheduler,
     ) -> Atom {
         let mut acc: Option<Atom> = None;
         for s in segs {
-            let v = unsafe { __s.call(|__child| self.expr_task(fx, out, &s.value, __child)) }.await;
+            let v = self.expr(fx, out, &s.value);
             let fmt = format(s.format.as_ref());
             let piece = match fmt {
                 Some(Fmt::Int {
@@ -2809,8 +2333,7 @@ impl<'a> Lowerer<'a> {
                     little,
                     ..
                 }) => {
-                    let n =
-                        unsafe { __s.call(|__child| self.expr_task(fx, out, x, __child)) }.await;
+                    let n = self.expr(fx, out, x);
                     let site = self.site(fx, e.span.start);
                     let w = let_num(fx, out, NumValue::LengthOf(n, 1), site);
                     let_value(
@@ -2844,8 +2367,7 @@ impl<'a> Lowerer<'a> {
                     } else {
                         8
                     };
-                    let n =
-                        unsafe { __s.call(|__child| self.expr_task(fx, out, x, __child)) }.await;
+                    let n = self.expr(fx, out, x);
                     let site = self.site(fx, e.span.start);
                     let w = let_num(fx, out, NumValue::TakeLength(n, unit), site);
                     let_value(fx, out, Value::BitsTake(v, w), site)
@@ -2889,14 +2411,13 @@ impl<'a> Lowerer<'a> {
 
     // ---- case (§6.12) ----
 
-    async fn case_task(
+    fn case(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
         s: Atom,
         clauses: &[Clause],
         tail: bool,
-        __s: Scheduler,
     ) -> Option<Atom> {
         let end = fx.label();
         let dst = if tail {
@@ -2909,13 +2430,9 @@ impl<'a> Lowerer<'a> {
             let next = fx.label();
             let mut cb = Vec::new();
             if let [p] = c.patterns.as_slice() {
-                unsafe {
-                    __s.call(|__child| self.pattern_task(fx, &mut cb, p, s.clone(), next, __child))
-                }
-                .await;
+                self.pattern(fx, &mut cb, p, s.clone(), next);
                 if let Some(g) = &c.guard {
-                    let g = unsafe { __s.call(|__child| self.expr_task(fx, &mut cb, g, __child)) }
-                        .await;
+                    let g = self.expr(fx, &mut cb, g);
                     guard(&mut cb, Cond::True(g), next);
                 }
             } else {
@@ -2926,16 +2443,9 @@ impl<'a> Lowerer<'a> {
                 for p in &c.patterns {
                     let no = fx.label();
                     let mut pb = Vec::new();
-                    unsafe {
-                        __s.call(|__child| {
-                            self.pattern_task(fx, &mut pb, p, s.clone(), no, __child)
-                        })
-                    }
-                    .await;
+                    self.pattern(fx, &mut pb, p, s.clone(), no);
                     if let Some(g) = &c.guard {
-                        let g =
-                            unsafe { __s.call(|__child| self.expr_task(fx, &mut pb, g, __child)) }
-                                .await;
+                        let g = self.expr(fx, &mut pb, g);
                         guard(&mut pb, Cond::True(g), no);
                     }
                     pb.push(Stmt::Break(matched));
@@ -2950,10 +2460,7 @@ impl<'a> Lowerer<'a> {
                     body: mb,
                 });
             }
-            if let Some(a) =
-                unsafe { __s.call(|__child| self.lower_task(fx, &mut cb, &c.body, tail, __child)) }
-                    .await
-            {
+            if let Some(a) = self.lower(fx, &mut cb, &c.body, tail) {
                 cb.push(Stmt::Let {
                     dst: dst.expect("a value"),
                     value: Value::Atom(a),
@@ -3004,82 +2511,8 @@ impl<'a> Lowerer<'a> {
 
     /// Matches `v` with the pattern of a `case` clause, and leaves to `fail`
     /// when it does not match (§7.2).
-    async fn pattern_task(
-        &mut self,
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-        p: &Pattern,
-        v: Atom,
-        fail: Label,
-        __s: Scheduler,
-    ) {
+    fn pattern(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom, fail: Label) {
         match &p.kind {
-            PatternKind::Quote {
-                template,
-                functions,
-                captures,
-                ..
-            } => {
-                let template = unsafe {
-                    __s.call(|child| {
-                        self.pattern_call_task(
-                            fx,
-                            out,
-                            functions[0],
-                            p.span,
-                            vec![Atom::Int((*template).into())],
-                            child,
-                        )
-                    })
-                }
-                .await;
-                let result = unsafe {
-                    __s.call(|child| {
-                        self.pattern_call_task(
-                            fx,
-                            out,
-                            functions[1],
-                            p.span,
-                            vec![template, v],
-                            child,
-                        )
-                    })
-                }
-                .await;
-                let success = unsafe {
-                    __s.call(|child| {
-                        self.pattern_call_task(
-                            fx,
-                            out,
-                            functions[2],
-                            p.span,
-                            vec![result.clone()],
-                            child,
-                        )
-                    })
-                }
-                .await;
-                guard(out, Cond::True(success), fail);
-                for (index, (many, pattern)) in captures.iter().enumerate() {
-                    let value = unsafe {
-                        __s.call(|child| {
-                            self.pattern_call_task(
-                                fx,
-                                out,
-                                functions[if *many { 4 } else { 3 }],
-                                p.span,
-                                vec![result.clone(), Atom::Int(index.into())],
-                                child,
-                            )
-                        })
-                    }
-                    .await;
-                    unsafe {
-                        __s.call(|child| self.pattern_task(fx, out, pattern, value, fail, child))
-                    }
-                    .await;
-                }
-            }
             PatternKind::Var(b) => Self::bind_var(fx, out, b, v),
             PatternKind::Discard => {}
             PatternKind::Typed { binder, .. } => {
@@ -3097,10 +2530,7 @@ impl<'a> Lowerer<'a> {
             }
             PatternKind::Named { binder, pattern } => {
                 Self::bind_var(fx, out, binder, v.clone());
-                unsafe {
-                    __s.call(|__child| self.pattern_task(fx, out, pattern, v, fail, __child))
-                }
-                .await;
+                self.pattern(fx, out, pattern, v, fail);
             }
             PatternKind::Int { negative, value } => {
                 let mut n = BigInt::from(value.clone());
@@ -3136,20 +2566,14 @@ impl<'a> Lowerer<'a> {
                 guard(out, cond, fail);
                 for (arg, i) in self.fields_of(fx, p, args) {
                     let f = let_value(fx, out, Value::Field(v.clone(), i), None);
-                    unsafe {
-                        __s.call(|__child| self.pattern_task(fx, out, arg, f, fail, __child))
-                    }
-                    .await;
+                    self.pattern(fx, out, arg, f, fail);
                 }
             }
             PatternKind::Tuple(parts) => {
                 guard(out, Cond::Tuple(v.clone(), parts.len() as u32), fail);
                 for (i, part) in parts.iter().enumerate() {
                     let f = let_value(fx, out, Value::Field(v.clone(), i as u32), None);
-                    unsafe {
-                        __s.call(|__child| self.pattern_task(fx, out, part, f, fail, __child))
-                    }
-                    .await;
+                    self.pattern(fx, out, part, f, fail);
                 }
             }
             PatternKind::List { items, rest } => {
@@ -3158,10 +2582,7 @@ impl<'a> Lowerer<'a> {
                 for item in items {
                     guard(out, Cond::Not(Box::new(Cond::Empty(cur.clone()))), fail);
                     let h = let_value(fx, out, Value::ListHead(cur.clone()), None);
-                    unsafe {
-                        __s.call(|__child| self.pattern_task(fx, out, item, h, fail, __child))
-                    }
-                    .await;
+                    self.pattern(fx, out, item, h, fail);
                     cur = let_value(fx, out, Value::ListTail(cur), None);
                 }
                 match rest {
@@ -3170,41 +2591,9 @@ impl<'a> Lowerer<'a> {
                     Some(None) => {}
                 }
             }
-            PatternKind::BitArray(segs) => {
-                unsafe {
-                    __s.call(|__child| self.bits_pattern_task(fx, out, v, segs, fail, __child))
-                }
-                .await
-            }
+            PatternKind::BitArray(segs) => self.bits_pattern(fx, out, v, segs, fail),
             PatternKind::Error(_) => out.push(Stmt::Unreachable),
         }
-    }
-
-    async fn pattern_call_task(
-        &mut self,
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-        function: DefId,
-        span: Span,
-        args: Vec<Atom>,
-        __s: Scheduler,
-    ) -> Atom {
-        let callee = Expr {
-            kind: ExprKind::Name(ValueRef::Def(function)),
-            span,
-        };
-        let target = unsafe { __s.call(|child| self.target_task(fx, out, &callee, child)) }.await;
-        let value = match target {
-            Target::Callee(callee) => Value::Call {
-                callee,
-                args,
-                env: fx.env,
-            },
-            Target::Op(op) if op.needs_env() => Value::OpEnv(op, args, fx.env),
-            Target::Op(op) => Value::Op(op, args),
-            Target::Ctor(_) => unreachable!("quote service is a function"),
-        };
-        let_value(fx, out, value, self.site(fx, span.start))
     }
 
     /// The test of a type test `x: T` for one member of `T` (§7.1).
@@ -3232,60 +2621,54 @@ impl<'a> Lowerer<'a> {
     }
 
     fn head_cond(&self, v: Atom, h: Head) -> Cond {
-        let mut head = h;
-        loop {
-            match head {
-                Head::Tuple(n) => return Cond::Tuple(v, n),
-                Head::Fn => return Cond::Tag(v, 7),
-                Head::Named(TypeRef::Builtin(b)) => {
-                    return Cond::Tag(
-                        v,
-                        match b {
-                            BuiltinType::Int => 8,
-                            BuiltinType::Float => 2,
-                            BuiltinType::String => 3,
-                            BuiltinType::List => 6,
-                            BuiltinType::BitArray => 9,
-                            BuiltinType::UtfCodepoint => 13,
-                            BuiltinType::Boundary => 11,
-                            BuiltinType::Continuation => 12,
-                            BuiltinType::Key => 15,
-                            BuiltinType::Keyed => 16,
-                            BuiltinType::Request => 17,
-                            BuiltinType::Ticket => 18,
-                            BuiltinType::Never => u32::MAX,
-                        },
-                    );
-                }
-                Head::Named(TypeRef::Custom(t)) => match self.types.get(&t) {
-                    Some(TypeRepr::Bool) => return Cond::Tag(v, 1),
-                    Some(TypeRepr::Nil) => return Cond::Tag(v, 0),
-                    Some(TypeRepr::Record(id)) => return Cond::Type(v, *id),
-                    Some(TypeRepr::Host) => return Cond::Tag(v, 10),
-                    None => match &self.program.ty(t).body {
-                        TypeBody::Alias(Type {
-                            kind: TypeKind::Named { ty, .. },
-                            ..
-                        }) => {
-                            head = Head::Named(*ty);
-                        }
-                        _ => return Cond::Tag(v, u32::MAX),
-                    },
+        match h {
+            Head::Record => Cond::IsRec(v),
+            Head::Tuple(n) => Cond::Tuple(v, n),
+            Head::Fn => Cond::Tag(v, 7),
+            Head::Named(TypeRef::Builtin(b)) => Cond::Tag(
+                v,
+                match b {
+                    BuiltinType::Int => 8,
+                    BuiltinType::Float => 2,
+                    BuiltinType::String => 3,
+                    BuiltinType::List => 6,
+                    BuiltinType::BitArray => 9,
+                    BuiltinType::UtfCodepoint => 13,
+                    BuiltinType::Boundary => 11,
+                    BuiltinType::Continuation => 12,
+                    BuiltinType::Key => 15,
+                    BuiltinType::Keyed => 16,
+                    BuiltinType::Request => 17,
+                    BuiltinType::Ticket => 18,
+                    BuiltinType::Never => u32::MAX,
+                    BuiltinType::Record => unreachable!("Record is normalized to the record head"),
                 },
-            }
+            ),
+            Head::Named(TypeRef::Custom(t)) => match self.types.get(&t) {
+                Some(TypeRepr::Bool) => Cond::Tag(v, 1),
+                Some(TypeRepr::Nil) => Cond::Tag(v, 0),
+                Some(TypeRepr::Record(id)) => Cond::Type(v, *id),
+                Some(TypeRepr::Host) => Cond::Tag(v, 10),
+                None => match &self.program.ty(t).body {
+                    TypeBody::Alias(Type {
+                        kind: TypeKind::Named { ty, .. },
+                        ..
+                    }) => self.head_cond(v, Head::Named(*ty)),
+                    _ => Cond::Tag(v, u32::MAX),
+                },
+            },
         }
     }
 
     /// §8.4: the segments are matched from the start, and all the bits must
     /// be used.
-    async fn bits_pattern_task(
+    fn bits_pattern(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
         v: Atom,
         segs: &[Segment<Pattern>],
         fail: Label,
-        __s: Scheduler,
     ) {
         guard(out, Cond::Tag(v.clone(), 9), fail);
         let total = let_num(fx, out, NumValue::BitsLength(v.clone()), None);
@@ -3300,14 +2683,7 @@ impl<'a> Lowerer<'a> {
                 }) => {
                     let w = match width {
                         Width::Const(n) => Num::Const(n as i64),
-                        Width::Dyn(x) => {
-                            unsafe {
-                                __s.call(|__child| {
-                                    self.pattern_width_task(fx, out, x, 1, fail, __child)
-                                })
-                            }
-                            .await
-                        }
+                        Width::Dyn(x) => self.pattern_width(fx, out, x, 1, fail),
                     };
                     guard(out, Cond::BitsHas(v.clone(), pos.clone(), w.clone()), fail);
                     let x = let_value(
@@ -3322,10 +2698,7 @@ impl<'a> Lowerer<'a> {
                         },
                         None,
                     );
-                    unsafe {
-                        __s.call(|__child| self.pattern_task(fx, out, &s.value, x, fail, __child))
-                    }
-                    .await;
+                    self.pattern(fx, out, &s.value, x, fail);
                     pos = let_num(fx, out, NumValue::Add(pos, w), None);
                 }
                 Some(Fmt::Float { width, little }) => {
@@ -3350,10 +2723,7 @@ impl<'a> Lowerer<'a> {
                         },
                         None,
                     );
-                    unsafe {
-                        __s.call(|__child| self.pattern_task(fx, out, &s.value, x, fail, __child))
-                    }
-                    .await;
+                    self.pattern(fx, out, &s.value, x, fail);
                     pos = let_num(fx, out, NumValue::Add(pos, Num::Const(width as i64)), None);
                 }
                 Some(Fmt::Bits(None)) | Some(Fmt::Bytes(None)) => {
@@ -3371,10 +2741,7 @@ impl<'a> Lowerer<'a> {
                         },
                         None,
                     );
-                    unsafe {
-                        __s.call(|__child| self.pattern_task(fx, out, &s.value, x, fail, __child))
-                    }
-                    .await;
+                    self.pattern(fx, out, &s.value, x, fail);
                     pos = total.clone();
                 }
                 Some(Fmt::Bits(Some(n))) | Some(Fmt::Bytes(Some(n))) => {
@@ -3383,10 +2750,7 @@ impl<'a> Lowerer<'a> {
                     } else {
                         8
                     };
-                    let w = unsafe {
-                        __s.call(|__child| self.pattern_width_task(fx, out, n, unit, fail, __child))
-                    }
-                    .await;
+                    let w = self.pattern_width(fx, out, n, unit, fail);
                     guard(out, Cond::BitsHas(v.clone(), pos.clone(), w.clone()), fail);
                     let x = let_value(
                         fx,
@@ -3398,10 +2762,7 @@ impl<'a> Lowerer<'a> {
                         },
                         None,
                     );
-                    unsafe {
-                        __s.call(|__child| self.pattern_task(fx, out, &s.value, x, fail, __child))
-                    }
-                    .await;
+                    self.pattern(fx, out, &s.value, x, fail);
                     pos = let_num(fx, out, NumValue::Add(pos, w), None);
                 }
                 Some(Fmt::Utf {
@@ -3461,12 +2822,7 @@ impl<'a> Lowerer<'a> {
                         little,
                     });
                     guard(out, Cond::I32(ok), fail);
-                    unsafe {
-                        __s.call(|__child| {
-                            self.pattern_task(fx, out, &s.value, Atom::Local(cp), fail, __child)
-                        })
-                    }
-                    .await;
+                    self.pattern(fx, out, &s.value, Atom::Local(cp), fail);
                     pos = let_num(fx, out, NumValue::Add(pos, Num::Local(width)), None);
                 }
                 None => out.push(Stmt::Unreachable),
@@ -3477,16 +2833,15 @@ impl<'a> Lowerer<'a> {
 
     /// The width of a segment of a pattern with a length; a length that is
     /// negative does not match.
-    async fn pattern_width_task(
+    fn pattern_width(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
         n: &Expr,
         unit: u32,
         fail: Label,
-        __s: Scheduler,
     ) -> Num {
-        let n = unsafe { __s.call(|__child| self.expr_task(fx, out, n, __child)) }.await;
+        let n = self.expr(fx, out, n);
         let w = let_num(fx, out, NumValue::WidthOf(n, unit), None);
         guard(
             out,
@@ -3514,42 +2869,27 @@ impl<'a> Lowerer<'a> {
     /// Whether `bind` takes the pattern: it has no test at all, given the
     /// type of its value.
     fn plain(&self, p: &Pattern) -> bool {
-        let mut pending = vec![p];
-        while let Some(p) = pending.pop() {
-            match &p.kind {
-                PatternKind::Var(_) | PatternKind::Discard | PatternKind::Typed { .. } => {}
-                PatternKind::Named { pattern, .. } => pending.push(pattern),
-                PatternKind::Tuple(parts) => pending.extend(parts),
-                PatternKind::Constructor { ctor, args, .. } => {
-                    if !matches!(&self.program.ty(ctor.ty).body, TypeBody::Custom(cs) if cs.len() == 1)
-                    {
-                        return false;
-                    }
-                    pending.extend(args);
-                }
-                PatternKind::List {
-                    items,
-                    rest: Some(_),
-                } if items.is_empty() => {}
-                _ => return false,
+        match &p.kind {
+            PatternKind::Var(_) | PatternKind::Discard | PatternKind::Typed { .. } => true,
+            PatternKind::Named { pattern, .. } => self.plain(pattern),
+            PatternKind::Tuple(parts) => parts.iter().all(|x| self.plain(x)),
+            PatternKind::Constructor { ctor, args, .. } => {
+                matches!(&self.program.ty(ctor.ty).body, TypeBody::Custom(cs) if cs.len() == 1)
+                    && args.iter().all(|x| self.plain(x))
             }
+            PatternKind::List {
+                items,
+                rest: Some(_),
+            } => items.is_empty(),
+            _ => false,
         }
-        true
     }
 
     /// Binds the pattern of a binding or a parameter (§6.10, §6.11). When
     /// it may fail, a value that does not match is reported to `Assert`:
     /// `a.fail(AssertionFailure(m))`, with the message of §6.10 and the
     /// position `at` on the shadow stack.
-    async fn bind_checked_task(
-        &mut self,
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-        p: &Pattern,
-        v: Atom,
-        at: u32,
-        __s: Scheduler,
-    ) {
+    fn bind_checked(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom, at: u32) {
         let fails = self
             .typed
             .may_fail
@@ -3557,16 +2897,13 @@ impl<'a> Lowerer<'a> {
             .copied()
             .unwrap_or(false);
         if !fails && self.plain(p) {
-            unsafe { __s.call(|__child| self.bind_task(fx, out, p, v, __child)) }.await;
+            self.bind(fx, out, p, v);
             return;
         }
         let ok = fx.label();
         let no = fx.label();
         let mut matching = Vec::new();
-        unsafe {
-            __s.call(|__child| self.pattern_task(fx, &mut matching, p, v.clone(), no, __child))
-        }
-        .await;
+        self.pattern(fx, &mut matching, p, v.clone(), no);
         matching.push(Stmt::Break(ok));
         let mut body = vec![Stmt::Block {
             label: no,
@@ -3635,14 +2972,7 @@ impl<'a> Lowerer<'a> {
     }
 
     /// Binds a pattern that `plain` takes.
-    async fn bind_task(
-        &mut self,
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-        p: &Pattern,
-        v: Atom,
-        __s: Scheduler,
-    ) {
+    fn bind(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom) {
         match &p.kind {
             PatternKind::Var(b) => Self::bind_var(fx, out, b, v),
             PatternKind::Discard => {}
@@ -3653,18 +2983,18 @@ impl<'a> Lowerer<'a> {
             }
             PatternKind::Named { binder, pattern } => {
                 Self::bind_var(fx, out, binder, v.clone());
-                unsafe { __s.call(|__child| self.bind_task(fx, out, pattern, v, __child)) }.await;
+                self.bind(fx, out, pattern, v);
             }
             PatternKind::Tuple(parts) => {
                 for (i, part) in parts.iter().enumerate() {
                     let f = let_value(fx, out, Value::Field(v.clone(), i as u32), None);
-                    unsafe { __s.call(|__child| self.bind_task(fx, out, part, f, __child)) }.await;
+                    self.bind(fx, out, part, f);
                 }
             }
             PatternKind::Constructor { args, .. } => {
                 for (arg, i) in self.fields_of(fx, p, args) {
                     let f = let_value(fx, out, Value::Field(v.clone(), i), None);
-                    unsafe { __s.call(|__child| self.bind_task(fx, out, arg, f, __child)) }.await;
+                    self.bind(fx, out, arg, f);
                 }
             }
             PatternKind::List {
@@ -3674,23 +3004,6 @@ impl<'a> Lowerer<'a> {
             PatternKind::List { .. } => {}
             _ => out.push(Stmt::Unreachable),
         }
-    }
-    fn function(
-        &mut self,
-        module: ModuleId,
-        f: &Function,
-        captures: &[VarId],
-        name: String,
-    ) -> Func {
-        lowering_stack::run(|s| self.function_task(module, f, captures, name, s))
-    }
-
-    fn expr(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, e: &Expr) -> Atom {
-        lowering_stack::run(|s| self.expr_task(fx, out, e, s))
-    }
-
-    fn bind_checked(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom, at: u32) {
-        lowering_stack::run(|s| self.bind_checked_task(fx, out, p, v, at, s))
     }
 }
 
@@ -3801,449 +3114,4 @@ fn abi_json(
         abi["target"] = target.name().into();
     }
     abi.to_string()
-}
-
-#[cfg(test)]
-mod deep_lower_tests {
-    use super::*;
-
-    fn context() -> (PackageGraph, hir::Program, Typed) {
-        (
-            PackageGraph {
-                sources: Default::default(),
-                packages: Vec::new(),
-                library: 0,
-                root: None,
-                entry: None,
-            },
-            hir::Program::default(),
-            Typed::default(),
-        )
-    }
-
-    #[test]
-    fn deep_expression_and_pattern_lowering_does_not_use_native_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let (graph, program, typed) = context();
-                let mut lowerer = Lowerer::new(&graph, &program, &typed, Options::default());
-                let span = Span::default();
-                let mut expr = Expr {
-                    kind: ExprKind::Float(1.0),
-                    span,
-                };
-                for _ in 0..10_000 {
-                    expr = Expr {
-                        kind: ExprKind::Unary {
-                            op: UnOp::NegFloat,
-                            expr: Box::new(expr),
-                        },
-                        span,
-                    };
-                }
-                let mut fx = Fx::new(ModuleId(0), true);
-                let mut output = Vec::new();
-                let value = lowerer.expr(&mut fx, &mut output, &expr);
-                assert!(matches!(value, Atom::Local(_)));
-                assert_eq!(output.len(), 9_999);
-                drop(expr);
-
-                let mut pattern = Pattern {
-                    kind: PatternKind::Discard,
-                    span,
-                };
-                for _ in 0..10_000 {
-                    pattern = Pattern {
-                        kind: PatternKind::Tuple(vec![pattern]),
-                        span,
-                    };
-                }
-                let mut fx = Fx::new(ModuleId(0), true);
-                let mut output = Vec::new();
-                lowerer.bind_checked(&mut fx, &mut output, &pattern, Atom::Nil, 0);
-                assert_eq!(output.len(), 10_000);
-                drop(pattern);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-    #[test]
-    fn mixed_deep_call_block_and_unary_keeps_written_order() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let (graph, program, typed) = context();
-                let mut lowerer = Lowerer::new(&graph, &program, &typed, Options::default());
-                let span = Span::default();
-                let mut expr = Expr {
-                    kind: ExprKind::Int(1u32.into()),
-                    span,
-                };
-                for i in 0..10_000 {
-                    expr = Expr {
-                        span,
-                        kind: match i % 3 {
-                            0 => ExprKind::Unary {
-                                op: UnOp::Neg,
-                                expr: Box::new(expr),
-                            },
-                            1 => ExprKind::Call {
-                                callee: Box::new(Expr {
-                                    span,
-                                    kind: ExprKind::Name(ValueRef::Local(VarId(0))),
-                                }),
-                                args: vec![Arg {
-                                    label: None,
-                                    value: expr,
-                                }],
-                            },
-                            _ => ExprKind::Block(Block {
-                                span,
-                                stmts: vec![hir::Stmt::Expr(expr)],
-                            }),
-                        },
-                    };
-                }
-                let mut fx = Fx::new(ModuleId(0), true);
-                let mut output = Vec::new();
-                assert!(matches!(
-                    lowerer.expr(&mut fx, &mut output, &expr),
-                    Atom::Local(_)
-                ));
-                assert_eq!(output.len(), 6_666);
-                drop(expr);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-    #[test]
-    fn pipe_evaluates_left_then_callee_then_written_arguments() {
-        let (graph, program, typed) = context();
-        let mut lowerer = Lowerer::new(&graph, &program, &typed, Options::default());
-        let span = Span::default();
-        let local = |n| Expr {
-            span,
-            kind: ExprKind::Name(ValueRef::Local(VarId(n))),
-        };
-        let negate = |value| Expr {
-            span,
-            kind: ExprKind::Unary {
-                op: UnOp::Neg,
-                expr: Box::new(value),
-            },
-        };
-        let expr = Expr {
-            span,
-            kind: ExprKind::Binary {
-                op: BinOp::Pipe,
-                lhs: Box::new(negate(local(0))),
-                rhs: Box::new(Expr {
-                    span,
-                    kind: ExprKind::Call {
-                        callee: Box::new(local(1)),
-                        args: vec![Arg {
-                            label: None,
-                            value: negate(local(2)),
-                        }],
-                    },
-                }),
-            },
-        };
-        let mut fx = Fx::new(ModuleId(0), true);
-        let mut output = Vec::new();
-        lowerer.expr(&mut fx, &mut output, &expr);
-        assert!(
-            matches!(&output[0], Stmt::Let { dst: 1, value: Value::Op(Op::IntNeg, values), .. } if values == &[Atom::Local(0)])
-        );
-        assert!(
-            matches!(&output[1], Stmt::Let { dst: 4, value: Value::Op(Op::IntNeg, values), .. } if values == &[Atom::Local(3)])
-        );
-        assert!(
-            matches!(&output[2], Stmt::Let { value: Value::Call { callee: Callee::Value(Atom::Local(2)), args, env: Env::Param }, .. } if args == &[Atom::Local(1), Atom::Local(4)])
-        );
-    }
-    #[test]
-    fn deeply_nested_cases_lower_and_release_their_ir_on_a_small_stack() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let (graph, program, typed) = context();
-                let mut lowerer = Lowerer::new(&graph, &program, &typed, Options::default());
-                let span = Span::default();
-                let mut expr = Expr {
-                    kind: ExprKind::Int(0u32.into()),
-                    span,
-                };
-                for _ in 0..10_000 {
-                    expr = Expr {
-                        span,
-                        kind: ExprKind::Case {
-                            subject: Box::new(Expr {
-                                span,
-                                kind: ExprKind::Int(1u32.into()),
-                            }),
-                            clauses: vec![Clause {
-                                span,
-                                patterns: vec![Pattern {
-                                    span,
-                                    kind: PatternKind::Discard,
-                                }],
-                                guard: None,
-                                body: expr,
-                            }],
-                        },
-                    };
-                }
-                let mut fx = Fx::new(ModuleId(0), true);
-                let mut output = Vec::new();
-                assert!(matches!(
-                    lowerer.expr(&mut fx, &mut output, &expr),
-                    Atom::Local(_)
-                ));
-                let mut body = output.as_slice();
-                for _ in 0..10_000 {
-                    let Stmt::Block { body: outer, .. } = &body[0] else {
-                        panic!("expected case block")
-                    };
-                    let Stmt::Block { body: clause, .. } = &outer[0] else {
-                        panic!("expected clause block")
-                    };
-                    body = clause;
-                }
-                assert!(matches!(
-                    &body[0],
-                    Stmt::Let {
-                        value: Value::Atom(Atom::Int(_)),
-                        ..
-                    }
-                ));
-                drop(output);
-                drop(expr);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-}
-
-#[cfg(test)]
-mod deep_source_tests {
-    use super::*;
-
-    #[test]
-    fn quote_capture_scans_handle_deep_patterns() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let span = Span::default();
-                let mut p = Pattern {
-                    kind: PatternKind::Var(Binder {
-                        var: VarId(9),
-                        name: "capture".into(),
-                        span,
-                    }),
-                    span,
-                };
-                let function = DefId {
-                    module: ModuleId(0),
-                    index: 0,
-                };
-                for _ in 0..10_000 {
-                    p = Pattern {
-                        kind: PatternKind::Quote {
-                            template: 0,
-                            syntax: TypeId(0),
-                            functions: [function; 5],
-                            captures: vec![(false, p)],
-                        },
-                        span,
-                    };
-                }
-                assert_eq!(pattern_values(&p), 10_001);
-                let mut walk = Walk::default();
-                walk.pattern(&p);
-                assert_eq!(walk.bound, HashSet::from([VarId(9)]));
-                drop(p);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn source_measure_and_capture_walk_handle_deep_trees() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let span = Span::new(0, 1);
-                let mut e = Expr {
-                    kind: ExprKind::Name(ValueRef::Local(VarId(42))),
-                    span,
-                };
-                let mut p = Pattern {
-                    kind: PatternKind::Var(Binder {
-                        var: VarId(7),
-                        name: "x".into(),
-                        span,
-                    }),
-                    span,
-                };
-                for _ in 0..10_000 {
-                    e = Expr {
-                        kind: ExprKind::Tuple(vec![e]),
-                        span,
-                    };
-                    p = Pattern {
-                        kind: PatternKind::Tuple(vec![p]),
-                        span,
-                    };
-                }
-                assert_eq!(expression_values(&e), 1);
-                assert_eq!(pattern_values(&p), 10_001);
-                let mut w = Walk::default();
-                w.run(WalkNode::Expr(&e));
-                w.pattern(&p);
-                assert_eq!(w.used.into_iter().collect::<Vec<_>>(), [VarId(42)]);
-                assert_eq!(w.bound, HashSet::from([VarId(7)]));
-                drop(e);
-                drop(p);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn iterative_source_measure_agrees_with_shallow_reference() {
-        fn pending(xs: &[&Expr]) -> usize {
-            xs.iter()
-                .enumerate()
-                .fold(xs.len().max(1), |peak, (i, e)| peak.max(i + reference(e)))
-        }
-        fn reference(e: &Expr) -> usize {
-            match &e.kind {
-                ExprKind::Int(_) => 1,
-                ExprKind::Tuple(xs) => pending(&xs.iter().collect::<Vec<_>>()),
-                ExprKind::List { items, rest } => {
-                    pending(&items.iter().chain(rest.as_deref()).collect::<Vec<_>>())
-                }
-                ExprKind::Binary { lhs, rhs, .. } => pending(&[lhs, rhs]),
-                ExprKind::Block(b) => b
-                    .stmts
-                    .iter()
-                    .map(|s| match s {
-                        hir::Stmt::Expr(e) => reference(e),
-                        _ => unreachable!(),
-                    })
-                    .max()
-                    .unwrap_or(1),
-                ExprKind::Case { subject, clauses } => reference(subject).max(
-                    1 + clauses
-                        .iter()
-                        .map(|c| {
-                            c.patterns
-                                .iter()
-                                .map(ref_pattern)
-                                .max()
-                                .unwrap_or(1)
-                                .max(c.guard.as_ref().map_or(1, reference))
-                                .max(reference(&c.body))
-                        })
-                        .max()
-                        .unwrap_or(1),
-                ),
-                _ => unreachable!(),
-            }
-        }
-        fn ref_pattern(p: &Pattern) -> usize {
-            match &p.kind {
-                PatternKind::Discard => 1,
-                PatternKind::Tuple(xs) => 1 + xs.iter().map(ref_pattern).sum::<usize>(),
-                _ => unreachable!(),
-            }
-        }
-        fn generate(seed: u32, depth: u32, span: Span) -> Expr {
-            if depth == 0 {
-                return Expr {
-                    kind: ExprKind::Int(seed.into()),
-                    span,
-                };
-            }
-            let child = |n| generate(seed.wrapping_mul(17).wrapping_add(n), depth - 1, span);
-            let kind = match seed % 5 {
-                0 => ExprKind::Tuple(vec![child(1), child(2), child(3)]),
-                1 => ExprKind::List {
-                    items: vec![child(1), child(2)],
-                    rest: Some(Box::new(child(3))),
-                },
-                2 => ExprKind::Binary {
-                    op: BinOp::Add,
-                    lhs: Box::new(child(1)),
-                    rhs: Box::new(child(2)),
-                },
-                3 => ExprKind::Block(Block {
-                    stmts: vec![hir::Stmt::Expr(child(1)), hir::Stmt::Expr(child(2))],
-                    span,
-                }),
-                _ => ExprKind::Case {
-                    subject: Box::new(child(1)),
-                    clauses: vec![Clause {
-                        patterns: vec![Pattern {
-                            kind: PatternKind::Tuple(vec![Pattern {
-                                kind: PatternKind::Discard,
-                                span,
-                            }]),
-                            span,
-                        }],
-                        guard: Some(child(2)),
-                        body: child(3),
-                        span,
-                    }],
-                },
-            };
-            Expr { kind, span }
-        }
-        for seed in 0..128 {
-            let e = generate(seed, 4, Span::new(0, 1));
-            assert_eq!(expression_values(&e), reference(&e), "seed {seed}");
-        }
-    }
-
-    #[test]
-    fn source_measure_counts_pending_arguments_and_alternatives() {
-        let span = Span::new(0, 1);
-        let int = || Expr {
-            kind: ExprKind::Int(0u32.into()),
-            span,
-        };
-        let nested = Expr {
-            kind: ExprKind::Tuple(vec![int(), int(), int()]),
-            span,
-        };
-        let e = Expr {
-            kind: ExprKind::Tuple(vec![int(), nested, int()]),
-            span,
-        };
-        assert_eq!(expression_values(&e), 4);
-        let p = Pattern {
-            kind: PatternKind::Tuple(vec![
-                Pattern {
-                    kind: PatternKind::Discard,
-                    span,
-                },
-                Pattern {
-                    kind: PatternKind::Tuple(vec![Pattern {
-                        kind: PatternKind::Discard,
-                        span,
-                    }]),
-                    span,
-                },
-            ]),
-            span,
-        };
-        assert_eq!(pattern_values(&p), 4);
-    }
 }

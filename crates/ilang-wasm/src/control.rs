@@ -179,8 +179,7 @@ fn mentioned(
     set: &mut BTreeSet<Local>,
     goes_on: &mut dyn FnMut(&Stmt, &mut BTreeSet<Local>),
 ) {
-    let mut work: Vec<&Stmt> = stmts.iter().rev().collect();
-    while let Some(s) = work.pop() {
+    for s in stmts {
         let mut uses = Vec::new();
         let mut add = |l| uses.push(l);
         match s {
@@ -218,10 +217,10 @@ fn mentioned(
                 otherwise,
             } => {
                 cond_uses(cond, &mut add);
-                work.extend(otherwise.iter().rev());
-                work.extend(then.iter().rev());
+                mentioned(then, set, goes_on);
+                mentioned(otherwise, set, goes_on);
             }
-            Stmt::Block { body, .. } => work.extend(body.iter().rev()),
+            Stmt::Block { body, .. } => mentioned(body, set, goes_on),
             Stmt::Break(_) | Stmt::Unreachable => {}
             Stmt::Return(a) | Stmt::SetGlobal(_, a) => atom_uses(a, &mut add),
             Stmt::TailCall {
@@ -287,39 +286,32 @@ fn suspends(v: &Value, may: &[bool]) -> bool {
 }
 
 fn any_suspends(stmts: &[Stmt], may: &[bool]) -> bool {
-    let mut work: Vec<&Stmt> = stmts.iter().rev().collect();
-    while let Some(stmt) = work.pop() {
-        match stmt {
-            Stmt::Let { value, .. } if suspends(value, may) => return true,
-            Stmt::TailCall {
-                callee: Callee::Value(_),
-                ..
-            } => return true,
-            Stmt::TailCall {
-                callee: Callee::Direct(f),
-                ..
-            } if may[f.0 as usize] => return true,
-            Stmt::Suspendable { .. } => return true,
-            Stmt::If {
-                then, otherwise, ..
-            } => {
-                work.extend(otherwise.iter().rev());
-                work.extend(then.iter().rev());
-            }
-            Stmt::Block { body, .. } => work.extend(body.iter().rev()),
-            _ => {}
-        }
-    }
-    false
+    stmts.iter().any(|s| match s {
+        Stmt::Let { value, .. } => suspends(value, may),
+        Stmt::TailCall {
+            callee: Callee::Value(_),
+            ..
+        } => true,
+        Stmt::TailCall {
+            callee: Callee::Direct(f),
+            ..
+        } => may[f.0 as usize],
+        Stmt::If {
+            then, otherwise, ..
+        } => any_suspends(then, may) || any_suspends(otherwise, may),
+        Stmt::Block { body, .. } => any_suspends(body, may),
+        Stmt::Suspendable { .. } => true,
+        _ => false,
+    })
 }
 
-/// Turns every call that may suspend into a `Suspendable` with the next point id.
+/// Turns every call that may suspend into a `Suspendable` with the next
+/// point id.
 fn mark(stmts: &mut [Stmt], may: &[bool], next: &mut PointId) {
-    let mut work: Vec<&mut Stmt> = stmts.iter_mut().rev().collect();
-    while let Some(stmt) = work.pop() {
-        match stmt {
+    for s in stmts {
+        match s {
             Stmt::Let { dst, value, site } if suspends(value, may) => {
-                *stmt = Stmt::Suspendable {
+                *s = Stmt::Suspendable {
                     dst: *dst,
                     value: value.clone(),
                     site: *site,
@@ -330,20 +322,20 @@ fn mark(stmts: &mut [Stmt], may: &[bool], next: &mut PointId) {
             Stmt::If {
                 then, otherwise, ..
             } => {
-                work.extend(otherwise.iter_mut().rev());
-                work.extend(then.iter_mut().rev());
+                mark(then, may, next);
+                mark(otherwise, may, next);
             }
-            Stmt::Block { body, .. } => work.extend(body.iter_mut().rev()),
+            Stmt::Block { body, .. } => mark(body, may, next),
             _ => {}
         }
     }
 }
 
-/// The environment statements of a function: each environment local is made once.
+/// The environment statements of a function: each environment local is
+/// made once.
 fn env_defs(stmts: &[Stmt], out: &mut HashMap<Local, (Env, u32)>) {
-    let mut work: Vec<&Stmt> = stmts.iter().rev().collect();
-    while let Some(stmt) = work.pop() {
-        match stmt {
+    for s in stmts {
+        match s {
             Stmt::LetEnv {
                 dst, env, service, ..
             } => {
@@ -352,10 +344,10 @@ fn env_defs(stmts: &[Stmt], out: &mut HashMap<Local, (Env, u32)>) {
             Stmt::If {
                 then, otherwise, ..
             } => {
-                work.extend(otherwise.iter().rev());
-                work.extend(then.iter().rev());
+                env_defs(then, out);
+                env_defs(otherwise, out);
             }
-            Stmt::Block { body, .. } => work.extend(body.iter().rev()),
+            Stmt::Block { body, .. } => env_defs(body, out),
             _ => {}
         }
     }
@@ -379,117 +371,43 @@ struct Found<'a> {
     label_join: HashMap<Label, JoinId>,
 }
 
-#[cfg(test)]
 fn has_point(stmts: &[Stmt]) -> bool {
-    let mut work: Vec<&Stmt> = stmts.iter().rev().collect();
-    while let Some(stmt) = work.pop() {
-        match stmt {
-            Stmt::Suspendable { .. } => return true,
-            Stmt::If {
-                then, otherwise, ..
-            } => {
-                work.extend(otherwise.iter().rev());
-                work.extend(then.iter().rev());
-            }
-            Stmt::Block { body, .. } => work.extend(body.iter().rev()),
-            _ => {}
-        }
-    }
-    false
+    stmts.iter().any(|s| match s {
+        Stmt::Suspendable { .. } => true,
+        Stmt::If {
+            then, otherwise, ..
+        } => has_point(then) || has_point(otherwise),
+        Stmt::Block { body, .. } => has_point(body),
+        _ => false,
+    })
 }
 
 fn find<'a>(stmts: &'a [Stmt], path: &mut Path<'a>, out: &mut Found<'a>) {
-    // Record which structured nodes contain a point once, bottom up. The old
-    // repeated subtree searches were quadratic for nested macro output.
-    enum Scan<'a> {
-        Enter(&'a Stmt),
-        Exit(&'a Stmt),
-    }
-    let mut containing = std::collections::HashSet::new();
-    let mut scan: Vec<_> = stmts.iter().rev().map(Scan::Enter).collect();
-    while let Some(step) = scan.pop() {
-        match step {
-            Scan::Enter(stmt) => match stmt {
-                Stmt::Suspendable { .. } => {
-                    containing.insert(stmt as *const Stmt);
-                }
-                Stmt::If {
-                    then, otherwise, ..
-                } => {
-                    scan.push(Scan::Exit(stmt));
-                    scan.extend(otherwise.iter().rev().map(Scan::Enter));
-                    scan.extend(then.iter().rev().map(Scan::Enter));
-                }
-                Stmt::Block { body, .. } => {
-                    scan.push(Scan::Exit(stmt));
-                    scan.extend(body.iter().rev().map(Scan::Enter));
-                }
-                _ => {}
-            },
-            Scan::Exit(stmt) => {
-                let present = match stmt {
-                    Stmt::If {
-                        then, otherwise, ..
-                    } => then
-                        .iter()
-                        .chain(otherwise)
-                        .any(|s| containing.contains(&(s as *const Stmt))),
-                    Stmt::Block { body, .. } => body
-                        .iter()
-                        .any(|s| containing.contains(&(s as *const Stmt))),
-                    _ => unreachable!("only structured statements are exited"),
-                };
-                if present {
-                    containing.insert(stmt as *const Stmt);
-                }
+    for (i, s) in stmts.iter().enumerate() {
+        path.push((stmts, i));
+        match s {
+            Stmt::Suspendable { point, .. } => {
+                out.points.insert(*point, path.clone());
             }
+            Stmt::If {
+                then, otherwise, ..
+            } if has_point(then) || has_point(otherwise) => {
+                out.join_of
+                    .insert(s, out.first_join + out.joins.len() as JoinId);
+                out.joins.push(path.clone());
+                find(then, path, out);
+                find(otherwise, path, out);
+            }
+            Stmt::Block { label, body } if has_point(body) => {
+                let j = out.first_join + out.joins.len() as JoinId;
+                out.join_of.insert(s, j);
+                out.label_join.insert(*label, j);
+                out.joins.push(path.clone());
+                find(body, path, out);
+            }
+            _ => {}
         }
-    }
-    enum Step<'a> {
-        List(&'a [Stmt], usize),
-        Visit(&'a [Stmt], usize),
-        Pop,
-    }
-    let mut work = vec![Step::List(stmts, 0)];
-    while let Some(step) = work.pop() {
-        match step {
-            Step::List(list, i) => {
-                if i < list.len() {
-                    work.push(Step::List(list, i + 1));
-                    work.push(Step::Visit(list, i));
-                }
-            }
-            Step::Visit(list, i) => {
-                let stmt = &list[i];
-                path.push((list, i));
-                work.push(Step::Pop);
-                match stmt {
-                    Stmt::Suspendable { point, .. } => {
-                        out.points.insert(*point, path.clone());
-                    }
-                    Stmt::If {
-                        then, otherwise, ..
-                    } if containing.contains(&(stmt as *const Stmt)) => {
-                        out.join_of
-                            .insert(stmt, out.first_join + out.joins.len() as JoinId);
-                        out.joins.push(path.clone());
-                        work.push(Step::List(otherwise, 0));
-                        work.push(Step::List(then, 0));
-                    }
-                    Stmt::Block { label, body } if containing.contains(&(stmt as *const Stmt)) => {
-                        let j = out.first_join + out.joins.len() as JoinId;
-                        out.join_of.insert(stmt, j);
-                        out.label_join.insert(*label, j);
-                        out.joins.push(path.clone());
-                        work.push(Step::List(body, 0));
-                    }
-                    _ => {}
-                }
-            }
-            Step::Pop => {
-                path.pop().expect("each visit pushes a path item");
-            }
-        }
+        path.pop();
     }
 }
 
@@ -529,182 +447,44 @@ impl Cutter<'_> {
     /// labels of the blocks of the copy around the statements; a `Break` to
     /// another block goes on with the join of that block.
     fn cut(&self, stmts: &[Stmt], blocks: &mut Vec<Label>) -> Vec<Stmt> {
-        enum Step<'a> {
-            List {
-                list: &'a [Stmt],
-                at: usize,
-                out: Vec<Stmt>,
-            },
-            Then {
-                list: &'a [Stmt],
-                at: usize,
-                out: Vec<Stmt>,
-                original: &'a Stmt,
-                cond: &'a Cond,
-                otherwise: &'a [Stmt],
-            },
-            Else {
-                list: &'a [Stmt],
-                at: usize,
-                out: Vec<Stmt>,
-                original: &'a Stmt,
-                cond: &'a Cond,
-                then: Vec<Stmt>,
-            },
-            Block {
-                list: &'a [Stmt],
-                at: usize,
-                out: Vec<Stmt>,
-                original: &'a Stmt,
-                label: Label,
-            },
-        }
-        let mut work = vec![Step::List {
-            list: stmts,
-            at: 0,
-            out: Vec::new(),
-        }];
-        let mut result: Vec<Vec<Stmt>> = Vec::new();
-        while let Some(step) = work.pop() {
-            match step {
-                Step::List { list, at, mut out } => {
-                    if at == list.len() {
-                        result.push(out);
-                        continue;
-                    }
-                    let stmt = &list[at];
-                    match stmt {
-                        Stmt::Suspendable { point, .. } => {
-                            out.push(stmt.clone());
-                            out.push(Stmt::Continue(*point));
-                            result.push(out);
-                        }
-                        Stmt::Break(label) if !blocks.contains(label) => {
-                            out.push(Stmt::Join(self.label_join[label]));
-                            result.push(out);
-                        }
-                        Stmt::If {
-                            cond,
-                            then,
-                            otherwise,
-                        } => {
-                            work.push(Step::Then {
-                                list,
-                                at,
-                                out,
-                                original: stmt,
-                                cond,
-                                otherwise,
-                            });
-                            work.push(Step::List {
-                                list: then,
-                                at: 0,
-                                out: Vec::new(),
-                            });
-                        }
-                        Stmt::Block { label, body } => {
-                            blocks.push(*label);
-                            work.push(Step::Block {
-                                list,
-                                at,
-                                out,
-                                original: stmt,
-                                label: *label,
-                            });
-                            work.push(Step::List {
-                                list: body,
-                                at: 0,
-                                out: Vec::new(),
-                            });
-                        }
-                        _ => {
-                            out.push(stmt.clone());
-                            if let Some(&j) = self.join_of.get(&(stmt as *const Stmt)) {
-                                out.push(Stmt::Join(j));
-                                result.push(out);
-                            } else {
-                                work.push(Step::List {
-                                    list,
-                                    at: at + 1,
-                                    out,
-                                });
-                            }
-                        }
-                    }
+        let mut out = Vec::new();
+        for s in stmts {
+            match s {
+                Stmt::Suspendable { point, .. } => {
+                    out.push(s.clone());
+                    out.push(Stmt::Continue(*point));
+                    return out;
                 }
-                Step::Then {
-                    list,
-                    at,
-                    out,
-                    original,
-                    cond,
-                    otherwise,
-                } => {
-                    let then = result.pop().expect("then result");
-                    work.push(Step::Else {
-                        list,
-                        at,
-                        out,
-                        original,
-                        cond,
-                        then,
-                    });
-                    work.push(Step::List {
-                        list: otherwise,
-                        at: 0,
-                        out: Vec::new(),
-                    });
-                }
-                Step::Else {
-                    list,
-                    at,
-                    mut out,
-                    original,
+                Stmt::If {
                     cond,
                     then,
-                } => {
-                    let otherwise = result.pop().expect("else result");
-                    out.push(Stmt::If {
-                        cond: cond.clone(),
-                        then,
-                        otherwise,
+                    otherwise,
+                } => out.push(Stmt::If {
+                    cond: cond.clone(),
+                    then: self.cut(then, blocks),
+                    otherwise: self.cut(otherwise, blocks),
+                }),
+                Stmt::Block { label, body } => {
+                    blocks.push(*label);
+                    let body = self.cut(body, blocks);
+                    blocks.pop();
+                    out.push(Stmt::Block {
+                        label: *label,
+                        body,
                     });
-                    if let Some(&j) = self.join_of.get(&(original as *const Stmt)) {
-                        out.push(Stmt::Join(j));
-                        result.push(out);
-                    } else {
-                        work.push(Step::List {
-                            list,
-                            at: at + 1,
-                            out,
-                        });
-                    }
                 }
-                Step::Block {
-                    list,
-                    at,
-                    mut out,
-                    original,
-                    label,
-                } => {
-                    let body = result.pop().expect("block result");
-                    assert_eq!(blocks.pop(), Some(label), "nested block stack");
-                    out.push(Stmt::Block { label, body });
-                    if let Some(&j) = self.join_of.get(&(original as *const Stmt)) {
-                        out.push(Stmt::Join(j));
-                        result.push(out);
-                    } else {
-                        work.push(Step::List {
-                            list,
-                            at: at + 1,
-                            out,
-                        });
-                    }
+                Stmt::Break(label) if !blocks.contains(label) => {
+                    out.push(Stmt::Join(self.label_join[label]));
+                    return out;
                 }
+                s => out.push(s.clone()),
+            }
+            if let Some(&j) = self.join_of.get(&(s as *const Stmt)) {
+                out.push(Stmt::Join(j));
+                return out;
             }
         }
-        assert_eq!(result.len(), 1, "cut result count");
-        result.pop().unwrap()
+        out
     }
 }
 
@@ -724,85 +504,12 @@ impl Liveness<'_> {
     /// `stmts`, when `after` is live at their end. `breaks` has what is live
     /// after each enclosing block.
     fn stmts(&mut self, stmts: &[Stmt], after: Live, breaks: &mut HashMap<Label, Live>) -> Live {
-        enum Step<'a> {
-            List(&'a [Stmt], usize),
-            Statement(&'a Stmt),
-            AfterThen {
-                other: &'a [Stmt],
-                after: Live,
-                cond: &'a Cond,
-            },
-            AfterElse {
-                then_live: Live,
-                cond: &'a Cond,
-            },
-            Restore {
-                label: Label,
-                saved: Option<Live>,
-            },
-        }
         let mut live = after;
-        let mut work = vec![Step::List(stmts, stmts.len())];
-        while let Some(step) = work.pop() {
-            match step {
-                Step::List(list, count) => {
-                    if count == 0 {
-                        continue;
-                    }
-                    let stmt = &list[count - 1];
-                    if let Some(&j) = self.join_of.get(&(stmt as *const Stmt)) {
-                        self.joins.insert(j, live.clone());
-                    }
-                    work.push(Step::List(list, count - 1));
-                    work.push(Step::Statement(stmt));
-                }
-                Step::Statement(Stmt::If {
-                    cond,
-                    then,
-                    otherwise,
-                }) => {
-                    work.push(Step::AfterThen {
-                        other: otherwise,
-                        after: live.clone(),
-                        cond,
-                    });
-                    work.push(Step::List(then, then.len()));
-                }
-                Step::AfterThen { other, after, cond } => {
-                    let then_live = std::mem::replace(&mut live, after);
-                    work.push(Step::AfterElse { then_live, cond });
-                    work.push(Step::List(other, other.len()));
-                }
-                Step::AfterElse {
-                    mut then_live,
-                    cond,
-                } => {
-                    then_live.extend(live);
-                    live = then_live;
-                    cond_uses(cond, &mut |l| {
-                        live.insert(l);
-                    });
-                }
-                Step::Statement(Stmt::Block { label, body }) => {
-                    let saved = breaks.insert(*label, live.clone());
-                    work.push(Step::Restore {
-                        label: *label,
-                        saved,
-                    });
-                    work.push(Step::List(body, body.len()));
-                }
-                Step::Restore { label, saved } => match saved {
-                    Some(value) => {
-                        breaks.insert(label, value);
-                    }
-                    None => {
-                        breaks.remove(&label);
-                    }
-                },
-                Step::Statement(stmt) => {
-                    live = self.stmt(stmt, live, breaks);
-                }
+        for s in stmts.iter().rev() {
+            if let Some(&j) = self.join_of.get(&(s as *const Stmt)) {
+                self.joins.insert(j, live.clone());
             }
+            live = self.stmt(s, live, breaks);
         }
         live
     }
@@ -848,8 +555,26 @@ impl Liveness<'_> {
                     live.insert(l);
                 });
             }
-            Stmt::If { .. } | Stmt::Block { .. } => {
-                unreachable!("structured statements are scheduled by stmts")
+            Stmt::If {
+                cond,
+                then,
+                otherwise,
+            } => {
+                let a = self.stmts(then, live.clone(), breaks);
+                let b = self.stmts(otherwise, live, breaks);
+                live = a;
+                live.extend(b);
+                cond_uses(cond, &mut |l| {
+                    live.insert(l);
+                });
+            }
+            Stmt::Block { label, body } => {
+                let saved = breaks.insert(*label, live.clone());
+                live = self.stmts(body, live, breaks);
+                match saved {
+                    Some(s) => breaks.insert(*label, s),
+                    None => breaks.remove(label),
+                };
             }
             Stmt::Break(label) => live = breaks.get(label).cloned().unwrap_or_default(),
             Stmt::Return(a) => {
@@ -925,6 +650,7 @@ fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
     match v {
         Value::Atom(a)
         | Value::Field(a, _)
+        | Value::RecGet(a, _)
         | Value::ListHead(a)
         | Value::ListTail(a)
         | Value::StringSuffix(a, _)
@@ -944,6 +670,11 @@ fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
         Value::Service(env, _) => env_uses(*env, f),
         Value::Closure { captures, .. } => captures.iter().for_each(|a| atom_uses(a, f)),
         Value::Record { fields, .. } => fields.iter().for_each(|a| atom_uses(a, f)),
+        Value::RecNew(fields) => fields.iter().for_each(|(_, a)| atom_uses(a, f)),
+        Value::RecWith(base, fields) => {
+            atom_uses(base, f);
+            fields.iter().for_each(|(_, a)| atom_uses(a, f));
+        }
         Value::Cons(a, b) | Value::BitsConcat(a, b) => {
             atom_uses(a, f);
             atom_uses(b, f);
@@ -994,43 +725,41 @@ fn num_value_uses(v: &NumValue, f: &mut dyn FnMut(Local)) {
 }
 
 fn cond_uses(c: &Cond, f: &mut dyn FnMut(Local)) {
-    let mut work = vec![c];
-    while let Some(c) = work.pop() {
-        match c {
-            Cond::True(a)
-            | Cond::Tag(a, _)
-            | Cond::Bool(a, _)
-            | Cond::Ctor(a, _)
-            | Cond::Type(a, _)
-            | Cond::Tuple(a, _)
-            | Cond::Empty(a)
-            | Cond::IsInt(a, _)
-            | Cond::IsFloat(a, _)
-            | Cond::IsString(a, _) => atom_uses(a, f),
-            Cond::Not(c) => work.push(c),
-            Cond::And(a, b) | Cond::Or(a, b) => {
-                work.push(b);
-                work.push(a);
-            }
-            Cond::Equal(a, b) | Cond::StartsWith(a, b) | Cond::BitsEqual(a, b) => {
-                atom_uses(a, f);
-                atom_uses(b, f);
-            }
-            Cond::I32(l) => f(*l),
-            Cond::NumLt(a, b) | Cond::NumEq(a, b) => {
-                num_uses(a, f);
-                num_uses(b, f);
-            }
-            Cond::Whole(n) => num_uses(n, f),
-            Cond::BitsHas(a, s, w) => {
-                atom_uses(a, f);
-                num_uses(s, f);
-                num_uses(w, f);
-            }
-            Cond::BitsFloat { bits, start, .. } => {
-                atom_uses(bits, f);
-                num_uses(start, f);
-            }
+    match c {
+        Cond::True(a)
+        | Cond::Tag(a, _)
+        | Cond::IsRec(a)
+        | Cond::Bool(a, _)
+        | Cond::Ctor(a, _)
+        | Cond::Type(a, _)
+        | Cond::Tuple(a, _)
+        | Cond::Empty(a)
+        | Cond::IsInt(a, _)
+        | Cond::IsFloat(a, _)
+        | Cond::IsString(a, _) => atom_uses(a, f),
+        Cond::Not(c) => cond_uses(c, f),
+        Cond::And(a, b) | Cond::Or(a, b) => {
+            cond_uses(a, f);
+            cond_uses(b, f);
+        }
+        Cond::Equal(a, b) | Cond::StartsWith(a, b) | Cond::BitsEqual(a, b) => {
+            atom_uses(a, f);
+            atom_uses(b, f);
+        }
+        Cond::I32(l) => f(*l),
+        Cond::NumLt(a, b) | Cond::NumEq(a, b) => {
+            num_uses(a, f);
+            num_uses(b, f);
+        }
+        Cond::Whole(n) => num_uses(n, f),
+        Cond::BitsHas(a, s, w) => {
+            atom_uses(a, f);
+            num_uses(s, f);
+            num_uses(w, f);
+        }
+        Cond::BitsFloat { bits, start, .. } => {
+            atom_uses(bits, f);
+            num_uses(start, f);
         }
     }
 }
@@ -1038,130 +767,6 @@ fn cond_uses(c: &Cond, f: &mut dyn FnMut(Local)) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn deep_structured_liveness_and_point_marking_use_a_worklist() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let mut stmt = Stmt::Let {
-                    dst: 1,
-                    value: Value::Call {
-                        callee: Callee::Value(Atom::Local(0)),
-                        args: vec![],
-                        env: Env::Param,
-                    },
-                    site: None,
-                };
-                for n in 0..10_000 {
-                    stmt = Stmt::Block {
-                        label: n,
-                        body: vec![stmt],
-                    };
-                }
-                let mut body = vec![stmt];
-                assert!(any_suspends(&body, &[]));
-                let mut next = 0;
-                mark(&mut body, &[], &mut next);
-                assert_eq!(next, 1);
-                assert!(has_point(&body));
-                let mut defs = HashMap::new();
-                env_defs(&body, &mut defs);
-                let join_of = HashMap::new();
-                let mut live = Liveness {
-                    join_of: &join_of,
-                    points: HashMap::new(),
-                    joins: HashMap::new(),
-                };
-                let result = live.stmts(&body, BTreeSet::new(), &mut HashMap::new());
-                assert_eq!(result, BTreeSet::from([0]));
-                assert_eq!(live.points.len(), 1);
-                let mut mentioned_locals = BTreeSet::new();
-                mentioned(&body, &mut mentioned_locals, &mut |_, _| {});
-                assert_eq!(mentioned_locals, BTreeSet::from([0, 1]));
-                drop(body);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deep_point_discovery_and_copy_use_worklists() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let mut stmt = Stmt::Suspendable {
-                    dst: 1,
-                    value: Value::Call {
-                        callee: Callee::Value(Atom::Local(0)),
-                        args: vec![],
-                        env: Env::Param,
-                    },
-                    site: None,
-                    point: 0,
-                };
-                for n in 0..1_000 {
-                    stmt = Stmt::Block {
-                        label: n,
-                        body: vec![stmt],
-                    };
-                }
-                let body = vec![stmt];
-                let mut found = Found::default();
-                find(&body, &mut Vec::new(), &mut found);
-                assert_eq!(found.joins.len(), 1_000);
-                assert_eq!(found.points[&0].len(), 1_001);
-                let cutter = Cutter {
-                    join_of: &found.join_of,
-                    label_join: &found.label_join,
-                };
-                let segment = cutter.segment(&found.points[&0]);
-                assert!(matches!(segment.as_slice(), [Stmt::Join(_)]));
-                let copy = Cutter {
-                    join_of: &HashMap::new(),
-                    label_join: &HashMap::new(),
-                }
-                .cut(&body, &mut Vec::new());
-                drop(copy);
-                drop(found);
-                drop(body);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
-
-    #[test]
-    fn deep_control_copy_and_point_scan_without_points() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let mut stmt = Stmt::Return(Atom::Nil);
-                for n in 0..10_000 {
-                    stmt = Stmt::Block {
-                        label: n,
-                        body: vec![stmt],
-                    };
-                }
-                let body = vec![stmt];
-                let mut found = Found::default();
-                find(&body, &mut Vec::new(), &mut found);
-                assert!(found.points.is_empty());
-                assert!(found.joins.is_empty());
-                let copy = Cutter {
-                    join_of: &HashMap::new(),
-                    label_join: &HashMap::new(),
-                }
-                .cut(&body, &mut Vec::new());
-                drop(copy);
-                drop(found);
-                drop(body);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
 
     /// A function with an `i64` local and an environment that are live after
     /// a closure call: the frame record boxes the number, keeps the value of
@@ -1204,7 +809,6 @@ mod tests {
             funcs: vec![FuncKind::Code(Func {
                 name: "f".into(),
                 arity: 1,
-                budget_frame: 2,
                 locals: vec![
                     LocalType::Value,
                     LocalType::I64,

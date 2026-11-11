@@ -110,6 +110,9 @@ pub struct FuncId(pub u32);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct GlobalId(pub u32);
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct LabelConst(pub u32);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LocalType {
     Value,
@@ -135,6 +138,8 @@ pub enum Atom {
     Local(Local),
     /// A top-level value that is worked out in `ilang_start`.
     Global(GlobalId),
+    /// The one String object for these label bytes in the module.
+    Label(LabelConst),
     /// The one closure of a function that captures nothing: a top-level
     /// function, a constructor, or a library function used as a value.
     Func(FuncId),
@@ -296,6 +301,9 @@ pub enum Value {
         patched: bool,
     },
     Tuple(Vec<Atom>),
+    RecNew(Vec<(LabelConst, Atom)>),
+    RecGet(Atom, LabelConst),
+    RecWith(Atom, Vec<(LabelConst, Atom)>),
     Record {
         ctor: u32,
         ty: u32,
@@ -405,6 +413,7 @@ pub enum Cond {
     Or(Box<Cond>, Box<Cond>),
     /// The value tag of `runtime/mod.rs`.
     Tag(Atom, u32),
+    IsRec(Atom),
     Bool(Atom, bool),
     Ctor(Atom, u32),
     /// A custom value of the type with this id.
@@ -757,6 +766,8 @@ pub struct SitePos {
 /// The whole program in the intermediate form.
 #[derive(Clone, Debug, Default)]
 pub struct Program {
+    /// Label bytes, by LabelConst. Labels are numbered, never WAT names.
+    pub labels: Vec<String>,
     pub funcs: Vec<FuncKind>,
     /// The points of the calls that may suspend (§9.4).
     pub points: Vec<Point>,

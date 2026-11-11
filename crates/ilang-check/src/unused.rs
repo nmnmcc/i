@@ -151,6 +151,12 @@ impl References<'_> {
         match &e.kind {
             ExprKind::Name(ValueRef::Def(d)) => self.pending.push(*d),
             ExprKind::Tuple(items) => items.iter().for_each(|e| self.expr(e)),
+            ExprKind::Record { base, fields } => {
+                if let Some(base) = base {
+                    self.expr(base);
+                }
+                fields.iter().for_each(|(_, value)| self.expr(value));
+            }
             ExprKind::List { items, rest } => {
                 items
                     .iter()

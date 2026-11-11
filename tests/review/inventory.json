@@ -20605,19 +20605,19 @@
       "origin": "/tmp/review-rec/growth.i",
       "sha256": "21150877805e373b2d8a03f93fbbbd828ecf30e9171ce9a3242ce33666b2e7d3",
       "source": "docs/design/records.md; T3 is held in the ledger",
-      "case": "review-rec/_loose/growth"
+      "historical_snapshot": "tests/review/cases/review-rec/_loose/growth/.invalid/src/main.i"
     },
     {
       "origin": "/tmp/review-rec/probes.i",
       "sha256": "aeecbdae1c142356e90557fda4a9d9811b8b8802a0f4467e17a3af49186aa867",
       "source": "docs/design/records.md; T3 is held in the ledger",
-      "case": "review-rec/_loose/probes"
+      "historical_snapshot": "tests/review/cases/review-rec/_loose/probes/.invalid/src/main.i"
     },
     {
       "origin": "/tmp/review-rec/schema-union.i",
       "sha256": "5988d6050671f785ff945f7c1bdf67eb6ff27fe58bbdd5ef7b62eaa49e355c3c",
       "source": "docs/design/records.md; T3 is held in the ledger",
-      "case": "review-rec/_loose/schema-union"
+      "historical_snapshot": "tests/review/cases/review-rec/_loose/schema-union/.invalid/src/main.i"
     },
     {
       "origin": "/tmp/review-runtime/echo-types/src/main.i",

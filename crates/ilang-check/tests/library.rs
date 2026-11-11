@@ -23,6 +23,7 @@ fn library_resolves_cleanly() {
             "i/request",
             "i/key",
             "i/core",
+            "i/record",
             "i/io",
             "i/task",
             "i/clock",

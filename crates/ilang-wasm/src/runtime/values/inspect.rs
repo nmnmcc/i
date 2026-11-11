@@ -302,6 +302,8 @@ pub fn wat() -> String {
       ;; 2: the parts of a tuple or a custom value, from `index` on.
       (if (i32.eq (local.get $kind) (i32.const 2))
         (then
+          (if (i32.eq (call $value_tag (local.get $value)) (i32.const 14))
+            (then (call $inspect_record_field (local.get $value) (local.get $index)) (br $next)))
           (local.set $fields (struct.get $obj 5 (ref.cast (ref $obj) (local.get $value))))
           (if (ref.is_null (local.get $fields)) (then (br $next)))
           (br_if $next (i32.ge_u (local.get $index) (array.len (ref.as_non_null (local.get $fields)))))
@@ -323,6 +325,8 @@ pub fn wat() -> String {
 
       ;; 0: a value.
       (local.set $tag (call $value_tag (local.get $value)))
+      (if (i32.eq (local.get $tag) (i32.const 14))
+        (then (call $inspect_record (local.get $value)) (br $next)))
       (if (i32.or (i32.eq (local.get $tag) (i32.const 4)) (i32.eq (local.get $tag) (i32.const 5)))
         (then
           (local.set $obj (ref.cast (ref $obj) (local.get $value)))
