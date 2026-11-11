@@ -84,6 +84,7 @@ fn graph_with_path_dependencies() {
             "i/fs",
             "i/process",
             "i/net",
+            "i/tls",
             "i/stdio"
         ]
     );
