@@ -1,6 +1,10 @@
 //// HTTP/1.1 message values and incremental framing, without I/O.
 (
 	i/fail
+	i/net
+	i/tls
+	i/task
+	i/resource
 	std/list
 	std/string
 	std/int
@@ -32,6 +36,12 @@
 	reason
 	parse_query
 	build_query
+	serve
+	get
+	post
+	send
+	client
+	body_text
 	content_length
 	content_type
 	transfer_encoding
@@ -85,6 +95,12 @@ Response {
 HttpError {
 	NeedMore
 	BadMessage(String)
+	Dns(String)
+	Connect(String)
+	Tls(String)
+	Protocol(String)
+	Timeout
+	StatusError(Int)
 }
 
 Progress(A) {
@@ -183,6 +199,7 @@ feed_request = (buffer: BitArray, bytes: BitArray) -> Progress(Request) {
 		Ok((message, rest))    -> Complete(message, bits(rest))
 		Error(NeedMore)        -> More(input)
 		Error(BadMessage(why)) -> Invalid(why)
+		Error(_)               -> panic("http: unexpected parser error")
 	}
 }
 
@@ -192,6 +209,7 @@ feed_response = (buffer: BitArray, bytes: BitArray) -> Progress(Response) {
 		Ok((message, rest))    -> Complete(message, bits(rest))
 		Error(NeedMore)        -> More(input)
 		Error(BadMessage(why)) -> Invalid(why)
+		Error(_)               -> panic("http: unexpected parser error")
 	}
 }
 
@@ -211,6 +229,7 @@ feed_response_for = (
 		Ok((message, rest))    -> Complete(message, bits(rest))
 		Error(NeedMore)        -> More(input)
 		Error(BadMessage(why)) -> Invalid(why)
+		Error(_)               -> panic("http: unexpected parser error")
 	}
 }
 
@@ -227,6 +246,7 @@ feed_request_limit = (
 		Ok((message, rest))    -> Complete(message, bits(rest))
 		Error(NeedMore)        -> More(input)
 		Error(BadMessage(why)) -> Invalid(why)
+		Error(_)               -> panic("http: unexpected parser error")
 	}
 }
 
@@ -837,5 +857,256 @@ lowercase = (s: String) -> String {
 	bit_array.to_string(bits(raw)) |> {
 		Ok(value) -> value
 		Error(_)  -> panic("http: invalid internal text")
+	}
+}
+
+/// Serve each connection in a child task; requests on a connection are ordered.
+serve = (listener, handler) {
+	task.scope((scope) { accept_loop(listener, handler, scope) })
+}
+
+accept_loop = (listener, handler, scope) {
+	stream = net.accept(listener)
+	task.go(scope, () {
+		resource.ensure(() {
+			fail.catch(() { connection_loop(stream, handler, <<>>, False) })
+			Nil
+		}, () { net.close_stream(stream) })
+	})
+	accept_loop(listener, handler, scope)
+}
+
+connection_loop = (stream, handler, buffer, continued) {
+	feed_request_limit(<<>>, buffer, 32768) |> {
+		Invalid(_) -> net.write(
+			stream
+			serialize_response(
+				Response(
+					Status(400)
+					reason(400)
+					Headers([("Connection", "close"), ("Content-Length", "0")])
+					<<>>
+					Headers([])
+				)
+			)
+		)
+		Complete(req, rest) -> {
+			res: Response = fail.catch(() { handler(req) }) |> {
+				Ok(value) -> value
+				Error(_)  -> response(Status(500))
+			}
+			hs = header(res.headers, "content-length") |> {
+				Some(_) -> res.headers
+				None -> header(res.headers, "transfer-encoding") |> {
+					Some(_) -> res.headers
+					None -> add_header(
+						res.headers
+						"Content-Length"
+						int.to_string(bit_array.bit_size(res.body) / 8)
+					)
+				}
+			}
+			net.write(
+				stream
+				serialize_response(
+					Response(res.status, res.reason, hs, res.body, res.trailers)
+				)
+			)
+			{
+				header(req.headers, "connection") == Some("close") ||
+					header(hs, "connection") == Some("close")
+			} |> {
+				True  -> Nil
+				False -> connection_loop(stream, handler, rest, False)
+			}
+		}
+		More(_) -> {
+			should_continue = { continued } |> {
+				True  -> False
+				False -> expect_continue(buffer)
+			}
+			{ should_continue } |> {
+				True -> net.write(
+					stream
+					<<"HTTP/1.1 100 Continue\r\n\r\n":utf8>>
+				)
+				False -> Nil
+			}
+			bytes = net.read(stream, 65536)
+			{ bit_array.bit_size(bytes) == 0 } |> {
+				True -> Nil
+				False -> connection_loop(
+					stream
+					handler
+					bit_array.concat([buffer, bytes])
+					continued || should_continue
+				)
+			}
+		}
+	}
+}
+
+expect_continue = (buffer: BitArray) -> Bool {
+	fail.catch(() {
+		(_, after) = line(octets(buffer))
+		(hs, _) = read_headers(after, [])
+		header(hs, "expect") == Some("100-continue")
+	}) |> {
+		Ok(value) -> value
+		Error(_)  -> False
+	}
+}
+
+/// A provider is a record containing a send function, so callers can replace it.
+client = () { (send: (req) { send(req) }) }
+
+get = (url: String) { send(request(Method("GET"), url)) }
+
+post = (url: String, body: BitArray) {
+	send(Request(Method("POST"), url, Headers([]), body, Headers([])))
+}
+
+body_text = (res: Response) { bit_array.to_string(res.body) }
+
+send = (req: Request) { follow(req, 0) }
+
+follow = (req: Request, count: Int) {
+	{ count > 10 } |> {
+		True -> fail.raise(Protocol("too many redirects"))
+		False -> {
+			res = send_once(req)
+			Status(code) = res.status
+			(header(res.headers, "location"), code) |> {
+				(Some(location), c) ? c == 301 ||
+					c == 302 ||
+					c == 303 ||
+					c == 307 ||
+					c == 308 -> {
+					base = uri.parse(req.target) |> {
+						Ok(value) -> value
+						Error(_)  -> fail.raise(Protocol("invalid URL"))
+					}
+					next = uri.parse(location) |> {
+						Ok(value) -> value
+						Error(_)  -> fail.raise(Protocol("invalid redirect"))
+					}
+					url = uri.resolve(base, next) |> {
+						Ok(value) -> uri.to_string(value)
+						Error(_)  -> fail.raise(Protocol("invalid redirect"))
+					}
+					Method(method) = req.method
+					change = c == 303 && method != "HEAD" ||
+						{ c == 301 || c == 302 } && method == "POST"
+					change |> {
+						True -> follow(request(Method("GET"), url), count + 1)
+						False -> follow(
+							Request(
+								req.method
+								url
+								req.headers
+								req.body
+								req.trailers
+							)
+							count + 1
+						)
+					}
+				}
+				_ -> res
+			}
+		}
+	}
+}
+
+send_once = (req: Request) {
+	u = uri.parse(req.target) |> {
+		Ok(value) -> value
+		Error(_)  -> fail.raise(Protocol("invalid URL"))
+	}
+	parts = uri.parts(u)
+	secure = parts.scheme |> {
+		Some("http")  -> False
+		Some("https") -> True
+		_             -> fail.raise(Protocol("invalid URL scheme"))
+	}
+	authority = parts.authority |> {
+		Some(value) -> value
+		None        -> fail.raise(Protocol("missing host"))
+	}
+	hostname = authority.host |> {
+		uri.RegName(value)   -> value
+		uri.IpLiteral(value) -> value
+	}
+	port = authority.port |> {
+		Some(value) -> int.parse(value) |> {
+			Ok(number) ? number > 0 && number < 65536 -> number
+			_                                         -> fail.raise(Protocol("invalid port"))
+		}
+		None -> secure |> {
+			True  -> 443
+			False -> 80
+		}
+	}
+	path = { parts.path == "" } |> {
+		True  -> "/"
+		False -> parts.path
+	}
+	target = parts.query |> {
+		Some(q) -> path <> "?" <> q
+		None    -> path
+	}
+	host_header = authority.port |> {
+		Some(p) -> hostname <> ":" <> p
+		None    -> hostname
+	}
+	hs = header(req.headers, "host") |> {
+		Some(_) -> req.headers
+		None    -> add_header(req.headers, "Host", host_header)
+	}
+	hs = add_header(hs, "Connection", "close")
+	wire = serialize_request(
+		Request(req.method, target, hs, req.body, req.trailers)
+	)
+	stream = fail.catch(() { net.connect(hostname, port) }) |> {
+		Ok(value) -> value
+		Error(net.NetError(operation, endpoint, code)) -> fail.raise(
+			Connect(code)
+		)
+	}
+	secure |> {
+		False -> resource.ensure(() {
+			transport = net.byte_stream(stream)
+			transport.write(wire)
+			read_reply(transport, req.method, <<>>)
+		}, () { net.close_stream(stream) })
+		True -> {
+			secure_stream = fail.catch(() {
+				tls.connect(
+					stream
+					hostname
+					(..tls.options(), alpn: ["http/1.1"])
+				)
+			}) |> {
+				Ok(value)                          -> value
+				Error(tls.TlsError(stage, reason)) -> fail.raise(Tls(reason))
+			}
+			resource.ensure(() {
+				transport = tls.byte_stream(secure_stream)
+				transport.write(wire)
+				read_reply(transport, req.method, <<>>)
+			}, () { tls.close(secure_stream) })
+		}
+	}
+}
+
+read_reply = (transport, method, buffer) {
+	bytes = transport.read(65536)
+	eof = bit_array.bit_size(bytes) == 0
+	feed_response_for(buffer, bytes, method, eof, 32768) |> {
+		Complete(res, _) -> res
+		Invalid(why)     -> fail.raise(Protocol(why))
+		More(next) -> eof |> {
+			True  -> fail.raise(Protocol("unexpected end of response"))
+			False -> read_reply(transport, method, next)
+		}
 	}
 }
