@@ -326,27 +326,59 @@ impl Syntax {
 
     /// Mark a definition-query answer and all of its descendants as such.
     pub fn as_answer(&self) -> Self {
-        let map = |xs: &[Syntax]| xs.iter().map(Syntax::as_answer).collect();
-        let node = match self.node() {
-            Node::Round(xs) => Node::Round(map(xs)),
-            Node::Square(xs) => Node::Square(map(xs)),
-            Node::Curly(xs) => Node::Curly(map(xs)),
-            Node::Bits(xs) => Node::Bits(map(xs)),
-            Node::Quote(x) => Node::Quote(x.as_answer()),
-            Node::Unquote(x) => Node::Unquote(x.as_answer()),
-            Node::Splice(x) => Node::Splice(x.as_answer()),
-            leaf => leaf.clone(),
-        };
-        Self(Arc::new(SyntaxData {
-            node,
-            scope: self.scope().clone(),
-            span: self.span(),
-            provenance: Provenance::Answer,
-            identity: self.scope_identity().cloned(),
-            definition_head: self.definition_head(),
-            origin: Arc::new(()),
-            host_identity: Mutex::new(None),
-        }))
+        use std::collections::HashMap;
+        let mut seen = HashMap::<usize, Syntax>::new();
+        let mut pending = vec![(self, false)];
+        while let Some((syntax, finish)) = pending.pop() {
+            let key = Arc::as_ptr(&syntax.0) as usize;
+            if seen.contains_key(&key) {
+                continue;
+            }
+            if !finish {
+                pending.push((syntax, true));
+                match syntax.node() {
+                    Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                        for child in xs.iter().rev() {
+                            pending.push((child, false));
+                        }
+                    }
+                    Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => pending.push((x, false)),
+                    _ => {}
+                }
+                continue;
+            }
+            let mapped = |child: &Syntax| {
+                seen.get(&(Arc::as_ptr(&child.0) as usize))
+                    .expect("answer child was built first")
+                    .clone()
+            };
+            let children = |xs: &[Syntax]| xs.iter().map(mapped).collect();
+            let node = match syntax.node() {
+                Node::Round(xs) => Node::Round(children(xs)),
+                Node::Square(xs) => Node::Square(children(xs)),
+                Node::Curly(xs) => Node::Curly(children(xs)),
+                Node::Bits(xs) => Node::Bits(children(xs)),
+                Node::Quote(x) => Node::Quote(mapped(x)),
+                Node::Unquote(x) => Node::Unquote(mapped(x)),
+                Node::Splice(x) => Node::Splice(mapped(x)),
+                leaf => leaf.clone(),
+            };
+            seen.insert(
+                key,
+                Syntax(Arc::new(SyntaxData {
+                    node,
+                    scope: syntax.scope().clone(),
+                    span: syntax.span(),
+                    provenance: Provenance::Answer,
+                    identity: syntax.scope_identity().cloned(),
+                    definition_head: syntax.definition_head(),
+                    origin: Arc::new(()),
+                    host_identity: Mutex::new(None),
+                })),
+            );
+        }
+        seen.remove(&(Arc::as_ptr(&self.0) as usize))
+            .expect("answer root was built")
     }
     pub fn identical(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
