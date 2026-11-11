@@ -11,7 +11,7 @@ network provider. Request targets supplied to the client are absolute URLs;
 the transport sends the path and query as the HTTP request target. HTTPS
 uses TLS with the host name for certificate verification and SNI, and requests
 ALPN `http/1.1`. Redirects are resolved against the current URL with a limit
-of ten. `body_text`, `body_json` and `body_decode` provide UTF-8, JSON and
+of ten; DNS resolution failures use `Dns` and connection failures use `Connect`. `body_text`, `body_json` and `body_decode` provide UTF-8, JSON and
 schema decoding. `send_timeout(provider, request, nanoseconds)` races the
 request against a scheduler-friendly clock sleep.
 

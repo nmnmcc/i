@@ -157,6 +157,23 @@ main = () {
 }
 
 #[test]
+fn http_dns_distinct_from_connection_refused() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+    run_http_program(&format!(
+        r#"
+(i/fail, std/http)
+@main
+main = () {{
+ result = fail.catch(() {{ http.get("http://127.0.0.1:{port}/") }})
+ result |> {{ Error(http.Connect(_)) -> Nil _ -> panic("expected connection error") }}
+}}
+"#
+    ));
+}
+
+#[test]
 fn http_redirect_methods() {
     for status in [301, 302, 303, 307, 308] {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
