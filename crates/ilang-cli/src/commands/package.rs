@@ -2113,11 +2113,11 @@ mod value_type_interfaces {
             "(f, Person)\nf(K) = (r: (K: Int), key: K) -> Int { 1 }\nPerson = (name: String, age: Int)",
         );
         let b = canonical(
-            "(f, Person)\nf(Key) = (r: (Key: Int), key: Key) -> Int { 1 }\nPerson = (age: Int, name: String)",
+            "(f, Person)\nf(LabelName) = (r: (LabelName: Int), key: LabelName) -> Int { 1 }\nPerson = (age: Int, name: String)",
         );
         assert_eq!(a, b);
         let changed = canonical(
-            "(f, Person)\nf(Key) = (r: (Key: String), key: Key) -> Int { 1 }\nPerson = (age: Int, name: String)",
+            "(f, Person)\nf(LabelName) = (r: (LabelName: String), key: LabelName) -> Int { 1 }\nPerson = (age: Int, name: String)",
         );
         assert_ne!(a, changed);
     }
@@ -2212,8 +2212,8 @@ mod value_type_interfaces {
     #[test]
     fn exported_record_schemes_compare_labels_and_value_types() {
         let a = interface("(f)\nf(K) = (r: (K: Int), key: K) -> Int { 1 }");
-        let same = interface("(f)\nf(Key) = (r: (Key: Int), key: Key) -> Int { 1 }");
-        let changed = interface("(f)\nf(Key) = (r: (Key: String), key: Key) -> Int { 1 }");
+        let same = interface("(f)\nf(LabelName) = (r: (LabelName: Int), key: LabelName) -> Int { 1 }");
+        let changed = interface("(f)\nf(LabelName) = (r: (LabelName: String), key: LabelName) -> Int { 1 }");
         assert!(Diff::new(&a, &same).unwrap().changed.is_empty());
         assert!(!Diff::new(&a, &changed).unwrap().changed.is_empty());
     }
@@ -2236,7 +2236,7 @@ mod value_type_interfaces {
         );
         assert!(!Diff::new(&generic, &concrete).unwrap().changed.is_empty());
         let renamed = interface(
-            "(i/record)\n(f)\nf(Key,Item) = (r: (Key: Item), key: Key) -> Item { record.get(r, key) }",
+            "(i/record)\n(f)\nf(LabelName,Item) = (r: (LabelName: Item), key: LabelName) -> Item { record.get(r, key) }",
         );
         assert!(Diff::new(&generic, &renamed).unwrap().changed.is_empty());
     }
@@ -2247,7 +2247,7 @@ mod value_type_interfaces {
             "(i/record)\n(f)\nf(R,K,V) = (r: R & Record, key: K, value: V) -> (..R, K: V) { record.put(r, key, value) }",
         );
         let b = interface(
-            "(i/record)\n(f)\nf(Row,Key,Item) = (r: Row & Record, key: Key, value: Item) -> (..Row, Key: Item) { record.put(r, key, value) }",
+            "(i/record)\n(f)\nf(Row,LabelName,Item) = (r: Row & Record, key: LabelName, value: Item) -> (..Row, LabelName: Item) { record.put(r, key, value) }",
         );
         assert!(Diff::new(&a, &b).unwrap().changed.is_empty());
     }
