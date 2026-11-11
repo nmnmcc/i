@@ -16,6 +16,7 @@ use crate::hir::*;
 use crate::types::{Head, HostType, Ty};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast;
+use ilang_syntax::ast::Ident;
 use ilang_syntax::lisp::syntax::{Provenance, Scope as SyntaxScope, ScopeIdentity};
 use ilang_syntax::span::Span;
 use std::collections::BTreeSet;
@@ -180,52 +181,76 @@ fn is_upper(name: &str) -> bool {
 }
 
 /// The names a pattern binds, in order, with repeats (§7.2).
-fn ast_binders(p: &ast::Pattern, out: &mut Vec<(String, Span)>) {
+fn ast_binders(root: &ast::Pattern, out: &mut Vec<(String, Span)>) {
     use ast::PatternKind as P;
-    match &p.kind {
-        P::Var(n) => out.push((n.clone(), p.span)),
-        P::Typed { binder, .. } if !binder.discard => out.push((binder.name.clone(), binder.span)),
-        P::Named { name, pattern } => {
-            out.push((name.name.clone(), name.span));
-            ast_binders(pattern, out);
-        }
-        P::Prefix { rest, .. } if !rest.discard => out.push((rest.name.clone(), rest.span)),
-        P::Constructor { args, .. } | P::Tuple(args) => {
-            args.iter().for_each(|a| ast_binders(a, out));
-        }
-        P::List { items, rest } => {
-            items.iter().for_each(|a| ast_binders(a, out));
-            if let Some(Some(b)) = rest
-                && !b.discard
-            {
-                out.push((b.name.clone(), b.span));
+    enum Task<'a> {
+        Pattern(&'a ast::Pattern),
+        Binder(&'a ast::Binder),
+    }
+    let mut work = vec![Task::Pattern(root)];
+    while let Some(task) = work.pop() {
+        match task {
+            Task::Binder(b) => {
+                if !b.discard {
+                    out.push((b.name.clone(), b.span));
+                }
             }
+            Task::Pattern(p) => match &p.kind {
+                P::Var(n) => out.push((n.clone(), p.span)),
+                P::Typed { binder, .. } if !binder.discard => {
+                    out.push((binder.name.clone(), binder.span))
+                }
+                P::Named { name, pattern } => {
+                    out.push((name.name.clone(), name.span));
+                    work.push(Task::Pattern(pattern));
+                }
+                P::Prefix { rest, .. } if !rest.discard => out.push((rest.name.clone(), rest.span)),
+                P::Constructor { args, .. } | P::Tuple(args) => {
+                    work.extend(args.iter().rev().map(Task::Pattern))
+                }
+                P::List { items, rest } => {
+                    if let Some(Some(b)) = rest {
+                        work.push(Task::Binder(b));
+                    }
+                    work.extend(items.iter().rev().map(Task::Pattern));
+                }
+                P::BitArray(segs) => {
+                    work.extend(segs.iter().rev().map(|s| Task::Pattern(&s.value)))
+                }
+                _ => {}
+            },
         }
-        P::BitArray(segs) => segs.iter().for_each(|s| ast_binders(&s.value, out)),
-        _ => {}
     }
 }
 
 /// The label of a parameter (§6.11): the last name in the `=` chain at the
 /// top of its pattern.
-fn label_of(p: &ast::Pattern) -> Option<String> {
+fn label_of(mut p: &ast::Pattern) -> Option<String> {
     use ast::PatternKind as P;
-    match &p.kind {
-        P::Var(n) => Some(n.clone()),
-        P::Typed { binder, .. } if !binder.discard => Some(binder.name.clone()),
-        P::Named { name, pattern } => label_of(pattern).or_else(|| Some(name.name.clone())),
-        _ => None,
+    let mut fallback = None;
+    loop {
+        match &p.kind {
+            P::Var(n) => return Some(n.clone()),
+            P::Typed { binder, .. } if !binder.discard => return Some(binder.name.clone()),
+            P::Named { name, pattern } => {
+                fallback = Some(name.name.clone());
+                p = pattern;
+            }
+            _ => return fallback,
+        }
     }
 }
 
 /// `{ e }` with one expression is a group (§6.10): it is `e`.
-fn ungroup(e: &ast::Expr) -> &ast::Expr {
-    match &e.kind {
-        ast::ExprKind::Block(b) if b.stmts.len() == 1 => match &b.stmts[0] {
-            ast::Stmt::Expr(inner) => ungroup(inner),
-            _ => e,
-        },
-        _ => e,
+fn ungroup(mut e: &ast::Expr) -> &ast::Expr {
+    loop {
+        match &e.kind {
+            ast::ExprKind::Block(b) if b.stmts.len() == 1 => match &b.stmts[0] {
+                ast::Stmt::Expr(inner) => e = inner,
+                _ => return e,
+            },
+            _ => return e,
+        }
     }
 }
 
@@ -601,34 +626,35 @@ impl<'a> Resolver<'a> {
     fn collect_pattern_binders(
         &mut self,
         m: ModuleId,
-        t: &ast::TypeExpr,
+        root: &ast::TypeExpr,
         attrs: &Attrs,
         out: &mut Vec<TypeId>,
     ) {
-        match &t.kind {
-            ast::TypeKind::Named {
-                module: None,
-                name,
-                args,
-            } if args.is_empty() => {
-                let def = ast::TypeDef {
-                    alias_pattern: false,
-                    name: name.clone(),
-                    params: Vec::new(),
-                    head: Vec::new(),
-                    body: ast::TypeBody::Alias(ast::TypeExpr {
-                        kind: ast::TypeKind::Hole,
-                        span: t.span,
-                    }),
-                };
-                out.push(self.collect_type(m, &def, attrs));
-            }
-            ast::TypeKind::Named { args, .. } | ast::TypeKind::Tuple(args) => {
-                for t in args {
-                    self.collect_pattern_binders(m, t, attrs, out);
+        let mut work = vec![root];
+        while let Some(t) = work.pop() {
+            match &t.kind {
+                ast::TypeKind::Named {
+                    module: None,
+                    name,
+                    args,
+                } if args.is_empty() => {
+                    let def = ast::TypeDef {
+                        alias_pattern: false,
+                        name: name.clone(),
+                        params: Vec::new(),
+                        head: Vec::new(),
+                        body: ast::TypeBody::Alias(ast::TypeExpr {
+                            kind: ast::TypeKind::Hole,
+                            span: t.span,
+                        }),
+                    };
+                    out.push(self.collect_type(m, &def, attrs));
                 }
+                ast::TypeKind::Named { args, .. } | ast::TypeKind::Tuple(args) => {
+                    work.extend(args.iter().rev())
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
 
@@ -1448,50 +1474,114 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn projectable_pattern(&self, pattern: &TypePattern, seen: &mut HashSet<TypeId>) -> bool {
-        match pattern {
-            TypePattern::Bind(_) | TypePattern::Skip | TypePattern::Error => true,
-            TypePattern::Exact(t) => !value_dependent(&self.p, t),
-            TypePattern::Tuple(parts) => parts.iter().all(|p| self.projectable_pattern(p, seen)),
-            TypePattern::Named(TypeRef::Custom(id), parts)
-                if matches!(self.p.ty(*id).body, TypeBody::Alias(_)) =>
-            {
-                if self.circular.contains(id) {
-                    return true;
-                }
-                if !seen.insert(*id) {
-                    return false;
-                }
-                let def = self.p.ty(*id);
-                let TypeBody::Alias(body) = &def.body else {
-                    unreachable!()
-                };
-                if value_dependent(&self.p, body) {
-                    return false;
-                }
-                let map = def
-                    .params
-                    .iter()
-                    .map(|(_, v)| *v)
-                    .zip(parts.iter().cloned())
-                    .collect();
-                let expanded = projectable_body(body, &map, &mut HashSet::new());
-                let valid = expanded.is_some_and(|p| {
-                    let shape = match &p {
-                        TypePattern::Exact(t) => matches!(
-                            self.expand(t).kind,
-                            TypeKind::Named { .. } | TypeKind::Tuple(_)
-                        ),
-                        TypePattern::Named(..) | TypePattern::Tuple(_) => true,
-                        _ => false,
-                    };
-                    shape && self.projectable_pattern(&p, seen)
-                });
-                seen.remove(id);
-                valid
-            }
-            TypePattern::Named(_, parts) => parts.iter().all(|p| self.projectable_pattern(p, seen)),
+    fn projectable_pattern(&self, root: &TypePattern, seen: &mut HashSet<TypeId>) -> bool {
+        enum Node<'a> {
+            Borrowed(&'a TypePattern),
+            Owned(TypePattern),
         }
+        impl<'a> Node<'a> {
+            fn value(&self) -> &TypePattern {
+                match self {
+                    Self::Borrowed(p) => p,
+                    Self::Owned(p) => p,
+                }
+            }
+            fn children(self) -> Vec<Node<'a>> {
+                match self {
+                    Self::Borrowed(TypePattern::Named(_, parts) | TypePattern::Tuple(parts)) => {
+                        parts.iter().map(Node::Borrowed).collect()
+                    }
+                    Self::Owned(mut p) => match &mut p {
+                        TypePattern::Named(_, parts) | TypePattern::Tuple(parts) => {
+                            std::mem::take(parts).into_iter().map(Node::Owned).collect()
+                        }
+                        _ => unreachable!("only structural patterns have children"),
+                    },
+                    _ => unreachable!("only structural patterns have children"),
+                }
+            }
+        }
+        enum Task<'a> {
+            Visit(Node<'a>),
+            Exit(TypeId),
+        }
+        let mut work = vec![Task::Visit(Node::Borrowed(root))];
+        while let Some(task) = work.pop() {
+            match task {
+                Task::Exit(id) => {
+                    seen.remove(&id);
+                }
+                Task::Visit(node) => {
+                    let mut valid = true;
+                    let mut expanded = None;
+                    let mut alias = None;
+                    let mut children = false;
+                    match node.value() {
+                        TypePattern::Bind(_) | TypePattern::Skip | TypePattern::Error => {}
+                        TypePattern::Exact(t) => valid = !value_dependent(&self.p, t),
+                        TypePattern::Tuple(_) => children = true,
+                        TypePattern::Named(TypeRef::Custom(id), parts)
+                            if matches!(self.p.ty(*id).body, TypeBody::Alias(_)) =>
+                        {
+                            if !self.circular.contains(id) {
+                                if !seen.insert(*id) {
+                                    valid = false;
+                                } else {
+                                    let def = self.p.ty(*id);
+                                    let TypeBody::Alias(body) = &def.body else {
+                                        unreachable!()
+                                    };
+                                    if value_dependent(&self.p, body) {
+                                        valid = false;
+                                        seen.remove(id);
+                                    } else {
+                                        let map = def
+                                            .params
+                                            .iter()
+                                            .map(|(_, v)| *v)
+                                            .zip(parts.iter().cloned())
+                                            .collect();
+                                        expanded =
+                                            projectable_body(body, &map, &mut HashSet::new());
+                                        valid = expanded.as_ref().is_some_and(|p| match p {
+                                            TypePattern::Exact(t) => matches!(
+                                                self.expand(t).kind,
+                                                TypeKind::Named { .. } | TypeKind::Tuple(_)
+                                            ),
+                                            TypePattern::Named(..) | TypePattern::Tuple(_) => true,
+                                            _ => false,
+                                        });
+                                        if valid {
+                                            alias = Some(*id);
+                                        } else {
+                                            seen.remove(id);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        TypePattern::Named(_, _) => children = true,
+                    }
+                    if !valid {
+                        for task in work {
+                            if let Task::Exit(id) = task {
+                                seen.remove(&id);
+                            }
+                        }
+                        return false;
+                    }
+                    if let Some(id) = alias {
+                        work.push(Task::Exit(id));
+                        work.push(Task::Visit(Node::Owned(
+                            expanded.expect("valid alias expansion"),
+                        )));
+                    } else if children {
+                        work.extend(node.children().into_iter().rev().map(Task::Visit));
+                    }
+                }
+            }
+        }
+        true
     }
 
     fn environment_reads(&mut self) {
@@ -1923,161 +2013,303 @@ impl<'a> Resolver<'a> {
 
     fn type_pattern(
         &mut self,
-        t: &ast::TypeExpr,
+        root: &ast::TypeExpr,
         ids: &[TypeId],
         heads: &mut Vec<(Span, TypeRef)>,
     ) -> TypePattern {
-        match &t.kind {
-            ast::TypeKind::Hole => TypePattern::Skip,
-            ast::TypeKind::Named {
-                module: None,
-                name,
-                args,
-            } if args.is_empty() => ids
-                .iter()
-                .copied()
-                .find(|id| self.p.ty(*id).span == name.span)
-                .map_or(TypePattern::Error, TypePattern::Bind),
-            ast::TypeKind::Named { module, name, args } => {
-                let parts = args
-                    .iter()
-                    .map(|t| self.type_pattern(t, ids, heads))
-                    .collect::<Vec<_>>();
-                match self.lookup_type(module.as_ref(), name) {
-                    Some(ty) if self.arity(ty) == parts.len() => {
-                        heads.push((name.span, ty));
-                        TypePattern::Named(ty, parts)
-                    }
-                    Some(_) => {
-                        self.error(
-                            code::TYPE_ARITY,
-                            t.span,
-                            "alias pattern has the wrong number of arguments",
+        enum Task<'a> {
+            Visit(&'a ast::TypeExpr),
+            Named {
+                span: Span,
+                module: Option<&'a Ident>,
+                name: &'a Ident,
+                count: usize,
+            },
+            Tuple(usize),
+        }
+        let mut work = vec![Task::Visit(root)];
+        let mut values: Vec<TypePattern> = Vec::new();
+        while let Some(task) = work.pop() {
+            match task {
+                Task::Visit(t) => match &t.kind {
+                    ast::TypeKind::Hole => values.push(TypePattern::Skip),
+                    ast::TypeKind::Named {
+                        module: None,
+                        name,
+                        args,
+                    } if args.is_empty() => {
+                        values.push(
+                            ids.iter()
+                                .copied()
+                                .find(|id| self.p.ty(*id).span == name.span)
+                                .map_or(TypePattern::Error, TypePattern::Bind),
                         );
-                        TypePattern::Error
                     }
-                    None => TypePattern::Error,
+                    ast::TypeKind::Named { module, name, args } => {
+                        work.push(Task::Named {
+                            span: t.span,
+                            module: module.as_ref(),
+                            name,
+                            count: args.len(),
+                        });
+                        work.extend(args.iter().rev().map(Task::Visit));
+                    }
+                    ast::TypeKind::Tuple(ts) => {
+                        work.push(Task::Tuple(ts.len()));
+                        work.extend(ts.iter().rev().map(Task::Visit));
+                    }
+                    _ => {
+                        self.error(
+                            code::TYPE_PATTERN_FORM,
+                            t.span,
+                            "a type pattern is a binder, `_`, a named type, or a tuple",
+                        );
+                        values.push(TypePattern::Error);
+                    }
+                },
+                Task::Named {
+                    span,
+                    module,
+                    name,
+                    count,
+                } => {
+                    let parts = values.split_off(values.len() - count);
+                    let pattern = match self.lookup_type(module, name) {
+                        Some(ty) if self.arity(ty) == parts.len() => {
+                            heads.push((name.span, ty));
+                            TypePattern::Named(ty, parts)
+                        }
+                        Some(_) => {
+                            self.error(
+                                code::TYPE_ARITY,
+                                span,
+                                "alias pattern has the wrong number of arguments",
+                            );
+                            TypePattern::Error
+                        }
+                        None => TypePattern::Error,
+                    };
+                    values.push(pattern);
                 }
-            }
-            ast::TypeKind::Tuple(ts) => TypePattern::Tuple(
-                ts.iter()
-                    .map(|t| self.type_pattern(t, ids, heads))
-                    .collect(),
-            ),
-            _ => {
-                self.error(
-                    code::TYPE_PATTERN_FORM,
-                    t.span,
-                    "a type pattern is a binder, `_`, a named type, or a tuple",
-                );
-                TypePattern::Error
+                Task::Tuple(count) => {
+                    let parts = values.split_off(values.len() - count);
+                    values.push(TypePattern::Tuple(parts));
+                }
             }
         }
+        assert_eq!(
+            values.len(),
+            1,
+            "type pattern resolution must return one value"
+        );
+        values.pop().unwrap()
     }
 
-    fn ty(&mut self, t: &ast::TypeExpr) -> Type {
+    fn ty(&mut self, root: &ast::TypeExpr) -> Type {
         use ast::TypeKind as T;
-        let kind = match &t.kind {
-            T::Lit(v) => TypeKind::Lit(v.clone()),
-            T::Named { module, name, args } => {
-                let key = self.name_key(&name.name, name.span);
-                let variable = if module.is_none() {
-                    self.ty_frames
-                        .iter()
-                        .rev()
-                        .find_map(|f| f.names.get(&key).copied())
-                        .or_else(|| {
-                            self.ty_def.as_mut().and_then(|mode| {
-                                let var = mode.params.get(&key).copied()?;
-                                mode.used.insert(var);
-                                Some(var)
-                            })
-                        })
-                } else {
-                    None
-                };
-                if let Some(var) = variable {
-                    let kind = if args.is_empty() {
-                        TypeKind::Var(var)
-                    } else {
-                        self.error(
-                            code::TYPE_VAR_ARGS,
-                            t.span,
-                            "a type variable takes no arguments",
-                        );
-                        TypeKind::Error
-                    };
-                    return Type { kind, span: t.span };
-                }
-                let before = self.diags.len();
-                let found = self.lookup_type(module.as_ref(), name);
-                if found.is_none() && module.is_none() && args.is_empty() {
-                    let hint = if self.ty_def.is_some() {
-                        "to use a type parameter, declare it in the head, as in `Box(A) { … }`"
-                    } else {
-                        "to use a type variable, declare it after the name of the binding, as in `f(A) = …`"
-                    };
-                    for d in &mut self.diags[before..] {
-                        if d.code == code::UNKNOWN_TYPE {
-                            d.message.push_str("; ");
-                            d.message.push_str(hint);
-                        }
-                    }
-                }
-                let args: Vec<Type> = args.iter().map(|a| self.ty(a)).collect();
-                match found {
-                    Some(ty) if self.arity(ty) != args.len() => {
-                        let want = self.arity(ty);
-                        let tname = self.type_name(ty);
-                        self.error(
-                            code::TYPE_ARITY,
-                            t.span,
-                            format!(
-                                "the type `{tname}` has {want} type parameter{}, but {} {} given",
-                                if want == 1 { "" } else { "s" },
-                                args.len(),
-                                if args.len() == 1 { "is" } else { "are" }
-                            ),
-                        );
-                        TypeKind::Error
-                    }
-                    Some(ty) => TypeKind::Named { ty, args },
-                    None => TypeKind::Error,
-                }
-            }
-            T::ValueOf { module, name } => self.value_type(module.as_ref(), name, t.span),
-            T::Call { .. } => {
-                self.error(
-                    code::MACRO_RESERVED,
-                    t.span,
-                    "a call in a type is kept for macros",
-                );
-                TypeKind::Error
-            }
-            T::Hole => TypeKind::Hole,
-            T::Tuple(ts) => TypeKind::Tuple(ts.iter().map(|x| self.ty(x)).collect()),
-            T::Union(ts) => TypeKind::Union(ts.iter().map(|x| self.ty(x)).collect()),
-            T::Inter(ts) => TypeKind::Inter(ts.iter().map(|x| self.ty(x)).collect()),
-            T::Diff(ts) => TypeKind::Diff(ts.iter().map(|x| self.ty(x)).collect()),
-            T::Fn {
-                params,
-                ret,
-                err,
-                env,
-            } => TypeKind::Fn {
-                params: params
-                    .iter()
-                    .map(|p| FnParamType {
-                        label: p.label.clone(),
-                        ty: self.ty(&p.ty),
-                    })
-                    .collect(),
-                ret: Box::new(self.ty(ret)),
-                err: err.as_ref().map(|e| Box::new(self.ty(e))),
-                env: env.as_ref().map(|e| Box::new(self.ty(e))),
+        enum ListKind {
+            Tuple,
+            Union,
+            Inter,
+            Diff,
+        }
+        enum Task<'a> {
+            Visit(&'a ast::TypeExpr),
+            Named {
+                span: Span,
+                found: Option<TypeRef>,
+                count: usize,
             },
-        };
-        Type { kind, span: t.span }
+            List {
+                span: Span,
+                kind: ListKind,
+                count: usize,
+            },
+            Function {
+                span: Span,
+                labels: Vec<Option<Ident>>,
+                err: bool,
+                env: bool,
+            },
+        }
+        let mut work = vec![Task::Visit(root)];
+        let mut values: Vec<Type> = Vec::new();
+        while let Some(task) = work.pop() {
+            match task {
+                Task::Visit(t) => {
+                    let kind = match &t.kind {
+                        T::Lit(v) => TypeKind::Lit(v.clone()),
+                        T::Named { module, name, args } => {
+                            let key = self.name_key(&name.name, name.span);
+                            let variable = if module.is_none() {
+                                self.ty_frames
+                                    .iter()
+                                    .rev()
+                                    .find_map(|f| f.names.get(&key).copied())
+                                    .or_else(|| {
+                                        self.ty_def.as_mut().and_then(|mode| {
+                                            let var = mode.params.get(&key).copied()?;
+                                            mode.used.insert(var);
+                                            Some(var)
+                                        })
+                                    })
+                            } else {
+                                None
+                            };
+                            if let Some(var) = variable {
+                                let kind = if args.is_empty() {
+                                    TypeKind::Var(var)
+                                } else {
+                                    self.error(
+                                        code::TYPE_VAR_ARGS,
+                                        t.span,
+                                        "a type variable takes no arguments",
+                                    );
+                                    TypeKind::Error
+                                };
+                                values.push(Type { kind, span: t.span });
+                                continue;
+                            }
+                            let before = self.diags.len();
+                            let found = self.lookup_type(module.as_ref(), name);
+                            if found.is_none() && module.is_none() && args.is_empty() {
+                                let hint = if self.ty_def.is_some() {
+                                    "to use a type parameter, declare it in the head, as in `Box(A) { … }`"
+                                } else {
+                                    "to use a type variable, declare it after the name of the binding, as in `f(A) = …`"
+                                };
+                                for d in &mut self.diags[before..] {
+                                    if d.code == code::UNKNOWN_TYPE {
+                                        d.message.push_str("; ");
+                                        d.message.push_str(hint);
+                                    }
+                                }
+                            }
+                            work.push(Task::Named {
+                                span: t.span,
+                                found,
+                                count: args.len(),
+                            });
+                            work.extend(args.iter().rev().map(Task::Visit));
+                            continue;
+                        }
+                        T::ValueOf { module, name } => {
+                            self.value_type(module.as_ref(), name, t.span)
+                        }
+                        T::Call { .. } => {
+                            self.error(
+                                code::MACRO_RESERVED,
+                                t.span,
+                                "a call in a type is kept for macros",
+                            );
+                            TypeKind::Error
+                        }
+                        T::Hole => TypeKind::Hole,
+                        T::Tuple(ts) | T::Union(ts) | T::Inter(ts) | T::Diff(ts) => {
+                            let kind = match &t.kind {
+                                T::Tuple(_) => ListKind::Tuple,
+                                T::Union(_) => ListKind::Union,
+                                T::Inter(_) => ListKind::Inter,
+                                T::Diff(_) => ListKind::Diff,
+                                _ => unreachable!(),
+                            };
+                            work.push(Task::List {
+                                span: t.span,
+                                kind,
+                                count: ts.len(),
+                            });
+                            work.extend(ts.iter().rev().map(Task::Visit));
+                            continue;
+                        }
+                        T::Fn {
+                            params,
+                            ret,
+                            err,
+                            env,
+                        } => {
+                            work.push(Task::Function {
+                                span: t.span,
+                                labels: params.iter().map(|p| p.label.clone()).collect(),
+                                err: err.is_some(),
+                                env: env.is_some(),
+                            });
+                            if let Some(env) = env {
+                                work.push(Task::Visit(env));
+                            }
+                            if let Some(err) = err {
+                                work.push(Task::Visit(err));
+                            }
+                            work.push(Task::Visit(ret));
+                            work.extend(params.iter().rev().map(|p| Task::Visit(&p.ty)));
+                            continue;
+                        }
+                    };
+                    values.push(Type { kind, span: t.span });
+                }
+                Task::Named { span, found, count } => {
+                    let args = values.split_off(values.len() - count);
+                    let kind = match found {
+                        Some(ty) if self.arity(ty) != args.len() => {
+                            let want = self.arity(ty);
+                            let tname = self.type_name(ty);
+                            self.error(code::TYPE_ARITY, span, format!("the type `{tname}` has {want} type parameter{}, but {} {} given", if want == 1 { "" } else { "s" }, args.len(), if args.len() == 1 { "is" } else { "are" }));
+                            TypeKind::Error
+                        }
+                        Some(ty) => TypeKind::Named { ty, args },
+                        None => TypeKind::Error,
+                    };
+                    values.push(Type { kind, span });
+                }
+                Task::List { span, kind, count } => {
+                    let items = values.split_off(values.len() - count);
+                    let kind = match kind {
+                        ListKind::Tuple => TypeKind::Tuple(items),
+                        ListKind::Union => TypeKind::Union(items),
+                        ListKind::Inter => TypeKind::Inter(items),
+                        ListKind::Diff => TypeKind::Diff(items),
+                    };
+                    values.push(Type { kind, span });
+                }
+                Task::Function {
+                    span,
+                    labels,
+                    err,
+                    env,
+                } => {
+                    let count = labels.len() + 1 + usize::from(err) + usize::from(env);
+                    let mut parts = values.split_off(values.len() - count).into_iter();
+                    let params = labels
+                        .into_iter()
+                        .map(|label| FnParamType {
+                            label,
+                            ty: parts.next().expect("function parameter"),
+                        })
+                        .collect();
+                    let ret = Box::new(parts.next().expect("function return"));
+                    let err = err.then(|| Box::new(parts.next().expect("function error")));
+                    let env = env.then(|| Box::new(parts.next().expect("function environment")));
+                    assert!(
+                        parts.next().is_none(),
+                        "function type work stack has extra values"
+                    );
+                    values.push(Type {
+                        kind: TypeKind::Fn {
+                            params,
+                            ret,
+                            err,
+                            env,
+                        },
+                        span,
+                    });
+                }
+            }
+        }
+        assert_eq!(
+            values.len(),
+            1,
+            "type resolution work stack must return one value"
+        );
+        values.pop().unwrap()
     }
 
     /// The type that the alias `t` stands for, with its arguments put in
@@ -2537,7 +2769,11 @@ impl<'a> Resolver<'a> {
     /// A binding, at the top level or in a block. Gives back the binders of
     /// its pattern; in a block, the caller makes them visible from the next
     /// statement (§6.10).
-    fn binding(&mut self, b: &ast::Binding, top: bool) -> (Binding, Vec<Binder>) {
+    fn enter_binding(
+        &mut self,
+        b: &ast::Binding,
+        top: bool,
+    ) -> (Pattern, Vec<Binder>, Vec<TyVarId>, bool) {
         let ty_vars = self.push_declared_frame(&b.type_params);
         let direct = self.is_direct(&b.value);
         let mut binders = Vec::new();
@@ -2550,9 +2786,7 @@ impl<'a> Resolver<'a> {
         self.pending.push(names.clone());
         let pattern = self.pattern(&b.pattern, &mut binders, None);
         self.pending.pop();
-        let value = if direct && !top {
-            // §6.10: the names may be used inside the function bodies of a
-            // direct value.
+        if direct && !top {
             self.locals.push(Frame {
                 names: binders
                     .iter()
@@ -2560,74 +2794,100 @@ impl<'a> Resolver<'a> {
                     .collect(),
                 fn_only: Some(self.fn_depth),
             });
-            self.reserved.push((self.locals.len(), names.clone()));
-            let v = self.expr(&b.value);
-            self.reserved.pop();
+        }
+        self.reserved.push((self.locals.len(), names));
+        (pattern, binders, ty_vars, direct)
+    }
+
+    fn leave_binding(
+        &mut self,
+        b: &ast::Binding,
+        top: bool,
+        pattern: Pattern,
+        binders: Vec<Binder>,
+        ty_vars: Vec<TyVarId>,
+        direct: bool,
+        value: Expr,
+    ) -> (Binding, Vec<Binder>) {
+        self.reserved.pop();
+        if direct && !top {
             self.locals.pop();
-            v
-        } else {
-            self.reserved.push((self.locals.len(), names));
-            let value = self.expr(&b.value);
-            self.reserved.pop();
-            value
-        };
+        }
         self.ty_frames.pop();
-        let binding = Binding {
-            pattern,
-            value,
-            direct,
-            ty_vars,
-            span: b.span,
-        };
-        (binding, binders)
+        (
+            Binding {
+                pattern,
+                value,
+                direct,
+                ty_vars,
+                span: b.span,
+            },
+            binders,
+        )
+    }
+
+    fn binding(&mut self, b: &ast::Binding, top: bool) -> (Binding, Vec<Binder>) {
+        let (pattern, binders, ty_vars, direct) = self.enter_binding(b, top);
+        let value = self.expr(&b.value);
+        self.leave_binding(b, top, pattern, binders, ty_vars, direct, value)
     }
 
     /// §6.10: a direct value is made without running code.
-    fn is_direct(&self, e: &ast::Expr) -> bool {
+    fn is_direct(&self, root: &ast::Expr) -> bool {
         use ast::ExprKind as E;
-        match &ungroup(e).kind {
-            E::Fn(_) | E::Clauses(_) | E::Int(_) | E::Float(_) | E::String(_) | E::Name { .. } => {
-                true
-            }
-            E::Unary { expr, .. } => {
-                matches!(ungroup(expr).kind, E::Int(_) | E::Float(_) | E::String(_))
-            }
-            E::Field { target, .. } => match &target.kind {
-                // `m.x` is a name when `m` is a module.
-                E::Name { module: None, name } => {
-                    matches!(
-                        self.find(&name.name, name.span),
-                        Some(Found::Entry(Entry::Module(_)))
-                    )
-                }
-                _ => false,
-            },
-            E::Tuple(items) => items.iter().all(|x| self.is_direct(x)),
-            E::List { items, rest } => items
-                .iter()
-                .chain(rest.as_deref())
-                .all(|x| self.is_direct(x)),
-            // Constructors are the only values with an `UpName`.
-            E::Call { callee, args } => {
-                is_constructor(callee) && args.iter().all(|a| self.is_direct(&a.value))
-            }
-            // §6.9: `a |> C` is `C(a)`, and `a |> C(b)` is `C(a, b)`.
-            E::Binary {
-                op: ast::BinOp::Pipe,
-                lhs,
-                rhs,
-            } => {
-                self.is_direct(lhs)
-                    && match &rhs.kind {
-                        E::Name { .. } => is_constructor(rhs),
-                        E::Call { callee, args } => {
-                            is_constructor(callee) && args.iter().all(|a| self.is_direct(&a.value))
-                        }
-                        _ => false,
+        let mut work = vec![root];
+        while let Some(e) = work.pop() {
+            match &ungroup(e).kind {
+                E::Fn(_)
+                | E::Clauses(_)
+                | E::Int(_)
+                | E::Float(_)
+                | E::String(_)
+                | E::Name { .. } => {}
+                E::Unary { expr, .. } => {
+                    if !matches!(ungroup(expr).kind, E::Int(_) | E::Float(_) | E::String(_)) {
+                        return false;
                     }
+                }
+                E::Field { target, .. } => match &target.kind {
+                    E::Name { module: None, name }
+                        if matches!(
+                            self.find(&name.name, name.span),
+                            Some(Found::Entry(Entry::Module(_)))
+                        ) => {}
+                    _ => return false,
+                },
+                E::Tuple(items) => work.extend(items.iter().rev()),
+                E::List { items, rest } => {
+                    if let Some(rest) = rest {
+                        work.push(rest);
+                    }
+                    work.extend(items.iter().rev());
+                }
+                E::Call { callee, args } => {
+                    if !is_constructor(callee) {
+                        return false;
+                    }
+                    work.extend(args.iter().rev().map(|a| &a.value));
+                }
+                E::Binary {
+                    op: ast::BinOp::Pipe,
+                    lhs,
+                    rhs,
+                } => {
+                    match &rhs.kind {
+                        E::Name { .. } if is_constructor(rhs) => {}
+                        E::Call { callee, args } if is_constructor(callee) => {
+                            work.extend(args.iter().rev().map(|a| &a.value))
+                        }
+                        _ => return false,
+                    }
+                    work.push(lhs);
+                }
+                _ => return false,
             }
-            _ => false,
         }
+        true
     }
 
     fn check_binder(&mut self, name: &str, span: Span, top: bool, type_parameter: bool) {
@@ -2908,211 +3168,761 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn expr(&mut self, e: &ast::Expr) -> Expr {
+    fn expr(&mut self, root: &ast::Expr) -> Expr {
         use ast::ExprKind as E;
-        let kind = match &e.kind {
-            E::Quote(_) => {
-                self.error(
-                    code::MACRO_RESERVED,
-                    e.span,
-                    "a quote must be evaluated inside a macro",
-                );
-                ExprKind::Error
-            }
-            E::Int(n) => ExprKind::Int(n.clone()),
-            E::Float(f) => ExprKind::Float(*f),
-            E::String(s) => ExprKind::String(s.clone()),
-            E::Name { module, name } => self.name(module.as_ref(), name),
-            E::Tuple(items) => ExprKind::Tuple(items.iter().map(|x| self.expr(x)).collect()),
-            E::List { items, rest } => ExprKind::List {
-                items: items.iter().map(|x| self.expr(x)).collect(),
-                rest: rest.as_ref().map(|r| Box::new(self.expr(r))),
+        enum Build<'a> {
+            Tuple(usize),
+            List(usize, bool),
+            Call(&'a [ast::Arg]),
+            Field(&'a Ident),
+            Index(&'a num_bigint::BigUint, Span),
+            Unary(ast::UnOp),
+            Binary(ast::BinOp),
+            Update(Option<CtorRef>, Span, &'a [(Ident, ast::Expr)]),
+        }
+        enum Task<'a> {
+            Visit(&'a ast::Expr),
+            Finish(Span, Build<'a>),
+            BitNext {
+                span: Span,
+                segs: &'a [ast::Segment<ast::Expr>],
+                index: usize,
+                out: Vec<Segment<Expr>>,
             },
-            E::BitArray(segs) => ExprKind::BitArray(
-                segs.iter()
-                    .map(|s| Segment {
-                        value: self.expr(&s.value),
-                        format: self.format(s.format.as_ref()),
-                        span: s.span,
-                    })
-                    .collect(),
-            ),
-            E::Block(b) => ExprKind::Block(self.block(b)),
-            E::Fn(f) => ExprKind::Fn(Box::new(self.function(f, e.span))),
-            E::Clauses(clauses) => self.clause_function(clauses, e.span),
-            E::Case { subject, clauses }
-                if clauses.len() == 1
-                    && clauses[0].guard.is_none()
-                    && clauses[0].patterns.len() == 1 =>
-            {
-                let clause = &clauses[0];
-                // §3.9: the subject precedes the new scope; no type frame,
-                // no generalization, and the binding stops at the pattern.
-                let value = self.expr(subject);
-                let mut binders = Vec::new();
-                let pattern = self.pattern(&clause.patterns[0], &mut binders, None);
-                self.locals.push(Frame {
-                    names: binders
-                        .into_iter()
-                        .map(|b| (self.name_key(&b.name, b.span), b.var))
-                        .collect(),
-                    fn_only: None,
-                });
-                let body = self.expr(&clause.body);
-                self.locals.pop();
-                let span = pattern.span;
-                ExprKind::Block(Block {
-                    stmts: vec![
-                        Stmt::Bind(Binding {
-                            pattern,
-                            value,
-                            direct: false,
-                            ty_vars: vec![],
-                            span,
-                        }),
-                        Stmt::Expr(body),
-                    ],
-                    span: e.span,
-                })
-            }
-            E::Case {
-                subject, clauses, ..
-            } => ExprKind::Case {
-                subject: Box::new(self.expr(subject)),
-                clauses: clauses.iter().map(|c| self.clause(c)).collect(),
+            BitValue {
+                span: Span,
+                segs: &'a [ast::Segment<ast::Expr>],
+                index: usize,
+                out: Vec<Segment<Expr>>,
             },
-            E::Call { callee, args } => ExprKind::Call {
-                callee: Box::new(self.expr(callee)),
-                args: args
-                    .iter()
-                    .map(|a| Arg {
-                        label: a.label.clone(),
-                        value: self.expr(&a.value),
-                    })
-                    .collect(),
+            BitFormat {
+                span: Span,
+                segs: &'a [ast::Segment<ast::Expr>],
+                index: usize,
+                out: Vec<Segment<Expr>>,
+                value: Expr,
             },
-            E::Field { target, name } => {
-                let module = match &target.kind {
-                    E::Name { module: None, name } => match self.find(&name.name, name.span) {
-                        Some(Found::Entry(Entry::Module(t))) => {
-                            Some(Some((t, self.compiler_reference(name))))
+            BlockStart(&'a ast::Block),
+            BlockNext {
+                block: &'a ast::Block,
+                index: usize,
+                mark: usize,
+                stmts: Vec<Stmt>,
+            },
+            BlockExpr {
+                span: Span,
+            },
+            BlockAfterExpr {
+                block: &'a ast::Block,
+                index: usize,
+                mark: usize,
+                stmts: Vec<Stmt>,
+            },
+            BlockAfterEnv {
+                block: &'a ast::Block,
+                index: usize,
+                mark: usize,
+                stmts: Vec<Stmt>,
+                ty: Type,
+                span: Span,
+            },
+            BlockAfterBinding {
+                block: &'a ast::Block,
+                index: usize,
+                mark: usize,
+                stmts: Vec<Stmt>,
+                binding: &'a ast::Binding,
+                pattern: Pattern,
+                binders: Vec<Binder>,
+                ty_vars: Vec<TyVarId>,
+                direct: bool,
+            },
+            FunctionFinish {
+                span: Span,
+                params: Vec<Param>,
+                ret: Option<RetType>,
+            },
+            ClauseFunctionFinish {
+                span: Span,
+                params: Vec<Param>,
+                ret: Option<RetType>,
+            },
+            CaseAfterSubject {
+                span: Span,
+                clauses: &'a [ast::Clause],
+            },
+            CaseNext {
+                span: Span,
+                subject: Expr,
+                clauses: &'a [ast::Clause],
+                index: usize,
+                out: Vec<Clause>,
+            },
+            CaseAfterGuard {
+                span: Span,
+                subject: Expr,
+                clauses: &'a [ast::Clause],
+                index: usize,
+                out: Vec<Clause>,
+                patterns: Vec<Pattern>,
+                has_guard: bool,
+            },
+            CaseAfterBody {
+                span: Span,
+                subject: Expr,
+                clauses: &'a [ast::Clause],
+                index: usize,
+                out: Vec<Clause>,
+                patterns: Vec<Pattern>,
+                guard: Option<Expr>,
+            },
+            SingleAfterSubject {
+                span: Span,
+                clause: &'a ast::Clause,
+            },
+            SingleAfterBody {
+                span: Span,
+                pattern: Pattern,
+                value: Expr,
+            },
+        }
+        let mut work = vec![Task::Visit(root)];
+        let mut values: Vec<Expr> = Vec::new();
+        let mut blocks: Vec<Block> = Vec::new();
+        while let Some(task) = work.pop() {
+            match task {
+                Task::Visit(e) => {
+                    let kind = match &e.kind {
+                        E::Quote(_) => {
+                            self.error(
+                                code::MACRO_RESERVED,
+                                e.span,
+                                "a quote must be evaluated inside a macro",
+                            );
+                            ExprKind::Error
                         }
-                        Some(Found::Entry(Entry::Broken)) => Some(None),
-                        _ => None,
-                    },
-                    _ => None,
-                };
-                match module {
-                    Some(Some((t, trusted))) => self.member(t, name, trusted),
-                    Some(None) => ExprKind::Error,
-                    None => ExprKind::Field {
-                        target: Box::new(self.expr(target)),
-                        name: name.clone(),
-                    },
-                }
-            }
-            E::TupleIndex {
-                target,
-                index,
-                index_span,
-            } => ExprKind::TupleIndex {
-                target: Box::new(self.expr(target)),
-                index: index.clone(),
-                index_span: *index_span,
-            },
-            E::RecordUpdate {
-                constructor,
-                base,
-                fields,
-            } => {
-                let ctor = match &constructor.kind {
-                    E::Name { module, name } => self.ctor(module.as_ref(), name),
-                    _ => {
-                        self.error(
-                            code::NOT_A_CONSTRUCTOR,
-                            constructor.span,
-                            "a record update starts with a constructor",
-                        );
-                        None
-                    }
-                };
-                let base = Box::new(self.expr(base));
-                let fields = fields
-                    .iter()
-                    .map(|(n, x)| (n.clone(), self.expr(x)))
-                    .collect();
-                match ctor {
-                    Some(ctor) => ExprKind::RecordUpdate {
-                        ctor,
-                        ctor_span: constructor.span,
-                        base,
-                        fields,
-                    },
-                    None => ExprKind::Error,
-                }
-            }
-            E::Unary { op, expr } => ExprKind::Unary {
-                op: *op,
-                expr: Box::new(self.expr(expr)),
-            },
-            E::Binary { op, lhs, rhs } => ExprKind::Binary {
-                op: *op,
-                lhs: Box::new(self.expr(lhs)),
-                rhs: Box::new(self.expr(rhs)),
-            },
-        };
-        Expr { kind, span: e.span }
-    }
-
-    fn clause_function(&mut self, clauses: &[ast::Clause], span: Span) -> ExprKind {
-        let single =
-            clauses.len() == 1 && clauses[0].guard.is_none() && clauses[0].patterns.len() == 1;
-        let synthetic = Span::new(span.start, span.start);
-        let (param, body) = if single {
-            (clauses[0].patterns[0].clone(), clauses[0].body.clone())
-        } else {
-            let case_span = match (clauses.first(), clauses.last()) {
-                (Some(first), Some(last)) => first.span.to(last.span),
-                _ => Span::new(span.start + 1, span.start + 1),
-            };
-            (
-                ast::Pattern {
-                    kind: ast::PatternKind::Var("%arg".into()),
-                    span: synthetic,
-                },
-                ast::Expr {
-                    kind: ast::ExprKind::Case {
-                        subject: Box::new(ast::Expr {
-                            kind: ast::ExprKind::Name {
-                                module: None,
-                                name: ast::Ident {
+                        E::Int(n) => ExprKind::Int(n.clone()),
+                        E::Float(f) => ExprKind::Float(*f),
+                        E::String(x) => ExprKind::String(x.clone()),
+                        E::Name { module, name } => self.name(module.as_ref(), name),
+                        E::Tuple(items) => {
+                            work.push(Task::Finish(e.span, Build::Tuple(items.len())));
+                            work.extend(items.iter().rev().map(Task::Visit));
+                            continue;
+                        }
+                        E::List { items, rest } => {
+                            work.push(Task::Finish(
+                                e.span,
+                                Build::List(items.len(), rest.is_some()),
+                            ));
+                            if let Some(rest) = rest {
+                                work.push(Task::Visit(rest));
+                            }
+                            work.extend(items.iter().rev().map(Task::Visit));
+                            continue;
+                        }
+                        E::BitArray(segs) => {
+                            work.push(Task::BitNext {
+                                span: e.span,
+                                segs,
+                                index: 0,
+                                out: Vec::with_capacity(segs.len()),
+                            });
+                            continue;
+                        }
+                        E::Call { callee, args } => {
+                            work.push(Task::Finish(e.span, Build::Call(args)));
+                            work.extend(args.iter().rev().map(|a| Task::Visit(&a.value)));
+                            work.push(Task::Visit(callee));
+                            continue;
+                        }
+                        E::Field { target, name } => {
+                            let module = match &target.kind {
+                                E::Name { module: None, name } => {
+                                    match self.find(&name.name, name.span) {
+                                        Some(Found::Entry(Entry::Module(t))) => {
+                                            Some(Some((t, self.compiler_reference(name))))
+                                        }
+                                        Some(Found::Entry(Entry::Broken)) => Some(None),
+                                        _ => None,
+                                    }
+                                }
+                                _ => None,
+                            };
+                            match module {
+                                Some(Some((t, trusted))) => self.member(t, name, trusted),
+                                Some(None) => ExprKind::Error,
+                                None => {
+                                    work.push(Task::Finish(e.span, Build::Field(name)));
+                                    work.push(Task::Visit(target));
+                                    continue;
+                                }
+                            }
+                        }
+                        E::TupleIndex {
+                            target,
+                            index,
+                            index_span,
+                        } => {
+                            work.push(Task::Finish(e.span, Build::Index(index, *index_span)));
+                            work.push(Task::Visit(target));
+                            continue;
+                        }
+                        E::RecordUpdate {
+                            constructor,
+                            base,
+                            fields,
+                        } => {
+                            let ctor = match &constructor.kind {
+                                E::Name { module, name } => self.ctor(module.as_ref(), name),
+                                _ => {
+                                    self.error(
+                                        code::NOT_A_CONSTRUCTOR,
+                                        constructor.span,
+                                        "a record update starts with a constructor",
+                                    );
+                                    None
+                                }
+                            };
+                            work.push(Task::Finish(
+                                e.span,
+                                Build::Update(ctor, constructor.span, fields),
+                            ));
+                            work.extend(fields.iter().rev().map(|(_, x)| Task::Visit(x)));
+                            work.push(Task::Visit(base));
+                            continue;
+                        }
+                        E::Unary { op, expr } => {
+                            work.push(Task::Finish(e.span, Build::Unary(*op)));
+                            work.push(Task::Visit(expr));
+                            continue;
+                        }
+                        E::Binary { op, lhs, rhs } => {
+                            work.push(Task::Finish(e.span, Build::Binary(*op)));
+                            work.push(Task::Visit(rhs));
+                            work.push(Task::Visit(lhs));
+                            continue;
+                        }
+                        E::Block(block) => {
+                            work.push(Task::BlockExpr { span: e.span });
+                            work.push(Task::BlockStart(block));
+                            continue;
+                        }
+                        E::Fn(f) => {
+                            let (params, ret) = self.enter_function(f);
+                            work.push(Task::FunctionFinish {
+                                span: e.span,
+                                params,
+                                ret,
+                            });
+                            work.push(Task::BlockStart(&f.body));
+                            continue;
+                        }
+                        E::Case { subject, clauses }
+                            if clauses.len() == 1
+                                && clauses[0].guard.is_none()
+                                && clauses[0].patterns.len() == 1 =>
+                        {
+                            work.push(Task::SingleAfterSubject {
+                                span: e.span,
+                                clause: &clauses[0],
+                            });
+                            work.push(Task::Visit(subject));
+                            continue;
+                        }
+                        E::Case { subject, clauses } => {
+                            work.push(Task::CaseAfterSubject {
+                                span: e.span,
+                                clauses,
+                            });
+                            work.push(Task::Visit(subject));
+                            continue;
+                        }
+                        E::Clauses(clauses) => {
+                            let single = clauses.len() == 1
+                                && clauses[0].guard.is_none()
+                                && clauses[0].patterns.len() == 1;
+                            let synthetic = Span::new(e.span.start, e.span.start);
+                            let parameter = if single {
+                                clauses[0].patterns[0].clone()
+                            } else {
+                                ast::Pattern {
+                                    kind: ast::PatternKind::Var("%arg".into()),
+                                    span: synthetic,
+                                }
+                            };
+                            let temporary = ast::Function {
+                                params: vec![ast::Param::Pattern(parameter)],
+                                ret: None,
+                                body: ast::Block {
+                                    stmts: Vec::new(),
+                                    span: e.span,
+                                },
+                            };
+                            let (mut params, ret) = self.enter_function(&temporary);
+                            if !single && let Param::Pattern { label, .. } = &mut params[0] {
+                                *label = None;
+                            }
+                            work.push(Task::ClauseFunctionFinish {
+                                span: e.span,
+                                params,
+                                ret,
+                            });
+                            if single {
+                                work.push(Task::Visit(&clauses[0].body));
+                            } else {
+                                let case_span = match (clauses.first(), clauses.last()) {
+                                    (Some(first), Some(last)) => first.span.to(last.span),
+                                    _ => Span::new(e.span.start + 1, e.span.start + 1),
+                                };
+                                let name = Ident {
                                     name: "%arg".into(),
                                     span: synthetic,
+                                };
+                                let subject = Expr {
+                                    kind: self.name(None, &name),
+                                    span: synthetic,
+                                };
+                                work.push(Task::CaseNext {
+                                    span: case_span,
+                                    subject,
+                                    clauses,
+                                    index: 0,
+                                    out: Vec::with_capacity(clauses.len()),
+                                });
+                            }
+                            continue;
+                        }
+                    };
+                    values.push(Expr { kind, span: e.span });
+                }
+                Task::Finish(span, build) => {
+                    let kind = match build {
+                        Build::Tuple(count) => {
+                            ExprKind::Tuple(values.split_off(values.len() - count))
+                        }
+                        Build::List(count, rest) => {
+                            let mut parts =
+                                values.split_off(values.len() - count - usize::from(rest));
+                            let rest = rest.then(|| Box::new(parts.pop().expect("list rest")));
+                            ExprKind::List { items: parts, rest }
+                        }
+                        Build::Call(args) => {
+                            let mut parts =
+                                values.split_off(values.len() - args.len() - 1).into_iter();
+                            let callee = Box::new(parts.next().expect("call callee"));
+                            let args = args
+                                .iter()
+                                .map(|a| Arg {
+                                    label: a.label.clone(),
+                                    value: parts.next().expect("call argument"),
+                                })
+                                .collect();
+                            ExprKind::Call { callee, args }
+                        }
+                        Build::Field(name) => ExprKind::Field {
+                            target: Box::new(values.pop().expect("field target")),
+                            name: name.clone(),
+                        },
+                        Build::Index(index, index_span) => ExprKind::TupleIndex {
+                            target: Box::new(values.pop().expect("index target")),
+                            index: index.clone(),
+                            index_span,
+                        },
+                        Build::Unary(op) => ExprKind::Unary {
+                            op,
+                            expr: Box::new(values.pop().expect("unary operand")),
+                        },
+                        Build::Binary(op) => {
+                            let rhs = Box::new(values.pop().expect("binary rhs"));
+                            let lhs = Box::new(values.pop().expect("binary lhs"));
+                            ExprKind::Binary { op, lhs, rhs }
+                        }
+                        Build::Update(ctor, ctor_span, fields) => {
+                            let mut parts = values
+                                .split_off(values.len() - fields.len() - 1)
+                                .into_iter();
+                            let base = Box::new(parts.next().expect("record update base"));
+                            let fields = fields
+                                .iter()
+                                .map(|(n, _)| (n.clone(), parts.next().expect("record field")))
+                                .collect();
+                            match ctor {
+                                Some(ctor) => ExprKind::RecordUpdate {
+                                    ctor,
+                                    ctor_span,
+                                    base,
+                                    fields,
                                 },
-                            },
-                            span: synthetic,
-                        }),
-                        clauses: clauses.to_vec(),
-                    },
-                    span: case_span,
-                },
-            )
-        };
-        let mut function = self.function(
-            &ast::Function {
-                params: vec![ast::Param::Pattern(param)],
-                ret: None,
-                body: ast::Block {
-                    stmts: vec![ast::Stmt::Expr(body)],
+                                None => ExprKind::Error,
+                            }
+                        }
+                    };
+                    values.push(Expr { kind, span });
+                }
+                Task::BitNext {
                     span,
-                },
-            },
-            span,
-        );
-        if !single && let Param::Pattern { label, .. } = &mut function.params[0] {
-            *label = None;
+                    segs,
+                    index,
+                    out,
+                } => {
+                    if index == segs.len() {
+                        values.push(Expr {
+                            kind: ExprKind::BitArray(out),
+                            span,
+                        });
+                    } else {
+                        work.push(Task::BitValue {
+                            span,
+                            segs,
+                            index,
+                            out,
+                        });
+                        work.push(Task::Visit(&segs[index].value));
+                    }
+                }
+                Task::BitValue {
+                    span,
+                    segs,
+                    index,
+                    mut out,
+                } => {
+                    let segment = &segs[index];
+                    let value = values.pop().expect("bit expression segment");
+                    if let Some(arg) = segment.format.as_ref().and_then(|f| f.arg.as_ref()) {
+                        work.push(Task::BitFormat {
+                            span,
+                            segs,
+                            index,
+                            out,
+                            value,
+                        });
+                        work.push(Task::Visit(arg));
+                    } else {
+                        let format = segment.format.as_ref().map(|f| Format {
+                            name: f.name.clone(),
+                            arg: None,
+                        });
+                        out.push(Segment {
+                            value,
+                            format,
+                            span: segment.span,
+                        });
+                        work.push(Task::BitNext {
+                            span,
+                            segs,
+                            index: index + 1,
+                            out,
+                        });
+                    }
+                }
+                Task::BitFormat {
+                    span,
+                    segs,
+                    index,
+                    mut out,
+                    value,
+                } => {
+                    let segment = &segs[index];
+                    let f = segment.format.as_ref().expect("format with argument");
+                    let format = Some(Format {
+                        name: f.name.clone(),
+                        arg: Some(Box::new(values.pop().expect("format argument"))),
+                    });
+                    out.push(Segment {
+                        value,
+                        format,
+                        span: segment.span,
+                    });
+                    work.push(Task::BitNext {
+                        span,
+                        segs,
+                        index: index + 1,
+                        out,
+                    });
+                }
+                Task::BlockStart(block) => {
+                    work.push(Task::BlockNext {
+                        block,
+                        index: 0,
+                        mark: self.locals.len(),
+                        stmts: Vec::with_capacity(block.stmts.len()),
+                    });
+                }
+                Task::BlockNext {
+                    block,
+                    index,
+                    mark,
+                    stmts,
+                } => {
+                    if index == block.stmts.len() {
+                        self.locals.truncate(mark);
+                        blocks.push(Block {
+                            stmts,
+                            span: block.span,
+                        });
+                    } else {
+                        match &block.stmts[index] {
+                            ast::Stmt::Bind(binding) => {
+                                let (pattern, binders, ty_vars, direct) =
+                                    self.enter_binding(binding, false);
+                                work.push(Task::BlockAfterBinding {
+                                    block,
+                                    index,
+                                    mark,
+                                    stmts,
+                                    binding,
+                                    pattern,
+                                    binders,
+                                    ty_vars,
+                                    direct,
+                                });
+                                work.push(Task::Visit(&binding.value));
+                            }
+                            ast::Stmt::Env { ty, value, span } => {
+                                let ty = self.ty(ty);
+                                self.env_type(&ty);
+                                work.push(Task::BlockAfterEnv {
+                                    block,
+                                    index,
+                                    mark,
+                                    stmts,
+                                    ty,
+                                    span: *span,
+                                });
+                                work.push(Task::Visit(value));
+                            }
+                            ast::Stmt::Expr(expr) => {
+                                work.push(Task::BlockAfterExpr {
+                                    block,
+                                    index,
+                                    mark,
+                                    stmts,
+                                });
+                                work.push(Task::Visit(expr));
+                            }
+                        }
+                    }
+                }
+                Task::BlockAfterExpr {
+                    block,
+                    index,
+                    mark,
+                    mut stmts,
+                } => {
+                    stmts.push(Stmt::Expr(values.pop().expect("block expression")));
+                    work.push(Task::BlockNext {
+                        block,
+                        index: index + 1,
+                        mark,
+                        stmts,
+                    });
+                }
+                Task::BlockAfterEnv {
+                    block,
+                    index,
+                    mark,
+                    mut stmts,
+                    ty,
+                    span,
+                } => {
+                    let value = values.pop().expect("environment value");
+                    stmts.push(Stmt::Env { ty, value, span });
+                    work.push(Task::BlockNext {
+                        block,
+                        index: index + 1,
+                        mark,
+                        stmts,
+                    });
+                }
+                Task::BlockAfterBinding {
+                    block,
+                    index,
+                    mark,
+                    mut stmts,
+                    binding,
+                    pattern,
+                    binders,
+                    ty_vars,
+                    direct,
+                } => {
+                    let value = values.pop().expect("binding value");
+                    let (binding, binders) = self
+                        .leave_binding(binding, false, pattern, binders, ty_vars, direct, value);
+                    self.locals.push(Frame {
+                        names: binders
+                            .into_iter()
+                            .map(|b| (self.name_key(&b.name, b.span), b.var))
+                            .collect(),
+                        fn_only: None,
+                    });
+                    stmts.push(Stmt::Bind(binding));
+                    work.push(Task::BlockNext {
+                        block,
+                        index: index + 1,
+                        mark,
+                        stmts,
+                    });
+                }
+                Task::BlockExpr { span } => {
+                    values.push(Expr {
+                        kind: ExprKind::Block(blocks.pop().expect("resolved block")),
+                        span,
+                    });
+                }
+                Task::FunctionFinish { span, params, ret } => {
+                    let body = blocks.pop().expect("resolved function body");
+                    let function = self.leave_function(params, ret, body, span);
+                    values.push(Expr {
+                        kind: ExprKind::Fn(Box::new(function)),
+                        span,
+                    });
+                }
+                Task::ClauseFunctionFinish { span, params, ret } => {
+                    let body = Block {
+                        stmts: vec![Stmt::Expr(values.pop().expect("clause function body"))],
+                        span,
+                    };
+                    let function = self.leave_function(params, ret, body, span);
+                    values.push(Expr {
+                        kind: ExprKind::Fn(Box::new(function)),
+                        span,
+                    });
+                }
+                Task::CaseAfterSubject { span, clauses } => {
+                    let subject = values.pop().expect("case subject");
+                    work.push(Task::CaseNext {
+                        span,
+                        subject,
+                        clauses,
+                        index: 0,
+                        out: Vec::with_capacity(clauses.len()),
+                    });
+                }
+                Task::CaseNext {
+                    span,
+                    subject,
+                    clauses,
+                    index,
+                    out,
+                } => {
+                    if index == clauses.len() {
+                        values.push(Expr {
+                            kind: ExprKind::Case {
+                                subject: Box::new(subject),
+                                clauses: out,
+                            },
+                            span,
+                        });
+                    } else {
+                        let clause = &clauses[index];
+                        let patterns = self.enter_clause(clause);
+                        work.push(Task::CaseAfterGuard {
+                            span,
+                            subject,
+                            clauses,
+                            index,
+                            out,
+                            patterns,
+                            has_guard: clause.guard.is_some(),
+                        });
+                        if let Some(guard) = &clause.guard {
+                            work.push(Task::Visit(guard));
+                        }
+                    }
+                }
+                Task::CaseAfterGuard {
+                    span,
+                    subject,
+                    clauses,
+                    index,
+                    out,
+                    patterns,
+                    has_guard,
+                } => {
+                    let guard = has_guard.then(|| values.pop().expect("clause guard"));
+                    work.push(Task::CaseAfterBody {
+                        span,
+                        subject,
+                        clauses,
+                        index,
+                        out,
+                        patterns,
+                        guard,
+                    });
+                    work.push(Task::Visit(&clauses[index].body));
+                }
+                Task::CaseAfterBody {
+                    span,
+                    subject,
+                    clauses,
+                    index,
+                    mut out,
+                    patterns,
+                    guard,
+                } => {
+                    let body = values.pop().expect("clause body");
+                    out.push(self.leave_clause(&clauses[index], patterns, guard, body));
+                    work.push(Task::CaseNext {
+                        span,
+                        subject,
+                        clauses,
+                        index: index + 1,
+                        out,
+                    });
+                }
+                Task::SingleAfterSubject { span, clause } => {
+                    let value = values.pop().expect("single case subject");
+                    let mut binders = Vec::new();
+                    let pattern = self.pattern(&clause.patterns[0], &mut binders, None);
+                    self.locals.push(Frame {
+                        names: binders
+                            .into_iter()
+                            .map(|b| (self.name_key(&b.name, b.span), b.var))
+                            .collect(),
+                        fn_only: None,
+                    });
+                    work.push(Task::SingleAfterBody {
+                        span,
+                        pattern,
+                        value,
+                    });
+                    work.push(Task::Visit(&clause.body));
+                }
+                Task::SingleAfterBody {
+                    span,
+                    pattern,
+                    value,
+                } => {
+                    let body = values.pop().expect("single case body");
+                    self.locals.pop();
+                    let pattern_span = pattern.span;
+                    let block = Block {
+                        stmts: vec![
+                            Stmt::Bind(Binding {
+                                pattern,
+                                value,
+                                direct: false,
+                                ty_vars: vec![],
+                                span: pattern_span,
+                            }),
+                            Stmt::Expr(body),
+                        ],
+                        span,
+                    };
+                    values.push(Expr {
+                        kind: ExprKind::Block(block),
+                        span,
+                    });
+                }
+            }
         }
-        ExprKind::Fn(Box::new(function))
+        assert_eq!(
+            values.len(),
+            1,
+            "expression resolution work stack must return one value"
+        );
+        values.pop().unwrap()
     }
 
     fn format(&mut self, f: Option<&ast::Format>) -> Option<Format> {
@@ -3122,44 +3932,7 @@ impl<'a> Resolver<'a> {
         })
     }
 
-    fn block(&mut self, b: &ast::Block) -> Block {
-        let mark = self.locals.len();
-        let mut stmts = Vec::new();
-        for s in &b.stmts {
-            stmts.push(match s {
-                ast::Stmt::Bind(binding) => {
-                    let (binding, binders) = self.binding(binding, false);
-                    self.locals.push(Frame {
-                        names: binders
-                            .into_iter()
-                            .map(|b| (self.name_key(&b.name, b.span), b.var))
-                            .collect(),
-                        fn_only: None,
-                    });
-                    Stmt::Bind(binding)
-                }
-                ast::Stmt::Env { ty, value, span } => {
-                    let ty = self.ty(ty);
-                    self.env_type(&ty);
-                    let value = self.expr(value);
-                    Stmt::Env {
-                        ty,
-                        value,
-                        span: *span,
-                    }
-                }
-                ast::Stmt::Expr(e) => Stmt::Expr(self.expr(e)),
-            });
-        }
-        self.locals.truncate(mark);
-        Block {
-            stmts,
-            span: b.span,
-        }
-    }
-
-    /// §6.8 and §6.11.
-    fn function(&mut self, f: &ast::Function, span: Span) -> Function {
+    fn enter_function(&mut self, f: &ast::Function) -> (Vec<Param>, Option<RetType>) {
         let mut params = Vec::new();
         let mut env_heads: Vec<TypeRef> = Vec::new();
         let mut all: Vec<Binder> = Vec::new();
@@ -3254,7 +4027,16 @@ impl<'a> Resolver<'a> {
                 .collect(),
             fn_only: None,
         });
-        let body = self.block(&f.body);
+        (params, ret)
+    }
+
+    fn leave_function(
+        &mut self,
+        params: Vec<Param>,
+        ret: Option<RetType>,
+        body: Block,
+        span: Span,
+    ) -> Function {
         self.locals.pop();
         self.fn_depth -= 1;
         Function {
@@ -3278,7 +4060,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn clause(&mut self, c: &ast::Clause) -> Clause {
+    fn enter_clause(&mut self, c: &ast::Clause) -> Vec<Pattern> {
         let mut first: Vec<Binder> = Vec::new();
         let mut patterns = Vec::new();
         let mut pending = Vec::new();
@@ -3337,8 +4119,16 @@ impl<'a> Resolver<'a> {
                 .collect(),
             fn_only: None,
         });
-        let guard = c.guard.as_ref().map(|g| self.expr(g));
-        let body = self.expr(&c.body);
+        patterns
+    }
+
+    fn leave_clause(
+        &mut self,
+        c: &ast::Clause,
+        patterns: Vec<Pattern>,
+        guard: Option<Expr>,
+        body: Expr,
+    ) -> Clause {
         self.locals.pop();
         Clause {
             patterns,
@@ -3382,93 +4172,206 @@ impl<'a> Resolver<'a> {
 
     fn pattern(
         &mut self,
-        p: &ast::Pattern,
+        root: &ast::Pattern,
         binders: &mut Vec<Binder>,
         shared: Option<&HashMap<NameKey, VarId>>,
     ) -> Pattern {
         use ast::PatternKind as P;
-        let kind = match &p.kind {
-            P::Quote(_) => {
-                self.error(
-                    code::MACRO_RESERVED,
-                    p.span,
-                    "a quote pattern must be evaluated inside a macro",
-                );
-                PatternKind::Error(Vec::new())
-            }
-            P::Var(n) => PatternKind::Var(self.bind(n, p.span, binders, shared)),
-            P::Discard(_) => PatternKind::Discard,
-            P::Typed { binder, ty } => {
-                let binder = (!binder.discard)
-                    .then(|| self.bind(&binder.name, binder.span, binders, shared));
-                PatternKind::Typed {
-                    binder,
-                    ty: self.ty(ty),
-                }
-            }
-            P::Named { name, pattern } => {
-                let binder = self.bind(&name.name, name.span, binders, shared);
-                PatternKind::Named {
-                    binder,
-                    pattern: Box::new(self.pattern(pattern, binders, shared)),
-                }
-            }
-            P::Int { negative, value } => PatternKind::Int {
-                negative: *negative,
-                value: value.clone(),
+        enum Task<'a> {
+            Visit(&'a ast::Pattern),
+            Named {
+                span: Span,
+                binder: Binder,
             },
-            P::Float { negative, value } => PatternKind::Float {
-                negative: *negative,
-                value: *value,
+            Constructor {
+                span: Span,
+                ctor: Option<CtorRef>,
+                spread: bool,
+                count: usize,
             },
-            P::String(s) => PatternKind::String(s.clone()),
-            P::Prefix { prefix, rest } => PatternKind::Prefix {
-                prefix: prefix.clone(),
-                rest: (!rest.discard).then(|| self.bind(&rest.name, rest.span, binders, shared)),
+            Tuple {
+                span: Span,
+                count: usize,
             },
-            P::Constructor {
-                module,
-                name,
-                args,
-                spread,
-            } => {
-                let ctor = self.ctor(module.as_ref(), name);
-                let args: Vec<Pattern> = args
-                    .iter()
-                    .map(|a| self.pattern(a, binders, shared))
-                    .collect();
-                match ctor {
-                    Some(ctor) => PatternKind::Constructor {
-                        ctor,
-                        args,
-                        spread: *spread,
-                    },
-                    None => PatternKind::Error(args),
+            List {
+                span: Span,
+                count: usize,
+                rest: &'a Option<Option<ast::Binder>>,
+            },
+            BitNext {
+                span: Span,
+                segments: &'a [ast::Segment<ast::Pattern>],
+                index: usize,
+                out: Vec<Segment<Pattern>>,
+            },
+            BitFinish {
+                span: Span,
+                segments: &'a [ast::Segment<ast::Pattern>],
+                index: usize,
+                out: Vec<Segment<Pattern>>,
+            },
+        }
+        let mut work = vec![Task::Visit(root)];
+        let mut values: Vec<Pattern> = Vec::new();
+        while let Some(task) = work.pop() {
+            match task {
+                Task::Visit(p) => {
+                    let kind = match &p.kind {
+                        P::Quote(_) => {
+                            self.error(
+                                code::MACRO_RESERVED,
+                                p.span,
+                                "a quote pattern must be evaluated inside a macro",
+                            );
+                            PatternKind::Error(Vec::new())
+                        }
+                        P::Var(n) => PatternKind::Var(self.bind(n, p.span, binders, shared)),
+                        P::Discard(_) => PatternKind::Discard,
+                        P::Typed { binder, ty } => {
+                            let binder = (!binder.discard)
+                                .then(|| self.bind(&binder.name, binder.span, binders, shared));
+                            PatternKind::Typed {
+                                binder,
+                                ty: self.ty(ty),
+                            }
+                        }
+                        P::Named { name, pattern } => {
+                            let binder = self.bind(&name.name, name.span, binders, shared);
+                            work.push(Task::Named {
+                                span: p.span,
+                                binder,
+                            });
+                            work.push(Task::Visit(pattern));
+                            continue;
+                        }
+                        P::Int { negative, value } => PatternKind::Int {
+                            negative: *negative,
+                            value: value.clone(),
+                        },
+                        P::Float { negative, value } => PatternKind::Float {
+                            negative: *negative,
+                            value: *value,
+                        },
+                        P::String(x) => PatternKind::String(x.clone()),
+                        P::Prefix { prefix, rest } => PatternKind::Prefix {
+                            prefix: prefix.clone(),
+                            rest: (!rest.discard)
+                                .then(|| self.bind(&rest.name, rest.span, binders, shared)),
+                        },
+                        P::Constructor {
+                            module,
+                            name,
+                            args,
+                            spread,
+                        } => {
+                            let ctor = self.ctor(module.as_ref(), name);
+                            work.push(Task::Constructor {
+                                span: p.span,
+                                ctor,
+                                spread: *spread,
+                                count: args.len(),
+                            });
+                            work.extend(args.iter().rev().map(Task::Visit));
+                            continue;
+                        }
+                        P::Tuple(items) => {
+                            work.push(Task::Tuple {
+                                span: p.span,
+                                count: items.len(),
+                            });
+                            work.extend(items.iter().rev().map(Task::Visit));
+                            continue;
+                        }
+                        P::List { items, rest } => {
+                            work.push(Task::List {
+                                span: p.span,
+                                count: items.len(),
+                                rest,
+                            });
+                            work.extend(items.iter().rev().map(Task::Visit));
+                            continue;
+                        }
+                        P::BitArray(segments) => {
+                            work.push(Task::BitNext {
+                                span: p.span,
+                                segments,
+                                index: 0,
+                                out: Vec::with_capacity(segments.len()),
+                            });
+                            continue;
+                        }
+                    };
+                    values.push(Pattern { kind, span: p.span });
                 }
-            }
-            P::Tuple(items) => PatternKind::Tuple(
-                items
-                    .iter()
-                    .map(|a| self.pattern(a, binders, shared))
-                    .collect(),
-            ),
-            P::List { items, rest } => {
-                let items = items
-                    .iter()
-                    .map(|a| self.pattern(a, binders, shared))
-                    .collect();
-                let rest = rest.as_ref().map(|r| {
-                    r.as_ref()
-                        .filter(|b| !b.discard)
-                        .map(|b| self.bind(&b.name, b.span, binders, shared))
-                });
-                PatternKind::List { items, rest }
-            }
-            P::BitArray(segs) => {
-                let mut out = Vec::new();
-                for s in segs {
-                    let value = self.pattern(&s.value, binders, shared);
-                    // §8.4: a length may use names of earlier segments.
+                Task::Named { span, binder } => {
+                    let pattern = Box::new(values.pop().expect("named pattern child"));
+                    values.push(Pattern {
+                        kind: PatternKind::Named { binder, pattern },
+                        span,
+                    });
+                }
+                Task::Constructor {
+                    span,
+                    ctor,
+                    spread,
+                    count,
+                } => {
+                    let args = values.split_off(values.len() - count);
+                    let kind = match ctor {
+                        Some(ctor) => PatternKind::Constructor { ctor, args, spread },
+                        None => PatternKind::Error(args),
+                    };
+                    values.push(Pattern { kind, span });
+                }
+                Task::Tuple { span, count } => {
+                    let items = values.split_off(values.len() - count);
+                    values.push(Pattern {
+                        kind: PatternKind::Tuple(items),
+                        span,
+                    });
+                }
+                Task::List { span, count, rest } => {
+                    let items = values.split_off(values.len() - count);
+                    let rest = rest.as_ref().map(|r| {
+                        r.as_ref()
+                            .filter(|b| !b.discard)
+                            .map(|b| self.bind(&b.name, b.span, binders, shared))
+                    });
+                    values.push(Pattern {
+                        kind: PatternKind::List { items, rest },
+                        span,
+                    });
+                }
+                Task::BitNext {
+                    span,
+                    segments,
+                    index,
+                    out,
+                } => {
+                    if index == segments.len() {
+                        values.push(Pattern {
+                            kind: PatternKind::BitArray(out),
+                            span,
+                        });
+                    } else {
+                        work.push(Task::BitFinish {
+                            span,
+                            segments,
+                            index,
+                            out,
+                        });
+                        work.push(Task::Visit(&segments[index].value));
+                    }
+                }
+                Task::BitFinish {
+                    span,
+                    segments,
+                    index,
+                    mut out,
+                } => {
+                    let segment = &segments[index];
+                    let value = values.pop().expect("bit pattern segment");
+                    // Earlier segments' binders are visible to a format expression.
                     self.locals.push(Frame {
                         names: binders
                             .iter()
@@ -3476,18 +4379,28 @@ impl<'a> Resolver<'a> {
                             .collect(),
                         fn_only: None,
                     });
-                    let format = self.format(s.format.as_ref());
+                    let format = self.format(segment.format.as_ref());
                     self.locals.pop();
                     out.push(Segment {
                         value,
                         format,
-                        span: s.span,
+                        span: segment.span,
+                    });
+                    work.push(Task::BitNext {
+                        span,
+                        segments,
+                        index: index + 1,
+                        out,
                     });
                 }
-                PatternKind::BitArray(out)
             }
-        };
-        Pattern { kind, span: p.span }
+        }
+        assert_eq!(
+            values.len(),
+            1,
+            "pattern resolution work stack must return one value"
+        );
+        values.pop().unwrap()
     }
 
     // ---- Phase 5: exported types (§2.4) ----
@@ -3564,32 +4477,50 @@ impl<'a> Resolver<'a> {
     fn hidden_types(
         &self,
         m: ModuleId,
-        t: &Type,
+        root: &Type,
         at: Option<Span>,
         seen: &mut HashSet<TypeId>,
         out: &mut Vec<(Span, String, bool)>,
     ) {
-        if let TypeKind::Named {
-            ty: TypeRef::Custom(id),
-            ..
-        } = &t.kind
-        {
-            let def = self.p.ty(*id);
-            if !def.exported {
-                match &def.body {
-                    TypeBody::Alias(body) => {
-                        if !self.circular.contains(id) && seen.insert(*id) {
-                            self.hidden_types(m, body, Some(at.unwrap_or(t.span)), seen, out);
-                            seen.remove(id);
+        enum Task<'a> {
+            Visit(&'a Type, Option<Span>),
+            Exit(TypeId),
+        }
+        let mut work = vec![Task::Visit(root, at)];
+        while let Some(task) = work.pop() {
+            match task {
+                Task::Exit(id) => {
+                    seen.remove(&id);
+                }
+                Task::Visit(t, at) => {
+                    let mut children = Vec::new();
+                    for_each_child(t, &mut |c| children.push(c));
+                    work.extend(children.into_iter().rev().map(|c| Task::Visit(c, at)));
+                    if let TypeKind::Named {
+                        ty: TypeRef::Custom(id),
+                        ..
+                    } = &t.kind
+                    {
+                        let def = self.p.ty(*id);
+                        if !def.exported {
+                            match &def.body {
+                                TypeBody::Alias(body) => {
+                                    if !self.circular.contains(id) && seen.insert(*id) {
+                                        work.push(Task::Exit(*id));
+                                        work.push(Task::Visit(body, Some(at.unwrap_or(t.span))));
+                                    }
+                                }
+                                TypeBody::Custom(_) => out.push((
+                                    at.unwrap_or(t.span),
+                                    def.name.clone(),
+                                    def.module != m,
+                                )),
+                            }
                         }
-                    }
-                    TypeBody::Custom(_) => {
-                        out.push((at.unwrap_or(t.span), def.name.clone(), def.module != m))
                     }
                 }
             }
         }
-        for_each_child(t, &mut |c| self.hidden_types(m, c, at, seen, out));
     }
 
     // ---- Phase 6: rules about the whole program ----
@@ -3775,32 +4706,15 @@ impl<'a> Resolver<'a> {
 
 /// The custom types and aliases named in a type.
 fn named_types(t: &Type, out: &mut Vec<TypeId>) {
-    match &t.kind {
-        TypeKind::Named { ty, args } => {
-            if let TypeRef::Custom(id) = ty {
-                out.push(*id);
-            }
-            args.iter().for_each(|a| named_types(a, out));
+    walk_type(t, &mut |t| {
+        if let TypeKind::Named {
+            ty: TypeRef::Custom(id),
+            ..
+        } = &t.kind
+        {
+            out.push(*id);
         }
-        TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
-            ts.iter().for_each(|a| named_types(a, out))
-        }
-        TypeKind::Fn {
-            params,
-            ret,
-            err,
-            env,
-        } => {
-            params.iter().for_each(|p| named_types(&p.ty, out));
-            named_types(ret, out);
-            err.iter().chain(env).for_each(|a| named_types(a, out));
-        }
-        TypeKind::Lit(_)
-        | TypeKind::Of { .. }
-        | TypeKind::Var(_)
-        | TypeKind::Hole
-        | TypeKind::Error => {}
-    }
+    });
 }
 
 /// `C` or `m.C`: constructors are the only values with an `UpName`.
@@ -3809,7 +4723,7 @@ fn is_constructor(e: &ast::Expr) -> bool {
 }
 
 /// Calls `f` on each type directly inside `t`.
-fn for_each_child(t: &Type, f: &mut dyn FnMut(&Type)) {
+fn for_each_child<'a>(t: &'a Type, f: &mut dyn FnMut(&'a Type)) {
     match &t.kind {
         TypeKind::Named { args, .. } => args.iter().for_each(f),
         TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
@@ -3836,166 +4750,307 @@ fn for_each_child(t: &Type, f: &mut dyn FnMut(&Type)) {
 /// The place of the first part of `t`, `t` itself included, whose kind
 /// `is` says yes to.
 fn find_in_type(t: &Type, is: &dyn Fn(&TypeKind) -> bool) -> Option<Span> {
-    if is(&t.kind) {
-        return Some(t.span);
-    }
-    let mut found = None;
-    for_each_child(t, &mut |c| {
-        if found.is_none() {
-            found = find_in_type(c, is);
+    let mut work = vec![t];
+    while let Some(t) = work.pop() {
+        if is(&t.kind) {
+            return Some(t.span);
         }
-    });
-    found
+        let mut children = Vec::new();
+        for_each_child(t, &mut |c| children.push(c));
+        work.extend(children.into_iter().rev());
+    }
+    None
 }
 
 /// `t` with the type variables in `map` replaced.
-pub(crate) fn subst(t: &Type, map: &HashMap<TyVarId, &Type>) -> Type {
-    let kind = match &t.kind {
-        TypeKind::Lit(v) => TypeKind::Lit(v.clone()),
-        TypeKind::Var(v) => match map.get(v) {
-            Some(r) => return (*r).clone(),
-            None => TypeKind::Var(*v),
+pub(crate) fn subst(root: &Type, map: &HashMap<TyVarId, &Type>) -> Type {
+    enum ListKind {
+        Named(TypeRef),
+        Tuple,
+        Union,
+        Inter,
+        Diff,
+    }
+    enum Task<'a> {
+        Visit(&'a Type),
+        List {
+            span: Span,
+            kind: ListKind,
+            count: usize,
         },
-        TypeKind::Named { ty, args } => TypeKind::Named {
-            ty: *ty,
-            args: args.iter().map(|a| subst(a, map)).collect(),
+        Function {
+            span: Span,
+            labels: Vec<Option<Ident>>,
+            err: bool,
+            env: bool,
         },
-        TypeKind::Tuple(ts) => TypeKind::Tuple(ts.iter().map(|a| subst(a, map)).collect()),
-        TypeKind::Union(ts) => TypeKind::Union(ts.iter().map(|a| subst(a, map)).collect()),
-        TypeKind::Inter(ts) => TypeKind::Inter(ts.iter().map(|a| subst(a, map)).collect()),
-        TypeKind::Diff(ts) => TypeKind::Diff(ts.iter().map(|a| subst(a, map)).collect()),
-        TypeKind::Fn {
-            params,
-            ret,
-            err,
-            env,
-        } => TypeKind::Fn {
-            params: params
-                .iter()
-                .map(|p| FnParamType {
-                    label: p.label.clone(),
-                    ty: subst(&p.ty, map),
-                })
-                .collect(),
-            ret: Box::new(subst(ret, map)),
-            err: err.as_ref().map(|e| Box::new(subst(e, map))),
-            env: env.as_ref().map(|e| Box::new(subst(e, map))),
-        },
-        TypeKind::Of {
-            value,
-            site,
-            projection,
-        } => TypeKind::Of {
-            value: *value,
-            site: *site,
-            projection: *projection,
-        },
-        TypeKind::Hole => TypeKind::Hole,
-        TypeKind::Error => TypeKind::Error,
-    };
-    Type { kind, span: t.span }
+    }
+    let mut work = vec![Task::Visit(root)];
+    let mut values: Vec<Type> = Vec::new();
+    while let Some(task) = work.pop() {
+        match task {
+            Task::Visit(t) => {
+                let kind = match &t.kind {
+                    TypeKind::Lit(v) => TypeKind::Lit(v.clone()),
+                    TypeKind::Var(v) => match map.get(v) {
+                        Some(r) => {
+                            values.push((*r).clone());
+                            continue;
+                        }
+                        None => TypeKind::Var(*v),
+                    },
+                    TypeKind::Named { ty, args } => {
+                        work.push(Task::List {
+                            span: t.span,
+                            kind: ListKind::Named(*ty),
+                            count: args.len(),
+                        });
+                        work.extend(args.iter().rev().map(Task::Visit));
+                        continue;
+                    }
+                    TypeKind::Tuple(ts)
+                    | TypeKind::Union(ts)
+                    | TypeKind::Inter(ts)
+                    | TypeKind::Diff(ts) => {
+                        let kind = match &t.kind {
+                            TypeKind::Tuple(_) => ListKind::Tuple,
+                            TypeKind::Union(_) => ListKind::Union,
+                            TypeKind::Inter(_) => ListKind::Inter,
+                            TypeKind::Diff(_) => ListKind::Diff,
+                            _ => unreachable!(),
+                        };
+                        work.push(Task::List {
+                            span: t.span,
+                            kind,
+                            count: ts.len(),
+                        });
+                        work.extend(ts.iter().rev().map(Task::Visit));
+                        continue;
+                    }
+                    TypeKind::Fn {
+                        params,
+                        ret,
+                        err,
+                        env,
+                    } => {
+                        work.push(Task::Function {
+                            span: t.span,
+                            labels: params.iter().map(|p| p.label.clone()).collect(),
+                            err: err.is_some(),
+                            env: env.is_some(),
+                        });
+                        if let Some(env) = env {
+                            work.push(Task::Visit(env));
+                        }
+                        if let Some(err) = err {
+                            work.push(Task::Visit(err));
+                        }
+                        work.push(Task::Visit(ret));
+                        work.extend(params.iter().rev().map(|p| Task::Visit(&p.ty)));
+                        continue;
+                    }
+                    TypeKind::Of {
+                        value,
+                        site,
+                        projection,
+                    } => TypeKind::Of {
+                        value: *value,
+                        site: *site,
+                        projection: *projection,
+                    },
+                    TypeKind::Hole => TypeKind::Hole,
+                    TypeKind::Error => TypeKind::Error,
+                };
+                values.push(Type { kind, span: t.span });
+            }
+            Task::List { span, kind, count } => {
+                let items = values.split_off(values.len() - count);
+                let kind = match kind {
+                    ListKind::Named(ty) => TypeKind::Named { ty, args: items },
+                    ListKind::Tuple => TypeKind::Tuple(items),
+                    ListKind::Union => TypeKind::Union(items),
+                    ListKind::Inter => TypeKind::Inter(items),
+                    ListKind::Diff => TypeKind::Diff(items),
+                };
+                values.push(Type { kind, span });
+            }
+            Task::Function {
+                span,
+                labels,
+                err,
+                env,
+            } => {
+                let count = labels.len() + 1 + usize::from(err) + usize::from(env);
+                let mut parts = values.split_off(values.len() - count).into_iter();
+                let params = labels
+                    .into_iter()
+                    .map(|label| FnParamType {
+                        label,
+                        ty: parts.next().expect("function parameter"),
+                    })
+                    .collect();
+                let ret = Box::new(parts.next().expect("function return"));
+                let err = err.then(|| Box::new(parts.next().expect("function error")));
+                let env = env.then(|| Box::new(parts.next().expect("function environment")));
+                assert!(parts.next().is_none(), "substitution has extra values");
+                values.push(Type {
+                    kind: TypeKind::Fn {
+                        params,
+                        ret,
+                        err,
+                        env,
+                    },
+                    span,
+                });
+            }
+        }
+    }
+    assert_eq!(values.len(), 1, "substitution must return one type");
+    values.pop().unwrap()
 }
 
 /// §2.4: the annotations at the top of the pattern of a top-level binding
 /// that give the type of an exported name: `x: T`, and `x = y: T`.
-fn top_annotations(p: &Pattern, exported: &HashMap<VarId, String>, out: &mut Vec<(String, Type)>) {
-    fn top_type(p: &Pattern) -> Option<&Type> {
-        match &p.kind {
-            PatternKind::Typed { ty, .. } => Some(ty),
-            PatternKind::Named { pattern, .. } => top_type(pattern),
-            _ => None,
+fn top_annotations(
+    root: &Pattern,
+    exported: &HashMap<VarId, String>,
+    out: &mut Vec<(String, Type)>,
+) {
+    fn top_type(mut p: &Pattern) -> Option<&Type> {
+        loop {
+            match &p.kind {
+                PatternKind::Typed { ty, .. } => return Some(ty),
+                PatternKind::Named { pattern, .. } => p = pattern,
+                _ => return None,
+            }
         }
     }
-    let mut check = |b: &Binder, ty: Option<&Type>| {
-        if let (Some(name), Some(ty)) = (exported.get(&b.var), ty) {
-            out.push((format!("`{name}`"), ty.clone()));
+    let mut work = vec![root];
+    while let Some(p) = work.pop() {
+        match &p.kind {
+            PatternKind::Typed {
+                binder: Some(b),
+                ty,
+            } => {
+                if let Some(name) = exported.get(&b.var) {
+                    out.push((format!("`{name}`"), ty.clone()));
+                }
+            }
+            PatternKind::Named { binder, pattern } => {
+                if let (Some(name), Some(ty)) = (exported.get(&binder.var), top_type(pattern)) {
+                    out.push((format!("`{name}`"), ty.clone()));
+                }
+                work.push(pattern);
+            }
+            PatternKind::Constructor { args: ps, .. }
+            | PatternKind::Tuple(ps)
+            | PatternKind::Error(ps)
+            | PatternKind::List { items: ps, .. } => work.extend(ps.iter().rev()),
+            PatternKind::BitArray(segs) => work.extend(segs.iter().rev().map(|s| &s.value)),
+            _ => {}
         }
-    };
-    match &p.kind {
-        PatternKind::Typed {
-            binder: Some(b),
-            ty,
-        } => check(b, Some(ty)),
-        PatternKind::Named { binder, pattern } => {
-            check(binder, top_type(pattern));
-            top_annotations(pattern, exported, out);
-        }
-        PatternKind::Constructor { args: ps, .. }
-        | PatternKind::Tuple(ps)
-        | PatternKind::Error(ps)
-        | PatternKind::List { items: ps, .. } => {
-            ps.iter().for_each(|a| top_annotations(a, exported, out))
-        }
-        PatternKind::BitArray(segs) => segs
-            .iter()
-            .for_each(|s| top_annotations(&s.value, exported, out)),
-        _ => {}
     }
 }
 
-fn pattern_type_ids(p: &TypePattern, out: &mut Vec<TypeId>) {
-    match p {
-        TypePattern::Named(ty, parts) => {
-            if let TypeRef::Custom(id) = ty {
-                out.push(*id);
+fn pattern_type_ids(root: &TypePattern, out: &mut Vec<TypeId>) {
+    let mut work = vec![root];
+    while let Some(p) = work.pop() {
+        match p {
+            TypePattern::Named(ty, parts) => {
+                if let TypeRef::Custom(id) = ty {
+                    out.push(*id);
+                }
+                work.extend(parts.iter().rev());
             }
-            for p in parts {
-                pattern_type_ids(p, out);
-            }
+            TypePattern::Tuple(parts) => work.extend(parts.iter().rev()),
+            TypePattern::Exact(t) => named_types(t, out),
+            TypePattern::Bind(_) | TypePattern::Skip | TypePattern::Error => {}
         }
-        TypePattern::Tuple(parts) => {
-            for p in parts {
-                pattern_type_ids(p, out);
-            }
-        }
-        TypePattern::Exact(t) => named_types(t, out),
-        TypePattern::Bind(_) | TypePattern::Skip | TypePattern::Error => {}
     }
 }
 
 fn projectable_body(
-    t: &Type,
+    root: &Type,
     map: &HashMap<TyVarId, TypePattern>,
     used: &mut HashSet<TyVarId>,
 ) -> Option<TypePattern> {
-    let mut variable = false;
-    let mut invalid = false;
-    walk_type(t, &mut |t| match t.kind {
-        TypeKind::Var(_) => variable = true,
-        TypeKind::Hole | TypeKind::Error | TypeKind::Of { .. } => invalid = true,
-        _ => {}
-    });
-    if invalid {
-        return None;
+    // Compute subtree facts once, then build projections in source order. The
+    // former repeated recursive scan was quadratic on nested aliases.
+    enum Scan<'a> {
+        Visit(&'a Type),
+        Finish(&'a Type),
     }
-    if !variable {
-        return Some(TypePattern::Exact(t.clone()));
-    }
-    match &t.kind {
-        TypeKind::Var(v) => {
-            if !used.insert(*v) {
-                return None;
+    let mut facts: HashMap<*const Type, (bool, bool)> = HashMap::new();
+    let mut scan = vec![Scan::Visit(root)];
+    while let Some(task) = scan.pop() {
+        match task {
+            Scan::Visit(t) => {
+                scan.push(Scan::Finish(t));
+                let mut children = Vec::new();
+                for_each_child(t, &mut |c| children.push(c));
+                scan.extend(children.into_iter().rev().map(Scan::Visit));
             }
-            map.get(v).cloned()
+            Scan::Finish(t) => {
+                let mut variable = matches!(t.kind, TypeKind::Var(_));
+                let mut invalid = matches!(
+                    t.kind,
+                    TypeKind::Hole | TypeKind::Error | TypeKind::Of { .. }
+                );
+                for_each_child(t, &mut |c| {
+                    let (v, i) = facts[&(c as *const Type)];
+                    variable |= v;
+                    invalid |= i;
+                });
+                facts.insert(t as *const Type, (variable, invalid));
+            }
         }
-        TypeKind::Named { ty, args } => Some(TypePattern::Named(
-            *ty,
-            args.iter()
-                .map(|t| projectable_body(t, map, used))
-                .collect::<Option<_>>()?,
-        )),
-        TypeKind::Tuple(ts) => Some(TypePattern::Tuple(
-            ts.iter()
-                .map(|t| projectable_body(t, map, used))
-                .collect::<Option<_>>()?,
-        )),
-        TypeKind::Lit(_)
-        | TypeKind::Fn { .. }
-        | TypeKind::Union(_)
-        | TypeKind::Inter(_)
-        | TypeKind::Diff(_)
-        | TypeKind::Hole
-        | TypeKind::Error
-        | TypeKind::Of { .. } => None,
     }
+    enum Build<'a> {
+        Visit(&'a Type),
+        Named(TypeRef, usize),
+        Tuple(usize),
+    }
+    let mut work = vec![Build::Visit(root)];
+    let mut values: Vec<TypePattern> = Vec::new();
+    while let Some(task) = work.pop() {
+        match task {
+            Build::Visit(t) => {
+                let (variable, invalid) = facts[&(t as *const Type)];
+                if invalid {
+                    return None;
+                }
+                if !variable {
+                    values.push(TypePattern::Exact(t.clone()));
+                    continue;
+                }
+                match &t.kind {
+                    TypeKind::Var(v) => {
+                        if !used.insert(*v) {
+                            return None;
+                        }
+                        values.push(map.get(v)?.clone());
+                    }
+                    TypeKind::Named { ty, args } => {
+                        work.push(Build::Named(*ty, args.len()));
+                        work.extend(args.iter().rev().map(Build::Visit));
+                    }
+                    TypeKind::Tuple(ts) => {
+                        work.push(Build::Tuple(ts.len()));
+                        work.extend(ts.iter().rev().map(Build::Visit));
+                    }
+                    _ => return None,
+                }
+            }
+            Build::Named(ty, count) => {
+                let args = values.split_off(values.len() - count);
+                values.push(TypePattern::Named(ty, args));
+            }
+            Build::Tuple(count) => {
+                let args = values.split_off(values.len() - count);
+                values.push(TypePattern::Tuple(args));
+            }
+        }
+    }
+    assert_eq!(values.len(), 1, "type projection must return one pattern");
+    values.pop()
 }
