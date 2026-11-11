@@ -2788,3 +2788,14 @@ sin_odd_property = () {
 		)
 	}, core.inspect)
 }
+
+@test
+trig_large_and_near_pole_test = () {
+	assert(core.float_to_bits(float.sin(1.0e300)) == 0xbfea2c16b010e385)
+	assert(
+		core.float_to_bits(float.sin(float.max_finite)) == 0x3f7452fc98b34e97
+	)
+	assert(core.float_to_bits(float.cos(float.pi /. 2.0)) == 0x3c91a62633145c07)
+	Ok(t) = float.tan(float.pi /. 2.0)
+	assert(core.float_to_bits(t) == 0x434d02967c31cdb5)
+}

@@ -1390,6 +1390,10 @@ trig_reduce = (x: Float) -> (Int, Float, Float) {
 }
 
 // SunPro fdlibm kernels, via musl __sin.c and __cos.c.
+// Copyright (C) 1993 Sun Microsystems, Inc. All rights reserved.
+// Developed at SunSoft, a Sun Microsystems, Inc. business.
+// Permission to use, copy, modify, and distribute this software is freely
+// granted, provided that this notice is preserved.
 trig_sin = (x: Float, y: Float) -> Float {
 	z = x *. x
 	w = z *. z
@@ -1466,6 +1470,9 @@ cos = (x: Float) -> Float {
 }
 
 // SunPro fdlibm tangent kernel, via musl __tan.c.
+// Copyright 2004 Sun Microsystems, Inc. All rights reserved.
+// Permission to use, copy, modify, and distribute this software is freely
+// granted, provided that this notice is preserved.
 trig_tan = (input: Float, tail: Float, odd: Bool) -> Float {
 	big = abs(input) >=. 0.6744
 	negative = sign_bit(input)
