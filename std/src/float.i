@@ -1322,6 +1322,7 @@ hypot = (x: Float, y: Float) -> Result(Float, Nil) {
 }
 
 // Payne–Hanek reduction using the 4/pi digits from Go math/trig_reduce.go.
+// Copyright 2018 The Go Authors. All rights reserved. BSD-style license.
 // The arbitrary precision product retains the bits needed at every Float exponent.
 trig_reduce = (x: Float) -> (Int, Float, Float) {
 	bits = core.float_to_bits(x)
