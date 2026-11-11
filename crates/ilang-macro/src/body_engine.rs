@@ -27,8 +27,10 @@ pub enum Error {
     Preparation(Vec<ilang_package::Diagnostic>),
     Run(Failure),
     Conversion(ScopedError),
+    Metered(ilang_syntax::lisp::scoped::MeteredError),
     SameModule(Span),
     Depth(Span),
+    InvalidItem(Span, String),
 }
 struct Compiled {
     program: MacroProgram,
@@ -45,6 +47,8 @@ pub struct BodyEngine<'a> {
     pub resolver: Arc<DefinitionResolver>,
     pub transactions: Vec<Transaction>,
     cache: HashMap<(u32, String, u8), Compiled>,
+    pub(crate) item_locals: Vec<Local>,
+    pub(crate) run_mark: Arc<std::sync::atomic::AtomicU64>,
     session: &'a mut Session,
 }
 impl<'a> BodyEngine<'a> {
@@ -66,16 +70,18 @@ impl<'a> BodyEngine<'a> {
             resolver,
             transactions: Vec::new(),
             cache: HashMap::new(),
+            item_locals: Vec::new(),
+            run_mark: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             session,
         }
     }
-    fn scope(&self) -> Scope {
+    pub(crate) fn scope(&self) -> Scope {
         Scope {
             module: self.source.0,
             marks: BTreeSet::new(),
         }
     }
-    fn atom(&self, id: &Ident) -> Syntax {
+    pub(crate) fn atom(&self, id: &Ident) -> Syntax {
         if let Some(origin) = self.scoped.origin(id.span) {
             return origin.syntax.clone();
         }
@@ -103,7 +109,7 @@ impl<'a> BodyEngine<'a> {
             })
             .collect()
     }
-    fn resolve(
+    pub(crate) fn resolve(
         &self,
         module: Option<&Ident>,
         name: &Ident,
@@ -118,27 +124,35 @@ impl<'a> BodyEngine<'a> {
             &self.locals(locals, depth),
         )
     }
-    fn expr_syntax(&self, e: &Expr) -> Syntax {
+    pub(crate) fn expr_syntax(&self, e: &Expr) -> Syntax {
         if let Some(origin) = self.scoped.origin(e.span) {
             return origin.syntax.clone();
         }
         let file = self.graph.sources.get(self.source);
         source_expression_syntax(e, &self.scope(), &file.text, file.display.ends_with(".is"))
     }
-    fn ty_syntax(&self, ty: &TypeExpr) -> Syntax {
+    pub(crate) fn ty_syntax(&self, ty: &TypeExpr) -> Syntax {
         if let Some(origin) = self.scoped.origin(ty.span) {
             return origin.syntax.clone();
         }
         let file = self.graph.sources.get(self.source);
         source_type_syntax(ty, &self.scope(), &file.text, file.display.ends_with(".is"))
     }
-    fn execute(
+    pub(crate) fn execute(
         &mut self,
         mac: &Macro,
         args: Vec<MacroArgument>,
         call: &Syntax,
+        item: Option<Syntax>,
         position: MacroPosition,
-    ) -> Result<Syntax, Error> {
+    ) -> Result<
+        (
+            Syntax,
+            ilang_host::macro_budget::MacroBudget,
+            Vec<Transaction>,
+        ),
+        Error,
+    > {
         if mac.source == self.source {
             return Err(Error::SameModule(call.span()));
         }
@@ -176,19 +190,25 @@ impl<'a> BodyEngine<'a> {
             );
         }
         let compiled = &self.cache[&key];
+        self.run_mark.store(
+            self.session.next_mark(),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        let mut result_budget = None;
         let result = self
             .session
             .run(
                 &mac.definition,
                 &args,
-                None,
+                item,
                 call,
                 position,
                 &compiled.program,
                 &compiled.export,
                 compiled.templates.clone(),
                 self.resolver.clone(),
-                |_, syntax, _budget| {
+                |_, syntax, budget| {
+                    result_budget = Some(budget.clone());
                     Ok(Expanded {
                         syntax,
                         transactions: Vec::new(),
@@ -196,8 +216,11 @@ impl<'a> BodyEngine<'a> {
                 },
             )
             .map_err(Error::Run)?;
-        self.transactions.extend(result.transactions);
-        Ok(result.syntax)
+        Ok((
+            result.syntax,
+            result_budget.expect("successful run retains its budget"),
+            result.transactions,
+        ))
     }
 }
 impl Hook for BodyEngine<'_> {
@@ -225,10 +248,16 @@ impl Hook for BodyEngine<'_> {
             syntax: self.expr_syntax(&arg.value),
         }));
         let call = self.expr_syntax(expression);
-        let result = self.execute(&mac, args, &call, MacroPosition::Expression)?;
-        self.scoped
-            .expression(&result, &call)
-            .map_err(Error::Conversion)
+        let (result, budget, transactions) =
+            self.execute(&mac, args, &call, None, MacroPosition::Expression)?;
+        let output = self
+            .scoped
+            .expression_metered(&result, &call, |work, words| {
+                budget.charge(work, words).map_err(|e| Box::new(e) as _)
+            })
+            .map_err(Error::Metered)?;
+        self.transactions.extend(transactions);
+        Ok(output)
     }
     fn is_type_macro(
         &mut self,
@@ -260,8 +289,16 @@ impl Hook for BodyEngine<'_> {
             })
             .collect();
         let call = self.ty_syntax(ty);
-        let result = self.execute(&mac, args, &call, MacroPosition::Type)?;
-        self.scoped.ty(&result, &call).map_err(Error::Conversion)
+        let (result, budget, transactions) =
+            self.execute(&mac, args, &call, None, MacroPosition::Type)?;
+        let output = self
+            .scoped
+            .ty_metered(&result, &call, |work, words| {
+                budget.charge(work, words).map_err(|e| Box::new(e) as _)
+            })
+            .map_err(Error::Metered)?;
+        self.transactions.extend(transactions);
+        Ok(output)
     }
     fn depth_error(&mut self, span: Span) -> Error {
         Error::Depth(span)

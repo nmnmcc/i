@@ -25,6 +25,18 @@ compiler's i host, independently of the target of the program being built.
 | Enter a synthesized callable wrapper | 0 | 0 | 1 plus parameters |
 | Compiler Syntax operation | 1 plus nodes and bytes traversed | wrapper plus output and traversal words | traversal depth |
 | Copy a boundary buffer | bytes copied | 4 plus bytes rounded up to words | 0 |
+| Expand Syntax into a scoped AST | 1 plus one per node and child | 1 plus 64 per node and 8 per child | 0 |
+| Render a source-name or text atom for scoped AST | 24 times its UTF-8 bytes plus 16 | 4 plus that bound rounded up to words | 0 |
+| Render an integer atom for scoped AST | square of its 32-bit limb count plus its bit count plus 1 | 4 plus its bit count plus 1 bytes, rounded up to words | 0 |
+| Render a float atom for scoped AST | 32 | 8 | 0 |
+| Copy a written or expanded definition answer | syntax nodes and bytes, as for a compiler Syntax operation | output and traversal words, as for a compiler Syntax operation | traversal depth |
+| Construct one of the five synthetic builtin definitions | 512 | 512 | 0 |
+
+An expanded definition answer with parameter identities is charged for both
+tree constructions: identity freshening and answer-provenance conversion.
+| Look up a host identity among `n` live or weak entries | `16 × (1 + bit_length(n + 1))` | 0 | 0 |
+| Install a host identity | the lookup cost again | `64 × (1 + bit_length(n + 1))` | 0 |
+| Sweep weak host identities | number of entries | 0 | 0 |
 
 Array element widths are taken from the generated type: i8 is one byte, i16
 two, i32/f32 four and references/i64/f64 eight. Fixed runtime globals and

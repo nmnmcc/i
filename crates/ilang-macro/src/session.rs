@@ -42,6 +42,9 @@ pub struct Session {
 }
 
 impl Session {
+    pub(crate) fn next_mark(&self) -> u64 {
+        self.next_mark
+    }
     /// Expand one call and recursively expand its result while this run still
     /// occupies an expansion-depth frame. A retried call obtains a new mark.
     #[allow(clippy::too_many_arguments)]
