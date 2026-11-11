@@ -94,7 +94,7 @@ pub fn write(dir: &Path, stem: &str, source: &str) {
             wrappers.push_str(&format!("@test\n{name} = () {{ {alias}.{name}() }}\n"));
         }
         std::fs::create_dir_all(dir.join("test")).unwrap();
-        std::fs::write(dir.join("test").join(format!("{stem}.i")), wrappers).unwrap();
+        std::fs::write(dir.join("test").join(format!("{stem}_test.i")), wrappers).unwrap();
     }
     std::fs::create_dir_all(dir.join("src")).unwrap();
     std::fs::write(dir.join("src").join(format!("{stem}.i")), text).unwrap();
