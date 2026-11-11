@@ -354,3 +354,15 @@ fn check_corpus(dir: &std::path::Path) {
     }
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }
+
+#[test]
+fn record_type_printing_keeps_field_and_removal_order() {
+    let (module, errors) =
+        ilang_syntax::parse_module("Thing(R) = (..R, first: Int, -old, second: String, -gone)\n");
+    assert!(errors.is_empty(), "{errors:?}");
+    let text = print_module(&module);
+    assert_eq!(
+        text,
+        "(= (Thing R) {.. R (: first Int) (- old) (: second String) (- gone)})\n"
+    );
+}
