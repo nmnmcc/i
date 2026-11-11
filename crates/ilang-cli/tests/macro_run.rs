@@ -1720,6 +1720,30 @@ fn cli_check_and_run_expand_imported_macros() {
 }
 
 #[test]
+fn cli_expands_imported_macro_with_standard_service() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, twice)\n(@ macro (= twice (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(+ ~x ~x))))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros, i/stdio)\nmain = () { assert(m.twice(21) == 42) stdio.print(\"macro ok\") }\n",
+    )
+    .unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--offline", "--opt", "0", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "macro ok");
+}
+
+#[test]
 fn cli_expands_attribute_macros_before_checking() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();

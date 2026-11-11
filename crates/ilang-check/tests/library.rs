@@ -195,7 +195,25 @@ fn library_names() {
                 "read_lines",
             ],
         ),
-        ("i/process", &["args", "env", "cwd", "entropy", "spawn", "spawn_piped", "spawn_config", "read_stdout", "read_stderr", "write_stdin", "close_stdin", "wait", "terminate", "close"]),
+        (
+            "i/process",
+            &[
+                "args",
+                "env",
+                "cwd",
+                "entropy",
+                "spawn",
+                "spawn_piped",
+                "spawn_config",
+                "read_stdout",
+                "read_stderr",
+                "write_stdin",
+                "close_stdin",
+                "wait",
+                "terminate",
+                "close",
+            ],
+        ),
         (
             "i/net",
             &[
@@ -213,7 +231,22 @@ fn library_names() {
                 "byte_stream",
             ],
         ),
-        ("i/tls", &["options", "identity", "connect", "accept", "dial", "alpn", "read", "write", "shutdown_write", "close", "byte_stream"]),
+        (
+            "i/tls",
+            &[
+                "options",
+                "identity",
+                "connect",
+                "accept",
+                "dial",
+                "alpn",
+                "read",
+                "write",
+                "shutdown_write",
+                "close",
+                "byte_stream",
+            ],
+        ),
         (
             "i/stdio",
             &[

@@ -54,3 +54,29 @@ step 2 exception for nesting and stack-limit tests:
 - `ilang-check/tests/resolve_deep.rs::deep_alternating_pattern_and_format_expression` (10,000 nested nodes on a small stack)
 - `ilang-check/tests/resolve_deep.rs::deep_mixed_expression_preserves_diagnostic_origin` (10,000 nested nodes on a small stack)
 - `ilang-check/tests/resolve_deep.rs::deep_pattern_and_type_preserve_diagnostic_origin` (10,000 nested nodes on a small stack)
+
+## How to try it
+
+From the repository root, create a small project with a macro in a separate
+library module. `i check` expands macros as part of checking; there is no
+separate `i expand` command yet.
+
+```sh
+mkdir -p /tmp/i-macro-demo/src
+cat > /tmp/i-macro-demo/i.toml <<'TOML'
+name = "app"
+TOML
+cat > /tmp/i-macro-demo/src/macros.is <<'I'
+(, (= syntax (/ i syntax)))
+(, twice)
+(@ macro (= twice (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(+ ~x ~x))))
+I
+cat > /tmp/i-macro-demo/src/main.i <<'I'
+(m = app/macros, i/stdio)
+main = () { assert(m.twice(21) == 42) stdio.print("macro ok") }
+I
+./target/debug/i check --project /tmp/i-macro-demo
+./target/debug/i run --project /tmp/i-macro-demo --opt 0
+```
+
+The run prints `macro ok`.

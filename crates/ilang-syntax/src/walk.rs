@@ -215,7 +215,14 @@ impl Walk for PatternKind {
         match self {
             Self::Int { .. } => {}
             Self::Float { value, .. } => v.float(value),
-            Self::Quote { datum, captures, .. } => { datum.walk(v); for (_, pattern) in captures { pattern.walk(v); } }
+            Self::Quote {
+                datum, captures, ..
+            } => {
+                datum.walk(v);
+                for (_, pattern) in captures {
+                    pattern.walk(v);
+                }
+            }
             Self::Var(s) | Self::Discard(s) | Self::String(s) => s.walk(v),
             Self::Typed { binder, ty } => {
                 binder.walk(v);
@@ -303,12 +310,15 @@ impl Walk for crate::lisp::Datum {
     fn walk(&mut self, v: &mut impl Visitor) {
         use crate::lisp::DatumKind as D;
         self.span.walk(v);
-        for doc in &mut self.docs { doc.span.walk(v); doc.text.walk(v); }
+        for doc in &mut self.docs {
+            doc.span.walk(v);
+            doc.text.walk(v);
+        }
         match &mut self.kind {
             D::Name(s) | D::Discard(s) | D::UpName(s) | D::String(s) | D::Symbol(s) => s.walk(v),
             D::Round(xs) | D::Square(xs) | D::Curly(xs) | D::Bits(xs) => xs.walk(v),
             D::Quote(x) | D::Unquote(x) | D::Splice(x) => x.walk(v),
-            D::Int(_) => {},
+            D::Int(_) => {}
             D::Float(x) => v.float(x),
         }
     }

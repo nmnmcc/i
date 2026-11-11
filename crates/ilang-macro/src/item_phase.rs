@@ -183,9 +183,12 @@ impl BodyEngine<'_> {
                     &mac.definition.name,
                 );
                 reject_macro_definitions(&items)?;
-                if !is_type && !item.doc.is_empty()
+                if !is_type
+                    && !item.doc.is_empty()
                     && let Some(first) = items.iter_mut().find(|out| {
-                        item_names(out).iter().any(|name| original_names.contains(name))
+                        item_names(out)
+                            .iter()
+                            .any(|name| original_names.contains(name))
                     })
                     && first.doc.is_empty()
                 {
@@ -846,11 +849,17 @@ fn generated_values(engine: &BodyEngine<'_>, slots: &[Slot]) -> Vec<body_walk::L
     let mut out = Vec::new();
     for slot in slots {
         match &slot.item.kind {
-            ItemKind::Binding(binding) => body_walk::for_each_binder(&binding.pattern, |name, span| {
-                if engine.scoped.is_generated(span) {
-                    out.push(body_walk::Local { name: name.to_owned(), span, fn_only: None });
-                }
-            }),
+            ItemKind::Binding(binding) => {
+                body_walk::for_each_binder(&binding.pattern, |name, span| {
+                    if engine.scoped.is_generated(span) {
+                        out.push(body_walk::Local {
+                            name: name.to_owned(),
+                            span,
+                            fn_only: None,
+                        });
+                    }
+                })
+            }
             ItemKind::Declaration { name, .. } if engine.scoped.is_generated(name.span) => out
                 .push(body_walk::Local {
                     name: name.name.clone(),
@@ -935,9 +944,11 @@ fn commit_exports(
 fn unmarked_binder(pattern: &Pattern, wanted: &str, source: u32, scoped: &ScopedSource) -> bool {
     let mut found = false;
     body_walk::for_each_binder(pattern, |text, span| {
-        if text == wanted && scoped.origin(span).is_none_or(|origin| {
-            origin.syntax.scope().module == source && origin.syntax.scope().marks.is_empty()
-        }) {
+        if text == wanted
+            && scoped.origin(span).is_none_or(|origin| {
+                origin.syntax.scope().module == source && origin.syntax.scope().marks.is_empty()
+            })
+        {
             found = true;
         }
     });
