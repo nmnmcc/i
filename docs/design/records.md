@@ -1,10 +1,10 @@
 # Design: structural records
 
-Status: draft for review (study S3 of the redesign plan). When it is accepted at gate G3, track T3 puts the spec text of part 12 into `docs/spec.md` and makes the changes of parts 14 to 16. T3 starts after A1 (the new parser) and T1 (literal types) have landed, and after T2 has merged. Code citations are re-anchored to merged redesign c2f41b7 (merge 669dbbb); the historical execution report explicitly identifies its original revision. Existing implementation descriptions below are proposals where they describe Rec/Without, which are not landed.
+Status: T3 implementation and semantics. The language rules are in `docs/spec.md`; the current record surface is in §8.1–8.2 below. Earlier sections retain historical pre-SYN2 examples: translate `{ a: T }` and `{ a: e }` to `(a: T)` and `(a: e)`, `{..}` to `()` for a value or `Record` for a type, `{ ..R, a: T }` to `(..R, a: T)`, and `|>` to `|`. Braces in current syntax hold code or type groups. Historical implementation proposals and review gates do not set the current contract.
 
 Resolution at lane/note-rec: **section 20 is the substitution-stability amendment**. It supersedes the old common-field union, routing and empty-record claims wherever repeated in this note. R1–R4 revise its proof, place and resource rules. Section 21 reconciles that contract with the implementation study: it selects Elixir’s lazy BDD and map algorithms, with explicit adaptations for i. All code anchors, including the earlier implementation plan, are re-derived against the merged sources; §20.6 is the current hand-off.
 
-The examples use the new syntax of `docs/design/syntax.md`.
+The historical examples use the earlier syntax of `docs/design/syntax.md`; §8 gives their current spelling.
 
 ## 1. The problem
 
