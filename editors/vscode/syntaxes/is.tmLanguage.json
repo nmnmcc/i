@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "i Lisp surface",
+  "scopeName": "source.i-lisp",
+  "fileTypes": ["is"],
+  "patterns": [
+    { "name": "comment.line.documentation.module.i", "match": "////.*$" },
+    { "name": "comment.line.documentation.i", "match": "///.*$" },
+    { "name": "comment.line.double-slash.i", "match": "//.*$" },
+    {
+      "name": "string.quoted.double.i",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{ "name": "constant.character.escape.i", "match": "\\\\(?:[nrt\\\"]|u\\{[0-9a-fA-F]+\\})" }]
+    },
+    { "name": "constant.numeric.i", "match": "\\b(?:0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+|[0-9][0-9_]*(?:\\.[0-9_]+(?:[eE][+-]?[0-9_]+)?)?)\\b" },
+    { "name": "entity.name.type.i", "match": "\\b[A-Z][A-Za-z0-9]*\\b" },
+    { "name": "variable.language.discard.i", "match": "(?<![A-Za-z0-9_])(?:_|__[a-z0-9_]*)\\b" },
+    { "name": "variable.other.i", "match": "\\b_?[a-z][a-z0-9_]*\\b" },
+    { "name": "keyword.operator.quote.i", "match": "`|~\\.\\.|~" },
+    { "name": "punctuation.section.brackets.i", "match": "<<|>>|[()\\[\\]{}]" },
+    { "name": "keyword.operator.i", "match": "->|\\.\\.|[=,:.!?^@|&+*/%<>-]+" }
+  ]
+}

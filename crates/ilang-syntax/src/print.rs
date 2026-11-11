@@ -41,9 +41,11 @@ pub(crate) fn level(e: &Expr) -> u8 {
 /// An expression with no block, function, or `case` inside it.
 fn is_simple(e: &Expr) -> bool {
     match &e.kind {
-        ExprKind::Block(_) | ExprKind::Fn(_) | ExprKind::Case { .. } | ExprKind::Clauses(_) => {
-            false
-        }
+        ExprKind::Quote(_)
+        | ExprKind::Block(_)
+        | ExprKind::Fn(_)
+        | ExprKind::Case { .. }
+        | ExprKind::Clauses(_) => false,
         ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_) | ExprKind::Name { .. } => true,
         ExprKind::Tuple(items) => items.iter().all(is_simple),
         ExprKind::List { items, rest } => {
@@ -65,11 +67,6 @@ fn is_simple(e: &Expr) -> bool {
         ExprKind::Unary { expr, .. } => is_simple(expr),
         ExprKind::Binary { lhs, rhs, .. } => is_simple(lhs) && is_simple(rhs),
     }
-}
-
-/// A match `e |> { … }` (§6.12).
-pub(crate) fn is_match(e: &Expr) -> bool {
-    matches!(e.kind, ExprKind::Case { .. })
 }
 
 /// The function that `e` starts with, through operators, calls, `.f`, and
@@ -197,7 +194,11 @@ fn walk_expr(e: &Expr, f: &mut impl FnMut(&Expr)) {
         }
     };
     match &e.kind {
-        ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_) | ExprKind::Name { .. } => {}
+        ExprKind::Quote(_)
+        | ExprKind::Int(_)
+        | ExprKind::Float(_)
+        | ExprKind::String(_)
+        | ExprKind::Name { .. } => {}
         ExprKind::Tuple(items) => items.iter().for_each(f),
         ExprKind::List { items, rest } => items.iter().chain(rest.as_deref()).for_each(f),
         ExprKind::BitArray(segs) => {
@@ -507,7 +508,7 @@ impl Printer {
     /// more than that is needed.
     fn expr(&mut self, e: &Expr, min: u8) {
         let lvl = level(e);
-        if lvl < min || self.explicit && min > 0 && lvl < 10 || is_match(e) && min > 6 {
+        if lvl < min || self.explicit && min > 0 && lvl < 10 {
             self.w("{ ");
             self.expr_raw(e);
             self.w(" }");
@@ -518,6 +519,7 @@ impl Printer {
 
     fn expr_raw(&mut self, e: &Expr) {
         match &e.kind {
+            ExprKind::Quote(_) => panic!("quote has no normal-surface spelling"),
             ExprKind::Int(v) => self.w(&v.to_string()),
             ExprKind::Float(x) => self.w(&float(*x)),
             ExprKind::String(s) => self.w(&string_literal(s)),
@@ -552,9 +554,14 @@ impl Printer {
             ExprKind::Block(b) => self.block(b),
             ExprKind::Fn(f) => self.function(f),
             ExprKind::Case { subject, clauses } => {
-                // §6.9: `|>` is stronger than the operators of levels 1 to 5.
-                self.expr(subject, 6);
-                self.w(" |> ");
+                if matches!(subject.kind, ExprKind::Int(_) | ExprKind::Float(_)) {
+                    self.w("{ ");
+                    self.expr(subject, 0);
+                    self.w(" }");
+                } else {
+                    self.expr(subject, 10);
+                }
+                self.w(".");
                 self.clauses(clauses);
             }
             ExprKind::Clauses(clauses) => self.clauses(clauses),
@@ -687,6 +694,7 @@ impl Printer {
     /// comes after it.
     fn pattern(&mut self, p: &Pattern, clause: bool) {
         match &p.kind {
+            PatternKind::Quote(_) => panic!("quote pattern has no normal-surface spelling"),
             PatternKind::Var(n) | PatternKind::Discard(n) => self.w(n),
             PatternKind::Typed { binder, ty } => {
                 self.w(&format!("{}: ", binder.name));
@@ -892,7 +900,7 @@ impl Printer {
     ) {
         self.ty_in(ret, 1, tail && err.is_none() && env.is_none());
         if let Some(err) = err {
-            self.w(" ? ");
+            self.w(" ^ ");
             self.ty_in(err, 1, tail && env.is_none());
         }
         if let Some(env) = env {

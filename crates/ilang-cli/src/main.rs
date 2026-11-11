@@ -3,7 +3,7 @@
 mod commands;
 
 use clap::{Parser, Subcommand};
-use ilang_cli::{BuildOptions, build, level};
+use ilang_cli::{BuildOptions, level};
 use ilang_host::{Outcome, TestResult};
 use ilang_wasm::Target;
 use std::path::{Path, PathBuf};
@@ -41,6 +41,9 @@ enum Command {
         /// Optimization level: 0, 2, or 3.
         #[arg(long, default_value_t = 2)]
         opt: u8,
+        /// Select a function declared in [entries].
+        #[arg(long)]
+        entry: Option<String>,
         /// The output file; by default `build/<name>.wasm` in the package.
         #[arg(long)]
         out: Option<PathBuf>,
@@ -63,6 +66,9 @@ enum Command {
         /// Optimization level: 0, 2, or 3.
         #[arg(long, default_value_t = 2)]
         opt: u8,
+        /// Select a function declared in [entries].
+        #[arg(long)]
+        entry: Option<String>,
     },
     /// Build and run the tests of a package.
     Test {
@@ -91,6 +97,9 @@ enum Command {
         /// Write nothing; list the files that would change, and fail if any.
         #[arg(long)]
         check: bool,
+        /// Convert the source to the specified surface.
+        #[arg(long, value_parser = ["i", "is"])]
+        to: Option<String>,
         /// Files or directories to format instead.
         paths: Vec<PathBuf>,
     },
@@ -111,12 +120,22 @@ fn main() -> ExitCode {
             out,
             target,
             wat,
-        } => cmd_build(&project, opt, offline, out, target.into(), wat),
+            entry,
+        } => cmd_build(
+            &project,
+            opt,
+            offline,
+            out,
+            target.into(),
+            wat,
+            entry.as_deref(),
+        ),
         Command::Run {
             project,
             offline,
             opt,
-        } => cmd_run(&project, opt, offline),
+            entry,
+        } => cmd_run(&project, opt, offline, entry.as_deref()),
         Command::Test {
             project,
             offline,
@@ -129,8 +148,9 @@ fn main() -> ExitCode {
         Command::Fmt {
             project,
             check,
+            to,
             paths,
-        } => commands::fmt::run(&project, check, &paths),
+        } => commands::fmt::run(&project, check, to.as_deref(), &paths),
     };
     match result {
         Ok(code) => code,
@@ -168,7 +188,15 @@ fn options(opt: u8, tests: bool, offline: bool) -> anyhow::Result<BuildOptions> 
 }
 
 fn built(project: &Path, options: BuildOptions) -> anyhow::Result<Option<ilang_cli::Built>> {
-    match build(project, options) {
+    built_entry(project, options, None)
+}
+
+fn built_entry(
+    project: &Path,
+    options: BuildOptions,
+    entry: Option<&str>,
+) -> anyhow::Result<Option<ilang_cli::Built>> {
+    match ilang_cli::build_entry(project, options, entry) {
         Ok(b) => {
             for w in &b.warnings {
                 eprintln!("{w}");
@@ -190,12 +218,13 @@ fn cmd_build(
     out: Option<PathBuf>,
     target: Target,
     wat: bool,
+    entry: Option<&str>,
 ) -> anyhow::Result<ExitCode> {
     let options = BuildOptions {
         target,
         ..options(opt, false, offline)?
     };
-    let Some(b) = built(project, options)? else {
+    let Some(b) = built_entry(project, options, entry)? else {
         return Ok(ExitCode::FAILURE);
     };
     let out = out.unwrap_or_else(|| project.join("build").join(format!("{}.wasm", b.name)));
@@ -212,7 +241,8 @@ fn cmd_build(
         )?;
     }
     if wat {
-        let (graph, _) = ilang_cli::load(project, false, offline);
+        let (mut graph, _) = ilang_cli::load(project, false, offline);
+        graph.entry = entry.map(str::to_owned);
         let checked = ilang_check::check(&graph);
         if let (Some(p), Some(t)) = (&checked.program, &checked.types)
             && let Ok(text) = ilang_wasm::compile_wat(
@@ -232,13 +262,20 @@ fn cmd_build(
     Ok(ExitCode::SUCCESS)
 }
 
-fn cmd_run(project: &Path, opt: u8, offline: bool) -> anyhow::Result<ExitCode> {
-    let Some(b) = built(project, options(opt, false, offline)?)? else {
+fn cmd_run(
+    project: &Path,
+    opt: u8,
+    offline: bool,
+    entry: Option<&str>,
+) -> anyhow::Result<ExitCode> {
+    let Some(b) = built_entry(project, options(opt, false, offline)?, entry)? else {
         return Ok(ExitCode::FAILURE);
     };
     let program = b.host_program()?;
     if program.abi().entry.is_none() {
-        anyhow::bail!("the package has no `@main` (§10.2)");
+        anyhow::bail!(
+            "the package has no program entry; define `main` in `src/main.i` or select `--entry NAME` (§10.2)"
+        );
     }
     match program.run_entry(b.host_options())? {
         Outcome::Ok(_) => Ok(ExitCode::SUCCESS),

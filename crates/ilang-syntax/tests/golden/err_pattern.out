@@ -1,9 +1,9 @@
 f = (x) {
-  x |> {}
+  x.{}
 }
 
 g = (x) {
-  x |> {}
+  x.{}
 }
 --- errors ---
 E0108 @2:20 in a pattern, `-` comes before an int literal and `-.` before a float literal
