@@ -1086,3 +1086,29 @@ fn unused_macro_definitions_are_checked_for_signature_and_capabilities() {
     let outside = check("(, (= syntax (/ i syntax)))\n(@ (external \"other\" \"effect\") (: effect (-> () Nil)))\n(@ macro (= unsafe (-> ((: x (. syntax Syntax))) (. syntax Syntax) { (effect) x })))\n").unwrap_err();
     assert!(outside.iter().any(|d| d.is_error()), "{outside:?}");
 }
+
+#[test]
+fn macro_modules_expand_in_import_order_and_reject_cycles() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/a.i"), "a = 1\n").unwrap();
+    std::fs::write(dir.path().join("src/b.i"), "(a = app/a)\nb = 2\n").unwrap();
+    std::fs::write(dir.path().join("src/c.i"), "(b = app/b)\nc = 3\n").unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let ordered = ilang_macro::module_order::order(&graph, &parsed).unwrap();
+    let index = |path: &str| {
+        let source = parsed.iter().find(|p| p.path == path).unwrap().source;
+        ordered.iter().position(|id| *id == source).unwrap()
+    };
+    assert!(index("app/a") < index("app/b"));
+    assert!(index("app/b") < index("app/c"));
+    std::fs::write(dir.path().join("src/a.i"), "(c = app/c)\na = 1\n").unwrap();
+    let (graph, _) = ilang_cli::load(dir.path(), false, true);
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty());
+    assert!(ilang_macro::module_order::order(&graph, &parsed).is_err());
+}
