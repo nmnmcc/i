@@ -7,5 +7,5 @@ f = (value: Record | Int) -> Int {
     _: Int -> 2
   }
 }
-@main
+
 main = () { Nil }

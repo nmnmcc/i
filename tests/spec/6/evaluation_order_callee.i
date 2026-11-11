@@ -6,7 +6,7 @@
 // The function is worked out before the arguments.
 pick = (n: Int) -> (Int) -> Int { panic("callee") }
 
-@main
+
 main = () {
 	n = 1
 	{ pick(n) }(panic("argument"))

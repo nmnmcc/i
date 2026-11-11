@@ -24,12 +24,12 @@ Console {
 
 @host("app:storage/v1")
 Storage {
-	Storage(read: (key: String) -> String ? String)
+	Storage(read: (key: String) -> String ^ String)
 }
 
 @host("app:clock/v1", "async")
 Clock {
-	Clock(later: (x: Float) -> Float ? String, tick: (n: Int) -> Int)
+	Clock(later: (x: Float) -> Float ^ String, tick: (n: Int) -> Int)
 }
 
 @external("app:math/v1", "hypot")
@@ -53,7 +53,7 @@ wait_sum = (a: Float, b: Float, clock ! Clock) {
 }
 
 /// An async program entry.
-@main
+
 main = (console ! Console, clock ! Clock) {
 	n = clock.tick(41)
 	x = clock.later(1.5)

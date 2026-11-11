@@ -3,7 +3,7 @@
 (c = i/core)
 (main)
 (even, odd) = ((n) { n == 0 || odd(n - 1) }, (n) { n != 0 && even(n - 1) })
-@main
+
 main = () {
   assert(c.not(False))
   assert(even(10))

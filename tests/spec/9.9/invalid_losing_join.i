@@ -6,7 +6,7 @@
 	i/task
 )
 
-@main
+
 main = () {
 	t = task.scope((s) { task.go(s, () { 7 }) })
 	task.sync(task.choose([task.always(1), task.join_event(t)]))

@@ -8,7 +8,7 @@
 	i/fail
 )
 
-@main
+
 main = () {
 	callback = control.keep_env((_: Nil) {
 		task.scope((s) {

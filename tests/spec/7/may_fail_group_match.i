@@ -8,7 +8,7 @@ pair = ("b", () {
 	}
 })
 
-@main
+
 main = () {
 	! Assert = Assert((_) { panic("caught group match") })
 	pair.1()

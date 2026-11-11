@@ -11,7 +11,7 @@ inner = (body, svc: S(Dep)) {
   body()
 }
 wrap(N) = (body: () -> Int ! N, svc: S(Dep)) -> Int ! N { inner(body, svc) }
-@main
+
 main = () {
   ! S(Never) = S(() { 1 }, (_: Never) { Nil })
   wrap(() { use() }, S(() { get() }, (_: Dep) { Nil }))

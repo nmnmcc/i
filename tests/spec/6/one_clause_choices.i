@@ -4,7 +4,7 @@
 Result(A, E) { Ok(A) Error(E) }
 unwrap = (r: Result(Int, Int)) { r |> { Ok(v) | Error(v) -> v } }
 
-@main
+
 main = () {
   assert(unwrap(Ok(7)) == 7)
   assert(unwrap(Error(9)) == 9)

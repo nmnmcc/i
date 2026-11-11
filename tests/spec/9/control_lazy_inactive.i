@@ -6,7 +6,7 @@
 
 // `inner` is paused inside `k`, and is active again after the resume. The
 // `f` of a suspend to it is done in its place, where it is not active.
-@main
+
 main = () {
   control.boundary((outer) {
     control.boundary((inner) {

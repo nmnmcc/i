@@ -34,7 +34,7 @@ pong = (n: Int) { ping(n) + uset(1) }
 
 S(N) { S(f: () -> Int ! N) }
 
-@main
+
 main = () {
   closed()
   Nil

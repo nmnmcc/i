@@ -2,7 +2,7 @@
 Js { Js }
 Wasi { Wasi }
 Target { JsTarget(Js) NodeJS(Js) WasiTarget(Wasi) Native Host }
-Fs { Fs(read_file: (String) -> BitArray ? String) }
+Fs { Fs(read_file: (String) -> BitArray ^ String) }
 read_file = (path, fs ! Fs) { fs.read_file(path) }
 choose = (t ! Target) {
   t |> {

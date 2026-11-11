@@ -11,7 +11,7 @@ ready_wait(A) = (r: Request(A), await ! request.Await) {
 	await.wait(request.ticket(r))
 }
 
-@main
+
 main = () {
 	a = request.ready(42)
 	b = request.ready("answer")

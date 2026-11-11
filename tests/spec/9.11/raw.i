@@ -5,7 +5,7 @@
 (i/request)
 @host("test:async/v1", "request")
 Later { Later(double: (n: Int) -> Request(Result(Int, String)), echo: (text: String) -> Request(String)) }
-@main
+
 main = (later ! Later, root ! request.Root, owner ! request.Owner) {
   a = later.double(21)
   b = later.echo("answer")

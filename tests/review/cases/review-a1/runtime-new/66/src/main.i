@@ -6,7 +6,7 @@ g = () {
 	}
 }
 
-@main
+
 main = () {
 	assert(g() == 4)
 	Nil

@@ -30,7 +30,7 @@ h1 = () {
   l4 = () { h1() + with_int(() { run(() { ask() + 1 }) }) }
   askc()
 }
-@main
+
 main = () {
   ! Svc(Int) = Svc(() { twice(() { get() }) }, (_: Int) { Nil })
   ! Svc(Int) = Svc(() { with_dep(() { get() }) + ask() + run(() { ask() }) }, (_: Int) { Nil })

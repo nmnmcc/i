@@ -43,7 +43,7 @@ wrapj = (body) {
   ! S(_) = S(() { 1 })
   body()
 }
-@main
+
 main = (io ! Io) {
   a = wrap(() { use() })
   ! Dep = Dep(3)

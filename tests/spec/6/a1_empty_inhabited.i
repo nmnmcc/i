@@ -2,7 +2,7 @@
 // expect: compile-error E0501
 (main)
 
-@main
+
 main = () {
   1 |> {}
   Nil

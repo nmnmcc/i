@@ -3,7 +3,7 @@ deep = (n: Int) -> Nil ! task.Scheduler { { n == 0 } |> { True -> task.yield()
  False -> task.scope((s) { task.go(s, () { Nil })
  deep(n - 1) }) } }
 
-@main
+
 main = (io ! Io) {
 deep(200)
 io.print("deep-ok")

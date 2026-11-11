@@ -4,5 +4,5 @@
 
 @host("test:io/v1")
 Io { Io(print: (text: "a" | "b") -> Nil) }
-@main
+
 main = (io ! Io) { io.print("b") }

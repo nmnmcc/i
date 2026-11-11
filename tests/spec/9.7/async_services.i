@@ -21,7 +21,7 @@
 // program, and a final function waits too.
 @host("test:async/v1", "async")
 Later {
-	Later(double: (n: Int) -> Int ? String, echo: (text: String) -> String)
+	Later(double: (n: Int) -> Int ^ String, echo: (text: String) -> String)
 }
 
 @host("test:io/v1")
@@ -31,7 +31,7 @@ Io {
 
 twice = (n: Int, later ! Later) { later.double(later.double(n)) }
 
-@main
+
 main = (later ! Later, io ! Io) {
 	a = twice(1)
 	b = later.echo(core.inspect(a))

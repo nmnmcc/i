@@ -36,7 +36,7 @@ join_all = (
 	}
 }
 
-@main
+
 main = () {
 	value = task.scope((s) { join_all(spawn(s, 513), 0) })
 	assert(value == 131_841)

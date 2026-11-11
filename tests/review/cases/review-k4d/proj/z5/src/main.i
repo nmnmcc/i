@@ -14,7 +14,7 @@ tell = (x: Int) { x |> {
   5 -> "five"
   _ -> "other"
 } }
-@main
+
 main = (io ! Io) {
   ! Svc(Int) = Svc(() { 1 }, (_: Int) { Nil })
   io.print(tell(wrap((b) { b() + ask() }, Svc(() { "s" }, (_: String) { Nil }))))

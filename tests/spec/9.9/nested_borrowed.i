@@ -13,7 +13,7 @@ Later {
 	Later(echo: (text: String) -> Request(String))
 }
 
-@main
+
 main = (later ! Later) {
 	r = later.echo("borrowed")
 	assert(task.run(() { request.await_owned(r) }) == "borrowed")

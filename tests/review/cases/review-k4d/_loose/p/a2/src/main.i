@@ -5,5 +5,5 @@ example = () {
   ! S(Never) = S(() { Nil }, (_: Never) { Nil })
   run(() { use() })
 }
-@main
+
 main = () { example() }

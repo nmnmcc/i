@@ -5,7 +5,7 @@
 no = (x: 1) { x |> { _ ? x == 2 -> "wrong"  _ -> "fallback" } }
 yes = (x: 1) { x |> { _ ? x != 2 -> "chosen"  _ -> "wrong" } }
 
-@main
+
 main = () {
     assert(no(1) == "fallback")
     assert(yes(1) == "chosen")

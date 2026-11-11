@@ -3,5 +3,5 @@
 (i/record)
 (main)
 f = (getter: record.get) { Nil }
-@main
+
 main = () { Nil }

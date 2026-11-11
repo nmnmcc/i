@@ -1,7 +1,7 @@
 (i/request)
 @host("test:async/v1", "request")
 Later { Later(echo: (text: String) -> Request(String)) }
-@main
+
 main = (later ! Later, owner ! request.Owner) {
  first = later.echo("first")
  second = later.echo("second")

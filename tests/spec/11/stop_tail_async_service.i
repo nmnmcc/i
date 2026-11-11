@@ -31,7 +31,7 @@ twice = (later ! Later) {
 	later.echo("two")
 }
 
-@main
+
 main = (io ! Io) {
 	io.print(twice())
 	take()

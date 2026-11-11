@@ -4,7 +4,7 @@
 // at: spec/binding_text_crlf:9:3
 
 // The source text of the pattern has `\n` for each `\r\n`.
-@main
+
 main = () {
   [a,
 b] = [1]

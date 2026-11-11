@@ -17,7 +17,7 @@ Out {
 
 print = (text: String, out ! Out) { out.print(text) }
 
-@main
+
 main = () {
 	callback = control.keep_env((work: (() -> Nil, () -> Nil) -> Nil) {
 		task.scope((s) {

@@ -39,7 +39,7 @@ get = (d ! Dep) { d.v }
 
 Dep { Dep(v: Int) }
 
-@main
+
 main = () {
   closed()
   Nil

@@ -29,7 +29,7 @@ S(N) { S(f: () -> Int ! N) }
 
 loop = (x) { x(x) }
 
-@main
+
 main = () {
   closed()
   Nil

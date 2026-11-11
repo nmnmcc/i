@@ -28,7 +28,7 @@ h0 = () { askc() }
 h1 = () {
   with_dep(() { with_int(() { get() + ask() }) })
 }
-@main
+
 main = () {
   ! Cov(Int) = Cov(() { 2 })
   ! Cov(Int) = Cov(() { run(() { ask() }) + with_cov(() { askc() }, 3) })

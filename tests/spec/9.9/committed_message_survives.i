@@ -6,7 +6,7 @@
 	i/task
 )
 
-@main
+
 main = () {
 	task.scope((outer) {
 		carrier: task.Channel(task.Channel(Int)) = task.channel()

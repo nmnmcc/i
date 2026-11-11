@@ -20,7 +20,7 @@ h1 = () {
   ! Dep = Dep(2)
   h0()
 }
-@main
+
 main = () {
   ! S(Dep | T(Dep)) = S(() { h1() }, (_: Dep | T(Dep)) { Nil })
   ! S(Dep) = S(() { get() }, (_: Dep) { Nil })

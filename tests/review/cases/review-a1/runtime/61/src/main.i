@@ -4,7 +4,7 @@ Id(A) = A
 
 f = () { p + q }
 
-@main
+
 main = () {
 	assert(f() == 42)
 	Nil

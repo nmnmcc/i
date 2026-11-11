@@ -16,7 +16,7 @@ Out {
 
 print = (text: String, out ! Out) { out.print(text) }
 
-@main
+
 main = () {
 	result = fail.catch(() {
 		task.test(random.from_seed(7), [[1], [1], [999]], () {

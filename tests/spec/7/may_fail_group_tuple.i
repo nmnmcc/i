@@ -7,7 +7,7 @@ pair = ("b", () {
 	1
 })
 
-@main
+
 main = () {
 	! Assert = Assert((_) { panic("caught group tuple") })
 	pair.1()

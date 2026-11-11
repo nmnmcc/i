@@ -2,5 +2,5 @@
 // expect: stop "panic: the entry stops"
 // at: spec/test_stops:6:13
 
-@main
+
 main = () { panic("the entry stops") }

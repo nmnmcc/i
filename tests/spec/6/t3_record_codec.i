@@ -10,7 +10,6 @@ field(R, E, K, V) = (s: Codec(R, E), key: K, value: Codec(V, V)) -> Codec((..R, 
     encode: (x) { s.encode(x) <> value.encode(record.get(x, key)) },
   )
 }
-@main
 main = () {
   value = Codec(decode: () { 1 }, encode: (x: Int) { "x" })
   user = field(object, "age", value)

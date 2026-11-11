@@ -7,7 +7,7 @@
 	i/fail
 )
 
-@main
+
 main = () {
 	assert(fail.catch(() {
 		task.race(() { fail.raise("first") }, () {

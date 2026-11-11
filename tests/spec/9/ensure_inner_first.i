@@ -6,7 +6,7 @@
 )
 
 // Final functions run from the innermost to the outermost.
-@main
+
 main = () {
 	fail.catch(() {
 		resource.ensure(

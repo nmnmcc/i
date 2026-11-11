@@ -3,7 +3,7 @@
 (i/task, i/request)
 @host("review:gate/v1", "request")
 Gate { Gate(wait: () -> Request(Nil)) }
-@main
+
 main = (gate ! Gate, root ! request.Root) {
   pending = gate.wait()
   task.scope((s) {

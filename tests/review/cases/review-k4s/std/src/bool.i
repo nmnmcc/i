@@ -79,8 +79,8 @@ compare = (a: Bool, with: Bool) -> Order {
 guard(A, E, N) = (
 	when: Bool
 	return: A
-	otherwise: () -> A ? E ! N
-) -> A ? E ! N {
+	otherwise: () -> A ^ E ! N
+) -> A ^ E ! N {
 	when |> {
 		True  -> return
 		False -> otherwise()
@@ -90,9 +90,9 @@ guard(A, E, N) = (
 /// Like `guard`, but the value for `True` is made by a function too.
 lazy_guard(A, E, N) = (
 	when: Bool
-	return: () -> A ? E ! N
-	otherwise: () -> A ? E ! N
-) -> A ? E ! N {
+	return: () -> A ^ E ! N
+	otherwise: () -> A ^ E ! N
+) -> A ^ E ! N {
 	when |> {
 		True  -> return()
 		False -> otherwise()

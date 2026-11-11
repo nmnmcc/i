@@ -3,7 +3,7 @@
 (main)
 _empty: (Never) -> Int = {}
 
-@main
+
 main = () {
   assert(True)
   Nil

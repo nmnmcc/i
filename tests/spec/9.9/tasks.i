@@ -6,7 +6,7 @@
 	i/task
 )
 
-@main
+
 main = () {
 	assert(task.path() == [])
 	value = task.scope((s) {

@@ -14,5 +14,5 @@ Bad = T(S(Never) | S(Dep))
 
 use = (x: Bad) { x }
 
-@main
+
 main = () { Nil }

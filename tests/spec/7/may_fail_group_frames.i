@@ -9,5 +9,5 @@ f = (s: String) -> Int {
 	a
 }
 
-@main
+
 main = () { f("b") }

@@ -8,5 +8,5 @@
 
 // The final function runs, then the error comes to the program entry.
 
-@main
+
 main = () { resource.ensure(() { fail.raise(1) }, () { Nil }) }

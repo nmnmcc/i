@@ -61,7 +61,7 @@ map_error = () {
 }
 
 // §9.1: retrying is a normal function.
-retry(A, E, N) = (times: Int, body: () -> A ? E ! N) -> A ? E ! N {
+retry(A, E, N) = (times: Int, body: () -> A ^ E ! N) -> A ^ E ! N {
 	fail.catch(body) |> {
 		Ok(value) -> value
 		Error(error) -> { times > 1 } |> {
@@ -94,7 +94,7 @@ ParseError {
 }
 
 Http {
-	Http(get: (id: String) -> String ? HttpError)
+	Http(get: (id: String) -> String ^ HttpError)
 }
 
 default_user = User("default")

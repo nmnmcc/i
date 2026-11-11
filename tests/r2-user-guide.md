@@ -19,7 +19,7 @@ Two children and a result:
 	(Io) = i/io
 )
 
-@main
+
 main = (io ! Io) {
 	answer = task.scope((s) {
 		a = task.go(s, () { 20 })
@@ -51,7 +51,7 @@ forever = () -> Never ! task.Scheduler {
 	forever()
 }
 
-@main
+
 main = (io ! Io) {
 	answer = task.race(() {
 		task.yield()
@@ -76,7 +76,7 @@ A channel between two children:
 	(Io) = i/io
 )
 
-@main
+
 main = (io ! Io) {
 	task.scope((s) {
 		c: task.Channel(String) = task.channel()

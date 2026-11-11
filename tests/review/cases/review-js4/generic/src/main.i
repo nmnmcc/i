@@ -7,7 +7,7 @@ left = (c ! Cell(Int)) { Left(c.value) }
 right = (c ! Cell(String)) { Right(c.value) }
 use = (l ! Left, r ! Right) { (l.value, r.value) }
 
-@main
+
 main = () {
   l = {
     ! Cell(Int) = ints()

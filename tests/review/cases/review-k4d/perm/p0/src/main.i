@@ -45,7 +45,7 @@ bad(N) = (s ! S(N)) -> Int ! N {
 
 loop = (x) { x(x) }
 
-@main
+
 main = () {
   closed()
   Nil

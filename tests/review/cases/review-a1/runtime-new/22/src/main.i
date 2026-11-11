@@ -6,7 +6,7 @@ g = (p: (Int, Int)) {
 
 f = () { g((20, 21))(1) }
 
-@main
+
 main = () {
 	assert(f() == 42)
 	Nil

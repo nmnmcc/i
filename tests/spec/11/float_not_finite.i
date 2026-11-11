@@ -9,7 +9,7 @@ big = (x: Float) {
 	y *. 1.0e300
 }
 
-@main
+
 main = () {
 	big(1.0e300)
 	Nil

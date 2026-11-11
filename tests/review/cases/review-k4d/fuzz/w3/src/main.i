@@ -18,7 +18,7 @@ run(A, N) = (body: () -> A ! N) { body() }
 h0 = () {
   1
 }
-@main
+
 main = () {
   ! S(Dep | S(Dep)) = S(() { run(() { h0() + 1 + get() }) }, (_: Dep | S(Dep)) { Nil })
   run(() { run(() { usa() + h0() }) + 1 })

@@ -15,7 +15,7 @@ Out {
 
 print = (text: String, out ! Out) { out.print(text) }
 
-@main
+
 main = () {
 	assert(task.scope((s) {
 		task.go(s, () {

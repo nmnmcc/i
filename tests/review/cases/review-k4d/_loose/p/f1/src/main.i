@@ -5,7 +5,7 @@ use(N) = (s ! S(N)) {
   S(f) = s
   f()
 }
-@main
+
 main = () {
   ! S(Never) = S(() { get() })
   use()

@@ -4,7 +4,7 @@
 
 name_of = (r) { r.name }
 
-@main
+
 main = () {
   ada = (age: 36, name: "Ada")
   updated = (..ada, age: 37)

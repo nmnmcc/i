@@ -6,7 +6,7 @@
 // the host, and does not wait.
 @host("test:kv/v1")
 Kv {
-	Kv(get: (key: String) -> String ? String)
+	Kv(get: (key: String) -> String ^ String)
 }
 
 @host("test:async/v1", "async")

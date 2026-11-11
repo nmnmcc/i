@@ -4,5 +4,5 @@
 (i/request)
 @host("test:async/v1", "request")
 Later { Later(echo: (text: String) -> Request(String)) }
-@main
+
 main = (later ! Later) { request.take(later.echo("pending")) }

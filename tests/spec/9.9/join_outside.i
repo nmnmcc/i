@@ -5,7 +5,7 @@
 	i/task
 )
 
-@main
+
 main = () {
 	t = task.scope((s) { task.go(s, () { 7 }) })
 	task.join(t)

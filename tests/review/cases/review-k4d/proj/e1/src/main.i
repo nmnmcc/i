@@ -18,7 +18,7 @@ outer = (runner) {
   }
   (fa(), fb())
 }
-@main
+
 main = () {
   ! State(Int) = State(() { 5 })
   outer((c: () -> Int ! State(Int)) { c() })

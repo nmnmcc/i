@@ -5,7 +5,7 @@ f = (n: Int) {
 	}
 }
 
-@main
+
 main = () {
 	assert(f(1) == 42 && f(0) == 7)
 	Nil

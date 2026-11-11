@@ -6,7 +6,7 @@
 
 same = (a, b) { a == b }
 
-@main
+
 main = () {
   r = request.ready(37)
   other = request.ready(37)

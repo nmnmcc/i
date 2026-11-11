@@ -12,7 +12,7 @@ outer = () {
   }
   (fa(), fb())
 }
-@main
+
 main = () {
   outer()
   Nil

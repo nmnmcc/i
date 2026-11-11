@@ -29,7 +29,7 @@ h1 = () {
   ! Dep = Dep(1)
   ask()
 }
-@main
+
 main = () {
   ! Dep = Dep(1)
   run(h0) + with_dep(() { with_int(() { get() + ask() }) })

@@ -23,7 +23,7 @@ fr = () { run(() { use() }) }
 
 fw = () { use() }
 
-@main
+
 main = () {
   closed()
   Nil

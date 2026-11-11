@@ -5,7 +5,7 @@
 	(Io) = i/io
 )
 
-@main
+
 main = (io ! Io) {
 	answer = task.scope((s) {
 		a = task.go(s, () { 20 })

@@ -6,7 +6,7 @@ S(N) { S(() -> Nil ! N, (N) -> Nil) }
 
 use(N) = (s ! S(N)) { S(f, _) = s f() }
 annotated(N) = (s ! S(N)) -> Nil ! N | S(N) { S(f, _) = s f() }
-run(A, E, N) = (body: () -> A ? E ! N) { body() }
+run(A, E, N) = (body: () -> A ^ E ! N) { body() }
 
 // §4.8 rules 3–5 instantiate N with Never; rule 9 removes S(Never).
 @test
@@ -36,9 +36,9 @@ nested = () {
 
 // Std-2 §7's logging example, including its original error and marker.
 Entry { Entry(message: String) }
-Sink(E, N) { Sink((Entry) -> Nil ? E ! N, (N) -> Nil) }
+Sink(E, N) { Sink((Entry) -> Nil ^ E ! N, (N) -> Nil) }
 
-make(E, N) = (send: (Entry) -> Nil ? E ! N) -> Sink(E, N) {
+make(E, N) = (send: (Entry) -> Nil ^ E ! N) -> Sink(E, N) {
 	Sink(send, (_: N) { Nil })
 }
 
@@ -47,7 +47,7 @@ write(E, N) = (entry: Entry, sink ! Sink(E, N)) {
 	send(entry)
 }
 
-write_annotated(E, N) = (entry: Entry, sink ! Sink(E, N)) -> Nil ? E ! N | Sink(E, N) {
+write_annotated(E, N) = (entry: Entry, sink ! Sink(E, N)) -> Nil ^ E ! N | Sink(E, N) {
 	Sink(send, _) = sink
 	send(entry)
 }

@@ -23,7 +23,7 @@ make = () {
 	})
 }
 
-@main
+
 main = () {
 	event = make()
 	! Name = Name("caller")

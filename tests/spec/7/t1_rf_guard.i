@@ -4,5 +4,5 @@ strict = (s: String - "a") {
     s |> { "b" -> 1  _: String - "a" - "b" -> 2 }
 }
 f = (s: String, c: Bool) { s |> { "a" ? c -> 0  t -> strict(t) } }
-@main
+
 main = () { f("a", False) }

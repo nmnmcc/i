@@ -2,7 +2,7 @@ Svc(A) {
 	Svc(() -> A)
 }
 
-Row(N) = () -> Nil ? N
+Row(N) = () -> Nil ^ N
 
 bad(N) = (body: Row(N), one: Svc(Int), two: Svc(Nil)) {
 	first: N = one
@@ -10,5 +10,5 @@ bad(N) = (body: Row(N), one: Svc(Int), two: Svc(Nil)) {
 	second
 }
 
-@main
+
 main = () { Nil }

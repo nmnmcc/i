@@ -32,7 +32,7 @@ T(A, N) { T(g: (A) -> A ! N, m: (N) -> Nil) }
 
 Dep { Dep(v: Int) }
 
-@main
+
 main = () {
   closed()
   Nil

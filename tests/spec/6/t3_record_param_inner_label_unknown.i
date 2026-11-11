@@ -6,5 +6,4 @@ f(K) = (r: Record, key: K) -> Int {
   0
 }
 g = (key: String) { f((), key) }
-@main
 main = () { Nil }

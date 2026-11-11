@@ -6,7 +6,7 @@
 )
 
 // `release` gets the resource when `use` ends with an error.
-@main
+
 main = () {
 	fail.catch(() {
 		resource.acquire(() { 5 }, (r) {

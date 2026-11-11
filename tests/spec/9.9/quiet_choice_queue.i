@@ -37,7 +37,7 @@ send = (c: task.Channel(Int), n: Int) -> Nil ! task.Scheduler {
 	}
 }
 
-@main
+
 main = () {
 	task.scope((s) {
 		a: task.Channel(Int) = task.channel()

@@ -7,7 +7,7 @@ via_match = (n) {
   n |> { 0 -> 0  _ -> via_match(n - 1) }
 }
 
-@main
+
 main = () {
   first = make()
   second = make()

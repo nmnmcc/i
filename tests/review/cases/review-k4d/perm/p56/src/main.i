@@ -4,7 +4,7 @@ pong = (n: Int) { ping(n) + uset(1) }
 
 fw = () { use() }
 
-@main
+
 main = () {
   closed()
   Nil

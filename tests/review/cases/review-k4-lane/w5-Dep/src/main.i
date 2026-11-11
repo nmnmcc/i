@@ -18,7 +18,7 @@ wrap = (body, svc) {
 	body()
 }
 
-@main
+
 main = () {
 	! Dep = Dep(7)
 	assert(wrap(() { use() }, S(() { get() })) == 7)

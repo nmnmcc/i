@@ -3,7 +3,7 @@
 (main)
 read = (v: Int | String) { v |> { x: Int -> x } }
 
-@main
+
 main = () {
   read("other")
   Nil

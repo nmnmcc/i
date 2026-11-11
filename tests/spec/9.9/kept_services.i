@@ -15,7 +15,7 @@ Name {
 
 read_name = (name ! Name) { name.value }
 
-@main
+
 main = () {
 	! Name = Name("saved")
 	callback = task.keep((x: Int) {

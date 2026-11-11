@@ -7,12 +7,12 @@ Whole = {String - "error"} | "error"
 @host("test:kv/v1")
 Kv {
 	Kv(
-		get: (key: String & {String | Int}) -> Whole ? String | "error"
-		check: (n: {Int | String} & Int) -> {Int - 0} | 0 ? Nil | {Int - 0} | 0 | String | "error"
+		get: (key: String & {String | Int}) -> Whole ^ String | "error"
+		check: (n: {Int | String} & Int) -> {Int - 0} | 0 ^ Nil | {Int - 0} | 0 | String | "error"
 	)
 }
 
-@main
+
 main = (kv ! Kv) {
 	assert(kv.get("name") == "i")
 	assert(kv.check(21) == 42)

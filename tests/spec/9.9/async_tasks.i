@@ -9,10 +9,10 @@
 
 @host("test:async/v1", "async")
 Later {
-	Later(double: (n: Int) -> Int ? String, echo: (text: String) -> String)
+	Later(double: (n: Int) -> Int ^ String, echo: (text: String) -> String)
 }
 
-@main
+
 main = (later ! Later) {
 	assert(
 		task.both(() { later.double(21) }, () { later.echo("answer") }) ==

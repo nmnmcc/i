@@ -6,7 +6,7 @@ end_bias = () -> stream.Stream(Int, Never, Bias) {
 source = () -> stream.Stream(Int, Never, Bias) {
  stream.make((b ! Bias) { stream.Next(b.value, end_bias()) })
 }
-@main
+
 main = () {
  s = source()
  {

@@ -16,5 +16,5 @@ cycle = (n: Int, later ! Later) {
   cycle(n - 1)
  } }
 }
-@main
+
 main = () { cycle(200) }

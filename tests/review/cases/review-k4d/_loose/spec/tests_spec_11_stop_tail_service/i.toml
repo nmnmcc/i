@@ -1,1 +1,4 @@
 name = "spec"
+
+[entries]
+legacy = "stop_tail_service.main"

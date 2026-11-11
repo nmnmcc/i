@@ -3,7 +3,7 @@
 (main)
 id = (x: Missing) { x }
 
-@main
+
 main = () {
   assert(True)
   Nil

@@ -5,5 +5,5 @@ f(K) = (r: (K: Int), key: K) -> Int {
   nested = (another: K) { another }
   1
 }
-@main
+
 main = () { Nil }

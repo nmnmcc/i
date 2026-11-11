@@ -13,7 +13,7 @@ start = (owner: request.Owner, text: String, later ! Later) {
   ! request.Owner = owner
   later.echo(text)
 }
-@main
+
 main = (root ! request.Root, owner ! request.Owner) {
   separate = request.open_root()
   other = make_group(separate)

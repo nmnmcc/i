@@ -8,7 +8,7 @@
 	i/fail
 )
 
-@main
+
 main = () {
 	result = fail.catch(() {
 		task.scope((s) {

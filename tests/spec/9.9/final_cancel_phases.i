@@ -82,7 +82,7 @@ probe = (phase: Int, typed: Bool) {
 	print(core.inspect(result))
 }
 
-@main
+
 main = () {
 	probe(0, False)
 	probe(1, False)

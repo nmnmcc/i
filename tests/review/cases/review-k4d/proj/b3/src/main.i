@@ -7,7 +7,7 @@ use(N) = (s ! S(N)) {
 }
 run(A, N) = (body: () -> A ! N) { body() }
 
-@main
+
 main = () {
   local = () { use() }
   local()

@@ -3,7 +3,7 @@
 (main)
 Box(Int) { Box(Int) }
 
-@main
+
 main = () {
   assert(True)
   Nil

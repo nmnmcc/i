@@ -11,7 +11,7 @@ uset(A, N) = (x: A, t ! T(A, N)) -> A ! N | T(A, N) {
 
 S(N) { S(f: () -> Int ! N) }
 
-@main
+
 main = () {
   closed()
   Nil

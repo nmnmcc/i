@@ -14,7 +14,7 @@ half = (bad ! Bad) {
 	x /. 2.0
 }
 
-@main
+
 main = () {
 	half()
 	Nil

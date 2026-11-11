@@ -6,7 +6,7 @@ probe = (t ! Target) {
   ! Target = Native
   (captured(), read())
 }
-@main
+
 main = () {
   ! Target = Web
   assert(probe() == (1, 2))

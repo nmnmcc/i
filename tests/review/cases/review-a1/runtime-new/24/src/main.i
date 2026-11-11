@@ -5,7 +5,7 @@ f = (v: (Int) -> Int) {
 	}
 }
 
-@main
+
 main = () {
 	assert(f((x) { x + 1 }) == 42)
 	Nil

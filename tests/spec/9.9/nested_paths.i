@@ -8,7 +8,7 @@
 	i/fail
 )
 
-@main
+
 main = () {
 	! task.Runner = task.top(random.from_seed(7))
 	assert(task.run(() {

@@ -1,8 +1,8 @@
 Await { Await }
 Owner { Owner }
 FsError { FsError }
-Fs { Fs(read: () -> BitArray ? FsError ! Await | Owner) }
-Settings { Settings(read: () -> BitArray ? FsError ! Await | Owner) }
+Fs { Fs(read: () -> BitArray ^ FsError ! Await | Owner) }
+Settings { Settings(read: () -> BitArray ^ FsError ! Await | Owner) }
 
 read_file = (f ! Fs) { f.read() }
 filesystem = (f ! Fs) {
@@ -14,7 +14,7 @@ filesystem = (f ! Fs) {
 fallback = () { Settings(read: () { <<>> }) }
 use = (settings ! Settings) { settings.read() }
 
-@main
+
 main = () {
   ! Await = Await
   ! Owner = Owner

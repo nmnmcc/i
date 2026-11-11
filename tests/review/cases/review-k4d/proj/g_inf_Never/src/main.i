@@ -10,7 +10,7 @@ uset(N) = (s ! T(N)) {
   T(f) = s
   f()
 }
-@main
+
 main = () {
   ! S(Dep) = S(() { get() })
   ! T(Never) = T(() { use() })

@@ -11,5 +11,5 @@ run(N) = (body: () -> Nil ! N) { body() }
 
 example = () { run(() { use() }) }
 
-@main
+
 main = () { example() }

@@ -12,7 +12,7 @@ pair_match = {
   (x, _) -> x
 }
 
-@main
+
 main = () {
   tuple = (
     2

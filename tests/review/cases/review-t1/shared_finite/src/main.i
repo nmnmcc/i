@@ -5,5 +5,5 @@ f = (x: Pair("a" | "b")) { x |> {
  Pair("b","a") -> 2
  Pair("b","b") -> 3
 } }
-@main
+
 main = () { assert(f(Pair("a","b"))==1) assert(f(Pair("b","a"))==2) Nil }

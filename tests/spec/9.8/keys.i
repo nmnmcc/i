@@ -4,7 +4,7 @@
 // multicore.md 13: keyed equality compares the key and the stored value.
 (i/key, i/core)
 
-@main
+
 main = () {
   a: Key(Int) = key.new()
   b: Key(Int) = key.new()

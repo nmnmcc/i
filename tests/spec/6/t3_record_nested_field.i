@@ -2,7 +2,7 @@
 // expect: pass
 (main)
 User { User(name: String) }
-@main
+
 main = () {
   a = (user: User("Ada"))
   b = (..a, age: 36)

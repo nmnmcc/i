@@ -10,7 +10,7 @@
 // A library function of the runtime in tail position keeps its position.
 value = () { core.float_from_bits(9218868437227405312) }
 
-@main
+
 main = () {
 	value()
 	Nil

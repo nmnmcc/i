@@ -12,5 +12,5 @@ Later {
 	Later(echo: (text: "a" | "b") -> Request(String))
 }
 
-@main
+
 main = (later ! Later) { assert(request.await_owned(later.echo("a")) == "a") }

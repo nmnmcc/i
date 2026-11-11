@@ -3,7 +3,7 @@
 (main)
 User { User(name: String) }
 
-@main
+
 main = () {
   assert(1 + 2 |> { 3 -> True  _ -> False })
   assert({ 2 == 2 } |> { True -> 7  False -> 8 } == 7)

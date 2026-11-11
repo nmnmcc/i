@@ -4,7 +4,7 @@
 (i/request)
 @host("test:async/v1", "request")
 Later { Later(echo: (text: String) -> Request(String)) }
-@main
+
 main = (later ! Later, owner ! request.Owner) {
   request.close_owner(owner)
   later.echo("unreachable")

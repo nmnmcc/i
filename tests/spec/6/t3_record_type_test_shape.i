@@ -7,5 +7,5 @@ f = (value: (name: Int) | (name: String)) -> Int {
     _ -> 2
   }
 }
-@main
+
 main = () { Nil }

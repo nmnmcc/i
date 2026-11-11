@@ -11,7 +11,7 @@ example = () {
   })
   use()
 }
-@main
+
 main = () {
   example()
   Nil

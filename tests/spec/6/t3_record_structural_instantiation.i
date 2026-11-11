@@ -7,7 +7,7 @@ U = (a: Int | String)
 W = (b: Int | String)
 dup(A) = (x: A, y: A) -> (A, A) { (x, y) }
 use: (x: L, y: M) -> (U, W) = dup
-@main
+
 main = () {
   (a, b) = use((a: 1, b: "s"), (a: "s", b: 1))
   assert(a.a == 1)

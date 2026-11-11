@@ -9,5 +9,5 @@ wrap(N) = (body: () -> Int ! N | Svc(Int), svc: Svc(Int)) {
 	body()
 }
 
-@main
+
 main = () { assert(wrap(use, Svc(() { 6 })) == 6) }

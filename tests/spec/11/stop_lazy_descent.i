@@ -31,7 +31,7 @@ out1 = (outer) {
 
 // The resume goes into `inner` again: the stop inside it shows the frames
 // of both lists.
-@main
+
 main = () {
   p = control.boundary((outer) {
     out1(outer)

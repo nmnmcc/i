@@ -22,7 +22,7 @@ identity = { value -> value }
 
 make = () { control.keep_env((b) { walk(b, 0) }) }
 
-@main
+
 main = () {
   ! Name = Name("kept")
   kept = make()

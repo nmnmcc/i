@@ -6,7 +6,7 @@ run(A, N) = (body: () -> A ! N) { body() }
 
 T(A, N) { T(g: (A) -> A ! N, m: (N) -> Nil) }
 
-@main
+
 main = () {
   closed()
   Nil

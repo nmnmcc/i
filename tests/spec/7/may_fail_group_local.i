@@ -10,7 +10,7 @@ pair = ("b", () {
 	g()
 })
 
-@main
+
 main = () {
 	! Assert = Assert((_) { panic("caught group local") })
 	pair.1()

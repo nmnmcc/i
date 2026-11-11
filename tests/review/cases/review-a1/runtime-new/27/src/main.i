@@ -5,7 +5,7 @@ f = () {
 	}
 }
 
-@main
+
 main = () {
 	assert(f() == 42)
 	Nil

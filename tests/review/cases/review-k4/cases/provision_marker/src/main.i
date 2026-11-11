@@ -4,7 +4,7 @@ use(N) = (s ! G(N)) { G(f, _) = s f() }
 run = (f) { f() }
 with(A, R, N) = (x: A, f: () -> R ! N) { ! S(A) = S(x) f() }
 read = (s ! S(String)) { s.value <> "!" }
-@main
+
 main = () {
  ! G(Never) = G(() { Nil }, (_: Never) { Nil })
  run(() { use() })

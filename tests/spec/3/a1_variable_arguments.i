@@ -3,7 +3,7 @@
 (main)
 bad(A) = (x: A(Int)) { x }
 
-@main
+
 main = () {
   assert(True)
   Nil

@@ -3,7 +3,7 @@
 (main)
 pair(A, A) = (x: A) { (x, x) }
 
-@main
+
 main = () {
   assert(True)
   Nil

@@ -12,7 +12,7 @@ pair = (No, () {
 	n
 })
 
-@main
+
 main = () {
 	! Assert = Assert((_) { panic("caught group ctor") })
 	pair.1()

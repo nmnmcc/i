@@ -43,7 +43,7 @@ h2 = () {
   ! T(Never) = T(() { run(() { 2 + 2 + get() }) }, (_: Never) { Nil })
   run(() { get() + l0_0() + us() }) + run(() { us() + 1 })
 }
-@main
+
 main = () {
   ut()
   Nil

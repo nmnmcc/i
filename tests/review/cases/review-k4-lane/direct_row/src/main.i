@@ -12,5 +12,5 @@ T(N) {
 
 use = (x: T(S(Never) | S(Dep))) { x }
 
-@main
+
 main = () { Nil }

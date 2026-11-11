@@ -4,7 +4,7 @@
 (i/request)
 @host("test:async/v1", "request")
 Later { Later(double: (n: Int) -> Request(Result(Int, Never))) }
-@main
+
 main = (later ! Later) {
   assert(request.await_owned(later.double(21)) == Ok(42))
 }

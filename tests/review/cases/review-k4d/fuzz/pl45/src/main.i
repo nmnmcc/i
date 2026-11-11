@@ -28,7 +28,7 @@ h0 = () { with_dep(() { get() }) }
 h1 = () {
   get()
 }
-@main
+
 main = () {
   ! Svc(Int) = Svc(() { with_int(() { run(() { ask() + 1 }) }) }, (_: Int) { Nil })
   ! Cov(Int) = Cov(() { 2 })

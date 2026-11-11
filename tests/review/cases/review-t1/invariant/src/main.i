@@ -3,5 +3,5 @@ make = () { Cell((x) { x }) }
 ci: Cell(Int) = make()
 cs: Cell(String) = make()
 id(A) = (x: A) -> A { x }
-@main
+
 main = () { assert(ci.run(3) == 3) assert(cs.run("b") == "b") assert(id(1) == 1) Nil }

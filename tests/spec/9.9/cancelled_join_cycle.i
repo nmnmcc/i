@@ -8,7 +8,7 @@
 	i/fail
 )
 
-@main
+
 main = () {
 	task.scope((s) {
 		a: task.Channel(task.Task(Nil, String)) = task.channel()

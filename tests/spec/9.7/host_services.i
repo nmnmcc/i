@@ -19,8 +19,8 @@ Io {
 @host("test:kv/v1")
 Kv {
 	Kv(
-		get:   (key: String) -> String ? String
-		check: (n: Int) -> Int ? Nil | Int | String
+		get:   (key: String) -> String ^ String
+		check: (n: Int) -> Int ^ Nil | Int | String
 	)
 }
 
@@ -40,7 +40,7 @@ each = (xs: List(Int), f: (Int) -> String) -> String {
 	}
 }
 
-@main
+
 main = (kv ! Kv) {
 	say("hello")
 	say(kv.get("name"))

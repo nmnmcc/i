@@ -7,7 +7,7 @@ tell = (x: Int) { x |> {
   2 -> "two"
   _ -> "other"
 } }
-@main
+
 main = (io ! Io) {
   ! Svc(Int) = Svc(() { 1 }, (_: Int) { Nil })
   body = () { ask() + 1 }

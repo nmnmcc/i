@@ -45,7 +45,7 @@ fw = () { use() }
 
 T(A, N) { T(g: (A) -> A ! N, m: (N) -> Nil) }
 
-@main
+
 main = () {
   closed()
   Nil

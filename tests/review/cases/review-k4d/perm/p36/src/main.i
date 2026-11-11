@@ -20,7 +20,7 @@ ping = (n: Int) { n |> {
 
 loop = (x) { x(x) }
 
-@main
+
 main = () {
   closed()
   Nil

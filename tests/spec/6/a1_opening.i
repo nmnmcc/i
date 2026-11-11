@@ -4,7 +4,7 @@
 make = (n) { (x) -> Int { x + n } }
 read = (v: Int | String) { v |> { x: Int -> x  _ -> 0 } }
 
-@main
+
 main = () {
   assert(make(4)(3) == 7)
   assert(read(3) == 3)

@@ -4,7 +4,7 @@
 Shape { Circle(r: Int) Square(side: Int) }
 bad = (s: Shape) { s |> { Circle(..) -> s.r } }
 
-@main
+
 main = () {
   assert(True)
   Nil

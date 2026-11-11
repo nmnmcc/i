@@ -11,7 +11,7 @@ wrap(N) = (body: () -> Int ! N, svc: S(Dep)) -> Int ! N {
   ! S(Dep) = svc
   body()
 }
-@main
+
 main = () {
   ! S(Never) = S(() { 1 }, (_: Never) { Nil })
   wrap(() { use() }, S(() { get() }, (_: Dep) { Nil }))

@@ -14,7 +14,7 @@ Out {
 	Out(print: (text: String) -> Nil)
 }
 
-@main
+
 main = () {
 	assert(task.test(random.from_seed(7), [[1]], () { task.path() }) == [1])
 	assert(

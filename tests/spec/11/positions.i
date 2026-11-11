@@ -38,7 +38,7 @@ each = (xs, f) {
 	}
 }
 
-@main
+
 main = () {
 	each(["a", "b"], (s) { outer(s) })
 	Nil

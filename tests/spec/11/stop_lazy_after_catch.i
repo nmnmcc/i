@@ -38,7 +38,7 @@ outer = (b) {
 
 // The stop shows the frame of `outer`, not the one of `inner` that the
 // error went out of.
-@main
+
 main = () {
   p = control.boundary((b) {
     outer(b)

@@ -3,7 +3,7 @@
 (main)
 read = (r: (name: String)) { r.name }
 main = () {
-  old = { name: "Ada" }
+  old = ( name: "Ada" )
   new = (name: "Ada")
   assert(read(old) == read(new))
   assert((1, 2).0 == 1)

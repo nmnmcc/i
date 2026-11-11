@@ -12,7 +12,7 @@ make = (b: BitArray) {
 	x
 }
 
-@main
+
 main = () {
 	make(<<1>>)
 	Nil

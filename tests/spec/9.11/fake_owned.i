@@ -3,7 +3,7 @@
 // runtime.md 5.4: borrowed await takes; owning await cancels after take as a no-op.
 // runtime.md D5: Await/Root/Owner-only needs can use completed fakes synchronously.
 (i/request, i/core)
-@main
+
 main = (root ! request.Root, owner ! request.Owner) {
   assert(core.portable(root))
   assert(core.portable(owner))

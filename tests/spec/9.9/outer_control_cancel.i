@@ -14,7 +14,7 @@ Out {
 	Out(print: (text: String) -> Nil)
 }
 
-@main
+
 main = (out ! Out) {
 	control.boundary((b) {
 		task.scope((s) {

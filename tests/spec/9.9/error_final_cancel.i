@@ -18,7 +18,7 @@ Out {
 
 print = (text: String, out ! Out) { out.print(text) }
 
-@main
+
 main = () {
 	r = fail.catch(() {
 		task.scope((s) {

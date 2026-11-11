@@ -40,5 +40,5 @@ write = (fd: Int, bytes: BitArray, w ! Wasi) {
     }
   )
 }
-@main
+
 main = () { write(1, <<"hello\n":utf8>>) }

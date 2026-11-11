@@ -12,7 +12,7 @@ both(N) = () -> Int ! N | S(N) | T(Int, N) { pong(2) }
 
 S(N) { S(f: () -> Int ! N) }
 
-@main
+
 main = () {
   closed()
   Nil

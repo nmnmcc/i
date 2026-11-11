@@ -4,7 +4,7 @@
 	i/control
 )
 
-@main
+
 main = () {
 	control.boundary((b) {
 		control.suspend(b, (k) {

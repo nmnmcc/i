@@ -30,7 +30,7 @@ h1 = () {
   ! Svc(String) = Svc(() { "s" }, (_: String) { Nil })
   with_int(() { ask() })
 }
-@main
+
 main = () {
   ! Cov(Int) = Cov(() { with_int(() { run(() { ask() + 1 }) }) + 1 + askc() })
   ! Dep = Dep(1)

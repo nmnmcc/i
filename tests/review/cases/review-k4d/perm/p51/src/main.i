@@ -1,6 +1,6 @@
 loop = (x) { x(x) }
 
-@main
+
 main = () {
   closed()
   Nil

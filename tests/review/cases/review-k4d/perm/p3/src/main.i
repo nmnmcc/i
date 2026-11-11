@@ -26,7 +26,7 @@ closed = () {
 
 pong = (n: Int) { ping(n) + uset(1) }
 
-@main
+
 main = () {
   closed()
   Nil

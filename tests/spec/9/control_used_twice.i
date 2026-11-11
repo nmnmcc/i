@@ -7,7 +7,7 @@
 )
 
 // §9.4 rule 5: `resume` and `cancel` together may be used one time.
-@main
+
 main = () {
 	control.boundary((b) {
 		control.suspend(b, (k) {

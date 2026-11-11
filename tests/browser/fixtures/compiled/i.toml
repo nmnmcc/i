@@ -2,3 +2,6 @@ name = "app"
 
 [wasm]
 exports = ["app/app.greet", "app/app.lookup", "app/app.distance", "app/app.wait_sum", "app/opaque.direct_aa", "app/opaque.direct_ab", "app/opaque.generic_aa", "app/opaque.generic_ab", "app/opaque.alias_aa", "app/opaque.module_ab", "app/opaque.collection_aa", "app/opaque.collection_ab", "app/opaque.hash_aa", "app/opaque.inspect_a", "app/opaque.echo", "app/opaque.roundtrip_aa", "app/opaque.roundtrip_ab", "app/opaque.import_aa", "app/opaque.import_ab", "app/opaque.sync_aa", "app/opaque.sync_ab", "app/opaque.async_aa", "app/opaque.async_ab"]
+
+[entries]
+legacy = "app.main"

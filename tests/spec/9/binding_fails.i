@@ -8,7 +8,7 @@ first = (r: Result(Int, Int)) {
 	v
 }
 
-@main
+
 main = () {
 	first(Error(7))
 	Nil

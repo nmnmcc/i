@@ -13,7 +13,7 @@ outer(A) = (x: A) -> A ! Assert {
 }
 unbox(A) = (b: Alias(A)) -> A { b |> { Box(x) -> x } }
 
-@main
+
 main = () {
   assert(id(4) == 4)
   assert(id("four") == "four")

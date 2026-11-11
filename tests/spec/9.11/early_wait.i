@@ -4,7 +4,7 @@
 (i/request)
 @host("test:async/v1", "request")
 Later { Later(echo: (text: String) -> Request(String)) }
-@main
+
 main = (later ! Later) {
   ! request.Await = request.Await((_) { Nil })
   request.await(later.echo("pending"))

@@ -7,7 +7,7 @@
 	i/core
 )
 
-@main
+
 main = () {
 	control.boundary((b) {
 		result = task.scope((_) { b })
