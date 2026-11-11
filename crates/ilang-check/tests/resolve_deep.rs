@@ -100,7 +100,7 @@ fn deep_alternating_pattern_and_format_expression() {
         },
         span: origin,
     };
-    for _ in 0..10_000 {
+    for depth in 0..10_000 {
         let pattern = ast::Pattern {
             kind: ast::PatternKind::BitArray(vec![ast::Segment {
                 value: ast::Pattern {
@@ -118,16 +118,46 @@ fn deep_alternating_pattern_and_format_expression() {
             }]),
             span,
         };
-        expr = Expr {
-            kind: ExprKind::Fn(Box::new(ast::Function {
-                params: vec![ast::Param::Pattern(pattern)],
-                ret: None,
-                body: ast::Block {
-                    stmts: vec![],
-                    span,
-                },
-            })),
+        let literal = || Expr {
+            kind: ExprKind::Int(0u32.into()),
             span,
+        };
+        expr = match depth % 3 {
+            0 => Expr {
+                kind: ExprKind::Fn(Box::new(ast::Function {
+                    params: vec![ast::Param::Pattern(pattern)],
+                    ret: None,
+                    body: ast::Block {
+                        stmts: vec![],
+                        span,
+                    },
+                })),
+                span,
+            },
+            1 => Expr {
+                kind: ExprKind::Block(ast::Block {
+                    stmts: vec![ast::Stmt::Bind(ast::Binding {
+                        pattern,
+                        value: literal(),
+                        span,
+                        type_params: vec![],
+                    })],
+                    span,
+                }),
+                span,
+            },
+            _ => Expr {
+                kind: ExprKind::Case {
+                    subject: Box::new(literal()),
+                    clauses: vec![ast::Clause {
+                        patterns: vec![pattern],
+                        guard: Some(literal()),
+                        body: literal(),
+                        span,
+                    }],
+                },
+                span,
+            },
         };
     }
     let module = parsed.iter_mut().find(|m| m.path == "app/main").unwrap();

@@ -22,6 +22,19 @@ use ilang_syntax::span::Span;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
 
+enum ResolutionRoot<'a> {
+    Expr(&'a ast::Expr),
+    Pattern(
+        &'a ast::Pattern,
+        Vec<Binder>,
+        Option<HashMap<NameKey, VarId>>,
+    ),
+}
+enum ResolutionResult {
+    Expr(Expr),
+    Pattern(Pattern, Vec<Binder>),
+}
+
 pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnostic>) {
     let mut r = Resolver {
         graph,
@@ -3169,7 +3182,69 @@ impl<'a> Resolver<'a> {
     }
 
     fn expr(&mut self, root: &ast::Expr) -> Expr {
+        let ResolutionResult::Expr(expr) = self.resolve_tree(ResolutionRoot::Expr(root)) else {
+            unreachable!("expression root")
+        };
+        expr
+    }
+
+    fn pattern(
+        &mut self,
+        root: &ast::Pattern,
+        binders: &mut Vec<Binder>,
+        shared: Option<&HashMap<NameKey, VarId>>,
+    ) -> Pattern {
+        let ResolutionResult::Pattern(pattern, result) = self.resolve_tree(
+            ResolutionRoot::Pattern(root, std::mem::take(binders), shared.cloned()),
+        ) else {
+            unreachable!("pattern root")
+        };
+        *binders = result;
+        pattern
+    }
+
+    fn resolve_tree(&mut self, root: ResolutionRoot<'_>) -> ResolutionResult {
         use ast::ExprKind as E;
+        enum PatternTask<'a> {
+            Visit(&'a ast::Pattern),
+            Named {
+                span: Span,
+                binder: Binder,
+            },
+            Constructor {
+                span: Span,
+                ctor: Option<CtorRef>,
+                spread: bool,
+                count: usize,
+            },
+            Tuple {
+                span: Span,
+                count: usize,
+            },
+            List {
+                span: Span,
+                count: usize,
+                rest: &'a Option<Option<ast::Binder>>,
+            },
+            BitNext {
+                span: Span,
+                segments: &'a [ast::Segment<ast::Pattern>],
+                index: usize,
+                out: Vec<Segment<Pattern>>,
+            },
+            BitFinish {
+                span: Span,
+                segments: &'a [ast::Segment<ast::Pattern>],
+                index: usize,
+                out: Vec<Segment<Pattern>>,
+            },
+        }
+        struct PatternMachine<'a> {
+            work: Vec<PatternTask<'a>>,
+            values: Vec<Pattern>,
+            binders: Vec<Binder>,
+            shared: Option<HashMap<NameKey, VarId>>,
+        }
         enum Build<'a> {
             Tuple(usize),
             List(usize, bool),
@@ -3181,6 +3256,24 @@ impl<'a> Resolver<'a> {
             Update(Option<CtorRef>, Span, &'a [(Ident, ast::Expr)]),
         }
         enum Task<'a> {
+            PatternPoll(usize),
+            PatternAfterFormat {
+                context: usize,
+                span: Span,
+                segments: &'a [ast::Segment<ast::Pattern>],
+                index: usize,
+                out: Vec<Segment<Pattern>>,
+                value: Pattern,
+            },
+            FunctionAfterPattern {
+                span: Span,
+                function: &'a ast::Function,
+                index: usize,
+                params: Vec<Param>,
+                all: Vec<Binder>,
+                labels: Vec<String>,
+                env_heads: Vec<TypeRef>,
+            },
             Visit(&'a ast::Expr),
             Finish(Span, Build<'a>),
             BitNext {
@@ -3226,6 +3319,16 @@ impl<'a> Resolver<'a> {
                 ty: Type,
                 span: Span,
             },
+            BlockAfterBindingPattern {
+                block: &'a ast::Block,
+                index: usize,
+                mark: usize,
+                stmts: Vec<Stmt>,
+                binding: &'a ast::Binding,
+                ty_vars: Vec<TyVarId>,
+                direct: bool,
+                names: HashSet<NameKey>,
+            },
             BlockAfterBinding {
                 block: &'a ast::Block,
                 index: usize,
@@ -3237,10 +3340,23 @@ impl<'a> Resolver<'a> {
                 ty_vars: Vec<TyVarId>,
                 direct: bool,
             },
+            FunctionParams {
+                span: Span,
+                function: &'a ast::Function,
+                index: usize,
+                params: Vec<Param>,
+                all: Vec<Binder>,
+                labels: Vec<String>,
+                env_heads: Vec<TypeRef>,
+            },
             FunctionFinish {
                 span: Span,
                 params: Vec<Param>,
                 ret: Option<RetType>,
+            },
+            ClauseFunctionAfterPattern {
+                span: Span,
+                clauses: &'a [ast::Clause],
             },
             ClauseFunctionFinish {
                 span: Span,
@@ -3257,6 +3373,26 @@ impl<'a> Resolver<'a> {
                 clauses: &'a [ast::Clause],
                 index: usize,
                 out: Vec<Clause>,
+            },
+            CasePatterns {
+                span: Span,
+                subject: Expr,
+                clauses: &'a [ast::Clause],
+                index: usize,
+                out: Vec<Clause>,
+                pattern_index: usize,
+                patterns: Vec<Pattern>,
+                first: Vec<Binder>,
+            },
+            CaseAfterPattern {
+                span: Span,
+                subject: Expr,
+                clauses: &'a [ast::Clause],
+                index: usize,
+                out: Vec<Clause>,
+                pattern_index: usize,
+                patterns: Vec<Pattern>,
+                first: Vec<Binder>,
             },
             CaseAfterGuard {
                 span: Span,
@@ -3280,17 +3416,330 @@ impl<'a> Resolver<'a> {
                 span: Span,
                 clause: &'a ast::Clause,
             },
+            SingleAfterPattern {
+                span: Span,
+                clause: &'a ast::Clause,
+                value: Expr,
+            },
             SingleAfterBody {
                 span: Span,
                 pattern: Pattern,
                 value: Expr,
             },
         }
-        let mut work = vec![Task::Visit(root)];
+        let mut contexts: Vec<Option<PatternMachine<'_>>> = Vec::new();
+        let (mut work, is_pattern) = match root {
+            ResolutionRoot::Expr(expr) => (vec![Task::Visit(expr)], false),
+            ResolutionRoot::Pattern(pattern, binders, shared) => {
+                contexts.push(Some(PatternMachine {
+                    work: vec![PatternTask::Visit(pattern)],
+                    values: Vec::new(),
+                    binders,
+                    shared,
+                }));
+                (vec![Task::PatternPoll(0)], true)
+            }
+        };
         let mut values: Vec<Expr> = Vec::new();
         let mut blocks: Vec<Block> = Vec::new();
-        while let Some(task) = work.pop() {
+        let mut pattern_results: Vec<(Pattern, Vec<Binder>)> = Vec::new();
+        'dispatch: while let Some(task) = work.pop() {
             match task {
+                Task::PatternPoll(context) => {
+                    let mut machine = contexts[context].take().expect("active pattern machine");
+                    let binders = &mut machine.binders;
+                    let shared = machine.shared.as_ref();
+                    let pattern_work = &mut machine.work;
+                    let pattern_values = &mut machine.values;
+                    use ast::PatternKind as P;
+                    while let Some(task) = pattern_work.pop() {
+                        match task {
+                            PatternTask::Visit(p) => {
+                                let kind = match &p.kind {
+                                    P::Quote(_) => {
+                                        self.error(
+                                            code::MACRO_RESERVED,
+                                            p.span,
+                                            "a quote pattern must be evaluated inside a macro",
+                                        );
+                                        PatternKind::Error(Vec::new())
+                                    }
+                                    P::Var(n) => {
+                                        PatternKind::Var(self.bind(n, p.span, binders, shared))
+                                    }
+                                    P::Discard(_) => PatternKind::Discard,
+                                    P::Typed { binder, ty } => {
+                                        let binder = (!binder.discard).then(|| {
+                                            self.bind(&binder.name, binder.span, binders, shared)
+                                        });
+                                        PatternKind::Typed {
+                                            binder,
+                                            ty: self.ty(ty),
+                                        }
+                                    }
+                                    P::Named { name, pattern } => {
+                                        let binder =
+                                            self.bind(&name.name, name.span, binders, shared);
+                                        pattern_work.push(PatternTask::Named {
+                                            span: p.span,
+                                            binder,
+                                        });
+                                        pattern_work.push(PatternTask::Visit(pattern));
+                                        continue;
+                                    }
+                                    P::Int { negative, value } => PatternKind::Int {
+                                        negative: *negative,
+                                        value: value.clone(),
+                                    },
+                                    P::Float { negative, value } => PatternKind::Float {
+                                        negative: *negative,
+                                        value: *value,
+                                    },
+                                    P::String(x) => PatternKind::String(x.clone()),
+                                    P::Prefix { prefix, rest } => PatternKind::Prefix {
+                                        prefix: prefix.clone(),
+                                        rest: (!rest.discard).then(|| {
+                                            self.bind(&rest.name, rest.span, binders, shared)
+                                        }),
+                                    },
+                                    P::Constructor {
+                                        module,
+                                        name,
+                                        args,
+                                        spread,
+                                    } => {
+                                        let ctor = self.ctor(module.as_ref(), name);
+                                        pattern_work.push(PatternTask::Constructor {
+                                            span: p.span,
+                                            ctor,
+                                            spread: *spread,
+                                            count: args.len(),
+                                        });
+                                        pattern_work
+                                            .extend(args.iter().rev().map(PatternTask::Visit));
+                                        continue;
+                                    }
+                                    P::Tuple(items) => {
+                                        pattern_work.push(PatternTask::Tuple {
+                                            span: p.span,
+                                            count: items.len(),
+                                        });
+                                        pattern_work
+                                            .extend(items.iter().rev().map(PatternTask::Visit));
+                                        continue;
+                                    }
+                                    P::List { items, rest } => {
+                                        pattern_work.push(PatternTask::List {
+                                            span: p.span,
+                                            count: items.len(),
+                                            rest,
+                                        });
+                                        pattern_work
+                                            .extend(items.iter().rev().map(PatternTask::Visit));
+                                        continue;
+                                    }
+                                    P::BitArray(segments) => {
+                                        pattern_work.push(PatternTask::BitNext {
+                                            span: p.span,
+                                            segments,
+                                            index: 0,
+                                            out: Vec::with_capacity(segments.len()),
+                                        });
+                                        continue;
+                                    }
+                                };
+                                pattern_values.push(Pattern { kind, span: p.span });
+                            }
+                            PatternTask::Named { span, binder } => {
+                                let pattern =
+                                    Box::new(pattern_values.pop().expect("named pattern child"));
+                                pattern_values.push(Pattern {
+                                    kind: PatternKind::Named { binder, pattern },
+                                    span,
+                                });
+                            }
+                            PatternTask::Constructor {
+                                span,
+                                ctor,
+                                spread,
+                                count,
+                            } => {
+                                let args = pattern_values.split_off(pattern_values.len() - count);
+                                let kind = match ctor {
+                                    Some(ctor) => PatternKind::Constructor { ctor, args, spread },
+                                    None => PatternKind::Error(args),
+                                };
+                                pattern_values.push(Pattern { kind, span });
+                            }
+                            PatternTask::Tuple { span, count } => {
+                                let items = pattern_values.split_off(pattern_values.len() - count);
+                                pattern_values.push(Pattern {
+                                    kind: PatternKind::Tuple(items),
+                                    span,
+                                });
+                            }
+                            PatternTask::List { span, count, rest } => {
+                                let items = pattern_values.split_off(pattern_values.len() - count);
+                                let rest = rest.as_ref().map(|r| {
+                                    r.as_ref()
+                                        .filter(|b| !b.discard)
+                                        .map(|b| self.bind(&b.name, b.span, binders, shared))
+                                });
+                                pattern_values.push(Pattern {
+                                    kind: PatternKind::List { items, rest },
+                                    span,
+                                });
+                            }
+                            PatternTask::BitNext {
+                                span,
+                                segments,
+                                index,
+                                out,
+                            } => {
+                                if index == segments.len() {
+                                    pattern_values.push(Pattern {
+                                        kind: PatternKind::BitArray(out),
+                                        span,
+                                    });
+                                } else {
+                                    pattern_work.push(PatternTask::BitFinish {
+                                        span,
+                                        segments,
+                                        index,
+                                        out,
+                                    });
+                                    pattern_work.push(PatternTask::Visit(&segments[index].value));
+                                }
+                            }
+                            PatternTask::BitFinish {
+                                span,
+                                segments,
+                                index,
+                                mut out,
+                            } => {
+                                let segment = &segments[index];
+                                let value = pattern_values.pop().expect("bit pattern segment");
+                                // Earlier segments' binders are visible to a format expression.
+                                self.locals.push(Frame {
+                                    names: binders
+                                        .iter()
+                                        .map(|b| (self.name_key(&b.name, b.span), b.var))
+                                        .collect(),
+                                    fn_only: None,
+                                });
+                                if let Some(arg) =
+                                    segment.format.as_ref().and_then(|f| f.arg.as_deref())
+                                {
+                                    contexts[context] = Some(machine);
+                                    work.push(Task::PatternAfterFormat {
+                                        context,
+                                        span,
+                                        segments,
+                                        index,
+                                        out,
+                                        value,
+                                    });
+                                    work.push(Task::Visit(arg));
+                                    continue 'dispatch;
+                                }
+                                self.locals.pop();
+                                let format = segment.format.as_ref().map(|f| Format {
+                                    name: f.name.clone(),
+                                    arg: None,
+                                });
+                                out.push(Segment {
+                                    value,
+                                    format,
+                                    span: segment.span,
+                                });
+                                pattern_work.push(PatternTask::BitNext {
+                                    span,
+                                    segments,
+                                    index: index + 1,
+                                    out,
+                                });
+                            }
+                        }
+                    }
+                    assert_eq!(
+                        machine.values.len(),
+                        1,
+                        "pattern resolution must return one value"
+                    );
+                    pattern_results.push((machine.values.pop().unwrap(), machine.binders));
+                }
+                Task::PatternAfterFormat {
+                    context,
+                    span,
+                    segments,
+                    index,
+                    mut out,
+                    value,
+                } => {
+                    let arg = values.pop().expect("bit pattern format argument");
+                    self.locals.pop();
+                    let segment = &segments[index];
+                    let format = Some(Format {
+                        name: segment.format.as_ref().expect("format").name.clone(),
+                        arg: Some(Box::new(arg)),
+                    });
+                    out.push(Segment {
+                        value,
+                        format,
+                        span: segment.span,
+                    });
+                    contexts[context]
+                        .as_mut()
+                        .expect("pattern machine")
+                        .work
+                        .push(PatternTask::BitNext {
+                            span,
+                            segments,
+                            index: index + 1,
+                            out,
+                        });
+                    work.push(Task::PatternPoll(context));
+                }
+                Task::FunctionAfterPattern {
+                    span,
+                    function,
+                    index,
+                    mut params,
+                    mut all,
+                    mut labels,
+                    env_heads,
+                } => {
+                    let (pattern, binders) =
+                        pattern_results.pop().expect("function parameter pattern");
+                    let ast::Param::Pattern(pat) = &function.params[index] else {
+                        unreachable!("parameter must be a pattern")
+                    };
+                    for b in binders {
+                        self.param_name(&all, &b.name, b.span);
+                        all.push(b);
+                    }
+                    let label = label_of(pat);
+                    if let Some(l) = &label {
+                        if labels.contains(l) {
+                            self.error(
+                                code::PARAMS_SAME_LABEL,
+                                pat.span,
+                                format!("two parameters of this function have the label `{l}`"),
+                            );
+                        }
+                        labels.push(l.clone());
+                    }
+                    params.push(Param::Pattern { pattern, label });
+                    work.push(Task::FunctionParams {
+                        span,
+                        function,
+                        index: index + 1,
+                        params,
+                        all,
+                        labels,
+                        env_heads,
+                    });
+                }
                 Task::Visit(e) => {
                     let kind = match &e.kind {
                         E::Quote(_) => {
@@ -3409,13 +3858,30 @@ impl<'a> Resolver<'a> {
                             continue;
                         }
                         E::Fn(f) => {
-                            let (params, ret) = self.enter_function(f);
-                            work.push(Task::FunctionFinish {
+                            let mut pending = Vec::new();
+                            for p in &f.params {
+                                match p {
+                                    ast::Param::Pattern(p) => ast_binders(p, &mut pending),
+                                    ast::Param::Env { name, .. } => {
+                                        pending.push((name.name.clone(), name.span))
+                                    }
+                                }
+                            }
+                            self.pending.push(
+                                pending
+                                    .into_iter()
+                                    .map(|(n, span)| self.name_key(&n, span))
+                                    .collect(),
+                            );
+                            work.push(Task::FunctionParams {
                                 span: e.span,
-                                params,
-                                ret,
+                                function: f,
+                                index: 0,
+                                params: Vec::new(),
+                                all: Vec::new(),
+                                labels: Vec::new(),
+                                env_heads: Vec::new(),
                             });
-                            work.push(Task::BlockStart(&f.body));
                             continue;
                         }
                         E::Case { subject, clauses }
@@ -3442,35 +3908,55 @@ impl<'a> Resolver<'a> {
                             let single = clauses.len() == 1
                                 && clauses[0].guard.is_none()
                                 && clauses[0].patterns.len() == 1;
-                            let synthetic = Span::new(e.span.start, e.span.start);
-                            let parameter = if single {
-                                clauses[0].patterns[0].clone()
-                            } else {
-                                ast::Pattern {
-                                    kind: ast::PatternKind::Var("%arg".into()),
-                                    span: synthetic,
-                                }
-                            };
-                            let temporary = ast::Function {
-                                params: vec![ast::Param::Pattern(parameter)],
-                                ret: None,
-                                body: ast::Block {
-                                    stmts: Vec::new(),
-                                    span: e.span,
-                                },
-                            };
-                            let (mut params, ret) = self.enter_function(&temporary);
-                            if !single && let Param::Pattern { label, .. } = &mut params[0] {
-                                *label = None;
-                            }
-                            work.push(Task::ClauseFunctionFinish {
-                                span: e.span,
-                                params,
-                                ret,
-                            });
                             if single {
-                                work.push(Task::Visit(&clauses[0].body));
+                                let pat = &clauses[0].patterns[0];
+                                let mut pending = Vec::new();
+                                ast_binders(pat, &mut pending);
+                                self.pending.push(
+                                    pending
+                                        .into_iter()
+                                        .map(|(n, span)| self.name_key(&n, span))
+                                        .collect(),
+                                );
+                                let context = contexts.len();
+                                contexts.push(Some(PatternMachine {
+                                    work: vec![PatternTask::Visit(pat)],
+                                    values: Vec::new(),
+                                    binders: Vec::new(),
+                                    shared: None,
+                                }));
+                                work.push(Task::ClauseFunctionAfterPattern {
+                                    span: e.span,
+                                    clauses,
+                                });
+                                work.push(Task::PatternPoll(context));
                             } else {
+                                let synthetic = Span::new(e.span.start, e.span.start);
+                                self.pending
+                                    .push([self.name_key("%arg", synthetic)].into_iter().collect());
+                                let mut binders = Vec::new();
+                                let binder = self.bind("%arg", synthetic, &mut binders, None);
+                                self.pending.pop();
+                                self.fn_depth += 1;
+                                self.locals.push(Frame {
+                                    names: binders
+                                        .into_iter()
+                                        .map(|b| (self.name_key(&b.name, b.span), b.var))
+                                        .collect(),
+                                    fn_only: None,
+                                });
+                                let params = vec![Param::Pattern {
+                                    pattern: Pattern {
+                                        kind: PatternKind::Var(binder),
+                                        span: synthetic,
+                                    },
+                                    label: None,
+                                }];
+                                work.push(Task::ClauseFunctionFinish {
+                                    span: e.span,
+                                    params,
+                                    ret: None,
+                                });
                                 let case_span = match (clauses.first(), clauses.last()) {
                                     (Some(first), Some(last)) => first.span.to(last.span),
                                     _ => Span::new(e.span.start + 1, e.span.start + 1),
@@ -3664,20 +4150,33 @@ impl<'a> Resolver<'a> {
                     } else {
                         match &block.stmts[index] {
                             ast::Stmt::Bind(binding) => {
-                                let (pattern, binders, ty_vars, direct) =
-                                    self.enter_binding(binding, false);
-                                work.push(Task::BlockAfterBinding {
+                                let ty_vars = self.push_declared_frame(&binding.type_params);
+                                let direct = self.is_direct(&binding.value);
+                                let mut names = Vec::new();
+                                ast_binders(&binding.pattern, &mut names);
+                                let names: HashSet<NameKey> = names
+                                    .into_iter()
+                                    .map(|(n, span)| self.name_key(&n, span))
+                                    .collect();
+                                self.pending.push(names.clone());
+                                let context = contexts.len();
+                                contexts.push(Some(PatternMachine {
+                                    work: vec![PatternTask::Visit(&binding.pattern)],
+                                    values: Vec::new(),
+                                    binders: Vec::new(),
+                                    shared: None,
+                                }));
+                                work.push(Task::BlockAfterBindingPattern {
                                     block,
                                     index,
                                     mark,
                                     stmts,
                                     binding,
-                                    pattern,
-                                    binders,
                                     ty_vars,
                                     direct,
+                                    names,
                                 });
-                                work.push(Task::Visit(&binding.value));
+                                work.push(Task::PatternPoll(context));
                             }
                             ast::Stmt::Env { ty, value, span } => {
                                 let ty = self.ty(ty);
@@ -3735,6 +4234,41 @@ impl<'a> Resolver<'a> {
                         stmts,
                     });
                 }
+                Task::BlockAfterBindingPattern {
+                    block,
+                    index,
+                    mark,
+                    stmts,
+                    binding,
+                    ty_vars,
+                    direct,
+                    names,
+                } => {
+                    let (pattern, binders) = pattern_results.pop().expect("binding pattern");
+                    self.pending.pop();
+                    if direct {
+                        self.locals.push(Frame {
+                            names: binders
+                                .iter()
+                                .map(|b| (self.name_key(&b.name, b.span), b.var))
+                                .collect(),
+                            fn_only: Some(self.fn_depth),
+                        });
+                    }
+                    self.reserved.push((self.locals.len(), names));
+                    work.push(Task::BlockAfterBinding {
+                        block,
+                        index,
+                        mark,
+                        stmts,
+                        binding,
+                        pattern,
+                        binders,
+                        ty_vars,
+                        direct,
+                    });
+                    work.push(Task::Visit(&binding.value));
+                }
                 Task::BlockAfterBinding {
                     block,
                     index,
@@ -3770,6 +4304,100 @@ impl<'a> Resolver<'a> {
                         span,
                     });
                 }
+                Task::FunctionParams {
+                    span,
+                    function,
+                    index,
+                    mut params,
+                    mut all,
+                    labels,
+                    mut env_heads,
+                } => {
+                    if let Some(p) = function.params.get(index) {
+                        match p {
+                            ast::Param::Pattern(pat) => {
+                                let context = contexts.len();
+                                contexts.push(Some(PatternMachine {
+                                    work: vec![PatternTask::Visit(pat)],
+                                    values: Vec::new(),
+                                    binders: Vec::new(),
+                                    shared: None,
+                                }));
+                                work.push(Task::FunctionAfterPattern {
+                                    span,
+                                    function,
+                                    index,
+                                    params,
+                                    all,
+                                    labels,
+                                    env_heads,
+                                });
+                                work.push(Task::PatternPoll(context));
+                                continue;
+                            }
+                            ast::Param::Env { name, ty } => {
+                                let ty = self.ty(ty);
+                                if let Some(head) = self.env_type(&ty) {
+                                    if env_heads.contains(&head) {
+                                        let tname = self.type_name(head);
+                                        self.error(code::ENV_PARAMS_SAME, ty.span,
+                                            format!("two environment parameters of this function have the type constructor `{tname}` (§9.2)"));
+                                    }
+                                    env_heads.push(head);
+                                }
+                                let var = self.new_var();
+                                self.check_binder(&name.name, name.span, false, false);
+                                self.param_name(&all, &name.name, name.span);
+                                all.push(Binder {
+                                    var,
+                                    name: name.name.clone(),
+                                    span: name.span,
+                                });
+                                params.push(Param::Env {
+                                    var,
+                                    name: name.clone(),
+                                    ty,
+                                });
+                            }
+                        }
+                        work.push(Task::FunctionParams {
+                            span,
+                            function,
+                            index: index + 1,
+                            params,
+                            all,
+                            labels,
+                            env_heads,
+                        });
+                    } else {
+                        let ret = function.ret.as_ref().map(|r| RetType {
+                            value: self.ty(&r.value),
+                            err: r.err.as_ref().map(|t| self.ty(t)),
+                            env: r.env.as_ref().map(|t| self.ty(t)),
+                        });
+                        if let Some(ret) = &ret
+                            && let Some(env) = &ret.env
+                            && value_dependent(&self.p, env)
+                        {
+                            self.error(
+                                code::VALUE_TYPE_PLACE,
+                                env.span,
+                                "a value-dependent type is not allowed inside an environment type",
+                            );
+                        }
+                        self.pending.pop();
+                        self.fn_depth += 1;
+                        self.locals.push(Frame {
+                            names: all
+                                .into_iter()
+                                .map(|b| (self.name_key(&b.name, b.span), b.var))
+                                .collect(),
+                            fn_only: None,
+                        });
+                        work.push(Task::FunctionFinish { span, params, ret });
+                        work.push(Task::BlockStart(&function.body));
+                    }
+                }
                 Task::FunctionFinish { span, params, ret } => {
                     let body = blocks.pop().expect("resolved function body");
                     let function = self.leave_function(params, ret, body, span);
@@ -3777,6 +4405,31 @@ impl<'a> Resolver<'a> {
                         kind: ExprKind::Fn(Box::new(function)),
                         span,
                     });
+                }
+                Task::ClauseFunctionAfterPattern { span, clauses } => {
+                    let (pattern, binders) =
+                        pattern_results.pop().expect("clause function parameter");
+                    let label = label_of(&clauses[0].patterns[0]);
+                    let mut all = Vec::new();
+                    for b in binders {
+                        self.param_name(&all, &b.name, b.span);
+                        all.push(b);
+                    }
+                    self.pending.pop();
+                    self.fn_depth += 1;
+                    self.locals.push(Frame {
+                        names: all
+                            .into_iter()
+                            .map(|b| (self.name_key(&b.name, b.span), b.var))
+                            .collect(),
+                        fn_only: None,
+                    });
+                    work.push(Task::ClauseFunctionFinish {
+                        span,
+                        params: vec![Param::Pattern { pattern, label }],
+                        ret: None,
+                    });
+                    work.push(Task::Visit(&clauses[0].body));
                 }
                 Task::ClauseFunctionFinish { span, params, ret } => {
                     let body = Block {
@@ -3816,7 +4469,73 @@ impl<'a> Resolver<'a> {
                         });
                     } else {
                         let clause = &clauses[index];
-                        let patterns = self.enter_clause(clause);
+                        let mut pending = Vec::new();
+                        for p in &clause.patterns {
+                            ast_binders(p, &mut pending);
+                        }
+                        self.pending.push(
+                            pending
+                                .into_iter()
+                                .map(|(n, span)| self.name_key(&n, span))
+                                .collect(),
+                        );
+                        work.push(Task::CasePatterns {
+                            span,
+                            subject,
+                            clauses,
+                            index,
+                            out,
+                            pattern_index: 0,
+                            patterns: Vec::new(),
+                            first: Vec::new(),
+                        });
+                    }
+                }
+                Task::CasePatterns {
+                    span,
+                    subject,
+                    clauses,
+                    index,
+                    out,
+                    pattern_index,
+                    patterns,
+                    first,
+                } => {
+                    let clause = &clauses[index];
+                    if let Some(pat) = clause.patterns.get(pattern_index) {
+                        let shared = (pattern_index != 0).then(|| {
+                            first
+                                .iter()
+                                .map(|b| (self.name_key(&b.name, b.span), b.var))
+                                .collect()
+                        });
+                        let context = contexts.len();
+                        contexts.push(Some(PatternMachine {
+                            work: vec![PatternTask::Visit(pat)],
+                            values: Vec::new(),
+                            binders: Vec::new(),
+                            shared,
+                        }));
+                        work.push(Task::CaseAfterPattern {
+                            span,
+                            subject,
+                            clauses,
+                            index,
+                            out,
+                            pattern_index,
+                            patterns,
+                            first,
+                        });
+                        work.push(Task::PatternPoll(context));
+                    } else {
+                        self.pending.pop();
+                        self.locals.push(Frame {
+                            names: first
+                                .into_iter()
+                                .map(|b| (self.name_key(&b.name, b.span), b.var))
+                                .collect(),
+                            fn_only: None,
+                        });
                         work.push(Task::CaseAfterGuard {
                             span,
                             subject,
@@ -3830,6 +4549,50 @@ impl<'a> Resolver<'a> {
                             work.push(Task::Visit(guard));
                         }
                     }
+                }
+                Task::CaseAfterPattern {
+                    span,
+                    subject,
+                    clauses,
+                    index,
+                    out,
+                    pattern_index,
+                    mut patterns,
+                    mut first,
+                } => {
+                    let (pattern, binders) = pattern_results.pop().expect("clause pattern");
+                    patterns.push(pattern);
+                    if pattern_index == 0 {
+                        first = binders;
+                    } else {
+                        let a: HashSet<NameKey> = first
+                            .iter()
+                            .map(|b| self.name_key(&b.name, b.span))
+                            .collect();
+                        let b: HashSet<NameKey> = binders
+                            .iter()
+                            .map(|b| self.name_key(&b.name, b.span))
+                            .collect();
+                        if a != b {
+                            let mut diff: Vec<&str> = a
+                                .symmetric_difference(&b)
+                                .map(|k| k.text.as_str())
+                                .collect();
+                            diff.sort();
+                            self.error(code::CHOICES_DIFFER, clauses[index].patterns[pattern_index].span,
+                                format!("every choice of a clause binds the same names, but not all bind {}", diff.iter().map(|n| format!("`{n}`")).collect::<Vec<_>>().join(", ")));
+                        }
+                    }
+                    work.push(Task::CasePatterns {
+                        span,
+                        subject,
+                        clauses,
+                        index,
+                        out,
+                        pattern_index: pattern_index + 1,
+                        patterns,
+                        first,
+                    });
                 }
                 Task::CaseAfterGuard {
                     span,
@@ -3873,8 +4636,26 @@ impl<'a> Resolver<'a> {
                 }
                 Task::SingleAfterSubject { span, clause } => {
                     let value = values.pop().expect("single case subject");
-                    let mut binders = Vec::new();
-                    let pattern = self.pattern(&clause.patterns[0], &mut binders, None);
+                    let context = contexts.len();
+                    contexts.push(Some(PatternMachine {
+                        work: vec![PatternTask::Visit(&clause.patterns[0])],
+                        values: Vec::new(),
+                        binders: Vec::new(),
+                        shared: None,
+                    }));
+                    work.push(Task::SingleAfterPattern {
+                        span,
+                        clause,
+                        value,
+                    });
+                    work.push(Task::PatternPoll(context));
+                }
+                Task::SingleAfterPattern {
+                    span,
+                    clause,
+                    value,
+                } => {
+                    let (pattern, binders) = pattern_results.pop().expect("single case pattern");
                     self.locals.push(Frame {
                         names: binders
                             .into_iter()
@@ -3917,117 +4698,22 @@ impl<'a> Resolver<'a> {
                 }
             }
         }
-        assert_eq!(
-            values.len(),
-            1,
-            "expression resolution work stack must return one value"
-        );
-        values.pop().unwrap()
-    }
-
-    fn format(&mut self, f: Option<&ast::Format>) -> Option<Format> {
-        f.map(|f| Format {
-            name: f.name.clone(),
-            arg: f.arg.as_ref().map(|a| Box::new(self.expr(a))),
-        })
-    }
-
-    fn enter_function(&mut self, f: &ast::Function) -> (Vec<Param>, Option<RetType>) {
-        let mut params = Vec::new();
-        let mut env_heads: Vec<TypeRef> = Vec::new();
-        let mut all: Vec<Binder> = Vec::new();
-        let mut labels: Vec<String> = Vec::new();
-        let mut pending = Vec::new();
-        for p in &f.params {
-            match p {
-                ast::Param::Pattern(p) => ast_binders(p, &mut pending),
-                ast::Param::Env { name, .. } => pending.push((name.name.clone(), name.span)),
-            }
-        }
-        self.pending.push(
-            pending
-                .into_iter()
-                .map(|(n, span)| self.name_key(&n, span))
-                .collect(),
-        );
-        for p in &f.params {
-            match p {
-                ast::Param::Pattern(pat) => {
-                    let mut binders = Vec::new();
-                    let pattern = self.pattern(pat, &mut binders, None);
-                    for b in binders {
-                        self.param_name(&all, &b.name, b.span);
-                        all.push(b);
-                    }
-                    let label = label_of(pat);
-                    if let Some(l) = &label {
-                        if labels.contains(l) {
-                            self.error(
-                                code::PARAMS_SAME_LABEL,
-                                pat.span,
-                                format!("two parameters of this function have the label `{l}`"),
-                            );
-                        }
-                        labels.push(l.clone());
-                    }
-                    params.push(Param::Pattern { pattern, label });
-                }
-                ast::Param::Env { name, ty } => {
-                    let ty = self.ty(ty);
-                    // §9.2: two environment parameters of one function may
-                    // not have the same type constructor.
-                    if let Some(head) = self.env_type(&ty) {
-                        if env_heads.contains(&head) {
-                            let tname = self.type_name(head);
-                            self.error(
-                                code::ENV_PARAMS_SAME,
-                                ty.span,
-                                format!("two environment parameters of this function have the type constructor `{tname}` (§9.2)"),
-                            );
-                        }
-                        env_heads.push(head);
-                    }
-                    let var = self.new_var();
-                    self.check_binder(&name.name, name.span, false, false);
-                    self.param_name(&all, &name.name, name.span);
-                    all.push(Binder {
-                        var,
-                        name: name.name.clone(),
-                        span: name.span,
-                    });
-                    params.push(Param::Env {
-                        var,
-                        name: name.clone(),
-                        ty,
-                    });
-                }
-            }
-        }
-        let ret = f.ret.as_ref().map(|r| RetType {
-            value: self.ty(&r.value),
-            err: r.err.as_ref().map(|t| self.ty(t)),
-            env: r.env.as_ref().map(|t| self.ty(t)),
-        });
-        if let Some(ret) = &ret
-            && let Some(env) = &ret.env
-            && value_dependent(&self.p, env)
-        {
-            self.error(
-                code::VALUE_TYPE_PLACE,
-                env.span,
-                "a value-dependent type is not allowed inside an environment type",
+        if is_pattern {
+            assert_eq!(
+                pattern_results.len(),
+                1,
+                "pattern resolution must return one value"
             );
+            let (pattern, binders) = pattern_results.pop().unwrap();
+            ResolutionResult::Pattern(pattern, binders)
+        } else {
+            assert_eq!(
+                values.len(),
+                1,
+                "expression resolution must return one value"
+            );
+            ResolutionResult::Expr(values.pop().unwrap())
         }
-        self.pending.pop();
-        self.fn_depth += 1;
-        self.locals.push(Frame {
-            names: all
-                .into_iter()
-                .map(|b| (self.name_key(&b.name, b.span), b.var))
-                .collect(),
-            fn_only: None,
-        });
-        (params, ret)
     }
 
     fn leave_function(
@@ -4058,68 +4744,6 @@ impl<'a> Resolver<'a> {
                 format!("the parameters of this function bind `{name}` more than once"),
             );
         }
-    }
-
-    fn enter_clause(&mut self, c: &ast::Clause) -> Vec<Pattern> {
-        let mut first: Vec<Binder> = Vec::new();
-        let mut patterns = Vec::new();
-        let mut pending = Vec::new();
-        for p in &c.patterns {
-            ast_binders(p, &mut pending);
-        }
-        self.pending.push(
-            pending
-                .into_iter()
-                .map(|(n, span)| self.name_key(&n, span))
-                .collect(),
-        );
-        for (i, p) in c.patterns.iter().enumerate() {
-            if i == 0 {
-                patterns.push(self.pattern(p, &mut first, None));
-                continue;
-            }
-            let shared: HashMap<NameKey, VarId> = first
-                .iter()
-                .map(|b| (self.name_key(&b.name, b.span), b.var))
-                .collect();
-            let mut binders = Vec::new();
-            patterns.push(self.pattern(p, &mut binders, Some(&shared)));
-            let a: HashSet<NameKey> = first
-                .iter()
-                .map(|b| self.name_key(&b.name, b.span))
-                .collect();
-            let b: HashSet<NameKey> = binders
-                .iter()
-                .map(|b| self.name_key(&b.name, b.span))
-                .collect();
-            if a != b {
-                let mut diff: Vec<&str> = a
-                    .symmetric_difference(&b)
-                    .map(|k| k.text.as_str())
-                    .collect();
-                diff.sort();
-                self.error(
-                    code::CHOICES_DIFFER,
-                    p.span,
-                    format!(
-                        "every choice of a clause binds the same names, but not all bind {}",
-                        diff.iter()
-                            .map(|n| format!("`{n}`"))
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ),
-                );
-            }
-        }
-        self.pending.pop();
-        self.locals.push(Frame {
-            names: first
-                .into_iter()
-                .map(|b| (self.name_key(&b.name, b.span), b.var))
-                .collect(),
-            fn_only: None,
-        });
-        patterns
     }
 
     fn leave_clause(
@@ -4168,239 +4792,6 @@ impl<'a> Resolver<'a> {
         };
         binders.push(b.clone());
         b
-    }
-
-    fn pattern(
-        &mut self,
-        root: &ast::Pattern,
-        binders: &mut Vec<Binder>,
-        shared: Option<&HashMap<NameKey, VarId>>,
-    ) -> Pattern {
-        use ast::PatternKind as P;
-        enum Task<'a> {
-            Visit(&'a ast::Pattern),
-            Named {
-                span: Span,
-                binder: Binder,
-            },
-            Constructor {
-                span: Span,
-                ctor: Option<CtorRef>,
-                spread: bool,
-                count: usize,
-            },
-            Tuple {
-                span: Span,
-                count: usize,
-            },
-            List {
-                span: Span,
-                count: usize,
-                rest: &'a Option<Option<ast::Binder>>,
-            },
-            BitNext {
-                span: Span,
-                segments: &'a [ast::Segment<ast::Pattern>],
-                index: usize,
-                out: Vec<Segment<Pattern>>,
-            },
-            BitFinish {
-                span: Span,
-                segments: &'a [ast::Segment<ast::Pattern>],
-                index: usize,
-                out: Vec<Segment<Pattern>>,
-            },
-        }
-        let mut work = vec![Task::Visit(root)];
-        let mut values: Vec<Pattern> = Vec::new();
-        while let Some(task) = work.pop() {
-            match task {
-                Task::Visit(p) => {
-                    let kind = match &p.kind {
-                        P::Quote(_) => {
-                            self.error(
-                                code::MACRO_RESERVED,
-                                p.span,
-                                "a quote pattern must be evaluated inside a macro",
-                            );
-                            PatternKind::Error(Vec::new())
-                        }
-                        P::Var(n) => PatternKind::Var(self.bind(n, p.span, binders, shared)),
-                        P::Discard(_) => PatternKind::Discard,
-                        P::Typed { binder, ty } => {
-                            let binder = (!binder.discard)
-                                .then(|| self.bind(&binder.name, binder.span, binders, shared));
-                            PatternKind::Typed {
-                                binder,
-                                ty: self.ty(ty),
-                            }
-                        }
-                        P::Named { name, pattern } => {
-                            let binder = self.bind(&name.name, name.span, binders, shared);
-                            work.push(Task::Named {
-                                span: p.span,
-                                binder,
-                            });
-                            work.push(Task::Visit(pattern));
-                            continue;
-                        }
-                        P::Int { negative, value } => PatternKind::Int {
-                            negative: *negative,
-                            value: value.clone(),
-                        },
-                        P::Float { negative, value } => PatternKind::Float {
-                            negative: *negative,
-                            value: *value,
-                        },
-                        P::String(x) => PatternKind::String(x.clone()),
-                        P::Prefix { prefix, rest } => PatternKind::Prefix {
-                            prefix: prefix.clone(),
-                            rest: (!rest.discard)
-                                .then(|| self.bind(&rest.name, rest.span, binders, shared)),
-                        },
-                        P::Constructor {
-                            module,
-                            name,
-                            args,
-                            spread,
-                        } => {
-                            let ctor = self.ctor(module.as_ref(), name);
-                            work.push(Task::Constructor {
-                                span: p.span,
-                                ctor,
-                                spread: *spread,
-                                count: args.len(),
-                            });
-                            work.extend(args.iter().rev().map(Task::Visit));
-                            continue;
-                        }
-                        P::Tuple(items) => {
-                            work.push(Task::Tuple {
-                                span: p.span,
-                                count: items.len(),
-                            });
-                            work.extend(items.iter().rev().map(Task::Visit));
-                            continue;
-                        }
-                        P::List { items, rest } => {
-                            work.push(Task::List {
-                                span: p.span,
-                                count: items.len(),
-                                rest,
-                            });
-                            work.extend(items.iter().rev().map(Task::Visit));
-                            continue;
-                        }
-                        P::BitArray(segments) => {
-                            work.push(Task::BitNext {
-                                span: p.span,
-                                segments,
-                                index: 0,
-                                out: Vec::with_capacity(segments.len()),
-                            });
-                            continue;
-                        }
-                    };
-                    values.push(Pattern { kind, span: p.span });
-                }
-                Task::Named { span, binder } => {
-                    let pattern = Box::new(values.pop().expect("named pattern child"));
-                    values.push(Pattern {
-                        kind: PatternKind::Named { binder, pattern },
-                        span,
-                    });
-                }
-                Task::Constructor {
-                    span,
-                    ctor,
-                    spread,
-                    count,
-                } => {
-                    let args = values.split_off(values.len() - count);
-                    let kind = match ctor {
-                        Some(ctor) => PatternKind::Constructor { ctor, args, spread },
-                        None => PatternKind::Error(args),
-                    };
-                    values.push(Pattern { kind, span });
-                }
-                Task::Tuple { span, count } => {
-                    let items = values.split_off(values.len() - count);
-                    values.push(Pattern {
-                        kind: PatternKind::Tuple(items),
-                        span,
-                    });
-                }
-                Task::List { span, count, rest } => {
-                    let items = values.split_off(values.len() - count);
-                    let rest = rest.as_ref().map(|r| {
-                        r.as_ref()
-                            .filter(|b| !b.discard)
-                            .map(|b| self.bind(&b.name, b.span, binders, shared))
-                    });
-                    values.push(Pattern {
-                        kind: PatternKind::List { items, rest },
-                        span,
-                    });
-                }
-                Task::BitNext {
-                    span,
-                    segments,
-                    index,
-                    out,
-                } => {
-                    if index == segments.len() {
-                        values.push(Pattern {
-                            kind: PatternKind::BitArray(out),
-                            span,
-                        });
-                    } else {
-                        work.push(Task::BitFinish {
-                            span,
-                            segments,
-                            index,
-                            out,
-                        });
-                        work.push(Task::Visit(&segments[index].value));
-                    }
-                }
-                Task::BitFinish {
-                    span,
-                    segments,
-                    index,
-                    mut out,
-                } => {
-                    let segment = &segments[index];
-                    let value = values.pop().expect("bit pattern segment");
-                    // Earlier segments' binders are visible to a format expression.
-                    self.locals.push(Frame {
-                        names: binders
-                            .iter()
-                            .map(|b| (self.name_key(&b.name, b.span), b.var))
-                            .collect(),
-                        fn_only: None,
-                    });
-                    let format = self.format(segment.format.as_ref());
-                    self.locals.pop();
-                    out.push(Segment {
-                        value,
-                        format,
-                        span: segment.span,
-                    });
-                    work.push(Task::BitNext {
-                        span,
-                        segments,
-                        index: index + 1,
-                        out,
-                    });
-                }
-            }
-        }
-        assert_eq!(
-            values.len(),
-            1,
-            "pattern resolution work stack must return one value"
-        );
-        values.pop().unwrap()
     }
 
     // ---- Phase 5: exported types (§2.4) ----
