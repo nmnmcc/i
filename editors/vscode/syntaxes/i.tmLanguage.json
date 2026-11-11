@@ -133,10 +133,10 @@
       ]
     },
     "attributes": {
-      "comment": "§2.2: @external, @host, @main, @test, @deprecated. Others are compile errors.",
+      "comment": "§2.2: @external, @host, @test, @deprecated. Other annotations are reserved.",
       "patterns": [
         {
-          "match": "(@)(external|host|main|test|deprecated)\\b",
+          "match": "(@)(external|host|test|deprecated)\\b",
           "captures": {
             "0": {
               "name": "storage.type.annotation.i"
@@ -293,7 +293,7 @@
         },
         {
           "name": "keyword.operator.guard.i",
-          "match": "\\?(?=[^\\n]*->)"
+          "match": "\\?"
         },
         {
           "name": "keyword.operator.comparison.float.i",
@@ -333,7 +333,7 @@
         },
         {
           "name": "keyword.operator.error.i",
-          "match": "\\?"
+          "match": "\\^"
         },
         {
           "name": "keyword.operator.environment.i",

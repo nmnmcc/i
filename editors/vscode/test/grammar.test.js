@@ -114,7 +114,7 @@ test("token scopes of sample.i", async () => {
     assert.ok(scopesOf(tokens, word).every((s) => !s.some((x) => x.startsWith("keyword.control"))));
   }
   has("@", "punctuation.definition.annotation.i");
-  for (const a of ["main", "test", "external", "host", "deprecated"]) {
+  for (const a of ["test", "external", "host", "deprecated"]) {
     has(a, "storage.type.annotation.i");
   }
   has("\\t", "constant.character.escape.i");
@@ -139,7 +139,7 @@ test("token scopes of sample.i", async () => {
   for (const op of ["<.", "<=.", ">.", ">=."]) {
     has(op, "keyword.operator.comparison.float.i");
   }
-  has("?", "keyword.operator.error.i");
+  has("^", "keyword.operator.error.i");
   has("!", "keyword.operator.environment.i");
   has("->", "keyword.operator.arrow.i");
   has("|>", "keyword.operator.pipe.i");
