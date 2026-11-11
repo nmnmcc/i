@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "67525bee4f4b15e4490d1d5ec6fd968db9d264fd",
+  "binary_sha256": "cd4b0e2d992b0ffea0d86a3de8797e447c12e6197e8b0e68b1b4634286e4e35d",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -9,9 +9,49 @@
         "check",
         "--types"
       ],
-      "exit": 1,
+      "exit": 0,
+      "stdout": "app/main.event : task.Event(1, Never, Never)\napp/main.main : () -> Nil ! Assert | task.Runner\n",
+      "stderr": ""
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": ""
+    },
+    "run0": {
+      "command": [
+        "run",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
       "stdout": "",
-      "stderr": "src/main.i:3:14: error[E0203]: `i/task` has no `always`\nsrc/main.i:6:8: error[E0203]: `i/task` has no `run`\nsrc/main.i:6:29: error[E0203]: `i/task` has no `sync`\nsrc/main.i:8:14: error[E0203]: `i/task` has no `map`\nsrc/main.i:8:23: error[E0203]: `i/task` has no `always`\nsrc/main.i:9:26: error[E0203]: `i/core` has no `portable`\n6 errors\n"
+      "stderr": ""
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": ""
+    },
+    "run2": {
+      "command": [
+        "run",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
     }
   }
 }

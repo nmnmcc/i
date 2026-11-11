@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "67525bee4f4b15e4490d1d5ec6fd968db9d264fd",
+  "binary_sha256": "cd4b0e2d992b0ffea0d86a3de8797e447c12e6197e8b0e68b1b4634286e4e35d",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -9,9 +9,49 @@
         "check",
         "--types"
       ],
+      "exit": 0,
+      "stdout": "app/main.main : () -> Nil ! Gate | request.Owner | task.Runner\n",
+      "stderr": ""
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 1,
+      "stdout": "FAIL app/qa_corpus_runtime_test.qa_startup\n  missing host function review:gate/v1 wait\n0 passed, 1 failed\n",
+      "stderr": ""
+    },
+    "run0": {
+      "command": [
+        "run",
+        "--opt",
+        "0"
+      ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:10: error[E0210]: there is no module `i/request`\nsrc/main.i:3:1: error[E0302]: this attribute is written `@host(\"namespace\")` or `@host(\"namespace\", \"async\")`\nsrc/main.i:4:25: error[E0202]: the type `Request` is not defined\nsrc/main.i:8:8: error[E0203]: `i/task` has no `run`\n4 errors\n"
+      "stderr": "missing host function review:gate/v1 wait\n"
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 1,
+      "stdout": "FAIL app/qa_corpus_runtime_test.qa_startup\n  missing host function review:gate/v1 wait\n0 passed, 1 failed\n",
+      "stderr": ""
+    },
+    "run2": {
+      "command": [
+        "run",
+        "--opt",
+        "2"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "missing host function review:gate/v1 wait\n"
     }
   }
 }
