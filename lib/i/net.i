@@ -21,6 +21,8 @@
 	shutdown_write
 	close_stream
 	close_listener
+	stream_number
+	byte_stream
 )
 
 Listener {
@@ -163,4 +165,15 @@ resolve = (name, raw ! Net) {
 		Ok(value)   -> parts(value, 0)
 		Error(code) -> fail.raise(NetError("resolve", name, code))
 	}
+}
+
+/// The host handle used when upgrading a TCP stream.
+stream_number = (Stream(number)) { number }
+
+/// A transport-independent set of byte stream operations.
+byte_stream = (stream) {
+	(read: (max) { read(stream, max) },
+	  write: (bytes) { write(stream, bytes) },
+	  shutdown_write: () { shutdown_write(stream) },
+	  close: () { close_stream(stream) })
 }

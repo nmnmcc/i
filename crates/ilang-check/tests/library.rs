@@ -31,6 +31,7 @@ fn library_resolves_cleanly() {
             "i/fs",
             "i/process",
             "i/net",
+            "i/tls",
             "i/stdio"
         ]
     );
@@ -55,23 +56,6 @@ fn library_modules_have_sources() {
         count += 1;
     }
     assert_eq!(package.modules.len(), count);
-}
-
-/// The remaining unimplemented module holds only a documentation comment.
-#[test]
-fn reserved_modules_are_placeholders() {
-    for path in ["i/process"] {
-        let (_, text) = ilang_package::library::MODULES
-            .iter()
-            .find(|(p, _)| *p == path)
-            .unwrap_or_else(|| panic!("{path} is not registered"));
-        let (module, diags) = ilang_syntax::parse_module(text);
-        assert!(diags.is_empty(), "{path}: {diags:#?}");
-        assert!(!module.doc.is_empty(), "{path}");
-        assert!(module.imports.is_empty(), "{path}");
-        assert!(module.exports.is_empty(), "{path}");
-        assert!(module.items.is_empty(), "{path}");
-    }
 }
 
 /// The exported names of each library module, as in §9.3–§9.6, §9.10 and §13.
@@ -210,7 +194,7 @@ fn library_names() {
                 "read_lines",
             ],
         ),
-        ("i/process", &[]),
+        ("i/process", &["args", "env", "cwd", "entropy", "spawn", "spawn_piped", "spawn_config", "read_stdout", "read_stderr", "write_stdin", "close_stdin", "wait", "terminate", "close"]),
         (
             "i/net",
             &[
@@ -224,8 +208,11 @@ fn library_names() {
                 "shutdown_write",
                 "close_stream",
                 "close_listener",
+                "stream_number",
+                "byte_stream",
             ],
         ),
+        ("i/tls", &["options", "identity", "connect", "accept", "dial", "alpn", "read", "write", "shutdown_write", "close", "byte_stream"]),
         (
             "i/stdio",
             &[
@@ -354,7 +341,7 @@ fn hello_example_checks() {
     assert!(checked.program.is_some() && checked.types.is_some());
 }
 
-const RESERVED: [&str; 5] = ["i/clock", "i/fs", "i/process", "i/net", "i/stdio"];
+const RESERVED: [&str; 6] = ["i/clock", "i/fs", "i/process", "i/net", "i/tls", "i/stdio"];
 
 /// User code imports every reserved module with no problems.
 ///
