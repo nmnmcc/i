@@ -567,105 +567,159 @@ impl Solver {
     }
 
     fn same_form_in(&self, a: &Ty, b: &Ty, expanding: &mut HashSet<V>) -> bool {
-        let mut pending = vec![(a, b)];
-        while let Some((a, b)) = pending.pop() {
-            if a == b {
-                continue;
-            }
-            match (a, b) {
-                (Ty::Con(h, values, xs), Ty::Con(k, other, ys))
-                    if h == k && values == other && xs.len() == ys.len() =>
-                {
-                    pending.extend(xs.iter().zip(ys).rev());
-                }
-                (Ty::Fn(f), Ty::Fn(g)) if f.params.len() == g.params.len() => {
-                    pending.push((&f.env, &g.env));
-                    pending.push((&f.err, &g.err));
-                    pending.push((&f.ret, &g.ret));
-                    pending.extend(
-                        f.params
-                            .iter()
-                            .zip(&g.params)
-                            .rev()
-                            .map(|(p, q)| (&p.1, &q.1)),
-                    );
-                }
-                (Ty::Both(a, b), Ty::Both(c, d)) => {
-                    pending.push((b, d));
-                    pending.push((a, c));
-                }
-                (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys))
-                    if xs.len() == 1 && ys.len() == 1 =>
-                {
-                    pending.push((&xs[0], &ys[0]));
-                }
-                (Ty::Diff(a, xs), Ty::Diff(b, ys)) if xs.is_empty() && ys.is_empty() => {
-                    pending.push((a, b));
-                }
-                _ if !self.same_form_recursive(a, b, expanding) => return false,
-                _ => {}
-            }
+        enum Proof<'a> {
+            Compare(&'a Ty, &'a Ty),
+            All(Vec<Proof<'a>>),
+            Any(Vec<Proof<'a>>),
+            AllNext(Vec<Proof<'a>>),
+            AnyNext(Vec<Proof<'a>>),
+            Release(V),
+            Constant(bool),
         }
-        true
-    }
-
-    fn same_form_recursive(&self, a: &Ty, b: &Ty, expanding: &mut HashSet<V>) -> bool {
-        if a == b {
-            return true;
-        }
-        let sets = |xs: &[Ty], ys: &[Ty], expanding: &mut HashSet<V>| {
-            xs.iter()
-                .all(|x| ys.iter().any(|y| self.same_form_in(x, y, expanding)))
-                && ys
-                    .iter()
-                    .all(|y| xs.iter().any(|x| self.same_form_in(x, y, expanding)))
-        };
-        match (a, b) {
-            (Ty::Var(v), Ty::Var(w))
-                if self.reach(vec![*v], true).0.contains(w)
-                    && self.reach(vec![*v], false).0.contains(w) =>
-            {
-                true
-            }
-            (Ty::Var(v), t) | (t, Ty::Var(v)) => {
-                // L <: v <: U proves v = T when both L and U equal T.
-                // A hole fixed by a concrete service form is such a case.
-                self.observe(*v);
-                let st = self.var(*v);
-                if (st.lower.is_empty() && st.from.is_empty() && !matches!(t, Ty::Never))
-                    || (st.upper.is_empty() && st.into.is_empty() && !matches!(t, Ty::Top))
-                {
-                    return false;
-                }
-                if !expanding.insert(*v) {
-                    return false;
-                }
-                let lower = self.reach(vec![*v], true).0;
-                let upper = self.reach(vec![*v], false).0;
-                let equal = (matches!(t, Ty::Never)
-                    || lower.iter().any(|w| {
-                        self.var(*w)
-                            .lower
-                            .iter()
-                            .any(|b| !matches!(b, Ty::Var(_)) && self.same_form_in(b, t, expanding))
+        fn sets<'a>(xs: &'a [Ty], ys: &'a [Ty]) -> Proof<'a> {
+            Proof::All(
+                xs.iter()
+                    .map(|x| Proof::Any(ys.iter().map(|y| Proof::Compare(x, y)).rev().collect()))
+                    .chain(ys.iter().map(|y| {
+                        Proof::Any(xs.iter().map(|x| Proof::Compare(x, y)).rev().collect())
                     }))
-                    && (matches!(t, Ty::Top)
-                        || upper.iter().any(|w| {
-                            self.var(*w).upper.iter().any(|b| {
-                                !matches!(b, Ty::Var(_)) && self.same_form_in(b, t, expanding)
-                            })
-                        }));
-                expanding.remove(v);
-                equal
-            }
-            (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => {
-                sets(xs, ys, expanding)
-            }
-            (Ty::Diff(a, hs), Ty::Diff(b, ks)) => {
-                self.same_form_in(a, b, expanding) && sets(hs, ks, expanding)
-            }
-            _ => false,
+                    .rev()
+                    .collect(),
+            )
         }
+        let mut pending = vec![Proof::Compare(a, b)];
+        let mut result = false;
+        while let Some(proof) = pending.pop() {
+            match proof {
+                Proof::Constant(b) => result = b,
+                Proof::All(mut terms) => match terms.pop() {
+                    Some(next) => {
+                        pending.push(Proof::AllNext(terms));
+                        pending.push(next);
+                    }
+                    None => result = true,
+                },
+                Proof::Any(mut terms) => match terms.pop() {
+                    Some(next) => {
+                        pending.push(Proof::AnyNext(terms));
+                        pending.push(next);
+                    }
+                    None => result = false,
+                },
+                Proof::AllNext(terms) => {
+                    if result {
+                        pending.push(Proof::All(terms));
+                    }
+                }
+                Proof::AnyNext(terms) => {
+                    if !result {
+                        pending.push(Proof::Any(terms));
+                    }
+                }
+                Proof::Release(v) => {
+                    expanding.remove(&v);
+                }
+                Proof::Compare(a, b) => {
+                    if a == b {
+                        result = true;
+                        continue;
+                    }
+                    match (a, b) {
+                        (Ty::Var(v), Ty::Var(w))
+                            if self.reach(vec![*v], true).0.contains(w)
+                                && self.reach(vec![*v], false).0.contains(w) =>
+                        {
+                            result = true
+                        }
+                        (Ty::Var(v), t) | (t, Ty::Var(v)) => {
+                            self.observe(*v);
+                            let st = self.var(*v);
+                            if (st.lower.is_empty()
+                                && st.from.is_empty()
+                                && !matches!(t, Ty::Never))
+                                || (st.upper.is_empty()
+                                    && st.into.is_empty()
+                                    && !matches!(t, Ty::Top))
+                                || !expanding.insert(*v)
+                            {
+                                result = false;
+                                continue;
+                            }
+                            let lower = self.reach(vec![*v], true).0;
+                            let upper = self.reach(vec![*v], false).0;
+                            let lower = if matches!(t, Ty::Never) {
+                                Proof::Constant(true)
+                            } else {
+                                Proof::Any(
+                                    lower
+                                        .iter()
+                                        .flat_map(|w| self.var(*w).lower.iter())
+                                        .filter(|b| !matches!(b, Ty::Var(_)))
+                                        .map(|b| Proof::Compare(b, t))
+                                        .collect::<Vec<_>>()
+                                        .into_iter()
+                                        .rev()
+                                        .collect(),
+                                )
+                            };
+                            let upper = if matches!(t, Ty::Top) {
+                                Proof::Constant(true)
+                            } else {
+                                Proof::Any(
+                                    upper
+                                        .iter()
+                                        .flat_map(|w| self.var(*w).upper.iter())
+                                        .filter(|b| !matches!(b, Ty::Var(_)))
+                                        .map(|b| Proof::Compare(b, t))
+                                        .collect::<Vec<_>>()
+                                        .into_iter()
+                                        .rev()
+                                        .collect(),
+                                )
+                            };
+                            pending.push(Proof::Release(*v));
+                            pending.push(Proof::All(vec![upper, lower]));
+                        }
+                        (Ty::Con(h, values, xs), Ty::Con(k, other, ys))
+                            if h == k && values == other && xs.len() == ys.len() =>
+                        {
+                            pending.push(Proof::All(
+                                xs.iter()
+                                    .zip(ys)
+                                    .rev()
+                                    .map(|(x, y)| Proof::Compare(x, y))
+                                    .collect(),
+                            ));
+                        }
+                        (Ty::Fn(f), Ty::Fn(g)) if f.params.len() == g.params.len() => {
+                            let mut terms = vec![
+                                Proof::Compare(&f.env, &g.env),
+                                Proof::Compare(&f.err, &g.err),
+                                Proof::Compare(&f.ret, &g.ret),
+                            ];
+                            terms.extend(
+                                f.params
+                                    .iter()
+                                    .zip(&g.params)
+                                    .rev()
+                                    .map(|(x, y)| Proof::Compare(&x.1, &y.1)),
+                            );
+                            pending.push(Proof::All(terms));
+                        }
+                        (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => {
+                            pending.push(sets(xs, ys))
+                        }
+                        (Ty::Diff(a, xs), Ty::Diff(b, ys)) => {
+                            pending.push(Proof::All(vec![sets(xs, ys), Proof::Compare(a, b)]))
+                        }
+                        (Ty::Both(a, b), Ty::Both(c, d)) => pending
+                            .push(Proof::All(vec![Proof::Compare(b, d), Proof::Compare(a, c)])),
+                        _ => result = false,
+                    }
+                }
+            }
+        }
+        result
     }
 
     /// A shown scheme must express every handler restriction. A visible
@@ -3077,6 +3131,21 @@ mod handler_proof_tests {
         let Ty::Var(v) = a else { unreachable!() };
         assert!(s.occurs(vec![v]));
     }
+    #[test]
+    fn proof_compares_unordered_rows_and_exact_bounds() {
+        let mut s = Solver::new(StdHashMap::new(), Vec::new());
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+        let a = Ty::Union(vec![int.clone(), string.clone()]);
+        let b = Ty::Union(vec![string.clone(), int.clone()]);
+        assert!(s.same_form(&a, &b));
+        assert!(!s.same_form(&a, &Ty::Union(vec![int.clone()])));
+        let v = s.fresh();
+        s.constrain(&int, &v);
+        s.constrain(&v, &int);
+        assert!(s.same_form(&v, &int));
+        assert!(!s.same_form(&v, &string));
+    }
 }
 
 #[cfg(test)]
@@ -3572,6 +3641,13 @@ mod deep_tree_tests {
                 for _ in 0..10_000 {
                     a = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![a]);
                     b = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![b]);
+                }
+                assert!(!s.same_form(&a, &b));
+                let mut a = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+                let mut b = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+                for _ in 0..10_000 {
+                    a = Ty::Union(vec![a, Ty::Never]);
+                    b = Ty::Union(vec![b, Ty::Never]);
                 }
                 assert!(!s.same_form(&a, &b));
             })
