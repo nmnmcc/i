@@ -188,9 +188,12 @@ impl DefinitionWorld {
                             .exports
                             .iter()
                             .any(|e| e.name.name == binder.name && e.constructors);
-                    let definition = if current && snapshot.item_overrides.contains_key(&item.span)
-                    {
-                        let syntax = &snapshot.item_overrides[&item.span].0;
+                    let override_syntax = if current {
+                        snapshot.item_overrides.get(&item.span)
+                    } else {
+                        scoped.and_then(|source| source.item_override(item.span))
+                    };
+                    let definition = if let Some((syntax, _)) = override_syntax {
                         let syntax = ilang_syntax::lisp::definitions::expanded_definition(
                             syntax,
                             TEMPLATE_ANSWER,

@@ -221,6 +221,7 @@ impl BodyEngine<'_> {
                 let retained = if is_type {
                     let root_span = self.item_root(&item).1;
                     let inner_span = self.scoped.child_span(root_span, 2).unwrap_or(inner.span());
+                    self.scoped.set_item_override(item.span, inner.clone(), inner_span);
                     self.item_overrides.insert(item.span, (inner, inner_span));
                     item.attributes.remove(index);
                     Some(item)
@@ -328,6 +329,7 @@ impl BodyEngine<'_> {
                     .map(|(old, new, _)| (*old, *new))
                     .collect::<Vec<_>>();
                 let rewritten = self.scoped.rewrite_occurrences(&root, root_span, &spans);
+                self.scoped.set_item_override(item.span, rewritten.clone(), root_span);
                 self.item_overrides
                     .insert(item.span, (rewritten, root_span));
                 self.item_replacements.truncate(start);

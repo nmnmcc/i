@@ -50,6 +50,7 @@ pub struct ScopedSource {
     spans: HashMap<Span, Origin>,
     starts: HashMap<u32, Origin>,
     children: HashMap<Span, Vec<Span>>,
+    item_overrides: HashMap<Span, (Syntax, Span)>,
 }
 
 impl ScopedSource {
@@ -61,6 +62,7 @@ impl ScopedSource {
             spans: HashMap::new(),
             starts: HashMap::new(),
             children: HashMap::new(),
+            item_overrides: HashMap::new(),
         }
     }
     pub fn text(&self) -> &str {
@@ -81,6 +83,12 @@ impl ScopedSource {
                     .min_by_key(|(s, _)| s.end - s.start)
                     .map(|(_, origin)| origin)
             })
+    }
+    pub fn set_item_override(&mut self, item: Span, syntax: Syntax, root: Span) {
+        self.item_overrides.insert(item, (syntax, root));
+    }
+    pub fn item_override(&self, item: Span) -> Option<&(Syntax, Span)> {
+        self.item_overrides.get(&item)
     }
     pub fn child_span(&self, parent: Span, index: usize) -> Option<Span> {
         self.children
