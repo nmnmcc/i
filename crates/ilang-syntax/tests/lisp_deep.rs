@@ -267,3 +267,79 @@ fn deep_ast_structural_equality_and_difference_are_stack_safe() {
         .unwrap();
 }
 
+#[test]
+fn deep_structural_records_clone_compare_normalize_and_drop() {
+    use ilang_syntax::ast::{Expr, Ident, RecordLabel, TypeExpr};
+    use ilang_syntax::shape::equivalent_expression;
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let span = Span::new(1, 2);
+            let label = || Ident {
+                name: "field".into(),
+                span,
+            };
+            let mut expr = Expr {
+                kind: ExprKind::Tuple(vec![]),
+                span,
+            };
+            let mut ty = TypeExpr {
+                kind: TypeKind::Hole,
+                span,
+            };
+            for i in 0..10_000 {
+                let (eb, ef) = if i % 2 == 0 {
+                    (Some(Box::new(expr)), vec![])
+                } else {
+                    (None, vec![(label(), expr)])
+                };
+                expr = Expr {
+                    kind: ExprKind::Record {
+                        base: eb,
+                        fields: ef,
+                    },
+                    span,
+                };
+                let (tb, tf) = if i % 2 == 0 {
+                    (Some(Box::new(ty)), vec![])
+                } else {
+                    (
+                        None,
+                        vec![(
+                            RecordLabel {
+                                ident: label(),
+                                parameter: true,
+                            },
+                            ty,
+                        )],
+                    )
+                };
+                ty = TypeExpr {
+                    kind: TypeKind::Record {
+                        base: tb,
+                        fields: tf,
+                        removed: vec![RecordLabel {
+                            ident: label(),
+                            parameter: false,
+                        }],
+                    },
+                    span,
+                };
+            }
+            let cloned_expr = expr.clone();
+            let cloned_ty = ty.clone();
+            assert!(expr == cloned_expr);
+            assert!(ty == cloned_ty);
+            assert!(equivalent_expression(&expr, &cloned_expr));
+            let mut different = cloned_ty.clone();
+            let TypeKind::Record { removed, .. } = &mut different.kind else {
+                unreachable!()
+            };
+            removed[0].parameter = true;
+            assert!(ty != different);
+            drop((expr, cloned_expr, ty, cloned_ty, different));
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}

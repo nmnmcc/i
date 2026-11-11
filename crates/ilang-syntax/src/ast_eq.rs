@@ -148,6 +148,25 @@ fn eq(mut q: Vec<Pair<'_>>) -> bool {
                         },
                     ) => a == b && an == bn,
                     (K::Tuple(a), K::Tuple(b)) => exprs(a, b, &mut q),
+                    (
+                        K::Record {
+                            base: a,
+                            fields: af,
+                        },
+                        K::Record {
+                            base: b,
+                            fields: bf,
+                        },
+                    ) => {
+                        optional(a, b, |a, b| {
+                            q.push(Pair::Expr(a, b));
+                            true
+                        }) && af.len() == bf.len()
+                            && af.iter().zip(bf).all(|((al, av), (bl, bv))| {
+                                q.push(Pair::Expr(av, bv));
+                                al == bl
+                            })
+                    }
                     (K::List { items: a, rest: ar }, K::List { items: b, rest: br }) => {
                         exprs(a, b, &mut q)
                             && optional(ar, br, |a, b| {
@@ -399,6 +418,29 @@ fn eq(mut q: Vec<Pair<'_>>) -> bool {
                         },
                     ) => a == b && an == bn,
                     (K::Hole, K::Hole) => true,
+                    (
+                        K::Record {
+                            base: a,
+                            fields: af,
+                            removed: ar,
+                        },
+                        K::Record {
+                            base: b,
+                            fields: bf,
+                            removed: br,
+                        },
+                    ) => {
+                        ar == br
+                            && optional(a, b, |a, b| {
+                                q.push(Pair::Type(a, b));
+                                true
+                            })
+                            && af.len() == bf.len()
+                            && af.iter().zip(bf).all(|((al, av), (bl, bv))| {
+                                q.push(Pair::Type(av, bv));
+                                al == bl
+                            })
+                    }
                     (K::Tuple(a), K::Tuple(b))
                     | (K::Union(a), K::Union(b))
                     | (K::Inter(a), K::Inter(b))

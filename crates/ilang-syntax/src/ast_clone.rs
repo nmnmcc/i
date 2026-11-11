@@ -15,6 +15,17 @@ async fn ce<'a>(s: Scheduler<'a>, e: &'a Expr) -> Expr {
             name: name.clone(),
         },
         K::Tuple(xs) => K::Tuple(exprs(&s, xs).await),
+        K::Record { base, fields } => {
+            let base = match base {
+                Some(x) => Some(Box::new(s.call(|s| ce(s, x)).await)),
+                None => None,
+            };
+            let mut out = Vec::with_capacity(fields.len());
+            for (label, value) in fields {
+                out.push((label.clone(), s.call(|s| ce(s, value)).await));
+            }
+            K::Record { base, fields: out }
+        }
         K::List { items, rest } => K::List {
             items: exprs(&s, items).await,
             rest: match rest {
@@ -275,6 +286,25 @@ async fn ct<'a>(s: Scheduler<'a>, t: &'a TypeExpr) -> TypeExpr {
         },
         K::Hole => K::Hole,
         K::Tuple(xs) => K::Tuple(types(&s, xs).await),
+        K::Record {
+            base,
+            fields,
+            removed,
+        } => {
+            let base = match base {
+                Some(x) => Some(Box::new(s.call(|s| ct(s, x)).await)),
+                None => None,
+            };
+            let mut out = Vec::with_capacity(fields.len());
+            for (label, value) in fields {
+                out.push((label.clone(), s.call(|s| ct(s, value)).await));
+            }
+            K::Record {
+                base,
+                fields: out,
+                removed: removed.clone(),
+            }
+        }
         K::Union(xs) => K::Union(types(&s, xs).await),
         K::Inter(xs) => K::Inter(types(&s, xs).await),
         K::Diff(xs) => K::Diff(types(&s, xs).await),
