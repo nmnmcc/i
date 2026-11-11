@@ -64,7 +64,7 @@ char    = (* any Unicode scalar value but '"' and "\" *) .
 
 i has no keywords. Every word is a `name`, an `UpName`, or a discard (§1.3), and any `name` may be used as a name. The forms that other languages make with keywords are made with brackets and symbols: imports and exports are groups at the start of a file (§2.2), matching is a call of a clause block (§6.12), and a guard is written with `?`.
 
-Some forms are kept for macros, which are not yet part of i: an attribute that is not built in, such as `@m` or `@m(args)` before an item (§2.2); a top-level item that is a call, `m(args)` or `a.m(args)` (§2.2); a declaration with neither `@external` nor `@js` (§2.2); and, in a type, a lowercase name or `a.m` followed by `(` (§3). The parser reads each of them in full, and each is a compile error whose message says that the form is kept for macros.
+Macro calls and attributes use the ordinary grammar of their position and are expanded before checking (Appendix D). The parser reads them without resolving their names.
 
 ### 1.5 Symbols
 
@@ -175,18 +175,19 @@ A file has at most one imports group and at most one exports group. They come fi
 
 An item that is a `name`, with or without type parameters (§2.5), then `:` and a type, with no `=` after the type, is a declaration, whatever its attributes. Any other item that starts with an `UpName` is a type definition (§4.3). An item that is a call, `m(args)` or `a.m(args)`, with no `=` or `:` after its `)`, is a `MacroItem`. Every other item is a binding (§2.5).
 
-A `MacroItem` is kept for macros. It is a compile error, and the message says that a call at the top level is kept for macros.
+A `MacroItem` must name a syntax macro and is expanded as an item (Appendix D).
 
-A declaration requires `@external` or `@js` (§10.1), or expansion by a macro. A declaration with neither attribute is kept for macros, where it goes with a binding of the same name. Until that expansion is defined, it is a compile error, and the message says that the declaration is kept for macros.
+A declaration requires `@external` or `@js` (§10.1), or an attribute macro that replaces it (Appendix D). A declaration left without either foreign attribute after expansion is a compile error.
 
 In one module, every top-level name is defined one time only. Two bindings may not bind the same name, two type definitions may not define the same type, and two constructors may not have the same name. A constructor and a top-level binding may not have the same name either, because they are in one space of names (§2.3).
 
-These are the attributes. An attribute whose name is one of them, with no module name before it, is that attribute. Its arguments must be string literals, given by position, with no labels, and an attribute that takes no arguments is written with no `( )`, as in `@test`. Any other argument, such as `@external("env" <> "", "f")`, `@external(module: "env", "f")`, or `@test()`, is a compile error. Any other attribute, such as `@m`, `@m(args)`, or `@a.m(args)`, is a macro before an item. It is kept for macros, and it is a compile error whose message says so. An attribute in another place, or one attribute given two times on one item, is a compile error.
+These are the attributes. An attribute whose name is one of them, with no module name before it, is that attribute. Its arguments must be string literals, given by position, with no labels, and an attribute that takes no arguments is written with no `( )`, as in `@test`. Any other argument, such as `@external("env" <> "", "f")`, `@external(module: "env", "f")`, or `@test()`, is a compile error. Any other attribute, such as `@m`, `@m(args)`, or `@a.m(args)`, is a macro before an item. It is expanded as a macro (Appendix D). An attribute in another place, or a built-in attribute given two times on one item, is a compile error.
 
 - `@js("expression")`: on a declaration of a closed opaque type (§10.1.1). A declaration cannot have both `@js` and `@external`.
 - `@external("module", "function")`: on a declaration (§10.1). The module may not start with `ilang:` or `i:compiler/`, which are kept for the runtime and compiler (§B.4).
 - `@host("namespace")` and `@host("namespace", "async")`: on a type definition (§9.7). The namespace may not start with `ilang:` or `i:compiler/`.
 - `@test`: on such a binding in a module under `test/` (§10.2).
+- `@macro`: on a syntax macro binding in a `.is` module (Appendix D).
 - `@deprecated("note")`: on any item. Using the marked item from another module gives a compile warning.
 
 ### 2.3 Imports
@@ -255,7 +256,7 @@ A binding whose pattern is one name, with or without a type, may declare type va
 
 An item that starts with `name ( UpName { , UpName } )` and then `=` or `:` is always a binding or a declaration with type parameters. It is never a binding with a constructor pattern, though `f(A)` could also be read as one (§7.1). So `wrap(A) = (x: A) { Some(x) }` declares `A`. The same is true for a statement of a block (§6.1).
 
-An item that is a call, `m(args)` or `a.m(args)`, and has no `=` or `:` after its `)`, is not a binding. It is kept for macros (§2.2).
+An item that is a call, `m(args)` or `a.m(args)`, and has no `=` or `:` after its `)`, is a macro item, not a binding (§2.2, Appendix D).
 
 An item `name [ TypeParams ] : Type` with no `=` after the type is a declaration, whatever its attributes. A declaration requires `@external` or `@js`, or expansion by a macro (§2.2). A `@js` declaration has the closed opaque type and foreign link semantics of §10.1. It is initialized once during start only if retained by the target link pass; ordinary bindings retain this section's initialization rules.
 
@@ -594,7 +595,7 @@ IntPart   = int_lit | "{" IntPart "}" .
 - A type may not name a value bound by that same pattern; a parameter in the types of that function's own header, including its `->`, `^` and `!` parts; or its own binding's reserved name inside that binding's value. A distinct inner binder that has entered scope may cover that reserved name. This is a compile error even if an outer value has the same name. Those parameters may be named in types in the body. For example, `(x, y: x)` and `(x) -> x { x }` are errors, but `(x: Int) { y: x = x  y }` is allowed.
 - A value type is not its known type (§4.8). It follows the scheme, instantiation and completion rules of §4.7. It never makes a monomorphic value polymorphic.
 - A value type, directly or through aliases, may not occur in a custom constructor field, an external or host declaration, or a service/environment type. Those types must be complete before inference.
-- A lowercase `name`, or `a.m` with a lowercase `m`, whatever `a` is, followed by `(` is a `TypeCall`. It is kept for macros, and is a compile error. It is in the grammar, so a type with it is read in full, and the error says that it is kept for macros.
+- A lowercase `name`, or `a.m` with a lowercase `m`, whatever `a` is, followed by `(` is a `TypeCall`. It is a syntax macro call in a type (Appendix D). Its arguments are read by the type grammar.
 - `A | B` is a union, `A & B` is an intersection, and `A - B` is a difference (§4.4). `-` is stronger than `&`, and `&` is stronger than `|`.
 - `( … )` with `->` after it is a function type. Without `->`, a first `..` or label followed by `:` selects a record type; other nonempty contents select a positional tuple type. Empty `()` is a compile error suggesting `Record`. A record parameter type needs nesting: `((a: Int)) -> T`; `(a: Int) -> T` has one Int parameter labelled `a`.
 - A parameter of a function type may have a label: `(in: String, each: String) -> String` (§4.6).
@@ -2178,3 +2179,157 @@ fact = (n) {
     (-> 0 1)
     (-> _ (* n (fact (- n 1)))) })))
 ```
+
+## Appendix D. Syntax macros
+
+A syntax macro is a top-level binding in a `.is` module with `@macro`. Its
+pattern is one name without type parameters, and its value is a function
+expression whose parameters are names or environment parameters. With one
+ordinary parameter per argument, its type must be a subtype of
+`(Syntax, …) -> Syntax ^ SyntaxError ! Definitions | Items | Diagnostics | Assert`.
+`@macro` in a `.i` file or in an expansion is a compile error. A macro is
+imported and exported like a value, in the same name space, but its name may
+only be used in imports, exports, and macro calls. It cannot be called in the
+module that defines it; a call written in a template is code, not a call in
+that module.
+
+### D.1. Syntax values and quotes
+
+`i/syntax` exports the opaque `Syntax` type and `Node`, `Position`, and
+`SyntaxError`. A `Syntax` is one datum of Appendix C with its source position
+and scope. `node` gives its node; `make(node, like: s)` makes one with the
+position and scope of `s` and fails with `SyntaxError` if an atom cannot be a
+single token of its kind. An integer or float atom is nonnegative and a float
+atom cannot be negative zero. `same_code` compares datums without positions or
+scopes; `==` compares value identity. `show` gives the Lisp datum and `show_as`
+gives the normal syntax for a requested `Position`, or a `SyntaxError` if the
+datum cannot be written in that position. The compiler supplies these
+operations to compiler instances and tests, not to ordinary program entries.
+
+The compiler gives a macro the Lisp datum for code from either surface, with
+semantic groups removed and without documentation comments. In `.is`, quote
+`` `d `` makes the `Syntax` of its template with the source position and scope
+of each part. Inside it `~e` inserts one `Syntax`, and `~..e` inserts a
+`List(Syntax)` into a bracket. In a quote pattern, `~p` captures one node and
+`~..p` captures the remaining parts of a bracket; the splice must be last.
+Other nodes match by kind and value, without positions or scopes. A quote
+pattern can fail. An expansion result cannot contain quote, unquote, or splice
+nodes.
+
+### D.2. Calls and expansion
+
+A macro can be called in an expression, as a top-level item, before an item as
+`@m` or `@m(args)`, or in a type. A local binding covers a macro or module name
+as usual. The parser reads arguments according to their position: expression
+and item arguments are expressions, while type arguments are types, including
+literal and value types. Type arguments have no labels. Expression pipe calls
+`e | m` and `e | m(args)` pass `e` as the first argument. Arguments are not
+evaluated or expanded before they are passed. Labels choose parameters as in
+ordinary calls, and the macro receives the argument without its label.
+
+A result in an expression or type position must be one expression or type.
+An item result is one item or a flat `Curly` of zero or more items. A nested
+item sequence or an import or export header in a result is a compile error.
+A result is read in the call's position using Appendix C. A macro cannot add a
+statement to the enclosing block. A failure of `SyntaxError(message, at)` is a
+compile error at `at`; a template location is reported at the call with the
+template location as a note. A stopped macro is a compile error at its call.
+
+An attribute macro receives the item after its explicit arguments, including
+any attributes written after it. The first attribute macro is expanded first.
+Before a type definition the written definition stays and the result is added
+after it; before a binding, declaration, or item call the result replaces the
+item. A built-in attribute before a macro attribute is a compile error. An
+item's documentation stays with a written type definition or goes to the first
+result item defining the same name. An attribute macro can receive an item
+macro call, and returned calls and attributes are expanded in turn.
+
+The compiler expands imported modules first. In each module it first expands
+item calls, attribute macros, and type calls inside type definitions until all
+top-level names and complete type definitions are known; it then checks
+exports. It then expands calls in bodies and remaining type calls. Each call
+is expanded outside in: an argument retains its unexpanded calls until it is
+placed in a result. Each run has a fresh instance and fresh mark. Expansion
+nesting is limited to 256. A run is limited to 100,000,000 work units,
+2^28 allocation words and 10,000 frame units, counted independently of the
+machine and optimizer; exceeding a limit is a compile error naming the macro
+and limit. The abstract charges are given in `docs/design/macro-budget.md`.
+
+Foreign authority cannot be manufactured by a macro. `@external`, `@js`, or
+`@host` may occur in a result only when the entire attributed item came from
+the caller's source, passed unchanged through arguments of every run, and
+occurs at most once. A result may not define a macro.
+
+### D.3. Scope and names
+
+Every syntax node has a scope: a module and a set of marks. Source code has
+its module and no marks. Each run puts its fresh mark on arguments and on
+answers of `Definitions`, and flips that mark on the output. Thus arguments
+and answers retain their scopes, while template and made nodes receive the
+run's mark. A delayed retry is a new run. `make` takes the scope of its `like`
+argument; it does not acquire the authority of a source foreign attribute.
+
+A lexical name binds a use only when both text and scope match. If no lexical
+binding matches, an unmarked name is looked up in its scope's module and then
+among built-ins. A marked name first looks among names defined by expansions in
+the call's module with the same text and scope; otherwise it is looked up in
+its scope's module and then among built-ins. A made name looking into another
+module can reach only exported names. A made name derived from a definition
+answer does not use the expansion-defined-name step. Labels are compared by
+text only. A marked top-level name is not exportable and may not have the text
+of a top-level, imported, or module name of its scope's module. An unmarked
+name of another module cannot define a top-level name in the caller.
+
+A definition answer's type parameters have identities specific to that answer.
+Only the corresponding original definition head binds them. Copying a whole
+head carries its binders and uses together; separate answers and repeated
+copies have fresh identities. Other names from an answer cannot become binders,
+including names made like those answer nodes. Built-in names in synthetic
+answers retain their built-in identities. Making a name with one of these
+special identities and different text is a compile error. These rules apply to
+all checks for duplicate names, shadowing and export visibility. An exported
+item may not expose a type that its defining module does not export.
+
+### D.4. Compiler services
+
+`definition(of, d ! Definitions)` asks for the definition of an `UpName` or
+qualified type name. A malformed request, a type variable, or a type whose
+constructors are not visible gives a catchable `SyntaxError`. An unresolved
+name is a compile error at the requested node. The answer is the written alias
+or expanded type definition with attributes and parameter identities, not an
+inferred field set. Each alias of a value-dependent alias pattern returns the
+written pattern item. `Bool`, `Nil`, `Result`, `Assert`, and
+`AssertionFailure` have synthetic answers; other built-ins have no definition.
+
+In the item phase a definition is ready when it exists and has no remaining
+type macro calls. An unresolved or incomplete local definition, or a marked
+name that an unfinished expansion may define, defers the run while other runs
+remain. A deferred run and all its contributions are discarded and retried
+from the beginning with a fresh mark. A run's own fresh mark is never waited
+for. When all remaining runs wait, they are retried in call order against the
+current definitions and then the scoped module and built-ins. If none can
+proceed, each waiting name is diagnosed. Every fallback answer and answer for
+the run's own mark is checked again against the completed module; a changed
+answer is a compile error. In the body phase all definitions are ready.
+
+`Items` is available only in item expansions. `add(collection, target, data,
+at)` requests collection of a same-module, zero-ordinary-parameter function
+under an exported ordinary binding that names the collection. Metadata is a
+list of unique string keys and values. Duplicate collection/target pairs are
+errors; `at` must come from the invocation's arguments or call location.
+`expose(name)` requests an export of a same-module unmarked caller-scope name;
+repeated identical requests are harmless. Requests and `Diagnostics.note`
+messages are buffered per run and committed only with a successful, valid
+result, with the same mark transformation as that result. Deferred or failed
+runs contribute nothing. Collection does not evaluate a target, grant foreign
+authority, change imports, or alter configured entries; tools select checked
+targets before provider planning. Diagnostics and collected entries retain
+source and expansion locations.
+
+Macro programs run in the compiler with `Definitions`, `Diagnostics`,
+`Assert`, and, for item calls, `Items`. They receive no clock, file, network,
+or other program capability. An executable non-library foreign function or JS
+binding in their transitive needs is a compile error. Each run starts in fresh
+state, regardless of target or optimization. Tests may give their own ordinary
+service values. A diagnostic in expanded caller code points to that code; a
+diagnostic or stop from a template points to the call and notes the template.
