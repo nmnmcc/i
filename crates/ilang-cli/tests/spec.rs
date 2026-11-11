@@ -10,6 +10,8 @@
 //! ```text
 //! // spec: 6.10
 //! // expect: pass | compile-error <code> | stop "<first line>" | warning <code>
+//! # entry: name                (a package case selects an [entries] target)
+//! # entry-test: name           (same, only when building tests)
 //! // at: spec/case:3:5          (for a stop: each further line of the message)
 //! // output: text               (each text that the `@main` gave to a host function)
 //! ```
@@ -32,7 +34,7 @@
 //! `cargo test -p ilang-cli --test spec -- <filter>` runs the cases whose
 //! path has the filter.
 
-use ilang_cli::{BuildError, BuildOptions, Level, build, run_test_with};
+use ilang_cli::{BuildError, BuildOptions, Level, build_entry, run_test_with};
 use ilang_host::services::{Log, testing};
 use ilang_host::{HostOptions, Outcome, Program, TestResult};
 use std::path::{Path, PathBuf};
@@ -43,6 +45,9 @@ mod single_file;
 
 #[path = "common/spec_header.rs"]
 mod spec_header;
+
+#[path = "common/spec_entry.rs"]
+mod spec_entry;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Expect {
@@ -206,7 +211,8 @@ fn stop_text(stop: &ilang_host::Stop) -> String {
 }
 
 fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
-    let built = match build(
+    let entry = spec_entry::named_entry(project, true);
+    let built = match build_entry(
         project,
         BuildOptions {
             tests: true,
@@ -214,6 +220,7 @@ fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
             offline: false,
             target: Default::default(),
         },
+        entry.as_deref(),
     ) {
         Ok(b) => b,
         Err(BuildError::Program { lines, codes, .. }) => {

@@ -1,5 +1,6 @@
 # spec: 4.2, 6.9
 # expect: warning W0503
+# entry-test: legacy
 name = "spec"
 
 [dependencies]
