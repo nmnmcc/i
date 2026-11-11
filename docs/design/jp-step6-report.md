@@ -70,3 +70,13 @@ Corrected development failures:
 -p ilang-cli --locked` passed completely. This includes 417/417 spec cases at
 O0/O2. It regenerated the migrated `10.2/test_stops.i` trace from line 6 to
 line 7; that expectation is committed. The focused rustfmt check passed.
+
+Final supplied acceptance block: **passed, exit 0** (`bash target/jp-accept.sh`).
+Both `cargo test --workspace --locked` passes completed, with no failed test,
+panic or compiler-error output in either log. All requested IO/HTTP/CLI examples,
+macro tests, standard-library O0/O2 runs, JavaScript tests, the 2000-test project,
+and the final old-syntax audit passed. Redesign ancestry, a clean tree, absence
+of pending/special-case provider code and absence of `--entry` in CLI source all
+passed. No Rust test command failed during this step.
+
+Unfinished step-6 work: none. Branch: `lane/jp`.
