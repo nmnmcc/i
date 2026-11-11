@@ -1309,7 +1309,7 @@ The module `i/control` has one operation to pause a computation and go on with i
 | `control.suspend` | `(b: Boundary(R, E, N), f: (k: Continuation(A, R, E, N)) -> R ^ E ! N) -> A` |
 | `control.resume` | `(k: Continuation(A, R, E, N), value: A) -> R ^ E ! N` |
 | `control.cancel` | `(k: Continuation(A, R, E, N)) -> Nil ! N` |
-| `control.keep_env` | `(f: (x: S) -> A ? E ! N) -> { (x: S) -> A ? E } ! N` |
+| `control.keep_env` | `(f: (x: S) -> A ^ E ! N) -> { (x: S) -> A ^ E } ! N` |
 
 `Boundary` and `Continuation` are built-in types. They are not custom types: their values are made only by `control.boundary` and `control.suspend`, and the host cannot take them (§10.3).
 
@@ -1515,16 +1515,16 @@ Assert and user host services remain in N where the body needs them.
 | Binding | Type |
 |---|---|
 | `top` | `(seed: random.Generator) -> Runner ! Runner` |
-| `run(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
-| `test(A,E,N)` | `(seed: random.Generator, choices: List(List(Int)), body: () -> A ? E ! N) -> A ? E \| ScheduleError ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
-| `scope(A,E,N)` | `(body: (s: Scope(E)) -> A ? E ! N) -> A ? E ! N \| Scheduler` |
+| `run(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
+| `test(A,E,N)` | `(seed: random.Generator, choices: List(List(Int)), body: () -> A ^ E ! N) -> A ^ E \| ScheduleError ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
+| `scope(A,E,N)` | `(body: (s: Scope(E)) -> A ^ E ! N) -> A ^ E ! N \| Scheduler` |
 | `local_scope(A,E,N)` | Same scheme as scope |
-| `go(A,E,N)` | `(s: Scope(E), body: () -> A ? E ! N) -> Task(A,E) ! Scheduler \| N - Scheduler - Runner - request.Await` |
-| `join(A,E)` | `(t: Task(A,E)) -> A ? E ! Scheduler` |
+| `go(A,E,N)` | `(s: Scope(E), body: () -> A ^ E ! N) -> Task(A,E) ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `join(A,E)` | `(t: Task(A,E)) -> A ^ E ! Scheduler` |
 | `yield` | `() -> Nil ! Scheduler` |
 | `path` | `() -> List(Int) ! Scheduler` |
 | `random` | `() -> random.Generator ! Scheduler` |
-| `keep(S,A,E,N)` | `(f: (S) -> A ? E ! N) -> { (S) -> A ? E ! Scheduler } ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `keep(S,A,E,N)` | `(f: (S) -> A ^ E ! N) -> { (S) -> A ^ E ! Scheduler } ! Scheduler \| N - Scheduler - Runner - request.Await` |
 | `channel(A)` | `() -> Channel(A) ! Scheduler` |
 | `local_channel(A)` | `() -> Channel(A) ! Scheduler` |
 | `send(A)` | `(c: Channel(A), value: A) -> Nil ! Scheduler` |
@@ -1535,13 +1535,13 @@ Assert and user host services remain in N where the body needs them.
 | `always(A)` | `(value: A) -> Event(A,Never,Never)` |
 | `never` | `() -> Event(Never,Never,Never)` |
 | `choose(A,E,N)` | `(events: List(Event(A,E,N))) -> Event(A,E,N)` |
-| `map(A,B,E,F,N,M)` | `(e: Event(A,E,N), f: (A) -> B ? F ! M) -> Event(B,E \| F,N \| M)` |
-| `sync(A,E,N)` | `(e: Event(A,E,N)) -> A ? E ! N \| Scheduler` |
+| `map(A,B,E,F,N,M)` | `(e: Event(A,E,N), f: (A) -> B ^ F ! M) -> Event(B,E \| F,N \| M)` |
+| `sync(A,E,N)` | `(e: Event(A,E,N)) -> A ^ E ! N \| Scheduler` |
 | `share(A,E)` | `(s: Scope(E), value: A) -> Shared(A) ! Scheduler` |
 | `get(A)` | `(s: Shared(A)) -> A ! Scheduler` |
-| `both(A,B,E,N)` | `(left: () -> A ? E ! N, right: () -> B ? E ! N) -> (A,B) ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
-| `race(A,E,N)` | `(left: () -> A ? E ! N, right: () -> A ? E ! N) -> A ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
-| `map_concurrently(A,B,E,N)` | `(xs: List(A), f: (A) -> B ? E ! N) -> List(B) ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `both(A,B,E,N)` | `(left: () -> A ^ E ! N, right: () -> B ^ E ! N) -> (A,B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `race(A,E,N)` | `(left: () -> A ^ E ! N, right: () -> A ^ E ! N) -> A ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `map_concurrently(A,B,E,N)` | `(xs: List(A), f: (A) -> B ^ E ! N) -> List(B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
 
 In tables, `\|` is only Markdown escaping; the i operator is `|`. The schemes
 for combinators use one common E and N; subtyping admits either child's error
@@ -1633,7 +1633,7 @@ independently of the outcome. Keep dropped/cancelled records until scope exit.
 A cancelled outcome retains its causing scope and cancellation epoch, so a join
 can apply that cause even before its caller receives a cancel message. Do not
 use only a worker-local “cancel delivered” flag to decide whether to stop.
-join's type remains `(Task(A,E)) -> A ? E ! Scheduler`. After the run/chain checks, process any applicable scope cancellation
+join's type remains `(Task(A,E)) -> A ^ E ! Scheduler`. After the run/chain checks, process any applicable scope cancellation
 before observing a target's cancellation outcome. A joiner still cancellable by
 that cancellation is unwound; it never races between this path and a join panic.
 This includes a final executing a fresh scope body that the fresh scope can
@@ -1928,7 +1928,7 @@ RequestState(A) { Waiting Ready(A) Cancelled Taken }
 | `cancel_all_root` | `(root: Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
 | `wait_none` | `(owner: Owner) -> Nil ! Await` | Await until this group's count is zero |
 | `wait_none_root` | `(root: Root) -> Nil ! Await` | Await until this root's count is zero |
-| `within(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+| `within(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
 | `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
 | `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
 | `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
@@ -2330,7 +2330,7 @@ Before the program stops, the host gets a **stop message**, in one call of `pani
 
 A **source position** is written `module path:line:column`, for example `app/users:12:5`, with the module path as its own package names it. For a module of a package with a location, the location, `@`, the major version, and a space come first: `github.com/alice/json@1 json/decode:12:5`. Lines and columns count from 1; a column counts Unicode scalar values. The position of an expression is the position of its first token.
 
-A function with no errors and no environment (`? Never ! Never`) may still stop for these reasons, and it may never end.
+A function with no errors and no environment (`^ Never ! Never`) may still stop for these reasons, and it may never end.
 
 ### 11.8 Text form of values
 
