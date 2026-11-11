@@ -17,6 +17,7 @@ pub const MODULES: &[(&str, &str)] = &[
     ("i/task", include_str!("../../../lib/i/task.i")),
     ("i/clock", include_str!("../../../lib/i/clock.i")),
     ("i/random", include_str!("../../../lib/i/random.i")),
+    ("i/syntax", include_str!("../../../lib/i/syntax.i")),
     ("i/fs", include_str!("../../../lib/i/fs.i")),
     ("i/process", include_str!("../../../lib/i/process.i")),
     ("i/net", include_str!("../../../lib/i/net.i")),
@@ -48,6 +49,7 @@ pub(crate) fn add(graph: &mut PackageGraph) {
         dev_dependencies: Vec::new(),
         modules,
         wasm_exports: Vec::new(),
+        entries: Vec::new(),
         location: None,
     });
 }

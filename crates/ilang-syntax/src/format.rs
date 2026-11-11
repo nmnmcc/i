@@ -21,7 +21,7 @@
 
 use crate::ast::*;
 use crate::lexer::{Comment, lex};
-use crate::print::{is_match, level, type_prec};
+use crate::print::{level, type_prec};
 use crate::span::Span;
 use crate::token::{Token, TokenKind as T};
 use crate::{Diagnostic, parse_module};
@@ -1130,7 +1130,7 @@ impl<'a> Formatter<'a> {
     fn expr(&mut self, e: &Expr, min: u8) -> Doc {
         self.continued(e.span.start, |f| {
             // A match is an operation at level 6 (§6.9).
-            if level(e) < min || is_match(e) && min > 6 {
+            if level(e) < min {
                 let before = f.hard;
                 let body = f.expr_raw(e);
                 if f.hard == before {
@@ -1156,6 +1156,7 @@ impl<'a> Formatter<'a> {
     fn expr_raw(&mut self, e: &Expr) -> Doc {
         let span = e.span;
         match &e.kind {
+            ExprKind::Quote(_) => panic!("quote has no normal-surface spelling"),
             ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_) => text(self.slice(span)),
             ExprKind::Name { module, name } => match module {
                 Some(m) => text(format!("{}.{}", m.name, name.name)),
@@ -1203,12 +1204,18 @@ impl<'a> Formatter<'a> {
             ExprKind::Block(b) => self.block(b, false),
             ExprKind::Fn(func) => self.function(func, span.start),
             ExprKind::Case { subject, clauses } => {
-                // §6.9: `|>` is stronger than the operators of levels 1 to 5.
-                let subject_doc = self.expr(subject, 6);
-                let open = self.tok_after(subject.span.end);
-                let open = self.tok_after(open.span.end).span.start;
+                let subject_doc = if matches!(subject.kind, ExprKind::Int(_) | ExprKind::Float(_)) {
+                    group_of(
+                        Kind::Block,
+                        cat(vec![text("{ "), self.expr(subject, 0), text(" }")]),
+                    )
+                } else {
+                    self.expr(subject, 10)
+                };
+                let op = self.tok_after(subject.span.end);
+                let open = self.tok_after(op.span.end).span.start;
                 let body = self.clause_block(open, span.end - 1, clauses);
-                cat(vec![subject_doc, text(" |> "), body])
+                cat(vec![subject_doc, text("."), body])
             }
             ExprKind::Clauses(clauses) => self.clause_block(span.start, span.end - 1, clauses),
             ExprKind::Call { callee, args } => {
@@ -1319,7 +1326,7 @@ impl<'a> Formatter<'a> {
                     tail.push(self.force());
                 }
                 tail.push(Doc::Line);
-                tail.push(text("|> "));
+                tail.push(text("| "));
             } else if let Some(c) = comments {
                 tail.push(text(format!(" {}", op.text())));
                 tail.push(c);
@@ -1464,6 +1471,7 @@ impl<'a> Formatter<'a> {
     fn pattern_raw(&mut self, p: &Pattern, clause: bool) -> Doc {
         let span = p.span;
         match &p.kind {
+            PatternKind::Quote(_) => panic!("quote pattern has no normal-surface spelling"),
             PatternKind::Var(n) | PatternKind::Discard(n) => text(n.as_str()),
             PatternKind::Typed { binder, ty } => {
                 let t = if clause && ends_with_tuple(ty) {
@@ -1682,7 +1690,7 @@ impl<'a> Formatter<'a> {
     ) -> Doc {
         let mut out = vec![self.ty_in(ret, 1, tail && err.is_none() && env.is_none())];
         if let Some(err) = err {
-            out.push(text(" ? "));
+            out.push(text(" ^ "));
             out.push(self.ty_in(err, 1, tail && env.is_none()));
         }
         if let Some(env) = env {
